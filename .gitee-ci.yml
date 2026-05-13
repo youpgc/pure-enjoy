@@ -1,0 +1,109 @@
+# Gitee Go CI/CD 配置
+# 纯享App自动打包流水线
+
+stages:
+  - install
+  - build
+  - deploy
+
+variables:
+  FLUTTER_VERSION: "3.16.0"
+  APK_OUTPUT: "build/app/outputs/flutter-apk/app-release.apk"
+
+# 安装Flutter环境
+install_flutter:
+  stage: install
+  image: ubuntu:22.04
+  script:
+    - apt-get update && apt-get install -y curl git unzip xz-utils zip libglu1-mesa
+    - cd /opt && curl -O https://storage.googleapis.com/flutter_infra_release/releases/stable/linux/flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
+    - tar xf flutter_linux_${FLUTTER_VERSION}-stable.tar.xz
+    - export PATH="$PATH:/opt/flutter/bin"
+    - flutter doctor
+    - flutter config --no-analytics
+  cache:
+    key: flutter-${FLUTTER_VERSION}
+    paths:
+      - /opt/flutter
+
+# 构建Android APK
+build_android:
+  stage: build
+  image: cirrusci/flutter:stable
+  script:
+    - flutter pub get
+    - flutter build apk --release
+    - |
+      if [ -f "$APK_OUTPUT" ]; then
+        echo "APK构建成功: $APK_OUTPUT"
+        ls -lh $APK_OUTPUT
+        # 重命名带版本号
+        VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}')
+        cp $APK_OUTPUT "pure-enjoy-v${VERSION}.apk"
+      else
+        echo "APK构建失败"
+        exit 1
+      fi
+  artifacts:
+    name: "pure-enjoy-apk-$CI_COMMIT_REF_NAME-$CI_COMMIT_SHORT_SHA"
+    paths:
+      - pure-enjoy-*.apk
+    expire_in: 90 days
+  only:
+    - main
+    - tags
+
+# 上传到Gitee Release
+deploy_release:
+  stage: deploy
+  image: registry.cn-shenzhen.aliyuncs.com/gitee-go/gitee-cli:latest
+  script:
+    - |
+      # 获取版本号
+      VERSION=$(grep 'version:' pubspec.yaml | awk '{print $2}')
+      echo "发布版本: $VERSION"
+      
+      # 创建Release并上传APK
+      gitee releases create --tag "v${VERSION}" \
+        --name "纯享 v${VERSION}" \
+        --description "自动构建版本\n提交: $CI_COMMIT_SHA\n分支: $CI_COMMIT_REF_NAME" \
+        --assets "pure-enjoy-v${VERSION}.apk"
+  only:
+    - tags
+  dependencies:
+    - build_android
+
+# 构建管理后台并部署到Gitee Pages
+build_admin:
+  stage: build
+  image: node:18
+  script:
+    - cd admin
+    - npm install
+    - npm run build
+    - echo "管理后台构建完成"
+    # 创建部署目录
+    - mkdir -p ../pages
+    - cp -r dist/* ../pages/
+  artifacts:
+    paths:
+      - pages/
+    expire_in: 30 days
+  only:
+    - main
+
+deploy_pages:
+  stage: deploy
+  image: registry.cn-shenzhen.aliyuncs.com/gitee-go/gitee-cli:latest
+  script:
+    - echo "部署到Gitee Pages"
+    # 使用gitee-cli部署pages
+    - cd pages
+    - git init
+    - git add .
+    - git commit -m "Deploy to Gitee Pages"
+    - git push --force "https://gitee.com/YouPgC/pure-enjoy.git" main:gh-pages
+  only:
+    - main
+  dependencies:
+    - build_admin
