@@ -1,0 +1,231 @@
+name: Build APK and Upload to Supabase
+
+on:
+  push:
+    branches: [main, develop]
+    tags: ['v*']
+  workflow_dispatch:
+    inputs:
+      version:
+        description: '版本号 (如: 1.0.0)'
+        required: true
+        default: '1.0.0'
+      build_number:
+        description: '构建号 (如: 1)'
+        required: true
+        default: '1'
+      release_notes:
+        description: '更新说明'
+        required: false
+        default: ''
+      is_force_update:
+        description: '是否强制更新'
+        required: false
+        default: 'false'
+        type: choice
+        options:
+          - 'true'
+          - 'false'
+
+env:
+  FLUTTER_VERSION: '3.24.0'
+  JAVA_VERSION: '17'
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      actions: write
+
+    steps:
+      # 1. 检出代码
+      - name: Checkout repository
+        uses: actions/checkout@v4
+
+      # 2. 设置 Java 环境
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: 'temurin'
+          java-version: ${{ env.JAVA_VERSION }}
+
+      # 3. 设置 Flutter 环境
+      - name: Setup Flutter
+        uses: subosito/flutter-action@v2
+        with:
+          flutter-version: ${{ env.FLUTTER_VERSION }}
+          channel: 'stable'
+          cache: true
+
+      # 4. 验证 Flutter 环境
+      - name: Verify Flutter installation
+        run: |
+          flutter --version
+          flutter doctor -v
+
+      # 5. 获取依赖
+      - name: Get dependencies
+        run: flutter pub get
+
+      # 6. 运行代码生成（如果有 build_runner）
+      - name: Run build_runner (if needed)
+        run: |
+          if grep -q "build_runner" pubspec.yaml; then
+            flutter pub run build_runner build --delete-conflicting-outputs
+          fi
+
+      # 7. 运行测试（可选）
+      - name: Run tests
+        run: flutter test || true
+
+      # 8. 提取版本信息
+      - name: Extract version info
+        id: version
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            VERSION="${{ github.event.inputs.version }}"
+            BUILD_NUMBER="${{ github.event.inputs.build_number }}"
+          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+            VERSION=${GITHUB_REF#refs/tags/v}
+            BUILD_NUMBER=$(git rev-list --count HEAD)
+          else
+            VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
+            BUILD_NUMBER=$(git rev-list --count HEAD)
+          fi
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
+          echo "apk_name=pure-enjoy-v${VERSION}+${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
+          echo "Version: $VERSION, Build: $BUILD_NUMBER"
+
+      # 9. 更新 pubspec.yaml 版本号
+      - name: Update version in pubspec.yaml
+        run: |
+          sed -i "s/^version: .*/version: ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}/" pubspec.yaml
+          cat pubspec.yaml | grep version
+
+      # 10. 构建 APK
+      - name: Build APK
+        run: |
+          flutter build apk --release \
+            --build-name=${{ steps.version.outputs.version }} \
+            --build-number=${{ steps.version.outputs.build_number }}
+
+      # 11. 重命名 APK 文件
+      - name: Rename APK
+        run: |
+          mkdir -p build/app/outputs/apk/release/renamed
+          cp build/app/outputs/apk/release/app-release.apk \
+             "build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}"
+          ls -lh build/app/outputs/apk/release/renamed/
+
+      # 12. 计算 APK 文件哈希
+      - name: Calculate APK checksum
+        id: checksum
+        run: |
+          CHECKSUM=$(sha256sum "build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}" | awk '{print $1}')
+          echo "sha256=$CHECKSUM" >> $GITHUB_OUTPUT
+          echo "SHA256: $CHECKSUM"
+
+      # 13. 获取文件大小
+      - name: Get APK file size
+        id: filesize
+        run: |
+          FILESIZE=$(stat -c%s "build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}")
+          echo "bytes=$FILESIZE" >> $GITHUB_OUTPUT
+          echo "Size: $FILESIZE bytes"
+
+      # 14. 安装 Supabase CLI
+      - name: Install Supabase CLI
+        run: |
+          curl -fsSL https://github.com/supabase/cli/releases/latest/download/supabase_linux_amd64.tar.gz | tar -xz
+          sudo mv supabase /usr/local/bin/
+          supabase --version
+
+      # 15. 上传 APK 到 Supabase Storage
+      - name: Upload APK to Supabase Storage
+        id: upload
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # 使用 Supabase CLI 上传文件
+          supabase login --token "$SUPABASE_ACCESS_TOKEN"
+
+          # 确保存储桶存在
+          supabase storage buckets list --project-ref "$SUPABASE_PROJECT_ID" || true
+
+          # 上传 APK 文件
+          supabase storage cp \
+            "build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}" \
+            "ss://$SUPABASE_PROJECT_ID/apk-releases/${{ steps.version.outputs.apk_name }}" \
+            --project-ref "$SUPABASE_PROJECT_ID"
+
+          # 获取公开 URL
+          DOWNLOAD_URL="https://$SUPABASE_PROJECT_ID.supabase.co/storage/v1/object/public/apk-releases/${{ steps.version.outputs.apk_name }}"
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "Download URL: $DOWNLOAD_URL"
+
+      # 16. 创建版本记录到数据库
+      - name: Create version record in database
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          fi
+
+          IS_FORCE_UPDATE="${{ github.event.inputs.is_force_update }}"
+          if [ -z "$IS_FORCE_UPDATE" ]; then
+            IS_FORCE_UPDATE="false"
+          fi
+
+          curl -X POST "$SUPABASE_URL/rest/v1/app_versions" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "{
+              \"version\": \"${{ steps.version.outputs.version }}\",
+              \"build_number\": ${{ steps.version.outputs.build_number }},
+              \"download_url\": \"${{ steps.upload.outputs.download_url }}\",
+              \"file_size\": ${{ steps.filesize.outputs.bytes }},
+              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
+              \"release_notes\": \"$RELEASE_NOTES\",
+              \"is_force_update\": $IS_FORCE_UPDATE,
+              \"is_active\": true,
+              \"platform\": \"android\",
+              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
+              \"created_by\": \"github-actions\"
+            }"
+
+      # 17. 上传构建产物（作为备份）
+      - name: Upload build artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: apk-${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+          path: build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}
+          retention-days: 30
+
+      # 18. 创建 GitHub Release（仅标签触发时）
+      - name: Create GitHub Release
+        if: startsWith(github.ref, 'refs/tags/v')
+        uses: softprops/action-gh-release@v1
+        with:
+          files: build/app/outputs/apk/release/renamed/${{ steps.version.outputs.apk_name }}
+          generate_release_notes: true
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
+      # 19. 发送通知（可选）
+      - name: Send notification
+        if: always()
+        run: |
+          echo "Build completed!"
+          echo "Version: ${{ steps.version.outputs.version }}"
+          echo "Build Number: ${{ steps.version.outputs.build_number }}"
+          echo "Download URL: ${{ steps.upload.outputs.download_url }}"
+          echo "Status: ${{ job.status }}"
