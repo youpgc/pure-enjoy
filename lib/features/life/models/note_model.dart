@@ -12,7 +12,7 @@ class NoteModel {
 
   NoteModel({
     required this.id,
-    required this.userId,
+    this.userId = 'local_user',
     required this.title,
     this.content,
     this.category,

@@ -330,6 +330,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       category: _selectedCategory.name,
       description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
       date: _selectedDate,
+      createdAt: widget.expense?.createdAt ?? DateTime.now(),
     );
     
     // 更新或添加支出

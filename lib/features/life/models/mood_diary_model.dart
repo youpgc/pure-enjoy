@@ -13,7 +13,7 @@ class MoodDiaryModel {
 
   MoodDiaryModel({
     required this.id,
-    required this.userId,
+    this.userId = 'local_user',
     required this.mood,
     this.content,
     this.images,

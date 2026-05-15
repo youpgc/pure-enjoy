@@ -225,6 +225,7 @@ class _DiaryFormState extends State<_DiaryForm> {
       mood: _selectedMood.name,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       date: _selectedDate,
+      createdAt: widget.diary?.createdAt ?? DateTime.now(),
     );
     
     // 更新或添加日记

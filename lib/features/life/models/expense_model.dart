@@ -13,7 +13,7 @@ class ExpenseModel {
 
   ExpenseModel({
     required this.id,
-    required this.userId,
+    this.userId = 'local_user',
     required this.amount,
     required this.category,
     this.description,

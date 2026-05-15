@@ -67,13 +67,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     final index = _notes.indexWhere((n) => n.id == note.id);
     if (index >= 0) {
       setState(() {
-        _notes[index] = NoteModel(
-          id: note.id,
-          title: note.title,
-          content: note.content,
-          isPinned: !note.isPinned,
-          createdAt: note.createdAt,
-        );
+        _notes[index] = note.copyWith(isPinned: !note.isPinned);
       });
       await _saveNotes();
       _loadNotes();
