@@ -14,14 +14,7 @@ dependencies:
   provider: ^6.1.1
   shared_preferences: ^2.2.2
   intl: ^0.19.0
-  fl_chart: ^0.66.0
-  table_calendar: ^3.0.9
-  image_picker: ^1.0.7
-  cached_network_image: ^3.3.1
-  flutter_slidable: ^3.0.1
   uuid: ^4.3.1
-  package_info_plus: ^5.0.1
-  url_launcher: ^6.2.2
 
 dev_dependencies:
   flutter_test:
@@ -30,13 +23,3 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  assets:
-    - assets/images/
-  fonts:
-    - family: NotoSansSC
-      fonts:
-        - asset: assets/fonts/NotoSansSC-Regular.ttf
-        - asset: assets/fonts/NotoSansSC-Medium.ttf
-          weight: 500
-        - asset: assets/fonts/NotoSansSC-Bold.ttf
-          weight: 700
