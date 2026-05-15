@@ -1,0 +1,18 @@
+# This file must contain the Flutter SDK path
+# Copy this file to local.properties and set the correct path
+#
+# Example (Linux/macOS):
+# flutter.sdk=/home/user/flutter
+#
+# Example (Windows):
+# flutter.sdk=C:\\flutter
+#
+# You can find your Flutter SDK path by running:
+#   flutter sdk-path
+#
+# Or set the FLUTTER_ROOT environment variable
+
+flutter.sdk=/path/to/your/flutter/sdk
+flutter.buildMode=debug
+flutter.versionCode=1
+flutter.versionName=1.0.0
