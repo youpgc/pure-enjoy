@@ -16,20 +16,3 @@ subprojects {
 tasks.register("clean", Delete) {
     delete rootProject.buildDir
 }
-
-// 为所有子项目设置默认的 Android 配置
-// 这解决了 Flutter 插件（如 app_links）无法访问 flutter 扩展的问题
-subprojects { subproject ->
-    afterEvaluate {
-        if (subproject.hasProperty("android")) {
-            android {
-                compileSdkVersion 34
-                buildToolsVersion "34.0.0"
-                defaultConfig {
-                    minSdkVersion 21
-                    targetSdkVersion 34
-                }
-            }
-        }
-    }
-}
