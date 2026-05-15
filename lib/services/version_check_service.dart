@@ -1,17 +1,13 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:url_launcher/url_launcher.dart';
 
-/// 版本检查服务
+/// 版本检查服务（本地实现）
 class VersionCheckService {
   static VersionCheckService? _instance;
-  late final SupabaseClient _client;
   
-  VersionCheckService._() {
-    _client = Supabase.instance.client;
-  }
+  VersionCheckService._();
   
   static VersionCheckService get instance {
     _instance ??= VersionCheckService._();
@@ -24,37 +20,10 @@ class VersionCheckService {
     return info.version;
   }
   
-  /// 检查更新
+  /// 检查更新（本地空实现）
   Future<VersionInfo?> checkUpdate() async {
-    try {
-      final response = await _client
-          .from('app_versions')
-          .select()
-          .eq('platform', Platform.isAndroid ? 'android' : 'ios')
-          .eq('is_active', true)
-          .order('created_at', ascending: false)
-          .limit(1)
-          .maybeSingle();
-      
-      if (response == null) return null;
-      
-      final currentVersion = await getCurrentVersion();
-      final latestVersion = response['version'] as String;
-      
-      if (_compareVersions(latestVersion, currentVersion) > 0) {
-        return VersionInfo(
-          version: latestVersion,
-          downloadUrl: response['download_url'] as String?,
-          releaseNotes: response['release_notes'] as String?,
-          forceUpdate: response['force_update'] as bool? ?? false,
-        );
-      }
-      
-      return null;
-    } catch (e) {
-      debugPrint('检查更新失败: $e');
-      return null;
-    }
+    // 本地版本检查，返回 null 表示无需更新
+    return null;
   }
   
   /// 比较版本号

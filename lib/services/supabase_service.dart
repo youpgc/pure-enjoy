@@ -1,63 +1,72 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-/// Supabase 服务
-class SupabaseService {
-  static SupabaseService? _instance;
-  late final SupabaseClient _client;
+/// 用户认证服务（本地状态管理）
+class AuthService {
+  static AuthService? _instance;
   
-  SupabaseService._() {
-    _client = Supabase.instance.client;
-  }
+  AuthService._();
   
-  static SupabaseService get instance {
-    _instance ??= SupabaseService._();
+  static AuthService get instance {
+    _instance ??= AuthService._();
     return _instance!;
   }
   
-  SupabaseClient get client => _client;
+  // 本地存储的用户信息
+  String? _userId;
+  String? _userEmail;
+  String? _userName;
+  bool _isAuthenticated = false;
   
   /// 获取当前用户ID
-  String? get currentUserId => _client.auth.currentUser?.id;
+  String? get currentUserId => _userId;
   
-  /// 获取当前用户
-  User? get currentUser => _client.auth.currentUser;
+  /// 获取当前用户邮箱
+  String? get currentUserEmail => _userEmail;
+  
+  /// 获取当前用户名
+  String? get currentUserName => _userName;
   
   /// 检查是否已登录
-  bool get isAuthenticated => _client.auth.currentUser != null;
+  bool get isAuthenticated => _isAuthenticated;
   
   /// 登录
-  Future<AuthResponse> signIn(String email, String password) async {
-    return await _client.auth.signInWithPassword(
-      email: email,
-      password: password,
-    );
+  Future<bool> signIn(String email, String password) async {
+    // 简单的本地验证（实际应用中应该使用后端验证）
+    if (email.isNotEmpty && password.length >= 6) {
+      _userId = 'local_user_${DateTime.now().millisecondsSinceEpoch}';
+      _userEmail = email;
+      _userName = email.split('@').first;
+      _isAuthenticated = true;
+      return true;
+    }
+    return false;
   }
   
   /// 注册
-  Future<AuthResponse> signUp(String email, String password) async {
-    return await _client.auth.signUp(
-      email: email,
-      password: password,
-    );
+  Future<bool> signUp(String email, String password) async {
+    // 简单的本地注册
+    if (email.isNotEmpty && password.length >= 6) {
+      _userId = 'local_user_${DateTime.now().millisecondsSinceEpoch}';
+      _userEmail = email;
+      _userName = email.split('@').first;
+      _isAuthenticated = true;
+      return true;
+    }
+    return false;
   }
   
   /// 退出登录
   Future<void> signOut() async {
-    await _client.auth.signOut();
-  }
-  
-  /// 重置密码
-  Future<void> resetPassword(String email) async {
-    await _client.auth.resetPasswordForEmail(email);
+    _userId = null;
+    _userEmail = null;
+    _userName = null;
+    _isAuthenticated = false;
   }
   
   /// 更新用户信息
-  Future<User> updateUser(Map<String, dynamic> data) async {
-    return await _client.auth.updateUser(
-      UserAttributes(data: data),
-    );
+  void updateUser({String? name, String? email}) {
+    if (name != null) _userName = name;
+    if (email != null) _userEmail = email;
   }
-  
-  /// 监听认证状态变化
-  Stream<AuthState> get authStateChanges => _client.auth.onAuthStateChange;
 }
+
+// 为了兼容旧代码，保留 SupabaseService 别名
+typedef SupabaseService = AuthService;

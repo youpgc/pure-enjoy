@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import 'package:fl_chart/fl_chart.dart';
 import '../models/weight_record_model.dart';
@@ -13,7 +14,6 @@ class WeightRecordScreen extends StatefulWidget {
 }
 
 class _WeightRecordScreenState extends State<WeightRecordScreen> {
-  final _supabase = Supabase.instance.client;
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
 
@@ -27,16 +27,17 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final userId = _supabase.auth.currentUser!.id;
-      final response = await _supabase
-          .from('weight_records')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false)
-          .limit(30);
+      final prefs = await SharedPreferences.getInstance();
+      final recordsJson = prefs.getStringList('weight_records') ?? [];
+      
+      final records = recordsJson
+          .map((json) => WeightRecordModel.fromJson(jsonDecode(json)))
+          .toList();
+      
+      records.sort((a, b) => b.date.compareTo(a.date));
       
       setState(() {
-        _records = (response as List).map((e) => WeightRecordModel.fromJson(e)).toList();
+        _records = records.length > 30 ? records.sublist(0, 30) : records;
         _isLoading = false;
       });
     } catch (e) {
@@ -47,6 +48,14 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         );
       }
     }
+  }
+
+  Future<void> _saveRecords() async {
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = _records
+        .map((record) => jsonEncode(record.toJson()))
+        .toList();
+    await prefs.setStringList('weight_records', recordsJson);
   }
 
   Future<void> _deleteRecord(WeightRecordModel record) async {
@@ -69,8 +78,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     );
     
     if (confirm == true) {
-      await _supabase.from('weight_records').delete().eq('id', record.id);
-      _loadRecords();
+      setState(() {
+        _records.removeWhere((r) => r.id == record.id);
+      });
+      await _saveRecords();
     }
   }
 
@@ -320,31 +331,30 @@ class _RecordFormState extends State<_RecordForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final data = {
-      'user_id': userId,
-      'weight': double.parse(_weightController.text),
-      'note': _noteController.text.isEmpty ? null : _noteController.text,
-      'date': _selectedDate.toIso8601String(),
-    };
+    final prefs = await SharedPreferences.getInstance();
+    final recordsJson = prefs.getStringList('weight_records') ?? [];
     
-    try {
-      if (widget.record != null) {
-        await Supabase.instance.client
-            .from('weight_records')
-            .update(data)
-            .eq('id', widget.record!.id);
-      } else {
-        await Supabase.instance.client.from('weight_records').insert(data);
-      }
-      widget.onSave();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
-      }
+    final newRecord = WeightRecordModel(
+      id: widget.record?.id ?? 'weight_${DateTime.now().millisecondsSinceEpoch}',
+      weight: double.parse(_weightController.text),
+      note: _noteController.text.isEmpty ? null : _noteController.text,
+      date: _selectedDate,
+    );
+    
+    // 更新或添加记录
+    final existingIndex = recordsJson.indexWhere((json) {
+      final record = WeightRecordModel.fromJson(jsonDecode(json));
+      return record.id == newRecord.id;
+    });
+    
+    if (existingIndex >= 0) {
+      recordsJson[existingIndex] = jsonEncode(newRecord.toJson());
+    } else {
+      recordsJson.add(jsonEncode(newRecord.toJson()));
     }
+    
+    await prefs.setStringList('weight_records', recordsJson);
+    widget.onSave();
   }
 
   @override

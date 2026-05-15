@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../models/note_model.dart';
 
@@ -12,7 +13,6 @@ class NoteListScreen extends StatefulWidget {
 }
 
 class _NoteListScreenState extends State<NoteListScreen> {
-  final _supabase = Supabase.instance.client;
   List<NoteModel> _notes = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -27,17 +27,22 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final userId = _supabase.auth.currentUser!.id;
-      var query = _supabase
-          .from('notes')
-          .select()
-          .eq('user_id', userId)
-          .order('is_pinned', ascending: false)
-          .order('created_at', ascending: false);
+      final prefs = await SharedPreferences.getInstance();
+      final notesJson = prefs.getStringList('notes') ?? [];
       
-      final response = await query;
+      final notes = notesJson
+          .map((json) => NoteModel.fromJson(jsonDecode(json)))
+          .toList();
+      
+      notes.sort((a, b) {
+        if (a.isPinned != b.isPinned) {
+          return a.isPinned ? -1 : 1;
+        }
+        return b.createdAt.compareTo(a.createdAt);
+      });
+      
       setState(() {
-        _notes = (response as List).map((e) => NoteModel.fromJson(e)).toList();
+        _notes = notes;
         _isLoading = false;
       });
     } catch (e) {
@@ -50,12 +55,29 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
+  Future<void> _saveNotes() async {
+    final prefs = await SharedPreferences.getInstance();
+    final notesJson = _notes
+        .map((note) => jsonEncode(note.toJson()))
+        .toList();
+    await prefs.setStringList('notes', notesJson);
+  }
+
   Future<void> _togglePin(NoteModel note) async {
-    await _supabase
-        .from('notes')
-        .update({'is_pinned': !note.isPinned})
-        .eq('id', note.id);
-    _loadNotes();
+    final index = _notes.indexWhere((n) => n.id == note.id);
+    if (index >= 0) {
+      setState(() {
+        _notes[index] = NoteModel(
+          id: note.id,
+          title: note.title,
+          content: note.content,
+          isPinned: !note.isPinned,
+          createdAt: note.createdAt,
+        );
+      });
+      await _saveNotes();
+      _loadNotes();
+    }
   }
 
   Future<void> _deleteNote(NoteModel note) async {
@@ -78,8 +100,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
     
     if (confirm == true) {
-      await _supabase.from('notes').delete().eq('id', note.id);
-      _loadNotes();
+      setState(() {
+        _notes.removeWhere((n) => n.id == note.id);
+      });
+      await _saveNotes();
     }
   }
 
@@ -270,32 +294,32 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       return;
     }
     
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final data = {
-      'user_id': userId,
-      'title': _titleController.text,
-      'content': _contentController.text.isEmpty ? null : _contentController.text,
-      'is_pinned': _isPinned,
-    };
+    final prefs = await SharedPreferences.getInstance();
+    final notesJson = prefs.getStringList('notes') ?? [];
     
-    try {
-      if (widget.note != null) {
-        await Supabase.instance.client
-            .from('notes')
-            .update(data)
-            .eq('id', widget.note!.id);
-      } else {
-        await Supabase.instance.client.from('notes').insert(data);
-      }
-      widget.onSave();
-      if (mounted) Navigator.pop(context);
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
-      }
+    final newNote = NoteModel(
+      id: widget.note?.id ?? 'note_${DateTime.now().millisecondsSinceEpoch}',
+      title: _titleController.text,
+      content: _contentController.text.isEmpty ? null : _contentController.text,
+      isPinned: _isPinned,
+      createdAt: widget.note?.createdAt ?? DateTime.now(),
+    );
+    
+    // 更新或添加笔记
+    final existingIndex = notesJson.indexWhere((json) {
+      final note = NoteModel.fromJson(jsonDecode(json));
+      return note.id == newNote.id;
+    });
+    
+    if (existingIndex >= 0) {
+      notesJson[existingIndex] = jsonEncode(newNote.toJson());
+    } else {
+      notesJson.add(jsonEncode(newNote.toJson()));
     }
+    
+    await prefs.setStringList('notes', notesJson);
+    widget.onSave();
+    if (mounted) Navigator.pop(context);
   }
 
   @override

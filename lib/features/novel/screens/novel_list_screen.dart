@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 
@@ -12,7 +12,6 @@ class NovelListScreen extends StatefulWidget {
 }
 
 class _NovelListScreenState extends State<NovelListScreen> {
-  final _supabase = Supabase.instance.client;
   List<NovelModel> _novels = [];
   List<NovelModel> _readingNovels = [];
   bool _isLoading = true;
@@ -27,42 +26,72 @@ class _NovelListScreenState extends State<NovelListScreen> {
   Future<void> _loadNovels() async {
     setState(() => _isLoading = true);
     
-    try {
-      // 加载所有小说
-      var query = _supabase.from('novels').select();
-      
-      if (_selectedCategory != 'all') {
-        query = query.eq('category', _selectedCategory);
-      }
-      
-      final response = await query.order('created_at', ascending: false);
-      setState(() {
-        _novels = (response as List).map((e) => NovelModel.fromJson(e)).toList();
-      });
-      
-      // 加载阅读中的小说
-      final userId = _supabase.auth.currentUser!.id;
-      final progressResponse = await _supabase
-          .from('reading_progress')
-          .select('novel_id')
-          .eq('user_id', userId);
-      
-      final readingIds = (progressResponse as List)
-          .map((e) => e['novel_id'] as String)
-          .toSet();
-      
-      setState(() {
-        _readingNovels = _novels.where((n) => readingIds.contains(n.id)).toList();
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    // 本地模拟数据
+    final novels = [
+      NovelModel(
+        id: '1',
+        title: '示例小说一',
+        author: '作者A',
+        cover: null,
+        description: '这是一本示例小说，展示了小说列表的功能。',
+        category: '玄幻',
+        chapterCount: 100,
+        createdAt: DateTime.now().subtract(const Duration(days: 30)),
+      ),
+      NovelModel(
+        id: '2',
+        title: '示例小说二',
+        author: '作者B',
+        cover: null,
+        description: '这是另一本示例小说。',
+        category: '都市',
+        chapterCount: 50,
+        createdAt: DateTime.now().subtract(const Duration(days: 15)),
+      ),
+      NovelModel(
+        id: '3',
+        title: '示例小说三',
+        author: '作者C',
+        cover: null,
+        description: '言情小说示例。',
+        category: '言情',
+        chapterCount: 80,
+        createdAt: DateTime.now().subtract(const Duration(days: 7)),
+      ),
+      NovelModel(
+        id: '4',
+        title: '科幻世界',
+        author: '科幻作家',
+        cover: null,
+        description: '探索未来世界的科幻小说。',
+        category: '科幻',
+        chapterCount: 60,
+        createdAt: DateTime.now().subtract(const Duration(days: 3)),
+      ),
+    ];
+    
+    // 根据分类筛选
+    final filteredNovels = _selectedCategory == 'all'
+        ? novels
+        : novels.where((n) => n.category == _selectedCategory).toList();
+    
+    // 加载阅读中的小说
+    final prefs = await SharedPreferences.getInstance();
+    final readingIds = <String>{};
+    for (final novel in novels) {
+      final progress = prefs.getInt('novel_progress_${novel.id}');
+      if (progress != null && progress > 0) {
+        readingIds.add(novel.id);
       }
     }
+    
+    setState(() {
+      _novels = filteredNovels;
+      _readingNovels = novels.where((n) => readingIds.contains(n.id)).toList();
+      _isLoading = false;
+    });
   }
 
   void _openNovel(NovelModel novel) {
@@ -201,7 +230,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                       : GridView.builder(
                           shrinkWrap: true,
                           physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisAxis(
+                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
                             crossAxisCount: 2,
                             childAspectRatio: 0.7,
                             crossAxisSpacing: 12,

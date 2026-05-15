@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../services/supabase_service.dart';
 
 /// 登录页面
 class LoginScreen extends StatefulWidget {
@@ -31,30 +31,32 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
     
     try {
+      final authService = AuthService.instance;
+      
       if (_isRegister) {
-        await Supabase.instance.client.auth.signUp(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
+        final success = await authService.signUp(
+          _emailController.text.trim(),
+          _passwordController.text,
         );
-        if (mounted) {
+        if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('注册成功！请检查邮箱验证。')),
+            const SnackBar(content: Text('注册成功！')),
+          );
+        } else if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('注册失败，请重试')),
           );
         }
       } else {
-        await Supabase.instance.client.auth.signInWithPassword(
-          email: _emailController.text.trim(),
-          password: _passwordController.text,
+        final success = await authService.signIn(
+          _emailController.text.trim(),
+          _passwordController.text,
         );
-      }
-    } on AuthException catch (error) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(error.message),
-            backgroundColor: Theme.of(context).colorScheme.error,
-          ),
-        );
+        if (!success && mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('登录失败，请检查邮箱和密码')),
+          );
+        }
       }
     } catch (error) {
       if (mounted) {

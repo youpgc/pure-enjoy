@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../models/mood_diary_model.dart';
 
@@ -12,7 +13,6 @@ class MoodDiaryScreen extends StatefulWidget {
 }
 
 class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
-  final _supabase = Supabase.instance.client;
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
 
@@ -26,15 +26,17 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final userId = _supabase.auth.currentUser!.id;
-      final response = await _supabase
-          .from('mood_diaries')
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
+      final prefs = await SharedPreferences.getInstance();
+      final diariesJson = prefs.getStringList('mood_diaries') ?? [];
+      
+      final diaries = diariesJson
+          .map((json) => MoodDiaryModel.fromJson(jsonDecode(json)))
+          .toList();
+      
+      diaries.sort((a, b) => b.date.compareTo(a.date));
       
       setState(() {
-        _diaries = (response as List).map((e) => MoodDiaryModel.fromJson(e)).toList();
+        _diaries = diaries;
         _isLoading = false;
       });
     } catch (e) {
@@ -45,6 +47,14 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
         );
       }
     }
+  }
+
+  Future<void> _saveDiaries() async {
+    final prefs = await SharedPreferences.getInstance();
+    final diariesJson = _diaries
+        .map((diary) => jsonEncode(diary.toJson()))
+        .toList();
+    await prefs.setStringList('mood_diaries', diariesJson);
   }
 
   Future<void> _deleteDiary(MoodDiaryModel diary) async {
@@ -67,8 +77,10 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     );
     
     if (confirm == true) {
-      await _supabase.from('mood_diaries').delete().eq('id', diary.id);
-      _loadDiaries();
+      setState(() {
+        _diaries.removeWhere((d) => d.id == diary.id);
+      });
+      await _saveDiaries();
     }
   }
 
@@ -205,31 +217,30 @@ class _DiaryFormState extends State<_DiaryForm> {
   }
 
   Future<void> _save() async {
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final data = {
-      'user_id': userId,
-      'mood': _selectedMood.name,
-      'content': _contentController.text.isEmpty ? null : _contentController.text,
-      'date': _selectedDate.toIso8601String(),
-    };
+    final prefs = await SharedPreferences.getInstance();
+    final diariesJson = prefs.getStringList('mood_diaries') ?? [];
     
-    try {
-      if (widget.diary != null) {
-        await Supabase.instance.client
-            .from('mood_diaries')
-            .update(data)
-            .eq('id', widget.diary!.id);
-      } else {
-        await Supabase.instance.client.from('mood_diaries').insert(data);
-      }
-      widget.onSave();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
-      }
+    final newDiary = MoodDiaryModel(
+      id: widget.diary?.id ?? 'mood_${DateTime.now().millisecondsSinceEpoch}',
+      mood: _selectedMood.name,
+      content: _contentController.text.isEmpty ? null : _contentController.text,
+      date: _selectedDate,
+    );
+    
+    // 更新或添加日记
+    final existingIndex = diariesJson.indexWhere((json) {
+      final diary = MoodDiaryModel.fromJson(jsonDecode(json));
+      return diary.id == newDiary.id;
+    });
+    
+    if (existingIndex >= 0) {
+      diariesJson[existingIndex] = jsonEncode(newDiary.toJson());
+    } else {
+      diariesJson.add(jsonEncode(newDiary.toJson()));
     }
+    
+    await prefs.setStringList('mood_diaries', diariesJson);
+    widget.onSave();
   }
 
   @override

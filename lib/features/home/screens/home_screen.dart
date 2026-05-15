@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:provider/provider.dart';
 import '../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
+import '../../services/supabase_service.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -69,7 +69,7 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final user = Supabase.instance.client.currentUser;
+    final authService = AuthService.instance;
     
     return Scaffold(
       appBar: AppBar(
@@ -99,7 +99,7 @@ class DashboardPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    user?.email ?? '用户',
+                    authService.currentUserEmail ?? '用户',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -283,7 +283,7 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final user = Supabase.instance.client.currentUser;
+    final authService = AuthService.instance;
     final colorScheme = Theme.of(context).colorScheme;
     
     return Scaffold(
@@ -322,12 +322,12 @@ class ProfilePage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          user?.userMetadata?['name'] ?? '用户',
+                          authService.currentUserName ?? '用户',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          user?.email ?? '',
+                          authService.currentUserEmail ?? '',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -404,7 +404,7 @@ class ProfilePage extends StatelessWidget {
               );
               
               if (confirm == true) {
-                await Supabase.instance.client.auth.signOut();
+                await authService.signOut();
               }
             },
           ),

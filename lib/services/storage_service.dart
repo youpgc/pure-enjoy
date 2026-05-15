@@ -1,54 +1,51 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-
-/// 存储服务
+/// 本地存储服务
 class StorageService {
   static StorageService? _instance;
-  late final SupabaseClient _client;
   
-  StorageService._() {
-    _client = Supabase.instance.client;
-  }
+  StorageService._();
   
   static StorageService get instance {
     _instance ??= StorageService._();
     return _instance!;
   }
   
-  /// 上传文件
+  // 本地文件存储路径映射
+  final Map<String, List<int>> _fileCache = {};
+  
+  /// 上传文件（本地存储）
   Future<String> uploadFile({
     required String bucket,
     required String path,
     required List<int> bytes,
     String? contentType,
   }) async {
-    final response = await _client.storage
-        .from(bucket)
-        .uploadBinary(path, bytes, fileOptions: FileOptions(
-          contentType: contentType,
-        ));
-    return response;
+    final key = '$bucket/$path';
+    _fileCache[key] = bytes;
+    return key;
   }
   
   /// 获取文件公开URL
   String getPublicUrl(String bucket, String path) {
-    return _client.storage.from(bucket).getPublicUrl(path);
+    return 'local://$bucket/$path';
   }
   
   /// 获取签名URL（私有文件）
   Future<String> getSignedUrl(String bucket, String path, {int expiresIn = 3600}) async {
-    return await _client.storage
-        .from(bucket)
-        .createSignedUrl(path, expiresIn);
+    return 'local://$bucket/$path?signed=true&expires=$expiresIn';
   }
   
   /// 删除文件
   Future<void> deleteFile(String bucket, String path) async {
-    await _client.storage.from(bucket).remove([path]);
+    final key = '$bucket/$path';
+    _fileCache.remove(key);
   }
   
   /// 列出文件
-  Future<List<FileObject>> listFiles(String bucket, {String? path}) async {
-    return await _client.storage.from(bucket).list(path: path);
+  Future<List<String>> listFiles(String bucket, {String? path}) async {
+    final prefix = path != null ? '$bucket/$path' : '$bucket/';
+    return _fileCache.keys
+        .where((key) => key.startsWith(prefix))
+        .toList();
   }
   
   /// 上传头像
@@ -73,5 +70,11 @@ class StorageService {
       contentType: contentType ?? 'image/jpeg',
     );
     return getPublicUrl('images', path);
+  }
+  
+  /// 获取文件数据
+  List<int>? getFileData(String bucket, String path) {
+    final key = '$bucket/$path';
+    return _fileCache[key];
   }
 }

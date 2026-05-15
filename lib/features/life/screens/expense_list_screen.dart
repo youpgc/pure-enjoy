@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:convert';
 import 'package:intl/intl.dart';
 import '../models/expense_model.dart';
 
@@ -12,7 +13,6 @@ class ExpenseListScreen extends StatefulWidget {
 }
 
 class _ExpenseListScreenState extends State<ExpenseListScreen> {
-  final _supabase = Supabase.instance.client;
   List<ExpenseModel> _expenses = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
@@ -28,25 +28,31 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     setState(() => _isLoading = true);
     
     try {
-      final userId = _supabase.auth.currentUser!.id;
+      final prefs = await SharedPreferences.getInstance();
+      final expensesJson = prefs.getStringList('expenses') ?? [];
+      
+      var expenses = expensesJson
+          .map((json) => ExpenseModel.fromJson(jsonDecode(json)))
+          .toList();
+      
+      // 按月份筛选
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
       
-      var query = _supabase
-          .from('expenses')
-          .select()
-          .eq('user_id', userId)
-          .gte('date', startOfMonth.toIso8601String())
-          .lte('date', endOfMonth.toIso8601String())
-          .order('date', ascending: false);
+      expenses = expenses.where((e) {
+        return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
+               e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
+      }).toList();
       
+      // 按分类筛选
       if (_selectedCategory != 'all') {
-        query = query.eq('category', _selectedCategory);
+        expenses = expenses.where((e) => e.category == _selectedCategory).toList();
       }
       
-      final response = await query;
+      expenses.sort((a, b) => b.date.compareTo(a.date));
+      
       setState(() {
-        _expenses = (response as List).map((e) => ExpenseModel.fromJson(e)).toList();
+        _expenses = expenses;
         _isLoading = false;
       });
     } catch (e) {
@@ -57,6 +63,14 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         );
       }
     }
+  }
+
+  Future<void> _saveExpenses() async {
+    final prefs = await SharedPreferences.getInstance();
+    final expensesJson = _expenses
+        .map((expense) => jsonEncode(expense.toJson()))
+        .toList();
+    await prefs.setStringList('expenses', expensesJson);
   }
 
   Future<void> _deleteExpense(ExpenseModel expense) async {
@@ -79,8 +93,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
     
     if (confirm == true) {
-      await _supabase.from('expenses').delete().eq('id', expense.id);
-      _loadExpenses();
+      setState(() {
+        _expenses.removeWhere((e) => e.id == expense.id);
+      });
+      await _saveExpenses();
     }
   }
 
@@ -305,32 +321,31 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   Future<void> _save() async {
     if (!_formKey.currentState!.validate()) return;
     
-    final userId = Supabase.instance.client.auth.currentUser!.id;
-    final data = {
-      'user_id': userId,
-      'amount': double.parse(_amountController.text),
-      'category': _selectedCategory.name,
-      'description': _descriptionController.text.isEmpty ? null : _descriptionController.text,
-      'date': _selectedDate.toIso8601String(),
-    };
+    final prefs = await SharedPreferences.getInstance();
+    final expensesJson = prefs.getStringList('expenses') ?? [];
     
-    try {
-      if (widget.expense != null) {
-        await Supabase.instance.client
-            .from('expenses')
-            .update(data)
-            .eq('id', widget.expense!.id);
-      } else {
-        await Supabase.instance.client.from('expenses').insert(data);
-      }
-      widget.onSave();
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('保存失败: $e')),
-        );
-      }
+    final newExpense = ExpenseModel(
+      id: widget.expense?.id ?? 'expense_${DateTime.now().millisecondsSinceEpoch}',
+      amount: double.parse(_amountController.text),
+      category: _selectedCategory.name,
+      description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+      date: _selectedDate,
+    );
+    
+    // 更新或添加支出
+    final existingIndex = expensesJson.indexWhere((json) {
+      final expense = ExpenseModel.fromJson(jsonDecode(json));
+      return expense.id == newExpense.id;
+    });
+    
+    if (existingIndex >= 0) {
+      expensesJson[existingIndex] = jsonEncode(newExpense.toJson());
+    } else {
+      expensesJson.add(jsonEncode(newExpense.toJson()));
     }
+    
+    await prefs.setStringList('expenses', expensesJson);
+    widget.onSave();
   }
 
   @override

@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../models/novel_model.dart';
 
@@ -14,7 +13,6 @@ class NovelReaderScreen extends StatefulWidget {
 }
 
 class _NovelReaderScreenState extends State<NovelReaderScreen> {
-  final _supabase = Supabase.instance.client;
   final _scrollController = ScrollController();
   
   List<NovelChapterModel> _chapters = [];
@@ -52,59 +50,52 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
   }
 
   Future<void> _loadChapters() async {
-    try {
-      final response = await _supabase
-          .from('novel_chapters')
-          .select()
-          .eq('novel_id', widget.novel.id)
-          .order('chapter_order', ascending: true);
-      
-      final chapters = (response as List)
-          .map((e) => NovelChapterModel.fromJson(e))
-          .toList();
-      
-      // 加载阅读进度
-      final userId = _supabase.auth.currentUser!.id;
-      final progressResponse = await _supabase
-          .from('reading_progress')
-          .select()
-          .eq('user_id', userId)
-          .eq('novel_id', widget.novel.id)
-          .maybeSingle();
-      
-      int startIndex = 0;
-      if (progressResponse != null && progressResponse['current_chapter_id'] != null) {
-        final chapterId = progressResponse['current_chapter_id'] as String;
-        final index = chapters.indexWhere((c) => c.id == chapterId);
-        if (index != -1) startIndex = index;
-      }
-      
-      setState(() {
-        _chapters = chapters;
-        _currentChapterIndex = startIndex;
-        _currentChapter = chapters.isNotEmpty ? chapters[startIndex] : null;
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
-      }
+    // 本地模拟数据
+    await Future.delayed(const Duration(milliseconds: 500));
+    
+    final chapters = List.generate(
+      widget.novel.chapterCount,
+      (index) => NovelChapterModel(
+        id: 'chapter_$index',
+        novelId: widget.novel.id,
+        title: '第 ${index + 1} 章',
+        content: _generateChapterContent(index + 1),
+        chapterOrder: index,
+        createdAt: DateTime.now().subtract(Duration(days: widget.novel.chapterCount - index)),
+      ),
+    );
+    
+    // 加载阅读进度
+    final prefs = await SharedPreferences.getInstance();
+    final savedIndex = prefs.getInt('novel_progress_${widget.novel.id}') ?? 0;
+    final startIndex = savedIndex < chapters.length ? savedIndex : 0;
+    
+    setState(() {
+      _chapters = chapters;
+      _currentChapterIndex = startIndex;
+      _currentChapter = chapters.isNotEmpty ? chapters[startIndex] : null;
+      _isLoading = false;
+    });
+  }
+
+  String _generateChapterContent(int chapterNum) {
+    // 生成模拟章节内容
+    final buffer = StringBuffer();
+    buffer.writeln('第 $chapterNum 章');
+    buffer.writeln();
+    for (int i = 0; i < 20; i++) {
+      buffer.writeln('这是第 $chapterNum 章的第 ${i + 1} 段内容。这里展示的是模拟的章节文本，实际应用中应该从本地存储或网络加载真实的小说内容。');
+      buffer.writeln();
     }
+    return buffer.toString();
   }
 
   Future<void> _saveProgress() async {
     if (_currentChapter == null) return;
     
-    final userId = _supabase.auth.currentUser!.id;
-    await _supabase.from('reading_progress').upsert({
-      'user_id': userId,
-      'novel_id': widget.novel.id,
-      'current_chapter_id': _currentChapter!.id,
-      'last_read_at': DateTime.now().toIso8601String(),
-    }, onConflict: 'user_id,novel_id');
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt('novel_progress_${widget.novel.id}', _currentChapterIndex);
+    await prefs.setString('novel_last_read_${widget.novel.id}', DateTime.now().toIso8601String());
   }
 
   void _previousChapter() {
