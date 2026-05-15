@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'dart:convert';
 import 'package:intl/intl.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../models/weight_record_model.dart';
 
 /// 体重记录页面
@@ -166,71 +165,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                   ),
                   const SizedBox(height: 24),
                   
-                  // 体重趋势图
-                  if (_records.length >= 2) ...[
-                    Text(
-                      '体重趋势',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 200,
-                      child: LineChart(
-                        LineChartData(
-                          gridData: FlGridData(show: true),
-                          titlesData: FlTitlesData(
-                            leftTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 40,
-                                getTitlesWidget: (value, meta) {
-                                  return Text(
-                                    value.toStringAsFixed(0),
-                                    style: const TextStyle(fontSize: 10),
-                                  );
-                                },
-                              ),
-                            ),
-                            bottomTitles: AxisTitles(
-                              sideTitles: SideTitles(
-                                showTitles: true,
-                                reservedSize: 30,
-                                getTitlesWidget: (value, meta) {
-                                  if (value.toInt() >= 0 && value.toInt() < _records.length) {
-                                    final record = _records.reversed.toList()[value.toInt()];
-                                    return Text(
-                                      DateFormat('MM-dd').format(record.date),
-                                      style: const TextStyle(fontSize: 10),
-                                    );
-                                  }
-                                  return const Text('');
-                                },
-                              ),
-                            ),
-                            topTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                            rightTitles: const AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                          ),
-                          borderData: FlBorderData(show: false),
-                          lineBarsData: [
-                            LineChartBarData(
-                              spots: _records.reversed
-                                  .toList()
-                                  .asMap()
-                                  .entries
-                                  .map((e) => FlSpot(e.key.toDouble(), e.value.weight))
-                                  .toList(),
-                              isCurved: true,
-                              color: colorScheme.primary,
-                              barWidth: 3,
-                              dotData: const FlDotData(show: true),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-                  
                   // 记录列表
                   Text(
                     '历史记录',
@@ -336,9 +270,11 @@ class _RecordFormState extends State<_RecordForm> {
     
     final newRecord = WeightRecordModel(
       id: widget.record?.id ?? 'weight_${DateTime.now().millisecondsSinceEpoch}',
+      userId: 'local_user',
       weight: double.parse(_weightController.text),
       note: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
+      createdAt: widget.record?.createdAt ?? DateTime.now(),
     );
     
     // 更新或添加记录
