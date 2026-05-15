@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import '../../core/theme/theme_provider.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
-import '../../services/supabase_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
