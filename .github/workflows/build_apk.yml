@@ -141,8 +141,12 @@ jobs:
       - name: Get APK file size
         id: filesize
         run: |
-          FILESIZE=$(stat -c%s "build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}")
+          APK_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          echo "Checking APK at: $APK_PATH"
+          ls -lh "$APK_PATH"
+          FILESIZE=$(stat -c%s "$APK_PATH")
           echo "bytes=$FILESIZE" >> $GITHUB_OUTPUT
+          echo "file_size=$FILESIZE" >> $GITHUB_OUTPUT
           echo "Size: $FILESIZE bytes"
 
       # 14. 上传 APK 到 Supabase Storage
