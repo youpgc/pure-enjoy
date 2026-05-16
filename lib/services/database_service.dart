@@ -6,6 +6,9 @@ import '../features/life/models/expense_model.dart';
 import '../features/life/models/mood_diary_model.dart';
 import '../features/life/models/note_model.dart';
 import '../features/life/models/weight_record_model.dart';
+import '../features/life/models/favorite_model.dart';
+import '../features/life/models/reminder_model.dart';
+import '../features/life/models/habit_model.dart';
 import '../features/novel/models/novel_model.dart';
 
 /// 数据库服务
@@ -520,7 +523,7 @@ class DatabaseService {
         Uri.parse('$_restUrl/user_novels?user_id=eq.$userId&novel_id=eq.$novelId'),
         headers: _headers,
       );
-      
+
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
@@ -531,6 +534,231 @@ class DatabaseService {
     } catch (e) {
       print('Get reading progress error: $e');
       return null;
+    }
+  }
+
+  // ==================== 收藏夹 CRUD ====================
+
+  /// 获取用户的所有收藏
+  Future<List<FavoriteModel>> getFavorites() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList('favorites') ?? [];
+      return data.map((json) => FavoriteModel.fromJson(jsonDecode(json))).toList();
+    } catch (e) {
+      print('Get favorites error: $e');
+      return [];
+    }
+  }
+
+  /// 添加收藏
+  Future<void> insertFavorite(FavoriteModel favorite) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final favorites = await getFavorites();
+      favorites.add(favorite);
+      await prefs.setStringList(
+        'favorites',
+        favorites.map((f) => jsonEncode(f.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Insert favorite error: $e');
+      throw e;
+    }
+  }
+
+  /// 更新收藏
+  Future<void> updateFavorite(FavoriteModel favorite) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final favorites = await getFavorites();
+      final index = favorites.indexWhere((f) => f.id == favorite.id);
+      if (index != -1) {
+        favorites[index] = favorite;
+        await prefs.setStringList(
+          'favorites',
+          favorites.map((f) => jsonEncode(f.toJson())).toList(),
+        );
+      }
+    } catch (e) {
+      print('Update favorite error: $e');
+      throw e;
+    }
+  }
+
+  /// 删除收藏
+  Future<void> deleteFavorite(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final favorites = await getFavorites();
+      favorites.removeWhere((f) => f.id == id);
+      await prefs.setStringList(
+        'favorites',
+        favorites.map((f) => jsonEncode(f.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Delete favorite error: $e');
+      throw e;
+    }
+  }
+
+  // ==================== 提醒事项 CRUD ====================
+
+  /// 获取用户的所有提醒
+  Future<List<ReminderModel>> getReminders() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList('reminders') ?? [];
+      return data.map((json) => ReminderModel.fromJson(jsonDecode(json))).toList();
+    } catch (e) {
+      print('Get reminders error: $e');
+      return [];
+    }
+  }
+
+  /// 添加提醒
+  Future<void> insertReminder(ReminderModel reminder) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final reminders = await getReminders();
+      reminders.add(reminder);
+      await prefs.setStringList(
+        'reminders',
+        reminders.map((r) => jsonEncode(r.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Insert reminder error: $e');
+      throw e;
+    }
+  }
+
+  /// 更新提醒
+  Future<void> updateReminder(ReminderModel reminder) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final reminders = await getReminders();
+      final index = reminders.indexWhere((r) => r.id == reminder.id);
+      if (index != -1) {
+        reminders[index] = reminder;
+        await prefs.setStringList(
+          'reminders',
+          reminders.map((r) => jsonEncode(r.toJson())).toList(),
+        );
+      }
+    } catch (e) {
+      print('Update reminder error: $e');
+      throw e;
+    }
+  }
+
+  /// 删除提醒
+  Future<void> deleteReminder(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final reminders = await getReminders();
+      reminders.removeWhere((r) => r.id == id);
+      await prefs.setStringList(
+        'reminders',
+        reminders.map((r) => jsonEncode(r.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Delete reminder error: $e');
+      throw e;
+    }
+  }
+
+  // ==================== 习惯打卡 CRUD ====================
+
+  /// 获取用户的所有习惯
+  Future<List<HabitModel>> getHabits() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList('habits') ?? [];
+      return data.map((json) => HabitModel.fromJson(jsonDecode(json))).toList();
+    } catch (e) {
+      print('Get habits error: $e');
+      return [];
+    }
+  }
+
+  /// 添加习惯
+  Future<void> insertHabit(HabitModel habit) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final habits = await getHabits();
+      habits.add(habit);
+      await prefs.setStringList(
+        'habits',
+        habits.map((h) => jsonEncode(h.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Insert habit error: $e');
+      throw e;
+    }
+  }
+
+  /// 更新习惯
+  Future<void> updateHabit(HabitModel habit) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final habits = await getHabits();
+      final index = habits.indexWhere((h) => h.id == habit.id);
+      if (index != -1) {
+        habits[index] = habit;
+        await prefs.setStringList(
+          'habits',
+          habits.map((h) => jsonEncode(h.toJson())).toList(),
+        );
+      }
+    } catch (e) {
+      print('Update habit error: $e');
+      throw e;
+    }
+  }
+
+  /// 删除习惯
+  Future<void> deleteHabit(String id) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final habits = await getHabits();
+      habits.removeWhere((h) => h.id == id);
+      await prefs.setStringList(
+        'habits',
+        habits.map((h) => jsonEncode(h.toJson())).toList(),
+      );
+      // 同时删除相关的打卡记录
+      await prefs.remove('habit_checkins_$id');
+    } catch (e) {
+      print('Delete habit error: $e');
+      throw e;
+    }
+  }
+
+  /// 获取习惯的打卡记录
+  Future<List<HabitCheckinModel>> getHabitCheckins(String habitId) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final data = prefs.getStringList('habit_checkins_$habitId') ?? [];
+      return data.map((json) => HabitCheckinModel.fromJson(jsonDecode(json))).toList();
+    } catch (e) {
+      print('Get habit checkins error: $e');
+      return [];
+    }
+  }
+
+  /// 添加打卡记录
+  Future<void> insertHabitCheckin(HabitCheckinModel checkin) async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final checkins = await getHabitCheckins(checkin.habitId);
+      checkins.add(checkin);
+      await prefs.setStringList(
+        'habit_checkins_${checkin.habitId}',
+        checkins.map((c) => jsonEncode(c.toJson())).toList(),
+      );
+    } catch (e) {
+      print('Insert habit checkin error: $e');
+      throw e;
     }
   }
 }

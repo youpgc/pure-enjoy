@@ -25,6 +25,8 @@ dependencies:
   package_info_plus: ^4.2.0
   # URL 启动器
   url_launcher: ^6.2.2
+  # 本地通知
+  flutter_local_notifications: ^16.3.0
 
 dev_dependencies:
   flutter_test:

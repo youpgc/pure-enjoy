@@ -3,6 +3,9 @@ import 'expense_list_screen.dart';
 import 'mood_diary_screen.dart';
 import 'note_list_screen.dart';
 import 'weight_record_screen.dart';
+import 'favorites_screen.dart';
+import 'reminders_screen.dart';
+import 'habits_screen.dart';
 
 /// 生活模块主页面
 class LifeScreen extends StatelessWidget {
@@ -68,6 +71,45 @@ class LifeScreen extends StatelessWidget {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const WeightRecordScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _LifeFeatureCard(
+            icon: Icons.bookmark,
+            title: '我的收藏',
+            subtitle: '管理收藏链接和内容',
+            color: colorScheme.primaryContainer,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _LifeFeatureCard(
+            icon: Icons.notifications_active,
+            title: '提醒事项',
+            subtitle: '日程安排和待办提醒',
+            color: colorScheme.secondaryContainer,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RemindersScreen()),
+              );
+            },
+          ),
+          const SizedBox(height: 12),
+          _LifeFeatureCard(
+            icon: Icons.track_changes,
+            title: '习惯打卡',
+            subtitle: '培养好习惯，记录每一天',
+            color: colorScheme.tertiaryContainer,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const HabitsScreen()),
               );
             },
           ),
