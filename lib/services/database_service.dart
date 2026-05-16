@@ -540,11 +540,17 @@ class DatabaseService {
   // ==================== 收藏夹 CRUD ====================
 
   /// 获取用户的所有收藏
-  Future<List<FavoriteModel>> getFavorites() async {
+  Future<List<FavoriteModel>> getFavorites(String userId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList('favorites') ?? [];
-      return data.map((json) => FavoriteModel.fromJson(jsonDecode(json))).toList();
+      final response = await http.get(
+        Uri.parse('$_restUrl/user_favorites?user_id=eq.$userId&order=is_pinned.desc&order=created_at.desc'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => FavoriteModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
       print('Get favorites error: $e');
       return [];
@@ -552,64 +558,71 @@ class DatabaseService {
   }
 
   /// 添加收藏
-  Future<void> insertFavorite(FavoriteModel favorite) async {
+  Future<FavoriteModel?> insertFavorite(FavoriteModel favorite) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final favorites = await getFavorites();
-      favorites.add(favorite);
-      await prefs.setStringList(
-        'favorites',
-        favorites.map((f) => jsonEncode(f.toJson())).toList(),
+      final response = await http.post(
+        Uri.parse('$_restUrl/user_favorites'),
+        headers: _headers,
+        body: jsonEncode(favorite.toJson()),
       );
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return FavoriteModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
       print('Insert favorite error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 更新收藏
-  Future<void> updateFavorite(FavoriteModel favorite) async {
+  Future<FavoriteModel?> updateFavorite(FavoriteModel favorite) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final favorites = await getFavorites();
-      final index = favorites.indexWhere((f) => f.id == favorite.id);
-      if (index != -1) {
-        favorites[index] = favorite;
-        await prefs.setStringList(
-          'favorites',
-          favorites.map((f) => jsonEncode(f.toJson())).toList(),
-        );
+      final response = await http.patch(
+        Uri.parse('$_restUrl/user_favorites?id=eq.${favorite.id}'),
+        headers: _headers,
+        body: jsonEncode(favorite.toJson()),
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return FavoriteModel.fromJson(data.first);
       }
+      return null;
     } catch (e) {
       print('Update favorite error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 删除收藏
-  Future<void> deleteFavorite(String id) async {
+  Future<bool> deleteFavorite(String id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final favorites = await getFavorites();
-      favorites.removeWhere((f) => f.id == id);
-      await prefs.setStringList(
-        'favorites',
-        favorites.map((f) => jsonEncode(f.toJson())).toList(),
+      final response = await http.delete(
+        Uri.parse('$_restUrl/user_favorites?id=eq.$id'),
+        headers: _headers,
       );
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print('Delete favorite error: $e');
-      throw e;
+      return false;
     }
   }
 
   // ==================== 提醒事项 CRUD ====================
 
   /// 获取用户的所有提醒
-  Future<List<ReminderModel>> getReminders() async {
+  Future<List<ReminderModel>> getReminders(String userId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList('reminders') ?? [];
-      return data.map((json) => ReminderModel.fromJson(jsonDecode(json))).toList();
+      final response = await http.get(
+        Uri.parse('$_restUrl/user_reminders?user_id=eq.$userId&order=is_completed.asc&order=remind_at.asc'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => ReminderModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
       print('Get reminders error: $e');
       return [];
@@ -617,64 +630,71 @@ class DatabaseService {
   }
 
   /// 添加提醒
-  Future<void> insertReminder(ReminderModel reminder) async {
+  Future<ReminderModel?> insertReminder(ReminderModel reminder) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await getReminders();
-      reminders.add(reminder);
-      await prefs.setStringList(
-        'reminders',
-        reminders.map((r) => jsonEncode(r.toJson())).toList(),
+      final response = await http.post(
+        Uri.parse('$_restUrl/user_reminders'),
+        headers: _headers,
+        body: jsonEncode(reminder.toJson()),
       );
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return ReminderModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
       print('Insert reminder error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 更新提醒
-  Future<void> updateReminder(ReminderModel reminder) async {
+  Future<ReminderModel?> updateReminder(ReminderModel reminder) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await getReminders();
-      final index = reminders.indexWhere((r) => r.id == reminder.id);
-      if (index != -1) {
-        reminders[index] = reminder;
-        await prefs.setStringList(
-          'reminders',
-          reminders.map((r) => jsonEncode(r.toJson())).toList(),
-        );
+      final response = await http.patch(
+        Uri.parse('$_restUrl/user_reminders?id=eq.${reminder.id}'),
+        headers: _headers,
+        body: jsonEncode(reminder.toJson()),
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return ReminderModel.fromJson(data.first);
       }
+      return null;
     } catch (e) {
       print('Update reminder error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 删除提醒
-  Future<void> deleteReminder(String id) async {
+  Future<bool> deleteReminder(String id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final reminders = await getReminders();
-      reminders.removeWhere((r) => r.id == id);
-      await prefs.setStringList(
-        'reminders',
-        reminders.map((r) => jsonEncode(r.toJson())).toList(),
+      final response = await http.delete(
+        Uri.parse('$_restUrl/user_reminders?id=eq.$id'),
+        headers: _headers,
       );
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print('Delete reminder error: $e');
-      throw e;
+      return false;
     }
   }
 
   // ==================== 习惯打卡 CRUD ====================
 
   /// 获取用户的所有习惯
-  Future<List<HabitModel>> getHabits() async {
+  Future<List<HabitModel>> getHabits(String userId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList('habits') ?? [];
-      return data.map((json) => HabitModel.fromJson(jsonDecode(json))).toList();
+      final response = await http.get(
+        Uri.parse('$_restUrl/user_habits?user_id=eq.$userId&order=created_at.desc'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => HabitModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
       print('Get habits error: $e');
       return [];
@@ -682,64 +702,69 @@ class DatabaseService {
   }
 
   /// 添加习惯
-  Future<void> insertHabit(HabitModel habit) async {
+  Future<HabitModel?> insertHabit(HabitModel habit) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final habits = await getHabits();
-      habits.add(habit);
-      await prefs.setStringList(
-        'habits',
-        habits.map((h) => jsonEncode(h.toJson())).toList(),
+      final response = await http.post(
+        Uri.parse('$_restUrl/user_habits'),
+        headers: _headers,
+        body: jsonEncode(habit.toJson()),
       );
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return HabitModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
       print('Insert habit error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 更新习惯
-  Future<void> updateHabit(HabitModel habit) async {
+  Future<HabitModel?> updateHabit(HabitModel habit) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final habits = await getHabits();
-      final index = habits.indexWhere((h) => h.id == habit.id);
-      if (index != -1) {
-        habits[index] = habit;
-        await prefs.setStringList(
-          'habits',
-          habits.map((h) => jsonEncode(h.toJson())).toList(),
-        );
+      final response = await http.patch(
+        Uri.parse('$_restUrl/user_habits?id=eq.${habit.id}'),
+        headers: _headers,
+        body: jsonEncode(habit.toJson()),
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return HabitModel.fromJson(data.first);
       }
+      return null;
     } catch (e) {
       print('Update habit error: $e');
-      throw e;
+      return null;
     }
   }
 
   /// 删除习惯
-  Future<void> deleteHabit(String id) async {
+  Future<bool> deleteHabit(String id) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final habits = await getHabits();
-      habits.removeWhere((h) => h.id == id);
-      await prefs.setStringList(
-        'habits',
-        habits.map((h) => jsonEncode(h.toJson())).toList(),
+      final response = await http.delete(
+        Uri.parse('$_restUrl/user_habits?id=eq.$id'),
+        headers: _headers,
       );
-      // 同时删除相关的打卡记录
-      await prefs.remove('habit_checkins_$id');
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
       print('Delete habit error: $e');
-      throw e;
+      return false;
     }
   }
 
   /// 获取习惯的打卡记录
   Future<List<HabitCheckinModel>> getHabitCheckins(String habitId) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final data = prefs.getStringList('habit_checkins_$habitId') ?? [];
-      return data.map((json) => HabitCheckinModel.fromJson(jsonDecode(json))).toList();
+      final response = await http.get(
+        Uri.parse('$_restUrl/habit_checkins?habit_id=eq.$habitId&order=checkin_at.desc'),
+        headers: _headers,
+      );
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => HabitCheckinModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
       print('Get habit checkins error: $e');
       return [];
@@ -747,18 +772,21 @@ class DatabaseService {
   }
 
   /// 添加打卡记录
-  Future<void> insertHabitCheckin(HabitCheckinModel checkin) async {
+  Future<HabitCheckinModel?> insertHabitCheckin(HabitCheckinModel checkin) async {
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final checkins = await getHabitCheckins(checkin.habitId);
-      checkins.add(checkin);
-      await prefs.setStringList(
-        'habit_checkins_${checkin.habitId}',
-        checkins.map((c) => jsonEncode(c.toJson())).toList(),
+      final response = await http.post(
+        Uri.parse('$_restUrl/habit_checkins'),
+        headers: _headers,
+        body: jsonEncode(checkin.toJson()),
       );
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return HabitCheckinModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
       print('Insert habit checkin error: $e');
-      throw e;
+      return null;
     }
   }
 }

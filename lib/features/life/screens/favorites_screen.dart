@@ -3,6 +3,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../models/favorite_model.dart';
 import '../../../services/database_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 收藏夹页面
 class FavoritesScreen extends StatefulWidget {
@@ -27,7 +28,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _loadFavorites() async {
     setState(() => _isLoading = true);
     try {
-      final items = await _db.getFavorites();
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) {
+        setState(() {
+          _favorites = [];
+          _isLoading = false;
+        });
+        return;
+      }
+      final items = await _db.getFavorites(userId);
       setState(() {
         _favorites = items..sort((a, b) {
           if (a.isPinned && !b.isPinned) return -1;
@@ -185,8 +194,11 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     .where((t) => t.isNotEmpty)
                     .toList();
 
+                final userId = AuthService.instance.currentUserId ?? 'local_user';
+
                 final newFavorite = FavoriteModel(
                   id: isEditing ? favorite.id : const Uuid().v4(),
+                  userId: isEditing ? favorite.userId : userId,
                   title: titleController.text.trim(),
                   url: urlController.text.trim().isEmpty
                       ? null

@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 import 'package:intl/intl.dart';
 import '../models/habit_model.dart';
 import '../../../services/database_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 习惯打卡页面
 class HabitsScreen extends StatefulWidget {
@@ -28,7 +29,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Future<void> _loadHabits() async {
     setState(() => _isLoading = true);
     try {
-      final items = await _db.getHabits();
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) {
+        setState(() {
+          _habits = [];
+          _checkinHistory = {};
+          _isLoading = false;
+        });
+        return;
+      }
+      final items = await _db.getHabits(userId);
       final history = <String, List<DateTime>>{};
       
       for (final habit in items) {
@@ -77,9 +87,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
       await _db.updateHabit(updatedHabit);
       
       // 添加打卡记录
+      final userId = AuthService.instance.currentUserId ?? 'local_user';
       final checkin = HabitCheckinModel(
         id: const Uuid().v4(),
         habitId: habit.id,
+        userId: userId,
         checkinAt: DateTime.now(),
         createdAt: DateTime.now(),
       );
@@ -228,9 +240,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 }
 
                 final targetDays = int.tryParse(targetDaysController.text) ?? 21;
+                final userId = AuthService.instance.currentUserId ?? 'local_user';
 
                 final newHabit = HabitModel(
                   id: isEditing ? habit.id : const Uuid().v4(),
+                  userId: isEditing ? habit.userId : userId,
                   name: nameController.text.trim(),
                   description: descController.text.trim().isEmpty
                       ? null

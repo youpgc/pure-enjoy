@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../models/reminder_model.dart';
 import '../../../services/database_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 提醒事项页面
 class RemindersScreen extends StatefulWidget {
@@ -25,7 +26,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _loadReminders() async {
     setState(() => _isLoading = true);
-    final reminders = await _db.getReminders();
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) {
+      setState(() {
+        _reminders = [];
+        _isLoading = false;
+      });
+      return;
+    }
+    final reminders = await _db.getReminders(userId);
     setState(() {
       _reminders = reminders;
       _isLoading = false;
@@ -343,9 +352,10 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
         TextButton(
           onPressed: () {
             if (_formKey.currentState!.validate()) {
+              final userId = AuthService.instance.currentUserId ?? 'local_user';
               final reminder = ReminderModel(
                 id: widget.reminder?.id ?? const Uuid().v4(),
-                userId: widget.reminder?.userId ?? 'local_user',
+                userId: widget.reminder?.userId ?? userId,
                 title: _titleController.text,
                 description: _descController.text.isEmpty ? null : _descController.text,
                 remindAt: _remindAt,
