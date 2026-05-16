@@ -1,0 +1,42 @@
+name: Debug Supabase Connection
+
+on:
+  workflow_dispatch:
+
+jobs:
+  debug:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Check Supabase Secrets
+        env:
+          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Checking secrets..."
+          if [ -z "$SUPABASE_PROJECT_ID" ]; then
+            echo "❌ SUPABASE_PROJECT_ID is not set"
+          else
+            echo "✅ SUPABASE_PROJECT_ID is set (length: ${#SUPABASE_PROJECT_ID})"
+          fi
+          
+          if [ -z "$SUPABASE_SERVICE_ROLE_KEY" ]; then
+            echo "❌ SUPABASE_SERVICE_ROLE_KEY is not set"
+          else
+            echo "✅ SUPABASE_SERVICE_ROLE_KEY is set (length: ${#SUPABASE_SERVICE_ROLE_KEY})"
+          fi
+          
+          SUPABASE_URL="https://$SUPABASE_PROJECT_ID.supabase.co"
+          echo "Supabase URL: $SUPABASE_URL"
+          
+          # Test Storage bucket existence
+          echo "Testing Storage bucket..."
+          BUCKET_RESPONSE=$(curl -s -w "\n%{http_code}" "$SUPABASE_URL/storage/v1/bucket/apk-releases" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          echo "Bucket check response: $BUCKET_RESPONSE"
+          
+          # Test database connection
+          echo "Testing database connection..."
+          DB_RESPONSE=$(curl -s -w "\n%{http_code}" "$SUPABASE_URL/rest/v1/app_versions?limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          echo "Database check response: $DB_RESPONSE"

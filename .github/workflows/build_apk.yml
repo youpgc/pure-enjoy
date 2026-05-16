@@ -164,9 +164,14 @@ jobs:
           
           # 使用 curl 上传文件，带错误检查
           echo "Starting upload..."
+          echo "File to upload: build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          ls -lh "build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          
+          # Try upload with upsert header (allows overwriting)
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/vnd.android.package-archive" \
+            -H "x-upsert: true" \
             --data-binary @"build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}")
           
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
