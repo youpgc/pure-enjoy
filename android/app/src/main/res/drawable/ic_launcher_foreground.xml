@@ -1,0 +1,70 @@
+<?xml version="1.0" encoding="utf-8"?>
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+
+    <!-- 书本主体 - 左页 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M54,30
+                         C44,30 36,32 36,32
+                         L36,68
+                         C36,68 44,66 54,66
+                         Z"/>
+
+    <!-- 书本主体 - 右页 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.95"
+        android:pathData="M54,30
+                         C64,30 72,32 72,32
+                         L72,68
+                         C72,68 64,66 54,66
+                         Z"/>
+
+    <!-- 书脊 -->
+    <path
+        android:fillColor="#FFFFFF"
+        android:fillAlpha="0.8"
+        android:pathData="M53,30 L55,30 L55,66 L53,66 Z"/>
+
+    <!-- 左页线条 -->
+    <path
+        android:strokeColor="#F5C842"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.5"
+        android:pathData="M40,38 L50,38 M40,44 L50,44 M40,50 L50,50"/>
+
+    <!-- 右页线条 -->
+    <path
+        android:strokeColor="#F05A28"
+        android:strokeWidth="1.5"
+        android:strokeAlpha="0.5"
+        android:pathData="M58,38 L68,38 M58,44 L68,44 M58,50 L68,50"/>
+
+    <!-- 蒸汽线条 -->
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M46,26 Q44,22 46,18"/>
+
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M54,24 Q52,20 54,16"/>
+
+    <path
+        android:strokeColor="#FFFFFF"
+        android:strokeWidth="2"
+        android:strokeLineCap="round"
+        android:fillColor="@android:color/transparent"
+        android:pathData="M62,26 Q60,22 62,18"/>
+
+</vector>
