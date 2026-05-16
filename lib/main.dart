@@ -18,7 +18,7 @@ class PureEnjoyApp extends StatelessWidget {
   const PureEnjoyApp({super.key});
 
   @override
-  WidgetBuilder build(BuildContext context) {
+  Widget build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: Consumer<ThemeProvider>(

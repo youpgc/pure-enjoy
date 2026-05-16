@@ -35,11 +35,11 @@ class _LoginScreenState extends State<LoginScreen> {
       final supabaseService = SupabaseService.instance;
 
       if (_isRegister) {
-        final response = await supabaseService.signUp(
+        final success = await supabaseService.signUp(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        if (response.user != null && mounted) {
+        if (success && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('注册成功！请登录')),
           );
@@ -50,11 +50,11 @@ class _LoginScreenState extends State<LoginScreen> {
           );
         }
       } else {
-        final response = await supabaseService.signIn(
+        final success = await supabaseService.signIn(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        if (response.user != null && mounted) {
+        if (success && mounted) {
           // 登录成功，跳转到首页
           Navigator.of(context).pushReplacement(
             MaterialPageRoute(builder: (_) => const HomeScreen()),
