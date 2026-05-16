@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/database_service.dart';
+import '../../../services/auth_service.dart';
 import '../models/novel_model.dart';
 
 /// 小说阅读器页面
@@ -28,7 +28,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
   double _lineHeight = 1.8;
   String _fontFamily = 'system';
 
-  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
@@ -65,8 +65,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
       final userId = _userId;
       if (userId != null) {
         final progress = await DatabaseService.instance.getReadingProgress(userId, widget.novel.id);
-        if (progress != null && progress.currentChapterId != null) {
-          final chapterIndex = chapters.indexWhere((c) => c.id == progress.currentChapterId);
+        if (progress != null && progress['last_chapter'] != null) {
+          final chapterIndex = chapters.indexWhere((c) => c.id == progress['last_chapter']);
           if (chapterIndex >= 0) {
             startIndex = chapterIndex;
           }
@@ -99,7 +99,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
       await DatabaseService.instance.updateReadingProgress(
         userId: userId,
         novelId: widget.novel.id,
-        currentChapterId: _currentChapter!.id,
+        lastChapter: _currentChapter!.id,
         currentPosition: _scrollController.hasClients ? _scrollController.offset.toInt() : 0,
       );
     } catch (e) {

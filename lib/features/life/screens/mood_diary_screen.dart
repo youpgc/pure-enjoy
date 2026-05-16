@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/database_service.dart';
+import '../../../services/auth_service.dart';
 import '../models/mood_diary_model.dart';
 
 /// 心情日记页面
@@ -16,7 +16,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
 
-  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {

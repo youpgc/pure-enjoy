@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/database_service.dart';
+import '../../../services/auth_service.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面
@@ -17,7 +17,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
 
-  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {

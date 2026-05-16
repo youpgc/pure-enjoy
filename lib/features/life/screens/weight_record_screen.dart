@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/database_service.dart';
+import '../../../services/auth_service.dart';
 import '../models/weight_record_model.dart';
 
 /// 体重记录页面
@@ -16,7 +16,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
 
-  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {

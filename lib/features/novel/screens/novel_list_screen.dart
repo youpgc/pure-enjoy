@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../services/database_service.dart';
+import '../../../services/auth_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 
@@ -18,7 +18,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
   bool _isLoading = true;
   String _selectedCategory = 'all';
 
-  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
