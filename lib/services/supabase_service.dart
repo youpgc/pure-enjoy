@@ -97,6 +97,8 @@ class AuthService {
     try {
       final passwordHash = _hashPassword(password);
 
+      print('🔐 登录请求: email=$email, hash=${passwordHash.substring(0, 8)}...');
+
       final response = await http.get(
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
@@ -104,10 +106,12 @@ class AuthService {
         headers: SupabaseConfig.headers,
       );
 
+      print('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+
       if (response.statusCode == 200) {
         final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('邮箱或密码错误');
+          print('❌ 邮箱或密码错误');
           return false;
         }
 
@@ -115,7 +119,7 @@ class AuthService {
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          print('用户已被禁用');
+          print('❌ 用户已被禁用: ${user['status']}');
           return false;
         }
 
@@ -133,22 +137,25 @@ class AuthService {
           }),
         );
 
+        print('✅ 登录成功: ${user['username']}');
         return true;
+      } else {
+        print('❌ 登录失败: HTTP ${response.statusCode}');
+        return false;
       }
-      return false;
     } catch (e) {
-      print('Sign in error: $e');
+      print('❌ Sign in error: $e');
       return false;
     }
   }
 
   /// 通过用户名+密码登录
-  /// 先通过 users 表查询用户名对应的邮箱，再用邮箱+密码登录
   Future<bool> signInWithUsername(String username, String password) async {
     try {
       final passwordHash = _hashPassword(password);
 
-      // 直接通过用户名+密码哈希查询
+      print('🔐 用户名登录: username=$username, hash=${passwordHash.substring(0, 8)}...');
+
       final response = await http.get(
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
@@ -156,24 +163,24 @@ class AuthService {
         headers: SupabaseConfig.headers,
       );
 
+      print('🔐 用户名登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+
       if (response.statusCode == 200) {
         final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('用户名或密码错误');
+          print('❌ 用户名或密码错误');
           return false;
         }
 
         final user = users[0] as Map<String, dynamic>;
 
-        // 检查用户状态
         if (user['status'] != 'active') {
-          print('用户已被禁用');
+          print('❌ 用户已被禁用: ${user['status']}');
           return false;
         }
 
         await _saveUser(user);
 
-        // 更新最后登录信息
         await http.patch(
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
@@ -185,12 +192,14 @@ class AuthService {
           }),
         );
 
+        print('✅ 用户名登录成功: ${user['username']}');
         return true;
+      } else {
+        print('❌ 用户名登录失败: HTTP ${response.statusCode}');
+        return false;
       }
-
-      return false;
     } catch (e) {
-      print('signInWithUsername error: $e');
+      print('❌ signInWithUsername error: $e');
       return false;
     }
   }
@@ -376,9 +385,13 @@ class AuthService {
       final userId = _generateUserId();
       final now = DateTime.now().toUtc().toIso8601String();
 
+      final userEmail = email ?? '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local';
+
+      print('📝 注册请求: username=$username, email=$userEmail, hash=${passwordHash.substring(0, 8)}...');
+
       final userData = {
         'id': userId,
-        'email': email ?? '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local',
+        'email': userEmail,
         'username': username,
         'password_hash': passwordHash,
         'phone': phone,
@@ -402,16 +415,18 @@ class AuthService {
         body: jsonEncode(userData),
       );
 
+      print('📝 注册响应: statusCode=${response.statusCode}, body=${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
+
       if (response.statusCode == 200 || response.statusCode == 201) {
-        // 注册成功，自动登录
         await _saveUser(userData);
+        print('✅ 注册成功: $username');
         return true;
       } else {
-        print('注册失败: ${response.statusCode} ${response.body}');
+        print('❌ 注册失败: ${response.statusCode} ${response.body}');
         return false;
       }
     } catch (e) {
-      print('Sign up error: $e');
+      print('❌ Sign up error: $e');
       return false;
     }
   }
