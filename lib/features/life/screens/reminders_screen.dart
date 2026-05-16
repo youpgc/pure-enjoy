@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:uuid/uuid.dart';
 import '../models/reminder_model.dart';
 import '../../../services/database_service.dart';
@@ -14,8 +13,6 @@ class RemindersScreen extends StatefulWidget {
 
 class _RemindersScreenState extends State<RemindersScreen> {
   final DatabaseService _db = DatabaseService();
-  final FlutterLocalNotificationsPlugin _notifications =
-      FlutterLocalNotificationsPlugin();
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
   String _filter = 'all'; // all, pending, completed
@@ -23,99 +20,48 @@ class _RemindersScreenState extends State<RemindersScreen> {
   @override
   void initState() {
     super.initState();
-    _initNotifications();
     _loadReminders();
-  }
-
-  Future<void> _initNotifications() async {
-    const androidSettings =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    const iosSettings = DarwinInitializationSettings(
-      requestAlertPermission: true,
-      requestBadgePermission: true,
-      requestSoundPermission: true,
-    );
-    const initSettings = InitializationSettings(
-      android: androidSettings,
-      iOS: iosSettings,
-    );
-    await _notifications.initialize(initSettings);
-  }
-
-  Future<void> _scheduleNotification(ReminderModel reminder) async {
-    final scheduledDate = reminder.remindAt;
-    if (scheduledDate.isBefore(DateTime.now())) return;
-
-    const androidDetails = AndroidNotificationDetails(
-      'reminder_channel',
-      '提醒事项',
-      channelDescription: '日程提醒通知',
-      importance: Importance.high,
-      priority: Priority.high,
-    );
-    const iosDetails = DarwinNotificationDetails();
-    const details = NotificationDetails(
-      android: androidDetails,
-      iOS: iosDetails,
-    );
-
-    await _notifications.schedule(
-      reminder.id.hashCode,
-      reminder.title,
-      reminder.description ?? '您有一个待办事项',
-      scheduledDate,
-      details,
-    );
-  }
-
-  Future<void> _cancelNotification(String reminderId) async {
-    await _notifications.cancel(reminderId.hashCode);
   }
 
   Future<void> _loadReminders() async {
     setState(() => _isLoading = true);
-    try {
-      final items = await _db.getReminders();
-      setState(() {
-        _reminders = items..sort((a, b) {
-          // 未完成的排在前面
-          if (a.isCompleted != b.isCompleted) {
-            return a.isCompleted ? 1 : -1;
-          }
-          // 按时间排序
-          return a.remindAt.compareTo(b.remindAt);
-        });
-        _isLoading = false;
-      });
-    } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('加载提醒失败: $e');
+    final reminders = await _db.getReminders();
+    setState(() {
+      _reminders = reminders;
+      _isLoading = false;
+    });
+  }
+
+  List<ReminderModel> get _filteredReminders {
+    switch (_filter) {
+      case 'pending':
+        return _reminders.where((r) => !r.isCompleted).toList();
+      case 'completed':
+        return _reminders.where((r) => r.isCompleted).toList();
+      default:
+        return _reminders;
     }
   }
 
-  void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+  Future<void> _addReminder() async {
+    final result = await showDialog<ReminderModel>(
+      context: context,
+      builder: (context) => const ReminderEditDialog(),
     );
+    if (result != null) {
+      await _db.createReminder(result);
+      _loadReminders();
+    }
   }
 
-  Future<void> _toggleComplete(ReminderModel reminder) async {
-    try {
-      final updated = reminder.copyWith(
-        isCompleted: !reminder.isCompleted,
-        updatedAt: DateTime.now(),
-      );
-      await _db.updateReminder(updated);
-      
-      if (updated.isCompleted) {
-        await _cancelNotification(reminder.id);
-      } else {
-        await _scheduleNotification(updated);
-      }
-      
+  Future<void> _editReminder(ReminderModel reminder) async {
+    final result = await showDialog<ReminderModel>(
+      context: context,
+      builder: (context) => ReminderEditDialog(reminder: reminder),
+    );
+    if (result != null) {
+      await _db.updateReminder(result);
       _loadReminders();
-    } catch (e) {
-      _showError('操作失败: $e');
     }
   }
 
@@ -137,421 +83,282 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ],
       ),
     );
-
     if (confirmed == true) {
-      try {
-        await _cancelNotification(id);
-        await _db.deleteReminder(id);
-        _loadReminders();
-      } catch (e) {
-        _showError('删除失败: $e');
-      }
+      await _db.deleteReminder(id);
+      _loadReminders();
     }
   }
 
-  Future<void> _showEditDialog({ReminderModel? reminder}) async {
-    final isEditing = reminder != null;
-    final titleController = TextEditingController(text: reminder?.title ?? '');
-    final descController =
-        TextEditingController(text: reminder?.description ?? '');
-    DateTime selectedDate = reminder?.remindAt ?? DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.fromDateTime(selectedDate);
-    String priority = reminder?.priority ?? 'normal';
-
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: Text(isEditing ? '编辑提醒' : '添加提醒'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(
-                  controller: titleController,
-                  decoration: const InputDecoration(
-                    labelText: '标题 *',
-                    hintText: '输入提醒标题',
-                  ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: '描述',
-                    hintText: '输入提醒描述（可选）',
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('日期'),
-                  subtitle: Text(
-                    '${selectedDate.year}-${selectedDate.month.toString().padLeft(2, '0')}-${selectedDate.day.toString().padLeft(2, '0')}',
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    final date = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime.now(),
-                      lastDate: DateTime.now().add(const Duration(days: 365)),
-                    );
-                    if (date != null) {
-                      setDialogState(() => selectedDate = date);
-                    }
-                  },
-                ),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('时间'),
-                  subtitle: Text(
-                    '${selectedTime.hour.toString().padLeft(2, '0')}:${selectedTime.minute.toString().padLeft(2, '0')}',
-                  ),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: selectedTime,
-                    );
-                    if (time != null) {
-                      setDialogState(() => selectedTime = time);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: priority,
-                  decoration: const InputDecoration(labelText: '优先级'),
-                  items: const [
-                    DropdownMenuItem(value: 'high', child: Text('高')),
-                    DropdownMenuItem(value: 'normal', child: Text('普通')),
-                    DropdownMenuItem(value: 'low', child: Text('低')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => priority = value);
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (titleController.text.trim().isEmpty) {
-                  _showError('请输入标题');
-                  return;
-                }
-
-                final remindAt = DateTime(
-                  selectedDate.year,
-                  selectedDate.month,
-                  selectedDate.day,
-                  selectedTime.hour,
-                  selectedTime.minute,
-                );
-
-                final newReminder = ReminderModel(
-                  id: isEditing ? reminder.id : const Uuid().v4(),
-                  title: titleController.text.trim(),
-                  description: descController.text.trim().isEmpty
-                      ? null
-                      : descController.text.trim(),
-                  remindAt: remindAt,
-                  isCompleted: reminder?.isCompleted ?? false,
-                  priority: priority,
-                  createdAt: isEditing ? reminder.createdAt : DateTime.now(),
-                  updatedAt: DateTime.now(),
-                );
-
-                try {
-                  if (isEditing) {
-                    await _db.updateReminder(newReminder);
-                  } else {
-                    await _db.insertReminder(newReminder);
-                  }
-                  
-                  if (!newReminder.isCompleted) {
-                    await _scheduleNotification(newReminder);
-                  }
-                  
-                  Navigator.pop(context);
-                  _loadReminders();
-                } catch (e) {
-                  _showError('保存失败: $e');
-                }
-              },
-              child: Text(isEditing ? '保存' : '添加'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
-  List<ReminderModel> get _filteredReminders {
-    switch (_filter) {
-      case 'pending':
-        return _reminders.where((r) => !r.isCompleted).toList();
-      case 'completed':
-        return _reminders.where((r) => r.isCompleted).toList();
-      default:
-        return _reminders;
-    }
-  }
-
-  Color _getPriorityColor(String priority) {
-    switch (priority) {
-      case 'high':
-        return Colors.red;
-      case 'low':
-        return Colors.green;
-      default:
-        return Colors.orange;
-    }
+  Future<void> _toggleComplete(ReminderModel reminder) async {
+    final updated = reminder.copyWith(isCompleted: !reminder.isCompleted);
+    await _db.updateReminder(updated);
+    _loadReminders();
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('提醒事项'),
         actions: [
-          PopupMenuButton<String>(
-            icon: const Icon(Icons.filter_list),
-            tooltip: '筛选',
-            onSelected: (value) => setState(() => _filter = value),
-            itemBuilder: (context) => [
-              const PopupMenuItem(value: 'all', child: Text('全部')),
-              const PopupMenuItem(value: 'pending', child: Text('待完成')),
-              const PopupMenuItem(value: 'completed', child: Text('已完成')),
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'all', label: Text('全部')),
+              ButtonSegment(value: 'pending', label: Text('待办')),
+              ButtonSegment(value: 'completed', label: Text('已完成')),
             ],
+            selected: {_filter},
+            onSelectionChanged: (set) {
+              setState(() => _filter = set.first);
+            },
           ),
+          const SizedBox(width: 8),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _filteredReminders.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.notifications_none,
-                        size: 64,
-                        color: colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '暂无提醒事项',
-                        style: TextStyle(
-                          color: colorScheme.outline,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const Center(child: Text('暂无提醒事项'))
               : ListView.builder(
-                  padding: const EdgeInsets.all(16),
                   itemCount: _filteredReminders.length,
                   itemBuilder: (context, index) {
                     final reminder = _filteredReminders[index];
-                    return _ReminderCard(
+                    return ReminderCard(
                       reminder: reminder,
-                      priorityColor: _getPriorityColor(reminder.priority),
-                      onToggleComplete: () => _toggleComplete(reminder),
-                      onEdit: () => _showEditDialog(reminder: reminder),
+                      onToggle: () => _toggleComplete(reminder),
+                      onEdit: () => _editReminder(reminder),
                       onDelete: () => _deleteReminder(reminder.id),
                     );
                   },
                 ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showEditDialog(),
+        onPressed: _addReminder,
         child: const Icon(Icons.add),
       ),
     );
   }
 }
 
-class _ReminderCard extends StatelessWidget {
+class ReminderCard extends StatelessWidget {
   final ReminderModel reminder;
-  final Color priorityColor;
-  final VoidCallback onToggleComplete;
+  final VoidCallback onToggle;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
 
-  const _ReminderCard({
+  const ReminderCard({
+    super.key,
     required this.reminder,
-    required this.priorityColor,
-    required this.onToggleComplete,
+    required this.onToggle,
     required this.onEdit,
     required this.onDelete,
   });
 
+  Color get _priorityColor {
+    switch (reminder.priority) {
+      case 'high':
+        return Colors.red;
+      case 'normal':
+        return Colors.orange;
+      case 'low':
+        return Colors.green;
+      default:
+        return Colors.grey;
+    }
+  }
+
+  String get _priorityText {
+    switch (reminder.priority) {
+      case 'high':
+        return '高';
+      case 'normal':
+        return '中';
+      case 'low':
+        return '低';
+      default:
+        return '普通';
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final isOverdue = reminder.isOverdue;
-
     return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Row(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: Checkbox(
+          value: reminder.isCompleted,
+          onChanged: (_) => onToggle(),
+        ),
+        title: Text(
+          reminder.title,
+          style: TextStyle(
+            decoration: reminder.isCompleted ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Container(
-              width: 4,
-              height: 60,
-              decoration: BoxDecoration(
-                color: reminder.isCompleted ? Colors.grey : priorityColor,
-                borderRadius: BorderRadius.circular(2),
-              ),
-            ),
-            const SizedBox(width: 12),
-            Checkbox(
-              value: reminder.isCompleted,
-              onChanged: (_) => onToggleComplete(),
-            ),
-            const SizedBox(width: 8),
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    reminder.title,
-                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                          decoration: reminder.isCompleted
-                              ? TextDecoration.lineThrough
-                              : null,
-                          color: reminder.isCompleted
-                              ? colorScheme.outline
-                              : null,
-                        ),
-                  ),
-                  if (reminder.description != null) ...[
-                    const SizedBox(height: 4),
-                    Text(
-                      reminder.description!,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: reminder.isCompleted
-                            ? colorScheme.outline
-                            : colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                  ],
-                  const SizedBox(height: 4),
-                  Row(
-                    children: [
-                      Icon(
-                        Icons.access_time,
-                        size: 14,
-                        color: isOverdue ? Colors.red : colorScheme.outline,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        _formatDateTime(reminder.remindAt),
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: isOverdue ? Colors.red : colorScheme.outline,
-                          fontWeight:
-                              isOverdue ? FontWeight.bold : FontWeight.normal,
-                        ),
-                      ),
-                      if (isOverdue) ...[
-                        const SizedBox(width: 8),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 6,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: Colors.red.withOpacity(0.1),
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: const Text(
-                            '已过期',
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: Colors.red,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ],
-                  ),
-                ],
-              ),
-            ),
-            PopupMenuButton<String>(
-              onSelected: (value) {
-                switch (value) {
-                  case 'edit':
-                    onEdit();
-                    break;
-                  case 'delete':
-                    onDelete();
-                    break;
-                }
-              },
-              itemBuilder: (context) => [
-                const PopupMenuItem(
-                  value: 'edit',
-                  child: Row(
-                    children: [
-                      Icon(Icons.edit, size: 20),
-                      SizedBox(width: 8),
-                      Text('编辑'),
-                    ],
-                  ),
+            if (reminder.description != null && reminder.description!.isNotEmpty)
+              Text(reminder.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
+            Row(
+              children: [
+                Chip(
+                  label: Text(_priorityText),
+                  backgroundColor: _priorityColor.withOpacity(0.1),
+                  side: BorderSide(color: _priorityColor),
+                  padding: EdgeInsets.zero,
+                  labelStyle: TextStyle(color: _priorityColor, fontSize: 12),
                 ),
-                const PopupMenuItem(
-                  value: 'delete',
-                  child: Row(
-                    children: [
-                      Icon(Icons.delete, size: 20, color: Colors.red),
-                      SizedBox(width: 8),
-                      Text('删除', style: TextStyle(color: Colors.red)),
-                    ],
+                const SizedBox(width: 8),
+                Text(
+                  '${reminder.remindAt.month}/${reminder.remindAt.day} ${reminder.remindAt.hour}:${reminder.remindAt.minute.toString().padLeft(2, '0')}',
+                  style: TextStyle(
+                    color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
+                        ? Colors.red
+                        : Colors.grey,
+                    fontSize: 12,
                   ),
                 ),
               ],
             ),
           ],
         ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                onEdit();
+                break;
+              case 'delete':
+                onDelete();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'edit', child: Text('编辑')),
+            const PopupMenuItem(value: 'delete', child: Text('删除', style: TextStyle(color: Colors.red))),
+          ],
+        ),
       ),
     );
   }
+}
 
-  String _formatDateTime(DateTime dateTime) {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
-    final date = DateTime(dateTime.year, dateTime.month, dateTime.day);
+class ReminderEditDialog extends StatefulWidget {
+  final ReminderModel? reminder;
 
-    String dateStr;
-    if (date == today) {
-      dateStr = '今天';
-    } else if (date == today.add(const Duration(days: 1))) {
-      dateStr = '明天';
-    } else {
-      dateStr =
-          '${dateTime.month}/${dateTime.day}';
+  const ReminderEditDialog({super.key, this.reminder});
+
+  @override
+  State<ReminderEditDialog> createState() => _ReminderEditDialogState();
+}
+
+class _ReminderEditDialogState extends State<ReminderEditDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+  String _priority = 'normal';
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.reminder != null) {
+      _titleController.text = widget.reminder!.title;
+      _descController.text = widget.reminder!.description ?? '';
+      _remindAt = widget.reminder!.remindAt;
+      _priority = widget.reminder!.priority;
     }
+  }
 
-    final timeStr =
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-    return '$dateStr $timeStr';
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.reminder == null ? '新建提醒' : '编辑提醒'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: '标题'),
+                validator: (v) => v?.isEmpty == true ? '请输入标题' : null,
+              ),
+              TextFormField(
+                controller: _descController,
+                decoration: const InputDecoration(labelText: '描述（可选）'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('提醒时间'),
+                subtitle: Text('${_remindAt.month}/${_remindAt.day} ${_remindAt.hour}:${_remindAt.minute.toString().padLeft(2, '0')}'),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _remindAt,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (date != null) {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(_remindAt),
+                    );
+                    if (time != null) {
+                      setState(() {
+                        _remindAt = DateTime(
+                          date.year, date.month, date.day,
+                          time.hour, time.minute,
+                        );
+                      });
+                    }
+                  }
+                },
+              ),
+              const SizedBox(height: 16),
+              SegmentedButton<String>(
+                segments: const [
+                  ButtonSegment(value: 'high', label: Text('高')),
+                  ButtonSegment(value: 'normal', label: Text('中')),
+                  ButtonSegment(value: 'low', label: Text('低')),
+                ],
+                selected: {_priority},
+                onSelectionChanged: (set) {
+                  setState(() => _priority = set.first);
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              final reminder = ReminderModel(
+                id: widget.reminder?.id ?? const Uuid().v4(),
+                userId: widget.reminder?.userId ?? 'local_user',
+                title: _titleController.text,
+                description: _descController.text.isEmpty ? null : _descController.text,
+                remindAt: _remindAt,
+                isCompleted: widget.reminder?.isCompleted ?? false,
+                priority: _priority,
+                createdAt: widget.reminder?.createdAt ?? DateTime.now(),
+              );
+              Navigator.pop(context, reminder);
+            }
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    );
   }
 }
