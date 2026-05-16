@@ -4,6 +4,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
 
 /// 首页 - 主导航页面
@@ -23,6 +24,21 @@ class _HomeScreenState extends State<HomeScreen> {
     NovelListScreen(),
     ProfilePage(),
   ];
+
+  @override
+  void initState() {
+    super.initState();
+    // 应用启动时检查更新
+    _checkForUpdate();
+  }
+
+  /// 检查应用更新
+  void _checkForUpdate() async {
+    final versionInfo = await VersionCheckService.instance.checkUpdate();
+    if (versionInfo != null && mounted) {
+      VersionCheckService.instance.showUpdateDialog(context, versionInfo);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {

@@ -19,6 +19,12 @@ dependencies:
   # 工具
   intl: ^0.19.0
   uuid: ^4.3.1
+  # 密码加密
+  crypto: ^3.0.3
+  # 版本信息
+  package_info_plus: ^4.2.0
+  # URL 启动器
+  url_launcher: ^6.2.2
 
 dev_dependencies:
   flutter_test:
