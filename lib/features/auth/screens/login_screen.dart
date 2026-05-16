@@ -151,11 +151,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else if (mounted) {
-        _showSnackBar('登录失败，请检查输入信息');
+        _showSnackBar('登录失败，请检查用户名和密码');
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('发生错误: $e');
+        _showSnackBar('登录出错: $e');
       }
     } finally {
       if (mounted) {
@@ -187,11 +187,11 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
         _showSnackBar('注册成功！请登录', isSuccess: true);
         setState(() => _isRegister = false);
       } else if (mounted) {
-        _showSnackBar('注册失败，请重试');
+        _showSnackBar('注册失败，请检查网络或稍后重试');
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('发生错误: $e');
+        _showSnackBar('注册出错: $e');
       }
     } finally {
       if (mounted) {
