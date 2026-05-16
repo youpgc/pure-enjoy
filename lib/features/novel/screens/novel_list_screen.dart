@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/database_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 
@@ -13,9 +14,11 @@ class NovelListScreen extends StatefulWidget {
 
 class _NovelListScreenState extends State<NovelListScreen> {
   List<NovelModel> _novels = [];
-  List<NovelModel> _readingNovels = [];
+  List<Map<String, dynamic>> _userNovels = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
+
+  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
 
   @override
   void initState() {
@@ -25,73 +28,64 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
   Future<void> _loadNovels() async {
     setState(() => _isLoading = true);
-    
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    // 本地模拟数据
-    final novels = [
-      NovelModel(
-        id: '1',
-        title: '示例小说一',
-        author: '作者A',
-        cover: null,
-        description: '这是一本示例小说，展示了小说列表的功能。',
-        category: '玄幻',
-        chapterCount: 100,
-        createdAt: DateTime.now().subtract(const Duration(days: 30)),
-      ),
-      NovelModel(
-        id: '2',
-        title: '示例小说二',
-        author: '作者B',
-        cover: null,
-        description: '这是另一本示例小说。',
-        category: '都市',
-        chapterCount: 50,
-        createdAt: DateTime.now().subtract(const Duration(days: 15)),
-      ),
-      NovelModel(
-        id: '3',
-        title: '示例小说三',
-        author: '作者C',
-        cover: null,
-        description: '言情小说示例。',
-        category: '言情',
-        chapterCount: 80,
-        createdAt: DateTime.now().subtract(const Duration(days: 7)),
-      ),
-      NovelModel(
-        id: '4',
-        title: '科幻世界',
-        author: '科幻作家',
-        cover: null,
-        description: '探索未来世界的科幻小说。',
-        category: '科幻',
-        chapterCount: 60,
-        createdAt: DateTime.now().subtract(const Duration(days: 3)),
-      ),
-    ];
-    
-    // 根据分类筛选
-    final filteredNovels = _selectedCategory == 'all'
-        ? novels
-        : novels.where((n) => n.category == _selectedCategory).toList();
-    
-    // 加载阅读中的小说
-    final prefs = await SharedPreferences.getInstance();
-    final readingIds = <String>{};
-    for (final novel in novels) {
-      final progress = prefs.getInt('novel_progress_${novel.id}');
-      if (progress != null && progress > 0) {
-        readingIds.add(novel.id);
+
+    try {
+      // 加载所有公共小说
+      final novels = await DatabaseService.instance.getNovels();
+
+      // 根据分类筛选
+      final filteredNovels = _selectedCategory == 'all'
+          ? novels
+          : novels.where((n) => n.category == _selectedCategory).toList();
+
+      // 加载用户书架
+      List<Map<String, dynamic>> userNovels = [];
+      final userId = _userId;
+      if (userId != null) {
+        userNovels = await DatabaseService.instance.getUserNovels(userId);
+      }
+
+      setState(() {
+        _novels = filteredNovels;
+        _userNovels = userNovels;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载失败: $e')),
+        );
       }
     }
-    
-    setState(() {
-      _novels = filteredNovels;
-      _readingNovels = novels.where((n) => readingIds.contains(n.id)).toList();
-      _isLoading = false;
-    });
+  }
+
+  Future<void> _addToBookshelf(NovelModel novel) async {
+    final userId = _userId;
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
+
+    try {
+      await DatabaseService.instance.addToBookshelf(userId, novel.id);
+      await _loadNovels();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已添加到书架')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败: $e')),
+        );
+      }
+    }
   }
 
   void _openNovel(NovelModel novel) {
@@ -103,10 +97,15 @@ class _NovelListScreenState extends State<NovelListScreen> {
     );
   }
 
+  List<NovelModel> get _readingNovels {
+    final bookshelfNovelIds = _userNovels.map((un) => un['novel_id'] as String).toSet();
+    return _novels.where((n) => bookshelfNovelIds.contains(n.id)).toList();
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('小说'),
@@ -149,7 +148,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                     ),
                     const SizedBox(height: 24),
                   ],
-                  
+
                   // 分类筛选
                   SizedBox(
                     height: 40,
@@ -200,7 +199,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                     ),
                   ),
                   const SizedBox(height: 16),
-                  
+
                   // 小说列表
                   Text(
                     '全部小说',
@@ -239,9 +238,12 @@ class _NovelListScreenState extends State<NovelListScreen> {
                           itemCount: _novels.length,
                           itemBuilder: (context, index) {
                             final novel = _novels[index];
+                            final isInBookshelf = _userNovels.any((un) => un['novel_id'] == novel.id);
                             return _NovelCard(
                               novel: novel,
                               onTap: () => _openNovel(novel),
+                              onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
+                              isInBookshelf: isInBookshelf,
                             );
                           },
                         ),
@@ -279,16 +281,20 @@ class _CategoryChip extends StatelessWidget {
 class _NovelCard extends StatelessWidget {
   final NovelModel novel;
   final VoidCallback onTap;
+  final VoidCallback? onAddToBookshelf;
+  final bool isInBookshelf;
 
   const _NovelCard({
     required this.novel,
     required this.onTap,
+    this.onAddToBookshelf,
+    this.isInBookshelf = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Card(
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -299,26 +305,70 @@ class _NovelCard extends StatelessWidget {
             // 封面
             Expanded(
               flex: 3,
-              child: Container(
-                width: double.infinity,
-                color: colorScheme.surfaceContainerHighest,
-                child: novel.cover != null
-                    ? Image.network(
-                        novel.cover!,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Icon(
-                          Icons.book,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      )
-                    : Center(
-                        child: Icon(
-                          Icons.book,
-                          size: 48,
-                          color: colorScheme.onSurfaceVariant,
+              child: Stack(
+                children: [
+                  Container(
+                    width: double.infinity,
+                    color: colorScheme.surfaceContainerHighest,
+                    child: novel.cover != null
+                        ? Image.network(
+                            novel.cover!,
+                            fit: BoxFit.cover,
+                            errorBuilder: (_, __, ___) => Icon(
+                              Icons.book,
+                              size: 48,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          )
+                        : Center(
+                            child: Icon(
+                              Icons.book,
+                              size: 48,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                  ),
+                  if (onAddToBookshelf != null)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Material(
+                        color: colorScheme.primary,
+                        borderRadius: BorderRadius.circular(16),
+                        child: InkWell(
+                          onTap: onAddToBookshelf,
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(4),
+                            child: Icon(
+                              Icons.add,
+                              size: 16,
+                              color: colorScheme.onPrimary,
+                            ),
+                          ),
                         ),
                       ),
+                    ),
+                  if (isInBookshelf)
+                    Positioned(
+                      top: 4,
+                      right: 4,
+                      child: Container(
+                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: colorScheme.primary,
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
+                          '已加入',
+                          style: TextStyle(
+                            fontSize: 10,
+                            color: colorScheme.onPrimary,
+                          ),
+                        ),
+                      ),
+                    ),
+                ],
               ),
             ),
             // 信息

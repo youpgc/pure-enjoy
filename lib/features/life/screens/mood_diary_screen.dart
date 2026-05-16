@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/database_service.dart';
 import '../models/mood_diary_model.dart';
 
 /// 心情日记页面
@@ -16,6 +16,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
 
+  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+
   @override
   void initState() {
     super.initState();
@@ -23,18 +25,22 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   }
 
   Future<void> _loadDiaries() async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final diariesJson = prefs.getStringList('mood_diaries') ?? [];
-      
-      final diaries = diariesJson
-          .map((json) => MoodDiaryModel.fromJson(jsonDecode(json)))
-          .toList();
-      
-      diaries.sort((a, b) => b.date.compareTo(a.date));
-      
+      final diaries = await DatabaseService.instance.getMoodDiaries(userId);
+
       setState(() {
         _diaries = diaries;
         _isLoading = false;
@@ -49,15 +55,47 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     }
   }
 
-  Future<void> _saveDiaries() async {
-    final prefs = await SharedPreferences.getInstance();
-    final diariesJson = _diaries
-        .map((diary) => jsonEncode(diary.toJson()))
-        .toList();
-    await prefs.setStringList('mood_diaries', diariesJson);
+  Future<void> _createMoodDiary(MoodDiaryModel diary) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.createMoodDiary(diary);
+      await _loadDiaries();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('添加成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败: $e')),
+        );
+      }
+    }
   }
 
-  Future<void> _deleteDiary(MoodDiaryModel diary) async {
+  Future<void> _updateMoodDiary(MoodDiaryModel diary) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.updateMoodDiary(diary);
+      await _loadDiaries();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('更新成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _deleteMoodDiary(MoodDiaryModel diary) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -75,12 +113,25 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
         ],
       ),
     );
-    
+
     if (confirm == true) {
-      setState(() {
-        _diaries.removeWhere((d) => d.id == diary.id);
-      });
-      await _saveDiaries();
+      setState(() => _isLoading = true);
+      try {
+        await DatabaseService.instance.deleteMoodDiary(diary.id);
+        await _loadDiaries();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('删除成功')),
+          );
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -90,9 +141,14 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       isScrollControlled: true,
       builder: (context) => _DiaryForm(
         diary: diary,
-        onSave: () {
+        userId: _userId ?? 'local_user',
+        onSave: (newDiary) {
           Navigator.pop(context);
-          _loadDiaries();
+          if (diary != null) {
+            _updateMoodDiary(newDiary);
+          } else {
+            _createMoodDiary(newDiary);
+          }
         },
       ),
     );
@@ -117,12 +173,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                       (m) => m.name == diary.mood,
                       orElse: () => MoodType.calm,
                     );
-                    
+
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
                         onTap: () => _showDiaryForm(diary),
-                        onLongPress: () => _deleteDiary(diary),
+                        onLongPress: () => _deleteMoodDiary(diary),
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -184,9 +240,10 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
 class _DiaryForm extends StatefulWidget {
   final MoodDiaryModel? diary;
-  final VoidCallback onSave;
+  final String userId;
+  final Function(MoodDiaryModel) onSave;
 
-  const _DiaryForm({this.diary, required this.onSave});
+  const _DiaryForm({this.diary, required this.userId, required this.onSave});
 
   @override
   State<_DiaryForm> createState() => _DiaryFormState();
@@ -216,32 +273,17 @@ class _DiaryFormState extends State<_DiaryForm> {
     super.dispose();
   }
 
-  Future<void> _save() async {
-    final prefs = await SharedPreferences.getInstance();
-    final diariesJson = prefs.getStringList('mood_diaries') ?? [];
-    
+  void _save() {
     final newDiary = MoodDiaryModel(
       id: widget.diary?.id ?? 'mood_${DateTime.now().millisecondsSinceEpoch}',
+      userId: widget.userId,
       mood: _selectedMood.name,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       date: _selectedDate,
       createdAt: widget.diary?.createdAt ?? DateTime.now(),
     );
-    
-    // 更新或添加日记
-    final existingIndex = diariesJson.indexWhere((json) {
-      final diary = MoodDiaryModel.fromJson(jsonDecode(json));
-      return diary.id == newDiary.id;
-    });
-    
-    if (existingIndex >= 0) {
-      diariesJson[existingIndex] = jsonEncode(newDiary.toJson());
-    } else {
-      diariesJson.add(jsonEncode(newDiary.toJson()));
-    }
-    
-    await prefs.setStringList('mood_diaries', diariesJson);
-    widget.onSave();
+
+    widget.onSave(newDiary);
   }
 
   @override
@@ -262,7 +304,7 @@ class _DiaryFormState extends State<_DiaryForm> {
             style: Theme.of(context).textTheme.titleLarge,
           ),
           const SizedBox(height: 16),
-          
+
           // 心情选择
           Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
@@ -286,7 +328,7 @@ class _DiaryFormState extends State<_DiaryForm> {
             )).toList(),
           ),
           const SizedBox(height: 16),
-          
+
           // 内容输入
           TextField(
             controller: _contentController,
@@ -297,7 +339,7 @@ class _DiaryFormState extends State<_DiaryForm> {
             ),
           ),
           const SizedBox(height: 16),
-          
+
           // 日期选择
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -316,7 +358,7 @@ class _DiaryFormState extends State<_DiaryForm> {
             },
           ),
           const SizedBox(height: 16),
-          
+
           FilledButton(
             onPressed: _save,
             child: const Text('保存'),

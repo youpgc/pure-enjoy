@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/database_service.dart';
 import '../models/expense_model.dart';
 
 /// 支出列表页面
@@ -18,6 +18,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   String _selectedCategory = 'all';
   DateTime _selectedMonth = DateTime.now();
 
+  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+
   @override
   void initState() {
     super.initState();
@@ -25,32 +27,38 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   Future<void> _loadExpenses() async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final expensesJson = prefs.getStringList('expenses') ?? [];
-      
-      var expenses = expensesJson
-          .map((json) => ExpenseModel.fromJson(jsonDecode(json)))
-          .toList();
-      
+      var expenses = await DatabaseService.instance.getExpenses(userId);
+
       // 按月份筛选
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-      
+
       expenses = expenses.where((e) {
         return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
                e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
       }).toList();
-      
+
       // 按分类筛选
       if (_selectedCategory != 'all') {
         expenses = expenses.where((e) => e.category == _selectedCategory).toList();
       }
-      
+
       expenses.sort((a, b) => b.date.compareTo(a.date));
-      
+
       setState(() {
         _expenses = expenses;
         _isLoading = false;
@@ -65,12 +73,44 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
   }
 
-  Future<void> _saveExpenses() async {
-    final prefs = await SharedPreferences.getInstance();
-    final expensesJson = _expenses
-        .map((expense) => jsonEncode(expense.toJson()))
-        .toList();
-    await prefs.setStringList('expenses', expensesJson);
+  Future<void> _addExpense(ExpenseModel expense) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.createExpense(expense);
+      await _loadExpenses();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('添加成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _editExpense(ExpenseModel expense) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.updateExpense(expense);
+      await _loadExpenses();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('更新成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
   }
 
   Future<void> _deleteExpense(ExpenseModel expense) async {
@@ -91,12 +131,25 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         ],
       ),
     );
-    
+
     if (confirm == true) {
-      setState(() {
-        _expenses.removeWhere((e) => e.id == expense.id);
-      });
-      await _saveExpenses();
+      setState(() => _isLoading = true);
+      try {
+        await DatabaseService.instance.deleteExpense(expense.id);
+        await _loadExpenses();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('删除成功')),
+          );
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -106,9 +159,14 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       isScrollControlled: true,
       builder: (context) => _ExpenseForm(
         expense: expense,
-        onSave: () {
+        userId: _userId ?? 'local_user',
+        onSave: (newExpense) {
           Navigator.pop(context);
-          _loadExpenses();
+          if (expense != null) {
+            _editExpense(newExpense);
+          } else {
+            _addExpense(newExpense);
+          }
         },
       ),
     );
@@ -121,7 +179,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('记账'),
@@ -171,7 +229,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
               ],
             ),
           ),
-          
+
           // 分类筛选
           SizedBox(
             height: 40,
@@ -199,7 +257,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
             ),
           ),
           const SizedBox(height: 8),
-          
+
           // 支出列表
           Expanded(
             child: _isLoading
@@ -215,7 +273,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                             (c) => c.name == expense.category,
                             orElse: () => ExpenseCategory.other,
                           );
-                          
+
                           return Card(
                             margin: const EdgeInsets.only(bottom: 8),
                             child: ListTile(
@@ -282,9 +340,10 @@ class _CategoryChip extends StatelessWidget {
 
 class _ExpenseForm extends StatefulWidget {
   final ExpenseModel? expense;
-  final VoidCallback onSave;
+  final String userId;
+  final Function(ExpenseModel) onSave;
 
-  const _ExpenseForm({this.expense, required this.onSave});
+  const _ExpenseForm({this.expense, required this.userId, required this.onSave});
 
   @override
   State<_ExpenseForm> createState() => _ExpenseFormState();
@@ -318,35 +377,20 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     super.dispose();
   }
 
-  Future<void> _save() async {
+  void _save() {
     if (!_formKey.currentState!.validate()) return;
-    
-    final prefs = await SharedPreferences.getInstance();
-    final expensesJson = prefs.getStringList('expenses') ?? [];
-    
+
     final newExpense = ExpenseModel(
       id: widget.expense?.id ?? 'expense_${DateTime.now().millisecondsSinceEpoch}',
+      userId: widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
       description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
       date: _selectedDate,
       createdAt: widget.expense?.createdAt ?? DateTime.now(),
     );
-    
-    // 更新或添加支出
-    final existingIndex = expensesJson.indexWhere((json) {
-      final expense = ExpenseModel.fromJson(jsonDecode(json));
-      return expense.id == newExpense.id;
-    });
-    
-    if (existingIndex >= 0) {
-      expensesJson[existingIndex] = jsonEncode(newExpense.toJson());
-    } else {
-      expensesJson.add(jsonEncode(newExpense.toJson()));
-    }
-    
-    await prefs.setStringList('expenses', expensesJson);
-    widget.onSave();
+
+    widget.onSave(newExpense);
   }
 
   @override
@@ -369,7 +413,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
-            
+
             // 金额输入
             TextFormField(
               controller: _amountController,
@@ -385,7 +429,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             // 分类选择
             Text('分类', style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 8),
@@ -407,7 +451,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               )).toList(),
             ),
             const SizedBox(height: 16),
-            
+
             // 备注
             TextFormField(
               controller: _descriptionController,
@@ -416,7 +460,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               ),
             ),
             const SizedBox(height: 16),
-            
+
             // 日期选择
             ListTile(
               title: const Text('日期'),
@@ -434,7 +478,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
               },
             ),
             const SizedBox(height: 16),
-            
+
             FilledButton(
               onPressed: _save,
               child: const Text('保存'),

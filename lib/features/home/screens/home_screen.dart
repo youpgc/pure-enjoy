@@ -4,6 +4,7 @@ import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
 import '../../../services/supabase_service.dart';
+import '../../auth/screens/login_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -15,14 +16,14 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
-  
+
   final List<Widget> _pages = const [
     DashboardPage(),
     LifeScreen(),
     NovelListScreen(),
     ProfilePage(),
   ];
-  
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -69,8 +70,8 @@ class DashboardPage extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final authService = AuthService.instance;
-    
+    final supabaseService = SupabaseService.instance;
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('纯享'),
@@ -99,7 +100,7 @@ class DashboardPage extends StatelessWidget {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    authService.currentUserEmail ?? '用户',
+                    supabaseService.currentUserEmail ?? '用户',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),
@@ -114,7 +115,7 @@ class DashboardPage extends StatelessWidget {
             ),
           ),
           const SizedBox(height: 24),
-          
+
           // 快捷操作
           Text(
             '快捷操作',
@@ -173,7 +174,7 @@ class DashboardPage extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 24),
-          
+
           // 最近活动
           Text(
             '最近活动',
@@ -283,9 +284,9 @@ class ProfilePage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final authService = AuthService.instance;
+    final supabaseService = SupabaseService.instance;
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的'),
@@ -322,12 +323,12 @@ class ProfilePage extends StatelessWidget {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         Text(
-                          authService.currentUserName ?? '用户',
+                          supabaseService.currentUserName ?? '用户',
                           style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),
                         Text(
-                          authService.currentUserEmail ?? '',
+                          supabaseService.currentUserEmail ?? '',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
                             color: colorScheme.onSurfaceVariant,
                           ),
@@ -345,7 +346,7 @@ class ProfilePage extends StatelessWidget {
               ),
             ),
           ),
-          
+
           // 功能列表
           ListTile(
             leading: const Icon(Icons.palette_outlined),
@@ -402,9 +403,23 @@ class ProfilePage extends StatelessWidget {
                   ],
                 ),
               );
-              
+
               if (confirm == true) {
-                await authService.signOut();
+                try {
+                  await supabaseService.signOut();
+                  if (context.mounted) {
+                    Navigator.of(context).pushAndRemoveUntil(
+                      MaterialPageRoute(builder: (_) => const LoginScreen()),
+                      (route) => false,
+                    );
+                  }
+                } catch (e) {
+                  if (context.mounted) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('退出登录失败: $e')),
+                    );
+                  }
+                }
               }
             },
           ),
@@ -412,10 +427,10 @@ class ProfilePage extends StatelessWidget {
       ),
     );
   }
-  
+
   void _showThemeDialog(BuildContext context) {
     final themeProvider = Provider.of<ThemeProvider>(context, listen: false);
-    
+
     showDialog(
       context: context,
       builder: (context) => AlertDialog(

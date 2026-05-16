@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/database_service.dart';
 import '../models/novel_model.dart';
 
 /// 小说阅读器页面
@@ -14,17 +16,19 @@ class NovelReaderScreen extends StatefulWidget {
 
 class _NovelReaderScreenState extends State<NovelReaderScreen> {
   final _scrollController = ScrollController();
-  
+
   List<NovelChapterModel> _chapters = [];
   NovelChapterModel? _currentChapter;
   int _currentChapterIndex = 0;
   bool _isLoading = true;
   bool _showMenu = false;
-  
+
   // 阅读设置
   double _fontSize = 18;
   double _lineHeight = 1.8;
   String _fontFamily = 'system';
+
+  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
 
   @override
   void initState() {
@@ -50,52 +54,57 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
   }
 
   Future<void> _loadChapters() async {
-    // 本地模拟数据
-    await Future.delayed(const Duration(milliseconds: 500));
-    
-    final chapters = List.generate(
-      widget.novel.chapterCount,
-      (index) => NovelChapterModel(
-        id: 'chapter_$index',
-        novelId: widget.novel.id,
-        title: '第 ${index + 1} 章',
-        content: _generateChapterContent(index + 1),
-        chapterOrder: index,
-        createdAt: DateTime.now().subtract(Duration(days: widget.novel.chapterCount - index)),
-      ),
-    );
-    
-    // 加载阅读进度
-    final prefs = await SharedPreferences.getInstance();
-    final savedIndex = prefs.getInt('novel_progress_${widget.novel.id}') ?? 0;
-    final startIndex = savedIndex < chapters.length ? savedIndex : 0;
-    
-    setState(() {
-      _chapters = chapters;
-      _currentChapterIndex = startIndex;
-      _currentChapter = chapters.isNotEmpty ? chapters[startIndex] : null;
-      _isLoading = false;
-    });
-  }
+    setState(() => _isLoading = true);
 
-  String _generateChapterContent(int chapterNum) {
-    // 生成模拟章节内容
-    final buffer = StringBuffer();
-    buffer.writeln('第 $chapterNum 章');
-    buffer.writeln();
-    for (int i = 0; i < 20; i++) {
-      buffer.writeln('这是第 $chapterNum 章的第 ${i + 1} 段内容。这里展示的是模拟的章节文本，实际应用中应该从本地存储或网络加载真实的小说内容。');
-      buffer.writeln();
+    try {
+      // 加载小说章节
+      final chapters = await DatabaseService.instance.getNovelChapters(widget.novel.id);
+
+      // 加载阅读进度
+      int startIndex = 0;
+      final userId = _userId;
+      if (userId != null) {
+        final progress = await DatabaseService.instance.getReadingProgress(userId, widget.novel.id);
+        if (progress != null && progress.currentChapterId != null) {
+          final chapterIndex = chapters.indexWhere((c) => c.id == progress.currentChapterId);
+          if (chapterIndex >= 0) {
+            startIndex = chapterIndex;
+          }
+        }
+      }
+
+      setState(() {
+        _chapters = chapters;
+        _currentChapterIndex = startIndex;
+        _currentChapter = chapters.isNotEmpty ? chapters[startIndex] : null;
+        _isLoading = false;
+      });
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载章节失败: $e')),
+        );
+      }
     }
-    return buffer.toString();
   }
 
   Future<void> _saveProgress() async {
     if (_currentChapter == null) return;
-    
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt('novel_progress_${widget.novel.id}', _currentChapterIndex);
-    await prefs.setString('novel_last_read_${widget.novel.id}', DateTime.now().toIso8601String());
+
+    final userId = _userId;
+    if (userId == null) return;
+
+    try {
+      await DatabaseService.instance.updateReadingProgress(
+        userId: userId,
+        novelId: widget.novel.id,
+        currentChapterId: _currentChapter!.id,
+        currentPosition: _scrollController.hasClients ? _scrollController.offset.toInt() : 0,
+      );
+    } catch (e) {
+      debugPrint('保存阅读进度失败: $e');
+    }
   }
 
   void _previousChapter() {
@@ -146,7 +155,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
                 itemBuilder: (context, index) {
                   final chapter = _chapters[index];
                   final isCurrent = index == _currentChapterIndex;
-                  
+
                   return ListTile(
                     title: Text(
                       chapter.title,
@@ -197,7 +206,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
                 style: Theme.of(context).textTheme.titleLarge,
               ),
               const SizedBox(height: 24),
-              
+
               // 字体大小
               Row(
                 children: [
@@ -227,7 +236,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
                 ],
               ),
               const SizedBox(height: 16),
-              
+
               // 行间距
               Row(
                 children: [
@@ -258,14 +267,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       backgroundColor: Theme.of(context).scaffoldBackgroundColor,
       appBar: _showMenu
           ? AppBar(
               title: Text(
                 _currentChapter?.title ?? widget.novel.title,
-                style: TextStyle(fontSize: 16),
+                style: const TextStyle(fontSize: 16),
               ),
               actions: [
                 IconButton(

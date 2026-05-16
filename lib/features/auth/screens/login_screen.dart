@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
-import '../../services/supabase_service.dart';
+import '../../../services/supabase_service.dart';
+import '../../home/screens/home_screen.dart';
 
 /// 登录页面
 class LoginScreen extends StatefulWidget {
@@ -13,11 +14,11 @@ class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
   final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
-  
+
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _isRegister = false;
-  
+
   @override
   void dispose() {
     _emailController.dispose();
@@ -27,32 +28,38 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _submit() async {
     if (!_formKey.currentState!.validate()) return;
-    
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final authService = AuthService.instance;
-      
+      final supabaseService = SupabaseService.instance;
+
       if (_isRegister) {
-        final success = await authService.signUp(
+        final response = await supabaseService.signUp(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        if (success && mounted) {
+        if (response.user != null && mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('注册成功！')),
+            const SnackBar(content: Text('注册成功！请登录')),
           );
+          setState(() => _isRegister = false);
         } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('注册失败，请重试')),
           );
         }
       } else {
-        final success = await authService.signIn(
+        final response = await supabaseService.signIn(
           _emailController.text.trim(),
           _passwordController.text,
         );
-        if (!success && mounted) {
+        if (response.user != null && mounted) {
+          // 登录成功，跳转到首页
+          Navigator.of(context).pushReplacement(
+            MaterialPageRoute(builder: (_) => const HomeScreen()),
+          );
+        } else if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('登录失败，请检查邮箱和密码')),
           );
@@ -77,7 +84,7 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -115,7 +122,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 48),
-                    
+
                     // 邮箱输入框
                     TextFormField(
                       controller: _emailController,
@@ -137,7 +144,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // 密码输入框
                     TextFormField(
                       controller: _passwordController,
@@ -168,7 +175,7 @@ class _LoginScreenState extends State<LoginScreen> {
                       },
                     ),
                     const SizedBox(height: 24),
-                    
+
                     // 登录/注册按钮
                     FilledButton(
                       onPressed: _isLoading ? null : _submit,
@@ -181,7 +188,7 @@ class _LoginScreenState extends State<LoginScreen> {
                           : Text(_isRegister ? '注册' : '登录'),
                     ),
                     const SizedBox(height: 16),
-                    
+
                     // 切换登录/注册
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,

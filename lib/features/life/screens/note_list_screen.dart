@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:convert';
 import 'package:intl/intl.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
+import '../../../services/database_service.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面
@@ -17,6 +17,8 @@ class _NoteListScreenState extends State<NoteListScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
 
+  String? get _userId => Supabase.instance.client.auth.currentUser?.id;
+
   @override
   void initState() {
     super.initState();
@@ -24,23 +26,22 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _loadNotes() async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
+
     setState(() => _isLoading = true);
-    
+
     try {
-      final prefs = await SharedPreferences.getInstance();
-      final notesJson = prefs.getStringList('notes') ?? [];
-      
-      final notes = notesJson
-          .map((json) => NoteModel.fromJson(jsonDecode(json)))
-          .toList();
-      
-      notes.sort((a, b) {
-        if (a.isPinned != b.isPinned) {
-          return a.isPinned ? -1 : 1;
-        }
-        return b.createdAt.compareTo(a.createdAt);
-      });
-      
+      final notes = await DatabaseService.instance.getNotes(userId);
+
       setState(() {
         _notes = notes;
         _isLoading = false;
@@ -55,22 +56,43 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  Future<void> _saveNotes() async {
-    final prefs = await SharedPreferences.getInstance();
-    final notesJson = _notes
-        .map((note) => jsonEncode(note.toJson()))
-        .toList();
-    await prefs.setStringList('notes', notesJson);
+  Future<void> _createNote(NoteModel note) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.createNote(note);
+      await _loadNotes();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('创建成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('创建失败: $e')),
+        );
+      }
+    }
   }
 
-  Future<void> _togglePin(NoteModel note) async {
-    final index = _notes.indexWhere((n) => n.id == note.id);
-    if (index >= 0) {
-      setState(() {
-        _notes[index] = note.copyWith(isPinned: !note.isPinned);
-      });
-      await _saveNotes();
-      _loadNotes();
+  Future<void> _updateNote(NoteModel note) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.updateNote(note);
+      await _loadNotes();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('更新成功')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
     }
   }
 
@@ -92,12 +114,45 @@ class _NoteListScreenState extends State<NoteListScreen> {
         ],
       ),
     );
-    
+
     if (confirm == true) {
-      setState(() {
-        _notes.removeWhere((n) => n.id == note.id);
-      });
-      await _saveNotes();
+      setState(() => _isLoading = true);
+      try {
+        await DatabaseService.instance.deleteNote(note.id);
+        await _loadNotes();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('删除成功')),
+          );
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _togglePin(NoteModel note) async {
+    setState(() => _isLoading = true);
+    try {
+      await DatabaseService.instance.togglePin(note.id, !note.isPinned);
+      await _loadNotes();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text(note.isPinned ? '已取消置顶' : '已置顶')),
+        );
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e')),
+        );
+      }
     }
   }
 
@@ -107,7 +162,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
       MaterialPageRoute(
         builder: (_) => _NoteEditScreen(
           note: note,
-          onSave: _loadNotes,
+          userId: _userId ?? 'local_user',
+          onSave: (newNote) {
+            if (note != null) {
+              _updateNote(newNote);
+            } else {
+              _createNote(newNote);
+            }
+          },
         ),
       ),
     );
@@ -125,7 +187,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    
+
     return Scaffold(
       appBar: AppBar(
         title: const Text('笔记'),
@@ -149,7 +211,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               ),
             ),
           ),
-          
+
           // 笔记列表
           Expanded(
             child: _isLoading
@@ -183,7 +245,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                         itemCount: _filteredNotes.length,
                         itemBuilder: (context, index) {
                           final note = _filteredNotes[index];
-                          
+
                           return Card(
                             clipBehavior: Clip.antiAlias,
                             child: InkWell(
@@ -250,9 +312,10 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
 class _NoteEditScreen extends StatefulWidget {
   final NoteModel? note;
-  final VoidCallback onSave;
+  final String userId;
+  final Function(NoteModel) onSave;
 
-  const _NoteEditScreen({this.note, required this.onSave});
+  const _NoteEditScreen({this.note, required this.userId, required this.onSave});
 
   @override
   State<_NoteEditScreen> createState() => _NoteEditScreenState();
@@ -262,6 +325,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   bool _isPinned = false;
+  bool _isSaving = false;
 
   @override
   void initState() {
@@ -287,32 +351,19 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       );
       return;
     }
-    
-    final prefs = await SharedPreferences.getInstance();
-    final notesJson = prefs.getStringList('notes') ?? [];
-    
+
+    setState(() => _isSaving = true);
+
     final newNote = NoteModel(
       id: widget.note?.id ?? 'note_${DateTime.now().millisecondsSinceEpoch}',
+      userId: widget.userId,
       title: _titleController.text,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       isPinned: _isPinned,
       createdAt: widget.note?.createdAt ?? DateTime.now(),
     );
-    
-    // 更新或添加笔记
-    final existingIndex = notesJson.indexWhere((json) {
-      final note = NoteModel.fromJson(jsonDecode(json));
-      return note.id == newNote.id;
-    });
-    
-    if (existingIndex >= 0) {
-      notesJson[existingIndex] = jsonEncode(newNote.toJson());
-    } else {
-      notesJson.add(jsonEncode(newNote.toJson()));
-    }
-    
-    await prefs.setStringList('notes', notesJson);
-    widget.onSave();
+
+    widget.onSave(newNote);
     if (mounted) Navigator.pop(context);
   }
 
@@ -327,8 +378,14 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
             onPressed: () => setState(() => _isPinned = !_isPinned),
           ),
           IconButton(
-            icon: const Icon(Icons.save),
-            onPressed: _save,
+            icon: _isSaving
+                ? const SizedBox(
+                    height: 20,
+                    width: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.save),
+            onPressed: _isSaving ? null : _save,
           ),
         ],
       ),
