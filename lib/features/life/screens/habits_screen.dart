@@ -87,11 +87,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
       await _db.updateHabit(updatedHabit);
       
       // 添加打卡记录
-      final userId = AuthService.instance.currentUserId ?? 'local_user';
       final checkin = HabitCheckinModel(
         id: const Uuid().v4(),
         habitId: habit.id,
-        userId: userId,
         checkinAt: DateTime.now(),
         createdAt: DateTime.now(),
       );
