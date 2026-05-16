@@ -1,19 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:supabase_flutter/supabase_flutter.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
-import 'config.dart';
+import 'features/auth/screens/login_screen.dart';
+import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-
-  // 初始化 Supabase
-  await Supabase.initialize(
-    url: AppConfig.supabaseUrl,
-    anonKey: AppConfig.supabaseAnonKey,
-  );
-
+  
+  // 初始化认证服务（从本地存储恢复会话）
+  await AuthService.instance.initialize();
+  
   runApp(const PureEnjoyApp());
 }
 
@@ -21,7 +18,7 @@ class PureEnjoyApp extends StatelessWidget {
   const PureEnjoyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  WidgetBuilder build(BuildContext context) {
     return ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: Consumer<ThemeProvider>(
@@ -44,10 +41,24 @@ class PureEnjoyApp extends StatelessWidget {
               useMaterial3: true,
             ),
             themeMode: themeProvider.themeMode,
-            home: const HomeScreen(),
+            home: const AuthWrapper(),
           );
         },
       ),
     );
+  }
+}
+
+/// 认证状态包装器
+class AuthWrapper extends StatelessWidget {
+  const AuthWrapper({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    // 检查是否已登录
+    if (AuthService.instance.isAuthenticated) {
+      return const HomeScreen();
+    }
+    return const LoginScreen();
   }
 }

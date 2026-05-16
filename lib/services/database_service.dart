@@ -1,595 +1,536 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
-import '../config.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
+import 'supabase_service.dart';
 import '../features/life/models/expense_model.dart';
 import '../features/life/models/mood_diary_model.dart';
 import '../features/life/models/note_model.dart';
 import '../features/life/models/weight_record_model.dart';
 import '../features/novel/models/novel_model.dart';
 
-/// 数据库服务类 - 封装 Supabase 数据库操作
+/// 数据库服务
 class DatabaseService {
   static DatabaseService? _instance;
-
+  
   DatabaseService._();
-
+  
   static DatabaseService get instance {
     _instance ??= DatabaseService._();
     return _instance!;
   }
-
-  // Supabase 客户端
-  SupabaseClient get _client => Supabase.instance.client;
-
+  
+  /// 获取 REST API 基础 URL
+  String get _restUrl => '${SupabaseConfig.url}/rest/v1';
+  
+  /// 获取认证 Headers
+  Map<String, String> get _headers => AuthService.instance.authHeaders;
+  
   // ==================== 支出记录 CRUD ====================
-
-  /// 获取用户所有支出
+  
+  /// 获取用户的所有支出记录
   Future<List<ExpenseModel>> getExpenses(String userId) async {
     try {
-      final response = await _client
-          .from(AppConfig.expensesTable)
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
-
-      return (response as List<dynamic>)
-          .map((json) => ExpenseModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取支出记录失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/expenses?user_id=eq.$userId&order=date.desc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => ExpenseModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取支出记录失败: $e');
-      rethrow;
+      print('Get expenses error: $e');
+      return [];
     }
   }
-
-  /// 创建支出
-  Future<ExpenseModel> createExpense(ExpenseModel expense) async {
+  
+  /// 创建支出记录
+  Future<ExpenseModel?> createExpense(ExpenseModel expense) async {
     try {
-      final response = await _client
-          .from(AppConfig.expensesTable)
-          .insert(expense.toJson())
-          .select()
-          .single();
-
-      return ExpenseModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('创建支出记录失败: ${e.message}');
-      rethrow;
+      final response = await http.post(
+        Uri.parse('$_restUrl/expenses'),
+        headers: _headers,
+        body: jsonEncode(expense.toJson()),
+      );
+      
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return ExpenseModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('创建支出记录失败: $e');
-      rethrow;
+      print('Create expense error: $e');
+      return null;
     }
   }
-
-  /// 更新支出
-  Future<ExpenseModel> updateExpense(ExpenseModel expense) async {
+  
+  /// 更新支出记录
+  Future<ExpenseModel?> updateExpense(ExpenseModel expense) async {
     try {
-      final response = await _client
-          .from(AppConfig.expensesTable)
-          .update({
-            ...expense.toJson(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', expense.id)
-          .select()
-          .single();
-
-      return ExpenseModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('更新支出记录失败: ${e.message}');
-      rethrow;
+      final response = await http.patch(
+        Uri.parse('$_restUrl/expenses?id=eq.${expense.id}'),
+        headers: _headers,
+        body: jsonEncode(expense.toJson()),
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return ExpenseModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('更新支出记录失败: $e');
-      rethrow;
+      print('Update expense error: $e');
+      return null;
     }
   }
-
-  /// 删除支出
-  Future<void> deleteExpense(String id) async {
+  
+  /// 删除支出记录
+  Future<bool> deleteExpense(String id) async {
     try {
-      await _client
-          .from(AppConfig.expensesTable)
-          .delete()
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      debugPrint('删除支出记录失败: ${e.message}');
-      rethrow;
+      final response = await http.delete(
+        Uri.parse('$_restUrl/expenses?id=eq.$id'),
+        headers: _headers,
+      );
+      
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      debugPrint('删除支出记录失败: $e');
-      rethrow;
+      print('Delete expense error: $e');
+      return false;
     }
   }
-
+  
   // ==================== 心情日记 CRUD ====================
-
-  /// 获取用户所有心情日记
+  
+  /// 获取用户的所有心情日记
   Future<List<MoodDiaryModel>> getMoodDiaries(String userId) async {
     try {
-      final response = await _client
-          .from(AppConfig.moodDiariesTable)
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
-
-      return (response as List<dynamic>)
-          .map((json) => MoodDiaryModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取心情日记失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/mood_diaries?user_id=eq.$userId&order=date.desc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => MoodDiaryModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取心情日记失败: $e');
-      rethrow;
+      print('Get mood diaries error: $e');
+      return [];
     }
   }
-
+  
   /// 创建心情日记
-  Future<MoodDiaryModel> createMoodDiary(MoodDiaryModel diary) async {
+  Future<MoodDiaryModel?> createMoodDiary(MoodDiaryModel diary) async {
     try {
-      final response = await _client
-          .from(AppConfig.moodDiariesTable)
-          .insert(diary.toJson())
-          .select()
-          .single();
-
-      return MoodDiaryModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('创建心情日记失败: ${e.message}');
-      rethrow;
+      final response = await http.post(
+        Uri.parse('$_restUrl/mood_diaries'),
+        headers: _headers,
+        body: jsonEncode(diary.toJson()),
+      );
+      
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return MoodDiaryModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('创建心情日记失败: $e');
-      rethrow;
+      print('Create mood diary error: $e');
+      return null;
     }
   }
-
+  
   /// 更新心情日记
-  Future<MoodDiaryModel> updateMoodDiary(MoodDiaryModel diary) async {
+  Future<MoodDiaryModel?> updateMoodDiary(MoodDiaryModel diary) async {
     try {
-      final response = await _client
-          .from(AppConfig.moodDiariesTable)
-          .update({
-            ...diary.toJson(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', diary.id)
-          .select()
-          .single();
-
-      return MoodDiaryModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('更新心情日记失败: ${e.message}');
-      rethrow;
+      final response = await http.patch(
+        Uri.parse('$_restUrl/mood_diaries?id=eq.${diary.id}'),
+        headers: _headers,
+        body: jsonEncode(diary.toJson()),
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return MoodDiaryModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('更新心情日记失败: $e');
-      rethrow;
+      print('Update mood diary error: $e');
+      return null;
     }
   }
-
+  
   /// 删除心情日记
-  Future<void> deleteMoodDiary(String id) async {
+  Future<bool> deleteMoodDiary(String id) async {
     try {
-      await _client
-          .from(AppConfig.moodDiariesTable)
-          .delete()
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      debugPrint('删除心情日记失败: ${e.message}');
-      rethrow;
+      final response = await http.delete(
+        Uri.parse('$_restUrl/mood_diaries?id=eq.$id'),
+        headers: _headers,
+      );
+      
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      debugPrint('删除心情日记失败: $e');
-      rethrow;
+      print('Delete mood diary error: $e');
+      return false;
     }
   }
-
+  
   // ==================== 笔记 CRUD ====================
-
-  /// 获取用户所有笔记
+  
+  /// 获取用户的所有笔记
   Future<List<NoteModel>> getNotes(String userId) async {
     try {
-      final response = await _client
-          .from(AppConfig.notesTable)
-          .select()
-          .eq('user_id', userId)
-          .order('is_pinned', ascending: false)
-          .order('updated_at', ascending: false);
-
-      return (response as List<dynamic>)
-          .map((json) => NoteModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取笔记失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/notes?user_id=eq.$userId&order=is_pinned.desc,created_at.desc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => NoteModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取笔记失败: $e');
-      rethrow;
+      print('Get notes error: $e');
+      return [];
     }
   }
-
+  
   /// 创建笔记
-  Future<NoteModel> createNote(NoteModel note) async {
+  Future<NoteModel?> createNote(NoteModel note) async {
     try {
-      final response = await _client
-          .from(AppConfig.notesTable)
-          .insert(note.toJson())
-          .select()
-          .single();
-
-      return NoteModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('创建笔记失败: ${e.message}');
-      rethrow;
+      final response = await http.post(
+        Uri.parse('$_restUrl/notes'),
+        headers: _headers,
+        body: jsonEncode(note.toJson()),
+      );
+      
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return NoteModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('创建笔记失败: $e');
-      rethrow;
+      print('Create note error: $e');
+      return null;
     }
   }
-
+  
   /// 更新笔记
-  Future<NoteModel> updateNote(NoteModel note) async {
+  Future<NoteModel?> updateNote(NoteModel note) async {
     try {
-      final response = await _client
-          .from(AppConfig.notesTable)
-          .update({
-            ...note.toJson(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', note.id)
-          .select()
-          .single();
-
-      return NoteModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('更新笔记失败: ${e.message}');
-      rethrow;
+      final response = await http.patch(
+        Uri.parse('$_restUrl/notes?id=eq.${note.id}'),
+        headers: _headers,
+        body: jsonEncode(note.toJson()),
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return NoteModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('更新笔记失败: $e');
-      rethrow;
+      print('Update note error: $e');
+      return null;
     }
   }
-
+  
   /// 删除笔记
-  Future<void> deleteNote(String id) async {
+  Future<bool> deleteNote(String id) async {
     try {
-      await _client
-          .from(AppConfig.notesTable)
-          .delete()
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      debugPrint('删除笔记失败: ${e.message}');
-      rethrow;
+      final response = await http.delete(
+        Uri.parse('$_restUrl/notes?id=eq.$id'),
+        headers: _headers,
+      );
+      
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      debugPrint('删除笔记失败: $e');
-      rethrow;
+      print('Delete note error: $e');
+      return false;
     }
   }
-
+  
   /// 切换笔记置顶状态
-  Future<NoteModel> togglePin(String id, bool isPinned) async {
+  Future<bool> togglePin(String id, bool isPinned) async {
     try {
-      final response = await _client
-          .from(AppConfig.notesTable)
-          .update({
-            'is_pinned': isPinned,
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', id)
-          .select()
-          .single();
-
-      return NoteModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('切换笔记置顶状态失败: ${e.message}');
-      rethrow;
+      final response = await http.patch(
+        Uri.parse('$_restUrl/notes?id=eq.$id'),
+        headers: _headers,
+        body: jsonEncode({'is_pinned': isPinned}),
+      );
+      
+      return response.statusCode == 200;
     } catch (e) {
-      debugPrint('切换笔记置顶状态失败: $e');
-      rethrow;
+      print('Toggle pin error: $e');
+      return false;
     }
   }
-
+  
   // ==================== 体重记录 CRUD ====================
-
-  /// 获取用户所有体重记录
+  
+  /// 获取用户的所有体重记录
   Future<List<WeightRecordModel>> getWeightRecords(String userId) async {
     try {
-      final response = await _client
-          .from(AppConfig.weightRecordsTable)
-          .select()
-          .eq('user_id', userId)
-          .order('date', ascending: false);
-
-      return (response as List<dynamic>)
-          .map((json) => WeightRecordModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取体重记录失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/weight_records?user_id=eq.$userId&order=date.desc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => WeightRecordModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取体重记录失败: $e');
-      rethrow;
+      print('Get weight records error: $e');
+      return [];
     }
   }
-
+  
   /// 创建体重记录
-  Future<WeightRecordModel> createWeightRecord(WeightRecordModel record) async {
+  Future<WeightRecordModel?> createWeightRecord(WeightRecordModel record) async {
     try {
-      final response = await _client
-          .from(AppConfig.weightRecordsTable)
-          .insert(record.toJson())
-          .select()
-          .single();
-
-      return WeightRecordModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('创建体重记录失败: ${e.message}');
-      rethrow;
+      final response = await http.post(
+        Uri.parse('$_restUrl/weight_records'),
+        headers: _headers,
+        body: jsonEncode(record.toJson()),
+      );
+      
+      if (response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return WeightRecordModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('创建体重记录失败: $e');
-      rethrow;
+      print('Create weight record error: $e');
+      return null;
     }
   }
-
+  
   /// 更新体重记录
-  Future<WeightRecordModel> updateWeightRecord(WeightRecordModel record) async {
+  Future<WeightRecordModel?> updateWeightRecord(WeightRecordModel record) async {
     try {
-      final response = await _client
-          .from(AppConfig.weightRecordsTable)
-          .update({
-            ...record.toJson(),
-            'updated_at': DateTime.now().toIso8601String(),
-          })
-          .eq('id', record.id)
-          .select()
-          .single();
-
-      return WeightRecordModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('更新体重记录失败: ${e.message}');
-      rethrow;
+      final response = await http.patch(
+        Uri.parse('$_restUrl/weight_records?id=eq.${record.id}'),
+        headers: _headers,
+        body: jsonEncode(record.toJson()),
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return WeightRecordModel.fromJson(data.first);
+      }
+      return null;
     } catch (e) {
-      debugPrint('更新体重记录失败: $e');
-      rethrow;
+      print('Update weight record error: $e');
+      return null;
     }
   }
-
+  
   /// 删除体重记录
-  Future<void> deleteWeightRecord(String id) async {
+  Future<bool> deleteWeightRecord(String id) async {
     try {
-      await _client
-          .from(AppConfig.weightRecordsTable)
-          .delete()
-          .eq('id', id);
-    } on PostgrestException catch (e) {
-      debugPrint('删除体重记录失败: ${e.message}');
-      rethrow;
+      final response = await http.delete(
+        Uri.parse('$_restUrl/weight_records?id=eq.$id'),
+        headers: _headers,
+      );
+      
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      debugPrint('删除体重记录失败: $e');
-      rethrow;
+      print('Delete weight record error: $e');
+      return false;
     }
   }
-
+  
   // ==================== 小说相关 ====================
-
+  
   /// 获取所有公共小说（user_id is null）
   Future<List<NovelModel>> getNovels() async {
     try {
-      final response = await _client
-          .from(AppConfig.novelsTable)
-          .select()
-          .isFilter('user_id', null)
-          .order('created_at', ascending: false);
-
-      return (response as List<dynamic>)
-          .map((json) => NovelModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取小说列表失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/novels?user_id=is.null&order=created_at.desc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => NovelModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取小说列表失败: $e');
-      rethrow;
+      print('Get novels error: $e');
+      return [];
     }
   }
-
-  /// 获取小说章节
+  
+  /// 获取小说章节列表
   Future<List<NovelChapterModel>> getNovelChapters(String novelId) async {
     try {
-      final response = await _client
-          .from(AppConfig.novelChaptersTable)
-          .select()
-          .eq('novel_id', novelId)
-          .order('chapter_order', ascending: true);
-
-      return (response as List<dynamic>)
-          .map((json) => NovelChapterModel.fromJson(json as Map<String, dynamic>))
-          .toList();
-    } on PostgrestException catch (e) {
-      debugPrint('获取小说章节失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/novel_chapters?novel_id=eq.$novelId&order=chapter_num.asc'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        return data.map((json) => NovelChapterModel.fromJson(json)).toList();
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取小说章节失败: $e');
-      rethrow;
+      print('Get novel chapters error: $e');
+      return [];
     }
   }
-
+  
   /// 获取章节内容
-  Future<NovelChapterModel> getChapterContent(String chapterId) async {
+  Future<NovelChapterModel?> getChapterContent(String chapterId) async {
     try {
-      final response = await _client
-          .from(AppConfig.novelChaptersTable)
-          .select()
-          .eq('id', chapterId)
-          .single();
-
-      return NovelChapterModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('获取章节内容失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/novel_chapters?id=eq.$chapterId'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          return NovelChapterModel.fromJson(data.first);
+        }
+      }
+      return null;
     } catch (e) {
-      debugPrint('获取章节内容失败: $e');
-      rethrow;
+      print('Get chapter content error: $e');
+      return null;
     }
   }
-
+  
   /// 获取用户书架
   Future<List<Map<String, dynamic>>> getUserNovels(String userId) async {
     try {
-      final response = await _client
-          .from(AppConfig.userNovelsTable)
-          .select('*, novels(*)')
-          .eq('user_id', userId)
-          .order('added_at', ascending: false);
-
-      return (response as List<dynamic>).cast<Map<String, dynamic>>();
-    } on PostgrestException catch (e) {
-      debugPrint('获取用户书架失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/user_novels?user_id=eq.$userId'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        return jsonDecode(response.body);
+      }
+      return [];
     } catch (e) {
-      debugPrint('获取用户书架失败: $e');
-      rethrow;
+      print('Get user novels error: $e');
+      return [];
     }
   }
-
+  
   /// 添加到书架
-  Future<Map<String, dynamic>> addToBookshelf(String userId, String novelId) async {
+  Future<bool> addToBookshelf(String userId, String novelId) async {
     try {
-      final response = await _client
-          .from(AppConfig.userNovelsTable)
-          .insert({
-            'user_id': userId,
-            'novel_id': novelId,
-            'added_at': DateTime.now().toIso8601String(),
-          })
-          .select()
-          .single();
-
-      return response;
-    } on PostgrestException catch (e) {
-      debugPrint('添加到书架失败: ${e.message}');
-      rethrow;
+      final response = await http.post(
+        Uri.parse('$_restUrl/user_novels'),
+        headers: _headers,
+        body: jsonEncode({
+          'user_id': userId,
+          'novel_id': novelId,
+          'is_collected': true,
+        }),
+      );
+      
+      return response.statusCode == 201;
     } catch (e) {
-      debugPrint('添加到书架失败: $e');
-      rethrow;
+      print('Add to bookshelf error: $e');
+      return false;
     }
   }
-
+  
   /// 从书架移除
-  Future<void> removeFromBookshelf(String userId, String novelId) async {
+  Future<bool> removeFromBookshelf(String userId, String novelId) async {
     try {
-      await _client
-          .from(AppConfig.userNovelsTable)
-          .delete()
-          .eq('user_id', userId)
-          .eq('novel_id', novelId);
-    } on PostgrestException catch (e) {
-      debugPrint('从书架移除失败: ${e.message}');
-      rethrow;
+      final response = await http.delete(
+        Uri.parse('$_restUrl/user_novels?user_id=eq.$userId&novel_id=eq.$novelId'),
+        headers: _headers,
+      );
+      
+      return response.statusCode == 200 || response.statusCode == 204;
     } catch (e) {
-      debugPrint('从书架移除失败: $e');
-      rethrow;
+      print('Remove from bookshelf error: $e');
+      return false;
     }
   }
-
+  
   /// 更新阅读进度
-  Future<ReadingProgressModel> updateReadingProgress({
+  Future<bool> updateReadingProgress({
     required String userId,
     required String novelId,
-    String? currentChapterId,
-    int currentPosition = 0,
+    required String chapterId,
+    required int position,
+    required double progress,
   }) async {
     try {
-      final data = {
-        'user_id': userId,
-        'novel_id': novelId,
-        'current_chapter_id': currentChapterId,
-        'current_position': currentPosition,
-        'last_read_at': DateTime.now().toIso8601String(),
-      };
-
-      final response = await _client
-          .from(AppConfig.readingProgressTable)
-          .upsert(data, onConflict: 'user_id,novel_id')
-          .select()
-          .single();
-
-      return ReadingProgressModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('更新阅读进度失败: ${e.message}');
-      rethrow;
+      // 先检查是否已有记录
+      final checkResponse = await http.get(
+        Uri.parse('$_restUrl/user_novels?user_id=eq.$userId&novel_id=eq.$novelId'),
+        headers: _headers,
+      );
+      
+      if (checkResponse.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(checkResponse.body);
+        
+        if (data.isNotEmpty) {
+          // 更新现有记录
+          final response = await http.patch(
+            Uri.parse('$_restUrl/user_novels?user_id=eq.$userId&novel_id=eq.$novelId'),
+            headers: _headers,
+            body: jsonEncode({
+              'last_chapter': chapterId,
+              'progress': progress,
+              'last_read_at': DateTime.now().toIso8601String(),
+            }),
+          );
+          return response.statusCode == 200;
+        } else {
+          // 创建新记录
+          final response = await http.post(
+            Uri.parse('$_restUrl/user_novels'),
+            headers: _headers,
+            body: jsonEncode({
+              'user_id': userId,
+              'novel_id': novelId,
+              'last_chapter': chapterId,
+              'progress': progress,
+              'last_read_at': DateTime.now().toIso8601String(),
+              'is_collected': false,
+            }),
+          );
+          return response.statusCode == 201;
+        }
+      }
+      return false;
     } catch (e) {
-      debugPrint('更新阅读进度失败: $e');
-      rethrow;
+      print('Update reading progress error: $e');
+      return false;
     }
   }
-
+  
   /// 获取阅读进度
-  Future<ReadingProgressModel?> getReadingProgress(String userId, String novelId) async {
+  Future<Map<String, dynamic>?> getReadingProgress(String userId, String novelId) async {
     try {
-      final response = await _client
-          .from(AppConfig.readingProgressTable)
-          .select()
-          .eq('user_id', userId)
-          .eq('novel_id', novelId)
-          .maybeSingle();
-
-      if (response == null) return null;
-      return ReadingProgressModel.fromJson(response);
-    } on PostgrestException catch (e) {
-      debugPrint('获取阅读进度失败: ${e.message}');
-      rethrow;
+      final response = await http.get(
+        Uri.parse('$_restUrl/user_novels?user_id=eq.$userId&novel_id=eq.$novelId'),
+        headers: _headers,
+      );
+      
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          return data.first;
+        }
+      }
+      return null;
     } catch (e) {
-      debugPrint('获取阅读进度失败: $e');
-      rethrow;
+      print('Get reading progress error: $e');
+      return null;
     }
-  }
-
-  // ==================== Realtime 订阅 ====================
-
-  /// 订阅支出记录变化
-  RealtimeChannel subscribeToExpenses(
-    String userId,
-    void Function(PostgresChangePayload) callback,
-  ) {
-    return _client
-        .channel('expenses:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: AppConfig.expensesTable,
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: callback,
-        )
-        .subscribe();
-  }
-
-  /// 订阅笔记变化
-  RealtimeChannel subscribeToNotes(
-    String userId,
-    void Function(PostgresChangePayload) callback,
-  ) {
-    return _client
-        .channel('notes:$userId')
-        .onPostgresChanges(
-          event: PostgresChangeEvent.all,
-          schema: 'public',
-          table: AppConfig.notesTable,
-          filter: PostgresChangeFilter(
-            type: PostgresChangeFilterType.eq,
-            column: 'user_id',
-            value: userId,
-          ),
-          callback: callback,
-        )
-        .subscribe();
-  }
-
-  /// 取消订阅
-  Future<void> unsubscribe(RealtimeChannel channel) async {
-    await _client.removeChannel(channel);
   }
 }

@@ -1,142 +1,166 @@
-import 'package:supabase_flutter/supabase_flutter.dart';
-import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 
-/// Supabase 认证服务
-class SupabaseService {
-  static SupabaseService? _instance;
+/// Supabase 配置
+class SupabaseConfig {
+  static const String url = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
+  static const String anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oZHJianBxbXpzd3N3b2F6d2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjAyMTMsImV4cCI6MjA5NDE5NjIxM30.2qRPz7rB1n_q_8E2Z1F8X3h9Y4Z5a6b7c8d9e0f1a2b';
+  
+  static Map<String, String> get headers => {
+    'apikey': anonKey,
+    'Authorization': 'Bearer $anonKey',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
+}
 
-  SupabaseService._();
-
-  static SupabaseService get instance {
-    _instance ??= SupabaseService._();
+/// 用户认证服务
+class AuthService {
+  static AuthService? _instance;
+  
+  AuthService._();
+  
+  static AuthService get instance {
+    _instance ??= AuthService._();
     return _instance!;
   }
-
-  // Supabase 客户端
-  SupabaseClient get _client => Supabase.instance.client;
-
-  // 认证状态流
-  Stream<AuthState> get authStateChange => _client.auth.onAuthStateChange;
-
-  /// 获取当前用户
-  User? get currentUser => _client.auth.currentUser;
-
+  
+  String? _accessToken;
+  String? _refreshToken;
+  Map<String, dynamic>? _user;
+  
   /// 获取当前用户ID
-  String? get currentUserId => _client.auth.currentUser?.id;
-
+  String? get currentUserId => _user?['id'];
+  
   /// 获取当前用户邮箱
-  String? get currentUserEmail => _client.auth.currentUser?.email;
-
-  /// 获取当前用户元数据
-  Map<String, dynamic>? get userMetadata => _client.auth.currentUser?.userMetadata;
-
+  String? get currentUserEmail => _user?['email'];
+  
   /// 获取当前用户名
-  String? get currentUserName {
-    final metadata = userMetadata;
-    if (metadata != null && metadata['name'] != null) {
-      return metadata['name'] as String;
-    }
-    return currentUserEmail?.split('@').first;
-  }
-
+  String? get currentUserName => _user?['user_metadata']?['name'] ?? _user?['email']?.split('@').first;
+  
   /// 检查是否已登录
-  bool get isAuthenticated => _client.auth.currentUser != null;
-
+  bool get isAuthenticated => _accessToken != null && _user != null;
+  
+  /// 初始化（从本地存储恢复会话）
+  Future<void> initialize() async {
+    final prefs = await SharedPreferences.getInstance();
+    _accessToken = prefs.getString('access_token');
+    _refreshToken = prefs.getString('refresh_token');
+    final userJson = prefs.getString('user');
+    if (userJson != null) {
+      _user = jsonDecode(userJson);
+    }
+  }
+  
   /// 登录
-  Future<AuthResponse> signIn(String email, String password) async {
+  Future<bool> signIn(String email, String password) async {
     try {
-      final response = await _client.auth.signInWithPassword(
-        email: email,
-        password: password,
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/auth/v1/token?grant_type=password'),
+        headers: {
+          'apikey': SupabaseConfig.anonKey,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+        }),
       );
-      return response;
-    } on AuthException catch (e) {
-      debugPrint('登录失败: ${e.message}');
-      rethrow;
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _accessToken = data['access_token'];
+        _refreshToken = data['refresh_token'];
+        _user = data['user'];
+        
+        // 保存到本地
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', _accessToken!);
+        await prefs.setString('refresh_token', _refreshToken!);
+        await prefs.setString('user', jsonEncode(_user));
+        
+        return true;
+      }
+      return false;
     } catch (e) {
-      debugPrint('登录失败: $e');
-      rethrow;
+      print('Sign in error: $e');
+      return false;
     }
   }
-
+  
   /// 注册
-  Future<AuthResponse> signUp(String email, String password, {String? name}) async {
+  Future<bool> signUp(String email, String password, {String? name}) async {
     try {
-      final response = await _client.auth.signUp(
-        email: email,
-        password: password,
-        data: name != null ? {'name': name} : null,
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/auth/v1/signup'),
+        headers: {
+          'apikey': SupabaseConfig.anonKey,
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({
+          'email': email,
+          'password': password,
+          'data': {'name': name},
+        }),
       );
-      return response;
-    } on AuthException catch (e) {
-      debugPrint('注册失败: ${e.message}');
-      rethrow;
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        _accessToken = data['access_token'];
+        _refreshToken = data['refresh_token'];
+        _user = data['user'];
+        
+        // 保存到本地
+        final prefs = await SharedPreferences.getInstance();
+        await prefs.setString('access_token', _accessToken!);
+        await prefs.setString('refresh_token', _refreshToken!);
+        await prefs.setString('user', jsonEncode(_user));
+        
+        return true;
+      }
+      return false;
     } catch (e) {
-      debugPrint('注册失败: $e');
-      rethrow;
+      print('Sign up error: $e');
+      return false;
     }
   }
-
+  
   /// 退出登录
   Future<void> signOut() async {
     try {
-      await _client.auth.signOut();
-    } on AuthException catch (e) {
-      debugPrint('退出登录失败: ${e.message}');
-      rethrow;
+      if (_accessToken != null) {
+        await http.post(
+          Uri.parse('${SupabaseConfig.url}/auth/v1/logout'),
+          headers: {
+            'apikey': SupabaseConfig.anonKey,
+            'Authorization': 'Bearer $_accessToken',
+          },
+        );
+      }
     } catch (e) {
-      debugPrint('退出登录失败: $e');
-      rethrow;
+      print('Sign out error: $e');
+    } finally {
+      _accessToken = null;
+      _refreshToken = null;
+      _user = null;
+      
+      // 清除本地存储
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('access_token');
+      await prefs.remove('refresh_token');
+      await prefs.remove('user');
     }
   }
-
-  /// 更新用户信息
-  Future<UserResponse> updateUser({String? name, String? email, String? password}) async {
-    try {
-      final attributes = UserAttributes(
-        email: email,
-        password: password,
-        data: name != null ? {'name': name} : null,
-      );
-      final response = await _client.auth.updateUser(attributes);
-      return response;
-    } on AuthException catch (e) {
-      debugPrint('更新用户信息失败: ${e.message}');
-      rethrow;
-    } catch (e) {
-      debugPrint('更新用户信息失败: $e');
-      rethrow;
-    }
-  }
-
-  /// 发送密码重置邮件
-  Future<void> resetPassword(String email) async {
-    try {
-      await _client.auth.resetPasswordForEmail(email);
-    } on AuthException catch (e) {
-      debugPrint('发送密码重置邮件失败: ${e.message}');
-      rethrow;
-    } catch (e) {
-      debugPrint('发送密码重置邮件失败: $e');
-      rethrow;
-    }
-  }
-
-  /// 刷新会话
-  Future<AuthResponse> refreshSession() async {
-    try {
-      final response = await _client.auth.refreshSession();
-      return response;
-    } on AuthException catch (e) {
-      debugPrint('刷新会话失败: ${e.message}');
-      rethrow;
-    } catch (e) {
-      debugPrint('刷新会话失败: $e');
-      rethrow;
-    }
-  }
+  
+  /// 获取当前用户的认证 Headers
+  Map<String, String> get authHeaders => {
+    'apikey': SupabaseConfig.anonKey,
+    'Authorization': 'Bearer ${_accessToken ?? SupabaseConfig.anonKey}',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=representation',
+  };
 }
 
-/// 为了兼容旧代码，保留 AuthService 别名
-@Deprecated('使用 SupabaseService 替代')
-typedef AuthService = SupabaseService;
+// 为了兼容旧代码，保留别名
+typedef SupabaseService = AuthService;
