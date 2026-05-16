@@ -212,6 +212,14 @@ jobs:
             RELEASE_TYPE="feature"
           fi
           
+          # 先将其他所有已发布版本改为已下架
+          echo "Revoking other released versions..."
+          curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"status":"revoked","revoked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > /dev/null 2>&1 || true
+
           # 先尝试删除已存在的同版本记录（避免 409 冲突）
           curl -s -X DELETE "$SUPABASE_URL/rest/v1/app_versions?version=eq.${{ steps.version.outputs.version }}&build_number=eq.${{ steps.version.outputs.build_number }}" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
