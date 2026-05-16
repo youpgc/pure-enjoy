@@ -7,7 +7,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 /// Supabase 配置
 class SupabaseConfig {
   static const String url = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
-  static const String anonKey = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oZHJianBxbXpzd3N3b2F6d2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjAyMTMsImV4cCI6MjA5NDE5NjIxM30.2qRPz7rB1n_q_8E2Z1F8X3h9Y4Z5a6b7c8d9e0f1a2b';
+  static const String anonKey = 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
 
   static Map<String, String> get headers => {
     'apikey': anonKey,
