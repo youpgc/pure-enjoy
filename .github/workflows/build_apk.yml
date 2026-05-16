@@ -89,18 +89,12 @@ jobs:
             BUILD_NUMBER=$(git rev-list --count HEAD)
           else
             VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
-            BUILD_NUMBER=$(git rev-list --count HEAD)
+            BUILD_NUMBER=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "apk_name=pure-enjoy-v${VERSION}+${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
           echo "Version: $VERSION, Build: $BUILD_NUMBER"
-
-      # 9. 更新 pubspec.yaml 版本号
-      - name: Update version in pubspec.yaml
-        run: |
-          sed -i "s/^version: .*/version: ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}/" pubspec.yaml
-          cat pubspec.yaml | grep version
 
       # 10. 构建 APK
       - name: Build APK
