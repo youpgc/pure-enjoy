@@ -204,6 +204,14 @@ jobs:
           [ -z "$IS_FORCE_UPDATE" ] && IS_FORCE_UPDATE="false"
           
           echo "Creating database record..."
+          
+          # 根据是否强制更新决定 release_type
+          if [ "$IS_FORCE_UPDATE" = "true" ]; then
+            RELEASE_TYPE="force"
+          else
+            RELEASE_TYPE="feature"
+          fi
+          
           DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -212,16 +220,13 @@ jobs:
             -d "{
               \"version\": \"${{ steps.version.outputs.version }}\",
               \"build_number\": ${{ steps.version.outputs.build_number }},
-              \"download_url\": \"${{ steps.upload.outputs.download_url }}\",
-              \"file_size\": ${{ steps.filesize.outputs.bytes }},
-              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
+              \"release_type\": \"$RELEASE_TYPE\",
               \"release_notes\": \"$RELEASE_NOTES\",
-              \"is_force_update\": $IS_FORCE_UPDATE,
-              \"is_active\": true,
-              \"platform\": \"android\",
-              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
+              \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
+              \"apk_size\": ${{ steps.filesize.outputs.bytes }},
               \"status\": \"released\",
-              \"created_by\": \"github-actions\"
+              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"created_by\": null
             }")
           
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
