@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'dart:math';
+import 'package:crypto/crypto.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
@@ -17,6 +18,7 @@ class SupabaseConfig {
 }
 
 /// 用户认证服务
+/// 完全绕过 Supabase Auth，直接使用自定义 users 表进行认证
 class AuthService {
   static AuthService? _instance;
 
@@ -27,8 +29,6 @@ class AuthService {
     return _instance!;
   }
 
-  String? _accessToken;
-  String? _refreshToken;
   Map<String, dynamic>? _user;
 
   /// 获取当前用户ID
@@ -39,71 +39,155 @@ class AuthService {
 
   /// 获取当前用户名
   String? get currentUserName =>
-      _user?['user_metadata']?['name'] ??
-      _user?['user_metadata']?['username'] ??
+      _user?['username'] ??
+      _user?['nickname'] ??
       _user?['email']?.split('@').first;
 
   /// 检查是否已登录
-  bool get isAuthenticated => _accessToken != null && _user != null;
+  bool get isAuthenticated => _user != null;
+
+  /// 对密码进行 SHA-256 哈希
+  String _hashPassword(String password) {
+    final bytes = utf8.encode(password);
+    final hash = sha256.convert(bytes);
+    return hash.toString();
+  }
+
+  /// 生成用户ID（与管理后台格式一致）
+  /// 格式：U + 时间戳(10位) + 随机码(6位) + 校验码(2位)
+  String _generateUserId() {
+    final timestamp = (DateTime.now().millisecondsSinceEpoch ~/ 1000)
+        .toString()
+        .padLeft(10, '0');
+    final random = List.generate(
+      6,
+      (_) => 'ABCDEFGHIJKLMNOPQRSTUVWXYZ0123456789'[Random().nextInt(36)],
+    ).join();
+
+    // 校验码
+    int sum = 0;
+    for (int i = 0; i < (timestamp + random).length; i++) {
+      sum += (timestamp + random).codeUnitAt(i);
+    }
+    final checksum = (sum % 100).toString().padLeft(2, '0');
+
+    return 'U$timestamp$random$checksum';
+  }
 
   /// 初始化（从本地存储恢复会话）
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
-    _accessToken = prefs.getString('access_token');
-    _refreshToken = prefs.getString('refresh_token');
     final userJson = prefs.getString('user');
     if (userJson != null) {
       _user = jsonDecode(userJson);
     }
   }
 
-  /// 保存会话到本地
-  Future<void> _saveSession(Map<String, dynamic> data) async {
-    _accessToken = data['access_token'];
-    _refreshToken = data['refresh_token'];
-    _user = data['user'];
+  /// 保存用户信息到本地
+  Future<void> _saveUser(Map<String, dynamic> userData) async {
+    _user = userData;
 
     final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', _accessToken!);
-    await prefs.setString('refresh_token', _refreshToken!);
     await prefs.setString('user', jsonEncode(_user));
   }
 
-  /// 通过用户名+密码登录
-  /// 使用 Supabase auth 端点，将用户名作为邮箱的替代方式
-  /// 实际逻辑：先通过 users 表查询用户名对应的邮箱，再用邮箱登录
-  Future<bool> signInWithUsername(String username, String password) async {
+  /// 通过邮箱+密码登录
+  /// 直接查询 users 表验证邮箱+密码
+  Future<bool> signIn(String email, String password) async {
     try {
-      // 先通过 users 表查找用户名对应的用户
-      final queryResponse = await http.get(
+      final passwordHash = _hashPassword(password);
+
+      final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&select=id,email',
+          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );
 
-      if (queryResponse.statusCode == 200) {
-        final users = jsonDecode(queryResponse.body) as List;
+      if (response.statusCode == 200) {
+        final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('用户名不存在: $username');
+          print('邮箱或密码错误');
           return false;
         }
 
         final user = users[0] as Map<String, dynamic>;
-        final email = user['email'] as String?;
 
-        if (email != null && email.isNotEmpty) {
-          // 用邮箱登录
-          return await signIn(email, password);
-        } else {
-          // 用户没有绑定邮箱，尝试直接用用户名作为标识登录
-          // 使用自定义 RPC 或直接尝试
-          print('用户未绑定邮箱，尝试直接登录');
+        // 检查用户状态
+        if (user['status'] != 'active') {
+          print('用户已被禁用');
           return false;
         }
+
+        await _saveUser(user);
+
+        // 更新最后登录信息
+        await http.patch(
+          Uri.parse(
+            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
+          ),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode({
+            'last_login_at': DateTime.now().toUtc().toIso8601String(),
+            'login_count': (user['login_count'] ?? 0) + 1,
+          }),
+        );
+
+        return true;
+      }
+      return false;
+    } catch (e) {
+      print('Sign in error: $e');
+      return false;
+    }
+  }
+
+  /// 通过用户名+密码登录
+  /// 先通过 users 表查询用户名对应的邮箱，再用邮箱+密码登录
+  Future<bool> signInWithUsername(String username, String password) async {
+    try {
+      final passwordHash = _hashPassword(password);
+
+      // 直接通过用户名+密码哈希查询
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (response.statusCode == 200) {
+        final users = jsonDecode(response.body) as List;
+        if (users.isEmpty) {
+          print('用户名或密码错误');
+          return false;
+        }
+
+        final user = users[0] as Map<String, dynamic>;
+
+        // 检查用户状态
+        if (user['status'] != 'active') {
+          print('用户已被禁用');
+          return false;
+        }
+
+        await _saveUser(user);
+
+        // 更新最后登录信息
+        await http.patch(
+          Uri.parse(
+            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
+          ),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode({
+            'last_login_at': DateTime.now().toUtc().toIso8601String(),
+            'login_count': (user['login_count'] ?? 0) + 1,
+          }),
+        );
+
+        return true;
       }
 
-      // 如果 users 表查询失败，尝试直接用用户名作为邮箱登录
       return false;
     } catch (e) {
       print('signInWithUsername error: $e');
@@ -112,30 +196,49 @@ class AuthService {
   }
 
   /// 通过手机号+密码登录
-  /// 先通过 users 表查询手机号对应的用户，再用其邮箱登录
+  /// 先通过 users 表查询手机号对应的用户，再用密码验证
   Future<bool> signInWithPhone(String phone, String password) async {
     try {
-      // 先通过 users 表查找手机号对应的用户
-      final queryResponse = await http.get(
+      final passwordHash = _hashPassword(password);
+
+      // 直接通过手机号+密码哈希查询
+      final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&select=id,email',
+          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );
 
-      if (queryResponse.statusCode == 200) {
-        final users = jsonDecode(queryResponse.body) as List;
+      if (response.statusCode == 200) {
+        final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('手机号未注册: $phone');
+          print('手机号或密码错误');
           return false;
         }
 
         final user = users[0] as Map<String, dynamic>;
-        final email = user['email'] as String?;
 
-        if (email != null && email.isNotEmpty) {
-          return await signIn(email, password);
+        // 检查用户状态
+        if (user['status'] != 'active') {
+          print('用户已被禁用');
+          return false;
         }
+
+        await _saveUser(user);
+
+        // 更新最后登录信息
+        await http.patch(
+          Uri.parse(
+            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
+          ),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode({
+            'last_login_at': DateTime.now().toUtc().toIso8601String(),
+            'login_count': (user['login_count'] ?? 0) + 1,
+          }),
+        );
+
+        return true;
       }
 
       return false;
@@ -152,7 +255,7 @@ class AuthService {
       // 验证验证码
       final verifyResponse = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&sms_code=eq.$code&select=id,email,username,sms_code_expires_at',
+          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&sms_code=eq.$code&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,sms_code_expires_at',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -176,19 +279,27 @@ class AuthService {
           }
         }
 
-        final email = user['email'] as String?;
-        final userId = user['id'] as String?;
-
-        if (email != null && email.isNotEmpty) {
-          // 如果有邮箱，使用 Supabase auth 登录（需要密码，这里用特殊方式处理）
-          // 对于验证码登录，直接设置会话
-          await _createSessionForUser(userId!, user);
-          return true;
-        } else {
-          // 没有邮箱，直接创建会话
-          await _createSessionForUser(userId!, user);
-          return true;
+        // 检查用户状态
+        if (user['status'] != 'active') {
+          print('用户已被禁用');
+          return false;
         }
+
+        await _saveUser(user);
+
+        // 更新最后登录信息
+        await http.patch(
+          Uri.parse(
+            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
+          ),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode({
+            'last_login_at': DateTime.now().toUtc().toIso8601String(),
+            'login_count': (user['login_count'] ?? 0) + 1,
+          }),
+        );
+
+        return true;
       }
 
       return false;
@@ -196,30 +307,6 @@ class AuthService {
       print('signInWithPhoneCode error: $e');
       return false;
     }
-  }
-
-  /// 为用户创建本地会话（用于验证码登录等非密码登录方式）
-  Future<void> _createSessionForUser(
-    String userId,
-    Map<String, dynamic> userData,
-  ) async {
-    _user = {
-      'id': userId,
-      'email': userData['email'],
-      'user_metadata': {
-        'username': userData['username'],
-        'phone': userData['phone'],
-      },
-    };
-
-    // 生成一个临时 token（实际项目中应使用服务端签发的 JWT）
-    _accessToken = SupabaseConfig.anonKey;
-    _refreshToken = '';
-
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setString('access_token', _accessToken!);
-    await prefs.setString('refresh_token', _refreshToken!);
-    await prefs.setString('user', jsonEncode(_user));
   }
 
   /// 发送短信验证码
@@ -234,7 +321,6 @@ class AuthService {
       final expiresAt =
           DateTime.now().toUtc().add(const Duration(minutes: 5)).toIso8601String();
 
-      // 更新或插入验证码到 users 表
       // 先检查用户是否存在
       final checkResponse = await http.get(
         Uri.parse(
@@ -265,7 +351,6 @@ class AuthService {
           }
         } else {
           // 用户不存在，也可以发送验证码（注册场景）
-          // 这里简单返回成功，实际项目中应先注册或使用临时表
           print('手机号未注册，验证码: $code');
           return true;
         }
@@ -278,35 +363,8 @@ class AuthService {
     }
   }
 
-  /// 登录（邮箱+密码，保留原有方法）
-  Future<bool> signIn(String email, String password) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/auth/v1/token?grant_type=password'),
-        headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
-          'email': email,
-          'password': password,
-        }),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        await _saveSession(data);
-        return true;
-      }
-      return false;
-    } catch (e) {
-      print('Sign in error: $e');
-      return false;
-    }
-  }
-
   /// 注册（包含用户名、邮箱、手机号）
-  /// 先通过 Supabase Auth 创建用户，再更新 users 表
+  /// 直接 INSERT 到 users 表，密码使用 SHA-256 哈希
   Future<bool> signUp({
     required String username,
     required String password,
@@ -314,88 +372,44 @@ class AuthService {
     String? phone,
   }) async {
     try {
-      // 如果提供了邮箱，使用 Supabase Auth 注册
-      if (email != null && email.isNotEmpty) {
-        final response = await http.post(
-          Uri.parse('${SupabaseConfig.url}/auth/v1/signup'),
-          headers: {
-            'apikey': SupabaseConfig.anonKey,
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'email': email,
-            'password': password,
-            'data': {
-              'username': username,
-              'phone': phone,
-            },
-          }),
-        );
+      final passwordHash = _hashPassword(password);
+      final userId = _generateUserId();
+      final now = DateTime.now().toUtc().toIso8601String();
 
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          final data = jsonDecode(response.body);
-          await _saveSession(data);
+      final userData = {
+        'id': userId,
+        'email': email ?? '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local',
+        'username': username,
+        'password_hash': passwordHash,
+        'phone': phone,
+        'nickname': username,
+        'avatar_url': null,
+        'role': 'user',
+        'member_level': 'normal',
+        'points': 0,
+        'status': 'active',
+        'register_ip': null,
+        'last_login_ip': null,
+        'last_login_at': now,
+        'login_count': 1,
+        'created_at': now,
+        'updated_at': now,
+      };
 
-          // 更新 users 表，添加用户名和手机号
-          if (_user != null && _user!['id'] != null) {
-            await http.patch(
-              Uri.parse(
-                '${SupabaseConfig.url}/rest/v1/users?id=eq.${_user!['id']}',
-              ),
-              headers: SupabaseConfig.headers,
-              body: jsonEncode({
-                'username': username,
-                'phone': phone,
-              }),
-            );
-          }
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/users'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode(userData),
+      );
 
-          return true;
-        }
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        // 注册成功，自动登录
+        await _saveUser(userData);
+        return true;
       } else {
-        // 没有邮箱，直接在 users 表创建记录
-        // 生成一个伪邮箱作为标识
-        final pseudoEmail = '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local';
-
-        final response = await http.post(
-          Uri.parse('${SupabaseConfig.url}/auth/v1/signup'),
-          headers: {
-            'apikey': SupabaseConfig.anonKey,
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'email': pseudoEmail,
-            'password': password,
-            'data': {
-              'username': username,
-              'phone': phone,
-            },
-          }),
-        );
-
-        if (response.statusCode == 200 || response.statusCode == 201) {
-          final data = jsonDecode(response.body);
-          await _saveSession(data);
-
-          // 更新 users 表
-          if (_user != null && _user!['id'] != null) {
-            await http.patch(
-              Uri.parse(
-                '${SupabaseConfig.url}/rest/v1/users?id=eq.${_user!['id']}',
-              ),
-              headers: SupabaseConfig.headers,
-              body: jsonEncode({
-                'username': username,
-                'phone': phone,
-              }),
-            );
-          }
-
-          return true;
-        }
+        print('注册失败: ${response.statusCode} ${response.body}');
+        return false;
       }
-
-      return false;
     } catch (e) {
       print('Sign up error: $e');
       return false;
@@ -414,36 +428,28 @@ class AuthService {
   /// 退出登录
   Future<void> signOut() async {
     try {
-      if (_accessToken != null) {
-        await http.post(
-          Uri.parse('${SupabaseConfig.url}/auth/v1/logout'),
-          headers: {
-            'apikey': SupabaseConfig.anonKey,
-            'Authorization': 'Bearer $_accessToken',
-          },
-        );
-      }
+      // 不再调用 Supabase Auth 的 logout 端点
+      // 直接清除本地会话
     } catch (e) {
       print('Sign out error: $e');
     } finally {
-      _accessToken = null;
-      _refreshToken = null;
       _user = null;
 
       // 清除本地存储
       final prefs = await SharedPreferences.getInstance();
-      await prefs.remove('access_token');
-      await prefs.remove('refresh_token');
       await prefs.remove('user');
     }
   }
 
   /// 获取当前用户的认证 Headers
+  /// 不再使用 Supabase Auth 的 JWT token，使用 anon key
   Map<String, String> get authHeaders => {
     'apikey': SupabaseConfig.anonKey,
-    'Authorization': 'Bearer ${_accessToken ?? SupabaseConfig.anonKey}',
+    'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
     'Content-Type': 'application/json',
     'Prefer': 'return=representation',
+    // 自定义 header 传递当前用户ID（供 RLS 或业务逻辑使用）
+    if (_user?['id'] != null) 'x-user-id': _user!['id'] as String,
   };
 }
 
