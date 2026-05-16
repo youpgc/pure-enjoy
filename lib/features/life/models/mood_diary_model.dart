@@ -5,6 +5,7 @@ class MoodDiaryModel {
   final String id;
   final String userId;
   final String mood;
+  final String? moodLabel;
   final String? content;
   final DateTime date;
   final DateTime createdAt;
@@ -14,6 +15,7 @@ class MoodDiaryModel {
     required this.id,
     this.userId = 'local_user',
     required this.mood,
+    this.moodLabel,
     this.content,
     required this.date,
     required this.createdAt,
@@ -25,6 +27,7 @@ class MoodDiaryModel {
       id: json['id'] as String,
       userId: json['user_id'] as String,
       mood: json['mood'] as String,
+      moodLabel: json['mood_label'] as String?,
       content: json['content'] as String?,
       date: DateTime.parse(json['date'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
@@ -39,6 +42,7 @@ class MoodDiaryModel {
       'id': id,
       'user_id': userId,
       'mood': mood,
+      'mood_label': moodLabel,
       'content': content,
       'date': date.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
@@ -50,6 +54,7 @@ class MoodDiaryModel {
     String? id,
     String? userId,
     String? mood,
+    String? moodLabel,
     String? content,
     DateTime? date,
     DateTime? createdAt,
@@ -59,6 +64,7 @@ class MoodDiaryModel {
       id: id ?? this.id,
       userId: userId ?? this.userId,
       mood: mood ?? this.mood,
+      moodLabel: moodLabel ?? this.moodLabel,
       content: content ?? this.content,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,

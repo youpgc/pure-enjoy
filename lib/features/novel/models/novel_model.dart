@@ -1,25 +1,45 @@
 /// 小说模型
 class NovelModel {
   final String id;
+  final String? userId;
   final String title;
   final String? author;
   final String? cover;
   final String? description;
   final String? category;
+  final String? source;
+  final String? sourceUrl;
+  final List<String>? tags;
   final int chapterCount;
+  final int? wordCount;
   final String? status; // ongoing, completed
+  final bool? isFree;
+  final double? price;
+  final double? rating;
+  final int? readCount;
+  final int? collectCount;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
   NovelModel({
     required this.id,
+    this.userId,
     required this.title,
     this.author,
     this.cover,
     this.description,
     this.category,
+    this.source,
+    this.sourceUrl,
+    this.tags,
     this.chapterCount = 0,
+    this.wordCount,
     this.status,
+    this.isFree,
+    this.price,
+    this.rating,
+    this.readCount,
+    this.collectCount,
     required this.createdAt,
     this.updatedAt,
   });
@@ -27,13 +47,25 @@ class NovelModel {
   factory NovelModel.fromJson(Map<String, dynamic> json) {
     return NovelModel(
       id: json['id'] as String,
+      userId: json['user_id'] as String?,
       title: json['title'] as String,
       author: json['author'] as String?,
       cover: json['cover_url'] as String?,
       description: json['description'] as String?,
       category: json['category'] as String?,
+      source: json['source'] as String?,
+      sourceUrl: json['source_url'] as String?,
+      tags: json['tags'] != null
+          ? List<String>.from(json['tags'] as List)
+          : null,
       chapterCount: json['chapter_count'] as int? ?? 0,
+      wordCount: json['word_count'] as int?,
       status: json['status'] as String?,
+      isFree: json['is_free'] as bool?,
+      price: json['price'] != null ? (json['price'] as num).toDouble() : null,
+      rating: json['rating'] != null ? (json['rating'] as num).toDouble() : null,
+      readCount: json['read_count'] as int?,
+      collectCount: json['collect_count'] as int?,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -44,13 +76,23 @@ class NovelModel {
   Map<String, dynamic> toJson() {
     return {
       'id': id,
+      'user_id': userId,
       'title': title,
       'author': author,
       'cover_url': cover,
       'description': description,
       'category': category,
+      'source': source,
+      'source_url': sourceUrl,
+      'tags': tags,
       'chapter_count': chapterCount,
+      'word_count': wordCount,
       'status': status,
+      'is_free': isFree,
+      'price': price,
+      'rating': rating,
+      'read_count': readCount,
+      'collect_count': collectCount,
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
@@ -115,17 +157,23 @@ class ReadingProgressModel {
   final String id;
   final String userId;
   final String novelId;
-  final String? currentChapterId;
-  final int currentPosition;
+  final double progress;
+  final String? lastChapter;
+  final bool? isCollected;
   final DateTime lastReadAt;
+  final DateTime createdAt;
+  final DateTime? updatedAt;
 
   ReadingProgressModel({
     required this.id,
     required this.userId,
     required this.novelId,
-    this.currentChapterId,
-    this.currentPosition = 0,
+    this.progress = 0.0,
+    this.lastChapter,
+    this.isCollected,
     required this.lastReadAt,
+    required this.createdAt,
+    this.updatedAt,
   });
 
   factory ReadingProgressModel.fromJson(Map<String, dynamic> json) {
@@ -133,9 +181,14 @@ class ReadingProgressModel {
       id: json['id'] as String,
       userId: json['user_id'] as String,
       novelId: json['novel_id'] as String,
-      currentChapterId: json['current_chapter_id'] as String?,
-      currentPosition: json['current_position'] as int? ?? 0,
+      progress: json['progress'] != null ? (json['progress'] as num).toDouble() : 0.0,
+      lastChapter: json['last_chapter'] as String?,
+      isCollected: json['is_collected'] as bool?,
       lastReadAt: DateTime.parse(json['last_read_at'] as String),
+      createdAt: DateTime.parse(json['created_at'] as String),
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
     );
   }
 
@@ -144,9 +197,12 @@ class ReadingProgressModel {
       'id': id,
       'user_id': userId,
       'novel_id': novelId,
-      'current_chapter_id': currentChapterId,
-      'current_position': currentPosition,
+      'progress': progress,
+      'last_chapter': lastChapter,
+      'is_collected': isCollected,
       'last_read_at': lastReadAt.toIso8601String(),
+      'created_at': createdAt.toIso8601String(),
+      'updated_at': updatedAt?.toIso8601String(),
     };
   }
 }

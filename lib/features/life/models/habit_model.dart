@@ -134,17 +134,13 @@ class HabitModel {
 class HabitCheckinModel {
   final String id;
   final String habitId;
-  final String userId;
   final DateTime checkinAt;
-  final String? note;
   final DateTime createdAt;
 
   HabitCheckinModel({
     required this.id,
     required this.habitId,
-    this.userId = 'local_user',
     required this.checkinAt,
-    this.note,
     required this.createdAt,
   });
 
@@ -152,9 +148,7 @@ class HabitCheckinModel {
     return HabitCheckinModel(
       id: json['id'] as String,
       habitId: json['habit_id'] as String,
-      userId: json['user_id'] as String? ?? 'local_user',
       checkinAt: DateTime.parse(json['checkin_at'] as String),
-      note: json['note'] as String?,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -163,9 +157,7 @@ class HabitCheckinModel {
     return {
       'id': id,
       'habit_id': habitId,
-      'user_id': userId,
       'checkin_at': checkinAt.toIso8601String(),
-      'note': note,
       'created_at': createdAt.toIso8601String(),
     };
   }
