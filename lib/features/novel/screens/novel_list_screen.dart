@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/database_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 

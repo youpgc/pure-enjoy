@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/database_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
 
 /// 小说阅读器页面
@@ -99,8 +99,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> {
       await DatabaseService.instance.updateReadingProgress(
         userId: userId,
         novelId: widget.novel.id,
-        lastChapter: _currentChapter!.id,
-        currentPosition: _scrollController.hasClients ? _scrollController.offset.toInt() : 0,
+        chapterId: _currentChapter!.id,
+        position: _scrollController.hasClients ? _scrollController.offset.toInt() : 0,
+        progress: (_currentChapterIndex + 1) / _chapters.length,
       );
     } catch (e) {
       debugPrint('保存阅读进度失败: $e');

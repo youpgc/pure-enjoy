@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../services/database_service.dart';
-import '../../../services/auth_service.dart';
+import '../../../services/supabase_service.dart';
 import '../models/mood_diary_model.dart';
 
 /// 心情日记页面

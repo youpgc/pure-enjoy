@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
-import 'auth_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 存储文件对象
 class FileObject {
