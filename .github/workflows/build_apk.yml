@@ -162,14 +162,26 @@ jobs:
           
           echo "Uploading to: $DOWNLOAD_URL"
           
-          # 使用 curl 上传文件
-          curl -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
+          # 使用 curl 上传文件，带错误检查
+          echo "Starting upload..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @"build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+            --data-binary @"build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}")
+          
+          HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          
+          echo "Upload HTTP Code: $HTTP_CODE"
+          echo "Upload Response: $RESPONSE_BODY"
+          
+          if [ "$HTTP_CODE" -ne 200 ] && [ "$HTTP_CODE" -ne 201 ]; then
+            echo "❌ Upload failed with HTTP $HTTP_CODE"
+            exit 1
+          fi
           
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-          echo "Uploaded to: $DOWNLOAD_URL"
+          echo "✅ Uploaded to: $DOWNLOAD_URL"
 
       # 15. 创建版本记录到数据库
       - name: Create version record in database
@@ -186,7 +198,8 @@ jobs:
           IS_FORCE_UPDATE="${{ github.event.inputs.is_force_update }}"
           [ -z "$IS_FORCE_UPDATE" ] && IS_FORCE_UPDATE="false"
           
-          RESPONSE=$(curl -s -X POST "$SUPABASE_URL/rest/v1/app_versions" \
+          echo "Creating database record..."
+          DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
@@ -206,8 +219,19 @@ jobs:
               \"created_by\": \"github-actions\"
             }")
           
-          echo "Database response: $RESPONSE"
-          echo "version_id=$(echo $RESPONSE | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
+          DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
+          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
+          
+          echo "Database HTTP Code: $DB_HTTP_CODE"
+          echo "Database response: $DB_RESPONSE_BODY"
+          
+          if [ "$DB_HTTP_CODE" -ne 200 ] && [ "$DB_HTTP_CODE" -ne 201 ]; then
+            echo "❌ Database insert failed with HTTP $DB_HTTP_CODE"
+            exit 1
+          fi
+          
+          echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
+          echo "✅ Database record created successfully"
 
       # 16. 上传构建产物（作为备份）
       - name: Upload build artifact
