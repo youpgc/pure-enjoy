@@ -29,7 +29,7 @@ class NovelModel {
       id: json['id'] as String,
       title: json['title'] as String,
       author: json['author'] as String?,
-      cover: json['cover'] as String?,
+      cover: json['cover_url'] as String?,
       description: json['description'] as String?,
       category: json['category'] as String?,
       chapterCount: json['chapter_count'] as int? ?? 0,
@@ -46,7 +46,7 @@ class NovelModel {
       'id': id,
       'title': title,
       'author': author,
-      'cover': cover,
+      'cover_url': cover,
       'description': description,
       'category': category,
       'chapter_count': chapterCount,
@@ -64,6 +64,9 @@ class NovelChapterModel {
   final String title;
   final String content;
   final int chapterOrder;
+  final int? wordCount;
+  final bool? isFree;
+  final double? price;
   final DateTime createdAt;
 
   NovelChapterModel({
@@ -72,6 +75,9 @@ class NovelChapterModel {
     required this.title,
     required this.content,
     required this.chapterOrder,
+    this.wordCount,
+    this.isFree,
+    this.price,
     required this.createdAt,
   });
 
@@ -81,7 +87,10 @@ class NovelChapterModel {
       novelId: json['novel_id'] as String,
       title: json['title'] as String,
       content: json['content'] as String,
-      chapterOrder: json['chapter_order'] as int? ?? 0,
+      chapterOrder: json['chapter_num'] as int? ?? 0,
+      wordCount: json['word_count'] as int?,
+      isFree: json['is_free'] as bool?,
+      price: json['price'] != null ? (json['price'] as num).toDouble() : null,
       createdAt: DateTime.parse(json['created_at'] as String),
     );
   }
@@ -92,7 +101,10 @@ class NovelChapterModel {
       'novel_id': novelId,
       'title': title,
       'content': content,
-      'chapter_order': chapterOrder,
+      'chapter_num': chapterOrder,
+      'word_count': wordCount,
+      'is_free': isFree,
+      'price': price,
       'created_at': createdAt.toIso8601String(),
     };
   }

@@ -28,7 +28,7 @@ class ExpenseModel {
       userId: json['user_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
-      description: json['description'] as String?,
+      description: json['note'] as String?,
       date: DateTime.parse(json['date'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
@@ -43,7 +43,7 @@ class ExpenseModel {
       'user_id': userId,
       'amount': amount,
       'category': category,
-      'description': description,
+      'note': description,
       'date': date.toIso8601String(),
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
