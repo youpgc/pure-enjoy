@@ -13,7 +13,7 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  final DatabaseService _db = DatabaseService();
+  final DatabaseService _db = DatabaseService.instance;
   List<FavoriteModel> _favorites = [];
   bool _isLoading = true;
   String? _selectedCategory;

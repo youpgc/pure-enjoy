@@ -12,7 +12,7 @@ class RemindersScreen extends StatefulWidget {
 }
 
 class _RemindersScreenState extends State<RemindersScreen> {
-  final DatabaseService _db = DatabaseService();
+  final DatabaseService _db = DatabaseService.instance;
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
   String _filter = 'all'; // all, pending, completed
@@ -49,7 +49,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       builder: (context) => const ReminderEditDialog(),
     );
     if (result != null) {
-      await _db.createReminder(result);
+      await _db.insertReminder(result);
       _loadReminders();
     }
   }

@@ -13,7 +13,7 @@ class HabitsScreen extends StatefulWidget {
 }
 
 class _HabitsScreenState extends State<HabitsScreen> {
-  final DatabaseService _db = DatabaseService();
+  final DatabaseService _db = DatabaseService.instance;
   List<HabitModel> _habits = [];
   Map<String, List<DateTime>> _checkinHistory = {};
   bool _isLoading = true;
