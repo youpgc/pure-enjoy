@@ -189,6 +189,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       category: novelData['category'] as String?,
       status: novelData['status'] as String?,
       chapterCount: novelData['chapter_count'] as int? ?? 0,
+      createdAt: novelData['created_at'] != null
+          ? DateTime.parse(novelData['created_at'] as String)
+          : DateTime.now(),
     );
 
     Navigator.push(
@@ -326,9 +329,11 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
             IconButton(
               icon: const Icon(Icons.add),
               onPressed: () {
-                // 切换到小说列表页面
-                final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-                homeState?.setState(() => homeState._currentIndex = 2);
+                // 跳转到小说列表页面
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const NovelListScreen()),
+                );
               },
               tooltip: '添加小说',
             ),
@@ -380,10 +385,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                           const SizedBox(height: 24),
                           FilledButton.icon(
                             onPressed: () {
-                              final homeState = context
-                                  .findAncestorStateOfType<_HomeScreenState>();
-                              homeState
-                                  ?.setState(() => homeState._currentIndex = 2);
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(builder: (_) => const NovelListScreen()),
+                              );
                             },
                             icon: const Icon(Icons.add),
                             label: const Text('去添加'),
@@ -582,7 +587,7 @@ class _BookshelfItem extends StatelessWidget {
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: getStatusColor(status, colorScheme)
-                              .withValues(alpha: 0.1),
+                              .withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

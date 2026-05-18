@@ -200,8 +200,7 @@ class DashboardPage extends StatelessWidget {
                   color: colorScheme.errorContainer,
                   onTap: () {
                     // 切换到底部导航的小说页面
-                    final homeState = context.findAncestorStateOfType<_HomeScreenState>();
-                    homeState?.setState(() => homeState._currentIndex = 2);
+                    setState(() => _currentIndex = 2);
                   },
                 ),
               ),
