@@ -4,7 +4,11 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
+import '../../life/screens/expense_list_screen.dart';
+import '../../life/screens/mood_diary_screen.dart';
+import '../../life/screens/weight_record_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
+import '../../novel/screens/book_shelf_screen.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
@@ -149,7 +153,10 @@ class DashboardPage extends StatelessWidget {
                   label: '写日记',
                   color: colorScheme.primaryContainer,
                   onTap: () {
-                    // TODO: 导航到日记页面
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const MoodDiaryScreen()),
+                    );
                   },
                 ),
               ),
@@ -160,7 +167,10 @@ class DashboardPage extends StatelessWidget {
                   label: '记一笔',
                   color: colorScheme.secondaryContainer,
                   onTap: () {
-                    // TODO: 导航到记账页面
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const ExpenseListScreen()),
+                    );
                   },
                 ),
               ),
@@ -175,7 +185,10 @@ class DashboardPage extends StatelessWidget {
                   label: '记体重',
                   color: colorScheme.tertiaryContainer,
                   onTap: () {
-                    // TODO: 导航到体重页面
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const WeightRecordScreen()),
+                    );
                   },
                 ),
               ),
@@ -186,10 +199,32 @@ class DashboardPage extends StatelessWidget {
                   label: '看小说',
                   color: colorScheme.errorContainer,
                   onTap: () {
-                    // TODO: 导航到小说页面
+                    // 切换到底部导航的小说页面
+                    final homeState = context.findAncestorStateOfType<_HomeScreenState>();
+                    homeState?.setState(() => homeState._currentIndex = 2);
                   },
                 ),
               ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: [
+              Expanded(
+                child: _QuickActionCard(
+                  icon: Icons.library_books_outlined,
+                  label: '我的书架',
+                  color: colorScheme.primaryContainer,
+                  onTap: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const BookShelfScreen()),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(width: 12),
+              const Expanded(child: SizedBox()), // 占位保持对齐
             ],
           ),
           const SizedBox(height: 24),
@@ -311,12 +346,23 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _hasUpdate = false;
   bool _isForceUpdate = false;
   String? _apkUrl;
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
     _loadCurrentVersion();
     _checkVersion();
+    _loadUserData();
+  }
+
+  /// 从 Supabase 重新加载用户数据
+  Future<void> _loadUserData() async {
+    setState(() => _isLoading = true);
+    await SupabaseService.instance.reloadCurrentUser();
+    if (mounted) {
+      setState(() => _isLoading = false);
+    }
   }
 
   /// 加载当前版本
@@ -430,7 +476,9 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      body: ListView(
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView(
         children: [
           // 用户信息卡片
           Card(
@@ -477,8 +525,8 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       );
                       if (result == true) {
-                        // 刷新用户信息
-                        setState(() {});
+                        // 重新从 Supabase 加载用户数据
+                        _loadUserData();
                       }
                     },
                   ),

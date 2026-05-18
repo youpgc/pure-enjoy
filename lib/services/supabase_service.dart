@@ -456,6 +456,34 @@ class AuthService {
     }
   }
 
+  /// 重新从 Supabase 加载当前用户数据
+  /// 编辑资料后调用此方法刷新本地缓存
+  Future<bool> reloadCurrentUser() async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return false;
+
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,bio,location,birthday,gender',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (response.statusCode == 200) {
+        final users = jsonDecode(response.body) as List;
+        if (users.isNotEmpty) {
+          await _saveUser(users[0] as Map<String, dynamic>);
+          return true;
+        }
+      }
+      return false;
+    } catch (e) {
+      print('reloadCurrentUser error: $e');
+      return false;
+    }
+  }
+
   /// 获取当前用户的认证 Headers
   /// 不再使用 Supabase Auth 的 JWT token，使用 anon key
   Map<String, String> get authHeaders => {

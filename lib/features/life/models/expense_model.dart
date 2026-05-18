@@ -1,25 +1,22 @@
 import 'package:flutter/material.dart';
 
-/// 支出记录模型
+/// 支出记录模型 - 对应 Supabase expenses 表
+/// 字段: id(UUID), user_id(VARCHAR50), amount(DECIMAL), category(VARCHAR), description(TEXT), expense_date(DATE)
 class ExpenseModel {
   final String id;
   final String userId;
   final double amount;
   final String category;
   final String? description;
-  final DateTime date;
-  final DateTime createdAt;
-  final DateTime? updatedAt;
+  final DateTime expenseDate;
 
   ExpenseModel({
     required this.id,
-    this.userId = 'local_user',
+    required this.userId,
     required this.amount,
     required this.category,
     this.description,
-    required this.date,
-    required this.createdAt,
-    this.updatedAt,
+    required this.expenseDate,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
@@ -28,25 +25,27 @@ class ExpenseModel {
       userId: json['user_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
-      description: json['note'] as String?,
-      date: DateTime.parse(json['date'] as String),
-      createdAt: DateTime.parse(json['created_at'] as String),
-      updatedAt: json['updated_at'] != null
-          ? DateTime.parse(json['updated_at'] as String)
-          : null,
+      description: json['description'] as String?,
+      expenseDate: DateTime.parse(json['expense_date'] as String),
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
-      'id': id,
       'user_id': userId,
       'amount': amount,
       'category': category,
-      'note': description,
-      'date': date.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
+      'description': description,
+      'expense_date': expenseDate.toIso8601String().split('T').first,
+    };
+  }
+
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'amount': amount,
+      'category': category,
+      'description': description,
+      'expense_date': expenseDate.toIso8601String().split('T').first,
     };
   }
 
@@ -56,9 +55,7 @@ class ExpenseModel {
     double? amount,
     String? category,
     String? description,
-    DateTime? date,
-    DateTime? createdAt,
-    DateTime? updatedAt,
+    DateTime? expenseDate,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
@@ -66,9 +63,7 @@ class ExpenseModel {
       amount: amount ?? this.amount,
       category: category ?? this.category,
       description: description ?? this.description,
-      date: date ?? this.date,
-      createdAt: createdAt ?? this.createdAt,
-      updatedAt: updatedAt ?? this.updatedAt,
+      expenseDate: expenseDate ?? this.expenseDate,
     );
   }
 }

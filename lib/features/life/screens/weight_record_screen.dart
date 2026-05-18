@@ -1,10 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/weight_record_model.dart';
 
-/// 体重记录页面
+/// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
   const WeightRecordScreen({super.key});
 
@@ -39,12 +40,24 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final records = await DatabaseService.instance.getWeightRecords(userId);
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=record_date.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
 
-      setState(() {
-        _records = records.length > 30 ? records.sublist(0, 30) : records;
-        _isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
+
+        setState(() {
+          _records = records.length > 30 ? records.sublist(0, 30) : records;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -58,12 +71,21 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   Future<void> _createWeightRecord(WeightRecordModel record) async {
     setState(() => _isLoading = true);
     try {
-      await DatabaseService.instance.createWeightRecord(record);
-      await _loadRecords();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('添加成功')),
-        );
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode(record.toJson()),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await _loadRecords();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('添加成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -75,27 +97,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
   }
 
-  Future<void> _updateWeightRecord(WeightRecordModel record) async {
-    setState(() => _isLoading = true);
-    try {
-      await DatabaseService.instance.updateWeightRecord(record);
-      await _loadRecords();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新成功')),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteWeightRecord(WeightRecordModel record) async {
+  Future<void> _deleteWeightRecord(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -117,12 +119,20 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await DatabaseService.instance.deleteWeightRecord(record.id);
-        await _loadRecords();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('删除成功')),
-          );
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          await _loadRecords();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('删除成功')),
+            );
+          }
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -135,20 +145,15 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
   }
 
-  void _showRecordForm([WeightRecordModel? record]) {
+  void _showRecordForm() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => _RecordForm(
-        record: record,
         userId: _userId ?? 'local_user',
         onSave: (newRecord) {
           Navigator.pop(context);
-          if (record != null) {
-            _updateWeightRecord(newRecord);
-          } else {
-            _createWeightRecord(newRecord);
-          }
+          _createWeightRecord(newRecord);
         },
       ),
     );
@@ -245,31 +250,30 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
                                 leading: const Icon(Icons.monitor_weight),
-                                title: Text(
-                                  '${record.weight.toStringAsFixed(1)} kg',
-                                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  DateFormat('yyyy-MM-dd').format(record.date),
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
+                                title: Row(
                                   children: [
-                                    if (record.note != null)
-                                      Icon(
-                                        Icons.note,
-                                        size: 16,
-                                        color: colorScheme.onSurfaceVariant,
+                                    Text(
+                                      '${record.weight.toStringAsFixed(1)} kg',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
                                       ),
-                                    IconButton(
-                                      icon: const Icon(Icons.edit),
-                                      onPressed: () => _showRecordForm(record),
                                     ),
+                                    if (record.bodyFat != null) ...[
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
                                   ],
                                 ),
-                                onLongPress: () => _deleteWeightRecord(record),
+                                subtitle: Text(
+                                  DateFormat('yyyy-MM-dd').format(record.recordDate),
+                                ),
+                                trailing: IconButton(
+                                  icon: const Icon(Icons.delete_outline),
+                                  onPressed: () => _deleteWeightRecord(record.id),
+                                ),
                               ),
                             );
                           },
@@ -286,11 +290,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 }
 
 class _RecordForm extends StatefulWidget {
-  final WeightRecordModel? record;
   final String userId;
   final Function(WeightRecordModel) onSave;
 
-  const _RecordForm({this.record, required this.userId, required this.onSave});
+  const _RecordForm({required this.userId, required this.onSave});
 
   @override
   State<_RecordForm> createState() => _RecordFormState();
@@ -299,23 +302,13 @@ class _RecordForm extends StatefulWidget {
 class _RecordFormState extends State<_RecordForm> {
   final _formKey = GlobalKey<FormState>();
   final _weightController = TextEditingController();
-  final _noteController = TextEditingController();
+  final _bodyFatController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.record != null) {
-      _weightController.text = widget.record!.weight.toString();
-      _noteController.text = widget.record!.note ?? '';
-      _selectedDate = widget.record!.date;
-    }
-  }
 
   @override
   void dispose() {
     _weightController.dispose();
-    _noteController.dispose();
+    _bodyFatController.dispose();
     super.dispose();
   }
 
@@ -323,12 +316,13 @@ class _RecordFormState extends State<_RecordForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newRecord = WeightRecordModel(
-      id: widget.record?.id ?? 'weight_${DateTime.now().millisecondsSinceEpoch}',
+      id: '', // Supabase auto-generates UUID
       userId: widget.userId,
       weight: double.parse(_weightController.text),
-      note: _noteController.text.isEmpty ? null : _noteController.text,
-      date: _selectedDate,
-      createdAt: widget.record?.createdAt ?? DateTime.now(),
+      bodyFat: _bodyFatController.text.isNotEmpty
+          ? double.tryParse(_bodyFatController.text)
+          : null,
+      recordDate: _selectedDate,
     );
 
     widget.onSave(newRecord);
@@ -350,7 +344,7 @@ class _RecordFormState extends State<_RecordForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.record != null ? '编辑记录' : '添加记录',
+              '添加记录',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),
@@ -370,10 +364,12 @@ class _RecordFormState extends State<_RecordForm> {
             ),
             const SizedBox(height: 16),
 
-            TextField(
-              controller: _noteController,
+            TextFormField(
+              controller: _bodyFatController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
               decoration: const InputDecoration(
-                labelText: '备注（可选）',
+                labelText: '体脂率（可选）',
+                suffixText: '%',
               ),
             ),
             const SizedBox(height: 16),

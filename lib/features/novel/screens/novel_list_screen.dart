@@ -3,6 +3,7 @@ import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
+import 'book_shelf_screen.dart';
 
 /// 小说列表页面
 class NovelListScreen extends StatefulWidget {
@@ -110,6 +111,16 @@ class _NovelListScreenState extends State<NovelListScreen> {
       appBar: AppBar(
         title: const Text('小说'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const BookShelfScreen()),
+              );
+            },
+            tooltip: '我的书架',
+          ),
           IconButton(
             icon: const Icon(Icons.search),
             onPressed: () {

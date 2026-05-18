@@ -1,10 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/note_model.dart';
 
-/// 笔记列表页面
+/// 笔记列表页面 - Supabase 数据同步
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
 
@@ -40,12 +41,24 @@ class _NoteListScreenState extends State<NoteListScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final notes = await DatabaseService.instance.getNotes(userId);
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/notes?user_id=eq.$userId&select=*&order=is_pinned.desc,created_at.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
 
-      setState(() {
-        _notes = notes;
-        _isLoading = false;
-      });
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final notes = data.map((e) => NoteModel.fromJson(e)).toList();
+
+        setState(() {
+          _notes = notes;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -59,12 +72,21 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Future<void> _createNote(NoteModel note) async {
     setState(() => _isLoading = true);
     try {
-      await DatabaseService.instance.createNote(note);
-      await _loadNotes();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('创建成功')),
-        );
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/notes'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode(note.toJson()),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await _loadNotes();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('创建成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -79,12 +101,21 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Future<void> _updateNote(NoteModel note) async {
     setState(() => _isLoading = true);
     try {
-      await DatabaseService.instance.updateNote(note);
-      await _loadNotes();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新成功')),
-        );
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode(note.toJsonForUpdate()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadNotes();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -96,7 +127,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  Future<void> _deleteNote(NoteModel note) async {
+  Future<void> _deleteNote(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -118,12 +149,20 @@ class _NoteListScreenState extends State<NoteListScreen> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await DatabaseService.instance.deleteNote(note.id);
-        await _loadNotes();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('删除成功')),
-          );
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          await _loadNotes();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('删除成功')),
+            );
+          }
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -137,17 +176,25 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _togglePin(NoteModel note) async {
-    setState(() => _isLoading = true);
     try {
-      await DatabaseService.instance.togglePin(note.id, !note.isPinned);
-      await _loadNotes();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text(note.isPinned ? '已取消置顶' : '已置顶')),
-        );
+      final updated = note.copyWith(isPinned: !note.isPinned);
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({'is_pinned': updated.isPinned}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadNotes();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(note.isPinned ? '已取消置顶' : '已置顶')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('操作失败: $e')),
@@ -170,6 +217,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
               _createNote(newNote);
             }
           },
+          onTogglePin: note != null ? () => _togglePin(note) : null,
         ),
       ),
     );
@@ -250,7 +298,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             clipBehavior: Clip.antiAlias,
                             child: InkWell(
                               onTap: () => _showNoteForm(note),
-                              onLongPress: () => _deleteNote(note),
+                              onLongPress: () => _deleteNote(note.id),
                               child: Stack(
                                 children: [
                                   Padding(
@@ -274,12 +322,17 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                             overflow: TextOverflow.fade,
                                           ),
                                         ),
-                                        Text(
-                                          DateFormat('MM-dd').format(note.createdAt),
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: colorScheme.onSurfaceVariant,
+                                        if (note.tags != null && note.tags!.isNotEmpty)
+                                          Wrap(
+                                            spacing: 4,
+                                            children: note.tags!.take(2).map((tag) => Text(
+                                              '#$tag',
+                                              style: TextStyle(
+                                                fontSize: 11,
+                                                color: colorScheme.primary,
+                                              ),
+                                            )).toList(),
                                           ),
-                                        ),
                                       ],
                                     ),
                                   ),
@@ -314,8 +367,14 @@ class _NoteEditScreen extends StatefulWidget {
   final NoteModel? note;
   final String userId;
   final Function(NoteModel) onSave;
+  final VoidCallback? onTogglePin;
 
-  const _NoteEditScreen({this.note, required this.userId, required this.onSave});
+  const _NoteEditScreen({
+    this.note,
+    required this.userId,
+    required this.onSave,
+    this.onTogglePin,
+  });
 
   @override
   State<_NoteEditScreen> createState() => _NoteEditScreenState();
@@ -324,6 +383,7 @@ class _NoteEditScreen extends StatefulWidget {
 class _NoteEditScreenState extends State<_NoteEditScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+  final _tagsController = TextEditingController();
   bool _isPinned = false;
   bool _isSaving = false;
 
@@ -333,6 +393,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
     if (widget.note != null) {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content ?? '';
+      _tagsController.text = widget.note!.tags?.join(', ') ?? '';
       _isPinned = widget.note!.isPinned;
     }
   }
@@ -341,6 +402,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -354,13 +416,19 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
 
     setState(() => _isSaving = true);
 
+    final tags = _tagsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
     final newNote = NoteModel(
-      id: widget.note?.id ?? 'note_${DateTime.now().millisecondsSinceEpoch}',
+      id: widget.note?.id ?? '',
       userId: widget.userId,
       title: _titleController.text,
       content: _contentController.text.isEmpty ? null : _contentController.text,
+      tags: tags.isEmpty ? null : tags,
       isPinned: _isPinned,
-      createdAt: widget.note?.createdAt ?? DateTime.now(),
     );
 
     widget.onSave(newNote);
@@ -373,10 +441,14 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       appBar: AppBar(
         title: Text(widget.note != null ? '编辑笔记' : '新建笔记'),
         actions: [
-          IconButton(
-            icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
-            onPressed: () => setState(() => _isPinned = !_isPinned),
-          ),
+          if (widget.onTogglePin != null)
+            IconButton(
+              icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
+              onPressed: () {
+                setState(() => _isPinned = !_isPinned);
+                widget.onTogglePin!();
+              },
+            ),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(
@@ -411,6 +483,14 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                   hintText: '写点什么...',
                   border: InputBorder.none,
                 ),
+              ),
+            ),
+            TextField(
+              controller: _tagsController,
+              decoration: const InputDecoration(
+                hintText: '标签（可选，逗号分隔）',
+                prefixIcon: Icon(Icons.tag),
+                border: InputBorder.none,
               ),
             ),
           ],

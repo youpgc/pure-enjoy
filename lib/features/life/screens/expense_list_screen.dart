@@ -1,10 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
 import '../models/expense_model.dart';
 
-/// 支出列表页面
+/// 支出列表页面 - Supabase 数据同步
 class ExpenseListScreen extends StatefulWidget {
   const ExpenseListScreen({super.key});
 
@@ -41,28 +42,40 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     setState(() => _isLoading = true);
 
     try {
-      var expenses = await DatabaseService.instance.getExpenses(userId);
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=expense_date.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
 
-      // 按月份筛选
-      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        var expenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
-      expenses = expenses.where((e) {
-        return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-               e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
-      }).toList();
+        // 按月份筛选
+        final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+        final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
 
-      // 按分类筛选
-      if (_selectedCategory != 'all') {
-        expenses = expenses.where((e) => e.category == _selectedCategory).toList();
+        expenses = expenses.where((e) {
+          return e.expenseDate.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
+                 e.expenseDate.isBefore(endOfMonth.add(const Duration(days: 1)));
+        }).toList();
+
+        // 按分类筛选
+        if (_selectedCategory != 'all') {
+          expenses = expenses.where((e) => e.category == _selectedCategory).toList();
+        }
+
+        expenses.sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+
+        setState(() {
+          _expenses = expenses;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
       }
-
-      expenses.sort((a, b) => b.date.compareTo(a.date));
-
-      setState(() {
-        _expenses = expenses;
-        _isLoading = false;
-      });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -76,12 +89,21 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   Future<void> _addExpense(ExpenseModel expense) async {
     setState(() => _isLoading = true);
     try {
-      await DatabaseService.instance.createExpense(expense);
-      await _loadExpenses();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('添加成功')),
-        );
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode(expense.toJson()),
+      );
+
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await _loadExpenses();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('添加成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -93,27 +115,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
   }
 
-  Future<void> _editExpense(ExpenseModel expense) async {
-    setState(() => _isLoading = true);
-    try {
-      await DatabaseService.instance.updateExpense(expense);
-      await _loadExpenses();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('更新成功')),
-        );
-      }
-    } catch (e) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _deleteExpense(ExpenseModel expense) async {
+  Future<void> _deleteExpense(String id) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
@@ -135,12 +137,20 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     if (confirm == true) {
       setState(() => _isLoading = true);
       try {
-        await DatabaseService.instance.deleteExpense(expense.id);
-        await _loadExpenses();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('删除成功')),
-          );
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          await _loadExpenses();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('删除成功')),
+            );
+          }
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -153,20 +163,15 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
   }
 
-  void _showExpenseForm([ExpenseModel? expense]) {
+  void _showExpenseForm() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (context) => _ExpenseForm(
-        expense: expense,
         userId: _userId ?? 'local_user',
         onSave: (newExpense) {
           Navigator.pop(context);
-          if (expense != null) {
-            _editExpense(newExpense);
-          } else {
-            _addExpense(newExpense);
-          }
+          _addExpense(newExpense);
         },
       ),
     );
@@ -280,25 +285,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                               leading: Icon(category.icon),
                               title: Text(category.label),
                               subtitle: Text(
-                                DateFormat('MM-dd HH:mm').format(expense.date),
+                                '${DateFormat('MM-dd').format(expense.expenseDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
                               ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '¥${expense.amount.toStringAsFixed(2)}',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: colorScheme.error,
-                                      fontWeight: FontWeight.bold,
-                                    ),
-                                  ),
-                                  IconButton(
-                                    icon: const Icon(Icons.edit),
-                                    onPressed: () => _showExpenseForm(expense),
-                                  ),
-                                ],
+                              trailing: Text(
+                                '¥${expense.amount.toStringAsFixed(2)}',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.bold,
+                                ),
                               ),
-                              onLongPress: () => _deleteExpense(expense),
+                              onLongPress: () => _deleteExpense(expense.id),
                             ),
                           );
                         },
@@ -339,11 +335,10 @@ class _CategoryChip extends StatelessWidget {
 }
 
 class _ExpenseForm extends StatefulWidget {
-  final ExpenseModel? expense;
   final String userId;
   final Function(ExpenseModel) onSave;
 
-  const _ExpenseForm({this.expense, required this.userId, required this.onSave});
+  const _ExpenseForm({required this.userId, required this.onSave});
 
   @override
   State<_ExpenseForm> createState() => _ExpenseFormState();
@@ -357,20 +352,6 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   DateTime _selectedDate = DateTime.now();
 
   @override
-  void initState() {
-    super.initState();
-    if (widget.expense != null) {
-      _amountController.text = widget.expense!.amount.toString();
-      _descriptionController.text = widget.expense!.description ?? '';
-      _selectedCategory = ExpenseCategory.values.firstWhere(
-        (c) => c.name == widget.expense!.category,
-        orElse: () => ExpenseCategory.food,
-      );
-      _selectedDate = widget.expense!.date;
-    }
-  }
-
-  @override
   void dispose() {
     _amountController.dispose();
     _descriptionController.dispose();
@@ -381,13 +362,12 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newExpense = ExpenseModel(
-      id: widget.expense?.id ?? 'expense_${DateTime.now().millisecondsSinceEpoch}',
+      id: '', // Supabase auto-generates UUID
       userId: widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
       description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
-      date: _selectedDate,
-      createdAt: widget.expense?.createdAt ?? DateTime.now(),
+      expenseDate: _selectedDate,
     );
 
     widget.onSave(newExpense);
@@ -409,7 +389,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              widget.expense != null ? '编辑支出' : '添加支出',
+              '添加支出',
               style: Theme.of(context).textTheme.titleLarge,
             ),
             const SizedBox(height: 16),

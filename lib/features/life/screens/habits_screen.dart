@@ -1,11 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
+import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
-import '../models/habit_model.dart';
-import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
+import '../models/habit_model.dart';
 
-/// 习惯打卡页面
+/// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
   const HabitsScreen({super.key});
 
@@ -14,11 +14,11 @@ class HabitsScreen extends StatefulWidget {
 }
 
 class _HabitsScreenState extends State<HabitsScreen> {
-  final DatabaseService _db = DatabaseService.instance;
   List<HabitModel> _habits = [];
-  Map<String, List<DateTime>> _checkinHistory = {};
+  Map<String, List<HabitCheckinModel>> _checkinHistory = {};
   bool _isLoading = true;
-  DateTime _selectedMonth = DateTime.now();
+
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
@@ -29,7 +29,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Future<void> _loadHabits() async {
     setState(() => _isLoading = true);
     try {
-      final userId = AuthService.instance.currentUserId;
+      final userId = _userId;
       if (userId == null) {
         setState(() {
           _habits = [];
@@ -38,19 +38,42 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
         return;
       }
-      final items = await _db.getHabits(userId);
-      final history = <String, List<DateTime>>{};
-      
-      for (final habit in items) {
-        final checkins = await _db.getHabitCheckins(habit.id);
-        history[habit.id] = checkins.map((c) => c.checkinAt).toList();
+
+      // 加载习惯列表
+      final habitsResponse = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/habits?user_id=eq.$userId&select=*&order=is_active.desc,current_streak.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (habitsResponse.statusCode != 200) {
+        throw Exception('HTTP ${habitsResponse.statusCode}');
       }
-      
+
+      final List habitsData = jsonDecode(habitsResponse.body);
+      final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
+
+      // 加载所有打卡记录
+      final history = <String, List<HabitCheckinModel>>{};
+      for (final habit in items) {
+        final checkinsResponse = await http.get(
+          Uri.parse(
+            '${SupabaseConfig.url}/rest/v1/habit_records?habit_id=eq.${habit.id}&select=*&order=check_in_date.desc',
+          ),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (checkinsResponse.statusCode == 200) {
+          final List checkinsData = jsonDecode(checkinsResponse.body);
+          history[habit.id] = checkinsData.map((e) => HabitCheckinModel.fromJson(e)).toList();
+        } else {
+          history[habit.id] = [];
+        }
+      }
+
       setState(() {
-        _habits = items..sort((a, b) {
-          if (a.isActive != b.isActive) return a.isActive ? -1 : 1;
-          return b.currentStreak.compareTo(a.currentStreak);
-        });
+        _habits = items;
         _checkinHistory = history;
         _isLoading = false;
       });
@@ -69,34 +92,52 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Future<void> _checkIn(HabitModel habit) async {
     try {
       final today = DateTime.now();
-      final todayDate = DateTime(today.year, today.month, today.day);
-      
+      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
       // 检查今天是否已经打卡
-      final todayCheckins = _checkinHistory[habit.id]?.where((d) {
-        final checkinDate = DateTime(d.year, d.month, d.day);
-        return checkinDate == todayDate;
-      }).toList() ?? [];
-      
-      if (todayCheckins.isNotEmpty) {
+      final checkins = _checkinHistory[habit.id] ?? [];
+      final alreadyChecked = checkins.any((c) {
+        final dateStr = '${c.checkInDate.year}-${c.checkInDate.month.toString().padLeft(2, '0')}-${c.checkInDate.day.toString().padLeft(2, '0')}';
+        return dateStr == todayStr;
+      });
+
+      if (alreadyChecked) {
         _showError('今天已经打卡了');
         return;
       }
 
-      // 更新习惯数据
+      // 更新习惯数据（增加连续天数）
       final updatedHabit = habit.checkIn();
-      await _db.updateHabit(updatedHabit);
-      
-      // 添加打卡记录
-      final checkin = HabitCheckinModel(
-        id: const Uuid().v4(),
-        habitId: habit.id,
-        checkinAt: DateTime.now(),
-        createdAt: DateTime.now(),
+      final updateResponse = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.${habit.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({
+          'current_streak': updatedHabit.currentStreak,
+          'longest_streak': updatedHabit.longestStreak,
+        }),
       );
-      await _db.insertHabitCheckin(checkin);
-      
+
+      if (updateResponse.statusCode != 200 && updateResponse.statusCode != 204) {
+        throw Exception('更新习惯失败: HTTP ${updateResponse.statusCode}');
+      }
+
+      // 添加打卡记录
+      final checkinResponse = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/habit_records'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({
+          'habit_id': habit.id,
+          'user_id': _userId,
+          'check_in_date': todayStr,
+        }),
+      );
+
+      if (checkinResponse.statusCode != 201 && checkinResponse.statusCode != 200) {
+        throw Exception('添加打卡记录失败: HTTP ${checkinResponse.statusCode}');
+      }
+
       _loadHabits();
-      
+
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -130,8 +171,23 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     if (confirmed == true) {
       try {
-        await _db.deleteHabit(id);
-        _loadHabits();
+        // 先删除打卡记录
+        await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/habit_records?habit_id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        // 再删除习惯
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          _loadHabits();
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
+        }
       } catch (e) {
         _showError('删除失败: $e');
       }
@@ -145,8 +201,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final targetDaysController = TextEditingController(
       text: (habit?.targetDays ?? 21).toString(),
     );
-    String frequency = habit?.frequency ?? 'daily';
-    String color = habit?.color ?? 'blue';
 
     await showDialog(
       context: context,
@@ -173,20 +227,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   ),
                 ),
                 const SizedBox(height: 12),
-                DropdownButtonFormField<String>(
-                  value: frequency,
-                  decoration: const InputDecoration(labelText: '频率'),
-                  items: const [
-                    DropdownMenuItem(value: 'daily', child: Text('每天')),
-                    DropdownMenuItem(value: 'weekly', child: Text('每周')),
-                  ],
-                  onChanged: (value) {
-                    if (value != null) {
-                      setDialogState(() => frequency = value);
-                    }
-                  },
-                ),
-                const SizedBox(height: 12),
                 TextField(
                   controller: targetDaysController,
                   decoration: const InputDecoration(
@@ -194,33 +234,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     hintText: '例如：21',
                   ),
                   keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 12),
-                const Text('选择颜色'),
-                const SizedBox(height: 8),
-                Wrap(
-                  spacing: 8,
-                  runSpacing: 8,
-                  children: habitColors.entries.map((entry) {
-                    final isSelected = color == entry.key;
-                    return GestureDetector(
-                      onTap: () => setDialogState(() => color = entry.key),
-                      child: Container(
-                        width: 40,
-                        height: 40,
-                        decoration: BoxDecoration(
-                          color: Color(entry.value),
-                          borderRadius: BorderRadius.circular(20),
-                          border: isSelected
-                              ? Border.all(color: Colors.black, width: 3)
-                              : null,
-                        ),
-                        child: isSelected
-                            ? const Icon(Icons.check, color: Colors.white)
-                            : null,
-                      ),
-                    );
-                  }).toList(),
                 ),
               ],
             ),
@@ -238,31 +251,39 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 }
 
                 final targetDays = int.tryParse(targetDaysController.text) ?? 21;
-                final userId = AuthService.instance.currentUserId ?? 'local_user';
-
-                final newHabit = HabitModel(
-                  id: isEditing ? habit.id : const Uuid().v4(),
-                  userId: isEditing ? habit.userId : userId,
-                  name: nameController.text.trim(),
-                  description: descController.text.trim().isEmpty
-                      ? null
-                      : descController.text.trim(),
-                  frequency: frequency,
-                  targetDays: targetDays,
-                  currentStreak: habit?.currentStreak ?? 0,
-                  maxStreak: habit?.maxStreak ?? 0,
-                  totalCheckins: habit?.totalCheckins ?? 0,
-                  color: color,
-                  isActive: habit?.isActive ?? true,
-                  createdAt: isEditing ? habit.createdAt : DateTime.now(),
-                  updatedAt: DateTime.now(),
-                );
+                final userId = _userId ?? 'local_user';
 
                 try {
                   if (isEditing) {
-                    await _db.updateHabit(newHabit);
+                    final response = await http.patch(
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.${habit.id}'),
+                      headers: SupabaseConfig.headers,
+                      body: jsonEncode({
+                        'name': nameController.text.trim(),
+                        'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
+                        'target_days': targetDays,
+                      }),
+                    );
+                    if (response.statusCode != 200 && response.statusCode != 204) {
+                      throw Exception('HTTP ${response.statusCode}');
+                    }
                   } else {
-                    await _db.insertHabit(newHabit);
+                    final response = await http.post(
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/habits'),
+                      headers: SupabaseConfig.headers,
+                      body: jsonEncode({
+                        'user_id': userId,
+                        'name': nameController.text.trim(),
+                        'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
+                        'target_days': targetDays,
+                        'current_streak': 0,
+                        'longest_streak': 0,
+                        'is_active': true,
+                      }),
+                    );
+                    if (response.statusCode != 201 && response.statusCode != 200) {
+                      throw Exception('HTTP ${response.statusCode}');
+                    }
                   }
                   Navigator.pop(context);
                   _loadHabits();
@@ -280,7 +301,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   Future<void> _showHistoryDialog(HabitModel habit) async {
     final checkins = _checkinHistory[habit.id] ?? [];
-    
+
     await showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -293,10 +314,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
               : ListView.builder(
                   itemCount: checkins.length,
                   itemBuilder: (context, index) {
-                    final checkin = checkins.reversed.toList()[index];
+                    final checkin = checkins[index];
                     return ListTile(
                       leading: const Icon(Icons.check_circle, color: Colors.green),
-                      title: Text(DateFormat('yyyy-MM-dd HH:mm').format(checkin)),
+                      title: Text(DateFormat('yyyy-MM-dd').format(checkin.checkInDate)),
+                      subtitle: checkin.note != null ? Text(checkin.note!) : null,
                     );
                   },
                 ),
@@ -313,13 +335,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   bool _isCheckedInToday(String habitId) {
     final today = DateTime.now();
-    final todayDate = DateTime(today.year, today.month, today.day);
-    
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
     final checkins = _checkinHistory[habitId] ?? [];
-    return checkins.any((d) {
-      final checkinDate = DateTime(d.year, d.month, d.day);
-      return checkinDate == todayDate;
+    return checkins.any((c) {
+      final dateStr = '${c.checkInDate.year}-${c.checkInDate.month.toString().padLeft(2, '0')}-${c.checkInDate.day.toString().padLeft(2, '0')}';
+      return dateStr == todayStr;
     });
+  }
+
+  int _getTotalCheckins(String habitId) {
+    return _checkinHistory[habitId]?.length ?? 0;
   }
 
   @override
@@ -329,13 +355,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('习惯打卡'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: '查看日历',
-            onPressed: () => _showCalendarView(),
-          ),
-        ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
@@ -374,10 +393,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   itemBuilder: (context, index) {
                     final habit = _habits[index];
                     final isCheckedIn = _isCheckedInToday(habit.id);
+                    final totalCheckins = _getTotalCheckins(habit.id);
                     return _HabitCard(
                       habit: habit,
                       isCheckedIn: isCheckedIn,
-                      checkinHistory: _checkinHistory[habit.id] ?? [],
+                      totalCheckins: totalCheckins,
                       onCheckIn: () => _checkIn(habit),
                       onEdit: () => _showEditDialog(habit: habit),
                       onDelete: () => _deleteHabit(habit.id),
@@ -391,32 +411,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
       ),
     );
   }
-
-  void _showCalendarView() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.8,
-        minChildSize: 0.5,
-        maxChildSize: 0.95,
-        expand: false,
-        builder: (context, scrollController) {
-          return _CalendarView(
-            habits: _habits,
-            checkinHistory: _checkinHistory,
-            scrollController: scrollController,
-          );
-        },
-      ),
-    );
-  }
 }
 
 class _HabitCard extends StatelessWidget {
   final HabitModel habit;
   final bool isCheckedIn;
-  final List<DateTime> checkinHistory;
+  final int totalCheckins;
   final VoidCallback onCheckIn;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -425,7 +425,7 @@ class _HabitCard extends StatelessWidget {
   const _HabitCard({
     required this.habit,
     required this.isCheckedIn,
-    required this.checkinHistory,
+    required this.totalCheckins,
     required this.onCheckIn,
     required this.onEdit,
     required this.onDelete,
@@ -435,7 +435,7 @@ class _HabitCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final habitColor = Color(habitColors[habit.color] ?? habitColors['blue']!);
+    final habitColor = Color(habitColors['blue']!);
     final progress = habit.progress;
 
     return Card(
@@ -568,13 +568,13 @@ class _HabitCard extends StatelessWidget {
                 ),
                 _StatItem(
                   label: '最高连击',
-                  value: '${habit.maxStreak}',
+                  value: '${habit.longestStreak}',
                   icon: Icons.emoji_events,
                   color: Colors.amber,
                 ),
                 _StatItem(
                   label: '总打卡',
-                  value: '${habit.totalCheckins}',
+                  value: '$totalCheckins',
                   icon: Icons.check_circle,
                   color: Colors.green,
                 ),
@@ -658,227 +658,6 @@ class _StatItem extends StatelessWidget {
           ),
         ),
       ],
-    );
-  }
-}
-
-class _CalendarView extends StatefulWidget {
-  final List<HabitModel> habits;
-  final Map<String, List<DateTime>> checkinHistory;
-  final ScrollController scrollController;
-
-  const _CalendarView({
-    required this.habits,
-    required this.checkinHistory,
-    required this.scrollController,
-  });
-
-  @override
-  State<_CalendarView> createState() => _CalendarViewState();
-}
-
-class _CalendarViewState extends State<_CalendarView> {
-  late DateTime _selectedMonth;
-
-  @override
-  void initState() {
-    super.initState();
-    _selectedMonth = DateTime.now();
-  }
-
-  List<DateTime> _getDaysInMonth(DateTime month) {
-    final firstDay = DateTime(month.year, month.month, 1);
-    final lastDay = DateTime(month.year, month.month + 1, 0);
-    final days = <DateTime>[];
-    
-    // 添加月初之前的空白日期
-    final firstWeekday = firstDay.weekday % 7;
-    for (int i = 0; i < firstWeekday; i++) {
-      days.add(DateTime(month.year, month.month, 0 - i));
-    }
-    days.sort();
-    
-    // 添加当月日期
-    for (int i = 1; i <= lastDay.day; i++) {
-      days.add(DateTime(month.year, month.month, i));
-    }
-    
-    return days;
-  }
-
-  int _getCheckinCount(DateTime date) {
-    final dateOnly = DateTime(date.year, date.month, date.day);
-    int count = 0;
-    
-    for (final habit in widget.habits) {
-      final checkins = widget.checkinHistory[habit.id] ?? [];
-      if (checkins.any((d) {
-        final checkinDate = DateTime(d.year, d.month, d.day);
-        return checkinDate == dateOnly;
-      })) {
-        count++;
-      }
-    }
-    
-    return count;
-  }
-
-  Color _getHeatmapColor(int count, int totalHabits) {
-    if (count == 0) return Colors.grey.withOpacity(0.1);
-    if (totalHabits == 0) return Colors.grey.withOpacity(0.1);
-    
-    final intensity = count / totalHabits;
-    if (intensity >= 0.8) return Colors.green.shade700;
-    if (intensity >= 0.6) return Colors.green.shade500;
-    if (intensity >= 0.4) return Colors.green.shade300;
-    return Colors.green.shade100;
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final days = _getDaysInMonth(_selectedMonth);
-    final monthName = DateFormat('yyyy年M月').format(_selectedMonth);
-    
-    return Container(
-      decoration: BoxDecoration(
-        color: Theme.of(context).colorScheme.surface,
-        borderRadius: const BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      child: Column(
-        children: [
-          // 拖动条
-          Container(
-            margin: const EdgeInsets.only(top: 8),
-            width: 40,
-            height: 4,
-            decoration: BoxDecoration(
-              color: Colors.grey.withOpacity(0.3),
-              borderRadius: BorderRadius.circular(2),
-            ),
-          ),
-          // 标题栏
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                IconButton(
-                  icon: const Icon(Icons.chevron_left),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month - 1,
-                      );
-                    });
-                  },
-                ),
-                Text(
-                  monthName,
-                  style: Theme.of(context).textTheme.titleLarge,
-                ),
-                IconButton(
-                  icon: const Icon(Icons.chevron_right),
-                  onPressed: () {
-                    setState(() {
-                      _selectedMonth = DateTime(
-                        _selectedMonth.year,
-                        _selectedMonth.month + 1,
-                      );
-                    });
-                  },
-                ),
-              ],
-            ),
-          ),
-          // 星期标题
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceAround,
-              children: const ['日', '一', '二', '三', '四', '五', '六']
-                  .map((d) => SizedBox(
-                        width: 40,
-                        child: Text(
-                          d,
-                          textAlign: TextAlign.center,
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                      ))
-                  .toList(),
-            ),
-          ),
-          const SizedBox(height: 8),
-          // 日历网格
-          Expanded(
-            child: GridView.builder(
-              controller: widget.scrollController,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 7,
-                childAspectRatio: 1,
-              ),
-              itemCount: days.length,
-              itemBuilder: (context, index) {
-                final day = days[index];
-                final isCurrentMonth = day.month == _selectedMonth.month;
-                final checkinCount = _getCheckinCount(day);
-                
-                return Container(
-                  margin: const EdgeInsets.all(2),
-                  decoration: BoxDecoration(
-                    color: isCurrentMonth
-                        ? _getHeatmapColor(checkinCount, widget.habits.length)
-                        : Colors.transparent,
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: Center(
-                    child: isCurrentMonth
-                        ? Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Text(
-                                '${day.day}',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  fontWeight: FontWeight.bold,
-                                  color: checkinCount > 0
-                                      ? Colors.white
-                                      : Colors.black87,
-                                ),
-                              ),
-                              if (checkinCount > 0)
-                                Text(
-                                  '$checkinCount',
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    color: Colors.white70,
-                                  ),
-                                ),
-                            ],
-                          )
-                        : null,
-                  ),
-                );
-              },
-            ),
-          ),
-          // 图例
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Text('打卡强度: ', style: TextStyle(fontSize: 12)),
-                Container(width: 16, height: 16, color: Colors.green.shade100),
-                Container(width: 16, height: 16, color: Colors.green.shade300),
-                Container(width: 16, height: 16, color: Colors.green.shade500),
-                Container(width: 16, height: 16, color: Colors.green.shade700),
-              ],
-            ),
-          ),
-        ],
-      ),
     );
   }
 }

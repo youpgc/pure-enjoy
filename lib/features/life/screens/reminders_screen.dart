@@ -1,10 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
-import '../models/reminder_model.dart';
-import '../../../services/database_service.dart';
+import 'package:http/http.dart' as http;
 import '../../../services/supabase_service.dart';
+import '../models/reminder_model.dart';
 
-/// 提醒事项页面
+/// 提醒事项页面 - Supabase 数据同步
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
 
@@ -13,10 +13,11 @@ class RemindersScreen extends StatefulWidget {
 }
 
 class _RemindersScreenState extends State<RemindersScreen> {
-  final DatabaseService _db = DatabaseService.instance;
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
   String _filter = 'all'; // all, pending, completed
+
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
@@ -26,7 +27,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _loadReminders() async {
     setState(() => _isLoading = true);
-    final userId = AuthService.instance.currentUserId;
+    final userId = _userId;
     if (userId == null) {
       setState(() {
         _reminders = [];
@@ -34,11 +35,33 @@ class _RemindersScreenState extends State<RemindersScreen> {
       });
       return;
     }
-    final reminders = await _db.getReminders(userId);
-    setState(() {
-      _reminders = reminders;
-      _isLoading = false;
-    });
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/reminders?user_id=eq.$userId&select=*&order=remind_at.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
+        setState(() {
+          _reminders = reminders;
+          _isLoading = false;
+        });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载失败: $e')),
+        );
+      }
+    }
   }
 
   List<ReminderModel> get _filteredReminders {
@@ -58,8 +81,27 @@ class _RemindersScreenState extends State<RemindersScreen> {
       builder: (context) => const ReminderEditDialog(),
     );
     if (result != null) {
-      await _db.insertReminder(result);
-      _loadReminders();
+      setState(() => _isLoading = true);
+      try {
+        final response = await http.post(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders'),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode(result.toJson()),
+        );
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          _loadReminders();
+        } else {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('添加失败: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -69,8 +111,27 @@ class _RemindersScreenState extends State<RemindersScreen> {
       builder: (context) => ReminderEditDialog(reminder: reminder),
     );
     if (result != null) {
-      await _db.updateReminder(result);
-      _loadReminders();
+      setState(() => _isLoading = true);
+      try {
+        final response = await http.patch(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
+          headers: SupabaseConfig.headers,
+          body: jsonEncode(result.toJsonForUpdate()),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          _loadReminders();
+        } else {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('更新失败: $e')),
+          );
+        }
+      }
     }
   }
 
@@ -93,15 +154,47 @@ class _RemindersScreenState extends State<RemindersScreen> {
       ),
     );
     if (confirmed == true) {
-      await _db.deleteReminder(id);
-      _loadReminders();
+      try {
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          _loadReminders();
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败: $e')),
+          );
+        }
+      }
     }
   }
 
   Future<void> _toggleComplete(ReminderModel reminder) async {
-    final updated = reminder.copyWith(isCompleted: !reminder.isCompleted);
-    await _db.updateReminder(updated);
-    _loadReminders();
+    try {
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({'is_completed': !reminder.isCompleted}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        _loadReminders();
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e')),
+        );
+      }
+    }
   }
 
   @override
@@ -162,32 +255,6 @@ class ReminderCard extends StatelessWidget {
     required this.onDelete,
   });
 
-  Color get _priorityColor {
-    switch (reminder.priority) {
-      case 'high':
-        return Colors.red;
-      case 'normal':
-        return Colors.orange;
-      case 'low':
-        return Colors.green;
-      default:
-        return Colors.grey;
-    }
-  }
-
-  String get _priorityText {
-    switch (reminder.priority) {
-      case 'high':
-        return '高';
-      case 'normal':
-        return '中';
-      case 'low':
-        return '低';
-      default:
-        return '普通';
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
     return Card(
@@ -209,26 +276,14 @@ class ReminderCard extends StatelessWidget {
             if (reminder.description != null && reminder.description!.isNotEmpty)
               Text(reminder.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
-            Row(
-              children: [
-                Chip(
-                  label: Text(_priorityText),
-                  backgroundColor: _priorityColor.withOpacity(0.1),
-                  side: BorderSide(color: _priorityColor),
-                  padding: EdgeInsets.zero,
-                  labelStyle: TextStyle(color: _priorityColor, fontSize: 12),
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '${reminder.remindAt.month}/${reminder.remindAt.day} ${reminder.remindAt.hour}:${reminder.remindAt.minute.toString().padLeft(2, '0')}',
-                  style: TextStyle(
-                    color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
-                        ? Colors.red
-                        : Colors.grey,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
+            Text(
+              '${reminder.remindAt.month}/${reminder.remindAt.day} ${reminder.remindAt.hour}:${reminder.remindAt.minute.toString().padLeft(2, '0')}',
+              style: TextStyle(
+                color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
+                    ? Colors.red
+                    : Colors.grey,
+                fontSize: 12,
+              ),
             ),
           ],
         ),
@@ -267,7 +322,6 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
-  String _priority = 'normal';
 
   @override
   void initState() {
@@ -276,7 +330,6 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
       _titleController.text = widget.reminder!.title;
       _descController.text = widget.reminder!.description ?? '';
       _remindAt = widget.reminder!.remindAt;
-      _priority = widget.reminder!.priority;
     }
   }
 
@@ -328,18 +381,6 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                   }
                 },
               ),
-              const SizedBox(height: 16),
-              SegmentedButton<String>(
-                segments: const [
-                  ButtonSegment(value: 'high', label: Text('高')),
-                  ButtonSegment(value: 'normal', label: Text('中')),
-                  ButtonSegment(value: 'low', label: Text('低')),
-                ],
-                selected: {_priority},
-                onSelectionChanged: (set) {
-                  setState(() => _priority = set.first);
-                },
-              ),
             ],
           ),
         ),
@@ -354,14 +395,12 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
             if (_formKey.currentState!.validate()) {
               final userId = AuthService.instance.currentUserId ?? 'local_user';
               final reminder = ReminderModel(
-                id: widget.reminder?.id ?? const Uuid().v4(),
+                id: widget.reminder?.id ?? '',
                 userId: widget.reminder?.userId ?? userId,
                 title: _titleController.text,
                 description: _descController.text.isEmpty ? null : _descController.text,
                 remindAt: _remindAt,
                 isCompleted: widget.reminder?.isCompleted ?? false,
-                priority: _priority,
-                createdAt: widget.reminder?.createdAt ?? DateTime.now(),
               );
               Navigator.pop(context, reminder);
             }

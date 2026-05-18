@@ -1,11 +1,11 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
-import 'package:uuid/uuid.dart';
-import '../models/favorite_model.dart';
-import '../../../services/database_service.dart';
 import '../../../services/supabase_service.dart';
+import '../models/favorite_model.dart';
 
-/// 收藏夹页面
+/// 收藏夹页面 - Supabase 数据同步
 class FavoritesScreen extends StatefulWidget {
   const FavoritesScreen({super.key});
 
@@ -14,10 +14,11 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> {
-  final DatabaseService _db = DatabaseService.instance;
   List<FavoriteModel> _favorites = [];
   bool _isLoading = true;
   String? _selectedCategory;
+
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
@@ -28,7 +29,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   Future<void> _loadFavorites() async {
     setState(() => _isLoading = true);
     try {
-      final userId = AuthService.instance.currentUserId;
+      final userId = _userId;
       if (userId == null) {
         setState(() {
           _favorites = [];
@@ -36,15 +37,24 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         });
         return;
       }
-      final items = await _db.getFavorites(userId);
-      setState(() {
-        _favorites = items..sort((a, b) {
-          if (a.isPinned && !b.isPinned) return -1;
-          if (!a.isPinned && b.isPinned) return 1;
-          return b.createdAt.compareTo(a.createdAt);
+
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/favorites?user_id=eq.$userId&select=*&order=created_at.desc',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
+        setState(() {
+          _favorites = items;
+          _isLoading = false;
         });
-        _isLoading = false;
-      });
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       _showError('加载收藏失败: $e');
@@ -61,7 +71,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     if (url == null || url.isEmpty) return;
     final uri = Uri.tryParse(url);
     if (uri == null) return;
-    
+
     try {
       if (await canLaunchUrl(uri)) {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
@@ -70,19 +80,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       }
     } catch (e) {
       _showError('打开链接失败: $e');
-    }
-  }
-
-  Future<void> _togglePin(FavoriteModel favorite) async {
-    try {
-      final updated = favorite.copyWith(
-        isPinned: !favorite.isPinned,
-        updatedAt: DateTime.now(),
-      );
-      await _db.updateFavorite(updated);
-      _loadFavorites();
-    } catch (e) {
-      _showError('操作失败: $e');
     }
   }
 
@@ -107,8 +104,16 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (confirmed == true) {
       try {
-        await _db.deleteFavorite(id);
-        _loadFavorites();
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/favorites?id=eq.$id'),
+          headers: SupabaseConfig.headers,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          _loadFavorites();
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
+        }
       } catch (e) {
         _showError('删除失败: $e');
       }
@@ -119,9 +124,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final isEditing = favorite != null;
     final titleController = TextEditingController(text: favorite?.title ?? '');
     final urlController = TextEditingController(text: favorite?.url ?? '');
-    final tagsController = TextEditingController(
-      text: favorite?.tags?.join(', ') ?? '',
-    );
+    final descController = TextEditingController(text: favorite?.description ?? '');
     String category = favorite?.category ?? 'other';
 
     await showDialog(
@@ -150,6 +153,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   keyboardType: TextInputType.url,
                 ),
                 const SizedBox(height: 12),
+                TextField(
+                  controller: descController,
+                  decoration: const InputDecoration(
+                    labelText: '描述（可选）',
+                    hintText: '输入描述',
+                  ),
+                  maxLines: 2,
+                ),
+                const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
                   value: category,
                   decoration: const InputDecoration(labelText: '分类'),
@@ -164,14 +176,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       setDialogState(() => category = value);
                     }
                   },
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: tagsController,
-                  decoration: const InputDecoration(
-                    labelText: '标签',
-                    hintText: '用逗号分隔多个标签',
-                  ),
                 ),
               ],
             ),
@@ -188,33 +192,45 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   return;
                 }
 
-                final tags = tagsController.text
-                    .split(',')
-                    .map((t) => t.trim())
-                    .where((t) => t.isNotEmpty)
-                    .toList();
-
-                final userId = AuthService.instance.currentUserId ?? 'local_user';
+                final userId = _userId ?? 'local_user';
 
                 final newFavorite = FavoriteModel(
-                  id: isEditing ? favorite.id : const Uuid().v4(),
+                  id: isEditing ? favorite.id : '',
                   userId: isEditing ? favorite.userId : userId,
                   title: titleController.text.trim(),
                   url: urlController.text.trim().isEmpty
                       ? null
                       : urlController.text.trim(),
+                  description: descController.text.trim().isEmpty
+                      ? null
+                      : descController.text.trim(),
                   category: category,
-                  tags: tags.isEmpty ? null : tags,
-                  isPinned: favorite?.isPinned ?? false,
-                  createdAt: isEditing ? favorite.createdAt : DateTime.now(),
-                  updatedAt: DateTime.now(),
                 );
 
                 try {
                   if (isEditing) {
-                    await _db.updateFavorite(newFavorite);
+                    final response = await http.patch(
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/favorites?id=eq.${favorite.id}'),
+                      headers: SupabaseConfig.headers,
+                      body: jsonEncode({
+                        'title': newFavorite.title,
+                        'url': newFavorite.url,
+                        'description': newFavorite.description,
+                        'category': newFavorite.category,
+                      }),
+                    );
+                    if (response.statusCode != 200 && response.statusCode != 204) {
+                      throw Exception('HTTP ${response.statusCode}');
+                    }
                   } else {
-                    await _db.insertFavorite(newFavorite);
+                    final response = await http.post(
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/favorites'),
+                      headers: SupabaseConfig.headers,
+                      body: jsonEncode(newFavorite.toJson()),
+                    );
+                    if (response.statusCode != 201 && response.statusCode != 200) {
+                      throw Exception('HTTP ${response.statusCode}');
+                    }
                   }
                   Navigator.pop(context);
                   _loadFavorites();
@@ -290,204 +306,136 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   itemCount: _filteredFavorites.length,
                   itemBuilder: (context, index) {
                     final favorite = _filteredFavorites[index];
-                    return _FavoriteCard(
-                      favorite: favorite,
-                      onTap: () => _openUrl(favorite.url),
-                      onEdit: () => _showEditDialog(favorite: favorite),
-                      onDelete: () => _deleteFavorite(favorite.id),
-                      onTogglePin: () => _togglePin(favorite),
+                    final category = FavoriteCategory.values.firstWhere(
+                      (c) => c.name == favorite.category,
+                      orElse: () => FavoriteCategory.other,
+                    );
+
+                    return Card(
+                      margin: const EdgeInsets.only(bottom: 12),
+                      child: InkWell(
+                        onTap: () => _openUrl(favorite.url),
+                        borderRadius: BorderRadius.circular(12),
+                        child: Padding(
+                          padding: const EdgeInsets.all(16),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 48,
+                                height: 48,
+                                decoration: BoxDecoration(
+                                  color: colorScheme.primaryContainer,
+                                  borderRadius: BorderRadius.circular(12),
+                                ),
+                                child: Icon(
+                                  favorite.url != null ? Icons.link : Icons.bookmark,
+                                  color: colorScheme.primary,
+                                ),
+                              ),
+                              const SizedBox(width: 16),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      favorite.title,
+                                      style: Theme.of(context).textTheme.titleMedium,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                    const SizedBox(height: 4),
+                                    Row(
+                                      children: [
+                                        Container(
+                                          padding: const EdgeInsets.symmetric(
+                                            horizontal: 8,
+                                            vertical: 2,
+                                          ),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.secondaryContainer,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            category.label,
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: colorScheme.onSecondaryContainer,
+                                            ),
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                    if (favorite.description != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        favorite.description!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colorScheme.outline,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    if (favorite.url != null) ...[
+                                      const SizedBox(height: 4),
+                                      Text(
+                                        favorite.url!,
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color: colorScheme.outline,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                              ),
+                              PopupMenuButton<String>(
+                                onSelected: (value) {
+                                  switch (value) {
+                                    case 'edit':
+                                      _showEditDialog(favorite: favorite);
+                                      break;
+                                    case 'delete':
+                                      _deleteFavorite(favorite.id);
+                                      break;
+                                  }
+                                },
+                                itemBuilder: (context) => [
+                                  const PopupMenuItem(
+                                    value: 'edit',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.edit, size: 20),
+                                        SizedBox(width: 8),
+                                        Text('编辑'),
+                                      ],
+                                    ),
+                                  ),
+                                  const PopupMenuItem(
+                                    value: 'delete',
+                                    child: Row(
+                                      children: [
+                                        Icon(Icons.delete, size: 20, color: Colors.red),
+                                        SizedBox(width: 8),
+                                        Text('删除', style: TextStyle(color: Colors.red)),
+                                      ],
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
                     );
                   },
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class _FavoriteCard extends StatelessWidget {
-  final FavoriteModel favorite;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-  final VoidCallback onTogglePin;
-
-  const _FavoriteCard({
-    required this.favorite,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-    required this.onTogglePin,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final category = FavoriteCategory.values.firstWhere(
-      (c) => c.name == favorite.category,
-      orElse: () => FavoriteCategory.other,
-    );
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
-                ),
-                child: Icon(
-                  favorite.url != null ? Icons.link : Icons.bookmark,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        if (favorite.isPinned)
-                          Icon(
-                            Icons.push_pin,
-                            size: 16,
-                            color: colorScheme.primary,
-                          ),
-                        if (favorite.isPinned) const SizedBox(width: 4),
-                        Expanded(
-                          child: Text(
-                            favorite.title,
-                            style: Theme.of(context).textTheme.titleMedium,
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            category.label,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                        ),
-                        if (favorite.tags != null && favorite.tags!.isNotEmpty)
-                          ...favorite.tags!.take(2).map((tag) => Padding(
-                            padding: const EdgeInsets.only(left: 4),
-                            child: Container(
-                              padding: const EdgeInsets.symmetric(
-                                horizontal: 8,
-                                vertical: 2,
-                              ),
-                              decoration: BoxDecoration(
-                                color: colorScheme.tertiaryContainer,
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                tag,
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onTertiaryContainer,
-                                ),
-                              ),
-                            ),
-                          )),
-                      ],
-                    ),
-                    if (favorite.url != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        favorite.url!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.outline,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                  ],
-                ),
-              ),
-              PopupMenuButton<String>(
-                onSelected: (value) {
-                  switch (value) {
-                    case 'pin':
-                      onTogglePin();
-                      break;
-                    case 'edit':
-                      onEdit();
-                      break;
-                    case 'delete':
-                      onDelete();
-                      break;
-                  }
-                },
-                itemBuilder: (context) => [
-                  PopupMenuItem(
-                    value: 'pin',
-                    child: Row(
-                      children: [
-                        Icon(
-                          favorite.isPinned
-                              ? Icons.push_pin_outlined
-                              : Icons.push_pin,
-                          size: 20,
-                        ),
-                        const SizedBox(width: 8),
-                        Text(favorite.isPinned ? '取消置顶' : '置顶'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'edit',
-                    child: Row(
-                      children: [
-                        Icon(Icons.edit, size: 20),
-                        SizedBox(width: 8),
-                        Text('编辑'),
-                      ],
-                    ),
-                  ),
-                  const PopupMenuItem(
-                    value: 'delete',
-                    child: Row(
-                      children: [
-                        Icon(Icons.delete, size: 20, color: Colors.red),
-                        SizedBox(width: 8),
-                        Text('删除', style: TextStyle(color: Colors.red)),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ],
-          ),
-        ),
       ),
     );
   }
