@@ -1,0 +1,656 @@
+import 'dart:convert';
+import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
+import '../../../config.dart';
+import '../../../services/supabase_service.dart';
+import '../models/novel_model.dart';
+import 'novel_reader_screen.dart';
+
+/// 小说详情页面
+class NovelDetailScreen extends StatefulWidget {
+  final NovelModel novel;
+
+  const NovelDetailScreen({super.key, required this.novel});
+
+  @override
+  State<NovelDetailScreen> createState() => _NovelDetailScreenState();
+}
+
+class _NovelDetailScreenState extends State<NovelDetailScreen> {
+  bool _isInBookshelf = false;
+  bool _isLoadingShelf = true;
+  String? _bookshelfId;
+  int _currentChapter = 1;
+  List<NovelChapterModel> _chapters = [];
+  bool _isLoadingChapters = true;
+  bool _isCollected = false;
+
+  String? get _userId => AuthService.instance.currentUserId;
+
+  @override
+  void initState() {
+    super.initState();
+    _checkBookshelfStatus();
+    _loadChapters();
+  }
+
+  /// 检查书架状态
+  Future<void> _checkBookshelfStatus() async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoadingShelf = false);
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id,status,current_chapter',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          setState(() {
+            _isInBookshelf = true;
+            _bookshelfId = data.first['id'] as String;
+            _currentChapter = data.first['current_chapter'] as int? ?? 1;
+            _isLoadingShelf = false;
+          });
+        } else {
+          setState(() => _isLoadingShelf = false);
+        }
+      } else {
+        setState(() => _isLoadingShelf = false);
+      }
+    } catch (e) {
+      setState(() => _isLoadingShelf = false);
+    }
+  }
+
+  /// 加载章节列表
+  Future<void> _loadChapters() async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?novel_id=eq.${widget.novel.id}&select=id,title,chapter_num,word_count&order=chapter_num.asc',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        setState(() {
+          _chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+          _isLoadingChapters = false;
+        });
+      } else {
+        setState(() => _isLoadingChapters = false);
+      }
+    } catch (e) {
+      setState(() => _isLoadingChapters = false);
+    }
+  }
+
+  /// 加入/移出书架
+  Future<void> _toggleBookshelf() async {
+    final userId = _userId;
+    if (userId == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
+
+    if (_isInBookshelf && _bookshelfId != null) {
+      // 移出书架
+      try {
+        final response = await http.delete(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$_bookshelfId',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          },
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          setState(() {
+            _isInBookshelf = false;
+            _bookshelfId = null;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已从书架移除')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('操作失败: $e')),
+          );
+        }
+      }
+    } else {
+      // 加入书架
+      try {
+        final response = await http.post(
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: jsonEncode({
+            'user_id': userId,
+            'novel_id': widget.novel.id,
+            'status': 'reading',
+            'current_chapter': 1,
+          }),
+        );
+
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final List<dynamic> data = jsonDecode(response.body);
+          setState(() {
+            _isInBookshelf = true;
+            _bookshelfId = data.first['id'] as String;
+          });
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('已加入书架')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('操作失败: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  /// 开始阅读
+  void _startReading() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovelReaderScreen(
+          novel: widget.novel,
+          startChapter: _isInBookshelf ? _currentChapter : 1,
+        ),
+      ),
+    );
+  }
+
+  /// 跳转到指定章节
+  void _jumpToChapter(int chapterNum) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovelReaderScreen(
+          novel: widget.novel,
+          startChapter: chapterNum,
+        ),
+      ),
+    );
+  }
+
+  /// 显示章节目录
+  void _showChapterList() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => DraggableScrollableSheet(
+        initialChildSize: 0.6,
+        maxChildSize: 0.9,
+        minChildSize: 0.3,
+        expand: false,
+        builder: (context, scrollController) => Column(
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  Text(
+                    '章节目录',
+                    style: Theme.of(context).textTheme.titleLarge,
+                  ),
+                  const Spacer(),
+                  Text(
+                    '共 ${_chapters.length} 章',
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _isLoadingChapters
+                  ? const Center(child: CircularProgressIndicator())
+                  : _chapters.isEmpty
+                      ? const Center(child: Text('暂无章节'))
+                      : ListView.builder(
+                          controller: scrollController,
+                          itemCount: _chapters.length,
+                          itemBuilder: (context, index) {
+                            final chapter = _chapters[index];
+                            final isCurrent = chapter.chapterOrder == _currentChapter;
+
+                            return ListTile(
+                              dense: true,
+                              title: Text(
+                                chapter.title,
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: isCurrent
+                                      ? Theme.of(context).colorScheme.primary
+                                      : null,
+                                  fontWeight: isCurrent ? FontWeight.bold : null,
+                                ),
+                              ),
+                              trailing: isCurrent
+                                  ? Icon(
+                                      Icons.play_arrow,
+                                      color: Theme.of(context).colorScheme.primary,
+                                      size: 20,
+                                    )
+                                  : Text(
+                                      '${chapter.wordCount ?? ""}字',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                              onTap: () {
+                                Navigator.pop(context);
+                                _jumpToChapter(chapter.chapterOrder);
+                              },
+                            );
+                          },
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 格式化字数
+  String _formatWordCount(int? wordCount) {
+    if (wordCount == null) return '未知';
+    if (wordCount >= 10000) {
+      return '${(wordCount / 10000).toStringAsFixed(1)}万';
+    }
+    return '$wordCount';
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final novel = widget.novel;
+
+    return Scaffold(
+      body: CustomScrollView(
+        slivers: [
+          // 顶部应用栏 + 封面
+          SliverAppBar(
+            expandedHeight: 280,
+            pinned: true,
+            flexibleSpace: FlexibleSpaceBar(
+              background: Stack(
+                fit: StackFit.expand,
+                children: [
+                  // 背景封面（模糊效果）
+                  if (novel.cover != null)
+                    Image.network(
+                      novel.cover!,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: colorScheme.primaryContainer,
+                      ),
+                    )
+                  else
+                    Container(color: colorScheme.primaryContainer),
+                  // 渐变遮罩
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.transparent,
+                          Colors.black.withOpacity(0.3),
+                          colorScheme.surface,
+                        ],
+                        stops: const [0.0, 0.5, 1.0],
+                      ),
+                    ),
+                  ),
+                  // 小说信息
+                  Positioned(
+                    left: 20,
+                    right: 20,
+                    bottom: 20,
+                    child: Row(
+                      crossAxisAlignment: CrossAxisAlignment.end,
+                      children: [
+                        // 封面缩略图
+                        ClipRRect(
+                          borderRadius: BorderRadius.circular(8),
+                          child: SizedBox(
+                            width: 90,
+                            height: 120,
+                            child: novel.cover != null
+                                ? Image.network(
+                                    novel.cover!,
+                                    fit: BoxFit.cover,
+                                    errorBuilder: (_, __, ___) => Container(
+                                      color: colorScheme.surfaceContainerHighest,
+                                      child: Icon(
+                                        Icons.book,
+                                        size: 40,
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  )
+                                : Container(
+                                    color: colorScheme.surfaceContainerHighest,
+                                    child: Icon(
+                                      Icons.book,
+                                      size: 40,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        // 标题和作者
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Text(
+                                novel.title,
+                                style: const TextStyle(
+                                  fontSize: 20,
+                                  fontWeight: FontWeight.bold,
+                                  color: Colors.white,
+                                ),
+                                maxLines: 2,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                              const SizedBox(height: 6),
+                              Text(
+                                novel.author ?? '佚名',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.white.withOpacity(0.9),
+                                ),
+                              ),
+                              const SizedBox(height: 4),
+                              if (novel.category != null)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 8,
+                                    vertical: 2,
+                                  ),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary,
+                                    borderRadius: BorderRadius.circular(4),
+                                  ),
+                                  child: Text(
+                                    novel.category!,
+                                    style: const TextStyle(
+                                      fontSize: 11,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 统计信息
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
+              child: Row(
+                children: [
+                  _StatItem(
+                    label: '字数',
+                    value: _formatWordCount(novel.wordCount),
+                  ),
+                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+                  _StatItem(
+                    label: '章节',
+                    value: '${novel.chapterCount} 章',
+                  ),
+                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+                  _StatItem(
+                    label: '状态',
+                    value: novel.status == 'completed' ? '已完结' : '连载中',
+                  ),
+                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+                  _StatItem(
+                    label: '评分',
+                    value: novel.rating != null ? '${novel.rating}' : '--',
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          // 操作按钮
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  // 开始阅读按钮
+                  Expanded(
+                    child: FilledButton.icon(
+                      onPressed: _startReading,
+                      icon: const Icon(Icons.menu_book),
+                      label: Text(
+                        _isInBookshelf && _currentChapter > 1
+                            ? '继续阅读 第$_currentChapter章'
+                            : '开始阅读',
+                      ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 书架按钮
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: _isLoadingShelf
+                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                        : OutlinedButton(
+                            onPressed: _toggleBookshelf,
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(48, 48),
+                            ),
+                            child: Icon(
+                              _isInBookshelf
+                                  ? Icons.library_books
+                                  : Icons.library_add_outlined,
+                              color: _isInBookshelf ? colorScheme.primary : null,
+                            ),
+                          ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+          // 小说简介
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '简介',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    novel.description ?? '暂无简介',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      height: 1.6,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+          // 章节目录
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: Row(
+                children: [
+                  Text(
+                    '章节目录',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const Spacer(),
+                  if (!_isLoadingChapters)
+                    Text(
+                      '共 ${_chapters.length} 章',
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  const SizedBox(width: 8),
+                  GestureDetector(
+                    onTap: _showChapterList,
+                    child: Text(
+                      '查看全部',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: colorScheme.primary,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+
+          // 章节列表（显示前20章）
+          SliverList(
+            delegate: SliverChildBuilderDelegate(
+              (context, index) {
+                if (_isLoadingChapters) {
+                  return const ListTile(
+                    dense: true,
+                    title: Center(child: CircularProgressIndicator()),
+                  );
+                }
+
+                if (index >= _chapters.length) return null;
+
+                final chapter = _chapters[index];
+                final isCurrent = chapter.chapterOrder == _currentChapter;
+
+                return ListTile(
+                  dense: true,
+                  title: Text(
+                    chapter.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: isCurrent ? colorScheme.primary : null,
+                      fontWeight: isCurrent ? FontWeight.bold : null,
+                    ),
+                  ),
+                  trailing: isCurrent
+                      ? Icon(
+                          Icons.play_arrow,
+                          color: colorScheme.primary,
+                          size: 20,
+                        )
+                      : null,
+                  onTap: () => _jumpToChapter(chapter.chapterOrder),
+                );
+              },
+              childCount: _isLoadingChapters ? 1 : _chapters.length,
+            ),
+          ),
+
+          // 底部间距
+          const SliverToBoxAdapter(child: SizedBox(height: 80)),
+        ],
+      ),
+    );
+  }
+}
+
+/// 统计信息项
+class _StatItem extends StatelessWidget {
+  final String label;
+  final String value;
+
+  const _StatItem({required this.label, required this.value});
+
+  @override
+  Widget build(BuildContext context) {
+    return Expanded(
+      child: Column(
+        children: [
+          Text(
+            value,
+            style: Theme.of(context).textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          const SizedBox(height: 2),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}

@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import '../../../services/supabase_service.dart';
 import '../../../config.dart';
+import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
-import 'novel_list_screen.dart';
+import 'novel_detail_screen.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
@@ -42,7 +42,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 联合查询 book_shelves 和 novels 表
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count)',
+          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)&order=last_read_at.desc.nullslast',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -177,12 +177,43 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     }
   }
 
-  /// 打开小说阅读
-  void _openNovel(Map<String, dynamic> item) {
+  /// 继续阅读 - 跳转到上次阅读的章节
+  void _continueReading(Map<String, dynamic> item) {
     final novelData = item['novels'] as Map<String, dynamic>?;
     if (novelData == null) return;
 
-    final novel = NovelModel(
+    final novel = _parseNovel(novelData);
+    final currentChapter = item['current_chapter'] as int? ?? 1;
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovelReaderScreen(
+          novel: novel,
+          startChapter: currentChapter,
+        ),
+      ),
+    );
+  }
+
+  /// 打开小说详情
+  void _openNovelDetail(Map<String, dynamic> item) {
+    final novelData = item['novels'] as Map<String, dynamic>?;
+    if (novelData == null) return;
+
+    final novel = _parseNovel(novelData);
+
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovelDetailScreen(novel: novel),
+      ),
+    );
+  }
+
+  /// 解析小说数据
+  NovelModel _parseNovel(Map<String, dynamic> novelData) {
+    return NovelModel(
       id: novelData['id'] as String? ?? '',
       title: novelData['title'] as String? ?? '',
       author: novelData['author'] as String?,
@@ -190,23 +221,19 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       category: novelData['category'] as String?,
       status: novelData['status'] as String?,
       chapterCount: novelData['chapter_count'] as int? ?? 0,
-      createdAt: novelData['created_at'] != null
-          ? DateTime.parse(novelData['created_at'] as String)
-          : DateTime.now(),
-    );
-
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(novel: novel),
-      ),
+      wordCount: novelData['word_count'] as int?,
+      description: novelData['description'] as String?,
+      createdAt: DateTime.now(),
     );
   }
 
-  /// 显示状态选择底部弹窗
-  void _showStatusBottomSheet(BuildContext context, Map<String, dynamic> item) {
+  /// 显示操作底部弹窗
+  void _showActionBottomSheet(BuildContext context, Map<String, dynamic> item) {
     final bookshelfId = item['id'] as String;
     final currentStatus = item['status'] as String? ?? 'reading';
+    final currentChapter = item['current_chapter'] as int? ?? 1;
+    final novelData = item['novels'] as Map<String, dynamic>?;
+    final chapterCount = novelData?['chapter_count'] as int? ?? 0;
 
     showModalBottomSheet(
       context: context,
@@ -214,11 +241,34 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 继续阅读
+            ListTile(
+              leading: const Icon(Icons.play_circle_outline, color: Colors.blue),
+              title: const Text('继续阅读'),
+              subtitle: Text('第 $currentChapter / $chapterCount 章'),
+              onTap: () {
+                Navigator.pop(context);
+                _continueReading(item);
+              },
+            ),
+            // 查看详情
+            ListTile(
+              leading: const Icon(Icons.info_outline),
+              title: const Text('查看详情'),
+              onTap: () {
+                Navigator.pop(context);
+                _openNovelDetail(item);
+              },
+            ),
+            const Divider(),
             const Padding(
-              padding: EdgeInsets.all(16),
-              child: Text(
-                '更改阅读状态',
-                style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+              padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+              child: Align(
+                alignment: Alignment.centerLeft,
+                child: Text(
+                  '更改阅读状态',
+                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                ),
               ),
             ),
             ListTile(
@@ -282,7 +332,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认移除'),
-        content: const Text('确定要将这本小说从书架移除吗？'),
+        content: const Text('确定要将这本小说从书架移除吗？阅读进度将不会保留。'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
@@ -293,6 +343,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               Navigator.pop(context);
               _removeFromBookshelf(bookshelfId);
             },
+            style: FilledButton.styleFrom(
+              backgroundColor: Theme.of(context).colorScheme.error,
+            ),
             child: const Text('移除'),
           ),
         ],
@@ -318,6 +371,15 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     }
   }
 
+  /// 格式化字数
+  String _formatWordCount(int? wordCount) {
+    if (wordCount == null) return '';
+    if (wordCount >= 10000) {
+      return '${(wordCount / 10000).toStringAsFixed(1)}万字';
+    }
+    return '$wordCount字';
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -333,7 +395,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                 // 跳转到小说列表页面
                 Navigator.push(
                   context,
-                  MaterialPageRoute(builder: (_) => const NovelListScreen()),
+                  MaterialPageRoute(builder: (_) => const _NovelListForAddScreen()),
                 );
               },
               tooltip: '添加小说',
@@ -354,6 +416,17 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                   Text(
                     '请先登录后查看书架',
                     style: TextStyle(color: colorScheme.onSurfaceVariant),
+                  ),
+                  const SizedBox(height: 24),
+                  FilledButton(
+                    onPressed: () {
+                      // 返回到登录页
+                      Navigator.of(context).pushNamedAndRemoveUntil(
+                        '/login',
+                        (route) => false,
+                      );
+                    },
+                    child: const Text('去登录'),
                   ),
                 ],
               ),
@@ -388,7 +461,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                             onPressed: () {
                               Navigator.push(
                                 context,
-                                MaterialPageRoute(builder: (_) => const NovelListScreen()),
+                                MaterialPageRoute(
+                                  builder: (_) => const _NovelListForAddScreen(),
+                                ),
                               );
                             },
                             icon: const Icon(Icons.add),
@@ -476,10 +551,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                                         getStatusText: _getStatusText,
                                         getStatusColor: _getStatusColor,
                                         formatLastRead: _formatLastRead,
-                                        onTap: () => _openNovel(item),
+                                        formatWordCount: _formatWordCount,
+                                        onTap: () => _continueReading(item),
                                         onLongPress: () =>
-                                            _showStatusBottomSheet(
-                                                context, item),
+                                            _showActionBottomSheet(context, item),
                                       );
                                     },
                                   ),
@@ -491,6 +566,19 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 }
 
+/// 用于从书架添加小说的简单列表页
+class _NovelListForAddScreen extends StatelessWidget {
+  const _NovelListForAddScreen();
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(title: const Text('添加小说到书架')),
+      body: const Center(child: Text('请返回小说列表页浏览并添加')),
+    );
+  }
+}
+
 /// 书架列表项
 class _BookshelfItem extends StatelessWidget {
   final Map<String, dynamic> item;
@@ -498,6 +586,7 @@ class _BookshelfItem extends StatelessWidget {
   final String Function(String?) getStatusText;
   final Color Function(String?, ColorScheme) getStatusColor;
   final String Function(String?) formatLastRead;
+  final String Function(int?) formatWordCount;
   final VoidCallback onTap;
   final VoidCallback onLongPress;
 
@@ -507,6 +596,7 @@ class _BookshelfItem extends StatelessWidget {
     required this.getStatusText,
     required this.getStatusColor,
     required this.formatLastRead,
+    required this.formatWordCount,
     required this.onTap,
     required this.onLongPress,
   });
@@ -524,6 +614,8 @@ class _BookshelfItem extends StatelessWidget {
     final author = novelData['author'] as String? ?? '佚名';
     final coverUrl = novelData['cover_url'] as String?;
     final chapterCount = novelData['chapter_count'] as int? ?? 0;
+    final wordCount = novelData['word_count'] as int?;
+    final category = novelData['category'] as String?;
 
     return InkWell(
       onTap: onTap,
@@ -574,10 +666,32 @@ class _BookshelfItem extends StatelessWidget {
                     overflow: TextOverflow.ellipsis,
                   ),
                   const SizedBox(height: 4),
-                  Text(
-                    author,
-                    style: Theme.of(context).textTheme.bodySmall,
-                    maxLines: 1,
+                  Row(
+                    children: [
+                      Text(
+                        author,
+                        style: Theme.of(context).textTheme.bodySmall,
+                        maxLines: 1,
+                      ),
+                      if (category != null) ...[
+                        const SizedBox(width: 8),
+                        Container(
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: colorScheme.primaryContainer,
+                            borderRadius: BorderRadius.circular(3),
+                          ),
+                          child: Text(
+                            category,
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: colorScheme.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ],
                   ),
                   const SizedBox(height: 6),
                   Row(
@@ -614,14 +728,36 @@ class _BookshelfItem extends StatelessWidget {
                       ),
                     ],
                   ),
-                  if (lastReadAt != null) ...[
+                  if (lastReadAt != null || wordCount != null) ...[
                     const SizedBox(height: 4),
-                    Text(
-                      '上次阅读: ${formatLastRead(lastReadAt)}',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                            fontSize: 11,
+                    Row(
+                      children: [
+                        if (lastReadAt != null) ...[
+                          Text(
+                            '上次阅读: ${formatLastRead(lastReadAt)}',
+                            style: Theme.of(context)
+                                .textTheme
+                                .bodySmall
+                                ?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
+                                  fontSize: 11,
+                                ),
                           ),
+                          if (wordCount != null) ...[
+                            const SizedBox(width: 12),
+                            Text(
+                              formatWordCount(wordCount),
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontSize: 11,
+                                  ),
+                            ),
+                          ],
+                        ],
+                      ],
                     ),
                   ],
                 ],

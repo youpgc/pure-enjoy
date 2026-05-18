@@ -1,8 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import '../../../services/database_service.dart';
+import 'package:http/http.dart' as http;
+import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
-import 'novel_reader_screen.dart';
+import 'novel_detail_screen.dart';
 import 'book_shelf_screen.dart';
 
 /// 小说列表页面
@@ -15,9 +17,17 @@ class NovelListScreen extends StatefulWidget {
 
 class _NovelListScreenState extends State<NovelListScreen> {
   List<NovelModel> _novels = [];
+  List<NovelModel> _allNovels = [];
   List<Map<String, dynamic>> _userNovels = [];
   bool _isLoading = true;
-  String _selectedCategory = 'all';
+  String _selectedCategory = '全部';
+  String _searchQuery = '';
+  final TextEditingController _searchController = TextEditingController();
+
+  /// 分类列表
+  static const List<String> _categories = [
+    '全部', '玄幻', '仙侠', '都市', '历史', '武侠', '科幻', '游戏', '悬疑', '灵异', '言情',
+  ];
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -27,27 +37,56 @@ class _NovelListScreenState extends State<NovelListScreen> {
     _loadNovels();
   }
 
+  @override
+  void dispose() {
+    _searchController.dispose();
+    super.dispose();
+  }
+
   Future<void> _loadNovels() async {
     setState(() => _isLoading = true);
 
     try {
-      // 加载所有公共小说
-      final novels = await DatabaseService.instance.getNovels();
+      // 从 Supabase 加载已发布的小说
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novels?is_published=eq.true&select=*&order=created_at.desc&limit=100',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
 
-      // 根据分类筛选
-      final filteredNovels = _selectedCategory == 'all'
-          ? novels
-          : novels.where((n) => n.category == _selectedCategory).toList();
+      List<NovelModel> novels = [];
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        novels = data.map((json) => NovelModel.fromJson(json)).toList();
+      }
 
       // 加载用户书架
       List<Map<String, dynamic>> userNovels = [];
       final userId = _userId;
       if (userId != null) {
-        userNovels = await DatabaseService.instance.getUserNovels(userId);
+        try {
+          final shelfResponse = await http.get(
+            Uri.parse(
+              '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter',
+            ),
+            headers: {
+              'apikey': AppConfig.supabaseAnonKey,
+              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            },
+          );
+          if (shelfResponse.statusCode == 200) {
+            userNovels = jsonDecode(shelfResponse.body).cast<Map<String, dynamic>>();
+          }
+        } catch (_) {}
       }
 
       setState(() {
-        _novels = filteredNovels;
+        _allNovels = novels;
+        _novels = _applyFilters(novels);
         _userNovels = userNovels;
         _isLoading = false;
       });
@@ -61,6 +100,44 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
   }
 
+  /// 应用分类和搜索筛选
+  List<NovelModel> _applyFilters(List<NovelModel> novels) {
+    var filtered = novels;
+
+    // 分类筛选
+    if (_selectedCategory != '全部') {
+      filtered = filtered.where((n) => n.category == _selectedCategory).toList();
+    }
+
+    // 搜索筛选
+    if (_searchQuery.isNotEmpty) {
+      final query = _searchQuery.toLowerCase();
+      filtered = filtered.where((n) {
+        return n.title.toLowerCase().contains(query) ||
+            (n.author?.toLowerCase().contains(query) ?? false);
+      }).toList();
+    }
+
+    return filtered;
+  }
+
+  /// 切换分类
+  void _onCategoryChanged(String category) {
+    setState(() {
+      _selectedCategory = category;
+      _novels = _applyFilters(_allNovels);
+    });
+  }
+
+  /// 搜索
+  void _onSearchChanged(String query) {
+    setState(() {
+      _searchQuery = query;
+      _novels = _applyFilters(_allNovels);
+    });
+  }
+
+  /// 添加到书架
   Future<void> _addToBookshelf(NovelModel novel) async {
     final userId = _userId;
     if (userId == null) {
@@ -73,12 +150,29 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
 
     try {
-      await DatabaseService.instance.addToBookshelf(userId, novel.id);
-      await _loadNovels();
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已添加到书架')),
-        );
+      final response = await http.post(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode({
+          'user_id': userId,
+          'novel_id': novel.id,
+          'status': 'reading',
+          'current_chapter': 1,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        await _loadNovels();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已添加到书架')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
@@ -89,18 +183,53 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
   }
 
-  void _openNovel(NovelModel novel) {
+  /// 打开小说详情页
+  void _openNovelDetail(NovelModel novel) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(novel: novel),
+        builder: (_) => NovelDetailScreen(novel: novel),
       ),
     );
   }
 
+  /// 获取正在阅读的小说
   List<NovelModel> get _readingNovels {
     final bookshelfNovelIds = _userNovels.map((un) => un['novel_id'] as String).toSet();
-    return _novels.where((n) => bookshelfNovelIds.contains(n.id)).toList();
+    return _allNovels.where((n) => bookshelfNovelIds.contains(n.id)).toList();
+  }
+
+  /// 显示搜索对话框
+  void _showSearchDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('搜索小说'),
+        content: TextField(
+          controller: _searchController,
+          autofocus: true,
+          decoration: const InputDecoration(
+            hintText: '输入小说名或作者名',
+            prefixIcon: Icon(Icons.search),
+          ),
+          onChanged: _onSearchChanged,
+        ),
+        actions: [
+          TextButton(
+            onPressed: () {
+              _searchController.clear();
+              _onSearchChanged('');
+              Navigator.pop(context);
+            },
+            child: const Text('清除'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('搜索'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -123,9 +252,8 @@ class _NovelListScreenState extends State<NovelListScreen> {
           ),
           IconButton(
             icon: const Icon(Icons.search),
-            onPressed: () {
-              // TODO: 搜索功能
-            },
+            onPressed: _showSearchDialog,
+            tooltip: '搜索',
           ),
         ],
       ),
@@ -136,8 +264,32 @@ class _NovelListScreenState extends State<NovelListScreen> {
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: [
+                  // 搜索提示
+                  if (_searchQuery.isNotEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Row(
+                        children: [
+                          Icon(Icons.search, size: 16, color: colorScheme.onSurfaceVariant),
+                          const SizedBox(width: 4),
+                          Text(
+                            '搜索: "$_searchQuery" (${_novels.length} 结果)',
+                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+                          ),
+                          const Spacer(),
+                          GestureDetector(
+                            onTap: () {
+                              _searchController.clear();
+                              _onSearchChanged('');
+                            },
+                            child: Icon(Icons.close, size: 16, color: colorScheme.onSurfaceVariant),
+                          ),
+                        ],
+                      ),
+                    ),
+
                   // 阅读中的小说
-                  if (_readingNovels.isNotEmpty) ...[
+                  if (_readingNovels.isNotEmpty && _searchQuery.isEmpty) ...[
                     Text(
                       '继续阅读',
                       style: Theme.of(context).textTheme.titleMedium,
@@ -152,7 +304,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                           final novel = _readingNovels[index];
                           return _NovelCard(
                             novel: novel,
-                            onTap: () => _openNovel(novel),
+                            onTap: () => _openNovelDetail(novel),
                           );
                         },
                       ),
@@ -163,57 +315,24 @@ class _NovelListScreenState extends State<NovelListScreen> {
                   // 分类筛选
                   SizedBox(
                     height: 40,
-                    child: ListView(
+                    child: ListView.builder(
                       scrollDirection: Axis.horizontal,
-                      children: [
-                        _CategoryChip(
-                          label: '全部',
-                          isSelected: _selectedCategory == 'all',
-                          onTap: () {
-                            setState(() => _selectedCategory = 'all');
-                            _loadNovels();
-                          },
-                        ),
-                        _CategoryChip(
-                          label: '玄幻',
-                          isSelected: _selectedCategory == '玄幻',
-                          onTap: () {
-                            setState(() => _selectedCategory = '玄幻');
-                            _loadNovels();
-                          },
-                        ),
-                        _CategoryChip(
-                          label: '都市',
-                          isSelected: _selectedCategory == '都市',
-                          onTap: () {
-                            setState(() => _selectedCategory = '都市');
-                            _loadNovels();
-                          },
-                        ),
-                        _CategoryChip(
-                          label: '言情',
-                          isSelected: _selectedCategory == '言情',
-                          onTap: () {
-                            setState(() => _selectedCategory = '言情');
-                            _loadNovels();
-                          },
-                        ),
-                        _CategoryChip(
-                          label: '科幻',
-                          isSelected: _selectedCategory == '科幻',
-                          onTap: () {
-                            setState(() => _selectedCategory = '科幻');
-                            _loadNovels();
-                          },
-                        ),
-                      ],
+                      itemCount: _categories.length,
+                      itemBuilder: (context, index) {
+                        final category = _categories[index];
+                        return _CategoryChip(
+                          label: category,
+                          isSelected: _selectedCategory == category,
+                          onTap: () => _onCategoryChanged(category),
+                        );
+                      },
                     ),
                   ),
                   const SizedBox(height: 16),
 
                   // 小说列表
                   Text(
-                    '全部小说',
+                    _selectedCategory == '全部' ? '全部小说' : _selectedCategory,
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),
@@ -230,7 +349,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                                 ),
                                 const SizedBox(height: 16),
                                 Text(
-                                  '暂无小说',
+                                  _searchQuery.isNotEmpty ? '没有找到匹配的小说' : '暂无小说',
                                   style: TextStyle(color: colorScheme.onSurfaceVariant),
                                 ),
                               ],
@@ -252,7 +371,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                             final isInBookshelf = _userNovels.any((un) => un['novel_id'] == novel.id);
                             return _NovelCard(
                               novel: novel,
-                              onTap: () => _openNovel(novel),
+                              onTap: () => _openNovelDetail(novel),
                               onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
                               isInBookshelf: isInBookshelf,
                             );
