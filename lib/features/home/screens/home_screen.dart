@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
+import 'edit_profile_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -295,8 +298,120 @@ class _ActivityItem extends StatelessWidget {
 }
 
 /// 我的页面
-class ProfilePage extends StatelessWidget {
+class ProfilePage extends StatefulWidget {
   const ProfilePage({super.key});
+
+  @override
+  State<ProfilePage> createState() => _ProfilePageState();
+}
+
+class _ProfilePageState extends State<ProfilePage> {
+  String _currentVersion = '1.0.0';
+  String _latestVersion = '';
+  bool _hasUpdate = false;
+  bool _isForceUpdate = false;
+  String? _apkUrl;
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCurrentVersion();
+    _checkVersion();
+  }
+
+  /// 加载当前版本
+  Future<void> _loadCurrentVersion() async {
+    try {
+      final packageInfo = await PackageInfo.fromPlatform();
+      setState(() {
+        _currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+      });
+    } catch (e) {
+      print('获取版本信息失败: $e');
+    }
+  }
+
+  /// 检查最新版本
+  Future<void> _checkVersion() async {
+    try {
+      final versionInfo = await VersionCheckService.instance.checkUpdate();
+      if (versionInfo != null && mounted) {
+        setState(() {
+          _latestVersion = versionInfo['version'] ?? '';
+          _hasUpdate = true;
+          _isForceUpdate = versionInfo['is_force_update'] == true;
+          _apkUrl = versionInfo['apk_url'];
+        });
+      }
+    } catch (e) {
+      print('检查版本失败: $e');
+    }
+  }
+
+  /// 显示版本信息对话框
+  void _showVersionDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('版本信息'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('当前版本: $_currentVersion'),
+            if (_hasUpdate) ...[
+              const SizedBox(height: 8),
+              Text('最新版本: $_latestVersion'),
+              if (_isForceUpdate)
+                const Text(
+                  '【强制更新】',
+                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                ),
+            ],
+          ],
+        ),
+        actions: [
+          if (_hasUpdate && _apkUrl != null)
+            FilledButton(
+              onPressed: () {
+                Navigator.pop(context);
+                _downloadAndInstall();
+              },
+              child: const Text('立即更新'),
+            ),
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 下载并安装APK
+  Future<void> _downloadAndInstall() async {
+    if (_apkUrl == null) return;
+    
+    try {
+      // 使用url_launcher打开下载链接
+      final uri = Uri.parse(_apkUrl!);
+      if (await canLaunchUrl(uri)) {
+        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('无法打开下载链接')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -354,8 +469,17 @@ class ProfilePage extends StatelessWidget {
                   ),
                   IconButton(
                     icon: const Icon(Icons.edit_outlined),
-                    onPressed: () {
-                      // TODO: 编辑资料
+                    onPressed: () async {
+                      final result = await Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                          builder: (_) => const EditProfileScreen(),
+                        ),
+                      );
+                      if (result == true) {
+                        // 刷新用户信息
+                        setState(() {});
+                      }
                     },
                   ),
                 ],
@@ -378,6 +502,36 @@ class ProfilePage extends StatelessWidget {
               // TODO: 数据同步
             },
           ),
+          
+          // 版本信息 - 带更新提示
+          ListTile(
+            leading: const Icon(Icons.system_update_outlined),
+            title: const Text('版本信息'),
+            subtitle: Text('当前: $_currentVersion'),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_hasUpdate)
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: _isForceUpdate ? Colors.red : Colors.orange,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Text(
+                      _isForceUpdate ? '强制更新' : '有更新',
+                      style: const TextStyle(
+                        color: Colors.white,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
+            onTap: _showVersionDialog,
+          ),
+          
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于'),
@@ -386,7 +540,7 @@ class ProfilePage extends StatelessWidget {
               showAboutDialog(
                 context: context,
                 applicationName: '纯享',
-                applicationVersion: '1.0.0',
+                applicationVersion: _currentVersion,
                 applicationLegalese: '© 2024 纯享团队',
               );
             },
