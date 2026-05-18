@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/expense_list_screen.dart';
@@ -435,29 +434,10 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  /// 下载并安装APK
+  /// 下载并安装APK（内部下载）
   Future<void> _downloadAndInstall() async {
     if (_apkUrl == null) return;
-    
-    try {
-      // 使用url_launcher打开下载链接
-      final uri = Uri.parse(_apkUrl!);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
-      } else {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('无法打开下载链接')),
-          );
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
-      }
-    }
+    await VersionCheckService.instance.downloadAndInstall(context, _apkUrl!);
   }
 
   @override

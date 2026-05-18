@@ -1,11 +1,15 @@
 import 'dart:convert';
+import 'dart:io';
+import 'dart:isolate';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
-import 'package:url_launcher/url_launcher.dart';
+import 'package:path_provider/path_provider.dart';
+import 'package:permission_handler/permission_handler.dart';
+import 'package:open_filex/open_filex.dart';
 import '../config.dart';
 
-/// 版本检查服务
+/// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
   static final VersionCheckService _instance = VersionCheckService._internal();
   factory VersionCheckService() => _instance;
@@ -13,18 +17,19 @@ class VersionCheckService {
 
   static VersionCheckService get instance => _instance;
 
+  // 下载进度回调
+  ValueNotifier<double> downloadProgress = ValueNotifier(0);
+  ValueNotifier<String> downloadStatus = ValueNotifier('');
+
   /// 检查是否需要更新
-  /// 返回最新版本信息，如果不需要更新则返回null
   Future<Map<String, dynamic>?> checkUpdate() async {
     try {
-      // 获取当前版本
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       print('📱 当前版本: $currentVersion+$currentBuildNumber');
 
-      // 从Supabase获取最新版本
       final response = await http.get(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/app_versions?status=eq.released&order=created_at.desc&limit=1',
@@ -36,23 +41,15 @@ class VersionCheckService {
         },
       );
 
-      print('📱 版本检查响应: ${response.statusCode}');
-
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
-        if (data.isEmpty) {
-          print('📱 没有已发布的版本');
-          return null;
-        }
+        if (data.isEmpty) return null;
 
         final latestVersion = data.first as Map<String, dynamic>;
         final latestVersionStr = latestVersion['version'] as String;
         final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
         final isForceUpdate = latestVersion['is_force_update'] == true;
 
-        print('📱 最新版本: $latestVersionStr+$latestBuildNumber, 强制更新: $isForceUpdate');
-
-        // 比较版本号
         if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
           return {
             'version': latestVersionStr,
@@ -63,7 +60,6 @@ class VersionCheckService {
           };
         }
       }
-
       return null;
     } catch (e) {
       print('📱 检查更新失败: $e');
@@ -71,29 +67,20 @@ class VersionCheckService {
     }
   }
 
-  /// 比较版本号，判断是否需要更新
   bool _shouldUpdate(String currentVersion, int currentBuild, String latestVersion, int latestBuild) {
-    // 先比较build number
-    if (latestBuild > currentBuild) {
-      return true;
-    }
-    
-    // 如果build number相同，比较版本号
+    if (latestBuild > currentBuild) return true;
     final currentParts = currentVersion.split('.').map(int.tryParse).toList();
     final latestParts = latestVersion.split('.').map(int.tryParse).toList();
-    
     for (int i = 0; i < currentParts.length && i < latestParts.length; i++) {
       final current = currentParts[i] ?? 0;
       final latest = latestParts[i] ?? 0;
       if (latest > current) return true;
       if (latest < current) return false;
     }
-    
-    // 版本号相同但latest有更多位数
     return latestParts.length > currentParts.length;
   }
 
-  /// 显示更新对话框
+  /// 显示更新对话框（带下载进度）
   void showUpdateDialog(BuildContext context, Map<String, dynamic> versionInfo) {
     final isForceUpdate = versionInfo['is_force_update'] == true;
     final apkUrl = versionInfo['apk_url'] as String?;
@@ -102,64 +89,310 @@ class VersionCheckService {
 
     showDialog(
       context: context,
-      barrierDismissible: !isForceUpdate, // 强制更新时不可关闭
-      builder: (context) => WillPopScope(
-        onWillPop: () async => !isForceUpdate, // 强制更新时禁止返回
-        child: AlertDialog(
-          title: Text(isForceUpdate ? '强制更新' : '发现新版本'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('最新版本: $version'),
-              const SizedBox(height: 8),
-              if (releaseNotes.isNotEmpty) ...[
-                const Text('更新内容:', style: TextStyle(fontWeight: FontWeight.bold)),
-                Text(releaseNotes, style: const TextStyle(fontSize: 14)),
-                const SizedBox(height: 8),
-              ],
-              if (isForceUpdate)
-                const Text(
-                  '此版本为强制更新，必须更新后才能继续使用。',
-                  style: TextStyle(color: Colors.red, fontSize: 12),
-                ),
-            ],
-          ),
-          actions: [
-            if (!isForceUpdate)
-              TextButton(
-                onPressed: () => Navigator.pop(context),
-                child: const Text('稍后更新'),
-              ),
-            FilledButton(
-              onPressed: apkUrl != null ? () => _downloadUpdate(context, apkUrl) : null,
-              child: const Text('立即更新'),
-            ),
-          ],
-        ),
+      barrierDismissible: !isForceUpdate,
+      builder: (context) => _UpdateDialog(
+        version: version,
+        releaseNotes: releaseNotes,
+        isForceUpdate: isForceUpdate,
+        apkUrl: apkUrl,
+        versionService: this,
       ),
     );
   }
 
-  /// 下载更新
-  Future<void> _downloadUpdate(BuildContext context, String apkUrl) async {
+  /// 请求安装权限
+  Future<bool> requestInstallPermission() async {
+    // Android 8+ 需要请求安装未知来源权限
+    if (Platform.isAndroid) {
+      final status = await Permission.requestInstallPackages.status;
+      if (!status.isGranted) {
+        final result = await Permission.requestInstallPackages.request();
+        return result.isGranted;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  /// 请求存储权限
+  Future<bool> requestStoragePermission() async {
+    if (Platform.isAndroid) {
+      // Android 13+ 不需要存储权限
+      if (await _isAndroid13OrAbove()) return true;
+
+      final status = await Permission.storage.status;
+      if (!status.isGranted) {
+        final result = await Permission.storage.request();
+        return result.isGranted;
+      }
+      return true;
+    }
+    return false;
+  }
+
+  Future<bool> _isAndroid13OrAbove() async {
     try {
-      final uri = Uri.parse(apkUrl);
-      if (await canLaunchUrl(uri)) {
-        await launchUrl(uri, mode: LaunchMode.externalApplication);
+      final info = await PackageInfo.fromPlatform();
+      // 无法直接获取 Android SDK 版本，通过异常判断
+      return false;
+    } catch (_) {
+      return false;
+    }
+  }
+
+  /// 下载APK文件
+  Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
+    try {
+      downloadProgress.value = 0;
+      downloadStatus.value = '准备下载...';
+
+      // 请求权限
+      final hasStorage = await requestStoragePermission();
+      if (!hasStorage) {
+        downloadStatus.value = '存储权限被拒绝';
+        return null;
+      }
+
+      // 获取下载目录
+      final dir = await getExternalStorageDirectory();
+      if (dir == null) {
+        downloadStatus.value = '无法访问存储';
+        return null;
+      }
+
+      final savePath = '${dir.path}/pure_enjoy_update.apk';
+      final file = File(savePath);
+
+      // 如果旧文件存在则删除
+      if (await file.exists()) {
+        await file.delete();
+      }
+
+      downloadStatus.value = '正在下载...';
+
+      // 开始下载
+      final client = http.Client();
+      final request = http.Request('GET', Uri.parse(apkUrl));
+      final response = await client.send(request);
+
+      final totalBytes = response.contentLength ?? 0;
+      int downloadedBytes = 0;
+
+      final sink = file.openWrite();
+
+      await response.stream.listen(
+        (chunk) {
+          sink.add(chunk);
+          downloadedBytes += chunk.length;
+          if (totalBytes > 0) {
+            final progress = downloadedBytes / totalBytes;
+            downloadProgress.value = progress;
+            onProgress?.call(progress);
+            downloadStatus.value = '下载中 ${(progress * 100).toStringAsFixed(1)}%';
+          }
+        },
+        onDone: () async {
+          await sink.close();
+          client.close();
+        },
+        onError: (error) async {
+          await sink.close();
+          client.close();
+          downloadStatus.value = '下载失败: $error';
+        },
+        cancelOnError: true,
+      ).asFuture();
+
+      // 验证文件
+      if (await file.exists() && await file.length() > 0) {
+        downloadProgress.value = 1.0;
+        downloadStatus.value = '下载完成';
+        return savePath;
       } else {
-        if (context.mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('无法打开下载链接')),
-          );
-        }
+        downloadStatus.value = '下载失败：文件无效';
+        return null;
       }
     } catch (e) {
-      if (context.mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('下载失败: $e')),
-        );
-      }
+      downloadStatus.value = '下载出错: $e';
+      return null;
     }
+  }
+
+  /// 安装APK
+  Future<bool> installApk(String filePath) async {
+    try {
+      downloadStatus.value = '准备安装...';
+
+      // 请求安装权限
+      final hasPermission = await requestInstallPermission();
+      if (!hasPermission) {
+        downloadStatus.value = '安装权限被拒绝，请在设置中允许安装';
+        // 引导用户到设置页面
+        await openAppSettings();
+        return false;
+      }
+
+      final result = await OpenFilex.open(filePath, type: 'application/vnd.android.package-archive');
+
+      if (result.type == ResultType.done) {
+        downloadStatus.value = '安装成功';
+        return true;
+      } else {
+        downloadStatus.value = '安装未完成';
+        return false;
+      }
+    } catch (e) {
+      downloadStatus.value = '安装失败: $e';
+      return false;
+    }
+  }
+
+  /// 完整的下载并安装流程
+  Future<void> downloadAndInstall(BuildContext context, String apkUrl) async {
+    // 1. 下载APK
+    final filePath = await downloadApk(apkUrl);
+    if (filePath == null) return;
+
+    // 2. 安装APK
+    await installApk(filePath);
+  }
+}
+
+/// 更新对话框组件
+class _UpdateDialog extends StatefulWidget {
+  final String version;
+  final String releaseNotes;
+  final bool isForceUpdate;
+  final String? apkUrl;
+  final VersionCheckService versionService;
+
+  const _UpdateDialog({
+    required this.version,
+    required this.releaseNotes,
+    required this.isForceUpdate,
+    required this.apkUrl,
+    required this.versionService,
+  });
+
+  @override
+  State<_UpdateDialog> createState() => _UpdateDialogState();
+}
+
+class _UpdateDialogState extends State<_UpdateDialog> {
+  bool _isDownloading = false;
+  double _progress = 0;
+  String _statusText = '';
+
+  @override
+  void initState() {
+    super.initState();
+    widget.versionService.downloadProgress.addListener(_onProgressChanged);
+    widget.versionService.downloadStatus.addListener(_onStatusChanged);
+  }
+
+  @override
+  void dispose() {
+    widget.versionService.downloadProgress.removeListener(_onProgressChanged);
+    widget.versionService.downloadStatus.removeListener(_onStatusChanged);
+    super.dispose();
+  }
+
+  void _onProgressChanged() {
+    if (mounted) {
+      setState(() {
+        _progress = widget.versionService.downloadProgress.value;
+      });
+    }
+  }
+
+  void _onStatusChanged() {
+    if (mounted) {
+      setState(() {
+        _statusText = widget.versionService.downloadStatus.value;
+      });
+    }
+  }
+
+  Future<void> _startUpdate() async {
+    if (widget.apkUrl == null) return;
+
+    setState(() => _isDownloading = true);
+
+    await widget.versionService.downloadAndInstall(context, widget.apkUrl!);
+
+    if (mounted) {
+      setState(() => _isDownloading = false);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return PopScope(
+      canPop: !widget.isForceUpdate && !_isDownloading,
+      child: AlertDialog(
+        title: Text(widget.isForceUpdate ? '🔒 强制更新' : '📦 发现新版本'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(
+              '最新版本: v${widget.version}',
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+            ),
+            const SizedBox(height: 12),
+            if (widget.releaseNotes.isNotEmpty) ...[
+              const Text(
+                '更新内容:',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              const SizedBox(height: 4),
+              Container(
+                constraints: const BoxConstraints(maxHeight: 150),
+                child: SingleChildScrollView(
+                  child: Text(
+                    widget.releaseNotes,
+                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                  ),
+                ),
+              ),
+              const SizedBox(height: 12),
+            ],
+            if (widget.isForceUpdate)
+              Container(
+                padding: const EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.red.shade50,
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: const Text(
+                  '此版本为强制更新，必须更新后才能继续使用。',
+                  style: TextStyle(color: Colors.red, fontSize: 12),
+                ),
+              ),
+            if (_isDownloading) ...[
+              const SizedBox(height: 16),
+              LinearProgressIndicator(value: _progress),
+              const SizedBox(height: 8),
+              Text(
+                _statusText,
+                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                textAlign: TextAlign.center,
+              ),
+            ],
+          ],
+        ),
+        actions: [
+          if (!widget.isForceUpdate && !_isDownloading)
+            TextButton(
+              onPressed: () => Navigator.pop(context),
+              child: const Text('稍后更新'),
+            ),
+          FilledButton(
+            onPressed: _isDownloading ? null : _startUpdate,
+            child: Text(_isDownloading ? '下载中...' : '立即更新'),
+          ),
+        ],
+      ),
+    );
   }
 }

@@ -1,7 +1,7 @@
 name: pure_enjoy
 description: 纯享App - 记录生活，享受每一天
 publish_to: 'none'
-version: 1.4.1+13
+version: 1.5.0+14
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -25,6 +25,14 @@ dependencies:
   package_info_plus: ^4.2.0
   # URL 启动器
   url_launcher: ^6.2.2
+  # 文件路径
+  path_provider: ^2.1.2
+  # 权限管理
+  permission_handler: ^11.3.0
+  # 打开文件（安装APK）
+  open_filex: ^4.5.0
+  # 下载进度通知
+  flutter_downloader: ^1.11.6
   # 本地通知功能暂时禁用（兼容性问题）
   # flutter_local_notifications: ^15.1.0+1
 
