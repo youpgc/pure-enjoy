@@ -199,8 +199,10 @@ class DashboardPage extends StatelessWidget {
                   label: '看小说',
                   color: colorScheme.errorContainer,
                   onTap: () {
-                    // 切换到底部导航的小说页面
-                    setState(() => _currentIndex = 2);
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(builder: (_) => const NovelListScreen()),
+                    );
                   },
                 ),
               ),

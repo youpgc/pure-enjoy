@@ -5,6 +5,7 @@ import '../../../services/supabase_service.dart';
 import '../../../config.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
+import 'novel_list_screen.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
