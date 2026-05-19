@@ -58,8 +58,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
 
         expenses = expenses.where((e) {
-          return e.expenseDate.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-                 e.expenseDate.isBefore(endOfMonth.add(const Duration(days: 1)));
+          return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
+                 e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
         }).toList();
 
         // 按分类筛选
@@ -67,7 +67,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           expenses = expenses.where((e) => e.category == _selectedCategory).toList();
         }
 
-        expenses.sort((a, b) => b.expenseDate.compareTo(a.expenseDate));
+        expenses.sort((a, b) => b.date.compareTo(a.date));
 
         setState(() {
           _expenses = expenses;
@@ -285,7 +285,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                               leading: Icon(category.icon),
                               title: Text(category.label),
                               subtitle: Text(
-                                '${DateFormat('MM-dd').format(expense.expenseDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
+                                '${DateFormat('MM-dd').format(expense.date)}${expense.description != null ? ' - ${expense.description}' : ''}',
                               ),
                               trailing: Text(
                                 '¥${expense.amount.toStringAsFixed(2)}',
@@ -367,7 +367,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
       description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
-      expenseDate: _selectedDate,
+      date: _selectedDate,
     );
 
     widget.onSave(newExpense);
