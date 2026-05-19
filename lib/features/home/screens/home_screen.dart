@@ -437,7 +437,13 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 下载并安装APK（内部下载）
   Future<void> _downloadAndInstall() async {
     if (_apkUrl == null) return;
-    await VersionCheckService.instance.downloadAndInstall(context, _apkUrl!);
+
+    // 显示下载进度对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => _DownloadProgressDialog(apkUrl: _apkUrl!),
+    );
   }
 
   @override
@@ -667,6 +673,111 @@ class _ProfilePageState extends State<ProfilePage> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 下载进度对话框
+class _DownloadProgressDialog extends StatefulWidget {
+  final String apkUrl;
+
+  const _DownloadProgressDialog({required this.apkUrl});
+
+  @override
+  State<_DownloadProgressDialog> createState() => _DownloadProgressDialogState();
+}
+
+class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
+  double _progress = 0;
+  String _status = '准备下载...';
+  bool _isComplete = false;
+  bool _hasError = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _startDownload();
+  }
+
+  Future<void> _startDownload() async {
+    try {
+      final versionService = VersionCheckService.instance;
+
+      // 监听进度
+      versionService.downloadProgress.addListener(() {
+        if (mounted) {
+          setState(() {
+            _progress = versionService.downloadProgress.value;
+          });
+        }
+      });
+
+      // 监听状态
+      versionService.downloadStatus.addListener(() {
+        if (mounted) {
+          setState(() {
+            _status = versionService.downloadStatus.value;
+          });
+        }
+      });
+
+      // 开始下载和安装
+      await versionService.downloadAndInstall(context, widget.apkUrl);
+
+      if (mounted) {
+        setState(() {
+          _isComplete = true;
+        });
+
+        // 延迟关闭对话框
+        Future.delayed(const Duration(seconds: 2), () {
+          if (mounted && Navigator.canPop(context)) {
+            Navigator.pop(context);
+          }
+        });
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _hasError = true;
+          _status = '更新失败: $e';
+        });
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: const Text('应用更新'),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          if (!_isComplete && !_hasError) ...[
+            LinearProgressIndicator(value: _progress > 0 ? _progress : null),
+            const SizedBox(height: 16),
+          ],
+          Text(
+            _status,
+            textAlign: TextAlign.center,
+            style: TextStyle(
+              color: _hasError ? Colors.red : null,
+              fontWeight: _isComplete || _hasError ? FontWeight.bold : null,
+            ),
+          ),
+          if (_isComplete) ...[
+            const SizedBox(height: 8),
+            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+          ],
+        ],
+      ),
+      actions: [
+        if (_hasError || _isComplete)
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('关闭'),
+          ),
+      ],
     );
   }
 }
