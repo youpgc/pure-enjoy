@@ -42,7 +42,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 加载习惯列表
       final habitsResponse = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/habits?user_id=eq.$userId&select=*&order=is_active.desc,current_streak.desc',
+          '${SupabaseConfig.url}/rest/v1/user_habits?user_id=eq.$userId&select=*&order=is_active.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -59,7 +59,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       for (final habit in items) {
         final checkinsResponse = await http.get(
           Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/habit_records?habit_id=eq.${habit.id}&select=*&order=check_in_date.desc',
+            '${SupabaseConfig.url}/rest/v1/habit_checkins?habit_id=eq.${habit.id}&select=*&order=checkin_at.desc',
           ),
           headers: SupabaseConfig.headers,
         );
@@ -97,7 +97,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 检查今天是否已经打卡
       final checkins = _checkinHistory[habit.id] ?? [];
       final alreadyChecked = checkins.any((c) {
-        final dateStr = '${c.checkInDate.year}-${c.checkInDate.month.toString().padLeft(2, '0')}-${c.checkInDate.day.toString().padLeft(2, '0')}';
+        final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
         return dateStr == todayStr;
       });
 
@@ -106,29 +106,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
         return;
       }
 
-      // 更新习惯数据（增加连续天数）
-      final updatedHabit = habit.checkIn();
-      final updateResponse = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.${habit.id}'),
-        headers: SupabaseConfig.headers,
-        body: jsonEncode({
-          'current_streak': updatedHabit.currentStreak,
-          'longest_streak': updatedHabit.longestStreak,
-        }),
-      );
-
-      if (updateResponse.statusCode != 200 && updateResponse.statusCode != 204) {
-        throw Exception('更新习惯失败: HTTP ${updateResponse.statusCode}');
-      }
-
       // 添加打卡记录
       final checkinResponse = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/habit_records'),
+        Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins'),
         headers: SupabaseConfig.headers,
         body: jsonEncode({
           'habit_id': habit.id,
           'user_id': _userId,
-          'check_in_date': todayStr,
+          'checkin_at': today.toIso8601String(),
         }),
       );
 
@@ -141,7 +126,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${habit.name} 打卡成功！连续 ${updatedHabit.currentStreak} 天'),
+          content: Text('${habit.name} 打卡成功！'),
           backgroundColor: Colors.green,
         ),
       );
@@ -173,13 +158,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
       try {
         // 先删除打卡记录
         await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/habit_records?habit_id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins?habit_id=eq.$id'),
           headers: SupabaseConfig.headers,
         );
 
         // 再删除习惯
         final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.$id'),
           headers: SupabaseConfig.headers,
         );
 
@@ -256,7 +241,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 try {
                   if (isEditing) {
                     final response = await http.patch(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/habits?id=eq.${habit.id}'),
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.${habit.id}'),
                       headers: SupabaseConfig.headers,
                       body: jsonEncode({
                         'name': nameController.text.trim(),
@@ -269,15 +254,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     }
                   } else {
                     final response = await http.post(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/habits'),
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits'),
                       headers: SupabaseConfig.headers,
                       body: jsonEncode({
                         'user_id': userId,
+                        'user_nickname': AuthService.instance.currentUserName,
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
-                        'current_streak': 0,
-                        'longest_streak': 0,
+                        'frequency': 'daily',
+                        'start_date': DateTime.now().toIso8601String().split('T').first,
                         'is_active': true,
                       }),
                     );
@@ -317,7 +303,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     final checkin = checkins[index];
                     return ListTile(
                       leading: const Icon(Icons.check_circle, color: Colors.green),
-                      title: Text(DateFormat('yyyy-MM-dd').format(checkin.checkInDate)),
+                      title: Text(DateFormat('yyyy-MM-dd').format(checkin.checkinAt)),
                       subtitle: checkin.note != null ? Text(checkin.note!) : null,
                     );
                   },
@@ -339,7 +325,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     final checkins = _checkinHistory[habitId] ?? [];
     return checkins.any((c) {
-      final dateStr = '${c.checkInDate.year}-${c.checkInDate.month.toString().padLeft(2, '0')}-${c.checkInDate.day.toString().padLeft(2, '0')}';
+      final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
       return dateStr == todayStr;
     });
   }
@@ -436,7 +422,6 @@ class _HabitCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final habitColor = Color(habitColors['blue']!);
-    final progress = habit.progress;
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -561,16 +546,10 @@ class _HabitCard extends StatelessWidget {
               mainAxisAlignment: MainAxisAlignment.spaceAround,
               children: [
                 _StatItem(
-                  label: '当前连击',
-                  value: '${habit.currentStreak}',
-                  icon: Icons.local_fire_department,
-                  color: Colors.orange,
-                ),
-                _StatItem(
-                  label: '最高连击',
-                  value: '${habit.longestStreak}',
-                  icon: Icons.emoji_events,
-                  color: Colors.amber,
+                  label: '目标天数',
+                  value: '${habit.targetDays}',
+                  icon: Icons.flag,
+                  color: Colors.blue,
                 ),
                 _StatItem(
                   label: '总打卡',
@@ -578,13 +557,19 @@ class _HabitCard extends StatelessWidget {
                   icon: Icons.check_circle,
                   color: Colors.green,
                 ),
+                _StatItem(
+                  label: '频率',
+                  value: habit.frequency == 'daily' ? '每天' : habit.frequency,
+                  icon: Icons.calendar_today,
+                  color: Colors.purple,
+                ),
               ],
             ),
             const SizedBox(height: 12),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: progress,
+                value: totalCheckins / habit.targetDays,
                 backgroundColor: colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(habitColor),
                 minHeight: 8,
@@ -592,7 +577,7 @@ class _HabitCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '目标: ${habit.currentStreak}/${habit.targetDays} 天 (${(progress * 100).toInt()}%)',
+              '进度: $totalCheckins/${habit.targetDays} 天 (${((totalCheckins / habit.targetDays) * 100).toInt()}%)',
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.outline,

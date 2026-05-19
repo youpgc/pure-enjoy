@@ -42,7 +42,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/mood_entries?user_id=eq.$userId&select=*&order=entry_date.desc',
+          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId&select=*&order=date.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -72,7 +72,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     setState(() => _isLoading = true);
     try {
       final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/mood_entries'),
+        Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
         headers: SupabaseConfig.headers,
         body: jsonEncode(diary.toJson()),
       );
@@ -120,7 +120,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       setState(() => _isLoading = true);
       try {
         final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/mood_entries?id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.$id'),
           headers: SupabaseConfig.headers,
         );
 

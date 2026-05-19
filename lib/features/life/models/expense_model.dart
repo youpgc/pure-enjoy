@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
+import '../../../services/supabase_service.dart';
 
 /// 支出记录模型 - 对应 Supabase expenses 表
-/// 字段: id(UUID), user_id(VARCHAR50), amount(DECIMAL), category(VARCHAR), description(TEXT), expense_date(DATE)
+/// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), date(DATE)
 class ExpenseModel {
   final String id;
   final String userId;
   final double amount;
   final String category;
   final String? description;
-  final DateTime expenseDate;
+  final DateTime date;
+  final DateTime? createdAt;
 
   ExpenseModel({
     required this.id,
@@ -16,7 +18,8 @@ class ExpenseModel {
     required this.amount,
     required this.category,
     this.description,
-    required this.expenseDate,
+    required this.date,
+    this.createdAt,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
@@ -26,17 +29,21 @@ class ExpenseModel {
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
       description: json['description'] as String?,
-      expenseDate: DateTime.parse(json['expense_date'] as String),
+      date: DateTime.parse(json['date'] as String),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'user_id': userId,
+      'user_nickname': AuthService.instance.currentUserName,
       'amount': amount,
       'category': category,
       'description': description,
-      'expense_date': expenseDate.toIso8601String().split('T').first,
+      'date': date.toIso8601String().split('T').first,
+      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 
@@ -45,7 +52,7 @@ class ExpenseModel {
       'amount': amount,
       'category': category,
       'description': description,
-      'expense_date': expenseDate.toIso8601String().split('T').first,
+      'date': date.toIso8601String().split('T').first,
     };
   }
 
@@ -55,7 +62,8 @@ class ExpenseModel {
     double? amount,
     String? category,
     String? description,
-    DateTime? expenseDate,
+    DateTime? date,
+    DateTime? createdAt,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
@@ -63,7 +71,8 @@ class ExpenseModel {
       amount: amount ?? this.amount,
       category: category ?? this.category,
       description: description ?? this.description,
-      expenseDate: expenseDate ?? this.expenseDate,
+      date: date ?? this.date,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

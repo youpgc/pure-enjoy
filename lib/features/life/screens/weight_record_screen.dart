@@ -42,7 +42,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=record_date.desc',
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -268,7 +268,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                   ],
                                 ),
                                 subtitle: Text(
-                                  DateFormat('yyyy-MM-dd').format(record.recordDate),
+                                  DateFormat('yyyy-MM-dd').format(record.date),
                                 ),
                                 trailing: IconButton(
                                   icon: const Icon(Icons.delete_outline),
@@ -322,7 +322,7 @@ class _RecordFormState extends State<_RecordForm> {
       bodyFat: _bodyFatController.text.isNotEmpty
           ? double.tryParse(_bodyFatController.text)
           : null,
-      recordDate: _selectedDate,
+      date: _selectedDate,
     );
 
     widget.onSave(newRecord);

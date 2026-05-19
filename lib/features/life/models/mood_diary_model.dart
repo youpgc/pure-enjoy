@@ -1,7 +1,8 @@
 import 'package:flutter/material.dart';
+import '../../../services/supabase_service.dart';
 
-/// 心情日记模型 - 对应 Supabase mood_entries 表
-/// 字段: id(UUID), user_id(VARCHAR50), mood(VARCHAR), mood_score(INTEGER), content(TEXT), tags(TEXT[]), entry_date(DATE)
+/// 心情日记模型 - 对应 Supabase mood_diaries 表
+/// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), mood(VARCHAR), mood_label(VARCHAR), content(TEXT), tags(TEXT[]), date(DATE)
 class MoodDiaryModel {
   final String id;
   final String userId;
@@ -10,6 +11,7 @@ class MoodDiaryModel {
   final String? content;
   final List<String>? tags;
   final DateTime entryDate;
+  final DateTime? createdAt;
 
   MoodDiaryModel({
     required this.id,
@@ -19,6 +21,7 @@ class MoodDiaryModel {
     this.content,
     this.tags,
     required this.entryDate,
+    this.createdAt,
   });
 
   factory MoodDiaryModel.fromJson(Map<String, dynamic> json) {
@@ -26,21 +29,25 @@ class MoodDiaryModel {
       id: json['id'] as String,
       userId: json['user_id'] as String,
       mood: json['mood'] as String,
-      moodScore: json['mood_score'] as int? ?? 5,
+      moodScore: int.tryParse(json['mood_label']?.toString() ?? '5') ?? 5,
       content: json['content'] as String?,
       tags: (json['tags'] as List<dynamic>?)?.cast<String>(),
-      entryDate: DateTime.parse(json['entry_date'] as String),
+      entryDate: DateTime.parse(json['date'] as String),
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
 
   Map<String, dynamic> toJson() {
     return {
+      'id': id,
       'user_id': userId,
+      'user_nickname': AuthService.instance.currentUserName,
       'mood': mood,
-      'mood_score': moodScore,
+      'mood_label': moodScore.toString(),
       'content': content,
       'tags': tags,
-      'entry_date': entryDate.toIso8601String().split('T').first,
+      'date': entryDate.toIso8601String().split('T').first,
+      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
 
@@ -52,6 +59,7 @@ class MoodDiaryModel {
     String? content,
     List<String>? tags,
     DateTime? entryDate,
+    DateTime? createdAt,
   }) {
     return MoodDiaryModel(
       id: id ?? this.id,
@@ -61,6 +69,7 @@ class MoodDiaryModel {
       content: content ?? this.content,
       tags: tags ?? this.tags,
       entryDate: entryDate ?? this.entryDate,
+      createdAt: createdAt ?? this.createdAt,
     );
   }
 }

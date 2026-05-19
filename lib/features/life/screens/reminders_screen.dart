@@ -39,7 +39,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/reminders?user_id=eq.$userId&select=*&order=remind_at.desc',
+          '${SupabaseConfig.url}/rest/v1/user_reminders?user_id=eq.$userId&select=*&order=remind_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -84,7 +84,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       setState(() => _isLoading = true);
       try {
         final response = await http.post(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders'),
           headers: SupabaseConfig.headers,
           body: jsonEncode(result.toJson()),
         );
@@ -114,7 +114,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       setState(() => _isLoading = true);
       try {
         final response = await http.patch(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
           headers: SupabaseConfig.headers,
           body: jsonEncode(result.toJsonForUpdate()),
         );
@@ -156,7 +156,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (confirmed == true) {
       try {
         final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.$id'),
           headers: SupabaseConfig.headers,
         );
 
@@ -178,7 +178,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Future<void> _toggleComplete(ReminderModel reminder) async {
     try {
       final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
+        Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
         headers: SupabaseConfig.headers,
         body: jsonEncode({'is_completed': !reminder.isCompleted}),
       );
