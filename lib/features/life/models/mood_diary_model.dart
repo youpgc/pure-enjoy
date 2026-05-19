@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../services/supabase_service.dart';
 
 /// 心情日记模型 - 对应 Supabase mood_diaries 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), mood(VARCHAR), mood_label(VARCHAR), content(TEXT), tags(TEXT[]), date(DATE)
 class MoodDiaryModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final String mood;
   final int moodScore;
   final String? content;
@@ -16,6 +16,7 @@ class MoodDiaryModel {
   MoodDiaryModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.mood,
     required this.moodScore,
     this.content,
@@ -28,6 +29,7 @@ class MoodDiaryModel {
     return MoodDiaryModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       mood: json['mood'] as String,
       moodScore: int.tryParse(json['mood_label']?.toString() ?? '5') ?? 5,
       content: json['content'] as String?,
@@ -41,7 +43,7 @@ class MoodDiaryModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'mood': mood,
       'mood_label': moodScore.toString(),
       'content': content,
@@ -54,6 +56,7 @@ class MoodDiaryModel {
   MoodDiaryModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     String? mood,
     int? moodScore,
     String? content,
@@ -64,6 +67,7 @@ class MoodDiaryModel {
     return MoodDiaryModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       mood: mood ?? this.mood,
       moodScore: moodScore ?? this.moodScore,
       content: content ?? this.content,

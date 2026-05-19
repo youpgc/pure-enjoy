@@ -1,10 +1,9 @@
-import '../../../services/supabase_service.dart';
-
 /// 收藏夹模型 - 对应 Supabase user_favorites 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), title(VARCHAR), url(TEXT), description(TEXT), category(VARCHAR), is_pinned(BOOLEAN)
 class FavoriteModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final String title;
   final String? url;
   final String? description;
@@ -15,6 +14,7 @@ class FavoriteModel {
   FavoriteModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.title,
     this.url,
     this.description,
@@ -27,6 +27,7 @@ class FavoriteModel {
     return FavoriteModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       title: json['title'] as String,
       url: json['url'] as String?,
       description: json['description'] as String?,
@@ -40,7 +41,7 @@ class FavoriteModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'title': title,
       'url': url,
       'description': description,
@@ -53,6 +54,7 @@ class FavoriteModel {
   FavoriteModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     String? title,
     String? url,
     String? description,
@@ -63,6 +65,7 @@ class FavoriteModel {
     return FavoriteModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       title: title ?? this.title,
       url: url ?? this.url,
       description: description ?? this.description,

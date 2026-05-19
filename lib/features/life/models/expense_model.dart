@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
-import '../../../services/supabase_service.dart';
 
 /// 支出记录模型 - 对应 Supabase expenses 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), date(DATE)
 class ExpenseModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final double amount;
   final String category;
   final String? description;
@@ -15,6 +15,7 @@ class ExpenseModel {
   ExpenseModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.amount,
     required this.category,
     this.description,
@@ -26,6 +27,7 @@ class ExpenseModel {
     return ExpenseModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
       description: json['description'] as String?,
@@ -38,7 +40,7 @@ class ExpenseModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'amount': amount,
       'category': category,
       'description': description,
@@ -59,6 +61,7 @@ class ExpenseModel {
   ExpenseModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     double? amount,
     String? category,
     String? description,
@@ -68,6 +71,7 @@ class ExpenseModel {
     return ExpenseModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       amount: amount ?? this.amount,
       category: category ?? this.category,
       description: description ?? this.description,

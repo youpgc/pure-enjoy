@@ -1,10 +1,9 @@
-import '../../../services/supabase_service.dart';
-
 /// 体重记录模型 - 对应 Supabase weight_records 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), weight(DECIMAL), unit(VARCHAR), body_fat(DECIMAL), note(TEXT), date(DATE)
 class WeightRecordModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final double weight;
   final String unit;
   final double? bodyFat;
@@ -15,6 +14,7 @@ class WeightRecordModel {
   WeightRecordModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.weight,
     this.unit = 'kg',
     this.bodyFat,
@@ -27,6 +27,7 @@ class WeightRecordModel {
     return WeightRecordModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       weight: (json['weight'] as num).toDouble(),
       unit: json['unit'] as String? ?? 'kg',
       bodyFat: json['body_fat'] != null ? (json['body_fat'] as num).toDouble() : null,
@@ -40,7 +41,7 @@ class WeightRecordModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'weight': weight,
       'unit': unit,
       'body_fat': bodyFat,
@@ -53,6 +54,7 @@ class WeightRecordModel {
   WeightRecordModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     double? weight,
     String? unit,
     double? bodyFat,
@@ -63,6 +65,7 @@ class WeightRecordModel {
     return WeightRecordModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       weight: weight ?? this.weight,
       unit: unit ?? this.unit,
       bodyFat: bodyFat ?? this.bodyFat,

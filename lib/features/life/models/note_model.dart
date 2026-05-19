@@ -1,10 +1,9 @@
-import '../../../services/supabase_service.dart';
-
 /// 笔记模型 - 对应 Supabase notes 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), title(VARCHAR), content(TEXT), is_pinned(BOOLEAN)
 class NoteModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final String title;
   final String? content;
   final List<String>? tags;
@@ -15,6 +14,7 @@ class NoteModel {
   NoteModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.title,
     this.content,
     this.tags,
@@ -29,6 +29,7 @@ class NoteModel {
     return NoteModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       title: json['title'] as String,
       content: json['content'] as String?,
       tags: (json['tags'] as List<dynamic>?)?.cast<String>(),
@@ -42,7 +43,7 @@ class NoteModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'title': title,
       'content': content,
       'tags': tags,
@@ -65,6 +66,7 @@ class NoteModel {
   NoteModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     String? title,
     String? content,
     List<String>? tags,
@@ -75,6 +77,7 @@ class NoteModel {
     return NoteModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       title: title ?? this.title,
       content: content ?? this.content,
       tags: tags ?? this.tags,

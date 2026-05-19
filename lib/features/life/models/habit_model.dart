@@ -1,10 +1,9 @@
-import '../../../services/supabase_service.dart';
-
 /// 习惯打卡模型 - 对应 Supabase user_habits 表
 /// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), name(VARCHAR), description(TEXT), frequency(VARCHAR), target_days(INTEGER), start_date(DATE), is_active(BOOLEAN)
 class HabitModel {
   final String id;
   final String userId;
+  final String? userNickname;
   final String name;
   final String? description;
   final String frequency;
@@ -16,6 +15,7 @@ class HabitModel {
   HabitModel({
     required this.id,
     required this.userId,
+    this.userNickname,
     required this.name,
     this.description,
     this.frequency = 'daily',
@@ -29,6 +29,7 @@ class HabitModel {
     return HabitModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
+      userNickname: json['user_nickname'] as String?,
       name: json['name'] as String,
       description: json['description'] as String?,
       frequency: json['frequency'] as String? ?? 'daily',
@@ -43,7 +44,7 @@ class HabitModel {
     return {
       'id': id,
       'user_id': userId,
-      'user_nickname': AuthService.instance.currentUserName,
+      'user_nickname': userNickname,
       'name': name,
       'description': description,
       'frequency': frequency,
@@ -68,6 +69,7 @@ class HabitModel {
   HabitModel copyWith({
     String? id,
     String? userId,
+    String? userNickname,
     String? name,
     String? description,
     String? frequency,
@@ -79,6 +81,7 @@ class HabitModel {
     return HabitModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
+      userNickname: userNickname ?? this.userNickname,
       name: name ?? this.name,
       description: description ?? this.description,
       frequency: frequency ?? this.frequency,
