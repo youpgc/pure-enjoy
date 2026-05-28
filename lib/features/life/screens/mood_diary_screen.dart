@@ -145,6 +145,56 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     }
   }
 
+  Future<void> _updateMoodDiary(MoodDiaryModel diary) async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.${diary.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({
+          'mood': diary.mood,
+          'mood_score': diary.moodScore,
+          'content': diary.content,
+          'tags': diary.tags,
+          'date': diary.entryDate.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadDiaries();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditDiaryForm(MoodDiaryModel diary) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _DiaryForm(
+        userId: _userId ?? 'local_user',
+        diary: diary,
+        onSave: (updatedDiary) {
+          Navigator.pop(context);
+          _updateMoodDiary(updatedDiary);
+        },
+      ),
+    );
+  }
+
   void _showDiaryForm() {
     showModalBottomSheet(
       context: context,
@@ -182,7 +232,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
                       child: InkWell(
-                        onLongPress: () => _deleteMoodDiary(diary.id),
+                        onTap: () => _showEditDiaryForm(diary),
                         borderRadius: BorderRadius.circular(16),
                         child: Padding(
                           padding: const EdgeInsets.all(16),
@@ -216,6 +266,40 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                                   Text(
                                     DateFormat('MM-dd').format(diary.entryDate),
                                     style: Theme.of(context).textTheme.bodySmall,
+                                  ),
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'edit':
+                                          _showEditDiaryForm(diary);
+                                          break;
+                                        case 'delete':
+                                          _deleteMoodDiary(diary.id);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('编辑'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, size: 20, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('删除', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
                                   ),
                                 ],
                               ),
@@ -255,19 +339,39 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
 class _DiaryForm extends StatefulWidget {
   final String userId;
+  final MoodDiaryModel? diary;
   final Function(MoodDiaryModel) onSave;
 
-  const _DiaryForm({required this.userId, required this.onSave});
+  const _DiaryForm({required this.userId, this.diary, required this.onSave});
 
   @override
   State<_DiaryForm> createState() => _DiaryFormState();
 }
 
 class _DiaryFormState extends State<_DiaryForm> {
-  final _contentController = TextEditingController();
-  final _tagsController = TextEditingController();
-  MoodType _selectedMood = MoodType.calm;
-  DateTime _selectedDate = DateTime.now();
+  late final TextEditingController _contentController;
+  late final TextEditingController _tagsController;
+  late MoodType _selectedMood;
+  late DateTime _selectedDate;
+
+  bool get _isEditing => widget.diary != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final diary = widget.diary;
+    _contentController = TextEditingController(text: diary?.content ?? '');
+    _tagsController = TextEditingController(
+      text: diary?.tags?.join(', ') ?? '',
+    );
+    _selectedMood = diary != null
+        ? MoodType.values.firstWhere(
+            (m) => m.name == diary.mood,
+            orElse: () => MoodType.calm,
+          )
+        : MoodType.calm;
+    _selectedDate = diary?.entryDate ?? DateTime.now();
+  }
 
   @override
   void dispose() {
@@ -284,8 +388,8 @@ class _DiaryFormState extends State<_DiaryForm> {
         .toList();
 
     final newDiary = MoodDiaryModel(
-      id: '', // Supabase auto-generates UUID
-      userId: widget.userId,
+      id: _isEditing ? widget.diary!.id : '',
+      userId: _isEditing ? widget.diary!.userId : widget.userId,
       mood: _selectedMood.name,
       moodScore: _selectedMood.score,
       content: _contentController.text.isEmpty ? null : _contentController.text,

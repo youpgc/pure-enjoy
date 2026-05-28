@@ -40,7 +40,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/favorites?user_id=eq.$userId&select=*&order=created_at.desc',
+          '${SupabaseConfig.url}/rest/v1/user_favorites?user_id=eq.$userId&select=*&order=created_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -105,7 +105,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     if (confirmed == true) {
       try {
         final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/favorites?id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.$id'),
           headers: SupabaseConfig.headers,
         );
 
@@ -210,7 +210,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 try {
                   if (isEditing) {
                     final response = await http.patch(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/favorites?id=eq.${favorite.id}'),
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.${favorite.id}'),
                       headers: SupabaseConfig.headers,
                       body: jsonEncode({
                         'title': newFavorite.title,
@@ -223,10 +223,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       throw Exception('HTTP ${response.statusCode}');
                     }
                   } else {
+                    final userNickname = AuthService.instance.currentUserName ?? '';
                     final response = await http.post(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/favorites'),
+                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites'),
                       headers: SupabaseConfig.headers,
-                      body: jsonEncode(newFavorite.toJson()),
+                      body: jsonEncode({
+                        ...newFavorite.toJson(),
+                        'user_nickname': userNickname,
+                      }),
                     );
                     if (response.statusCode != 201 && response.statusCode != 200) {
                       throw Exception('HTTP ${response.statusCode}');

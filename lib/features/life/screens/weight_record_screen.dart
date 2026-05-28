@@ -145,6 +145,54 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
   }
 
+  Future<void> _updateWeightRecord(WeightRecordModel record) async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.${record.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({
+          'weight': record.weight,
+          'body_fat': record.bodyFat,
+          'date': record.date.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadRecords();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditRecordForm(WeightRecordModel record) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _RecordForm(
+        userId: _userId ?? 'local_user',
+        record: record,
+        onSave: (updatedRecord) {
+          Navigator.pop(context);
+          _updateWeightRecord(updatedRecord);
+        },
+      ),
+    );
+  }
+
   void _showRecordForm() {
     showModalBottomSheet(
       context: context,
@@ -270,9 +318,39 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                 subtitle: Text(
                                   DateFormat('yyyy-MM-dd').format(record.date),
                                 ),
-                                trailing: IconButton(
-                                  icon: const Icon(Icons.delete_outline),
-                                  onPressed: () => _deleteWeightRecord(record.id),
+                                trailing: PopupMenuButton<String>(
+                                  onSelected: (value) {
+                                    switch (value) {
+                                      case 'edit':
+                                        _showEditRecordForm(record);
+                                        break;
+                                      case 'delete':
+                                        _deleteWeightRecord(record.id);
+                                        break;
+                                    }
+                                  },
+                                  itemBuilder: (context) => [
+                                    const PopupMenuItem(
+                                      value: 'edit',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.edit, size: 20),
+                                          SizedBox(width: 8),
+                                          Text('编辑'),
+                                        ],
+                                      ),
+                                    ),
+                                    const PopupMenuItem(
+                                      value: 'delete',
+                                      child: Row(
+                                        children: [
+                                          Icon(Icons.delete, size: 20, color: Colors.red),
+                                          SizedBox(width: 8),
+                                          Text('删除', style: TextStyle(color: Colors.red)),
+                                        ],
+                                      ),
+                                    ),
+                                  ],
                                 ),
                               ),
                             );
@@ -291,9 +369,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
 class _RecordForm extends StatefulWidget {
   final String userId;
+  final WeightRecordModel? record;
   final Function(WeightRecordModel) onSave;
 
-  const _RecordForm({required this.userId, required this.onSave});
+  const _RecordForm({required this.userId, this.record, required this.onSave});
 
   @override
   State<_RecordForm> createState() => _RecordFormState();
@@ -301,9 +380,24 @@ class _RecordForm extends StatefulWidget {
 
 class _RecordFormState extends State<_RecordForm> {
   final _formKey = GlobalKey<FormState>();
-  final _weightController = TextEditingController();
-  final _bodyFatController = TextEditingController();
-  DateTime _selectedDate = DateTime.now();
+  late final TextEditingController _weightController;
+  late final TextEditingController _bodyFatController;
+  late DateTime _selectedDate;
+
+  bool get _isEditing => widget.record != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final record = widget.record;
+    _weightController = TextEditingController(
+      text: record != null ? record.weight.toString() : '',
+    );
+    _bodyFatController = TextEditingController(
+      text: record?.bodyFat?.toString() ?? '',
+    );
+    _selectedDate = record?.date ?? DateTime.now();
+  }
 
   @override
   void dispose() {
@@ -316,8 +410,8 @@ class _RecordFormState extends State<_RecordForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newRecord = WeightRecordModel(
-      id: '', // Supabase auto-generates UUID
-      userId: widget.userId,
+      id: _isEditing ? widget.record!.id : '',
+      userId: _isEditing ? widget.record!.userId : widget.userId,
       weight: double.parse(_weightController.text),
       bodyFat: _bodyFatController.text.isNotEmpty
           ? double.tryParse(_bodyFatController.text)

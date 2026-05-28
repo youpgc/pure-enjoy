@@ -257,7 +257,7 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   const SizedBox(height: 8),
                   Text(
-                    supabaseService.currentUserEmail ?? '用户',
+                    AuthService.instance.currentUserName ?? '用户',
                     style: Theme.of(context).textTheme.bodyLarge?.copyWith(
                       color: colorScheme.onSurfaceVariant,
                     ),

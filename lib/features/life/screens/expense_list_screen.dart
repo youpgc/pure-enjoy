@@ -163,6 +163,55 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
   }
 
+  Future<void> _updateExpense(ExpenseModel expense) async {
+    setState(() => _isLoading = true);
+    try {
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.${expense.id}'),
+        headers: SupabaseConfig.headers,
+        body: jsonEncode({
+          'amount': expense.amount,
+          'category': expense.category,
+          'description': expense.description,
+          'expense_date': expense.date.toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadExpenses();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditExpenseForm(ExpenseModel expense) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ExpenseForm(
+        userId: _userId ?? 'local_user',
+        expense: expense,
+        onSave: (updatedExpense) {
+          Navigator.pop(context);
+          _updateExpense(updatedExpense);
+        },
+      ),
+    );
+  }
+
   void _showExpenseForm() {
     showModalBottomSheet(
       context: context,
@@ -287,14 +336,52 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                               subtitle: Text(
                                 '${DateFormat('MM-dd').format(expense.date)}${expense.description != null ? ' - ${expense.description}' : ''}',
                               ),
-                              trailing: Text(
-                                '¥${expense.amount.toStringAsFixed(2)}',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  color: colorScheme.error,
-                                  fontWeight: FontWeight.bold,
-                                ),
+                              trailing: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Text(
+                                    '¥${expense.amount.toStringAsFixed(2)}',
+                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                      color: colorScheme.error,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                  PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'edit':
+                                          _showEditExpenseForm(expense);
+                                          break;
+                                        case 'delete':
+                                          _deleteExpense(expense.id);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('编辑'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, size: 20, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('删除', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ],
                               ),
-                              onLongPress: () => _deleteExpense(expense.id),
                             ),
                           );
                         },
@@ -336,9 +423,10 @@ class _CategoryChip extends StatelessWidget {
 
 class _ExpenseForm extends StatefulWidget {
   final String userId;
+  final ExpenseModel? expense;
   final Function(ExpenseModel) onSave;
 
-  const _ExpenseForm({required this.userId, required this.onSave});
+  const _ExpenseForm({required this.userId, this.expense, required this.onSave});
 
   @override
   State<_ExpenseForm> createState() => _ExpenseFormState();
@@ -346,10 +434,31 @@ class _ExpenseForm extends StatefulWidget {
 
 class _ExpenseFormState extends State<_ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
-  final _amountController = TextEditingController();
-  final _descriptionController = TextEditingController();
-  ExpenseCategory _selectedCategory = ExpenseCategory.food;
-  DateTime _selectedDate = DateTime.now();
+  late final TextEditingController _amountController;
+  late final TextEditingController _descriptionController;
+  late ExpenseCategory _selectedCategory;
+  late DateTime _selectedDate;
+
+  bool get _isEditing => widget.expense != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final expense = widget.expense;
+    _amountController = TextEditingController(
+      text: expense != null ? expense.amount.toString() : '',
+    );
+    _descriptionController = TextEditingController(
+      text: expense?.description ?? '',
+    );
+    _selectedCategory = expense != null
+        ? ExpenseCategory.values.firstWhere(
+            (c) => c.name == expense.category,
+            orElse: () => ExpenseCategory.food,
+          )
+        : ExpenseCategory.food;
+    _selectedDate = expense?.date ?? DateTime.now();
+  }
 
   @override
   void dispose() {
@@ -362,8 +471,8 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newExpense = ExpenseModel(
-      id: '', // Supabase auto-generates UUID
-      userId: widget.userId,
+      id: _isEditing ? widget.expense!.id : '',
+      userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
       description: _descriptionController.text.isEmpty ? null : _descriptionController.text,

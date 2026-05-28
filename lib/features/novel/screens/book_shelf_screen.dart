@@ -56,7 +56,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     _loadBookshelf();
   }
 
-  /// 从 Supabase 加载书架数据（book_shelves + novels 联合查询）
+  /// 从 Supabase 加载书架数据（user_novels + novels 联合查询）
   Future<void> _loadBookshelf() async {
     setState(() => _isLoading = true);
 
@@ -72,10 +72,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return;
       }
 
-      // 联合查询 book_shelves 和 novels 表
+      // 联合查询 user_novels 和 novels 表
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)&order=last_read_at.desc.nullslast',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)&order=last_read_at.desc.nullslast',
         ),
         headers: _buildAuthHeaders(),
       );
@@ -105,13 +105,13 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 
   /// 从书架移除小说
-  Future<void> _removeFromBookshelf(String bookshelfId) async {
+  Future<void> _removeFromBookshelf(String userNovelId) async {
     if (!_checkAuth()) return;
 
     try {
       final response = await http.delete(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$bookshelfId',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
         ),
         headers: _buildAuthHeaders(),
       );
@@ -140,13 +140,13 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 
   /// 更新阅读状态
-  Future<void> _updateStatus(String bookshelfId, String newStatus) async {
+  Future<void> _updateStatus(String userNovelId, String newStatus) async {
     if (!_checkAuth()) return;
 
     try {
       final response = await http.patch(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$bookshelfId',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
         ),
         headers: _buildAuthHeaders(jsonContent: true),
         body: jsonEncode({
@@ -255,7 +255,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 显示操作底部弹窗
   void _showActionBottomSheet(BuildContext context, Map<String, dynamic> item) {
-    final bookshelfId = item['id'] as String;
+    final userNovelId = item['id'] as String;
     final currentStatus = item['status'] as String? ?? 'reading';
     final currentChapter = item['current_chapter'] as int? ?? 1;
     final novelData = item['novels'] as Map<String, dynamic>?;
@@ -306,7 +306,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'reading') {
-                  _updateStatus(bookshelfId, 'reading');
+                  _updateStatus(userNovelId, 'reading');
                 }
               },
             ),
@@ -319,7 +319,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'completed') {
-                  _updateStatus(bookshelfId, 'completed');
+                  _updateStatus(userNovelId, 'completed');
                 }
               },
             ),
@@ -332,7 +332,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'paused') {
-                  _updateStatus(bookshelfId, 'paused');
+                  _updateStatus(userNovelId, 'paused');
                 }
               },
             ),
@@ -342,7 +342,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               title: const Text('移出书架', style: TextStyle(color: Colors.red)),
               onTap: () {
                 Navigator.pop(context);
-                _confirmRemove(bookshelfId);
+                _confirmRemove(userNovelId);
               },
             ),
             const SizedBox(height: 8),
@@ -353,7 +353,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 
   /// 确认移出书架
-  void _confirmRemove(String bookshelfId) {
+  void _confirmRemove(String userNovelId) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
@@ -367,7 +367,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           FilledButton(
             onPressed: () {
               Navigator.pop(context);
-              _removeFromBookshelf(bookshelfId);
+              _removeFromBookshelf(userNovelId);
             },
             style: FilledButton.styleFrom(
               backgroundColor: Theme.of(context).colorScheme.error,
