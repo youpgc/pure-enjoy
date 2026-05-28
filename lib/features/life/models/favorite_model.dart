@@ -38,8 +38,7 @@ class FavoriteModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
       'title': title,
@@ -49,6 +48,10 @@ class FavoriteModel {
       'is_pinned': isPinned,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 
   FavoriteModel copyWith({

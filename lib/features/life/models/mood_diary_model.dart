@@ -40,8 +40,7 @@ class MoodDiaryModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
       'mood': mood,
@@ -51,6 +50,10 @@ class MoodDiaryModel {
       'date': entryDate.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 
   MoodDiaryModel copyWith({

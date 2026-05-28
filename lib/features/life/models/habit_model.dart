@@ -41,8 +41,7 @@ class HabitModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
       'name': name,
@@ -53,6 +52,10 @@ class HabitModel {
       'is_active': isActive,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 
   Map<String, dynamic> toJsonForUpdate() {
@@ -123,14 +126,17 @@ class HabitCheckinModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'habit_id': habitId,
       'user_id': userId,
       'checkin_at': checkinAt.toIso8601String(),
       'note': note,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 }
 

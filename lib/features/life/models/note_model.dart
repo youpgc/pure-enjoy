@@ -40,8 +40,7 @@ class NoteModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
       'title': title,
@@ -51,6 +50,10 @@ class NoteModel {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt.toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 
   Map<String, dynamic> toJsonForUpdate() {

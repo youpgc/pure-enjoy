@@ -74,8 +74,7 @@ class NovelModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'title': title,
       'author': author,
@@ -96,6 +95,11 @@ class NovelModel {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
+    // 只在ID非空时添加，让数据库自动生成新记录的ID
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 }
 
@@ -138,8 +142,7 @@ class NovelChapterModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'novel_id': novelId,
       'title': title,
       'content': content,
@@ -149,6 +152,11 @@ class NovelChapterModel {
       'price': price,
       'created_at': createdAt.toIso8601String(),
     };
+    // 只在ID非空时添加，让数据库自动生成新记录的ID
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 }
 
@@ -193,8 +201,7 @@ class ReadingProgressModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'novel_id': novelId,
       'progress': progress,
@@ -204,5 +211,10 @@ class ReadingProgressModel {
       'created_at': createdAt.toIso8601String(),
       'updated_at': updatedAt?.toIso8601String(),
     };
+    // 只在ID非空时添加，让数据库自动生成新记录的ID
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 }
