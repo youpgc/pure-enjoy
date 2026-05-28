@@ -5,6 +5,7 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import '../../../services/supabase_service.dart';
 import '../../../config.dart';
+import '../../../services/auth_service.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
@@ -137,8 +138,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final uploadResponse = await http.post(
         Uri.parse('${AppConfig.supabaseUrl}/storage/v1/object/avatars/$fileName'),
         headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          ...AuthService.instance.authHeaders,
           'Content-Type': 'image/$fileExt',
         },
         body: bytes,
@@ -154,12 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 更新用户头像URL
       final updateResponse = await http.patch(
         Uri.parse('${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$_userId'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: AuthService.instance.authHeaders,
         body: jsonEncode({
           'avatar_url': publicUrl,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -208,12 +203,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final response = await http.patch(
         Uri.parse('${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$_userId'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: AuthService.instance.authHeaders,
         body: jsonEncode(updateData),
       );
 

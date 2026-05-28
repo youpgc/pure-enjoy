@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import 'supabase_service.dart';
 import '../features/life/models/expense_model.dart';
 import '../features/life/models/mood_diary_model.dart';
@@ -498,6 +499,7 @@ class DatabaseService {
             Uri.parse('$_restUrl/user_novels'),
             headers: _headers,
             body: jsonEncode({
+              'id': const Uuid().v4(),
               'user_id': userId,
               'novel_id': novelId,
               'last_chapter': chapterId,
