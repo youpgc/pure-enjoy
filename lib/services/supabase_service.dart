@@ -101,7 +101,7 @@ class AuthService {
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
+          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,login_count',
         ),
         headers: SupabaseConfig.headers,
       );

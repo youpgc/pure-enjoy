@@ -31,7 +31,7 @@ class ExpenseModel {
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
       description: json['description'] as String?,
-      date: DateTime.parse(json['date'] as String),
+      date: DateTime.parse(json['expense_date'] as String),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -44,7 +44,7 @@ class ExpenseModel {
       'amount': amount,
       'category': category,
       'description': description,
-      'date': date.toIso8601String().split('T').first,
+      'expense_date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
@@ -54,7 +54,7 @@ class ExpenseModel {
       'amount': amount,
       'category': category,
       'description': description,
-      'date': date.toIso8601String().split('T').first,
+      'expense_date': date.toIso8601String().split('T').first,
     };
   }
 

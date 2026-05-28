@@ -543,7 +543,7 @@ class DatabaseService {
   Future<List<FavoriteModel>> getFavorites(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$_restUrl/user_favorites?user_id=eq.$userId&order=is_pinned.desc&order=created_at.desc'),
+        Uri.parse('$_restUrl/user_favorites?user_id=eq.$userId&order=is_pinned.desc,created_at.desc'),
         headers: _headers,
       );
       if (response.statusCode == 200) {
@@ -615,7 +615,7 @@ class DatabaseService {
   Future<List<ReminderModel>> getReminders(String userId) async {
     try {
       final response = await http.get(
-        Uri.parse('$_restUrl/user_reminders?user_id=eq.$userId&order=is_completed.asc&order=remind_at.asc'),
+        Uri.parse('$_restUrl/user_reminders?user_id=eq.$userId&order=is_completed.asc,remind_at.asc'),
         headers: _headers,
       );
       if (response.statusCode == 200) {

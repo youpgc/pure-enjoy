@@ -32,7 +32,7 @@ class WeightRecordModel {
       unit: json['unit'] as String? ?? 'kg',
       bodyFat: json['body_fat'] != null ? (json['body_fat'] as num).toDouble() : null,
       note: json['note'] as String?,
-      date: DateTime.parse(json['date'] as String),
+      date: DateTime.parse(json['record_date'] as String),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -46,7 +46,7 @@ class WeightRecordModel {
       'unit': unit,
       'body_fat': bodyFat,
       'note': note,
-      'date': date.toIso8601String().split('T').first,
+      'record_date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
   }
