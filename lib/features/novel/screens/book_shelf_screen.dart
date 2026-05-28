@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
@@ -24,16 +23,12 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   String? get _userId => AuthService.instance.currentUserId;
 
   /// 获取当前用户的 JWT access token
-  String? get _accessToken =>
-      Supabase.instance.client.auth.currentSession?.accessToken;
-
-  /// 构建带用户认证的请求头
+  /// 构建认证请求头
+  /// 注意：本App使用自定义认证（非Supabase Auth），使用anon key + user_id过滤
   Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
-    final token = _accessToken;
-    if (token == null) return {};
     final headers = <String, String>{
       'apikey': AppConfig.supabaseAnonKey,
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
     };
     if (jsonContent) {
       headers['Content-Type'] = 'application/json';
@@ -44,14 +39,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 检查用户是否已登录，未登录则提示
   bool _checkAuth() {
-    if (_accessToken == null) {
+    if (!AuthService.instance.isAuthenticated) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('登录已过期，请重新登录')),
-        );
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/login',
-          (route) => false,
+          const SnackBar(content: Text('请先登录')),
         );
       }
       return false;
@@ -617,19 +608,14 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
   bool _isLoading = true;
   String _searchQuery = '';
 
-  /// 获取当前用户的 JWT access token
-  String? get _accessToken =>
-      Supabase.instance.client.auth.currentSession?.accessToken;
-
   String? get _userId => AuthService.instance.currentUserId;
 
-  /// 构建带用户认证的请求头
+  /// 构建认证请求头
+  /// 注意：本App使用自定义认证（非Supabase Auth），使用anon key + user_id过滤
   Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
-    final token = _accessToken;
-    if (token == null) return {};
     final headers = <String, String>{
       'apikey': AppConfig.supabaseAnonKey,
-      'Authorization': 'Bearer $token',
+      'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
     };
     if (jsonContent) {
       headers['Content-Type'] = 'application/json';
@@ -640,14 +626,10 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
 
   /// 检查用户认证
   bool _checkAuth() {
-    if (_accessToken == null) {
+    if (!AuthService.instance.isAuthenticated) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('登录已过期，请重新登录')),
-        );
-        Navigator.of(context).pushNamedAndRemoveUntil(
-          '/login',
-          (route) => false,
+          const SnackBar(content: Text('请先登录')),
         );
       }
       return false;
