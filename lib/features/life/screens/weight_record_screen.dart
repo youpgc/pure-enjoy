@@ -42,7 +42,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc',
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=record_date.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -154,7 +154,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         body: jsonEncode({
           'weight': record.weight,
           'body_fat': record.bodyFat,
-          'date': record.date.toIso8601String(),
+          'record_date': record.date.toIso8601String().split('T').first,
         }),
       );
 

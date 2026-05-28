@@ -24,7 +24,6 @@ class _LifeScreenState extends State<LifeScreen> {
 
   // 最新记录数据
   Map<String, dynamic>? _latestExpense;
-  Map<String, dynamic>? _latestDiary;
   Map<String, dynamic>? _latestWeight;
 
   @override
@@ -47,17 +46,11 @@ class _LifeScreenState extends State<LifeScreen> {
     };
 
     try {
-      // 并行请求三个模块的最新记录
+      // 并行请求两个模块的最新记录
       final results = await Future.wait([
         http.get(
           Uri.parse(
             '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc&limit=1',
-          ),
-          headers: headers,
-        ),
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/mood_diaries?user_id=eq.$userId&select=*&order=date.desc&limit=1',
           ),
           headers: headers,
         ),
@@ -72,14 +65,11 @@ class _LifeScreenState extends State<LifeScreen> {
       if (!mounted) return;
 
       final expenseList = jsonDecode(results[0].body) as List;
-      final diaryList = jsonDecode(results[1].body) as List;
-      final weightList = jsonDecode(results[2].body) as List;
+      final weightList = jsonDecode(results[1].body) as List;
 
       setState(() {
         _latestExpense =
             expenseList.isNotEmpty ? expenseList[0] as Map<String, dynamic> : null;
-        _latestDiary =
-            diaryList.isNotEmpty ? diaryList[0] as Map<String, dynamic> : null;
         _latestWeight =
             weightList.isNotEmpty ? weightList[0] as Map<String, dynamic> : null;
         _isLoading = false;
@@ -230,8 +220,6 @@ class _LifeScreenState extends State<LifeScreen> {
         children: [
           _buildShimmerCard(colorScheme.primaryContainer),
           const SizedBox(width: 10),
-          _buildShimmerCard(colorScheme.secondaryContainer),
-          const SizedBox(width: 10),
           _buildShimmerCard(colorScheme.tertiaryContainer),
         ],
       ),
@@ -322,29 +310,6 @@ class _LifeScreenState extends State<LifeScreen> {
           const SizedBox(width: 10),
           Expanded(
             child: _LatestRecordCard(
-              icon: Icons.mood,
-              title: '日记',
-              backgroundColor: colorScheme.secondaryContainer,
-              summary: _latestDiary != null
-                  ? '${_moodEmoji(_latestDiary!['mood'])} ${_moodText(_latestDiary!['mood'])}'
-                  : null,
-              description: _latestDiary?['content'] != null
-                  ? (_latestDiary!['content'] as String).length > 20
-                      ? '${(_latestDiary!['content'] as String).substring(0, 20)}...'
-                      : _latestDiary!['content'] as String
-                  : null,
-              date: _formatDate(_latestDiary?['date'] as String?),
-              onTap: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const MoodDiaryScreen()),
-                );
-              },
-            ),
-          ),
-          const SizedBox(width: 10),
-          Expanded(
-            child: _LatestRecordCard(
               icon: Icons.monitor_weight,
               title: '体重',
               backgroundColor: colorScheme.tertiaryContainer,
@@ -366,7 +331,7 @@ class _LifeScreenState extends State<LifeScreen> {
     );
   }
 
-  /// 下方网格功能列表（笔记、收藏、提醒、习惯）
+  /// 下方网格功能列表（笔记、日记、收藏、提醒、习惯）
   List<_FeatureItem> get _gridFeatures => [
         _FeatureItem(
           icon: Icons.note,
@@ -381,10 +346,22 @@ class _LifeScreenState extends State<LifeScreen> {
           },
         ),
         _FeatureItem(
+          icon: Icons.mood,
+          title: '日记',
+          subtitle: '记录心情点滴',
+          color: Theme.of(context).colorScheme.secondaryContainer,
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const MoodDiaryScreen()),
+            );
+          },
+        ),
+        _FeatureItem(
           icon: Icons.bookmark,
           title: '我的收藏',
           subtitle: '管理收藏链接',
-          color: Theme.of(context).colorScheme.secondaryContainer,
+          color: Theme.of(context).colorScheme.tertiaryContainer,
           onTap: (context) {
             Navigator.push(
               context,
@@ -396,7 +373,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.notifications_active,
           title: '提醒事项',
           subtitle: '日程和待办',
-          color: Theme.of(context).colorScheme.tertiaryContainer,
+          color: Theme.of(context).colorScheme.errorContainer,
           onTap: (context) {
             Navigator.push(
               context,
@@ -408,7 +385,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.track_changes,
           title: '习惯打卡',
           subtitle: '培养好习惯',
-          color: Theme.of(context).colorScheme.errorContainer,
+          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
           onTap: (context) {
             Navigator.push(
               context,

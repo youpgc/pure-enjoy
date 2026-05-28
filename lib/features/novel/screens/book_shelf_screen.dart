@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
+import 'novel_list_screen.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
@@ -56,7 +57,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     _loadBookshelf();
   }
 
-  /// 从 Supabase 加载书架数据（user_novels + novels 联合查询）
+  /// 从 Supabase 加载书架数据（分两步查询：先查user_novels，再查novels）
   Future<void> _loadBookshelf() async {
     setState(() => _isLoading = true);
 
@@ -72,28 +73,82 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return;
       }
 
-      // 联合查询 user_novels 和 novels 表
-      final response = await http.get(
+      // 第一步：查询 user_novels 获取用户的书架记录
+      final userNovelsResponse = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)&order=last_read_at.desc.nullslast',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at&order=last_read_at.desc.nullslast',
         ),
         headers: _buildAuthHeaders(),
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        setState(() {
-          _bookshelfItems = data.cast<Map<String, dynamic>>();
-          _isLoading = false;
-        });
-      } else {
+      if (userNovelsResponse.statusCode != 200) {
         setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载书架失败: ${response.statusCode}')),
+            SnackBar(content: Text('加载书架失败: ${userNovelsResponse.statusCode}')),
           );
         }
+        return;
       }
+
+      final List<dynamic> userNovelsData = jsonDecode(userNovelsResponse.body);
+      if (userNovelsData.isEmpty) {
+        setState(() {
+          _bookshelfItems = [];
+          _isLoading = false;
+        });
+        return;
+      }
+
+      // 提取 novel_id 列表
+      final novelIds = userNovelsData
+          .map((item) => item['novel_id'] as String?)
+          .where((id) => id != null)
+          .toList();
+
+      // 第二步：查询 novels 表获取小说详情
+      final novelsResponse = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novels?id=in.(${novelIds.join(',')})&select=id,title,author,cover_url,category,status,chapter_count,word_count,description',
+        ),
+        headers: _buildAuthHeaders(),
+      );
+
+      if (novelsResponse.statusCode != 200) {
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载小说详情失败: ${novelsResponse.statusCode}')),
+          );
+        }
+        return;
+      }
+
+      final List<dynamic> novelsData = jsonDecode(novelsResponse.body);
+      
+      // 创建小说详情映射表 (novel_id -> novel_data)
+      final novelsMap = <String, Map<String, dynamic>>{};
+      for (final novel in novelsData) {
+        novelsMap[novel['id'] as String] = novel as Map<String, dynamic>;
+      }
+
+      // 合并数据：将小说详情嵌入 user_novels 记录
+      final bookshelfItems = userNovelsData.map((userNovel) {
+        final novelId = userNovel['novel_id'] as String?;
+        return {
+          'id': userNovel['id'],
+          'novel_id': novelId,
+          'status': userNovel['status'],
+          'current_chapter': userNovel['current_chapter'],
+          'last_read_at': userNovel['last_read_at'],
+          'novels': novelsMap[novelId],
+        };
+      }).toList();
+
+      setState(() {
+        _bookshelfItems = bookshelfItems.cast<Map<String, dynamic>>();
+        _isLoading = false;
+      });
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -414,6 +469,17 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       appBar: AppBar(
         title: const Text('我的书架'),
         actions: [
+          // 进入小说库按钮
+          IconButton(
+            icon: const Icon(Icons.library_books_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NovelListScreen()),
+              );
+            },
+            tooltip: '小说库',
+          ),
           if (_userId != null)
             IconButton(
               icon: const Icon(Icons.add),

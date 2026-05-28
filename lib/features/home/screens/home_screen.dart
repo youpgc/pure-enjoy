@@ -32,7 +32,7 @@ class _HomeScreenState extends State<HomeScreen> {
   final List<Widget> _pages = const [
     DashboardPage(),
     LifeScreen(),
-    NovelListScreen(),
+    BookShelfScreen(),
     ProfilePage(),
   ];
 
@@ -77,7 +77,7 @@ class _HomeScreenState extends State<HomeScreen> {
           NavigationDestination(
             icon: Icon(Icons.book_outlined),
             selectedIcon: Icon(Icons.book),
-            label: '小说',
+            label: '书架',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
@@ -330,7 +330,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Expanded(
                 child: _QuickActionCard(
                   icon: Icons.menu_book_outlined,
-                  label: '看小说',
+                  label: '小说库',
                   color: colorScheme.errorContainer,
                   onTap: () {
                     Navigator.push(

@@ -173,7 +173,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           'amount': expense.amount,
           'category': expense.category,
           'description': expense.description,
-          'expense_date': expense.date.toIso8601String(),
+          'expense_date': expense.date.toIso8601String().split('T').first,
         }),
       );
 
