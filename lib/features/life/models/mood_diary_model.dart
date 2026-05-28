@@ -43,12 +43,9 @@ class MoodDiaryModel {
     final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
-      'mood': mood,
       'mood_label': moodScore.toString(),
       'content': content,
-      'tags': tags,
       'date': entryDate.toIso8601String().split('T').first,
-      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

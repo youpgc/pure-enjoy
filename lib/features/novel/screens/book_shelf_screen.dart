@@ -577,60 +577,61 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                         ],
                       ),
                     )
-                  : Column(
-                      children: [
-                        // 状态筛选栏
-                        SizedBox(
-                          height: 48,
-                          child: ListView(
-                            scrollDirection: Axis.horizontal,
-                            padding: const EdgeInsets.symmetric(horizontal: 16),
-                            children: [
-                              _FilterChip(
-                                label: '全部',
-                                count: _bookshelfItems.length,
-                                isSelected: _filterStatus == 'all',
-                                onTap: () =>
-                                    setState(() => _filterStatus = 'all'),
-                              ),
-                              _FilterChip(
-                                label: '在读',
-                                count: _bookshelfItems.where((i) {
-                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
-                                  return p > 0 && p < 1;
-                                }).length,
-                                isSelected: _filterStatus == 'reading',
-                                onTap: () => setState(
-                                    () => _filterStatus = 'reading'),
-                              ),
-                              _FilterChip(
-                                label: '已读完',
-                                count: _bookshelfItems.where((i) {
-                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
-                                  return p >= 1;
-                                }).length,
-                                isSelected: _filterStatus == 'completed',
-                                onTap: () => setState(
-                                    () => _filterStatus = 'completed'),
-                              ),
-                              _FilterChip(
-                                label: '暂停',
-                                count: _bookshelfItems.where((i) {
-                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
-                                  return p == 0;
-                                }).length,
-                                isSelected: _filterStatus == 'paused',
-                                onTap: () =>
-                                    setState(() => _filterStatus = 'paused'),
-                              ),
-                            ],
+                  : RefreshIndicator(
+                      onRefresh: _loadBookshelf,
+                      child: Column(
+                        children: [
+                          // 状态筛选栏
+                          SizedBox(
+                            height: 40,
+                            child: ListView(
+                              scrollDirection: Axis.horizontal,
+                              padding: const EdgeInsets.symmetric(horizontal: 16),
+                              children: [
+                                _FilterChip(
+                                  label: '全部',
+                                  count: _bookshelfItems.length,
+                                  isSelected: _filterStatus == 'all',
+                                  onTap: () =>
+                                      setState(() => _filterStatus = 'all'),
+                                ),
+                                _FilterChip(
+                                  label: '在读',
+                                  count: _bookshelfItems.where((i) {
+                                    final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                    return p > 0 && p < 1;
+                                  }).length,
+                                  isSelected: _filterStatus == 'reading',
+                                  onTap: () => setState(
+                                      () => _filterStatus = 'reading'),
+                                ),
+                                _FilterChip(
+                                  label: '已读完',
+                                  count: _bookshelfItems.where((i) {
+                                    final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                    return p >= 1;
+                                  }).length,
+                                  isSelected: _filterStatus == 'completed',
+                                  onTap: () => setState(
+                                      () => _filterStatus = 'completed'),
+                                ),
+                                _FilterChip(
+                                  label: '暂停',
+                                  count: _bookshelfItems.where((i) {
+                                    final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                    return p == 0;
+                                  }).length,
+                                  isSelected: _filterStatus == 'paused',
+                                  onTap: () =>
+                                      setState(() => _filterStatus = 'paused'),
+                                ),
+                              ],
+                            ),
                           ),
-                        ),
-                        const Divider(height: 1),
-                        // 书架列表
-                        Expanded(
-                          child: RefreshIndicator(
-                            onRefresh: _loadBookshelf,
+                          const Divider(height: 1),
+                          const SizedBox(height: 8),
+                          // 书架列表
+                          Expanded(
                             child: _filteredItems.isEmpty
                                 ? ListView(
                                     children: [
@@ -667,8 +668,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                                     },
                                   ),
                           ),
-                        ),
-                      ],
+                        ],
+                      ),
                     ),
     );
   }

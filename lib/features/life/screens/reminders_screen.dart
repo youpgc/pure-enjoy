@@ -348,6 +348,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 decoration: const InputDecoration(labelText: '标题'),
                 validator: (v) => v?.isEmpty == true ? '请输入标题' : null,
               ),
+              const SizedBox(height: 16),
               TextFormField(
                 controller: _descController,
                 decoration: const InputDecoration(labelText: '描述（可选）'),

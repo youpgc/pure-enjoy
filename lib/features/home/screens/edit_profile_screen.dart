@@ -1,6 +1,8 @@
+import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'package:image_picker/image_picker.dart';
 import '../../../services/supabase_service.dart';
 import '../../../config.dart';
 
@@ -30,6 +32,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   // 用户数据
   Map<String, dynamic>? _userData;
   String? _userId;
+  String? _avatarUrl;
+  bool _isUploadingAvatar = false;
 
   @override
   void initState() {
@@ -103,6 +107,84 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _locationController.text = _userData!['location'] ?? '';
     _birthdayController.text = _userData!['birthday'] ?? '';
     _genderController.text = _userData!['gender'] ?? '';
+    _avatarUrl = _userData!['avatar_url'];
+  }
+
+  /// 选择并上传头像
+  Future<void> _pickAndUploadAvatar() async {
+    try {
+      final ImagePicker picker = ImagePicker();
+      final XFile? image = await picker.pickImage(
+        source: ImageSource.gallery,
+        maxWidth: 512,
+        maxHeight: 512,
+        imageQuality: 85,
+      );
+
+      if (image == null) return;
+
+      setState(() => _isUploadingAvatar = true);
+
+      final file = File(image.path);
+      final fileExt = image.path.split('.').last;
+      final fileName = '${_userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
+      final filePath = 'avatars/$fileName';
+
+      // 读取文件字节
+      final bytes = await file.readAsBytes();
+
+      // 上传到 Supabase Storage
+      final uploadResponse = await http.post(
+        Uri.parse('${AppConfig.supabaseUrl}/storage/v1/object/avatars/$fileName'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'image/$fileExt',
+        },
+        body: bytes,
+      );
+
+      if (uploadResponse.statusCode != 200 && uploadResponse.statusCode != 201) {
+        throw Exception('上传失败: ${uploadResponse.statusCode}');
+      }
+
+      // 获取公开URL
+      final publicUrl = '${AppConfig.supabaseUrl}/storage/v1/object/public/avatars/$fileName';
+
+      // 更新用户头像URL
+      final updateResponse = await http.patch(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$_userId'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode({
+          'avatar_url': publicUrl,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }),
+      );
+
+      if (updateResponse.statusCode == 200 || updateResponse.statusCode == 204) {
+        setState(() => _avatarUrl = publicUrl);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('头像更新成功')),
+          );
+        }
+      } else {
+        throw Exception('更新头像URL失败: ${updateResponse.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('头像上传失败: $e')),
+        );
+      }
+    } finally {
+      setState(() => _isUploadingAvatar = false);
+    }
   }
 
   /// 保存用户资料
@@ -191,20 +273,42 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   Center(
                     child: Column(
                       children: [
-                        CircleAvatar(
-                          radius: 50,
-                          backgroundColor: colorScheme.primaryContainer,
-                          child: Icon(
-                            Icons.person,
-                            size: 50,
-                            color: colorScheme.onPrimaryContainer,
-                          ),
+                        Stack(
+                          children: [
+                            CircleAvatar(
+                              radius: 50,
+                              backgroundColor: colorScheme.primaryContainer,
+                              backgroundImage: _avatarUrl != null
+                                  ? NetworkImage(_avatarUrl!)
+                                  : null,
+                              child: _avatarUrl == null
+                                  ? Icon(
+                                      Icons.person,
+                                      size: 50,
+                                      color: colorScheme.onPrimaryContainer,
+                                    )
+                                  : null,
+                            ),
+                            if (_isUploadingAvatar)
+                              Positioned.fill(
+                                child: CircleAvatar(
+                                  radius: 50,
+                                  backgroundColor: Colors.black.withOpacity(0.5),
+                                  child: const SizedBox(
+                                    width: 24,
+                                    height: 24,
+                                    child: CircularProgressIndicator(
+                                      strokeWidth: 2,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                ),
+                              ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         TextButton(
-                          onPressed: () {
-                            // TODO: 更换头像
-                          },
+                          onPressed: _isUploadingAvatar ? null : _pickAndUploadAvatar,
                           child: const Text('更换头像'),
                         ),
                       ],

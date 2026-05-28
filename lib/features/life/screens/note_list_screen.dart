@@ -473,7 +473,9 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 border: InputBorder.none,
               ),
             ),
+            const SizedBox(height: 8),
             const Divider(),
+            const SizedBox(height: 8),
             Expanded(
               child: TextField(
                 controller: _contentController,
@@ -485,6 +487,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 ),
               ),
             ),
+            const SizedBox(height: 8),
             TextField(
               controller: _tagsController,
               decoration: const InputDecoration(
