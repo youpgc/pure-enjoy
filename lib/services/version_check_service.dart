@@ -114,29 +114,15 @@ class VersionCheckService {
   }
 
   /// 请求存储权限
+  /// Android 10+ 使用应用私有目录，不需要存储权限
   Future<bool> requestStoragePermission() async {
     if (Platform.isAndroid) {
-      // Android 13+ 不需要存储权限
-      if (await _isAndroid13OrAbove()) return true;
-
-      final status = await Permission.storage.status;
-      if (!status.isGranted) {
-        final result = await Permission.storage.request();
-        return result.isGranted;
-      }
+      // Android 10 (API 29)+ 使用应用私有目录，不需要存储权限
+      // 直接使用 getTemporaryDirectory() 或 getApplicationDocumentsDirectory()
+      // 这些目录不需要 READ_EXTERNAL_STORAGE / WRITE_EXTERNAL_STORAGE 权限
       return true;
     }
     return false;
-  }
-
-  Future<bool> _isAndroid13OrAbove() async {
-    try {
-      final info = await PackageInfo.fromPlatform();
-      // 无法直接获取 Android SDK 版本，通过异常判断
-      return false;
-    } catch (_) {
-      return false;
-    }
   }
 
   /// 下载APK文件
@@ -145,26 +131,9 @@ class VersionCheckService {
       downloadProgress.value = 0;
       downloadStatus.value = '准备下载...';
 
-      // 请求权限（Android 13+ 不需要存储权限）
-      if (Platform.isAndroid) {
-        final hasStorage = await requestStoragePermission();
-        if (!hasStorage) {
-          downloadStatus.value = '存储权限被拒绝';
-          return null;
-        }
-      }
-
-      // 获取下载目录 - 使用应用缓存目录（不需要额外权限）
-      Directory? dir;
-      try {
-        dir = await getExternalStorageDirectory();
-      } catch (_) {
-        dir = null;
-      }
-      
-      // 如果外部存储不可用，使用临时目录
-      dir ??= await getTemporaryDirectory();
-
+      // Android 10+ 使用应用私有目录，不需要存储权限
+      // 直接使用 getTemporaryDirectory() 保存到缓存目录
+      final dir = await getTemporaryDirectory();
       final savePath = '${dir.path}/pure_enjoy_update.apk';
       final file = File(savePath);
 
