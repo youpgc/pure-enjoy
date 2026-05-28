@@ -16,6 +16,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
+import 'rich_text_page.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -718,7 +719,60 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const RichTextPage()),
+                MaterialPageRoute(
+                  builder: (context) => const RichTextPage(
+                    configKey: 'about',
+                    title: '关于纯享',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('隐私政策'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RichTextPage(
+                    configKey: 'privacy_policy',
+                    title: '隐私政策',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('用户协议'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RichTextPage(
+                    configKey: 'user_agreement',
+                    title: '用户协议',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('帮助中心'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => const RichTextPage(
+                    configKey: 'help_center',
+                    title: '帮助中心',
+                  ),
+                ),
               );
             },
           ),
@@ -924,22 +978,4 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
   }
 }
 
-/// 富文本页面（占位，后续实现）
-class RichTextPage extends StatelessWidget {
-  const RichTextPage({super.key});
 
-  @override
-  Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('关于'),
-      ),
-      body: const Center(
-        child: Text(
-          '关于页面 - 即将上线',
-          style: TextStyle(fontSize: 16),
-        ),
-      ),
-    );
-  }
-}

@@ -12,6 +12,8 @@ dependencies:
   cupertino_icons: ^1.0.6
   # 使用 HTTP 客户端直接访问 Supabase REST API
   http: ^1.1.0
+  # Supabase Flutter SDK（用于获取 JWT access token）
+  supabase_flutter: ^2.8.0
   # 本地存储
   shared_preferences: ^2.2.2
   # 状态管理

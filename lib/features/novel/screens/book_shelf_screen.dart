@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../models/novel_model.dart';
@@ -22,6 +23,42 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   String? get _userId => AuthService.instance.currentUserId;
 
+  /// 获取当前用户的 JWT access token
+  String? get _accessToken =>
+      Supabase.instance.client.auth.currentSession?.accessToken;
+
+  /// 构建带用户认证的请求头
+  Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
+    final token = _accessToken;
+    if (token == null) return {};
+    final headers = <String, String>{
+      'apikey': AppConfig.supabaseAnonKey,
+      'Authorization': 'Bearer $token',
+    };
+    if (jsonContent) {
+      headers['Content-Type'] = 'application/json';
+      headers['Prefer'] = 'return=representation';
+    }
+    return headers;
+  }
+
+  /// 检查用户是否已登录，未登录则提示
+  bool _checkAuth() {
+    if (_accessToken == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('登录已过期，请重新登录')),
+        );
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+          (route) => false,
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
   @override
   void initState() {
     super.initState();
@@ -39,15 +76,17 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return;
       }
 
+      if (!_checkAuth()) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
       // 联合查询 book_shelves 和 novels 表
       final response = await http.get(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)&order=last_read_at.desc.nullslast',
         ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+        headers: _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200) {
@@ -76,15 +115,14 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 从书架移除小说
   Future<void> _removeFromBookshelf(String bookshelfId) async {
+    if (!_checkAuth()) return;
+
     try {
       final response = await http.delete(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$bookshelfId',
         ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+        headers: _buildAuthHeaders(),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
@@ -112,17 +150,14 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 更新阅读状态
   Future<void> _updateStatus(String bookshelfId, String newStatus) async {
+    if (!_checkAuth()) return;
+
     try {
       final response = await http.patch(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$bookshelfId',
         ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
+        headers: _buildAuthHeaders(jsonContent: true),
         body: jsonEncode({
           'status': newStatus,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
@@ -566,15 +601,516 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 }
 
-/// 用于从书架添加小说的简单列表页
-class _NovelListForAddScreen extends StatelessWidget {
+/// 用于从书架添加小说的列表页
+/// 从 novels 表查询公共小说列表，支持添加到书架
+class _NovelListForAddScreen extends StatefulWidget {
   const _NovelListForAddScreen();
 
   @override
+  State<_NovelListForAddScreen> createState() => _NovelListForAddScreenState();
+}
+
+class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
+  List<Map<String, dynamic>> _novels = [];
+  Set<String> _addedNovelIds = {};
+  Set<String> _addingNovelIds = {};
+  bool _isLoading = true;
+  String _searchQuery = '';
+
+  /// 获取当前用户的 JWT access token
+  String? get _accessToken =>
+      Supabase.instance.client.auth.currentSession?.accessToken;
+
+  String? get _userId => AuthService.instance.currentUserId;
+
+  /// 构建带用户认证的请求头
+  Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
+    final token = _accessToken;
+    if (token == null) return {};
+    final headers = <String, String>{
+      'apikey': AppConfig.supabaseAnonKey,
+      'Authorization': 'Bearer $token',
+    };
+    if (jsonContent) {
+      headers['Content-Type'] = 'application/json';
+      headers['Prefer'] = 'return=representation';
+    }
+    return headers;
+  }
+
+  /// 检查用户认证
+  bool _checkAuth() {
+    if (_accessToken == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('登录已过期，请重新登录')),
+        );
+        Navigator.of(context).pushNamedAndRemoveUntil(
+          '/login',
+          (route) => false,
+        );
+      }
+      return false;
+    }
+    return true;
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _loadData();
+  }
+
+  /// 加载公共小说列表和用户已添加的书架数据
+  Future<void> _loadData() async {
+    setState(() => _isLoading = true);
+
+    try {
+      final userId = _userId;
+      if (userId == null || !_checkAuth()) {
+        setState(() => _isLoading = false);
+        return;
+      }
+
+      // 并行请求：公共小说列表 + 用户已添加的书架
+      final results = await Future.wait([
+        // 查询公共小说列表（user_id IS NULL 表示公共小说）
+        http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/novels?user_id=is.null&select=id,title,author,cover_url,category,description,chapter_count,word_count,status&order=created_at.desc',
+          ),
+          headers: _buildAuthHeaders(),
+        ),
+        // 查询用户已添加到书架的小说ID列表
+        http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id',
+          ),
+          headers: _buildAuthHeaders(),
+        ),
+      ]);
+
+      final novelsResponse = results[0];
+      final shelfResponse = results[1];
+
+      if (novelsResponse.statusCode == 200) {
+        final List<dynamic> novelsData = jsonDecode(novelsResponse.body);
+        setState(() {
+          _novels = novelsData.cast<Map<String, dynamic>>();
+        });
+      }
+
+      if (shelfResponse.statusCode == 200) {
+        final List<dynamic> shelfData = jsonDecode(shelfResponse.body);
+        setState(() {
+          _addedNovelIds = shelfData
+              .map((item) => item['novel_id'] as String)
+              .toSet();
+        });
+      }
+
+      setState(() => _isLoading = false);
+    } catch (e) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载小说列表出错: $e')),
+        );
+      }
+    }
+  }
+
+  /// 添加小说到书架
+  Future<void> _addToBookshelf(String novelId) async {
+    final userId = _userId;
+    if (userId == null || !_checkAuth()) return;
+
+    setState(() => _addingNovelIds.add(novelId));
+
+    try {
+      final response = await http.post(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
+        headers: _buildAuthHeaders(jsonContent: true),
+        body: jsonEncode({
+          'user_id': userId,
+          'novel_id': novelId,
+          'is_collected': true,
+          'progress': 0,
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        setState(() => _addedNovelIds.add(novelId));
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已添加到书架')),
+          );
+        }
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('添加失败: ${response.statusCode}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加出错: $e')),
+        );
+      }
+    } finally {
+      setState(() => _addingNovelIds.remove(novelId));
+    }
+  }
+
+  /// 获取搜索过滤后的小说列表
+  List<Map<String, dynamic>> get _filteredNovels {
+    if (_searchQuery.isEmpty) return _novels;
+    final query = _searchQuery.toLowerCase();
+    return _novels.where((novel) {
+      final title = (novel['title'] as String? ?? '').toLowerCase();
+      final author = (novel['author'] as String? ?? '').toLowerCase();
+      return title.contains(query) || author.contains(query);
+    }).toList();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
     return Scaffold(
-      appBar: AppBar(title: const Text('添加小说到书架')),
-      body: const Center(child: Text('请返回小说列表页浏览并添加')),
+      appBar: AppBar(
+        title: const Text('添加小说到书架'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.search),
+            onPressed: () {
+              showSearch(
+                context: context,
+                delegate: _NovelSearchDelegate(
+                  novels: _novels,
+                  addedNovelIds: _addedNovelIds,
+                  addingNovelIds: _addingNovelIds,
+                  onAdd: _addToBookshelf,
+                ),
+              );
+            },
+          ),
+        ],
+      ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _filteredNovels.isEmpty
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Icon(
+                        Icons.menu_book_outlined,
+                        size: 64,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        '暂无可添加的小说',
+                        style: TextStyle(
+                          fontSize: 16,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : ListView.separated(
+                  itemCount: _filteredNovels.length,
+                  separatorBuilder: (_, __) => const Divider(height: 1),
+                  itemBuilder: (context, index) {
+                    final novel = _filteredNovels[index];
+                    final novelId = novel['id'] as String;
+                    final isAdded = _addedNovelIds.contains(novelId);
+                    final isAdding = _addingNovelIds.contains(novelId);
+
+                    return _NovelListItem(
+                      novel: novel,
+                      colorScheme: colorScheme,
+                      isAdded: isAdded,
+                      isAdding: isAdding,
+                      onAdd: () => _addToBookshelf(novelId),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+/// 小说列表项组件
+class _NovelListItem extends StatelessWidget {
+  final Map<String, dynamic> novel;
+  final ColorScheme colorScheme;
+  final bool isAdded;
+  final bool isAdding;
+  final VoidCallback onAdd;
+
+  const _NovelListItem({
+    required this.novel,
+    required this.colorScheme,
+    required this.isAdded,
+    required this.isAdding,
+    required this.onAdd,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final title = novel['title'] as String? ?? '未知';
+    final author = novel['author'] as String? ?? '佚名';
+    final coverUrl = novel['cover_url'] as String?;
+    final description = novel['description'] as String?;
+    final chapterCount = novel['chapter_count'] as int? ?? 0;
+    final wordCount = novel['word_count'] as int?;
+
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          // 封面
+          ClipRRect(
+            borderRadius: BorderRadius.circular(6),
+            child: SizedBox(
+              width: 64,
+              height: 88,
+              child: coverUrl != null && coverUrl.isNotEmpty
+                  ? Image.network(
+                      coverUrl,
+                      fit: BoxFit.cover,
+                      errorBuilder: (_, __, ___) => Container(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.book,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    )
+                  : Container(
+                      color: colorScheme.surfaceContainerHighest,
+                      child: Icon(
+                        Icons.book,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+            ),
+          ),
+          const SizedBox(width: 12),
+          // 信息
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  author,
+                  style: Theme.of(context).textTheme.bodySmall,
+                  maxLines: 1,
+                ),
+                if (description != null && description.isNotEmpty) ...[
+                  const SizedBox(height: 4),
+                  Text(
+                    description,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 12,
+                        ),
+                    maxLines: 2,
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                ],
+                const SizedBox(height: 4),
+                Row(
+                  children: [
+                    if (chapterCount > 0)
+                      Text(
+                        '$chapterCount章',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    if (wordCount != null && wordCount > 0) ...[
+                      if (chapterCount > 0) const SizedBox(width: 8),
+                      Text(
+                        wordCount >= 10000
+                            ? '${(wordCount / 10000).toStringAsFixed(1)}万字'
+                            : '$wordCount字',
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          // 添加按钮
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: SizedBox(
+              width: 64,
+              height: 32,
+              child: isAdded
+                  ? OutlinedButton(
+                      onPressed: null,
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        side: BorderSide(color: colorScheme.outlineVariant),
+                      ),
+                      child: FittedBox(
+                        child: Text(
+                          '已添加',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                        ),
+                      ),
+                    )
+                  : isAdding
+                      ? const SizedBox(
+                          width: 24,
+                          height: 24,
+                          child: Center(
+                            child: SizedBox(
+                              width: 18,
+                              height: 18,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            ),
+                          ),
+                        )
+                      : FilledButton(
+                          onPressed: onAdd,
+                          style: FilledButton.styleFrom(
+                            padding: EdgeInsets.zero,
+                          ),
+                          child: const FittedBox(
+                            child: Text(
+                              '添加',
+                              style: TextStyle(fontSize: 12),
+                            ),
+                          ),
+                        ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 小说搜索代理
+class _NovelSearchDelegate extends SearchDelegate<String> {
+  final List<Map<String, dynamic>> novels;
+  final Set<String> addedNovelIds;
+  final Set<String> addingNovelIds;
+  final Future<void> Function(String) onAdd;
+
+  _NovelSearchDelegate({
+    required this.novels,
+    required this.addedNovelIds,
+    required this.addingNovelIds,
+    required this.onAdd,
+  });
+
+  @override
+  List<Widget> buildActions(BuildContext context) {
+    return [
+      IconButton(
+        icon: const Icon(Icons.clear),
+        onPressed: () {
+          query = '';
+          close(context, '');
+        },
+      ),
+    ];
+  }
+
+  @override
+  Widget buildLeading(BuildContext context) {
+    return IconButton(
+      icon: const Icon(Icons.arrow_back),
+      onPressed: () {
+        close(context, '');
+      },
+    );
+  }
+
+  @override
+  Widget buildResults(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  @override
+  Widget buildSuggestions(BuildContext context) {
+    return _buildSearchResults(context);
+  }
+
+  Widget _buildSearchResults(BuildContext context) {
+    if (query.isEmpty) {
+      return const Center(child: Text('输入小说名称或作者搜索'));
+    }
+
+    final searchQuery = query.toLowerCase();
+    final results = novels.where((novel) {
+      final title = (novel['title'] as String? ?? '').toLowerCase();
+      final author = (novel['author'] as String? ?? '').toLowerCase();
+      return title.contains(searchQuery) || author.contains(searchQuery);
+    }).toList();
+
+    if (results.isEmpty) {
+      return const Center(child: Text('未找到相关小说'));
+    }
+
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return ListView.separated(
+      itemCount: results.length,
+      separatorBuilder: (_, __) => const Divider(height: 1),
+      itemBuilder: (context, index) {
+        final novel = results[index];
+        final novelId = novel['id'] as String;
+        final isAdded = addedNovelIds.contains(novelId);
+        final isAdding = addingNovelIds.contains(novelId);
+
+        return _NovelListItem(
+          novel: novel,
+          colorScheme: colorScheme,
+          isAdded: isAdded,
+          isAdding: isAdding,
+          onAdd: () {
+            onAdd(novelId);
+            // 刷新搜索结果以更新状态
+            showSearch(
+              context: context,
+              delegate: _NovelSearchDelegate(
+                novels: novels,
+                addedNovelIds: addedNovelIds,
+                addingNovelIds: addingNovelIds,
+                onAdd: onAdd,
+              ),
+            );
+          },
+        );
+      },
     );
   }
 }
