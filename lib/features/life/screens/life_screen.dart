@@ -242,7 +242,7 @@ class _LifeScreenState extends State<LifeScreen> {
   Widget _buildShimmerCard(Color baseColor) {
     return Expanded(
       child: Card(
-        color: baseColor.withValues(alpha: 0.3),
+        color: baseColor.withOpacity(0.3),
         elevation: 2,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -255,7 +255,7 @@ class _LifeScreenState extends State<LifeScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: baseColor.withValues(alpha: 0.5),
+                      color: baseColor.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
@@ -264,7 +264,7 @@ class _LifeScreenState extends State<LifeScreen> {
                     width: 40,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: baseColor.withValues(alpha: 0.5),
+                      color: baseColor.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -275,7 +275,7 @@ class _LifeScreenState extends State<LifeScreen> {
                 width: double.infinity,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: baseColor.withValues(alpha: 0.4),
+                  color: baseColor.withOpacity(0.4),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -284,7 +284,7 @@ class _LifeScreenState extends State<LifeScreen> {
                 width: 60,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: baseColor.withValues(alpha: 0.3),
+                  color: baseColor.withOpacity(0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
