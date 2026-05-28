@@ -37,6 +37,8 @@ dependencies:
   flutter_downloader: ^1.11.6
   # 本地通知功能暂时禁用（兼容性问题）
   # flutter_local_notifications: ^15.1.0+1
+  # 图片选择器（头像上传）
+  image_picker: ^1.0.7
 
 dev_dependencies:
   flutter_test:
