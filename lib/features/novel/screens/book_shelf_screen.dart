@@ -76,7 +76,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 第一步：查询 user_novels 获取用户的书架记录
       final userNovelsResponse = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,status,current_chapter,last_read_at&order=last_read_at.desc.nullslast',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,progress,last_chapter,last_read_at,is_collected&order=last_read_at.desc.nullslast',
         ),
         headers: _buildAuthHeaders(),
       );
@@ -138,9 +138,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return {
           'id': userNovel['id'],
           'novel_id': novelId,
-          'status': userNovel['status'],
-          'current_chapter': userNovel['current_chapter'],
+          'progress': userNovel['progress'],
+          'last_chapter': userNovel['last_chapter'],
           'last_read_at': userNovel['last_read_at'],
+          'is_collected': userNovel['is_collected'],
           'novels': novelsMap[novelId],
         };
       }).toList();
@@ -194,8 +195,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     }
   }
 
-  /// 更新阅读状态
-  Future<void> _updateStatus(String userNovelId, String newStatus) async {
+  /// 更新阅读进度
+  Future<void> _updateProgress(String userNovelId, double newProgress) async {
     if (!_checkAuth()) return;
 
     try {
@@ -205,7 +206,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         ),
         headers: _buildAuthHeaders(jsonContent: true),
         body: jsonEncode({
-          'status': newStatus,
+          'progress': newProgress,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
         }),
       );
@@ -216,22 +217,32 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新状态失败: $e')),
+          SnackBar(content: Text('更新进度失败: $e')),
         );
       }
     }
   }
 
+  /// 根据 progress 计算阅读状态
+  String _getReadingStatus(double? progress) {
+    if (progress == null || progress == 0) return 'paused';
+    if (progress >= 1) return 'completed';
+    return 'reading';
+  }
+
   /// 获取筛选后的列表
   List<Map<String, dynamic>> get _filteredItems {
     if (_filterStatus == 'all') return _bookshelfItems;
-    return _bookshelfItems
-        .where((item) => item['status'] == _filterStatus)
-        .toList();
+    return _bookshelfItems.where((item) {
+      final progress = (item['progress'] as num?)?.toDouble() ?? 0.0;
+      final status = _getReadingStatus(progress);
+      return status == _filterStatus;
+    }).toList();
   }
 
   /// 获取状态显示文本
-  String _getStatusText(String? status) {
+  String _getStatusText(double? progress) {
+    final status = _getReadingStatus(progress);
     switch (status) {
       case 'reading':
         return '在读';
@@ -245,7 +256,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 
   /// 获取状态颜色
-  Color _getStatusColor(String? status, ColorScheme colorScheme) {
+  Color _getStatusColor(double? progress, ColorScheme colorScheme) {
+    final status = _getReadingStatus(progress);
     switch (status) {
       case 'reading':
         return colorScheme.primary;
@@ -264,14 +276,14 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (novelData == null) return;
 
     final novel = _parseNovel(novelData);
-    final currentChapter = item['current_chapter'] as int? ?? 1;
+    final lastChapter = item['last_chapter'] as int? ?? 1;
 
     Navigator.push(
       context,
       MaterialPageRoute(
         builder: (_) => NovelReaderScreen(
           novel: novel,
-          startChapter: currentChapter,
+          startChapter: lastChapter,
         ),
       ),
     );
@@ -311,8 +323,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   /// 显示操作底部弹窗
   void _showActionBottomSheet(BuildContext context, Map<String, dynamic> item) {
     final userNovelId = item['id'] as String;
-    final currentStatus = item['status'] as String? ?? 'reading';
-    final currentChapter = item['current_chapter'] as int? ?? 1;
+    final progress = (item['progress'] as num?)?.toDouble() ?? 0.0;
+    final currentStatus = _getReadingStatus(progress);
+    final lastChapter = item['last_chapter'] as int? ?? 1;
     final novelData = item['novels'] as Map<String, dynamic>?;
     final chapterCount = novelData?['chapter_count'] as int? ?? 0;
 
@@ -326,7 +339,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
             ListTile(
               leading: const Icon(Icons.play_circle_outline, color: Colors.blue),
               title: const Text('继续阅读'),
-              subtitle: Text('第 $currentChapter / $chapterCount 章'),
+              subtitle: Text('第 $lastChapter / $chapterCount 章'),
               onTap: () {
                 Navigator.pop(context);
                 _continueReading(item);
@@ -361,7 +374,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'reading') {
-                  _updateStatus(userNovelId, 'reading');
+                  _updateProgress(userNovelId, 0.5); // 设置为在读状态 (progress > 0 && < 1)
                 }
               },
             ),
@@ -374,7 +387,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'completed') {
-                  _updateStatus(userNovelId, 'completed');
+                  _updateProgress(userNovelId, 1.0); // 设置为已读完状态 (progress >= 1)
                 }
               },
             ),
@@ -387,7 +400,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'paused') {
-                  _updateStatus(userNovelId, 'paused');
+                  _updateProgress(userNovelId, 0.0); // 设置为暂停状态 (progress == 0)
                 }
               },
             ),
@@ -582,27 +595,30 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                               ),
                               _FilterChip(
                                 label: '在读',
-                                count: _bookshelfItems
-                                    .where((i) => i['status'] == 'reading')
-                                    .length,
+                                count: _bookshelfItems.where((i) {
+                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                  return p > 0 && p < 1;
+                                }).length,
                                 isSelected: _filterStatus == 'reading',
                                 onTap: () => setState(
                                     () => _filterStatus = 'reading'),
                               ),
                               _FilterChip(
                                 label: '已读完',
-                                count: _bookshelfItems
-                                    .where((i) => i['status'] == 'completed')
-                                    .length,
+                                count: _bookshelfItems.where((i) {
+                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                  return p >= 1;
+                                }).length,
                                 isSelected: _filterStatus == 'completed',
                                 onTap: () => setState(
                                     () => _filterStatus = 'completed'),
                               ),
                               _FilterChip(
                                 label: '暂停',
-                                count: _bookshelfItems
-                                    .where((i) => i['status'] == 'paused')
-                                    .length,
+                                count: _bookshelfItems.where((i) {
+                                  final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                  return p == 0;
+                                }).length,
                                 isSelected: _filterStatus == 'paused',
                                 onTap: () =>
                                     setState(() => _filterStatus = 'paused'),
@@ -1167,8 +1183,8 @@ class _NovelSearchDelegate extends SearchDelegate<String> {
 class _BookshelfItem extends StatelessWidget {
   final Map<String, dynamic> item;
   final ColorScheme colorScheme;
-  final String Function(String?) getStatusText;
-  final Color Function(String?, ColorScheme) getStatusColor;
+  final String Function(double?) getStatusText;
+  final Color Function(double?, ColorScheme) getStatusColor;
   final String Function(String?) formatLastRead;
   final String Function(int?) formatWordCount;
   final VoidCallback onTap;
@@ -1185,11 +1201,19 @@ class _BookshelfItem extends StatelessWidget {
     required this.onLongPress,
   });
 
+  /// 根据 progress 计算阅读状态
+  String _getReadingStatus(double? progress) {
+    if (progress == null || progress == 0) return 'paused';
+    if (progress >= 1) return 'completed';
+    return 'reading';
+  }
+
   @override
   Widget build(BuildContext context) {
     final novelData = item['novels'] as Map<String, dynamic>?;
-    final status = item['status'] as String?;
-    final currentChapter = item['current_chapter'] as int? ?? 0;
+    final progress = (item['progress'] as num?)?.toDouble() ?? 0.0;
+    final status = _getReadingStatus(progress);
+    final lastChapter = item['last_chapter'] as int? ?? 0;
     final lastReadAt = item['last_read_at'] as String?;
 
     if (novelData == null) return const SizedBox.shrink();
@@ -1285,15 +1309,15 @@ class _BookshelfItem extends StatelessWidget {
                         padding: const EdgeInsets.symmetric(
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
-                          color: getStatusColor(status, colorScheme)
+                          color: getStatusColor(progress, colorScheme)
                               .withOpacity(0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(
-                          getStatusText(status),
+                          getStatusText(progress),
                           style: TextStyle(
                             fontSize: 11,
-                            color: getStatusColor(status, colorScheme),
+                            color: getStatusColor(progress, colorScheme),
                           ),
                         ),
                       ),
@@ -1301,7 +1325,7 @@ class _BookshelfItem extends StatelessWidget {
                       // 阅读进度
                       Expanded(
                         child: Text(
-                          '读到第 $currentChapter / $chapterCount 章',
+                          '读到第 $lastChapter / $chapterCount 章',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall
