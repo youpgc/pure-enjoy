@@ -5,7 +5,6 @@ import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import '../../../services/supabase_service.dart';
 import '../../../config.dart';
-import '../../../services/auth_service.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
