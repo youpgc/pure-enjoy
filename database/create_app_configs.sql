@@ -38,11 +38,12 @@ CREATE POLICY "Anyone can view active app configs" ON app_configs
   FOR SELECT USING (is_active = true);
 
 -- 6. 创建RLS策略：允许管理员管理配置
+-- 注意：users.id 是 VARCHAR 类型，auth.uid() 返回 UUID，需要类型转换
 CREATE POLICY "Admins can manage app configs" ON app_configs
   FOR ALL USING (
     EXISTS (
       SELECT 1 FROM users
-      WHERE users.id = auth.uid()
+      WHERE users.id = auth.uid()::VARCHAR
       AND users.role IN ('admin', 'super_admin')
     )
   );
