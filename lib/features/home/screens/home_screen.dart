@@ -1,7 +1,11 @@
+import 'dart:convert';
+
 import 'package:flutter/material.dart';
+import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/expense_list_screen.dart';
 import '../../life/screens/mood_diary_screen.dart';
@@ -86,8 +90,138 @@ class _HomeScreenState extends State<HomeScreen> {
 }
 
 /// 首页仪表板
-class DashboardPage extends StatelessWidget {
+class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
+
+  @override
+  State<DashboardPage> createState() => _DashboardPageState();
+}
+
+class _DashboardPageState extends State<DashboardPage> {
+  bool _isLoadingActivities = true;
+  List<Map<String, dynamic>> _recentActivities = [];
+
+  @override
+  void initState() {
+    super.initState();
+    _loadRecentActivities();
+  }
+
+  /// 从 Supabase 加载最近活动记录
+  Future<void> _loadRecentActivities() async {
+    try {
+      final userId = SupabaseService.instance.currentUserId;
+      if (userId == null) {
+        if (mounted) setState(() => _isLoadingActivities = false);
+        return;
+      }
+
+      final headers = {
+        'apikey': AppConfig.supabaseAnonKey,
+        'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+      };
+
+      // 并行查询 expenses、mood_diaries、weight_records 各最新一条
+      final futures = [
+        http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
+          ),
+          headers: headers,
+        ),
+        http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/mood_diaries?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
+          ),
+          headers: headers,
+        ),
+        http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
+          ),
+          headers: headers,
+        ),
+      ];
+
+      final responses = await Future.wait(futures);
+
+      final activities = <Map<String, dynamic>>[];
+
+      // 解析心情日记
+      final diaryResponse = responses[1];
+      if (diaryResponse.statusCode == 200) {
+        final list = jsonDecode(diaryResponse.body) as List;
+        if (list.isNotEmpty) {
+          final item = list[0] as Map<String, dynamic>;
+          activities.add({
+            'icon': Icons.edit_note,
+            'title': '心情日记',
+            'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
+            'time': _formatTime(item['created_at']),
+          });
+        }
+      }
+
+      // 解析支出记录
+      final expenseResponse = responses[0];
+      if (expenseResponse.statusCode == 200) {
+        final list = jsonDecode(expenseResponse.body) as List;
+        if (list.isNotEmpty) {
+          final item = list[0] as Map<String, dynamic>;
+          activities.add({
+            'icon': Icons.attach_money,
+            'title': '支出记录',
+            'subtitle': '${item['category'] ?? '其他'} ¥${item['amount'] ?? 0}',
+            'time': _formatTime(item['created_at']),
+          });
+        }
+      }
+
+      // 解析体重记录
+      final weightResponse = responses[2];
+      if (weightResponse.statusCode == 200) {
+        final list = jsonDecode(weightResponse.body) as List;
+        if (list.isNotEmpty) {
+          final item = list[0] as Map<String, dynamic>;
+          activities.add({
+            'icon': Icons.monitor_weight,
+            'title': '体重记录',
+            'subtitle': '${item['weight'] ?? 0} kg',
+            'time': _formatTime(item['created_at']),
+          });
+        }
+      }
+
+      // 按时间排序
+      activities.sort((a, b) => (b['time'] as String).compareTo(a['time'] as String));
+
+      if (mounted) {
+        setState(() {
+          _recentActivities = activities;
+          _isLoadingActivities = false;
+        });
+      }
+    } catch (e) {
+      print('加载最近活动失败: $e');
+      if (mounted) {
+        setState(() => _isLoadingActivities = false);
+      }
+    }
+  }
+
+  /// 格式化时间显示
+  String _formatTime(String? createdAt) {
+    if (createdAt == null) return '';
+    final dateTime = DateTime.tryParse(createdAt);
+    if (dateTime == null) return '';
+    final now = DateTime.now();
+    final diff = now.difference(dateTime);
+    if (diff.inMinutes < 1) return '刚刚';
+    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
+    if (diff.inHours < 24) return '${diff.inHours}小时前';
+    if (diff.inDays < 7) return '${diff.inDays}天前';
+    return '${dateTime.month}/${dateTime.day}';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -236,33 +370,43 @@ class DashboardPage extends StatelessWidget {
           ),
           const SizedBox(height: 12),
           Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                children: [
-                  _ActivityItem(
-                    icon: Icons.edit_note,
-                    title: '今日心情',
-                    subtitle: '记录今天的心情吧',
-                    time: '刚刚',
-                  ),
-                  const Divider(),
-                  _ActivityItem(
-                    icon: Icons.attach_money,
-                    title: '今日支出',
-                    subtitle: '还没有记录',
-                    time: '今天',
-                  ),
-                  const Divider(),
-                  _ActivityItem(
-                    icon: Icons.book,
-                    title: '阅读进度',
-                    subtitle: '继续阅读',
-                    time: '昨天',
-                  ),
-                ],
-              ),
-            ),
+            child: _isLoadingActivities
+                ? const Padding(
+                    padding: EdgeInsets.all(24),
+                    child: Center(child: CircularProgressIndicator()),
+                  )
+                : _recentActivities.isEmpty
+                    ? Padding(
+                        padding: const EdgeInsets.all(24),
+                        child: Center(
+                          child: Text(
+                            '暂无最近活动',
+                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      )
+                    : Padding(
+                        padding: const EdgeInsets.symmetric(vertical: 8),
+                        child: Column(
+                          children: List.generate(_recentActivities.length, (index) {
+                            final activity = _recentActivities[index];
+                            return Column(
+                              children: [
+                                _ActivityItem(
+                                  icon: activity['icon'] as IconData,
+                                  title: activity['title'] as String,
+                                  subtitle: activity['subtitle'] as String,
+                                  time: activity['time'] as String,
+                                ),
+                                if (index < _recentActivities.length - 1)
+                                  const Divider(),
+                              ],
+                            );
+                          }),
+                        ),
+                      ),
           ),
         ],
       ),
@@ -572,11 +716,9 @@ class _ProfilePageState extends State<ProfilePage> {
             title: const Text('关于'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              showAboutDialog(
-                context: context,
-                applicationName: '纯享',
-                applicationVersion: _currentVersion,
-                applicationLegalese: '© 2024 纯享团队',
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RichTextPage()),
               );
             },
           ),
@@ -778,6 +920,26 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
             child: const Text('关闭'),
           ),
       ],
+    );
+  }
+}
+
+/// 富文本页面（占位，后续实现）
+class RichTextPage extends StatelessWidget {
+  const RichTextPage({super.key});
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('关于'),
+      ),
+      body: const Center(
+        child: Text(
+          '关于页面 - 即将上线',
+          style: TextStyle(fontSize: 16),
+        ),
+      ),
     );
   }
 }

@@ -1,5 +1,9 @@
+import 'dart:io';
+
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 import 'package:provider/provider.dart';
+import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
@@ -7,10 +11,19 @@ import 'services/supabase_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
-  
+
+  // 设置状态栏样式
+  if (Platform.isAndroid) {
+    SystemChrome.setSystemUIOverlayStyle(const SystemUiOverlayStyle(
+      statusBarColor: Colors.transparent,
+      statusBarIconBrightness: Brightness.dark,
+      statusBarBrightness: Brightness.light,
+    ));
+  }
+
   // 初始化认证服务（从本地存储恢复会话）
   await AuthService.instance.initialize();
-  
+
   runApp(const PureEnjoyApp());
 }
 
@@ -26,20 +39,8 @@ class PureEnjoyApp extends StatelessWidget {
           return MaterialApp(
             title: '纯享',
             debugShowCheckedModeBanner: false,
-            theme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xFF1890FF),
-                brightness: Brightness.light,
-              ),
-              useMaterial3: true,
-            ),
-            darkTheme: ThemeData(
-              colorScheme: ColorScheme.fromSeed(
-                seedColor: const Color(0xFF1890FF),
-                brightness: Brightness.dark,
-              ),
-              useMaterial3: true,
-            ),
+            theme: AppTheme.lightTheme,
+            darkTheme: AppTheme.darkTheme,
             themeMode: themeProvider.themeMode,
             home: const AuthWrapper(),
           );
