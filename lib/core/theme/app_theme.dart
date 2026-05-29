@@ -31,7 +31,6 @@ class AppTheme {
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
-      brightness: brightness,
       scaffoldBackgroundColor: surfaceColor,
 
       // AppBar 主题
