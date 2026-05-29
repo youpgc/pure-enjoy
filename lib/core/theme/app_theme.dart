@@ -8,8 +8,7 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.light,
     );
-
-    return _buildTheme(colorScheme, Brightness.light);
+    return _buildTheme(colorScheme);
   }
 
   /// 根据配色方案生成深色主题
@@ -18,13 +17,12 @@ class AppTheme {
       seedColor: seedColor,
       brightness: Brightness.dark,
     );
-
-    return _buildTheme(colorScheme, Brightness.dark);
+    return _buildTheme(colorScheme);
   }
 
-  /// 统一构建主题（减少重复代码）
-  static ThemeData _buildTheme(ColorScheme colorScheme, Brightness brightness) {
-    final isLight = brightness == Brightness.light;
+  /// 统一构建主题
+  static ThemeData _buildTheme(ColorScheme colorScheme) {
+    final isLight = colorScheme.brightness == Brightness.light;
     final surfaceColor = isLight ? const Color(0xFFFFFBFE) : const Color(0xFF1C1B1F);
     final onSurfaceColor = isLight ? const Color(0xFF1C1B1F) : const Color(0xFFE6E1E5);
 
@@ -48,7 +46,7 @@ class AppTheme {
       ),
 
       // 卡片主题
-      cardTheme: CardTheme(
+      cardTheme: CardThemeData(
         elevation: 0,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(16),
