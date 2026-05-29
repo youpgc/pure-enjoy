@@ -436,7 +436,7 @@ class _ExpenseForm extends StatefulWidget {
 class _ExpenseFormState extends State<_ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
-  late final TextEditingController _descriptionController;
+  late final TextEditingController _noteController;
   late ExpenseCategory _selectedCategory;
   late DateTime _selectedDate;
 
@@ -449,8 +449,8 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     _amountController = TextEditingController(
       text: expense != null ? expense.amount.toString() : '',
     );
-    _descriptionController = TextEditingController(
-      text: expense?.description ?? '',
+    _noteController = TextEditingController(
+      text: expense?.note ?? '',
     );
     _selectedCategory = expense != null
         ? ExpenseCategory.values.firstWhere(
@@ -464,7 +464,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   @override
   void dispose() {
     _amountController.dispose();
-    _descriptionController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -476,7 +476,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
-      note: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+      note: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
 
@@ -544,7 +544,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
 
             // 备注
             TextFormField(
-              controller: _descriptionController,
+              controller: _noteController,
               decoration: const InputDecoration(
                 labelText: '备注（可选）',
               ),
