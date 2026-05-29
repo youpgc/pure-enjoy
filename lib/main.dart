@@ -8,6 +8,7 @@ import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'services/supabase_service.dart';
+import 'services/dict_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -23,6 +24,9 @@ void main() async {
 
   // 初始化认证服务（从本地存储恢复会话）
   await AuthService.instance.initialize();
+
+  // 初始化字典服务（预加载字典数据）
+  await DictService.instance.initialize();
 
   runApp(const PureEnjoyApp());
 }

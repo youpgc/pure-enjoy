@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 import 'book_shelf_screen.dart';
@@ -24,10 +25,11 @@ class _NovelListScreenState extends State<NovelListScreen> {
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
-  /// 分类列表
-  static const List<String> _categories = [
-    '全部', '玄幻', '仙侠', '都市', '历史', '武侠', '科幻', '游戏', '悬疑', '灵异', '言情',
-  ];
+  /// 分类列表（从字典服务获取）
+  List<String> get _categories {
+    final items = DictService.instance.getItemsSync(DictService.novelCategory);
+    return ['全部', ...items.map((item) => item.label)];
+  }
 
   String? get _userId => AuthService.instance.currentUserId;
 
