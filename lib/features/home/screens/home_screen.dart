@@ -886,11 +886,12 @@ class _ThemeSettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Consumer<ThemeProvider>(
             builder: (context, tp, _) => Card(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              child: Padding(
                 padding: const EdgeInsets.all(16),
-                children: AppColorScheme.values.map((scheme) {
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: AppColorScheme.values.map((scheme) {
                   final isSelected = tp.colorScheme == scheme;
                   return GestureDetector(
                     onTap: () => tp.setColorScheme(scheme),
@@ -933,6 +934,7 @@ class _ThemeSettingsScreen extends StatelessWidget {
                     ),
                   );
                 }).toList(),
+                ),
               ),
             ),
           ),
@@ -993,11 +995,12 @@ class _ThemeSettingsScreen extends StatelessWidget {
           const SizedBox(height: 8),
           Consumer<ThemeProvider>(
             builder: (context, tp, _) => Card(
-              child: Wrap(
-                spacing: 12,
-                runSpacing: 12,
+              child: Padding(
                 padding: const EdgeInsets.all(16),
-                children: ReaderBackgroundTheme.values.map((bg) {
+                child: Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: ReaderBackgroundTheme.values.map((bg) {
                   final isSelected = tp.readerBg == bg;
                   return GestureDetector(
                     onTap: () => tp.setReaderBackground(bg),
@@ -1042,6 +1045,7 @@ class _ThemeSettingsScreen extends StatelessWidget {
                     ),
                   );
                 }).toList(),
+                ),
               ),
             ),
           ),

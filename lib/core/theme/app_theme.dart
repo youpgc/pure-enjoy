@@ -142,7 +142,7 @@ class AppTheme {
       ),
 
       // 底部表单主题
-      const BottomSheetThemeData(
+      BottomSheetThemeData(
         showDragHandle: true,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
