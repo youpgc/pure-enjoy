@@ -96,7 +96,7 @@ class AuthService {
     try {
       final passwordHash = _hashPassword(password);
 
-      print('🔐 登录请求: email=$email, hash=${passwordHash.substring(0, 8)}...');
+      debugPrint('🔐 登录请求: email=$email, hash=${passwordHash.substring(0, 8)}...');
 
       final response = await http.get(
         Uri.parse(
@@ -105,12 +105,12 @@ class AuthService {
         headers: SupabaseConfig.headers,
       );
 
-      print('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      debugPrint('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
 
       if (response.statusCode == 200) {
         final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('❌ 邮箱或密码错误');
+          debugPrint('❌ 邮箱或密码错误');
           return false;
         }
 
@@ -118,7 +118,7 @@ class AuthService {
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          print('❌ 用户已被禁用: ${user['status']}');
+          debugPrint('❌ 用户已被禁用: ${user['status']}');
           return false;
         }
 
@@ -136,14 +136,14 @@ class AuthService {
           }),
         );
 
-        print('✅ 登录成功: ${user['nickname']}');
+        debugPrint('✅ 登录成功: ${user['nickname']}');
         return true;
       } else {
-        print('❌ 登录失败: HTTP ${response.statusCode}');
+        debugPrint('❌ 登录失败: HTTP ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('❌ Sign in error: $e');
+      debugPrint('❌ Sign in error: $e');
       return false;
     }
   }
@@ -154,7 +154,7 @@ class AuthService {
     try {
       final passwordHash = _hashPassword(password);
 
-      print('🔐 用户名登录: nickname=$username, hash=${passwordHash.substring(0, 8)}...');
+      debugPrint('🔐 用户名登录: nickname=$username, hash=${passwordHash.substring(0, 8)}...');
 
       final response = await http.get(
         Uri.parse(
@@ -163,19 +163,19 @@ class AuthService {
         headers: SupabaseConfig.headers,
       );
 
-      print('🔐 用户名登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      debugPrint('🔐 用户名登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
 
       if (response.statusCode == 200) {
         final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('❌ 用户名或密码错误');
+          debugPrint('❌ 用户名或密码错误');
           return false;
         }
 
         final user = users[0] as Map<String, dynamic>;
 
         if (user['status'] != 'active') {
-          print('❌ 用户已被禁用: ${user['status']}');
+          debugPrint('❌ 用户已被禁用: ${user['status']}');
           return false;
         }
 
@@ -192,14 +192,14 @@ class AuthService {
           }),
         );
 
-        print('✅ 用户名登录成功: ${user['nickname']}');
+        debugPrint('✅ 用户名登录成功: ${user['nickname']}');
         return true;
       } else {
-        print('❌ 用户名登录失败: HTTP ${response.statusCode}');
+        debugPrint('❌ 用户名登录失败: HTTP ${response.statusCode}');
         return false;
       }
     } catch (e) {
-      print('❌ signInWithUsername error: $e');
+      debugPrint('❌ signInWithUsername error: $e');
       return false;
     }
   }
@@ -221,7 +221,7 @@ class AuthService {
       if (response.statusCode == 200) {
         final users = jsonDecode(response.body) as List;
         if (users.isEmpty) {
-          print('手机号或密码错误');
+          debugPrint('手机号或密码错误');
           return false;
         }
 
@@ -229,7 +229,7 @@ class AuthService {
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          print('用户已被禁用');
+          debugPrint('用户已被禁用');
           return false;
         }
 
@@ -252,7 +252,7 @@ class AuthService {
 
       return false;
     } catch (e) {
-      print('signInWithPhone error: $e');
+      debugPrint('signInWithPhone error: $e');
       return false;
     }
   }
@@ -272,7 +272,7 @@ class AuthService {
       if (verifyResponse.statusCode == 200) {
         final users = jsonDecode(verifyResponse.body) as List;
         if (users.isEmpty) {
-          print('验证码错误或手机号未注册');
+          debugPrint('验证码错误或手机号未注册');
           return false;
         }
 
@@ -283,14 +283,14 @@ class AuthService {
         if (expiresAt != null) {
           final expires = DateTime.parse(expiresAt);
           if (DateTime.now().toUtc().isAfter(expires)) {
-            print('验证码已过期');
+            debugPrint('验证码已过期');
             return false;
           }
         }
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          print('用户已被禁用');
+          debugPrint('用户已被禁用');
           return false;
         }
 
@@ -313,7 +313,7 @@ class AuthService {
 
       return false;
     } catch (e) {
-      print('signInWithPhoneCode error: $e');
+      debugPrint('signInWithPhoneCode error: $e');
       return false;
     }
   }
@@ -355,19 +355,19 @@ class AuthService {
 
           if (updateResponse.statusCode == 200 ||
               updateResponse.statusCode == 204) {
-            print('验证码已发送到 $phone: $code');
+            debugPrint('验证码已发送到 $phone: $code');
             return true;
           }
         } else {
           // 用户不存在，也可以发送验证码（注册场景）
-          print('手机号未注册，验证码: $code');
+          debugPrint('手机号未注册，验证码: $code');
           return true;
         }
       }
 
       return false;
     } catch (e) {
-      print('sendSmsCode error: $e');
+      debugPrint('sendSmsCode error: $e');
       return false;
     }
   }
@@ -387,7 +387,7 @@ class AuthService {
 
       final userEmail = email ?? '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local';
 
-      print('📝 注册请求: username=$username, email=$userEmail, hash=${passwordHash.substring(0, 8)}...');
+      debugPrint('📝 注册请求: username=$username, email=$userEmail, hash=${passwordHash.substring(0, 8)}...');
 
       final userData = {
         'id': userId,
@@ -414,18 +414,18 @@ class AuthService {
         body: jsonEncode(userData),
       );
 
-      print('📝 注册响应: statusCode=${response.statusCode}, body=${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
+      debugPrint('📝 注册响应: statusCode=${response.statusCode}, body=${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
 
       if (response.statusCode == 200 || response.statusCode == 201) {
         await _saveUser(userData);
-        print('✅ 注册成功: $username');
+        debugPrint('✅ 注册成功: $username');
         return true;
       } else {
-        print('❌ 注册失败: ${response.statusCode} ${response.body}');
+        debugPrint('❌ 注册失败: ${response.statusCode} ${response.body}');
         return false;
       }
     } catch (e) {
-      print('❌ Sign up error: $e');
+      debugPrint('❌ Sign up error: $e');
       return false;
     }
   }
@@ -445,7 +445,7 @@ class AuthService {
       // 不再调用 Supabase Auth 的 logout 端点
       // 直接清除本地会话
     } catch (e) {
-      print('Sign out error: $e');
+      debugPrint('Sign out error: $e');
     } finally {
       _user = null;
 
@@ -478,7 +478,7 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      print('reloadCurrentUser error: $e');
+      debugPrint('reloadCurrentUser error: $e');
       return false;
     }
   }

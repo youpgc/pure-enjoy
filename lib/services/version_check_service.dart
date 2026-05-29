@@ -27,7 +27,7 @@ class VersionCheckService {
       final currentVersion = packageInfo.version;
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      print('📱 当前版本: $currentVersion+$currentBuildNumber');
+      debugPrint('📱 当前版本: $currentVersion+$currentBuildNumber');
 
       final response = await http.get(
         Uri.parse(
@@ -62,7 +62,7 @@ class VersionCheckService {
       }
       return null;
     } catch (e) {
-      print('📱 检查更新失败: $e');
+      debugPrint('📱 检查更新失败: $e');
       return null;
     }
   }
@@ -146,12 +146,12 @@ class VersionCheckService {
       downloadStatus.value = '正在下载...';
 
       // 开始下载
-      print('📱 开始下载APK...');
+      debugPrint('📱 开始下载APK...');
       final client = http.Client();
       final request = http.Request('GET', Uri.parse(apkUrl));
       final response = await client.send(request);
 
-      print('📱 HTTP 状态码: ${response.statusCode}');
+      debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
       if (response.statusCode != 200) {
         downloadStatus.value = '下载失败: HTTP ${response.statusCode}';
@@ -160,7 +160,7 @@ class VersionCheckService {
       }
 
       final totalBytes = response.contentLength ?? 0;
-      print('📱 文件总大小: $totalBytes bytes');
+      debugPrint('📱 文件总大小: $totalBytes bytes');
       int downloadedBytes = 0;
 
       final sink = file.openWrite();
@@ -178,13 +178,13 @@ class VersionCheckService {
           }
         },
         onDone: () async {
-          print('📱 下载流完成');
+          debugPrint('📱 下载流完成');
           downloadSuccess = true;
           await sink.close();
           client.close();
         },
         onError: (error) async {
-          print('📱 下载流出错: $error');
+          debugPrint('📱 下载流出错: $error');
           await sink.close();
           client.close();
           downloadStatus.value = '下载失败: $error';
@@ -247,42 +247,42 @@ class VersionCheckService {
   /// 完整的下载并安装流程
   Future<void> downloadAndInstall(BuildContext context, String apkUrl) async {
     try {
-      print('📱 开始下载并安装流程');
-      print('📱 APK URL: $apkUrl');
+      debugPrint('📱 开始下载并安装流程');
+      debugPrint('📱 APK URL: $apkUrl');
 
       // 1. 下载APK
       final filePath = await downloadApk(apkUrl);
       if (filePath == null) {
-        print('📱 下载失败，filePath 为 null');
+        debugPrint('📱 下载失败，filePath 为 null');
         return;
       }
 
-      print('📱 APK 下载完成，路径: $filePath');
+      debugPrint('📱 APK 下载完成，路径: $filePath');
 
       // 验证文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
-        print('📱 错误：下载的文件不存在');
+        debugPrint('📱 错误：下载的文件不存在');
         downloadStatus.value = '下载文件不存在';
         return;
       }
 
       final fileSize = await file.length();
-      print('📱 文件大小: $fileSize bytes');
+      debugPrint('📱 文件大小: $fileSize bytes');
 
       if (fileSize == 0) {
-        print('📱 错误：文件大小为0');
+        debugPrint('📱 错误：文件大小为0');
         downloadStatus.value = '下载文件无效（大小为0）';
         return;
       }
 
       // 2. 安装APK
-      print('📱 开始安装APK...');
+      debugPrint('📱 开始安装APK...');
       final result = await installApk(filePath);
-      print('📱 安装结果: $result');
+      debugPrint('📱 安装结果: $result');
     } catch (e, stackTrace) {
-      print('📱 下载安装流程出错: $e');
-      print('📱 堆栈: $stackTrace');
+      debugPrint('📱 下载安装流程出错: $e');
+      debugPrint('📱 堆栈: $stackTrace');
       downloadStatus.value = '更新失败: $e';
     }
   }

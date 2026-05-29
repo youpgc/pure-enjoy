@@ -212,7 +212,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
                 sections: categories.asMap().entries.map((entry) {
                   final index = entry.key;
                   final category = entry.value;
-                  final percentage = (category.value / total * 100);
+                  final percentage = total > 0 ? (category.value / total * 100) : 0;
                   return PieChartSectionData(
                     value: category.value,
                     title: '${percentage.toStringAsFixed(1)}%',

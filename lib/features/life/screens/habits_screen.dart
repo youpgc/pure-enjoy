@@ -570,7 +570,7 @@ class _HabitCard extends StatelessWidget {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: totalCheckins / habit.targetDays,
+                value: habit.targetDays > 0 ? totalCheckins / habit.targetDays : 0,
                 backgroundColor: colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(habitColor),
                 minHeight: 8,
@@ -578,7 +578,7 @@ class _HabitCard extends StatelessWidget {
             ),
             const SizedBox(height: 4),
             Text(
-              '进度: $totalCheckins/${habit.targetDays} 天 (${((totalCheckins / habit.targetDays) * 100).toInt()}%)',
+              '进度: $totalCheckins/${habit.targetDays} 天 (${habit.targetDays > 0 ? ((totalCheckins / habit.targetDays) * 100).toInt() : 0}%)',
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.outline,

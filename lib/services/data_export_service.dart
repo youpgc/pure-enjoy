@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import 'supabase_service.dart';
 
 /// 数据导出服务
@@ -25,10 +26,11 @@ class DataExportService {
     }
 
     try {
+      final packageInfo = await PackageInfo.fromPlatform();
       final data = <String, dynamic>{
         'export_time': DateTime.now().toIso8601String(),
         'user_id': userId,
-        'app_version': '1.8.5',
+        'app_version': '${packageInfo.version}+${packageInfo.buildNumber}',
       };
 
       // 根据类型获取数据

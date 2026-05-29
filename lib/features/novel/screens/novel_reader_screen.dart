@@ -385,10 +385,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
 
         if (response.statusCode == 200 || response.statusCode == 201) {
           final List<dynamic> data = jsonDecode(response.body);
-          setState(() {
-            _isInBookshelf = true;
-            _bookshelfId = data.first['id'] as String;
-          });
+          if (mounted) {
+            setState(() {
+              _isInBookshelf = true;
+              _bookshelfId = data.first['id'] as String;
+            });
+          }
         }
       }
     } catch (e) {
@@ -435,6 +437,38 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('已加入书架')),
           );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e')),
+        );
+      }
+    }
+  }
+
+  /// 切换收藏状态
+  Future<void> _toggleCollection() async {
+    if (_bookshelfId == null) {
+      await _addToBookshelf();
+      return;
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_collected': !_isCollected}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          setState(() => _isCollected = !_isCollected);
         }
       }
     } catch (e) {
@@ -689,6 +723,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   /// 切换菜单显示
   void _toggleMenu() {
     setState(() => _showMenu = !_showMenu);
+    _setFullScreen(!_showMenu);
   }
 
   /// 设置全屏
@@ -713,9 +748,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
 
   @override
   Widget build(BuildContext context) {
-    // 根据背景设置状态栏
-    _setFullScreen(!_showMenu);
-
     return Scaffold(
       backgroundColor: _background.bgColor,
       appBar: _showMenu
@@ -758,9 +790,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
                         : Icons.favorite_border,
                     color: _isCollected ? Colors.red : null,
                   ),
-                  onPressed: () {
-                    setState(() => _isCollected = !_isCollected);
-                  },
+                  onPressed: () => _toggleCollection(),
                   tooltip: '收藏',
                 ),
                 // 详情按钮

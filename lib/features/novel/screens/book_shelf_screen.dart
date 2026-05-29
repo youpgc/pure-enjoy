@@ -7,6 +7,7 @@ import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
 import 'novel_list_screen.dart';
+import '../../auth/screens/login_screen.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
@@ -526,8 +527,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                   FilledButton(
                     onPressed: () {
                       // 返回到登录页
-                      Navigator.of(context).pushNamedAndRemoveUntil(
-                        '/login',
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(
+                          builder: (_) => const LoginScreen(),
+                        ),
                         (route) => false,
                       );
                     },
