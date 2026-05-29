@@ -6,7 +6,7 @@ class AppConfig {
 
   // 应用信息
   static const String appName = '纯享';
-  static const String appVersion = '1.0.0';
+  static const String appVersion = '1.8.0';
 
   // 存储桶名称
   static const String avatarsBucket = 'avatars';
