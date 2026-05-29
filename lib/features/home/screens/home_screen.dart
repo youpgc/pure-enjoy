@@ -13,6 +13,7 @@ import '../../life/screens/weight_record_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/data_export_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
@@ -776,6 +777,13 @@ class _ProfilePageState extends State<ProfilePage> {
               );
             },
           ),
+          ListTile(
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('数据导出'),
+            subtitle: const Text('导出消费、体重、心情数据'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showExportDialog(context),
+          ),
           const Divider(),
           ListTile(
             leading: Icon(
@@ -826,6 +834,17 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
+    );
+  }
+
+  void _showExportDialog(BuildContext context) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+      ),
+      builder: (context) => const _ExportBottomSheet(),
     );
   }
 
@@ -1095,6 +1114,180 @@ class _ThemeModeTile extends StatelessWidget {
           ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
           : null,
       onTap: onTap,
+    );
+  }
+}
+
+/// 数据导出底部弹窗
+class _ExportBottomSheet extends StatefulWidget {
+  const _ExportBottomSheet();
+
+  @override
+  State<_ExportBottomSheet> createState() => _ExportBottomSheetState();
+}
+
+class _ExportBottomSheetState extends State<_ExportBottomSheet> {
+  bool _isLoading = true;
+  Map<String, int> _counts = {};
+  bool _isExporting = false;
+
+  static const _typeLabels = {
+    DataExportService.typeExpenses: '消费记录',
+    DataExportService.typeWeight: '体重记录',
+    DataExportService.typeMood: '心情日记',
+  };
+
+  static const _typeIcons = {
+    DataExportService.typeExpenses: Icons.receipt_long,
+    DataExportService.typeWeight: Icons.monitor_weight,
+    DataExportService.typeMood: Icons.mood,
+  };
+
+  static const _typeColors = {
+    DataExportService.typeExpenses: Colors.orange,
+    DataExportService.typeWeight: Colors.blue,
+    DataExportService.typeMood: Colors.purple,
+  };
+
+  @override
+  void initState() {
+    super.initState();
+    _loadCounts();
+  }
+
+  Future<void> _loadCounts() async {
+    final counts = await DataExportService.getDataCounts();
+    if (mounted) {
+      setState(() {
+        _counts = counts;
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _export(String type) async {
+    setState(() => _isExporting = true);
+
+    final result = await DataExportService.exportAndShare(type: type);
+
+    if (mounted) {
+      setState(() => _isExporting = false);
+
+      if (result.success) {
+        Navigator.pop(context);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导出成功！共 ${result.count} 条数据'),
+            backgroundColor: Colors.green,
+          ),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('导出失败：${result.error}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.only(
+        left: 24,
+        right: 24,
+        top: 16,
+        bottom: MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 拖拽手柄
+          Container(
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: Colors.grey[300],
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
+          const SizedBox(height: 20),
+
+          // 标题
+          Text(
+            '数据导出',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '选择要导出的数据类型',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                  color: Theme.of(context).colorScheme.outline,
+                ),
+          ),
+          const SizedBox(height: 20),
+
+          // 数据类型列表
+          if (_isLoading)
+            const Padding(
+              padding: EdgeInsets.all(32),
+              child: CircularProgressIndicator(),
+            )
+          else
+            ..._typeLabels.keys.map((type) {
+                    final count = _counts[type] ?? 0;
+                    return Padding(
+                      padding: const EdgeInsets.only(bottom: 12),
+                      child: Card(
+                        child: ListTile(
+                          leading: Container(
+                            width: 40,
+                            height: 40,
+                            decoration: BoxDecoration(
+                              color: (_typeColors[type] ?? Colors.grey).withOpacity(0.1),
+                              borderRadius: BorderRadius.circular(10),
+                            ),
+                            child: Icon(
+                              _typeIcons[type] ?? Icons.data_usage,
+                              color: _typeColors[type],
+                            ),
+                          ),
+                          title: Text(_typeLabels[type] ?? type),
+                          subtitle: Text('$count 条记录'),
+                          trailing: const Icon(Icons.share, size: 20),
+                          onTap: _isExporting ? null : () => _export(type),
+                        ),
+                      ),
+                    );
+                  }),
+
+          // 导出全部按钮
+          if (!_isLoading)
+            Padding(
+              padding: const EdgeInsets.only(top: 4),
+              child: SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: _isExporting ? null : () => _export(DataExportService.typeAll),
+                  icon: _isExporting
+                      ? const SizedBox(
+                          width: 20,
+                          height: 20,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : const Icon(Icons.download),
+                  label: Text(_isExporting ? '导出中...' : '导出全部数据'),
+                ),
+              ),
+            ),
+          const SizedBox(height: 8),
+        ],
+      ),
     );
   }
 }
