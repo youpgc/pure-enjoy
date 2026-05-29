@@ -39,8 +39,8 @@ class PureEnjoyApp extends StatelessWidget {
           return MaterialApp(
             title: '纯享',
             debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme,
-            darkTheme: AppTheme.darkTheme,
+            theme: AppTheme.lightTheme(themeProvider.colorScheme.seedColor),
+            darkTheme: AppTheme.darkTheme(themeProvider.colorScheme.seedColor),
             themeMode: themeProvider.themeMode,
             home: const AuthWrapper(),
           );
