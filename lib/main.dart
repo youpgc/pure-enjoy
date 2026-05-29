@@ -8,8 +8,6 @@ import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'services/supabase_service.dart';
-import 'services/notification_service.dart';
-import 'services/habit_reminder_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -25,12 +23,6 @@ void main() async {
 
   // 初始化认证服务（从本地存储恢复会话）
   await AuthService.instance.initialize();
-
-  // 初始化通知服务
-  await NotificationService().initialize();
-
-  // 初始化习惯提醒
-  await HabitReminderService.initializeAllReminders();
 
   runApp(const PureEnjoyApp());
 }

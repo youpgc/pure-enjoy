@@ -4,8 +4,6 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/notification_service.dart';
-import '../../../services/habit_reminder_service.dart';
 import '../models/habit_model.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
@@ -402,7 +400,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 }
 
-class _HabitCard extends StatefulWidget {
+class _HabitCard extends StatelessWidget {
   final HabitModel habit;
   final bool isCheckedIn;
   final int totalCheckins;
@@ -422,107 +420,9 @@ class _HabitCard extends StatefulWidget {
   });
 
   @override
-  State<_HabitCard> createState() => _HabitCardState();
-}
-
-class _HabitCardState extends State<_HabitCard> {
-  HabitReminder? _reminder;
-
-  @override
-  void initState() {
-    super.initState();
-    _loadReminder();
-  }
-
-  Future<void> _loadReminder() async {
-    final reminder = await HabitReminderService.getReminder(widget.habit.id);
-    if (mounted) {
-      setState(() => _reminder = reminder);
-    }
-  }
-
-  Future<void> _showReminderDialog() async {
-    // 检查权限
-    final hasPermission = await NotificationService().checkPermission();
-    if (!hasPermission) {
-      final granted = await NotificationService().requestPermission();
-      if (!granted) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('需要通知权限才能设置提醒')),
-          );
-        }
-        return;
-      }
-    }
-
-    var selectedTime = _reminder?.time ?? const TimeOfDay(hour: 9, minute: 0);
-    var isEnabled = _reminder?.enabled ?? false;
-
-    await showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('打卡提醒'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              SwitchListTile(
-                title: const Text('开启提醒'),
-                value: isEnabled,
-                onChanged: (value) => setDialogState(() => isEnabled = value),
-              ),
-              if (isEnabled) ...[
-                const SizedBox(height: 16),
-                ListTile(
-                  leading: const Icon(Icons.access_time),
-                  title: const Text('提醒时间'),
-                  trailing: Text(
-                    selectedTime.format(context),
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  onTap: () async {
-                    final time = await showTimePicker(
-                      context: context,
-                      initialTime: selectedTime,
-                    );
-                    if (time != null) {
-                      setDialogState(() => selectedTime = time);
-                    }
-                  },
-                ),
-              ],
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (isEnabled) {
-                  await HabitReminderService.saveReminder(
-                    HabitReminder(
-                      habitId: widget.habit.id,
-                      habitName: widget.habit.name,
-                      time: selectedTime,
-                      enabled: true,
-                    ),
-                  );
-                } else {
-                  await HabitReminderService.deleteReminder(widget.habit.id);
-                }
-                await _loadReminder();
-                if (mounted) Navigator.pop(context);
-              },
-              child: const Text('保存'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final habitColor = Color(habitColors['blue']!);
 
     return Card(
       margin: const EdgeInsets.only(bottom: 12),
@@ -554,11 +454,11 @@ class _HabitCardState extends State<_HabitCard> {
                         children: [
                           Expanded(
                             child: Text(
-                              widget.habit.name,
+                              habit.name,
                               style: Theme.of(context).textTheme.titleMedium,
                             ),
                           ),
-                          if (!widget.habit.isActive)
+                          if (!habit.isActive)
                             Container(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -578,10 +478,10 @@ class _HabitCardState extends State<_HabitCard> {
                             ),
                         ],
                       ),
-                      if (widget.habit.description != null) ...[
+                      if (habit.description != null) ...[
                         const SizedBox(height: 2),
                         Text(
-                          widget.habit.description!,
+                          habit.description!,
                           style: TextStyle(
                             fontSize: 12,
                             color: colorScheme.outline,
@@ -596,43 +496,18 @@ class _HabitCardState extends State<_HabitCard> {
                 PopupMenuButton<String>(
                   onSelected: (value) {
                     switch (value) {
-                      case 'reminder':
-                        _showReminderDialog();
-                        break;
                       case 'history':
-                        widget.onViewHistory();
+                        onViewHistory();
                         break;
                       case 'edit':
-                        widget.onEdit();
+                        onEdit();
                         break;
                       case 'delete':
-                        widget.onDelete();
+                        onDelete();
                         break;
                     }
                   },
                   itemBuilder: (context) => [
-                    PopupMenuItem(
-                      value: 'reminder',
-                      child: Row(
-                        children: [
-                          Icon(
-                            _reminder?.enabled == true
-                                ? Icons.notifications_active
-                                : Icons.notifications_none,
-                            size: 20,
-                            color: _reminder?.enabled == true
-                                ? Colors.orange
-                                : null,
-                          ),
-                          const SizedBox(width: 8),
-                          Text(
-                            _reminder?.enabled == true
-                                ? '提醒 (${_reminder!.time.format(context)})'
-                                : '设置提醒',
-                          ),
-                        ],
-                      ),
-                    ),
                     const PopupMenuItem(
                       value: 'history',
                       child: Row(
@@ -673,19 +548,19 @@ class _HabitCardState extends State<_HabitCard> {
               children: [
                 _StatItem(
                   label: '目标天数',
-                  value: '${widget.habit.targetDays}',
+                  value: '${habit.targetDays}',
                   icon: Icons.flag,
                   color: Colors.blue,
                 ),
                 _StatItem(
                   label: '总打卡',
-                  value: '${widget.totalCheckins}',
+                  value: '$totalCheckins',
                   icon: Icons.check_circle,
                   color: Colors.green,
                 ),
                 _StatItem(
                   label: '频率',
-                  value: widget.habit.frequency == 'daily' ? '每天' : widget.habit.frequency,
+                  value: habit.frequency == 'daily' ? '每天' : habit.frequency,
                   icon: Icons.calendar_today,
                   color: Colors.purple,
                 ),
@@ -695,7 +570,7 @@ class _HabitCardState extends State<_HabitCard> {
             ClipRRect(
               borderRadius: BorderRadius.circular(4),
               child: LinearProgressIndicator(
-                value: widget.totalCheckins / widget.habit.targetDays,
+                value: totalCheckins / habit.targetDays,
                 backgroundColor: colorScheme.surfaceContainerHighest,
                 valueColor: AlwaysStoppedAnimation<Color>(habitColor),
                 minHeight: 8,
@@ -703,7 +578,7 @@ class _HabitCardState extends State<_HabitCard> {
             ),
             const SizedBox(height: 4),
             Text(
-              '进度: ${widget.totalCheckins}/${widget.habit.targetDays} 天 (${((widget.totalCheckins / widget.habit.targetDays) * 100).toInt()}%)',
+              '进度: $totalCheckins/${habit.targetDays} 天 (${((totalCheckins / habit.targetDays) * 100).toInt()}%)',
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.outline,
@@ -713,11 +588,11 @@ class _HabitCardState extends State<_HabitCard> {
             SizedBox(
               width: double.infinity,
               child: FilledButton.icon(
-                onPressed: widget.isCheckedIn ? null : widget.onCheckIn,
-                icon: Icon(widget.isCheckedIn ? Icons.check : Icons.add),
-                label: Text(widget.isCheckedIn ? '今日已打卡' : '立即打卡'),
+                onPressed: isCheckedIn ? null : onCheckIn,
+                icon: Icon(isCheckedIn ? Icons.check : Icons.add),
+                label: Text(isCheckedIn ? '今日已打卡' : '立即打卡'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: widget.isCheckedIn ? Colors.green : habitColor,
+                  backgroundColor: isCheckedIn ? Colors.green : habitColor,
                   foregroundColor: Colors.white,
                 ),
               ),
