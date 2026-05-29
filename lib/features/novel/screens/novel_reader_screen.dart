@@ -41,10 +41,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
 
   List<NovelChapterModel> _chapters = [];
   NovelChapterModel? _currentChapter;
+  NovelChapterModel? _nextChapterCache; // 预加载下一章
   int _currentChapterIndex = 0;
   bool _isLoading = true;
   bool _isLoadingChapter = false;
   bool _showMenu = false;
+
+  // 阅读时长统计
+  DateTime? _readingStartTime;
+  Duration _totalReadingTime = Duration.zero;
+  bool _hasStartedReading = false;
 
   // 阅读设置
   static const List<double> _fontSizes = [14, 16, 18, 20, 22];
@@ -81,6 +87,51 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
       _saveProgress();
+      _pauseReadingTimer();
+    } else if (state == AppLifecycleState.resumed) {
+      _resumeReadingTimer();
+    }
+  }
+
+  /// 暂停阅读计时器
+  void _pauseReadingTimer() {
+    if (_readingStartTime != null && _hasStartedReading) {
+      _totalReadingTime += DateTime.now().difference(_readingStartTime!);
+      _readingStartTime = null;
+    }
+  }
+
+  /// 恢复阅读计时器
+  void _resumeReadingTimer() {
+    if (_hasStartedReading) {
+      _readingStartTime = DateTime.now();
+    }
+  }
+
+  /// 开始阅读计时
+  void _startReadingTimer() {
+    if (!_hasStartedReading) {
+      _hasStartedReading = true;
+      _readingStartTime = DateTime.now();
+    }
+  }
+
+  /// 获取当前阅读时长
+  Duration get _currentReadingDuration {
+    if (_readingStartTime != null) {
+      return _totalReadingTime + DateTime.now().difference(_readingStartTime!);
+    }
+    return _totalReadingTime;
+  }
+
+  /// 格式化阅读时长
+  String _formatReadingDuration(Duration duration) {
+    if (duration.inHours > 0) {
+      return '${duration.inHours}小时${duration.inMinutes.remainder(60)}分钟';
+    } else if (duration.inMinutes > 0) {
+      return '${duration.inMinutes}分钟';
+    } else {
+      return '${duration.inSeconds}秒';
     }
   }
 
@@ -208,6 +259,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           });
           _scrollController.jumpTo(0);
           _saveProgress();
+          _startReadingTimer(); // 开始阅读计时
+          _preloadNextChapter(); // 预加载下一章
         } else {
           setState(() {
             _currentChapter = chapter;
@@ -225,6 +278,36 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
         _currentChapter = chapter;
         _isLoadingChapter = false;
       });
+    }
+  }
+
+  /// 预加载下一章内容
+  Future<void> _preloadNextChapter() async {
+    final nextIndex = _currentChapterIndex + 1;
+    if (nextIndex >= _chapters.length) return;
+
+    final nextChapter = _chapters[nextIndex];
+    if (_nextChapterCache?.id == nextChapter.id) return; // 已有缓存
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${nextChapter.id}&select=id,content',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
+        if (data.isNotEmpty) {
+          _nextChapterCache = NovelChapterModel.fromJson(data.first);
+        }
+      }
+    } catch (_) {
+      // 静默失败，不影响阅读
     }
   }
 
@@ -379,13 +462,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     }
   }
 
-  /// 下一章
+  /// 下一章（使用预加载缓存）
   void _nextChapter() {
     if (_currentChapterIndex < _chapters.length - 1) {
+      final nextIndex = _currentChapterIndex + 1;
+      final nextChapter = _chapters[nextIndex];
+
       setState(() {
-        _currentChapterIndex++;
+        _currentChapterIndex = nextIndex;
+        // 如果有缓存，使用缓存的内容
+        if (_nextChapterCache?.id == nextChapter.id) {
+          _currentChapter = _nextChapterCache;
+          _isLoadingChapter = false;
+          _nextChapterCache = null; // 清空缓存
+        }
       });
-      _loadChapterContent(_chapters[_currentChapterIndex]);
+
+      // 如果没有缓存，正常加载
+      if (_currentChapter?.id != nextChapter.id) {
+        _loadChapterContent(nextChapter);
+      } else {
+        _scrollController.jumpTo(0);
+        _saveProgress();
+        _startReadingTimer();
+        _preloadNextChapter(); // 预加载再下一章
+      }
     } else {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -599,6 +700,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     }
   }
 
+  /// 计算阅读进度百分比
+  double get _readingProgress {
+    if (_chapters.isEmpty) return 0;
+    return (_currentChapterIndex + 1) / _chapters.length;
+  }
+
+  /// 格式化进度百分比
+  String get _progressText {
+    return '${(_readingProgress * 100).toStringAsFixed(1)}%';
+  }
+
   @override
   Widget build(BuildContext context) {
     // 根据背景设置状态栏
@@ -608,9 +720,24 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
       backgroundColor: _background.bgColor,
       appBar: _showMenu
           ? AppBar(
-              title: Text(
-                _currentChapter?.title ?? widget.novel.title,
-                style: const TextStyle(fontSize: 16),
+              title: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(
+                    _currentChapter?.title ?? widget.novel.title,
+                    style: const TextStyle(fontSize: 16),
+                  ),
+                  // 阅读进度和时长
+                  if (_chapters.isNotEmpty)
+                    Text(
+                      '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
+                      style: TextStyle(
+                        fontSize: 11,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                ],
               ),
               actions: [
                 // 书架按钮
@@ -669,6 +796,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
                   )
                 : Column(
                     children: [
+                      // 阅读进度条
+                      if (_chapters.isNotEmpty)
+                        LinearProgressIndicator(
+                          value: _readingProgress,
+                          backgroundColor: _background.textColor.withOpacity(0.1),
+                          valueColor: AlwaysStoppedAnimation<Color>(
+                            _background == ReaderBackground.dark
+                                ? Colors.blue
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                          minHeight: 3,
+                        ),
                       // 章节内容
                       Expanded(
                         child: _isLoadingChapter
