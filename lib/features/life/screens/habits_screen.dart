@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/habit_model.dart';
 
@@ -107,10 +108,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
       }
 
       // 添加打卡记录
+      final checkinId = const Uuid().v4();
       final checkinResponse = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins'),
         headers: SupabaseConfig.headers,
         body: jsonEncode({
+          'id': checkinId,
           'habit_id': habit.id,
           'user_id': _userId,
           'checkin_at': today.toIso8601String(),
@@ -253,10 +256,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       throw Exception('HTTP ${response.statusCode}');
                     }
                   } else {
+                    final habitId = const Uuid().v4();
                     final response = await http.post(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits'),
                       headers: SupabaseConfig.headers,
                       body: jsonEncode({
+                        'id': habitId,
                         'user_id': userId,
                         'user_nickname': AuthService.instance.currentUserName,
                         'name': nameController.text.trim(),

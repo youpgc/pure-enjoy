@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/weight_record_model.dart';
 
@@ -410,7 +411,7 @@ class _RecordFormState extends State<_RecordForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newRecord = WeightRecordModel(
-      id: _isEditing ? widget.record!.id : '',
+      id: _isEditing ? widget.record!.id : const Uuid().v4(),
       userId: _isEditing ? widget.record!.userId : widget.userId,
       weight: double.parse(_weightController.text),
       bodyFat: _bodyFatController.text.isNotEmpty

@@ -129,15 +129,17 @@ class NovelChapterModel {
 
   factory NovelChapterModel.fromJson(Map<String, dynamic> json) {
     return NovelChapterModel(
-      id: json['id'] as String,
-      novelId: json['novel_id'] as String,
-      title: json['title'] as String,
-      content: json['content'] as String,
+      id: json['id'] as String? ?? '',
+      novelId: json['novel_id'] as String? ?? '',
+      title: json['title'] as String? ?? '无标题',
+      content: json['content'] as String? ?? '',
       chapterOrder: json['chapter_num'] as int? ?? 0,
       wordCount: json['word_count'] as int?,
       isFree: json['is_free'] as bool?,
       price: json['price'] != null ? (json['price'] as num).toDouble() : null,
-      createdAt: DateTime.parse(json['created_at'] as String),
+      createdAt: json['created_at'] != null
+          ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
+          : DateTime.now(),
     );
   }
 

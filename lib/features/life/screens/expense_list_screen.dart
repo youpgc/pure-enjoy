@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/expense_model.dart';
 
@@ -471,7 +472,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     if (!_formKey.currentState!.validate()) return;
 
     final newExpense = ExpenseModel(
-      id: _isEditing ? widget.expense!.id : '',
+      id: _isEditing ? widget.expense!.id : const Uuid().v4(),
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,

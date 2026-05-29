@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/mood_diary_model.dart';
 
@@ -388,7 +389,7 @@ class _DiaryFormState extends State<_DiaryForm> {
         .toList();
 
     final newDiary = MoodDiaryModel(
-      id: _isEditing ? widget.diary!.id : '',
+      id: _isEditing ? widget.diary!.id : const Uuid().v4(),
       userId: _isEditing ? widget.diary!.userId : widget.userId,
       mood: _selectedMood.name,
       moodScore: _selectedMood.score,

@@ -1,6 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/reminder_model.dart';
 
@@ -396,7 +397,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
             if (_formKey.currentState!.validate()) {
               final userId = AuthService.instance.currentUserId ?? 'local_user';
               final reminder = ReminderModel(
-                id: widget.reminder?.id ?? '',
+                id: widget.reminder?.id ?? const Uuid().v4(),
                 userId: widget.reminder?.userId ?? userId,
                 title: _titleController.text,
                 description: _descController.text.isEmpty ? null : _descController.text,

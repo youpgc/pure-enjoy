@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/note_model.dart';
 
@@ -423,7 +424,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
         .toList();
 
     final newNote = NoteModel(
-      id: widget.note?.id ?? '',
+      id: widget.note?.id ?? const Uuid().v4(),
       userId: widget.userId,
       title: _titleController.text,
       content: _contentController.text.isEmpty ? null : _contentController.text,

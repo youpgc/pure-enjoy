@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../models/favorite_model.dart';
 
@@ -195,7 +196,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 final userId = _userId ?? 'local_user';
 
                 final newFavorite = FavoriteModel(
-                  id: isEditing ? favorite.id : '',
+                  id: isEditing ? favorite.id : const Uuid().v4(),
                   userId: isEditing ? favorite.userId : userId,
                   title: titleController.text.trim(),
                   url: urlController.text.trim().isEmpty
