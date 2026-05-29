@@ -10,6 +10,7 @@ import 'weight_record_screen.dart';
 import 'favorites_screen.dart';
 import 'reminders_screen.dart';
 import 'habits_screen.dart';
+import 'statistics_screen.dart';
 
 /// 生活模块主页面 - 展示最新记录 + 功能入口
 class LifeScreen extends StatefulWidget {
@@ -390,6 +391,18 @@ class _LifeScreenState extends State<LifeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const HabitsScreen()),
+            );
+          },
+        ),
+        _FeatureItem(
+          icon: Icons.bar_chart,
+          title: '数据统计',
+          subtitle: '消费/体重/心情图表',
+          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StatisticsScreen()),
             );
           },
         ),

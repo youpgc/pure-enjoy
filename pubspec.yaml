@@ -1,7 +1,7 @@
 name: pure_enjoy
 description: 纯享App - 记录生活，享受每一天
 publish_to: 'none'
-version: 1.8.0+32
+version: 1.8.2+34
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -39,6 +39,8 @@ dependencies:
   # flutter_local_notifications: ^15.1.0+1
   # 图片选择器（头像上传）
   image_picker: ^1.0.7
+  # 图表库
+  fl_chart: ^0.68.0
 
 dev_dependencies:
   flutter_test:
