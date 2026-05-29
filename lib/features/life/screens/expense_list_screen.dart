@@ -45,7 +45,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=expense_date.desc',
+          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -173,8 +173,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         body: jsonEncode({
           'amount': expense.amount,
           'category': expense.category,
-          'description': expense.description,
-          'expense_date': expense.date.toIso8601String().split('T').first,
+          'note': expense.note,
+          'date': expense.date.toIso8601String().split('T').first,
         }),
       );
 
@@ -335,7 +335,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                               leading: Icon(category.icon),
                               title: Text(category.label),
                               subtitle: Text(
-                                '${DateFormat('MM-dd').format(expense.date)}${expense.description != null ? ' - ${expense.description}' : ''}',
+                                '${DateFormat('MM-dd').format(expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -476,7 +476,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategory.name,
-      description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+      note: _descriptionController.text.isEmpty ? null : _descriptionController.text,
       date: _selectedDate,
     );
 

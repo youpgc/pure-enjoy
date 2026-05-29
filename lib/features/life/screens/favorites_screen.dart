@@ -126,6 +126,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     final titleController = TextEditingController(text: favorite?.title ?? '');
     final urlController = TextEditingController(text: favorite?.url ?? '');
     final descController = TextEditingController(text: favorite?.description ?? '');
+    final tagsController = TextEditingController(
+      text: favorite?.tags?.join(', ') ?? '',
+    );
     String category = favorite?.category ?? 'other';
 
     await showDialog(
@@ -178,6 +181,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     }
                   },
                 ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: tagsController,
+                  decoration: const InputDecoration(
+                    labelText: '标签（可选）',
+                    hintText: '用逗号分隔多个标签',
+                  ),
+                ),
               ],
             ),
           ),
@@ -195,6 +206,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
                 final userId = _userId ?? 'local_user';
 
+                // 解析标签
+                final tagsText = tagsController.text.trim();
+                final tags = tagsText.isNotEmpty
+                    ? tagsText.split(',').map((t) => t.trim()).where((t) => t.isNotEmpty).toList()
+                    : null;
+
                 final newFavorite = FavoriteModel(
                   id: isEditing ? favorite.id : const Uuid().v4(),
                   userId: isEditing ? favorite.userId : userId,
@@ -206,6 +223,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       ? null
                       : descController.text.trim(),
                   category: category,
+                  tags: tags,
                 );
 
                 try {
@@ -218,20 +236,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                         'url': newFavorite.url,
                         'description': newFavorite.description,
                         'category': newFavorite.category,
+                        'tags': newFavorite.tags,
                       }),
                     );
                     if (response.statusCode != 200 && response.statusCode != 204) {
                       throw Exception('HTTP ${response.statusCode}');
                     }
                   } else {
-                    final userNickname = AuthService.instance.currentUserName ?? '';
                     final response = await http.post(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites'),
                       headers: SupabaseConfig.headers,
-                      body: jsonEncode({
-                        ...newFavorite.toJson(),
-                        'user_nickname': userNickname,
-                      }),
+                      body: jsonEncode(newFavorite.toJson()),
                     );
                     if (response.statusCode != 201 && response.statusCode != 200) {
                       throw Exception('HTTP ${response.statusCode}');
@@ -380,6 +395,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                         ),
                                         maxLines: 1,
                                         overflow: TextOverflow.ellipsis,
+                                      ),
+                                    ],
+                                    if (favorite.tags != null && favorite.tags!.isNotEmpty) ...[
+                                      const SizedBox(height: 4),
+                                      Wrap(
+                                        spacing: 4,
+                                        children: favorite.tags!.take(3).map((tag) => Container(
+                                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                          decoration: BoxDecoration(
+                                            color: colorScheme.tertiaryContainer,
+                                            borderRadius: BorderRadius.circular(4),
+                                          ),
+                                          child: Text(
+                                            tag,
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: colorScheme.onTertiaryContainer,
+                                            ),
+                                          ),
+                                        )).toList(),
                                       ),
                                     ],
                                     if (favorite.url != null) ...[

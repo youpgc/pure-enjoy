@@ -156,7 +156,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           'mood': diary.mood,
           'mood_label': diary.moodScore.toString(),
           'content': diary.content,
-          'tags': diary.tags,
           'date': diary.entryDate.toIso8601String().split('T').first,
         }),
       );

@@ -1,24 +1,22 @@
 import 'package:flutter/material.dart';
 
 /// 支出记录模型 - 对应 Supabase expenses 表
-/// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), date(DATE)
+/// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), note(TEXT), date(DATE), created_at, updated_at
 class ExpenseModel {
   final String id;
   final String userId;
-  final String? userNickname;
   final double amount;
   final String category;
-  final String? description;
+  final String? note;
   final DateTime date;
   final DateTime? createdAt;
 
   ExpenseModel({
     required this.id,
     required this.userId,
-    this.userNickname,
     required this.amount,
     required this.category,
-    this.description,
+    this.note,
     required this.date,
     this.createdAt,
   });
@@ -27,11 +25,10 @@ class ExpenseModel {
     return ExpenseModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      userNickname: json['user_nickname'] as String?,
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
-      description: json['description'] as String?,
-      date: DateTime.parse(json['expense_date'] as String),
+      note: json['note'] as String?,
+      date: DateTime.parse(json['date'] as String),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -39,11 +36,10 @@ class ExpenseModel {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'user_id': userId,
-      'user_nickname': userNickname,
       'amount': amount,
       'category': category,
-      'description': description,
-      'expense_date': date.toIso8601String().split('T').first,
+      'note': note,
+      'date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID
@@ -57,28 +53,26 @@ class ExpenseModel {
     return {
       'amount': amount,
       'category': category,
-      'description': description,
-      'expense_date': date.toIso8601String().split('T').first,
+      'note': note,
+      'date': date.toIso8601String().split('T').first,
     };
   }
 
   ExpenseModel copyWith({
     String? id,
     String? userId,
-    String? userNickname,
     double? amount,
     String? category,
-    String? description,
+    String? note,
     DateTime? date,
     DateTime? createdAt,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
-      userNickname: userNickname ?? this.userNickname,
       amount: amount ?? this.amount,
       category: category ?? this.category,
-      description: description ?? this.description,
+      note: note ?? this.note,
       date: date ?? this.date,
       createdAt: createdAt ?? this.createdAt,
     );

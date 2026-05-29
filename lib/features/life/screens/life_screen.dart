@@ -297,7 +297,7 @@ class _LifeScreenState extends State<LifeScreen> {
               summary: _latestExpense != null
                   ? '${_latestExpense!['category'] ?? ''} ${_latestExpense!['amount'] ?? ''}'
                   : null,
-              description: _latestExpense?['description'] as String?,
+              description: _latestExpense?['note'] as String?,
               date: _formatDate(_latestExpense?['date'] as String?),
               onTap: () {
                 Navigator.push(

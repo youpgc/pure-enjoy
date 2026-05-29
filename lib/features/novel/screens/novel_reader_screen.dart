@@ -139,7 +139,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           try {
             final progressResponse = await http.get(
               Uri.parse(
-                '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=current_chapter',
+                '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=last_chapter',
               ),
               headers: {
                 'apikey': AppConfig.supabaseAnonKey,
@@ -149,7 +149,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
             if (progressResponse.statusCode == 200) {
               final progressData = jsonDecode(progressResponse.body);
               if (progressData.isNotEmpty) {
-                final savedChapter = progressData.first['current_chapter'] as int? ?? 1;
+                final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
                 for (int i = 0; i < chapters.length; i++) {
                   if (chapters[i].chapterOrder >= savedChapter) {
                     startIndex = i;
@@ -236,7 +236,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -270,7 +270,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
         // 更新已有书架记录
         await http.patch(
           Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$_bookshelfId',
+            '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId',
           ),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,
@@ -278,14 +278,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
             'Content-Type': 'application/json',
           },
           body: jsonEncode({
-            'current_chapter': chapterNum,
+            'last_chapter': chapterNum,
             'last_read_at': DateTime.now().toUtc().toIso8601String(),
           }),
         );
       } else {
         // 自动加入书架并记录进度
         final response = await http.post(
-          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,
             'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
@@ -295,8 +295,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
-            'status': 'reading',
-            'current_chapter': chapterNum,
+            'is_collected': true,
+            'last_chapter': chapterNum,
           }),
         );
 
@@ -327,7 +327,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
 
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
@@ -337,8 +337,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
         body: jsonEncode({
           'user_id': userId,
           'novel_id': widget.novel.id,
-          'status': 'reading',
-          'current_chapter': _currentChapter?.chapterOrder ?? 1,
+          'is_collected': true,
+          'last_chapter': _currentChapter?.chapterOrder ?? 1,
         }),
       );
 

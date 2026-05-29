@@ -80,10 +80,9 @@ class SyncService {
         final expenseData = {
           'id': expense.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'amount': expense.amount,
           'category': expense.category,
-          'description': expense.description,
+          'note': expense.note,
           'date': expense.date.toIso8601String().split('T').first,
           'created_at': expense.createdAt.toIso8601String(),
         };
@@ -126,11 +125,9 @@ class SyncService {
         final diaryData = {
           'id': diary.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'mood': diary.mood,
           'mood_label': diary.moodScore.toString(),
           'content': diary.content,
-          'tags': diary.tags,
           'date': diary.entryDate.toIso8601String().split('T').first,
           'created_at': DateTime.now().toIso8601String(),
         };
@@ -172,7 +169,6 @@ class SyncService {
         final noteData = {
           'id': note.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'title': note.title,
           'content': note.content,
           'is_pinned': note.isPinned,
@@ -217,11 +213,8 @@ class SyncService {
         final recordData = {
           'id': record.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'weight': record.weight,
-          'unit': record.unit,
           'body_fat': record.bodyFat,
-          'note': record.note,
           'date': record.date.toIso8601String().split('T').first,
           'created_at': record.createdAt.toIso8601String(),
         };
@@ -263,7 +256,6 @@ class SyncService {
         final favoriteData = {
           'id': favorite.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'title': favorite.title,
           'url': favorite.url,
           'description': favorite.description,
@@ -309,7 +301,6 @@ class SyncService {
         final reminderData = {
           'id': reminder.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'title': reminder.title,
           'description': reminder.description,
           'remind_at': reminder.remindAt.toIso8601String(),
@@ -355,7 +346,6 @@ class SyncService {
         final habitData = {
           'id': habit.id,
           'user_id': userId,
-          'user_nickname': AuthService.instance.currentUserName,
           'name': habit.name,
           'description': habit.description,
           'frequency': habit.frequency,

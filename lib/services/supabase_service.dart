@@ -39,7 +39,6 @@ class AuthService {
 
   /// 获取当前用户名
   String? get currentUserName =>
-      _user?['username'] ??
       _user?['nickname'] ??
       _user?['email']?.split('@').first;
 
@@ -101,7 +100,7 @@ class AuthService {
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,login_count',
+          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -137,7 +136,7 @@ class AuthService {
           }),
         );
 
-        print('✅ 登录成功: ${user['username']}');
+        print('✅ 登录成功: ${user['nickname']}');
         return true;
       } else {
         print('❌ 登录失败: HTTP ${response.statusCode}');
@@ -150,15 +149,16 @@ class AuthService {
   }
 
   /// 通过用户名+密码登录
+  /// 注意: users 表没有 username 字段，此方法改用 nickname 查询
   Future<bool> signInWithUsername(String username, String password) async {
     try {
       final passwordHash = _hashPassword(password);
 
-      print('🔐 用户名登录: username=$username, hash=${passwordHash.substring(0, 8)}...');
+      print('🔐 用户名登录: nickname=$username, hash=${passwordHash.substring(0, 8)}...');
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
+          '${SupabaseConfig.url}/rest/v1/users?nickname=eq.$username&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -192,7 +192,7 @@ class AuthService {
           }),
         );
 
-        print('✅ 用户名登录成功: ${user['username']}');
+        print('✅ 用户名登录成功: ${user['nickname']}');
         return true;
       } else {
         print('❌ 用户名登录失败: HTTP ${response.statusCode}');
@@ -213,7 +213,7 @@ class AuthService {
       // 直接通过手机号+密码哈希查询
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&password_hash=eq.$passwordHash&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url',
+          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -264,7 +264,7 @@ class AuthService {
       // 验证验证码
       final verifyResponse = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&sms_code=eq.$code&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,sms_code_expires_at',
+          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&sms_code=eq.$code&select=id,email,nickname,phone,role,member_level,points,status,avatar_url,sms_code_expires_at',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -392,7 +392,6 @@ class AuthService {
       final userData = {
         'id': userId,
         'email': userEmail,
-        'username': username,
         'password_hash': passwordHash,
         'phone': phone,
         'nickname': username,
@@ -465,7 +464,7 @@ class AuthService {
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,username,nickname,phone,role,member_level,points,status,avatar_url,bio,location,birthday,gender',
+          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );

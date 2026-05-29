@@ -43,7 +43,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=record_date.desc',
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -154,8 +154,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         headers: SupabaseConfig.headers,
         body: jsonEncode({
           'weight': record.weight,
+          'bmi': record.bmi,
           'body_fat': record.bodyFat,
-          'record_date': record.date.toIso8601String().split('T').first,
+          'note': record.note,
+          'date': record.date.toIso8601String().split('T').first,
         }),
       );
 
@@ -314,10 +316,30 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                         style: Theme.of(context).textTheme.bodySmall,
                                       ),
                                     ],
+                                    if (record.bmi != null) ...[
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'BMI ${record.bmi!.toStringAsFixed(1)}',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
                                   ],
                                 ),
-                                subtitle: Text(
-                                  DateFormat('yyyy-MM-dd').format(record.date),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(DateFormat('yyyy-MM-dd').format(record.date)),
+                                    if (record.note != null && record.note!.isNotEmpty)
+                                      Text(
+                                        record.note!,
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.outline,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
                                 ),
                                 trailing: PopupMenuButton<String>(
                                   onSelected: (value) {
@@ -383,6 +405,8 @@ class _RecordFormState extends State<_RecordForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _weightController;
   late final TextEditingController _bodyFatController;
+  late final TextEditingController _bmiController;
+  late final TextEditingController _noteController;
   late DateTime _selectedDate;
 
   bool get _isEditing => widget.record != null;
@@ -397,6 +421,12 @@ class _RecordFormState extends State<_RecordForm> {
     _bodyFatController = TextEditingController(
       text: record?.bodyFat?.toString() ?? '',
     );
+    _bmiController = TextEditingController(
+      text: record?.bmi?.toString() ?? '',
+    );
+    _noteController = TextEditingController(
+      text: record?.note ?? '',
+    );
     _selectedDate = record?.date ?? DateTime.now();
   }
 
@@ -404,6 +434,8 @@ class _RecordFormState extends State<_RecordForm> {
   void dispose() {
     _weightController.dispose();
     _bodyFatController.dispose();
+    _bmiController.dispose();
+    _noteController.dispose();
     super.dispose();
   }
 
@@ -414,9 +446,11 @@ class _RecordFormState extends State<_RecordForm> {
       id: _isEditing ? widget.record!.id : const Uuid().v4(),
       userId: _isEditing ? widget.record!.userId : widget.userId,
       weight: double.parse(_weightController.text),
+      bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
       bodyFat: _bodyFatController.text.isNotEmpty
           ? double.tryParse(_bodyFatController.text)
           : null,
+      note: _noteController.text.isNotEmpty ? _noteController.text : null,
       date: _selectedDate,
     );
 
@@ -466,6 +500,25 @@ class _RecordFormState extends State<_RecordForm> {
                 labelText: '体脂率（可选）',
                 suffixText: '%',
               ),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _bmiController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: 'BMI（可选）',
+              ),
+            ),
+            const SizedBox(height: 16),
+
+            TextFormField(
+              controller: _noteController,
+              decoration: const InputDecoration(
+                labelText: '备注（可选）',
+                hintText: '添加备注信息',
+              ),
+              maxLines: 2,
             ),
             const SizedBox(height: 16),
 

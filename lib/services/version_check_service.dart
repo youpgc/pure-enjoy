@@ -47,7 +47,7 @@ class VersionCheckService {
         final latestVersion = data.first as Map<String, dynamic>;
         final latestVersionStr = latestVersion['version'] as String;
         final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
-        final isForceUpdate = latestVersion['is_force_update'] == true;
+        final isForceUpdate = latestVersion['release_type'] == 'force';
 
         if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
           return {
@@ -56,6 +56,7 @@ class VersionCheckService {
             'apk_url': latestVersion['apk_url'],
             'release_notes': latestVersion['release_notes'],
             'is_force_update': isForceUpdate,
+            'release_type': latestVersion['release_type'],
           };
         }
       }

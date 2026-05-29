@@ -162,13 +162,14 @@ class NovelChapterModel {
   }
 }
 
-/// 阅读进度模型
+/// 阅读进度模型 - 对应 Supabase user_novels 表
+/// 字段: id(UUID), user_id(VARCHAR), novel_id(VARCHAR), progress(DECIMAL), last_chapter(INTEGER), last_read_at(TIMESTAMPTZ), is_collected(BOOLEAN), created_at, updated_at
 class ReadingProgressModel {
   final String id;
   final String userId;
   final String novelId;
   final double progress;
-  final String? lastChapter;
+  final int? lastChapter;
   final bool? isCollected;
   final DateTime lastReadAt;
   final DateTime createdAt;
@@ -192,7 +193,7 @@ class ReadingProgressModel {
       userId: json['user_id'] as String,
       novelId: json['novel_id'] as String,
       progress: json['progress'] != null ? (json['progress'] as num).toDouble() : 0.0,
-      lastChapter: json['last_chapter'] as String?,
+      lastChapter: json['last_chapter'] as int?,
       isCollected: json['is_collected'] as bool?,
       lastReadAt: DateTime.parse(json['last_read_at'] as String),
       createdAt: DateTime.parse(json['created_at'] as String),

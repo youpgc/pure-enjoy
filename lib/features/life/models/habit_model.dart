@@ -1,40 +1,46 @@
-/// 习惯打卡模型 - 对应 Supabase user_habits 表
-/// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), name(VARCHAR), description(TEXT), frequency(VARCHAR), target_days(INTEGER), start_date(DATE), is_active(BOOLEAN)
+/// 习惯模型 - 对应 Supabase user_habits 表
+/// 字段: id(UUID), user_id(VARCHAR), name(VARCHAR), description(TEXT), frequency(VARCHAR), target_days(INTEGER), current_streak(INTEGER), max_streak(INTEGER), total_checkins(INTEGER), color(VARCHAR), is_active(BOOLEAN), created_at, updated_at
 class HabitModel {
   final String id;
   final String userId;
-  final String? userNickname;
   final String name;
   final String? description;
   final String frequency;
   final int targetDays;
-  final DateTime startDate;
+  final int currentStreak;
+  final int maxStreak;
+  final int totalCheckins;
+  final String? color;
   final bool isActive;
   final DateTime? createdAt;
 
   HabitModel({
     required this.id,
     required this.userId,
-    this.userNickname,
     required this.name,
     this.description,
     this.frequency = 'daily',
     this.targetDays = 21,
-    DateTime? startDate,
+    this.currentStreak = 0,
+    this.maxStreak = 0,
+    this.totalCheckins = 0,
+    this.color,
     this.isActive = true,
     this.createdAt,
-  }) : startDate = startDate ?? DateTime.now();
+  });
 
   factory HabitModel.fromJson(Map<String, dynamic> json) {
     return HabitModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      userNickname: json['user_nickname'] as String?,
       name: json['name'] as String,
       description: json['description'] as String?,
       frequency: json['frequency'] as String? ?? 'daily',
       targetDays: json['target_days'] as int? ?? 21,
-      startDate: json['start_date'] != null ? DateTime.parse(json['start_date'] as String) : DateTime.now(),
+      currentStreak: json['current_streak'] as int? ?? 0,
+      maxStreak: json['max_streak'] as int? ?? 0,
+      totalCheckins: json['total_checkins'] as int? ?? 0,
+      color: json['color'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
@@ -43,12 +49,14 @@ class HabitModel {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'user_id': userId,
-      'user_nickname': userNickname,
       'name': name,
       'description': description,
       'frequency': frequency,
       'target_days': targetDays,
-      'start_date': startDate.toIso8601String().split('T').first,
+      'current_streak': currentStreak,
+      'max_streak': maxStreak,
+      'total_checkins': totalCheckins,
+      'color': color,
       'is_active': isActive,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
@@ -64,7 +72,10 @@ class HabitModel {
       'description': description,
       'frequency': frequency,
       'target_days': targetDays,
-      'start_date': startDate.toIso8601String().split('T').first,
+      'current_streak': currentStreak,
+      'max_streak': maxStreak,
+      'total_checkins': totalCheckins,
+      'color': color,
       'is_active': isActive,
     };
   }
@@ -72,24 +83,28 @@ class HabitModel {
   HabitModel copyWith({
     String? id,
     String? userId,
-    String? userNickname,
     String? name,
     String? description,
     String? frequency,
     int? targetDays,
-    DateTime? startDate,
+    int? currentStreak,
+    int? maxStreak,
+    int? totalCheckins,
+    String? color,
     bool? isActive,
     DateTime? createdAt,
   }) {
     return HabitModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
-      userNickname: userNickname ?? this.userNickname,
       name: name ?? this.name,
       description: description ?? this.description,
       frequency: frequency ?? this.frequency,
       targetDays: targetDays ?? this.targetDays,
-      startDate: startDate ?? this.startDate,
+      currentStreak: currentStreak ?? this.currentStreak,
+      maxStreak: maxStreak ?? this.maxStreak,
+      totalCheckins: totalCheckins ?? this.totalCheckins,
+      color: color ?? this.color,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
     );
@@ -97,20 +112,17 @@ class HabitModel {
 }
 
 /// 习惯打卡记录模型 - 对应 Supabase habit_checkins 表
+/// 字段: id(UUID), habit_id(UUID), checkin_at(TIMESTAMPTZ), created_at
 class HabitCheckinModel {
   final String id;
   final String habitId;
-  final String userId;
   final DateTime checkinAt;
-  final String? note;
   final DateTime? createdAt;
 
   HabitCheckinModel({
     required this.id,
     required this.habitId,
-    required this.userId,
     required this.checkinAt,
-    this.note,
     this.createdAt,
   });
 
@@ -118,9 +130,7 @@ class HabitCheckinModel {
     return HabitCheckinModel(
       id: json['id'] as String,
       habitId: json['habit_id'] as String,
-      userId: json['user_id'] as String,
       checkinAt: DateTime.parse(json['checkin_at'] as String),
-      note: json['note'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -128,9 +138,7 @@ class HabitCheckinModel {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'habit_id': habitId,
-      'user_id': userId,
       'checkin_at': checkinAt.toIso8601String(),
-      'note': note,
       'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
     };
     if (id.isNotEmpty) {

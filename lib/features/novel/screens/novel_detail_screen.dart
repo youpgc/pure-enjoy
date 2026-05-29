@@ -45,7 +45,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id,status,current_chapter',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id,is_collected,last_chapter,last_read_at',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -59,7 +59,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           setState(() {
             _isInBookshelf = true;
             _bookshelfId = data.first['id'] as String;
-            _currentChapter = data.first['current_chapter'] as int? ?? 1;
+            _currentChapter = data.first['last_chapter'] as int? ?? 1;
             _isLoadingShelf = false;
           });
         } else {
@@ -117,7 +117,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       try {
         final response = await http.delete(
           Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/book_shelves?id=eq.$_bookshelfId',
+            '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId',
           ),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,
@@ -147,7 +147,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       // 加入书架
       try {
         final response = await http.post(
-          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,
             'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
@@ -157,8 +157,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
-            'status': 'reading',
-            'current_chapter': 1,
+            'is_collected': true,
           }),
         );
 

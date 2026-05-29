@@ -23,11 +23,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nicknameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
-  final _usernameController = TextEditingController();
-  final _bioController = TextEditingController();
-  final _locationController = TextEditingController();
-  final _birthdayController = TextEditingController();
-  final _genderController = TextEditingController();
 
   // 用户数据
   Map<String, dynamic>? _userData;
@@ -46,11 +41,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nicknameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
-    _usernameController.dispose();
-    _bioController.dispose();
-    _locationController.dispose();
-    _birthdayController.dispose();
-    _genderController.dispose();
     super.dispose();
   }
 
@@ -102,11 +92,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nicknameController.text = _userData!['nickname'] ?? '';
     _emailController.text = _userData!['email'] ?? '';
     _phoneController.text = _userData!['phone'] ?? '';
-    _usernameController.text = _userData!['username'] ?? '';
-    _bioController.text = _userData!['bio'] ?? '';
-    _locationController.text = _userData!['location'] ?? '';
-    _birthdayController.text = _userData!['birthday'] ?? '';
-    _genderController.text = _userData!['gender'] ?? '';
     _avatarUrl = _userData!['avatar_url'];
   }
 
@@ -192,11 +177,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'nickname': _nicknameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
-        'username': _usernameController.text.trim(),
-        'bio': _bioController.text.trim(),
-        'location': _locationController.text.trim(),
-        'birthday': _birthdayController.text.trim(),
-        'gender': _genderController.text.trim(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -314,12 +294,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     icon: Icons.person_outline,
                   ),
                   _buildTextField(
-                    controller: _usernameController,
-                    label: '用户名',
-                    hint: '请输入用户名',
-                    icon: Icons.account_circle_outlined,
-                  ),
-                  _buildTextField(
                     controller: _emailController,
                     label: '邮箱',
                     hint: '请输入邮箱',
@@ -332,41 +306,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     hint: '请输入手机号',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 个人简介
-                  _buildSectionTitle('个人简介'),
-                  _buildTextField(
-                    controller: _bioController,
-                    label: '个性签名',
-                    hint: '介绍一下自己',
-                    icon: Icons.edit_note_outlined,
-                    maxLines: 3,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 其他信息
-                  _buildSectionTitle('其他信息'),
-                  _buildTextField(
-                    controller: _genderController,
-                    label: '性别',
-                    hint: '男/女/保密',
-                    icon: Icons.people_outline,
-                  ),
-                  _buildTextField(
-                    controller: _birthdayController,
-                    label: '生日',
-                    hint: 'YYYY-MM-DD',
-                    icon: Icons.cake_outlined,
-                  ),
-                  _buildTextField(
-                    controller: _locationController,
-                    label: '所在地',
-                    hint: '请输入所在城市',
-                    icon: Icons.location_on_outlined,
                   ),
                 ],
               ),

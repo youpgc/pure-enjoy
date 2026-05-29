@@ -115,7 +115,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
         body: jsonEncode({
           'id': checkinId,
           'habit_id': habit.id,
-          'user_id': _userId,
           'checkin_at': today.toIso8601String(),
         }),
       );
@@ -263,12 +262,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       body: jsonEncode({
                         'id': habitId,
                         'user_id': userId,
-                        'user_nickname': AuthService.instance.currentUserName,
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
                         'frequency': 'daily',
-                        'start_date': DateTime.now().toIso8601String().split('T').first,
                         'is_active': true,
                       }),
                     );
@@ -309,7 +306,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     return ListTile(
                       leading: const Icon(Icons.check_circle, color: Colors.green),
                       title: Text(DateFormat('yyyy-MM-dd').format(checkin.checkinAt)),
-                      subtitle: checkin.note != null ? Text(checkin.note!) : null,
                     );
                   },
                 ),

@@ -50,7 +50,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
       // 从 Supabase 加载已发布的小说
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/novels?is_published=eq.true&select=*&order=created_at.desc&limit=100',
+          '${AppConfig.supabaseUrl}/rest/v1/novels?user_id=is.null&select=*&order=created_at.desc&limit=100',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -71,7 +71,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
         try {
           final shelfResponse = await http.get(
             Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/book_shelves?user_id=eq.$userId&select=id,novel_id,status,current_chapter',
+              '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,is_collected,last_chapter,last_read_at',
             ),
             headers: {
               'apikey': AppConfig.supabaseAnonKey,
@@ -151,7 +151,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
     try {
       final response = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/book_shelves'),
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
@@ -161,8 +161,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
         body: jsonEncode({
           'user_id': userId,
           'novel_id': novel.id,
-          'status': 'reading',
-          'current_chapter': 1,
+          'is_collected': true,
         }),
       );
 

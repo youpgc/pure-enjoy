@@ -1,11 +1,11 @@
 /// 笔记模型 - 对应 Supabase notes 表
-/// 字段: id(UUID), user_id(VARCHAR), user_nickname(VARCHAR), title(VARCHAR), content(TEXT), is_pinned(BOOLEAN)
+/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), content(TEXT), category(VARCHAR), tags(TEXT[]), is_pinned(BOOLEAN), created_at, updated_at
 class NoteModel {
   final String id;
   final String userId;
-  final String? userNickname;
   final String title;
   final String? content;
+  final String? category;
   final List<String>? tags;
   final bool isPinned;
   final DateTime createdAt;
@@ -14,14 +14,14 @@ class NoteModel {
   NoteModel({
     required this.id,
     required this.userId,
-    this.userNickname,
     required this.title,
     this.content,
+    this.category,
     this.tags,
     this.isPinned = false,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) : 
+  }) :
     createdAt = createdAt ?? DateTime.now(),
     updatedAt = updatedAt ?? DateTime.now();
 
@@ -29,9 +29,9 @@ class NoteModel {
     return NoteModel(
       id: json['id'] as String,
       userId: json['user_id'] as String,
-      userNickname: json['user_nickname'] as String?,
       title: json['title'] as String,
       content: json['content'] as String?,
+      category: json['category'] as String?,
       tags: (json['tags'] as List<dynamic>?)?.cast<String>(),
       isPinned: json['is_pinned'] as bool? ?? false,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
@@ -42,9 +42,9 @@ class NoteModel {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'user_id': userId,
-      'user_nickname': userNickname,
       'title': title,
       'content': content,
+      'category': category,
       'tags': tags,
       'is_pinned': isPinned,
       'created_at': createdAt.toIso8601String(),
@@ -60,6 +60,7 @@ class NoteModel {
     return {
       'title': title,
       'content': content,
+      'category': category,
       'tags': tags,
       'is_pinned': isPinned,
       'updated_at': DateTime.now().toIso8601String(),
@@ -69,9 +70,9 @@ class NoteModel {
   NoteModel copyWith({
     String? id,
     String? userId,
-    String? userNickname,
     String? title,
     String? content,
+    String? category,
     List<String>? tags,
     bool? isPinned,
     DateTime? createdAt,
@@ -80,9 +81,9 @@ class NoteModel {
     return NoteModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
-      userNickname: userNickname ?? this.userNickname,
       title: title ?? this.title,
       content: content ?? this.content,
+      category: category ?? this.category,
       tags: tags ?? this.tags,
       isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
