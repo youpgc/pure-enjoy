@@ -1,11 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:provider/provider.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
-import '../../core/constants/app_config.dart';
-import '../auth/services/auth_provider.dart';
+import '../../../services/supabase_service.dart';
 
 /// 统计图表页面
 class StatisticsScreen extends StatefulWidget {
@@ -77,8 +75,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
   }
 
   Future<void> _loadData() async {
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.currentUser?.id;
+    final userId = AuthService.instance.currentUserId;
 
     if (userId == null) {
       setState(() {
@@ -95,19 +92,19 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
 
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId'
+          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId'
           '&date=gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)}'
           '&date=lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)}'
           '&select=*&order=date.desc',
         ),
         headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'apikey': SupabaseConfig.anonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
         },
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = _parseJson(response.body);
         setState(() {
           _expenses = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -124,6 +121,11 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
         _isLoading = false;
       });
     }
+  }
+
+  List<dynamic> _parseJson(String body) {
+    if (body.isEmpty) return [];
+    return jsonDecode(body) as List<dynamic>;
   }
 
   @override
@@ -272,8 +274,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
   }
 
   Future<void> _loadData() async {
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.currentUser?.id;
+    final userId = AuthService.instance.currentUserId;
 
     if (userId == null) {
       setState(() {
@@ -287,17 +288,17 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
       // 获取最近30条记录
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId'
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId'
           '&select=*&order=date.desc&limit=30',
         ),
         headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'apikey': SupabaseConfig.anonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
         },
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = _parseJson(response.body);
         setState(() {
           _records = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -314,6 +315,11 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
         _isLoading = false;
       });
     }
+  }
+
+  List<dynamic> _parseJson(String body) {
+    if (body.isEmpty) return [];
+    return jsonDecode(body) as List<dynamic>;
   }
 
   @override
@@ -420,7 +426,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                           final date = sortedRecords[index]['date'];
                           if (date != null) {
                             return Text(
-                              DateFormat('MM/dd').format(DateTime.parse(date)),
+                              DateFormat('MM/dd').format(DateTime.parse(date.toString())),
                               style: const TextStyle(fontSize: 10),
                             );
                           }
@@ -460,7 +466,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                         if (index >= 0 && index < sortedRecords.length) {
                           final date = sortedRecords[index]['date'];
                           return LineTooltipItem(
-                            '${DateFormat('MM/dd').format(DateTime.parse(date))}\n${spot.y.toStringAsFixed(1)} kg',
+                            '${DateFormat('MM/dd').format(DateTime.parse(date.toString()))}\n${spot.y.toStringAsFixed(1)} kg',
                             const TextStyle(color: Colors.white),
                           );
                         }
@@ -481,7 +487,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
           ),
           const SizedBox(height: 8),
           ...sortedRecords.reversed.take(10).map((record) {
-            final date = DateTime.parse(record['date']);
+            final date = DateTime.parse(record['date'].toString());
             return ListTile(
               leading: const CircleAvatar(child: Icon(Icons.monitor_weight)),
               title: Text('${record['weight']} kg'),
@@ -540,8 +546,7 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
   }
 
   Future<void> _loadData() async {
-    final authProvider = context.read<AuthProvider>();
-    final userId = authProvider.currentUser?.id;
+    final userId = AuthService.instance.currentUserId;
 
     if (userId == null) {
       setState(() {
@@ -555,17 +560,17 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
       // 获取最近30天记录
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/mood_diaries?user_id=eq.$userId'
+          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId'
           '&select=*&order=date.desc&limit=30',
         ),
         headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'apikey': SupabaseConfig.anonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
         },
       );
 
       if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+        final List<dynamic> data = _parseJson(response.body);
         setState(() {
           _diaries = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -582,6 +587,11 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
         _isLoading = false;
       });
     }
+  }
+
+  List<dynamic> _parseJson(String body) {
+    if (body.isEmpty) return [];
+    return jsonDecode(body) as List<dynamic>;
   }
 
   @override
