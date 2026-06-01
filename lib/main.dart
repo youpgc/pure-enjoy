@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
@@ -51,6 +52,16 @@ class PureEnjoyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme(themeProvider.colorScheme.seedColor),
             themeMode: themeProvider.themeMode,
             home: const AuthWrapper(),
+            // 中文本地化配置
+            localizationsDelegates: const [
+              GlobalMaterialLocalizations.delegate,
+              GlobalWidgetsLocalizations.delegate,
+              GlobalCupertinoLocalizations.delegate,
+            ],
+            supportedLocales: const [
+              Locale('zh', 'CN'), // 简体中文
+            ],
+            locale: const Locale('zh', 'CN'),
           );
         },
       ),
