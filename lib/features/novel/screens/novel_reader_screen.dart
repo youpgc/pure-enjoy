@@ -5,6 +5,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/chapter_cache_service.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 
@@ -260,6 +261,27 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     setState(() => _isLoadingChapter = true);
 
     try {
+      // 优先使用本地缓存
+      final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
+      if (cachedContent != null) {
+        setState(() {
+          _currentChapter = NovelChapterModel(
+            id: chapter.id,
+            novelId: chapter.novelId,
+            title: chapter.title,
+            chapterNum: chapter.chapterNum,
+            content: cachedContent,
+          );
+          _isLoadingChapter = false;
+        });
+        _scrollController.jumpTo(0);
+        _saveProgress();
+        _startReadingTimer();
+        _preloadNextChapter();
+        return;
+      }
+
+      // 无缓存，从网络加载
       final response = await http.get(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/chapters?id=eq.${chapter.id}&select=*',
@@ -273,14 +295,26 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
+          final chapterData = data.first;
           setState(() {
-            _currentChapter = NovelChapterModel.fromJson(data.first);
+            _currentChapter = NovelChapterModel.fromJson(chapterData);
             _isLoadingChapter = false;
           });
           _scrollController.jumpTo(0);
           _saveProgress();
-          _startReadingTimer(); // 开始阅读计时
-          _preloadNextChapter(); // 预加载下一章
+          _startReadingTimer();
+          _preloadNextChapter();
+
+          // 自动缓存当前章节
+          if (_currentChapter!.content != null && _currentChapter!.content!.isNotEmpty) {
+            ChapterCacheService.instance.cacheChapter(
+              chapterId: _currentChapter!.id,
+              novelId: widget.novel.id,
+              title: _currentChapter!.title,
+              chapterNum: _currentChapter!.chapterNum,
+              content: _currentChapter!.content!,
+            );
+          }
         } else {
           setState(() {
             _currentChapter = chapter;
@@ -324,6 +358,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
         final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
           _nextChapterCache = NovelChapterModel.fromJson(data.first);
+
+          // 缓存下一章
+          if (_nextChapterCache!.content != null && _nextChapterCache!.content!.isNotEmpty) {
+            ChapterCacheService.instance.cacheChapter(
+              chapterId: _nextChapterCache!.id,
+              novelId: widget.novel.id,
+              title: _nextChapterCache!.title,
+              chapterNum: _nextChapterCache!.chapterNum,
+              content: _nextChapterCache!.content!,
+            );
+          }
         }
       }
     } catch (_) {

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/chapter_cache_service.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 
@@ -19,6 +20,8 @@ class NovelDetailScreen extends StatefulWidget {
 class _NovelDetailScreenState extends State<NovelDetailScreen> {
   bool _isInBookshelf = false;
   bool _isLoadingShelf = true;
+  bool _isDownloading = false;
+  int _cachedChapterCount = 0;
   String? _bookshelfId;
   int _currentChapter = 1;
   List<NovelChapterModel> _chapters = [];
@@ -32,6 +35,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     super.initState();
     _checkBookshelfStatus();
     _loadChapters();
+    _updateCacheStatus();
   }
 
   /// 检查书架状态
@@ -181,6 +185,69 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         }
       }
     }
+  }
+
+  /// 更新缓存状态
+  void _updateCacheStatus() {
+    setState(() {
+      _cachedChapterCount = ChapterCacheService.instance.getCachedCount(widget.novel.id);
+    });
+  }
+
+  /// 下载全部章节（离线缓存）
+  Future<void> _downloadAllChapters() async {
+    if (_chapters.isEmpty) return;
+    setState(() => _isDownloading = true);
+
+    int downloaded = 0;
+    for (final chapter in _chapters) {
+      // 跳过已缓存的章节
+      if (ChapterCacheService.instance.isCached(chapter.id)) {
+        downloaded++;
+        setState(() => _cachedChapterCount = downloaded);
+        continue;
+      }
+
+      try {
+        final response = await http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/chapters?id=eq.${chapter.id}&select=*',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(response.body);
+          if (data.isNotEmpty) {
+            final content = data.first['content'] as String?;
+            if (content != null && content.isNotEmpty) {
+              await ChapterCacheService.instance.cacheChapter(
+                chapterId: chapter.id,
+                novelId: widget.novel.id,
+                title: chapter.title,
+                chapterNum: chapter.chapterNum,
+                content: content,
+              );
+              downloaded++;
+              setState(() => _cachedChapterCount = downloaded);
+            }
+          }
+        }
+      } catch (_) {
+        // 单章失败不影响整体
+      }
+    }
+
+    setState(() => _isDownloading = false);
+  }
+
+  /// 清除缓存
+  Future<void> _clearCache() async {
+    await ChapterCacheService.instance.clearNovelCache(widget.novel.id);
+    _updateCacheStatus();
   }
 
   /// 开始阅读
@@ -503,6 +570,29 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                   ? Icons.library_books
                                   : Icons.library_add_outlined,
                               color: _isInBookshelf ? colorScheme.primary : null,
+                            ),
+                          ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 缓存下载按钮
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: _isDownloading
+                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                        : OutlinedButton(
+                            onPressed: _cachedChapterCount > 0 && _cachedChapterCount >= _chapters.length
+                                ? _clearCache
+                                : _downloadAllChapters,
+                            style: OutlinedButton.styleFrom(
+                              padding: EdgeInsets.zero,
+                              minimumSize: const Size(48, 48),
+                            ),
+                            child: Icon(
+                              _cachedChapterCount > 0
+                                  ? Icons.download_done
+                                  : Icons.download_outlined,
+                              color: _cachedChapterCount > 0 ? Colors.green : null,
                             ),
                           ),
                   ),
