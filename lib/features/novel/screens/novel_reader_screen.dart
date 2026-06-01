@@ -21,6 +21,18 @@ enum ReaderBackground {
   final Color textColor;
 }
 
+/// 字体选择枚举
+enum ReaderFont {
+  system('系统默认', 'system'),
+  serif('宋体', 'serif'),
+  sansSerif('黑体', 'sans-serif'),
+  monospace('等宽', 'monospace');
+
+  const ReaderFont(this.label, this.fontFamily);
+  final String label;
+  final String fontFamily;
+}
+
 /// 小说阅读器页面
 class NovelReaderScreen extends StatefulWidget {
   final NovelModel novel;
@@ -53,11 +65,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   bool _hasStartedReading = false;
 
   // 阅读设置
-  static const List<double> _fontSizes = [14, 16, 18, 20, 22];
-  int _fontSizeIndex = 2; // 默认 18
+  static const List<double> _fontSizes = [12, 14, 16, 18, 20, 22, 24, 26, 28];
+  int _fontSizeIndex = 3; // 默认 18
   double get _fontSize => _fontSizes[_fontSizeIndex];
-  double _lineHeight = 1.8;
+  static const List<double> _lineHeights = [1.4, 1.6, 1.8, 2.0, 2.2];
+  int _lineHeightIndex = 2; // 默认 1.8
+  double get _lineHeight => _lineHeights[_lineHeightIndex];
   ReaderBackground _background = ReaderBackground.white;
+  ReaderFont _font = ReaderFont.system;
 
   // 书架状态
   bool _isInBookshelf = false;
@@ -141,10 +156,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     setState(() {
       final savedFontSize = prefs.getDouble('reader_font_size') ?? 18;
       _fontSizeIndex = _fontSizes.indexOf(savedFontSize);
-      if (_fontSizeIndex < 0) _fontSizeIndex = 2;
-      _lineHeight = prefs.getDouble('reader_line_height') ?? 1.8;
+      if (_fontSizeIndex < 0) _fontSizeIndex = 3;
+      final savedLineHeight = prefs.getDouble('reader_line_height') ?? 1.8;
+      _lineHeightIndex = _lineHeights.indexOf(savedLineHeight);
+      if (_lineHeightIndex < 0) _lineHeightIndex = 2;
       final savedBg = prefs.getInt('reader_background') ?? 0;
       _background = ReaderBackground.values[savedBg.clamp(0, ReaderBackground.values.length - 1)];
+      final savedFont = prefs.getInt('reader_font') ?? 0;
+      _font = ReaderFont.values[savedFont.clamp(0, ReaderFont.values.length - 1)];
     });
   }
 
@@ -154,6 +173,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     await prefs.setDouble('reader_font_size', _fontSize);
     await prefs.setDouble('reader_line_height', _lineHeight);
     await prefs.setInt('reader_background', _background.index);
+    await prefs.setInt('reader_font', _font.index);
   }
 
   /// 加载章节列表
@@ -656,6 +676,66 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
               ),
               const SizedBox(height: 20),
 
+              // 行高设置
+              Row(
+                children: [
+                  const Text('行高'),
+                  const Spacer(),
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.remove),
+                    onPressed: _lineHeightIndex > 0
+                        ? () {
+                            setModalState(() => _lineHeightIndex--);
+                            setState(() {});
+                            _saveSettings();
+                          }
+                        : null,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  ),
+                  Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 12),
+                    child: Text(
+                      _lineHeight.toStringAsFixed(1),
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                  ),
+                  IconButton.filledTonal(
+                    icon: const Icon(Icons.add),
+                    onPressed: _lineHeightIndex < _lineHeights.length - 1
+                        ? () {
+                            setModalState(() => _lineHeightIndex++);
+                            setState(() {});
+                            _saveSettings();
+                          }
+                        : null,
+                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 20),
+
+              // 字体设置
+              const Text('字体'),
+              const SizedBox(height: 12),
+              Wrap(
+                spacing: 8,
+                children: ReaderFont.values.map((font) {
+                  final isSelected = _font == font;
+                  return ChoiceChip(
+                    label: Text(font.label),
+                    selected: isSelected,
+                    onSelected: (selected) {
+                      if (selected) {
+                        setModalState(() => _font = font);
+                        setState(() {});
+                        _saveSettings();
+                      }
+                    },
+                  );
+                }).toList(),
+              ),
+              const SizedBox(height: 20),
+
               // 背景设置
               const Text('背景'),
               const SizedBox(height: 12),
@@ -866,6 +946,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
                                             fontWeight: FontWeight.bold,
                                             color: _background.textColor,
                                             height: 1.6,
+                                            fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
                                           ),
                                           textAlign: TextAlign.center,
                                         ),
@@ -879,6 +960,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
                                         height: _lineHeight,
                                         color: _background.textColor,
                                         letterSpacing: 0.5,
+                                        fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
                                       ),
                                     ),
                                     const SizedBox(height: 40),
