@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/notification_service.dart';
 import '../models/habit_model.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
@@ -188,6 +189,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final targetDaysController = TextEditingController(
       text: (habit?.targetDays ?? 21).toString(),
     );
+    bool enableReminder = habit?.reminderEnabled ?? false;
+    int reminderHour = habit?.reminderHour ?? 9;
+    int reminderMinute = habit?.reminderMinute ?? 0;
 
     await showDialog(
       context: context,
@@ -222,6 +226,45 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   ),
                   keyboardType: TextInputType.number,
                 ),
+                const SizedBox(height: 16),
+                // 提醒设置
+                SwitchListTile(
+                  title: const Text('每日打卡提醒'),
+                  subtitle: Text(enableReminder
+                      ? '${reminderHour.toString().padLeft(2, '0')}:${reminderMinute.toString().padLeft(2, '0')} 提醒'
+                      : '关闭'),
+                  contentPadding: EdgeInsets.zero,
+                  value: enableReminder,
+                  onChanged: (value) {
+                    setDialogState(() => enableReminder = value);
+                  },
+                ),
+                if (enableReminder)
+                  Row(
+                    children: [
+                      const Text('提醒时间: '),
+                      const SizedBox(width: 8),
+                      DropdownButton<int>(
+                        value: reminderHour,
+                        items: List.generate(24, (h) => DropdownMenuItem(
+                          value: h,
+                          child: Text('$h 时', style: const TextStyle(fontSize: 14)),
+                        )),
+                        onChanged: (v) => setDialogState(() => reminderHour = v ?? 9),
+                        underline: const SizedBox(),
+                      ),
+                      const SizedBox(width: 8),
+                      DropdownButton<int>(
+                        value: reminderMinute,
+                        items: [0, 15, 30, 45].map((m) => DropdownMenuItem(
+                          value: m,
+                          child: Text('$m 分', style: const TextStyle(fontSize: 14)),
+                        )).toList(),
+                        onChanged: (v) => setDialogState(() => reminderMinute = v ?? 0),
+                        underline: const SizedBox(),
+                      ),
+                    ],
+                  ),
               ],
             ),
           ),
@@ -249,10 +292,24 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
+                        'reminder_enabled': enableReminder,
+                        'reminder_hour': enableReminder ? reminderHour : null,
+                        'reminder_minute': enableReminder ? reminderMinute : null,
                       }),
                     );
                     if (response.statusCode != 200 && response.statusCode != 204) {
                       throw Exception('HTTP ${response.statusCode}');
+                    }
+                    // 设置/取消通知
+                    if (enableReminder) {
+                      await NotificationService.instance.setHabitReminder(
+                        habitId: habit.id,
+                        habitName: nameController.text.trim(),
+                        hour: reminderHour,
+                        minute: reminderMinute,
+                      );
+                    } else {
+                      await NotificationService.instance.cancelHabitReminder(habit.id);
                     }
                   } else {
                     final habitId = const Uuid().v4();
@@ -267,10 +324,22 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         'target_days': targetDays,
                         'frequency': 'daily',
                         'is_active': true,
+                        'reminder_enabled': enableReminder,
+                        'reminder_hour': enableReminder ? reminderHour : null,
+                        'reminder_minute': enableReminder ? reminderMinute : null,
                       }),
                     );
                     if (response.statusCode != 201 && response.statusCode != 200) {
                       throw Exception('HTTP ${response.statusCode}');
+                    }
+                    // 设置通知
+                    if (enableReminder) {
+                      await NotificationService.instance.setHabitReminder(
+                        habitId: habitId,
+                        habitName: nameController.text.trim(),
+                        hour: reminderHour,
+                        minute: reminderMinute,
+                      );
                     }
                   }
                   Navigator.pop(context);

@@ -13,6 +13,9 @@ class HabitModel {
   final String? color;
   final bool isActive;
   final DateTime? createdAt;
+  final bool reminderEnabled;
+  final int? reminderHour;
+  final int? reminderMinute;
 
   HabitModel({
     required this.id,
@@ -27,6 +30,9 @@ class HabitModel {
     this.color,
     this.isActive = true,
     this.createdAt,
+    this.reminderEnabled = false,
+    this.reminderHour,
+    this.reminderMinute,
   });
 
   factory HabitModel.fromJson(Map<String, dynamic> json) {
@@ -43,6 +49,9 @@ class HabitModel {
       color: json['color'] as String?,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      reminderEnabled: json['reminder_enabled'] as bool? ?? false,
+      reminderHour: json['reminder_hour'] as int?,
+      reminderMinute: json['reminder_minute'] as int?,
     );
   }
 
@@ -93,6 +102,9 @@ class HabitModel {
     String? color,
     bool? isActive,
     DateTime? createdAt,
+    bool? reminderEnabled,
+    int? reminderHour,
+    int? reminderMinute,
   }) {
     return HabitModel(
       id: id ?? this.id,
@@ -107,6 +119,9 @@ class HabitModel {
       color: color ?? this.color,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
+      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
+      reminderHour: reminderHour ?? this.reminderHour,
+      reminderMinute: reminderMinute ?? this.reminderMinute,
     );
   }
 }

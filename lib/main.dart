@@ -9,6 +9,7 @@ import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'services/supabase_service.dart';
 import 'services/dict_service.dart';
+import 'services/notification_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
@@ -27,6 +28,9 @@ void main() async {
 
   // 初始化字典服务（预加载字典数据）
   await DictService.instance.initialize();
+
+  // 初始化通知服务
+  await NotificationService.instance.initialize();
 
   runApp(const PureEnjoyApp());
 }
