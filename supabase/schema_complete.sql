@@ -7,9 +7,8 @@
 
 -- ============================================================
 -- 一、users 表 —— 用户表
--- App端查询字段: id, email, nickname, phone, role, member_level, points, status, avatar_url, login_count
--- 管理端字段: id, email, phone, password_hash, nickname, avatar_url, role, member_level, points, status, register_ip, last_login_ip, last_login_at, login_count, created_at, updated_at
--- 注意: users 表没有 username、sms_code、bio、location、birthday、gender 字段
+-- App端字段: id, email, phone, nickname, avatar_url, username, bio, gender, birthday, location, occupation, company, website
+-- 管理端字段: role, member_level, points, status, register_ip, last_login_ip, last_login_at, login_count
 -- ============================================================
 CREATE TABLE IF NOT EXISTS users (
     id VARCHAR(32) PRIMARY KEY,
@@ -18,6 +17,15 @@ CREATE TABLE IF NOT EXISTS users (
     password_hash VARCHAR(255) NOT NULL,
     nickname VARCHAR(50),
     avatar_url TEXT,
+    -- 扩展资料字段 (V1.9.2)
+    username VARCHAR(50),
+    bio TEXT,
+    gender VARCHAR(10) DEFAULT '保密',
+    birthday DATE,
+    location VARCHAR(100),
+    occupation VARCHAR(50),
+    company VARCHAR(100),
+    website VARCHAR(255),
     role VARCHAR(20) DEFAULT 'user',
     member_level VARCHAR(20) DEFAULT 'free',
     points INTEGER DEFAULT 0,
