@@ -128,104 +128,50 @@ ON CONFLICT (code) DO UPDATE SET
     description = EXCLUDED.description,
     is_system = EXCLUDED.is_system;
 
--- 7. 插入字典项数据（同时填充 code/name 和 item_code/item_name）
+-- 7. 插入字典项数据
 -- 消费分类
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'food', '餐饮', 'food', '餐饮', 'food', 1, true
-FROM dict_types dt WHERE dt.code = 'expense_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'transport', '交通', 'transport', '交通', 'transport', 2, true
-FROM dict_types dt WHERE dt.code = 'expense_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'shopping', '购物', 'shopping', '购物', 'shopping', 3, true
-FROM dict_types dt WHERE dt.code = 'expense_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'entertainment', '娱乐', 'entertainment', '娱乐', 'entertainment', 4, true
-FROM dict_types dt WHERE dt.code = 'expense_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'housing', '居住', 'housing', '居住', 'housing', 5, true
-FROM dict_types dt WHERE dt.code = 'expense_category'
-ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'food', 'food', '餐饮', 'food', 1, true FROM dict_types dt WHERE dt.code = 'expense_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'transport', 'transport', '交通', 'transport', 2, true FROM dict_types dt WHERE dt.code = 'expense_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'shopping', 'shopping', '购物', 'shopping', 3, true FROM dict_types dt WHERE dt.code = 'expense_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'entertainment', 'entertainment', '娱乐', 'entertainment', 4, true FROM dict_types dt WHERE dt.code = 'expense_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'housing', 'housing', '居住', 'housing', 5, true FROM dict_types dt WHERE dt.code = 'expense_category' ON CONFLICT DO NOTHING;
 
 -- 心情类型
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'happy', '开心', 'happy', '开心', 'happy', 1, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'excited', '兴奋', 'excited', '兴奋', 'excited', 2, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'calm', '平静', 'calm', '平静', 'calm', 3, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'tired', '疲惫', 'tired', '疲惫', 'tired', 4, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'sad', '难过', 'sad', '难过', 'sad', 5, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'angry', '生气', 'angry', '生气', 'angry', 6, true
-FROM dict_types dt WHERE dt.code = 'mood_type'
-ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'happy', 'happy', '开心', 'happy', 1, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'excited', 'excited', '兴奋', 'excited', 2, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'calm', 'calm', '平静', 'calm', 3, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'tired', 'tired', '疲惫', 'tired', 4, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'sad', 'sad', '难过', 'sad', 5, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'angry', 'angry', '生气', 'angry', 6, true FROM dict_types dt WHERE dt.code = 'mood_type' ON CONFLICT DO NOTHING;
 
 -- 小说分类
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'xianxia', '仙侠', 'xianxia', '仙侠', 'xianxia', 1, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'wuxia', '武侠', 'wuxia', '武侠', 'wuxia', 2, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'urban', '都市', 'urban', '都市', 'urban', 3, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'fantasy', '玄幻', 'fantasy', '玄幻', 'fantasy', 4, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'romance', '言情', 'romance', '言情', 'romance', 5, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'scifi', '科幻', 'scifi', '科幻', 'scifi', 6, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'history', '历史', 'history', '历史', 'history', 7, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
-
-INSERT INTO dict_items (type_id, code, name, item_code, item_name, item_value, sort_order, is_active)
-SELECT dt.id, 'game', '游戏', 'game', '游戏', 'game', 8, true
-FROM dict_types dt WHERE dt.code = 'novel_category'
-ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'xianxia', 'xianxia', '仙侠', 'xianxia', 1, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'wuxia', 'wuxia', '武侠', 'wuxia', 2, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'urban', 'urban', '都市', 'urban', 3, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'fantasy', 'fantasy', '玄幻', 'fantasy', 4, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'romance', 'romance', '言情', 'romance', 5, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'scifi', 'scifi', '科幻', 'scifi', 6, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'history', 'history', '历史', 'history', 7, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
+INSERT INTO dict_items (type_id, code, item_code, item_name, item_value, sort_order, is_active)
+SELECT dt.id, 'game', 'game', '游戏', 'game', 8, true FROM dict_types dt WHERE dt.code = 'novel_category' ON CONFLICT DO NOTHING;
 
 -- 修复完成
 SELECT '字典表结构修复和数据插入完成' AS status;
