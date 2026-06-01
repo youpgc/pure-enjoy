@@ -271,6 +271,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
             title: chapter.title,
             chapterOrder: chapter.chapterOrder,
             content: cachedContent,
+            createdAt: chapter.createdAt,
           );
           _isLoadingChapter = false;
         });

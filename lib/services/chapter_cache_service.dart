@@ -147,12 +147,12 @@ class ChapterCacheService {
 
   /// 获取某本小说的总缓存大小（字节数）
   int getCacheSize(String novelId) {
-    return getCachedChapters(novelId).fold(0, (sum, entry) => sum + entry.contentLength);
+    return getCachedChapters(novelId).fold<int>(0, (sum, entry) => sum + entry.contentLength);
   }
 
   /// 获取全部缓存大小（字节数）
   int getTotalCacheSize() {
-    return _index?.values.fold(0, (sum, entry) => sum + entry.contentLength) ?? 0;
+    return _index?.values.fold<int>(0, (sum, entry) => sum + entry.contentLength) ?? 0;
   }
 
   /// 格式化缓存大小
