@@ -1,6 +1,6 @@
 -- ============================================================
 -- 敏感词管理模块 - 数据库迁移
--- 包含: sensitive_words 表 + sensitive_word_logs 表
+-- 包含: sensitive_words 表 + sensitive_word_logs 表 + sensitive_word_configs 表
 -- ============================================================
 
 -- 1. 敏感词表
@@ -43,7 +43,7 @@ CREATE TABLE IF NOT EXISTS sensitive_word_logs (
   user_id VARCHAR(100),                     -- 触发用户ID
   content_snippet TEXT,                     -- 命中内容片段（截取前后各50字符）
   action_taken VARCHAR(20) NOT NULL,        -- 处理动作: blocked(已屏蔽), replaced(已替换), warned(已警告)
-  ip_address VARCHAR(50),                   -- 触发IP
+  ip_address VARCHAR(50),                    -- 触发IP
   created_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
 );
 
@@ -57,13 +57,21 @@ CREATE INDEX IF NOT EXISTS idx_swl_user_id ON sensitive_word_logs(user_id);
 COMMENT ON TABLE sensitive_word_logs IS '敏感词命中日志表';
 COMMENT ON COLUMN sensitive_word_logs.source IS '来源类型: novel_content-小说内容, user_comment-用户评论, user_nickname-用户昵称, user_bio-用户简介';
 
--- 3. 敏感词分类开关配置（使用 app_configs 表）
+-- 3. 敏感词分类开关配置表（独立的开关配置表）
+CREATE TABLE IF NOT EXISTS sensitive_word_configs (
+  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+  config_key VARCHAR(100) NOT NULL UNIQUE,  -- 配置键: novel_enabled, system_enabled
+  config_value VARCHAR(100) NOT NULL DEFAULT 'false',  -- 配置值
+  description TEXT,                          -- 配置描述
+  created_at TIMESTAMPTZ NOT NULL DEFAULT NOW(),
+  updated_at TIMESTAMPTZ NOT NULL DEFAULT NOW()
+);
+
 -- 插入默认开关配置
-INSERT INTO app_configs (key, value, description, created_at, updated_at)
-VALUES
-  ('sensitive_word_novel_enabled', 'false', '小说敏感词拦截开关', NOW(), NOW()),
-  ('sensitive_word_system_enabled', 'false', '系统敏感词拦截开关', NOW(), NOW())
-ON CONFLICT (key) DO NOTHING;
+INSERT INTO sensitive_word_configs (config_key, config_value, description) VALUES
+  ('novel_enabled', 'false', '小说敏感词拦截开关'),
+  ('system_enabled', 'false', '系统敏感词拦截开关')
+ON CONFLICT (config_key) DO NOTHING;
 
 -- 4. 插入示例敏感词（可选，便于测试）
 INSERT INTO sensitive_words (word, category, level, replace_word, description, match_mode, is_active, created_by) VALUES

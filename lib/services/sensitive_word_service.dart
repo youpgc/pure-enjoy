@@ -128,7 +128,7 @@ class SensitiveWordService {
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/app_configs?key=in.(sensitive_word_novel_enabled,sensitive_word_system_enabled)&select=key,value',
+          '${AppConfig.supabaseUrl}/rest/v1/sensitive_word_configs?select=config_key,config_value',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -139,10 +139,10 @@ class SensitiveWordService {
       if (response.statusCode == 200) {
         final List<dynamic> configs = jsonDecode(response.body);
         for (final config in configs) {
-          if (config['key'] == 'sensitive_word_novel_enabled') {
-            _novelEnabled = config['value'] == 'true';
-          } else if (config['key'] == 'sensitive_word_system_enabled') {
-            _systemEnabled = config['value'] == 'true';
+          if (config['config_key'] == 'novel_enabled') {
+            _novelEnabled = config['config_value'] == 'true';
+          } else if (config['config_key'] == 'system_enabled') {
+            _systemEnabled = config['config_value'] == 'true';
           }
         }
       }
