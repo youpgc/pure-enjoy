@@ -67,8 +67,8 @@ class DictItem {
       code: json['code'] as String,
       label: json['label'] as String,
       value: json['value'] as String?,
-      extra: json['extra'] != null
-          ? Map<String, dynamic>.from(json['extra'] as Map)
+      extra: json['extra_data'] != null
+          ? Map<String, dynamic>.from(json['extra_data'] as Map)
           : null,
       sortOrder: json['sort_order'] as int? ?? 0,
       isDefault: json['is_default'] as bool? ?? false,

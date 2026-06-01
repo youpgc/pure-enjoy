@@ -161,7 +161,11 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
+            'progress': 0,
+            'last_chapter': 0,
             'is_collected': true,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
           }),
         );
 

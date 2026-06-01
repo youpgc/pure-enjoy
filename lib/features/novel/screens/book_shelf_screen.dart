@@ -800,8 +800,11 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         body: jsonEncode({
           'user_id': userId,
           'novel_id': novelId,
-          'is_collected': true,
           'progress': 0,
+          'last_chapter': 0,
+          'is_collected': true,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         }),
       );
 

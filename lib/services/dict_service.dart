@@ -57,7 +57,7 @@ class DictService {
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/dict_items?dict_types!inner(code)=eq.$typeCode&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
+          '${AppConfig.supabaseUrl}/rest/v1/dict_items?dict_types!inner(code)=eq.$typeCode&select=id,type_id,code,label,value,extra_data,sort_order,is_default,status&order=sort_order.asc',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,

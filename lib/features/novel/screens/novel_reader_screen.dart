@@ -444,8 +444,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
-            'is_collected': true,
+            'progress': 0,
             'last_chapter': chapterNum,
+            'is_collected': true,
+            'created_at': DateTime.now().toUtc().toIso8601String(),
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
           }),
         );
 
@@ -488,8 +491,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
         body: jsonEncode({
           'user_id': userId,
           'novel_id': widget.novel.id,
-          'is_collected': true,
+          'progress': 0,
           'last_chapter': _currentChapter?.chapterOrder ?? 1,
+          'is_collected': true,
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
         }),
       );
 
