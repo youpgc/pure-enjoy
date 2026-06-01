@@ -94,13 +94,16 @@ CREATE INDEX IF NOT EXISTS idx_reading_progress_novel_id ON user_reading_progres
 -- ============================================================
 -- 3. 字典管理表 (V1.8.8)
 -- 用途: 数据字典服务，支持动态配置
+-- 注意: 表可能已存在，使用 ALTER TABLE 添加缺失列
+-- 实际 NOT NULL 列: dict_types(code,name,status) dict_items(type_id,code,label,status)
 -- ============================================================
 
--- 字典类型表
+-- 字典类型表（如已存在则跳过）
 CREATE TABLE IF NOT EXISTS dict_types (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
-    type_code VARCHAR(50) NOT NULL UNIQUE,
-    type_name VARCHAR(100) NOT NULL,
+    code VARCHAR(50) NOT NULL UNIQUE,
+    name VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
     description TEXT,
     sort_order INTEGER DEFAULT 0,
     is_system BOOLEAN DEFAULT false,
@@ -111,114 +114,151 @@ CREATE TABLE IF NOT EXISTS dict_types (
 
 COMMENT ON TABLE dict_types IS '字典类型表';
 
--- 字典项表
+-- 字典项表（如已存在则跳过）
 CREATE TABLE IF NOT EXISTS dict_items (
     id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
     type_id UUID NOT NULL REFERENCES dict_types(id) ON DELETE CASCADE,
-    item_code VARCHAR(50) NOT NULL,
-    item_name VARCHAR(100) NOT NULL,
-    item_value TEXT,
+    code VARCHAR(50) NOT NULL,
+    label VARCHAR(100) NOT NULL,
+    status VARCHAR(20) DEFAULT 'active',
+    description TEXT,
+    value TEXT,
     sort_order INTEGER DEFAULT 0,
     is_default BOOLEAN DEFAULT false,
     is_active BOOLEAN DEFAULT true,
     extra_data JSONB,
     created_at TIMESTAMPTZ DEFAULT NOW(),
-    updated_at TIMESTAMPTZ DEFAULT NOW(),
-    UNIQUE(type_id, item_code)
+    updated_at TIMESTAMPTZ DEFAULT NOW()
 );
 
 COMMENT ON TABLE dict_items IS '字典项表';
+
+-- 添加 App 需要的新列（如果不存在）
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_types' AND column_name = 'type_code') THEN
+        ALTER TABLE dict_types ADD COLUMN type_code VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_types' AND column_name = 'type_name') THEN
+        ALTER TABLE dict_types ADD COLUMN type_name VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_types' AND column_name = 'is_system') THEN
+        ALTER TABLE dict_types ADD COLUMN is_system BOOLEAN DEFAULT false;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_types' AND column_name = 'is_active') THEN
+        ALTER TABLE dict_types ADD COLUMN is_active BOOLEAN DEFAULT true;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_items' AND column_name = 'item_code') THEN
+        ALTER TABLE dict_items ADD COLUMN item_code VARCHAR(50);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_items' AND column_name = 'item_name') THEN
+        ALTER TABLE dict_items ADD COLUMN item_name VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_items' AND column_name = 'item_value') THEN
+        ALTER TABLE dict_items ADD COLUMN item_value TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'dict_items' AND column_name = 'extra_data') THEN
+        ALTER TABLE dict_items ADD COLUMN extra_data JSONB;
+    END IF;
+END $$;
+
+-- 回填新列
+UPDATE dict_types SET type_code = code, type_name = name WHERE type_code IS NULL;
+UPDATE dict_items SET item_code = code, item_name = label WHERE item_code IS NULL;
 
 -- 创建索引
 CREATE INDEX IF NOT EXISTS idx_dict_items_type_id ON dict_items(type_id);
 CREATE INDEX IF NOT EXISTS idx_dict_items_item_code ON dict_items(item_code);
 
--- 插入示例字典数据
--- 字典类型
-INSERT INTO dict_types (type_code, type_name, description, is_system) VALUES
-('expense_category', '消费分类', '记账消费分类', true),
-('mood_type', '心情类型', '心情记录类型', true),
-('novel_category', '小说分类', '小说分类', true)
-ON CONFLICT (type_code) DO NOTHING;
+-- 插入示例字典数据（使用实际列名 code/name/status）
+INSERT INTO dict_types (code, name, status, type_code, type_name, description, is_system) VALUES
+('expense_category', '消费分类', 'active', 'expense_category', '消费分类', '记账消费分类', true),
+('mood_type', '心情类型', 'active', 'mood_type', '心情类型', '心情记录类型', true),
+('novel_category', '小说分类', 'active', 'novel_category', '小说分类', '小说分类', true)
+ON CONFLICT (code) DO UPDATE SET
+    type_code = EXCLUDED.type_code,
+    type_name = EXCLUDED.type_name,
+    description = EXCLUDED.description,
+    is_system = EXCLUDED.is_system;
 
 -- 消费分类
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'food', '餐饮', 'food', 1 FROM dict_types WHERE type_code = 'expense_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'food', '餐饮', 'active', 'food', '餐饮', 'food', 1 FROM dict_types WHERE code = 'expense_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'transport', '交通', 'transport', 2 FROM dict_types WHERE type_code = 'expense_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'transport', '交通', 'active', 'transport', '交通', 'transport', 2 FROM dict_types WHERE code = 'expense_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'shopping', '购物', 'shopping', 3 FROM dict_types WHERE type_code = 'expense_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'shopping', '购物', 'active', 'shopping', '购物', 'shopping', 3 FROM dict_types WHERE code = 'expense_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'entertainment', '娱乐', 'entertainment', 4 FROM dict_types WHERE type_code = 'expense_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'entertainment', '娱乐', 'active', 'entertainment', '娱乐', 'entertainment', 4 FROM dict_types WHERE code = 'expense_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'housing', '居住', 'housing', 5 FROM dict_types WHERE type_code = 'expense_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'housing', '居住', 'active', 'housing', '居住', 'housing', 5 FROM dict_types WHERE code = 'expense_category'
+ON CONFLICT DO NOTHING;
 
 -- 心情类型
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'happy', '开心', 'happy', 1 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'happy', '开心', 'active', 'happy', '开心', 'happy', 1 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'excited', '兴奋', 'excited', 2 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'excited', '兴奋', 'active', 'excited', '兴奋', 'excited', 2 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'calm', '平静', 'calm', 3 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'calm', '平静', 'active', 'calm', '平静', 'calm', 3 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'tired', '疲惫', 'tired', 4 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'tired', '疲惫', 'active', 'tired', '疲惫', 'tired', 4 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'sad', '难过', 'sad', 5 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'sad', '难过', 'active', 'sad', '难过', 'sad', 5 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'angry', '生气', 'angry', 6 FROM dict_types WHERE type_code = 'mood_type'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'angry', '生气', 'active', 'angry', '生气', 'angry', 6 FROM dict_types WHERE code = 'mood_type'
+ON CONFLICT DO NOTHING;
 
 -- 小说分类
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'xianxia', '仙侠', 'xianxia', 1 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'xianxia', '仙侠', 'active', 'xianxia', '仙侠', 'xianxia', 1 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'wuxia', '武侠', 'wuxia', 2 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'wuxia', '武侠', 'active', 'wuxia', '武侠', 'wuxia', 2 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'urban', '都市', 'urban', 3 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'urban', '都市', 'active', 'urban', '都市', 'urban', 3 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'fantasy', '玄幻', 'fantasy', 4 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'fantasy', '玄幻', 'active', 'fantasy', '玄幻', 'fantasy', 4 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'romance', '言情', 'romance', 5 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'romance', '言情', 'active', 'romance', '言情', 'romance', 5 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'scifi', '科幻', 'scifi', 6 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'scifi', '科幻', 'active', 'scifi', '科幻', 'scifi', 6 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'history', '历史', 'history', 7 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'history', '历史', 'active', 'history', '历史', 'history', 7 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
-INSERT INTO dict_items (type_id, item_code, item_name, item_value, sort_order) 
-SELECT id, 'game', '游戏', 'game', 8 FROM dict_types WHERE type_code = 'novel_category'
-ON CONFLICT (type_id, item_code) DO NOTHING;
+INSERT INTO dict_items (type_id, code, label, status, item_code, item_name, item_value, sort_order) 
+SELECT id, 'game', '游戏', 'active', 'game', '游戏', 'game', 8 FROM dict_types WHERE code = 'novel_category'
+ON CONFLICT DO NOTHING;
 
 
 -- ============================================================
