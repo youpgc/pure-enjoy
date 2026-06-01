@@ -269,7 +269,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
             id: chapter.id,
             novelId: chapter.novelId,
             title: chapter.title,
-            chapterNum: chapter.chapterNum,
+            chapterOrder: chapter.chapterOrder,
             content: cachedContent,
           );
           _isLoadingChapter = false;
@@ -311,7 +311,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
               chapterId: _currentChapter!.id,
               novelId: widget.novel.id,
               title: _currentChapter!.title,
-              chapterNum: _currentChapter!.chapterNum,
+              chapterOrder: _currentChapter!.chapterOrder,
               content: _currentChapter!.content!,
             );
           }
@@ -365,7 +365,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
               chapterId: _nextChapterCache!.id,
               novelId: widget.novel.id,
               title: _nextChapterCache!.title,
-              chapterNum: _nextChapterCache!.chapterNum,
+              chapterOrder: _nextChapterCache!.chapterOrder,
               content: _nextChapterCache!.content!,
             );
           }

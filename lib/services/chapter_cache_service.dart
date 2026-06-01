@@ -4,51 +4,51 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 缓存条目
+class _CacheEntry {
+  final String chapterId;
+  final String novelId;
+  final String title;
+  final int chapterOrder;
+  final int contentLength;
+  final DateTime cachedAt;
+
+  _CacheEntry({
+    required this.chapterId,
+    required this.novelId,
+    required this.title,
+    required this.chapterOrder,
+    required this.contentLength,
+    required this.cachedAt,
+  });
+
+  Map<String, dynamic> toJson() => {
+    'chapter_id': chapterId,
+    'novel_id': novelId,
+    'title': title,
+    'chapter_order': chapterOrder,
+    'content_length': contentLength,
+    'cached_at': cachedAt.toIso8601String(),
+  };
+
+  factory _CacheEntry.fromJson(Map<String, dynamic> json) => _CacheEntry(
+    chapterId: json['chapter_id'] as String,
+    novelId: json['novel_id'] as String,
+    title: json['title'] as String,
+    chapterOrder: json['chapter_order'] as int,
+    contentLength: json['content_length'] as int,
+    cachedAt: DateTime.parse(json['cached_at'] as String),
+  );
+}
+
 /// 章节缓存服务
 /// 将小说章节内容缓存到本地文件，支持离线阅读
 class ChapterCacheService {
   ChapterCacheService._();
-  static final ChapterCacheService instance = ChapterCacheService();
+  static final ChapterCacheService instance = ChapterCacheService._();
 
   static const String _cacheIndexKey = 'chapter_cache_index';
   Map<String, _CacheEntry>? _index;
-
-  /// 缓存条目
-  class _CacheEntry {
-    final String chapterId;
-    final String novelId;
-    final String title;
-    final int chapterNum;
-    final int contentLength;
-    final DateTime cachedAt;
-
-    _CacheEntry({
-      required this.chapterId,
-      required this.novelId,
-      required this.title,
-      required this.chapterNum,
-      required this.contentLength,
-      required this.cachedAt,
-    });
-
-    Map<String, dynamic> toJson() => {
-      'chapter_id': chapterId,
-      'novel_id': novelId,
-      'title': title,
-      'chapter_num': chapterNum,
-      'content_length': contentLength,
-      'cached_at': cachedAt.toIso8601String(),
-    };
-
-    factory _CacheEntry.fromJson(Map<String, dynamic> json) => _CacheEntry(
-      chapterId: json['chapter_id'] as String,
-      novelId: json['novel_id'] as String,
-      title: json['title'] as String,
-      chapterNum: json['chapter_num'] as int,
-      contentLength: json['content_length'] as int,
-      cachedAt: DateTime.parse(json['cached_at'] as String),
-    );
-  }
 
   /// 初始化缓存索引
   Future<void> initialize() async {
@@ -86,7 +86,7 @@ class ChapterCacheService {
     required String chapterId,
     required String novelId,
     required String title,
-    required int chapterNum,
+    required int chapterOrder,
     required String content,
   }) async {
     try {
@@ -100,7 +100,7 @@ class ChapterCacheService {
         chapterId: chapterId,
         novelId: novelId,
         title: title,
-        chapterNum: chapterNum,
+        chapterOrder: chapterOrder,
         contentLength: content.length,
         cachedAt: DateTime.now(),
       );
@@ -137,7 +137,7 @@ class ChapterCacheService {
     return _index!.values
         .where((entry) => entry.novelId == novelId)
         .toList()
-      ..sort((a, b) => a.chapterNum.compareTo(b.chapterNum));
+      ..sort((a, b) => a.chapterOrder.compareTo(b.chapterOrder));
   }
 
   /// 获取某本小说的缓存章节数

@@ -228,7 +228,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                 chapterId: chapter.id,
                 novelId: widget.novel.id,
                 title: chapter.title,
-                chapterNum: chapter.chapterNum,
+                chapterOrder: chapter.chapterOrder,
                 content: content,
               );
               downloaded++;
