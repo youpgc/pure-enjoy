@@ -61,8 +61,8 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
-      debugPrint('📱 通知权限: ${granted ? "已授权" : "未授权"}');
-      return granted;
+      debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      return granted == true;
     }
 
     final iosPlugin = _plugin.resolvePlatformSpecificImplementation<
@@ -73,8 +73,8 @@ class NotificationService {
         badge: true,
         sound: true,
       );
-      debugPrint('📱 通知权限: ${granted ?? false ? "已授权" : "未授权"}');
-      return granted ?? false;
+      debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      return granted == true;
     }
 
     return true;
