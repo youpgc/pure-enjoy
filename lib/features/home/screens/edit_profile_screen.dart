@@ -23,11 +23,19 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _nicknameController = TextEditingController();
   final _emailController = TextEditingController();
   final _phoneController = TextEditingController();
+  final _usernameController = TextEditingController();
+  final _bioController = TextEditingController();
+  final _locationController = TextEditingController();
+  final _birthdayController = TextEditingController();
+  final _occupationController = TextEditingController();
+  final _companyController = TextEditingController();
+  final _websiteController = TextEditingController();
 
   // 用户数据
   Map<String, dynamic>? _userData;
   String? _userId;
   String? _avatarUrl;
+  String? _gender;
   bool _isUploadingAvatar = false;
 
   @override
@@ -41,6 +49,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nicknameController.dispose();
     _emailController.dispose();
     _phoneController.dispose();
+    _usernameController.dispose();
+    _bioController.dispose();
+    _locationController.dispose();
+    _birthdayController.dispose();
+    _occupationController.dispose();
+    _companyController.dispose();
+    _websiteController.dispose();
     super.dispose();
   }
 
@@ -92,6 +107,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _nicknameController.text = _userData!['nickname'] ?? '';
     _emailController.text = _userData!['email'] ?? '';
     _phoneController.text = _userData!['phone'] ?? '';
+    _usernameController.text = _userData!['username'] ?? '';
+    _bioController.text = _userData!['bio'] ?? '';
+    _locationController.text = _userData!['location'] ?? '';
+    _birthdayController.text = _userData!['birthday'] ?? '';
+    _occupationController.text = _userData!['occupation'] ?? '';
+    _companyController.text = _userData!['company'] ?? '';
+    _websiteController.text = _userData!['website'] ?? '';
+    _gender = _userData!['gender'] ?? '保密';
     _avatarUrl = _userData!['avatar_url'];
   }
 
@@ -113,7 +136,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final file = File(image.path);
       final fileExt = image.path.split('.').last;
       final fileName = '${_userId}_${DateTime.now().millisecondsSinceEpoch}.$fileExt';
-      final filePath = 'avatars/$fileName';
 
       // 读取文件字节
       final bytes = await file.readAsBytes();
@@ -166,6 +188,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     }
   }
 
+  /// 选择生日
+  Future<void> _selectBirthday() async {
+    final DateTime? picked = await showDatePicker(
+      context: context,
+      initialDate: _birthdayController.text.isNotEmpty
+          ? DateTime.tryParse(_birthdayController.text) ?? DateTime(2000)
+          : DateTime(2000),
+      firstDate: DateTime(1900),
+      lastDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        _birthdayController.text = picked.toIso8601String().split('T')[0];
+      });
+    }
+  }
+
+  /// 选择性别
+  void _selectGender() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              title: const Text('男'),
+              leading: const Icon(Icons.male),
+              onTap: () {
+                setState(() => _gender = '男');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('女'),
+              leading: const Icon(Icons.female),
+              onTap: () {
+                setState(() => _gender = '女');
+                Navigator.pop(context);
+              },
+            ),
+            ListTile(
+              title: const Text('保密'),
+              leading: const Icon(Icons.lock_outline),
+              onTap: () {
+                setState(() => _gender = '保密');
+                Navigator.pop(context);
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
   /// 保存用户资料
   Future<void> _saveProfile() async {
     if (!_formKey.currentState!.validate()) return;
@@ -177,6 +254,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'nickname': _nicknameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': _phoneController.text.trim(),
+        'username': _usernameController.text.trim(),
+        'bio': _bioController.text.trim(),
+        'location': _locationController.text.trim(),
+        'birthday': _birthdayController.text.trim(),
+        'gender': _gender ?? '保密',
+        'occupation': _occupationController.text.trim(),
+        'company': _companyController.text.trim(),
+        'website': _websiteController.text.trim(),
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
@@ -294,6 +379,12 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     icon: Icons.person_outline,
                   ),
                   _buildTextField(
+                    controller: _usernameController,
+                    label: '用户名',
+                    hint: '请输入用户名',
+                    icon: Icons.account_circle_outlined,
+                  ),
+                  _buildTextField(
                     controller: _emailController,
                     label: '邮箱',
                     hint: '请输入邮箱',
@@ -306,6 +397,61 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     hint: '请输入手机号',
                     icon: Icons.phone_outlined,
                     keyboardType: TextInputType.phone,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 个人简介
+                  _buildSectionTitle('个人简介'),
+                  _buildTextField(
+                    controller: _bioController,
+                    label: '个性签名',
+                    hint: '介绍一下自己',
+                    icon: Icons.edit_note_outlined,
+                    maxLines: 3,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 个人信息
+                  _buildSectionTitle('个人信息'),
+                  _buildGenderSelector(),
+                  _buildDatePickerField(
+                    controller: _birthdayController,
+                    label: '生日',
+                    hint: '选择生日',
+                    icon: Icons.cake_outlined,
+                    onTap: _selectBirthday,
+                  ),
+                  _buildTextField(
+                    controller: _locationController,
+                    label: '所在地',
+                    hint: '请输入所在城市',
+                    icon: Icons.location_on_outlined,
+                  ),
+
+                  const SizedBox(height: 16),
+
+                  // 职业信息
+                  _buildSectionTitle('职业信息'),
+                  _buildTextField(
+                    controller: _occupationController,
+                    label: '职业',
+                    hint: '请输入职业',
+                    icon: Icons.work_outline,
+                  ),
+                  _buildTextField(
+                    controller: _companyController,
+                    label: '公司/组织',
+                    hint: '请输入公司或组织名称',
+                    icon: Icons.business_outlined,
+                  ),
+                  _buildTextField(
+                    controller: _websiteController,
+                    label: '个人网站',
+                    hint: 'https://example.com',
+                    icon: Icons.link_outlined,
+                    keyboardType: TextInputType.url,
                   ),
                 ],
               ),
@@ -344,6 +490,53 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           hintText: hint,
           prefixIcon: Icon(icon),
           border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildDatePickerField({
+    required TextEditingController controller,
+    required String label,
+    required String hint,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: TextFormField(
+        controller: controller,
+        readOnly: true,
+        onTap: onTap,
+        decoration: InputDecoration(
+          labelText: label,
+          hintText: hint,
+          prefixIcon: Icon(icon),
+          suffixIcon: const Icon(Icons.arrow_drop_down),
+          border: const OutlineInputBorder(),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildGenderSelector() {
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 16),
+      child: InkWell(
+        onTap: _selectGender,
+        child: InputDecorator(
+          decoration: InputDecoration(
+            labelText: '性别',
+            prefixIcon: const Icon(Icons.people_outline),
+            suffixIcon: const Icon(Icons.arrow_drop_down),
+            border: const OutlineInputBorder(),
+          ),
+          child: Text(
+            _gender ?? '保密',
+            style: TextStyle(
+              color: _gender == null ? Colors.grey : null,
+            ),
+          ),
         ),
       ),
     );

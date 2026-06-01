@@ -437,6 +437,41 @@ ON CONFLICT (id) DO NOTHING;
 
 
 -- ============================================================
+-- 5. users 表扩展字段 (V1.9.2)
+-- 用途: 个人资料扩展（用户名、签名、性别、生日、地区、职业等）
+-- ============================================================
+
+-- 添加 users 表扩展字段
+DO $$
+BEGIN
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'username') THEN
+        ALTER TABLE users ADD COLUMN username VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'bio') THEN
+        ALTER TABLE users ADD COLUMN bio TEXT;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'gender') THEN
+        ALTER TABLE users ADD COLUMN gender VARCHAR(10) DEFAULT '保密';
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'birthday') THEN
+        ALTER TABLE users ADD COLUMN birthday DATE;
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'location') THEN
+        ALTER TABLE users ADD COLUMN location VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'occupation') THEN
+        ALTER TABLE users ADD COLUMN occupation VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'company') THEN
+        ALTER TABLE users ADD COLUMN company VARCHAR(100);
+    END IF;
+    IF NOT EXISTS (SELECT 1 FROM information_schema.columns WHERE table_name = 'users' AND column_name = 'website') THEN
+        ALTER TABLE users ADD COLUMN website VARCHAR(255);
+    END IF;
+END $$;
+
+
+-- ============================================================
 -- 迁移完成
 -- ============================================================
 
@@ -449,3 +484,4 @@ SELECT '- user_novels (用户书架关联表)' AS table_name;
 SELECT '- dict_types (字典类型表)' AS table_name;
 SELECT '- dict_items (字典项表)' AS table_name;
 SELECT '- user_habits (习惯表 - 新增提醒字段)' AS table_name;
+SELECT '- users (用户表 - 新增个人资料扩展字段)' AS table_name;
