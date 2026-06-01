@@ -92,7 +92,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/expenses'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(expense.toJson()),
       );
 
@@ -140,7 +140,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -169,7 +169,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.${expense.id}'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({
           'amount': expense.amount,
           'category': expense.category,

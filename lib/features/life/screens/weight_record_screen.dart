@@ -74,7 +74,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(record.toJson()),
       );
 
@@ -122,7 +122,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -151,7 +151,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.${record.id}'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({
           'weight': record.weight,
           'bmi': record.bmi,

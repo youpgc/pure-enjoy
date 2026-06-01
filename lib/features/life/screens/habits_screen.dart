@@ -112,7 +112,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       final checkinId = const Uuid().v4();
       final checkinResponse = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({
           'id': checkinId,
           'habit_id': habit.id,
@@ -162,13 +162,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
         // 先删除打卡记录
         await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins?habit_id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         // 再删除习惯
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -287,7 +287,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   if (isEditing) {
                     final response = await http.patch(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.${habit.id}'),
-                      headers: SupabaseConfig.headers,
+                      headers: SupabaseConfig.writeHeaders,
                       body: jsonEncode({
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
@@ -315,7 +315,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     final habitId = const Uuid().v4();
                     final response = await http.post(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits'),
-                      headers: SupabaseConfig.headers,
+                      headers: SupabaseConfig.writeHeaders,
                       body: jsonEncode({
                         'id': habitId,
                         'user_id': userId,

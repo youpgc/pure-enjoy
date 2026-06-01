@@ -10,11 +10,19 @@ class SupabaseConfig {
   static const String url = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
   static const String anonKey = 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
 
+  /// 基础请求头（查询用）
   static Map<String, String> get headers => {
     'apikey': anonKey,
     'Authorization': 'Bearer $anonKey',
     'Content-Type': 'application/json',
-    'Prefer': 'return=representation',
+  };
+
+  /// 写入请求头（INSERT/UPDATE/DELETE 用，要求返回数据）
+  static Map<String, String> get writeHeaders => {
+    'apikey': anonKey,
+    'Authorization': 'Bearer $anonKey',
+    'Content-Type': 'application/json',
+    'Prefer': 'return=minimal',
   };
 }
 
@@ -130,7 +138,7 @@ class AuthService {
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
           ),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
           body: jsonEncode({
             'last_login_at': DateTime.now().toUtc().toIso8601String(),
             'login_count': (user['login_count'] ?? 0) + 1,
@@ -186,7 +194,7 @@ class AuthService {
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
           ),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
           body: jsonEncode({
             'last_login_at': DateTime.now().toUtc().toIso8601String(),
             'login_count': (user['login_count'] ?? 0) + 1,
@@ -241,7 +249,7 @@ class AuthService {
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
           ),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
           body: jsonEncode({
             'last_login_at': DateTime.now().toUtc().toIso8601String(),
             'login_count': (user['login_count'] ?? 0) + 1,
@@ -302,7 +310,7 @@ class AuthService {
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
           ),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
           body: jsonEncode({
             'last_login_at': DateTime.now().toUtc().toIso8601String(),
             'login_count': (user['login_count'] ?? 0) + 1,
@@ -347,7 +355,7 @@ class AuthService {
           final userId = users[0]['id'];
           final updateResponse = await http.patch(
             Uri.parse('${SupabaseConfig.url}/rest/v1/users?id=eq.$userId'),
-            headers: SupabaseConfig.headers,
+            headers: SupabaseConfig.writeHeaders,
             body: jsonEncode({
               'sms_code': code,
               'sms_code_expires_at': expiresAt,
@@ -411,7 +419,7 @@ class AuthService {
 
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/users'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(userData),
       );
 

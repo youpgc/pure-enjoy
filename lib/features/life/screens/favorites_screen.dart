@@ -107,7 +107,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -230,26 +230,27 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   if (isEditing) {
                     final response = await http.patch(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.${favorite.id}'),
-                      headers: SupabaseConfig.headers,
+                      headers: SupabaseConfig.writeHeaders,
                       body: jsonEncode({
                         'title': newFavorite.title,
                         'url': newFavorite.url,
                         'description': newFavorite.description,
                         'category': newFavorite.category,
                         'tags': newFavorite.tags,
+                        'updated_at': DateTime.now().toUtc().toIso8601String(),
                       }),
                     );
                     if (response.statusCode != 200 && response.statusCode != 204) {
-                      throw Exception('HTTP ${response.statusCode}');
+                      throw Exception('HTTP ${response.statusCode}: ${response.body}');
                     }
                   } else {
                     final response = await http.post(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites'),
-                      headers: SupabaseConfig.headers,
+                      headers: SupabaseConfig.writeHeaders,
                       body: jsonEncode(newFavorite.toJson()),
                     );
                     if (response.statusCode != 201 && response.statusCode != 200) {
-                      throw Exception('HTTP ${response.statusCode}');
+                      throw Exception('HTTP ${response.statusCode}: ${response.body}');
                     }
                   }
                   Navigator.pop(context);

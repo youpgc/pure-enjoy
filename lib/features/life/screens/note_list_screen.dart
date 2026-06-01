@@ -75,7 +75,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/notes'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(note.toJson()),
       );
 
@@ -104,7 +104,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(note.toJsonForUpdate()),
       );
 
@@ -152,7 +152,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -181,7 +181,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       final updated = note.copyWith(isPinned: !note.isPinned);
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({'is_pinned': updated.isPinned}),
       );
 

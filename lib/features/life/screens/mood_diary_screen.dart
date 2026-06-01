@@ -74,7 +74,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode(diary.toJson()),
       );
 
@@ -122,7 +122,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.$id'),
-          headers: SupabaseConfig.headers,
+          headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -151,7 +151,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.${diary.id}'),
-        headers: SupabaseConfig.headers,
+        headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({
           'mood': diary.mood,
           'mood_label': diary.moodScore.toString(),
