@@ -405,39 +405,26 @@ class SensitiveWordService {
     }
   }
 
-  /// 增加敏感词命中次数
+  /// 增加敏感词命中次数（使用 RPC 原子更新）
   Future<void> _incrementHitCount(String wordId) async {
     try {
-      // 先获取当前次数
-      final getResponse = await http.get(
+      // 使用 RPC 函数原子更新命中次数，避免 N+1 查询问题
+      final response = await http.post(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/sensitive_words?id=eq.$wordId&select=hit_count',
+          '${AppConfig.supabaseUrl}/rest/v1/rpc/increment_sensitive_word_hit_count',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({
+          'word_id': wordId,
+        }),
       );
 
-      if (getResponse.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(getResponse.body);
-        if (data.isNotEmpty) {
-          final currentCount = data.first['hit_count'] as int? ?? 0;
-          await http.patch(
-            Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/sensitive_words?id=eq.$wordId',
-            ),
-            headers: {
-              'apikey': AppConfig.supabaseAnonKey,
-              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-              'Content-Type': 'application/json',
-            },
-            body: jsonEncode({
-              'hit_count': currentCount + 1,
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            }),
-          );
-        }
+      if (response.statusCode != 200) {
+        debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('❌ 更新命中次数失败: $e');
