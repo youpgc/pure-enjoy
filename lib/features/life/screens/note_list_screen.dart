@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面 - Supabase 数据同步
@@ -334,6 +334,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                               ),
                                             )).toList(),
                                           ),
+                                        const SizedBox(height: 4),
+                                        Text(
+                                          DateTimeUtils.formatStandard(note.createdAt),
+                                          style: TextStyle(
+                                            fontSize: 10,
+                                            color: colorScheme.outline.withOpacity(0.7),
+                                          ),
+                                        ),
                                       ],
                                     ),
                                   ),

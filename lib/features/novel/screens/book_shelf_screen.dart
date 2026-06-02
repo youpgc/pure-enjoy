@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
@@ -460,7 +461,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
       if (diff.inHours < 24) return '${diff.inHours}小时前';
       if (diff.inDays < 7) return '${diff.inDays}天前';
-      return '${dateTime.month}-${dateTime.day}';
+      return DateTimeUtils.formatStandard(dateTime);
     } catch (e) {
       return '';
     }

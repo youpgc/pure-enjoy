@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/habit_model.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
@@ -374,7 +374,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     final checkin = checkins[index];
                     return ListTile(
                       leading: const Icon(Icons.check_circle, color: Colors.green),
-                      title: Text(DateFormat('yyyy-MM-dd').format(checkin.checkinAt)),
+                      title: Text(DateTimeUtils.formatStandard(checkin.checkinAt)),
                     );
                   },
                 ),

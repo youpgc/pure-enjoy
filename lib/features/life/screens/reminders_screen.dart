@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/reminder_model.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
@@ -278,7 +279,7 @@ class ReminderCard extends StatelessWidget {
               Text(reminder.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
             const SizedBox(height: 4),
             Text(
-              '${reminder.remindAt.month}/${reminder.remindAt.day} ${reminder.remindAt.hour}:${reminder.remindAt.minute.toString().padLeft(2, '0')}',
+              DateTimeUtils.formatStandard(reminder.remindAt),
               style: TextStyle(
                 color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
                     ? Colors.red
@@ -358,7 +359,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
               const SizedBox(height: 16),
               ListTile(
                 title: const Text('提醒时间'),
-                subtitle: Text('${_remindAt.month}/${_remindAt.day} ${_remindAt.hour}:${_remindAt.minute.toString().padLeft(2, '0')}'),
+                subtitle: Text(DateTimeUtils.formatStandard(_remindAt)),
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
                   final date = await showDatePicker(

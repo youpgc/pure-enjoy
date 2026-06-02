@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/weight_record_model.dart';
 
 /// 体重记录页面 - Supabase 数据同步
@@ -328,7 +328,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                 subtitle: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Text(DateFormat('yyyy-MM-dd').format(record.date)),
+                                    Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
                                     if (record.note != null && record.note!.isNotEmpty)
                                       Text(
                                         record.note!,
@@ -525,7 +525,7 @@ class _RecordFormState extends State<_RecordForm> {
             ListTile(
               contentPadding: EdgeInsets.zero,
               title: const Text('日期'),
-              trailing: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,

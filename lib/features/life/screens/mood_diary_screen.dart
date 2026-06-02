@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/mood_diary_model.dart';
 
 /// 心情日记页面 - Supabase 数据同步
@@ -264,7 +264,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                                   ),
                                   const Spacer(),
                                   Text(
-                                    DateFormat('MM-dd').format(diary.entryDate),
+                                    DateTimeUtils.formatStandard(diary.createdAt ?? diary.entryDate),
                                     style: Theme.of(context).textTheme.bodySmall,
                                   ),
                                   PopupMenuButton<String>(
@@ -468,7 +468,7 @@ class _DiaryFormState extends State<_DiaryForm> {
           ListTile(
             contentPadding: EdgeInsets.zero,
             title: const Text('日期'),
-            trailing: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+            trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
             onTap: () async {
               final picked = await showDatePicker(
                 context: context,

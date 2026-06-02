@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/favorite_model.dart';
 
 /// 收藏夹页面 - Supabase 数据同步
@@ -453,6 +454,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                         overflow: TextOverflow.ellipsis,
                                       ),
                                     ],
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      DateTimeUtils.formatStandard(favorite.createdAt),
+                                      style: TextStyle(
+                                        fontSize: 11,
+                                        color: colorScheme.outline.withOpacity(0.7),
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),

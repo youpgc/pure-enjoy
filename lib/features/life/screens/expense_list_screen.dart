@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
-import 'package:intl/intl.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/expense_model.dart';
 
 /// 支出列表页面 - Supabase 数据同步
@@ -271,7 +271,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  DateFormat('yyyy年MM月').format(_selectedMonth),
+                  '${_selectedMonth.year}年${_selectedMonth.month.toString().padLeft(2, '0')}月',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
@@ -335,7 +335,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                               leading: Icon(category.icon),
                               title: Text(category.label),
                               subtitle: Text(
-                                '${DateFormat('MM-dd').format(expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
+                                '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
                               ),
                               trailing: Row(
                                 mainAxisSize: MainAxisSize.min,
@@ -554,7 +554,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             // 日期选择
             ListTile(
               title: const Text('日期'),
-              trailing: Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
