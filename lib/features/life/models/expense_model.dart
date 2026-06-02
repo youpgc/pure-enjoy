@@ -40,7 +40,7 @@ class ExpenseModel {
       'category': category,
       'note': note,
       'date': date.toIso8601String().split('T').first,
-      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
+      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID
     if (id.isNotEmpty) {

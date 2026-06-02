@@ -92,8 +92,8 @@ class NovelModel {
       'rating': rating,
       'read_count': readCount,
       'collect_count': collectCount,
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt?.toUtc().toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID
     if (id.isNotEmpty) {
@@ -152,7 +152,7 @@ class NovelChapterModel {
       'word_count': wordCount,
       'is_free': isFree,
       'price': price,
-      'created_at': createdAt.toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID
     if (id.isNotEmpty) {
@@ -210,9 +210,9 @@ class ReadingProgressModel {
       'progress': progress,
       'last_chapter': lastChapter,
       'is_collected': isCollected,
-      'last_read_at': lastReadAt.toIso8601String(),
-      'created_at': createdAt.toIso8601String(),
-      'updated_at': updatedAt?.toIso8601String(),
+      'last_read_at': lastReadAt.toUtc().toIso8601String(),
+      'created_at': createdAt.toUtc().toIso8601String(),
+      'updated_at': updatedAt?.toUtc().toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID
     if (id.isNotEmpty) {

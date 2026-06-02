@@ -27,10 +27,10 @@ class ReminderModel {
       userId: json['user_id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
-      remindAt: DateTime.parse(json['remind_at'] as String),
+      remindAt: DateTime.parse(json['remind_at'] as String).toLocal(),
       isCompleted: json['is_completed'] as bool? ?? false,
       priority: json['priority'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : null,
     );
   }
 
@@ -42,7 +42,7 @@ class ReminderModel {
       'remind_at': remindAt.toUtc().toIso8601String(),
       'is_completed': isCompleted,
       'priority': priority,
-      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
+      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

@@ -116,7 +116,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         body: jsonEncode({
           'id': checkinId,
           'habit_id': habit.id,
-          'checkin_at': today.toIso8601String(),
+          'checkin_at': today.toUtc().toIso8601String(),
         }),
       );
 

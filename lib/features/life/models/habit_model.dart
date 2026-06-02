@@ -67,7 +67,7 @@ class HabitModel {
       'total_checkins': totalCheckins,
       'color': color,
       'is_active': isActive,
-      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
+      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;
@@ -145,7 +145,7 @@ class HabitCheckinModel {
     return HabitCheckinModel(
       id: json['id'] as String,
       habitId: json['habit_id'] as String,
-      checkinAt: DateTime.parse(json['checkin_at'] as String),
+      checkinAt: DateTime.parse(json['checkin_at'] as String).toLocal(),
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -153,8 +153,8 @@ class HabitCheckinModel {
   Map<String, dynamic> toJson() {
     final json = <String, dynamic>{
       'habit_id': habitId,
-      'checkin_at': checkinAt.toIso8601String(),
-      'created_at': (createdAt ?? DateTime.now()).toIso8601String(),
+      'checkin_at': checkinAt.toUtc().toIso8601String(),
+      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;
