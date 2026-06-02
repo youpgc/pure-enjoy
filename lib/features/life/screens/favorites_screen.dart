@@ -227,10 +227,18 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 );
 
                 try {
+                  // 构建请求头
+                  final headers = {
+                    'apikey': SupabaseConfig.anonKey,
+                    'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
+                  };
+
                   if (isEditing) {
                     final response = await http.patch(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.${favorite.id}'),
-                      headers: SupabaseConfig.writeHeaders,
+                      headers: headers,
                       body: jsonEncode({
                         'title': newFavorite.title,
                         'url': newFavorite.url,
@@ -244,11 +252,26 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       throw Exception('HTTP ${response.statusCode}: ${response.body}');
                     }
                   } else {
+                    // 新增：手动构建 JSON，确保字段正确
+                    final body = jsonEncode({
+                      'id': newFavorite.id,
+                      'user_id': newFavorite.userId,
+                      'title': newFavorite.title,
+                      'url': newFavorite.url,
+                      'description': newFavorite.description,
+                      'category': newFavorite.category,
+                      'tags': newFavorite.tags,
+                      'is_pinned': newFavorite.isPinned,
+                      'created_at': DateTime.now().toUtc().toIso8601String(),
+                    });
+                    debugPrint('📤 新增收藏请求体: $body');
+                    
                     final response = await http.post(
                       Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites'),
-                      headers: SupabaseConfig.writeHeaders,
-                      body: jsonEncode(newFavorite.toJson()),
+                      headers: headers,
+                      body: body,
                     );
+                    debugPrint('📥 新增收藏响应: ${response.statusCode} - ${response.body}');
                     if (response.statusCode != 201 && response.statusCode != 200) {
                       throw Exception('HTTP ${response.statusCode}: ${response.body}');
                     }
