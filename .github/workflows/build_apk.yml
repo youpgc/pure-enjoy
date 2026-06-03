@@ -5,23 +5,6 @@ on:
     branches: [main, master, develop]
     tags: ['v*']
   workflow_dispatch:
-    inputs:
-      version:
-        description: '版本号 (如: 1.0.0)'
-        required: true
-        default: '1.0.0'
-      build_number:
-        description: '构建号 (如: 1)'
-        required: true
-        default: '1'
-      release_notes:
-        description: '更新说明'
-        required: false
-        default: ''
-      is_force_update:
-        description: '强制更新'
-        required: false
-        default: 'false'
 
 env:
   FLUTTER_VERSION: '3.24.0'
@@ -81,16 +64,12 @@ jobs:
       - name: Extract and increment version
         id: version
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            # 手动触发：使用输入的版本号
-            VERSION="${{ github.event.inputs.version }}"
-            BUILD_NUMBER="${{ github.event.inputs.build_number }}"
-          elif [[ "${{ github.ref }}" == refs/tags/v* ]]; then
+          if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
             # 标签触发：从标签提取版本
             VERSION=${GITHUB_REF#refs/tags/v}
             BUILD_NUMBER=$(git rev-list --count HEAD)
           else
-            # 自动触发（push）：读取当前版本并自动迭代
+            # push 或 workflow_dispatch：读取当前版本并自动迭代
             CURRENT_VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
             CURRENT_BUILD=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
             
@@ -100,7 +79,6 @@ jobs:
             PATCH=$(echo $CURRENT_VERSION | cut -d'.' -f3)
             
             # 自动递增修订号（patch）和构建号
-            # 规则：v1.9.3+45 → v1.9.4+46
             NEW_PATCH=$((PATCH + 1))
             NEW_BUILD=$((CURRENT_BUILD + 1))
             
@@ -236,22 +214,12 @@ jobs:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          RELEASE_NOTES="${{ github.event.inputs.release_notes }}"
-          if [ -z "$RELEASE_NOTES" ]; then
-            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
-          fi
-          
-          IS_FORCE_UPDATE="${{ github.event.inputs.is_force_update }}"
-          [ -z "$IS_FORCE_UPDATE" ] && IS_FORCE_UPDATE="false"
+          RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           
           echo "Creating database record..."
           
           # 根据是否强制更新决定 release_type
-          if [ "$IS_FORCE_UPDATE" = "true" ]; then
-            RELEASE_TYPE="force"
-          else
-            RELEASE_TYPE="feature"
-          fi
+          RELEASE_TYPE="feature"
           
           # 先将其他所有已发布版本改为已下架
           echo "Revoking other released versions..."
