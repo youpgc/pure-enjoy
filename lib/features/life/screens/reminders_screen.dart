@@ -3,10 +3,10 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
-import '../../../utils/cache_helper.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/reminder_model.dart';
 
-/// 提醒页面 - Supabase 数据同步
+/// 提醒事项页面 - Supabase 数据同步
 class RemindersScreen extends StatefulWidget {
   const RemindersScreen({super.key});
 
@@ -17,51 +17,31 @@ class RemindersScreen extends StatefulWidget {
 class _RemindersScreenState extends State<RemindersScreen> {
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
-  String _selectedFilter = 'all';
+  String _filter = 'all'; // all, pending, completed
 
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _initLoad();
-  }
-
-  /// 初始化加载：先读缓存，再静默刷新
-  Future<void> _initLoad() async {
-    await _loadCache();
-    await _loadReminders();
-  }
-
-  /// 从 SharedPreferences 加载缓存数据
-  Future<void> _loadCache() async {
-    final userId = _userId;
-    if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyReminders);
-    if (cached.isNotEmpty && mounted) {
-      setState(() {
-        _reminders = cached.map((e) => ReminderModel.fromJson(e)).toList();
-        _isLoading = false;
-      });
-    }
+    _loadReminders();
   }
 
   Future<void> _loadReminders() async {
+    setState(() => _isLoading = true);
     final userId = _userId;
     if (userId == null) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
-      }
+      setState(() {
+        _reminders = [];
+        _isLoading = false;
+      });
       return;
     }
 
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/reminders?user_id=eq.$userId&select=*&order=date_time.asc',
+          '${SupabaseConfig.url}/rest/v1/user_reminders?user_id=eq.$userId&select=*&order=remind_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -69,17 +49,10 @@ class _RemindersScreenState extends State<RemindersScreen> {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
-
         setState(() {
           _reminders = reminders;
           _isLoading = false;
         });
-
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyReminders,
-          reminders.map((r) => r.toJson()).toList(),
-        );
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -93,99 +66,104 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-  Future<void> _addReminder(ReminderModel reminder) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/reminders'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(reminder.toJson()),
-      );
+  List<ReminderModel> get _filteredReminders {
+    switch (_filter) {
+      case 'pending':
+        return _reminders.where((r) => !r.isCompleted).toList();
+      case 'completed':
+        return _reminders.where((r) => r.isCompleted).toList();
+      default:
+        return _reminders;
+    }
+  }
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await _loadReminders();
+  Future<void> _addReminder() async {
+    final result = await showDialog<ReminderModel>(
+      context: context,
+      builder: (context) => const ReminderEditDialog(),
+    );
+    if (result != null) {
+      setState(() => _isLoading = true);
+      try {
+        final response = await http.post(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders'),
+          headers: SupabaseConfig.writeHeaders,
+          body: jsonEncode(result.toJson()),
+        );
+
+        if (response.statusCode == 201 || response.statusCode == 200) {
+          _loadReminders();
+        } else {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('添加成功')),
+            SnackBar(content: Text('添加失败: $e')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
       }
     }
   }
 
-  Future<void> _updateReminder(ReminderModel reminder) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
-          'title': reminder.title,
-          'date_time': reminder.dateTime.toIso8601String(),
-          'repeat_type': reminder.repeatType,
-          'category': reminder.category,
-          'note': reminder.note,
-        }),
-      );
+  Future<void> _editReminder(ReminderModel reminder) async {
+    final result = await showDialog<ReminderModel>(
+      context: context,
+      builder: (context) => ReminderEditDialog(reminder: reminder),
+    );
+    if (result != null) {
+      setState(() => _isLoading = true);
+      try {
+        final response = await http.patch(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
+          headers: SupabaseConfig.writeHeaders,
+          body: jsonEncode(result.toJsonForUpdate()),
+        );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadReminders();
+        if (response.statusCode == 200 || response.statusCode == 204) {
+          _loadReminders();
+        } else {
+          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        }
+      } catch (e) {
+        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
+            SnackBar(content: Text('更新失败: $e')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
       }
     }
   }
 
   Future<void> _deleteReminder(String id) async {
-    final confirm = await showDialog<bool>(
+    final confirmed = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
         title: const Text('确认删除'),
-        content: const Text('确定要删除这条提醒吗？'),
+        content: const Text('确定要删除这个提醒吗？'),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context, false),
             child: const Text('取消'),
           ),
-          FilledButton(
+          TextButton(
             onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
+            child: const Text('删除', style: TextStyle(color: Colors.red)),
           ),
         ],
       ),
     );
-
-    if (confirm == true) {
+    if (confirmed == true) {
       try {
         final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.$id'),
+          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.$id'),
           headers: SupabaseConfig.writeHeaders,
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
-          await _loadReminders();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
-            );
-          }
+          _loadReminders();
         } else {
           throw Exception('HTTP ${response.statusCode}');
         }
@@ -202,18 +180,13 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Future<void> _toggleComplete(ReminderModel reminder) async {
     try {
       final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/reminders?id=eq.${reminder.id}'),
+        Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
         headers: SupabaseConfig.writeHeaders,
         body: jsonEncode({'is_completed': !reminder.isCompleted}),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadReminders();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(reminder.isCompleted ? '已标记为未完成' : '已标记为完成')),
-          );
-        }
+        _loadReminders();
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -226,371 +199,218 @@ class _RemindersScreenState extends State<RemindersScreen> {
     }
   }
 
-  void _showReminderForm([ReminderModel? reminder]) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ReminderForm(
-        userId: _userId ?? 'local_user',
-        reminder: reminder,
-        onSave: (newReminder) {
-          Navigator.pop(context);
-          if (reminder != null) {
-            _updateReminder(newReminder);
-          } else {
-            _addReminder(newReminder);
-          }
-        },
-      ),
-    );
-  }
-
-  List<ReminderModel> get _filteredReminders {
-    final now = DateTime.now();
-    switch (_selectedFilter) {
-      case 'upcoming':
-        return _reminders.where((r) => r.dateTime.isAfter(now)).toList();
-      case 'completed':
-        return _reminders.where((r) => r.isCompleted).toList();
-      case 'overdue':
-        return _reminders.where((r) => r.dateTime.isBefore(now) && !r.isCompleted).toList();
-      default:
-        return _reminders;
-    }
-  }
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('提醒'),
-      ),
-      body: Column(
-        children: [
-          // 筛选栏
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                _FilterChip(
-                  label: '全部',
-                  isSelected: _selectedFilter == 'all',
-                  onTap: () => setState(() => _selectedFilter = 'all'),
-                ),
-                _FilterChip(
-                  label: '待办',
-                  isSelected: _selectedFilter == 'upcoming',
-                  onTap: () => setState(() => _selectedFilter = 'upcoming'),
-                ),
-                _FilterChip(
-                  label: '已完成',
-                  isSelected: _selectedFilter == 'completed',
-                  onTap: () => setState(() => _selectedFilter = 'completed'),
-                ),
-                _FilterChip(
-                  label: '已过期',
-                  isSelected: _selectedFilter == 'overdue',
-                  onTap: () => setState(() => _selectedFilter = 'overdue'),
-                ),
-              ],
-            ),
+        title: const Text('提醒事项'),
+        actions: [
+          SegmentedButton<String>(
+            segments: const [
+              ButtonSegment(value: 'all', label: Text('全部')),
+              ButtonSegment(value: 'pending', label: Text('待办')),
+              ButtonSegment(value: 'completed', label: Text('已完成')),
+            ],
+            selected: {_filter},
+            onSelectionChanged: (set) {
+              setState(() => _filter = set.first);
+            },
           ),
-          const SizedBox(height: 8),
-
-          // 提醒列表
-          Expanded(
-            child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
-                : _filteredReminders.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.notifications_none,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '暂无提醒',
-                              style: TextStyle(color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: _loadReminders,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.all(16),
-                          itemCount: _filteredReminders.length,
-                          itemBuilder: (context, index) {
-                            final reminder = _filteredReminders[index];
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 12),
-                              child: ListTile(
-                                leading: Checkbox(
-                                  value: reminder.isCompleted,
-                                  onChanged: (_) => _toggleComplete(reminder),
-                                ),
-                                title: Text(
-                                  reminder.title,
-                                  style: TextStyle(
-                                    decoration: reminder.isCompleted
-                                        ? TextDecoration.lineThrough
-                                        : null,
-                                    color: reminder.isCompleted
-                                        ? colorScheme.onSurfaceVariant
-                                        : null,
-                                  ),
-                                ),
-                                subtitle: Text(
-                                  '${_formatDateTime(reminder.dateTime)}${reminder.note != null ? ' - ${reminder.note}' : ''}',
-                                ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'edit':
-                                        _showReminderForm(reminder);
-                                        break;
-                                      case 'delete':
-                                        _deleteReminder(reminder.id);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.edit, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('编辑'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, size: 20, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('删除', style: TextStyle(color: Colors.red)),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-          ),
+          const SizedBox(width: 8),
         ],
       ),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _filteredReminders.isEmpty
+              ? const Center(child: Text('暂无提醒事项'))
+              : ListView.builder(
+                  itemCount: _filteredReminders.length,
+                  itemBuilder: (context, index) {
+                    final reminder = _filteredReminders[index];
+                    return ReminderCard(
+                      reminder: reminder,
+                      onToggle: () => _toggleComplete(reminder),
+                      onEdit: () => _editReminder(reminder),
+                      onDelete: () => _deleteReminder(reminder.id),
+                    );
+                  },
+                ),
       floatingActionButton: FloatingActionButton(
-        onPressed: () => _showReminderForm(),
+        onPressed: _addReminder,
         child: const Icon(Icons.add),
       ),
     );
   }
-
-  String _formatDateTime(DateTime dateTime) {
-    return '${dateTime.year}-${dateTime.month.toString().padLeft(2, '0')}-${dateTime.day.toString().padLeft(2, '0')} '
-        '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
-  }
 }
 
-class _FilterChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
+class ReminderCard extends StatelessWidget {
+  final ReminderModel reminder;
+  final VoidCallback onToggle;
+  final VoidCallback onEdit;
+  final VoidCallback onDelete;
 
-  const _FilterChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
+  const ReminderCard({
+    super.key,
+    required this.reminder,
+    required this.onToggle,
+    required this.onEdit,
+    required this.onDelete,
   });
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) => onTap(),
-      ),
-    );
-  }
-}
-
-class _ReminderForm extends StatefulWidget {
-  final String userId;
-  final ReminderModel? reminder;
-  final Function(ReminderModel) onSave;
-
-  const _ReminderForm({required this.userId, this.reminder, required this.onSave});
-
-  @override
-  State<_ReminderForm> createState() => _ReminderFormState();
-}
-
-class _ReminderFormState extends State<_ReminderForm> {
-  final _formKey = GlobalKey<FormState>();
-  final _titleController = TextEditingController();
-  final _noteController = TextEditingController();
-  late DateTime _selectedDateTime;
-  late String _selectedRepeatType;
-
-  @override
-  void initState() {
-    super.initState();
-    final reminder = widget.reminder;
-    _titleController.text = reminder?.title ?? '';
-    _noteController.text = reminder?.note ?? '';
-    _selectedDateTime = reminder?.dateTime ?? DateTime.now().add(const Duration(hours: 1));
-    _selectedRepeatType = reminder?.repeatType ?? 'none';
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final newReminder = ReminderModel(
-      id: widget.reminder?.id ?? const Uuid().v4(),
-      userId: widget.userId,
-      title: _titleController.text,
-      dateTime: _selectedDateTime,
-      repeatType: _selectedRepeatType,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
-    );
-
-    widget.onSave(newReminder);
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Form(
-        key: _formKey,
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
+    return Card(
+      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+      child: ListTile(
+        leading: Checkbox(
+          value: reminder.isCompleted,
+          onChanged: (_) => onToggle(),
+        ),
+        title: Text(
+          reminder.title,
+          style: TextStyle(
+            decoration: reminder.isCompleted ? TextDecoration.lineThrough : null,
+          ),
+        ),
+        subtitle: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            if (reminder.description != null && reminder.description!.isNotEmpty)
+              Text(reminder.description!, maxLines: 2, overflow: TextOverflow.ellipsis),
+            const SizedBox(height: 4),
             Text(
-              '添加提醒',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _titleController,
-              decoration: const InputDecoration(
-                labelText: '标题',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '请输入标题';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            ListTile(
-              contentPadding: EdgeInsets.zero,
-              title: const Text('日期时间'),
-              trailing: Text(
-                '${_selectedDateTime.year}-${_selectedDateTime.month.toString().padLeft(2, '0')}-${_selectedDateTime.day.toString().padLeft(2, '0')} '
-                '${_selectedDateTime.hour.toString().padLeft(2, '0')}:${_selectedDateTime.minute.toString().padLeft(2, '0')}',
-              ),
-              onTap: () async {
-                final pickedDate = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDateTime,
-                  firstDate: DateTime.now(),
-                  lastDate: DateTime(2100),
-                );
-                if (pickedDate != null) {
-                  final pickedTime = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.fromDateTime(_selectedDateTime),
-                  );
-                  if (pickedTime != null) {
-                    setState(() {
-                      _selectedDateTime = DateTime(
-                        pickedDate.year,
-                        pickedDate.month,
-                        pickedDate.day,
-                        pickedTime.hour,
-                        pickedTime.minute,
-                      );
-                    });
-                  }
-                }
-              },
-            ),
-            const SizedBox(height: 16),
-
-            Text('重复', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: ['none', 'daily', 'weekly', 'monthly'].map((type) => ChoiceChip(
-                label: Text(_getRepeatLabel(type)),
-                selected: _selectedRepeatType == type,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedRepeatType = type);
-                },
-              )).toList(),
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: '备注（可选）',
+              DateTimeUtils.formatStandard(reminder.remindAt),
+              style: TextStyle(
+                color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
+                    ? Colors.red
+                    : Colors.grey,
+                fontSize: 12,
               ),
             ),
-            const SizedBox(height: 16),
-
-            FilledButton(
-              onPressed: _save,
-              child: const Text('保存'),
-            ),
+          ],
+        ),
+        trailing: PopupMenuButton<String>(
+          onSelected: (value) {
+            switch (value) {
+              case 'edit':
+                onEdit();
+                break;
+              case 'delete':
+                onDelete();
+                break;
+            }
+          },
+          itemBuilder: (context) => [
+            const PopupMenuItem(value: 'edit', child: Text('编辑')),
+            const PopupMenuItem(value: 'delete', child: Text('删除', style: TextStyle(color: Colors.red))),
           ],
         ),
       ),
     );
   }
+}
 
-  String _getRepeatLabel(String type) {
-    switch (type) {
-      case 'daily':
-        return '每天';
-      case 'weekly':
-        return '每周';
-      case 'monthly':
-        return '每月';
-      default:
-        return '不重复';
+class ReminderEditDialog extends StatefulWidget {
+  final ReminderModel? reminder;
+
+  const ReminderEditDialog({super.key, this.reminder});
+
+  @override
+  State<ReminderEditDialog> createState() => _ReminderEditDialogState();
+}
+
+class _ReminderEditDialogState extends State<ReminderEditDialog> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+
+  @override
+  void initState() {
+    super.initState();
+    if (widget.reminder != null) {
+      _titleController.text = widget.reminder!.title;
+      _descController.text = widget.reminder!.description ?? '';
+      _remindAt = widget.reminder!.remindAt;
     }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.reminder == null ? '新建提醒' : '编辑提醒'),
+      content: Form(
+        key: _formKey,
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              TextFormField(
+                controller: _titleController,
+                decoration: const InputDecoration(labelText: '标题'),
+                validator: (v) => v?.isEmpty == true ? '请输入标题' : null,
+              ),
+              const SizedBox(height: 16),
+              TextFormField(
+                controller: _descController,
+                decoration: const InputDecoration(labelText: '描述（可选）'),
+                maxLines: 3,
+              ),
+              const SizedBox(height: 16),
+              ListTile(
+                title: const Text('提醒时间'),
+                subtitle: Text(DateTimeUtils.formatStandard(_remindAt)),
+                trailing: const Icon(Icons.access_time),
+                onTap: () async {
+                  final date = await showDatePicker(
+                    context: context,
+                    initialDate: _remindAt,
+                    firstDate: DateTime.now(),
+                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                  );
+                  if (date != null) {
+                    final time = await showTimePicker(
+                      context: context,
+                      initialTime: TimeOfDay.fromDateTime(_remindAt),
+                    );
+                    if (time != null) {
+                      setState(() {
+                        _remindAt = DateTime(
+                          date.year, date.month, date.day,
+                          time.hour, time.minute,
+                        );
+                      });
+                    }
+                  }
+                },
+              ),
+            ],
+          ),
+        ),
+      ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        TextButton(
+          onPressed: () {
+            if (_formKey.currentState!.validate()) {
+              final userId = AuthService.instance.currentUserId ?? 'local_user';
+              final reminder = ReminderModel(
+                id: widget.reminder?.id ?? const Uuid().v4(),
+                userId: widget.reminder?.userId ?? userId,
+                title: _titleController.text,
+                description: _descController.text.isEmpty ? null : _descController.text,
+                remindAt: _remindAt,
+                isCompleted: widget.reminder?.isCompleted ?? false,
+              );
+              Navigator.pop(context, reminder);
+            }
+          },
+          child: const Text('保存'),
+        ),
+      ],
+    );
   }
 }
