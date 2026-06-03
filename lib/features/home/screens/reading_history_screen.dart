@@ -37,7 +37,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 
       final resp = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_read_chapter,last_read_at,novels:novel_id(title,cover_url,author,description,category,status,word_count,chapter_count)&order=last_read_at.desc&limit=50',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_chapter,last_read_at,novels:novel_id(title,cover_url,author,description,category,status,word_count,chapter_count)&order=last_read_at.desc&limit=50',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -168,7 +168,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         final title = novelData['title'] ?? '未知小说';
         final coverUrl = novelData['cover_url'];
         final author = novelData['author'] ?? '';
-        final lastChapter = item['last_read_chapter'] ?? 0;
+        final lastChapter = item['last_chapter'] ?? 0;
 
         return ListTile(
           leading: coverUrl != null

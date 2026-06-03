@@ -230,7 +230,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
                 }
               }
             }
-          } catch (_) {}
+          } catch (e) {
+            debugPrint('解析已读章节进度失败: $e');
+          }
         }
 
         setState(() {
@@ -372,8 +374,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           }
         }
       }
-    } catch (_) {
-      // 静默失败，不影响阅读
+    } catch (e) {
+      debugPrint('预缓存下一章失败: $e');
     }
   }
 
@@ -402,7 +404,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           });
         }
       }
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('检查书架状态失败: $e');
+    }
   }
 
   /// 保存阅读进度

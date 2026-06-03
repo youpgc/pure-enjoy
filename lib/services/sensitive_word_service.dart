@@ -300,7 +300,8 @@ class SensitiveWordService {
       case 'regex':
         try {
           return RegExp(sw.word, caseSensitive: false).hasMatch(text);
-        } catch (_) {
+        } catch (e) {
+          debugPrint('正则匹配敏感词失败: $e');
           return false;
         }
       default:

@@ -240,8 +240,8 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             }
           }
         }
-      } catch (_) {
-        // 单章失败不影响整体
+      } catch (e) {
+        debugPrint('缓存章节失败: $e');
       }
     }
 

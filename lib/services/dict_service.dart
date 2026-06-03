@@ -94,7 +94,8 @@ class DictService {
     final items = getItemsSync(typeCode);
     try {
       return items.firstWhere((item) => item.code == itemCode);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('根据code查找字典项失败: $e');
       return null;
     }
   }
@@ -119,7 +120,8 @@ class DictService {
     final items = getItemsSync(typeCode);
     try {
       return items.firstWhere((item) => item.isDefault);
-    } catch (_) {
+    } catch (e) {
+      debugPrint('获取默认字典项失败: $e');
       return items.isNotEmpty ? items.first : null;
     }
   }

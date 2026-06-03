@@ -102,7 +102,8 @@ class _LifeScreenState extends State<LifeScreen> {
       } else {
         return '${date.month}/${date.day}';
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('格式化日期失败: $e');
       return '';
     }
   }

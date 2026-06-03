@@ -34,7 +34,8 @@ class ApiErrorHandler {
       if (body is Map) {
         detail = body['message'] ?? body['error'] ?? body['detail'] ?? '';
       }
-    } catch (_) {
+    } catch (e) {
+      debugPrint('解析错误响应体失败: $e');
       // 解析失败，使用默认消息
     }
 

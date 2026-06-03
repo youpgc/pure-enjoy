@@ -83,7 +83,9 @@ class _NovelListScreenState extends State<NovelListScreen> {
           if (shelfResponse.statusCode == 200) {
             userNovels = jsonDecode(shelfResponse.body).cast<Map<String, dynamic>>();
           }
-        } catch (_) {}
+        } catch (e) {
+          debugPrint('加载用户书架数据失败: $e');
+        }
       }
 
       setState(() {
