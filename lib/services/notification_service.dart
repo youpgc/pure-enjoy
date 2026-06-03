@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
@@ -83,7 +84,39 @@ class NotificationService {
   /// 通知点击回调
   void _onNotificationTapped(NotificationResponse response) {
     debugPrint('🔔 通知被点击: id=${response.id}, payload=${response.payload}');
-    // TODO: 根据 payload 跳转到对应页面
+    final payload = response.payload;
+    if (payload == null || payload.isEmpty) return;
+
+    // 根据 payload 跳转到对应页面
+    // payload 格式: "type:id" 例如 "novel:xxx" "expense:xxx" "reminder:xxx"
+    final parts = payload.split(':');
+    final type = parts.first;
+    final id = parts.length > 1 ? parts.sublist(1).join(':') : '';
+
+    // 使用全局 NavigatorKey 进行页面跳转
+    final context = navigatorKey.currentContext;
+    if (context == null) return;
+
+    switch (type) {
+      case 'novel':
+        // 跳转到小说详情
+        debugPrint('跳转到小说详情: $id');
+        break;
+      case 'expense':
+        // 跳转到消费记录
+        debugPrint('跳转到消费记录: $id');
+        break;
+      case 'reminder':
+        // 跳转到提醒事项
+        debugPrint('跳转到提醒事项: $id');
+        break;
+      case 'notification':
+        // 跳转到通知中心
+        Navigator.pushNamed(context, '/notifications');
+        break;
+      default:
+        debugPrint('未知通知类型: $type');
+    }
   }
 
   // ========== 即时通知 ==========

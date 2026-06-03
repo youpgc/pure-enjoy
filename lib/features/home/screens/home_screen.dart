@@ -21,6 +21,8 @@ import 'edit_profile_screen.dart';
 import 'rich_text_page.dart';
 import 'reading_history_screen.dart';
 import 'data_sync_screen.dart';
+import 'notification_center_screen.dart';
+import 'settings_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -240,7 +242,10 @@ class _DashboardPageState extends State<DashboardPage> {
           IconButton(
             icon: const Icon(Icons.notifications_outlined),
             onPressed: () {
-              // TODO: 通知页面
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
+              );
             },
           ),
         ],
@@ -607,7 +612,10 @@ class _ProfilePageState extends State<ProfilePage> {
           IconButton(
             icon: const Icon(Icons.settings_outlined),
             onPressed: () {
-              // TODO: 设置页面
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const SettingsScreen()),
+              );
             },
           ),
         ],

@@ -12,6 +12,9 @@ import 'services/supabase_service.dart';
 import 'services/dict_service.dart';
 import 'services/notification_service.dart';
 
+/// 全局 NavigatorKey，用于通知点击跳转
+final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
+
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
@@ -46,6 +49,7 @@ class PureEnjoyApp extends StatelessWidget {
       child: Consumer<ThemeProvider>(
         builder: (context, themeProvider, child) {
           return MaterialApp(
+            navigatorKey: navigatorKey,
             title: '纯享',
             debugShowCheckedModeBanner: false,
             theme: AppTheme.lightTheme(themeProvider.colorScheme.seedColor),
