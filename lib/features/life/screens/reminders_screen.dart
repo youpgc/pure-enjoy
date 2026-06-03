@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/reminder_model.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
@@ -28,7 +29,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Future<void> _loadReminders() async {
-    setState(() => _isLoading = true);
     final userId = _userId;
     if (userId == null) {
       setState(() {
@@ -38,6 +38,18 @@ class _RemindersScreenState extends State<RemindersScreen> {
       return;
     }
 
+    // 1. 先加载本地缓存
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyReminders);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _reminders = cached.map((e) => ReminderModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    // 2. 静默从网络刷新
     try {
       final response = await http.get(
         Uri.parse(
@@ -49,19 +61,25 @@ class _RemindersScreenState extends State<RemindersScreen> {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
-        setState(() {
-          _reminders = reminders;
-          _isLoading = false;
-        });
+        // 保存缓存
+        await CacheHelper.instance.saveList(CacheHelper.keyReminders, data);
+        if (mounted) {
+          setState(() {
+            _reminders = reminders;
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+        setState(() => _isLoading = false);
+        if (_reminders.isEmpty) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载失败: $e')),
+          );
+        }
       }
     }
   }

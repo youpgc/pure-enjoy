@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/habit_model.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
@@ -29,19 +30,29 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 
   Future<void> _loadHabits() async {
-    setState(() => _isLoading = true);
-    try {
-      final userId = _userId;
-      if (userId == null) {
-        setState(() {
-          _habits = [];
-          _checkinHistory = {};
-          _isLoading = false;
-        });
-        return;
-      }
+    final userId = _userId;
+    if (userId == null) {
+      setState(() {
+        _habits = [];
+        _checkinHistory = {};
+        _isLoading = false;
+      });
+      return;
+    }
 
-      // 加载习惯列表
+    // 1. 先加载本地缓存
+    final cachedHabits = await CacheHelper.instance.loadList(CacheHelper.keyHabits);
+    if (cachedHabits.isNotEmpty && mounted) {
+      setState(() {
+        _habits = cachedHabits.map((e) => HabitModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    // 2. 静默从网络刷新
+    try {
       final habitsResponse = await http.get(
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/user_habits?user_id=eq.$userId&select=*&order=is_active.desc',
@@ -55,6 +66,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       final List habitsData = jsonDecode(habitsResponse.body);
       final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
+      // 保存习惯缓存
+      await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
 
       // 加载所有打卡记录
       final history = <String, List<HabitCheckinModel>>{};
@@ -74,14 +87,20 @@ class _HabitsScreenState extends State<HabitsScreen> {
         }
       }
 
-      setState(() {
-        _habits = items;
-        _checkinHistory = history;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _habits = items;
+          _checkinHistory = history;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('加载习惯失败: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        if (_habits.isEmpty) {
+          _showError('加载习惯失败: $e');
+        }
+      }
     }
   }
 

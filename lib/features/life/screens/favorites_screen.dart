@@ -5,6 +5,7 @@ import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/favorite_model.dart';
 
 /// 收藏夹页面 - Supabase 数据同步
@@ -29,17 +30,28 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _loadFavorites() async {
-    setState(() => _isLoading = true);
-    try {
-      final userId = _userId;
-      if (userId == null) {
-        setState(() {
-          _favorites = [];
-          _isLoading = false;
-        });
-        return;
-      }
+    final userId = _userId;
+    if (userId == null) {
+      setState(() {
+        _favorites = [];
+        _isLoading = false;
+      });
+      return;
+    }
 
+    // 1. 先加载本地缓存
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _favorites = cached.map((e) => FavoriteModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    } else if (mounted) {
+      setState(() => _isLoading = true);
+    }
+
+    // 2. 静默从网络刷新
+    try {
       final response = await http.get(
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/user_favorites?user_id=eq.$userId&select=*&order=created_at.desc',
@@ -50,16 +62,25 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
         final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
-        setState(() {
-          _favorites = items;
-          _isLoading = false;
-        });
+        // 保存缓存
+        await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
+        if (mounted) {
+          setState(() {
+            _favorites = items;
+            _isLoading = false;
+          });
+        }
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
-      _showError('加载收藏失败: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        // 如果已有缓存数据，静默失败不提示
+        if (_favorites.isEmpty) {
+          _showError('加载收藏失败: $e');
+        }
+      }
     }
   }
 

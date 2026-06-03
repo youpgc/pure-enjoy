@@ -93,8 +93,11 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
+        final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+        // 过滤掉章节号为0的无效章节
+        chapters.removeWhere((c) => c.chapterOrder <= 0);
         setState(() {
-          _chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+          _chapters = chapters;
           _isLoadingChapters = false;
         });
       } else {
