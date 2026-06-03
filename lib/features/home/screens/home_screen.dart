@@ -631,15 +631,7 @@ class _ProfilePageState extends State<ProfilePage> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  CircleAvatar(
-                    radius: 32,
-                    backgroundColor: colorScheme.primaryContainer,
-                    child: Icon(
-                      Icons.person,
-                      size: 32,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
+                  _buildAvatar(colorScheme),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -714,56 +706,22 @@ class _ProfilePageState extends State<ProfilePage> {
             },
           ),
           
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              '系统设置',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: Colors.grey,
-              ),
-            ),
-          ),
-          ListTile(
-            leading: const Icon(Icons.palette_outlined),
-            title: const Text('主题设置'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showThemeDialog(context),
-          ),
-          ListTile(
-            leading: const Icon(Icons.cloud_sync_outlined),
-            title: const Text('数据同步'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DataSyncScreen()),
-              );
-            },
-          ),
-          
-          // 版本信息 - 带更新提示
+          // 版本信息 - 带更新提示（保留在我的页面，方便查看）
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
             title: const Text('版本信息'),
-            subtitle: Text('当前: $_currentVersion'),
+            subtitle: Text('当前: $_currentVersion${_hasUpdate ? ' · 有新版本' : ''}'),
             trailing: Row(
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_hasUpdate)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _isForceUpdate ? Colors.red : Colors.orange,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Text(
-                      _isForceUpdate ? '强制更新' : '有更新',
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 12,
-                      ),
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: 8),
+                    decoration: const BoxDecoration(
+                      color: Colors.red,
+                      shape: BoxShape.circle,
                     ),
                   ),
                 const Icon(Icons.chevron_right),
@@ -772,77 +730,6 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: _showVersionDialog,
           ),
           
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('关于'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RichTextPage(
-                    configKey: 'about',
-                    title: '关于纯享',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('隐私政策'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RichTextPage(
-                    configKey: 'privacy_policy',
-                    title: '隐私政策',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('用户协议'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RichTextPage(
-                    configKey: 'user_agreement',
-                    title: '用户协议',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('帮助中心'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => const RichTextPage(
-                    configKey: 'help_center',
-                    title: '帮助中心',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: const Text('数据导出'),
-            subtitle: const Text('导出消费、体重、心情数据'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showExportDialog(context),
-          ),
           const Divider(),
           ListTile(
             leading: Icon(
@@ -911,6 +798,29 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const _ThemeSettingsScreen()),
+    );
+  }
+
+  /// 构建用户头像
+  Widget _buildAvatar(ColorScheme colorScheme) {
+    final avatarUrl = supabaseService.currentUserAvatar;
+    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+      return CircleAvatar(
+        radius: 32,
+        backgroundImage: NetworkImage(avatarUrl),
+        onBackgroundImageError: (_, __) {},
+        backgroundColor: colorScheme.primaryContainer,
+        child: const Icon(Icons.person, size: 32),
+      );
+    }
+    return CircleAvatar(
+      radius: 32,
+      backgroundColor: colorScheme.primaryContainer,
+      child: Icon(
+        Icons.person,
+        size: 32,
+        color: colorScheme.onPrimaryContainer,
+      ),
     );
   }
 }

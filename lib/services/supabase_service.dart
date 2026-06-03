@@ -51,6 +51,9 @@ class AuthService {
       _user?['nickname'] ??
       _user?['email']?.split('@').first;
 
+  /// 获取当前用户头像
+  String? get currentUserAvatar => _user?['avatar_url'];
+
   /// 检查是否已登录
   bool get isAuthenticated => _user != null;
 

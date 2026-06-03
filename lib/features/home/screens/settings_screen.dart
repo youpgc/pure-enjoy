@@ -3,6 +3,8 @@ import 'package:provider/provider.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'data_sync_screen.dart';
+import 'rich_text_page.dart';
+import '../../../services/data_export_service.dart';
 
 /// 系统设置页面
 class SettingsScreen extends StatefulWidget {
@@ -21,16 +23,25 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _wifiOnly = true;
   bool _pushNotification = true;
   bool _dailyReminder = false;
+  String _currentVersion = '';
 
   @override
   void initState() {
     super.initState();
     _loadSettings();
+    _loadVersion();
   }
 
   void _loadSettings() {
     final themeProvider = context.read<ThemeProvider>();
     _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+  }
+
+  Future<void> _loadVersion() async {
+    final info = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() => _currentVersion = '${info.version}+${info.buildNumber}');
+    }
   }
 
   @override
@@ -85,6 +96,18 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _wifiOnly,
             onChanged: (val) => setState(() => _wifiOnly = val),
           ),
+          ListTile(
+            leading: const Icon(Icons.cloud_sync_outlined),
+            title: const Text('数据同步'),
+            subtitle: const Text('手动同步数据到云端'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DataSyncScreen()),
+              );
+            },
+          ),
 
           // 通知设置
           const _SectionHeader(title: '通知设置'),
@@ -116,16 +139,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // 数据管理
           const _SectionHeader(title: '数据管理'),
           ListTile(
-            leading: const Icon(Icons.cloud_sync_outlined),
-            title: const Text('数据同步'),
-            subtitle: const Text('手动同步数据到云端'),
+            leading: const Icon(Icons.download_outlined),
+            title: const Text('数据导出'),
+            subtitle: const Text('导出消费、体重、心情数据'),
             trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DataSyncScreen()),
-              );
-            },
+            onTap: () => _showExportDialog(),
           ),
           ListTile(
             leading: const Icon(Icons.cleaning_services_outlined),
@@ -135,12 +153,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showClearCacheDialog(),
           ),
 
-          // 关于
-          const _SectionHeader(title: '关于'),
+          // 关于与法律
+          const _SectionHeader(title: '关于与法律'),
           ListTile(
             leading: const Icon(Icons.info_outline),
+            title: const Text('关于纯享'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RichTextPage(
+                    configKey: 'about',
+                    title: '关于纯享',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.privacy_tip_outlined),
+            title: const Text('隐私政策'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RichTextPage(
+                    configKey: 'privacy_policy',
+                    title: '隐私政策',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.description_outlined),
+            title: const Text('用户协议'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RichTextPage(
+                    configKey: 'user_agreement',
+                    title: '用户协议',
+                  ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.help_outline),
+            title: const Text('帮助中心'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const RichTextPage(
+                    configKey: 'help_center',
+                    title: '帮助中心',
+                  ),
+                ),
+              );
+            },
+          ),
+
+          // 版本信息
+          const _SectionHeader(title: '版本'),
+          ListTile(
+            leading: const Icon(Icons.system_update_outlined),
             title: const Text('版本信息'),
-            subtitle: const Text('查看当前版本'),
+            subtitle: Text(_currentVersion.isEmpty ? '加载中...' : _currentVersion),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showVersionInfo(),
           ),
@@ -232,6 +317,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ],
       ),
     );
+  }
+
+  Future<void> _showExportDialog() async {
+    final service = DataExportService();
+    await service.exportAllData();
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('数据导出成功')),
+      );
+    }
   }
 
   Future<void> _showVersionInfo() async {

@@ -45,9 +45,12 @@ class VersionCheckService {
         if (data.isEmpty) return null;
 
         final latestVersion = data.first as Map<String, dynamic>;
-        final latestVersionStr = latestVersion['version'] as String;
+        // 统一版本号格式：去掉 v 前缀
+        final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
         final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
         final isForceUpdate = latestVersion['release_type'] == 'force';
+
+        debugPrint('📱 最新版本: $latestVersionStr+$latestBuildNumber');
 
         if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
           return {
