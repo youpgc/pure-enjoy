@@ -320,12 +320,17 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showExportDialog() async {
-    final service = DataExportService();
-    await service.exportAllData();
+    final result = await DataExportService.exportAndShare(type: DataExportService.typeAll);
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('数据导出成功')),
-      );
+      if (result.success) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('数据导出成功，共${result.count}条记录')),
+        );
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('导出失败: ${result.error}')),
+        );
+      }
     }
   }
 

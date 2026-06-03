@@ -631,7 +631,7 @@ class _ProfilePageState extends State<ProfilePage> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  _buildAvatar(colorScheme),
+                  _buildAvatar(colorScheme, supabaseService),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -802,7 +802,7 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// 构建用户头像
-  Widget _buildAvatar(ColorScheme colorScheme) {
+  Widget _buildAvatar(ColorScheme colorScheme, SupabaseService supabaseService) {
     final avatarUrl = supabaseService.currentUserAvatar;
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return CircleAvatar(
@@ -823,6 +823,7 @@ class _ProfilePageState extends State<ProfilePage> {
       ),
     );
   }
+
 }
 
 /// 个性化设置页面
