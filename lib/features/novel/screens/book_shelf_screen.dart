@@ -1,9 +1,11 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
@@ -21,7 +23,7 @@ class BookShelfScreen extends StatefulWidget {
 class _BookShelfScreenState extends State<BookShelfScreen> {
   List<Map<String, dynamic>> _bookshelfItems = [];
   bool _isLoading = true;
-  String _filterStatus = 'all'; // all, reading, completed, paused
+  String _filterStatus = 'all'; // all, reading, completed
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -56,25 +58,42 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   @override
   void initState() {
     super.initState();
-    _loadBookshelf();
+    _initLoad();
+  }
+
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadBookshelf();
+  }
+
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyBookshelf);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _bookshelfItems = cached.cast<Map<String, dynamic>>();
+        _isLoading = false;
+      });
+    }
   }
 
   /// 从 Supabase 加载书架数据（分两步查询：先查user_novels，再查novels）
   Future<void> _loadBookshelf() async {
-    setState(() => _isLoading = true);
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      return;
+    }
+
+    if (!_checkAuth()) {
+      setState(() => _isLoading = false);
+      return;
+    }
 
     try {
-      final userId = _userId;
-      if (userId == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
-      if (!_checkAuth()) {
-        setState(() => _isLoading = false);
-        return;
-      }
-
       // 第一步：查询 user_novels 获取用户的书架记录
       final userNovelsResponse = await http.get(
         Uri.parse(
@@ -84,7 +103,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       );
 
       if (userNovelsResponse.statusCode != 200) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('加载书架失败: ${userNovelsResponse.statusCode}')),
@@ -99,6 +117,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           _bookshelfItems = [];
           _isLoading = false;
         });
+        await CacheHelper.instance.saveList(CacheHelper.keyBookshelf, []);
         return;
       }
 
@@ -117,7 +136,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       );
 
       if (novelsResponse.statusCode != 200) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('加载小说详情失败: ${novelsResponse.statusCode}')),
@@ -152,6 +170,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         _bookshelfItems = bookshelfItems.cast<Map<String, dynamic>>();
         _isLoading = false;
       });
+
+      // 写入缓存
+      await CacheHelper.instance.saveList(CacheHelper.keyBookshelf, bookshelfItems);
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -421,19 +442,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                 }
               },
             ),
-            ListTile(
-              leading: const Icon(Icons.pause_circle_outline),
-              title: const Text('暂停'),
-              trailing: currentStatus == 'unread'
-                  ? const Icon(Icons.check, color: Colors.orange)
-                  : null,
-              onTap: () {
-                Navigator.pop(context);
-                if (currentStatus != 'unread') {
-                  _updateReadingStatus(userNovelId, 'paused');
-                }
-              },
-            ),
             const Divider(),
             ListTile(
               leading: const Icon(Icons.delete_outline, color: Colors.red),
@@ -497,7 +505,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 格式化字数
   String _formatWordCount(int? wordCount) {
-    if (wordCount == null) return '';
+    if (wordCount == null || wordCount == 0) return '未知';
     if (wordCount >= 10000) {
       return '${(wordCount / 10000).toStringAsFixed(1)}万字';
     }
@@ -657,16 +665,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                                     isSelected: _filterStatus == 'completed',
                                     onTap: () => setState(
                                         () => _filterStatus = 'completed'),
-                                  ),
-                                  _FilterChip(
-                                    label: '暂停',
-                                    count: _bookshelfItems.where((i) {
-                                      final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
-                                      return p == 0;
-                                    }).length,
-                                    isSelected: _filterStatus == 'paused',
-                                    onTap: () => setState(
-                                        () => _filterStatus = 'paused'),
                                   ),
                                 ],
                               ),
@@ -1372,7 +1370,9 @@ class _BookshelfItem extends StatelessWidget {
                       // 阅读进度
                       Expanded(
                         child: Text(
-                          '读到第 $lastChapter / $chapterCount 章',
+                          chapterCount == 0
+                              ? '读到第 $lastChapter 章（共0章）'
+                              : '读到第 $lastChapter / $chapterCount 章',
                           style: Theme.of(context)
                               .textTheme
                               .bodySmall

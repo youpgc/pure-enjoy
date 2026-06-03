@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 import 'book_shelf_screen.dart';
@@ -36,7 +37,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNovels();
+    _initLoad();
   }
 
   @override
@@ -45,9 +46,26 @@ class _NovelListScreenState extends State<NovelListScreen> {
     super.dispose();
   }
 
-  Future<void> _loadNovels() async {
-    setState(() => _isLoading = true);
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadNovels();
+  }
 
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyNovelList);
+    if (cached.isNotEmpty && mounted) {
+      final novels = cached.map((json) => NovelModel.fromJson(json)).toList();
+      setState(() {
+        _allNovels = novels;
+        _novels = _applyFilters(novels);
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadNovels() async {
     try {
       // 从 Supabase 加载已发布的小说
       final response = await http.get(
@@ -94,6 +112,12 @@ class _NovelListScreenState extends State<NovelListScreen> {
         _userNovels = userNovels;
         _isLoading = false;
       });
+
+      // 写入缓存
+      await CacheHelper.instance.saveList(
+        CacheHelper.keyNovelList,
+        novels.map((n) => n.toJson()).toList(),
+      );
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -201,13 +225,15 @@ class _NovelListScreenState extends State<NovelListScreen> {
     );
   }
 
-  /// 获取正在阅读的小说（只显示在读的：progress > 0 且 progress < 1）
+  /// 获取正在阅读的小说（只显示在读的：progress > 0 且 progress < 1，且章节数 > 0）
   List<NovelModel> get _readingNovels {
     final readingNovelIds = _userNovels.where((un) {
       final progress = (un['progress'] as num?)?.toDouble() ?? 0.0;
       return progress > 0 && progress < 1;
     }).map((un) => un['novel_id'] as String).toSet();
-    return _allNovels.where((n) => readingNovelIds.contains(n.id)).toList();
+    return _allNovels
+        .where((n) => readingNovelIds.contains(n.id) && n.chapterCount > 0)
+        .toList();
   }
 
   /// 显示搜索对话框

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/weight_record_model.dart';
 
 /// 体重记录页面 - Supabase 数据同步
@@ -23,7 +24,26 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   @override
   void initState() {
     super.initState();
-    _loadRecords();
+    _initLoad();
+  }
+
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadRecords();
+  }
+
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyWeightRecords);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _records = cached.map((e) => WeightRecordModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadRecords() async {
@@ -37,8 +57,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       }
       return;
     }
-
-    setState(() => _isLoading = true);
 
     try {
       final response = await http.get(
@@ -56,6 +74,12 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
           _records = records.length > 30 ? records.sublist(0, 30) : records;
           _isLoading = false;
         });
+
+        // 写入缓存
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyWeightRecords,
+          records.map((r) => r.toJson()).toList(),
+        );
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -70,7 +94,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   }
 
   Future<void> _createWeightRecord(WeightRecordModel record) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records'),
@@ -89,7 +112,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('添加失败: $e')),
@@ -118,7 +140,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     );
 
     if (confirm == true) {
-      setState(() => _isLoading = true);
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.$id'),
@@ -136,7 +157,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
           throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('删除失败: $e')),
@@ -147,7 +167,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   }
 
   Future<void> _updateWeightRecord(WeightRecordModel record) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.${record.id}'),
@@ -172,7 +191,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('更新失败: $e')),
@@ -227,159 +245,162 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  // 当前体重卡片
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Text(
-                            '当前体重',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _latestWeight != null
-                                ? '${_latestWeight!.toStringAsFixed(2)} kg'
-                                : '-- kg',
-                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
+          : RefreshIndicator(
+              onRefresh: _loadRecords,
+              child: SingleChildScrollView(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 当前体重卡片
+                    Card(
+                      child: Padding(
+                        padding: const EdgeInsets.all(20),
+                        child: Column(
+                          children: [
+                            Text(
+                              '当前体重',
+                              style: Theme.of(context).textTheme.bodyMedium,
                             ),
-                          ),
-                          if (_weightChange != null) ...[
                             const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                                  size: 16,
-                                  color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                ),
-                                Text(
-                                  '${_weightChange!.abs().toStringAsFixed(2)} kg',
-                                  style: TextStyle(
+                            Text(
+                              _latestWeight != null
+                                  ? '${_latestWeight!.toStringAsFixed(2)} kg'
+                                  : '-- kg',
+                              style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                                fontWeight: FontWeight.bold,
+                                color: colorScheme.primary,
+                              ),
+                            ),
+                            if (_weightChange != null) ...[
+                              const SizedBox(height: 8),
+                              Row(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                                    size: 16,
                                     color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
                                   ),
-                                ),
-                              ],
-                            ),
+                                  Text(
+                                    '${_weightChange!.abs().toStringAsFixed(2)} kg',
+                                    style: TextStyle(
+                                      color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ],
                           ],
-                        ],
+                        ),
                       ),
                     ),
-                  ),
-                  const SizedBox(height: 24),
+                    const SizedBox(height: 24),
 
-                  // 记录列表
-                  Text(
-                    '历史记录',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  _records.isEmpty
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(32),
-                            child: Text('暂无记录'),
-                          ),
-                        )
-                      : ListView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          itemCount: _records.length,
-                          itemBuilder: (context, index) {
-                            final record = _records[index];
+                    // 记录列表
+                    Text(
+                      '历史记录',
+                      style: Theme.of(context).textTheme.titleMedium,
+                    ),
+                    const SizedBox(height: 12),
+                    _records.isEmpty
+                        ? const Center(
+                            child: Padding(
+                              padding: EdgeInsets.all(32),
+                              child: Text('暂无记录'),
+                            ),
+                          )
+                        : ListView.builder(
+                            shrinkWrap: true,
+                            physics: const NeverScrollableScrollPhysics(),
+                            itemCount: _records.length,
+                            itemBuilder: (context, index) {
+                              final record = _records[index];
 
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: const Icon(Icons.monitor_weight),
-                                title: Row(
-                                  children: [
-                                    Text(
-                                      '${record.weight.toStringAsFixed(2)} kg',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (record.bodyFat != null) ...[
-                                      const SizedBox(width: 12),
+                              return Card(
+                                margin: const EdgeInsets.only(bottom: 8),
+                                child: ListTile(
+                                  leading: const Icon(Icons.monitor_weight),
+                                  title: Row(
+                                    children: [
                                       Text(
-                                        '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                    if (record.bmi != null) ...[
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
-                                    if (record.note != null && record.note!.isNotEmpty)
-                                      Text(
-                                        record.note!,
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context).colorScheme.outline,
-                                          fontStyle: FontStyle.italic,
+                                        '${record.weight.toStringAsFixed(2)} kg',
+                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                          fontWeight: FontWeight.bold,
                                         ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
                                       ),
-                                  ],
+                                      if (record.bodyFat != null) ...[
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                      if (record.bmi != null) ...[
+                                        const SizedBox(width: 12),
+                                        Text(
+                                          'BMI ${record.bmi!.toStringAsFixed(1)}',
+                                          style: Theme.of(context).textTheme.bodySmall,
+                                        ),
+                                      ],
+                                    ],
+                                  ),
+                                  subtitle: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
+                                      if (record.note != null && record.note!.isNotEmpty)
+                                        Text(
+                                          record.note!,
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: Theme.of(context).colorScheme.outline,
+                                            fontStyle: FontStyle.italic,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                    ],
+                                  ),
+                                  trailing: PopupMenuButton<String>(
+                                    onSelected: (value) {
+                                      switch (value) {
+                                        case 'edit':
+                                          _showEditRecordForm(record);
+                                          break;
+                                        case 'delete':
+                                          _deleteWeightRecord(record.id);
+                                          break;
+                                      }
+                                    },
+                                    itemBuilder: (context) => [
+                                      const PopupMenuItem(
+                                        value: 'edit',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.edit, size: 20),
+                                            SizedBox(width: 8),
+                                            Text('编辑'),
+                                          ],
+                                        ),
+                                      ),
+                                      const PopupMenuItem(
+                                        value: 'delete',
+                                        child: Row(
+                                          children: [
+                                            Icon(Icons.delete, size: 20, color: Colors.red),
+                                            SizedBox(width: 8),
+                                            Text('删除', style: TextStyle(color: Colors.red)),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
-                                trailing: PopupMenuButton<String>(
-                                  onSelected: (value) {
-                                    switch (value) {
-                                      case 'edit':
-                                        _showEditRecordForm(record);
-                                        break;
-                                      case 'delete':
-                                        _deleteWeightRecord(record.id);
-                                        break;
-                                    }
-                                  },
-                                  itemBuilder: (context) => [
-                                    const PopupMenuItem(
-                                      value: 'edit',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.edit, size: 20),
-                                          SizedBox(width: 8),
-                                          Text('编辑'),
-                                        ],
-                                      ),
-                                    ),
-                                    const PopupMenuItem(
-                                      value: 'delete',
-                                      child: Row(
-                                        children: [
-                                          Icon(Icons.delete, size: 20, color: Colors.red),
-                                          SizedBox(width: 8),
-                                          Text('删除', style: TextStyle(color: Colors.red)),
-                                        ],
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                ],
+                              );
+                            },
+                          ),
+                  ],
+                ),
               ),
             ),
       floatingActionButton: FloatingActionButton(

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/mood_diary_model.dart';
 
 /// 心情日记页面 - Supabase 数据同步
@@ -23,7 +24,26 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   @override
   void initState() {
     super.initState();
-    _loadDiaries();
+    _initLoad();
+  }
+
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadDiaries();
+  }
+
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _diaries = cached.map((e) => MoodDiaryModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadDiaries() async {
@@ -37,8 +57,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       }
       return;
     }
-
-    setState(() => _isLoading = true);
 
     try {
       final response = await http.get(
@@ -56,6 +74,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           _diaries = diaries;
           _isLoading = false;
         });
+
+        // 写入缓存
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyDiaries,
+          diaries.map((d) => d.toJson()).toList(),
+        );
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -70,7 +94,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   }
 
   Future<void> _createMoodDiary(MoodDiaryModel diary) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
@@ -89,7 +112,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('添加失败: $e')),
@@ -118,7 +140,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     );
 
     if (confirm == true) {
-      setState(() => _isLoading = true);
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.$id'),
@@ -136,7 +157,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('删除失败: $e')),
@@ -147,7 +167,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   }
 
   Future<void> _updateMoodDiary(MoodDiaryModel diary) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.${diary.id}'),
@@ -172,7 +191,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('更新失败: $e')),
@@ -220,115 +238,118 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           ? const Center(child: CircularProgressIndicator())
           : _diaries.isEmpty
               ? const Center(child: Text('暂无日记，点击右下角按钮添加'))
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _diaries.length,
-                  itemBuilder: (context, index) {
-                    final diary = _diaries[index];
-                    final moodType = MoodType.values.firstWhere(
-                      (m) => m.name == diary.mood,
-                      orElse: () => MoodType.calm,
-                    );
+              : RefreshIndicator(
+                  onRefresh: _loadDiaries,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _diaries.length,
+                    itemBuilder: (context, index) {
+                      final diary = _diaries[index];
+                      final moodType = MoodType.values.firstWhere(
+                        (m) => m.name == diary.mood,
+                        orElse: () => MoodType.calm,
+                      );
 
-                    return Card(
-                      margin: const EdgeInsets.only(bottom: 12),
-                      child: InkWell(
-                        onTap: () => _showEditDiaryForm(diary),
-                        borderRadius: BorderRadius.circular(16),
-                        child: Padding(
-                          padding: const EdgeInsets.all(16),
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Row(
-                                children: [
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                      horizontal: 12,
-                                      vertical: 6,
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          onTap: () => _showEditDiaryForm(diary),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: moodType.color.withOpacity(0.2),
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            moodType.emoji,
+                                            style: const TextStyle(fontSize: 16),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(moodType.label),
+                                        ],
+                                      ),
                                     ),
-                                    decoration: BoxDecoration(
-                                      color: moodType.color.withOpacity(0.2),
-                                      borderRadius: BorderRadius.circular(20),
+                                    const Spacer(),
+                                    Text(
+                                      DateTimeUtils.formatStandard(diary.createdAt ?? diary.entryDate),
+                                      style: Theme.of(context).textTheme.bodySmall,
                                     ),
-                                    child: Row(
-                                      mainAxisSize: MainAxisSize.min,
-                                      children: [
-                                        Text(
-                                          moodType.emoji,
-                                          style: const TextStyle(fontSize: 16),
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'edit':
+                                            _showEditDiaryForm(diary);
+                                            break;
+                                          case 'delete':
+                                            _deleteMoodDiary(diary.id);
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, size: 20),
+                                              SizedBox(width: 8),
+                                              Text('编辑'),
+                                            ],
+                                          ),
                                         ),
-                                        const SizedBox(width: 4),
-                                        Text(moodType.label),
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, size: 20, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text('删除', style: TextStyle(color: Colors.red)),
+                                            ],
+                                          ),
+                                        ),
                                       ],
                                     ),
-                                  ),
-                                  const Spacer(),
+                                  ],
+                                ),
+                                if (diary.content != null && diary.content!.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
                                   Text(
-                                    DateTimeUtils.formatStandard(diary.createdAt ?? diary.entryDate),
-                                    style: Theme.of(context).textTheme.bodySmall,
-                                  ),
-                                  PopupMenuButton<String>(
-                                    onSelected: (value) {
-                                      switch (value) {
-                                        case 'edit':
-                                          _showEditDiaryForm(diary);
-                                          break;
-                                        case 'delete':
-                                          _deleteMoodDiary(diary.id);
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 20),
-                                            SizedBox(width: 8),
-                                            Text('编辑'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, size: 20, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text('删除', style: TextStyle(color: Colors.red)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                    diary.content!,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
-                              ),
-                              if (diary.content != null && diary.content!.isNotEmpty) ...[
-                                const SizedBox(height: 12),
-                                Text(
-                                  diary.content!,
-                                  maxLines: 3,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
+                                if (diary.tags != null && diary.tags!.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    children: diary.tags!.map((tag) => Chip(
+                                      label: Text(tag, style: const TextStyle(fontSize: 12)),
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    )).toList(),
+                                  ),
+                                ],
                               ],
-                              if (diary.tags != null && diary.tags!.isNotEmpty) ...[
-                                const SizedBox(height: 8),
-                                Wrap(
-                                  spacing: 6,
-                                  children: diary.tags!.map((tag) => Chip(
-                                    label: Text(tag, style: const TextStyle(fontSize: 12)),
-                                    padding: EdgeInsets.zero,
-                                    materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                  )).toList(),
-                                ),
-                              ],
-                            ],
+                            ),
                           ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showDiaryForm(),

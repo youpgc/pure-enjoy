@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面 - Supabase 数据同步
@@ -24,7 +25,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadNotes();
+    _initLoad();
+  }
+
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadNotes();
+  }
+
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyNotes);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _notes = cached.map((e) => NoteModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
   }
 
   Future<void> _loadNotes() async {
@@ -38,8 +58,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
       }
       return;
     }
-
-    setState(() => _isLoading = true);
 
     try {
       final response = await http.get(
@@ -57,6 +75,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
           _notes = notes;
           _isLoading = false;
         });
+
+        // 写入缓存
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyNotes,
+          notes.map((n) => n.toJson()).toList(),
+        );
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -71,7 +95,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _createNote(NoteModel note) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/notes'),
@@ -90,7 +113,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('创建失败: $e')),
@@ -100,7 +122,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _updateNote(NoteModel note) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
@@ -119,7 +140,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('更新失败: $e')),
@@ -148,7 +168,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
 
     if (confirm == true) {
-      setState(() => _isLoading = true);
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.$id'),
@@ -166,7 +185,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
           throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('删除失败: $e')),
@@ -283,83 +301,86 @@ class _NoteListScreenState extends State<NoteListScreen> {
                           ],
                         ),
                       )
-                    : GridView.builder(
-                        padding: const EdgeInsets.all(16),
-                        gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                          maxCrossAxisExtent: 200,
-                          mainAxisSpacing: 12,
-                          crossAxisSpacing: 12,
-                          childAspectRatio: 1,
-                        ),
-                        itemCount: _filteredNotes.length,
-                        itemBuilder: (context, index) {
-                          final note = _filteredNotes[index];
+                    : RefreshIndicator(
+                        onRefresh: _loadNotes,
+                        child: GridView.builder(
+                          padding: const EdgeInsets.all(16),
+                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                            maxCrossAxisExtent: 200,
+                            mainAxisSpacing: 12,
+                            crossAxisSpacing: 12,
+                            childAspectRatio: 1,
+                          ),
+                          itemCount: _filteredNotes.length,
+                          itemBuilder: (context, index) {
+                            final note = _filteredNotes[index];
 
-                          return Card(
-                            clipBehavior: Clip.antiAlias,
-                            child: InkWell(
-                              onTap: () => _showNoteForm(note),
-                              onLongPress: () => _deleteNote(note.id),
-                              child: Stack(
-                                children: [
-                                  Padding(
-                                    padding: const EdgeInsets.all(12),
-                                    child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          note.title,
-                                          style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.bold,
+                            return Card(
+                              clipBehavior: Clip.antiAlias,
+                              child: InkWell(
+                                onTap: () => _showNoteForm(note),
+                                onLongPress: () => _deleteNote(note.id),
+                                child: Stack(
+                                  children: [
+                                    Padding(
+                                      padding: const EdgeInsets.all(12),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          Text(
+                                            note.title,
+                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                              fontWeight: FontWeight.bold,
+                                            ),
+                                            maxLines: 2,
+                                            overflow: TextOverflow.ellipsis,
                                           ),
-                                          maxLines: 2,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                        const SizedBox(height: 8),
-                                        Expanded(
-                                          child: Text(
-                                            note.content ?? '',
-                                            style: Theme.of(context).textTheme.bodySmall,
-                                            overflow: TextOverflow.fade,
+                                          const SizedBox(height: 8),
+                                          Expanded(
+                                            child: Text(
+                                              note.content ?? '',
+                                              style: Theme.of(context).textTheme.bodySmall,
+                                              overflow: TextOverflow.fade,
+                                            ),
                                           ),
-                                        ),
-                                        if (note.tags != null && note.tags!.isNotEmpty)
-                                          Wrap(
-                                            spacing: 4,
-                                            children: note.tags!.take(2).map((tag) => Text(
-                                              '#$tag',
-                                              style: TextStyle(
-                                                fontSize: 11,
-                                                color: colorScheme.primary,
-                                              ),
-                                            )).toList(),
+                                          if (note.tags != null && note.tags!.isNotEmpty)
+                                            Wrap(
+                                              spacing: 4,
+                                              children: note.tags!.take(2).map((tag) => Text(
+                                                '#$tag',
+                                                style: TextStyle(
+                                                  fontSize: 11,
+                                                  color: colorScheme.primary,
+                                                ),
+                                              )).toList(),
+                                            ),
+                                          const SizedBox(height: 4),
+                                          Text(
+                                            DateTimeUtils.formatStandard(note.createdAt),
+                                            style: TextStyle(
+                                              fontSize: 10,
+                                              color: colorScheme.outline.withOpacity(0.7),
+                                            ),
                                           ),
-                                        const SizedBox(height: 4),
-                                        Text(
-                                          DateTimeUtils.formatStandard(note.createdAt),
-                                          style: TextStyle(
-                                            fontSize: 10,
-                                            color: colorScheme.outline.withOpacity(0.7),
-                                          ),
-                                        ),
-                                      ],
-                                    ),
-                                  ),
-                                  if (note.isPinned)
-                                    Positioned(
-                                      top: 8,
-                                      right: 8,
-                                      child: Icon(
-                                        Icons.push_pin,
-                                        size: 16,
-                                        color: colorScheme.primary,
+                                        ],
                                       ),
                                     ),
-                                ],
+                                    if (note.isPinned)
+                                      Positioned(
+                                        top: 8,
+                                        right: 8,
+                                        child: Icon(
+                                          Icons.push_pin,
+                                          size: 16,
+                                          color: colorScheme.primary,
+                                        ),
+                                      ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
           ),
         ],

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/expense_model.dart';
 
 /// 支出列表页面 - Supabase 数据同步
@@ -25,7 +26,46 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   @override
   void initState() {
     super.initState();
-    _loadExpenses();
+    _initLoad();
+  }
+
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadExpenses();
+  }
+
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyExpenses);
+    if (cached.isNotEmpty && mounted) {
+      final allExpenses = cached.map((e) => ExpenseModel.fromJson(e)).toList();
+      setState(() {
+        _expenses = _applyFilters(allExpenses);
+        _isLoading = false;
+      });
+    }
+  }
+
+  List<ExpenseModel> _applyFilters(List<ExpenseModel> expenses) {
+    // 按月份筛选
+    final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+    final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+
+    var filtered = expenses.where((e) {
+      return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
+             e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
+    }).toList();
+
+    // 按分类筛选
+    if (_selectedCategory != 'all') {
+      filtered = filtered.where((e) => e.category == _selectedCategory).toList();
+    }
+
+    filtered.sort((a, b) => b.date.compareTo(a.date));
+    return filtered;
   }
 
   Future<void> _loadExpenses() async {
@@ -40,8 +80,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       return;
     }
 
-    setState(() => _isLoading = true);
-
     try {
       final response = await http.get(
         Uri.parse(
@@ -52,28 +90,18 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
       if (response.statusCode == 200) {
         final List data = jsonDecode(response.body);
-        var expenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
-
-        // 按月份筛选
-        final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-        final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-
-        expenses = expenses.where((e) {
-          return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-                 e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
-        }).toList();
-
-        // 按分类筛选
-        if (_selectedCategory != 'all') {
-          expenses = expenses.where((e) => e.category == _selectedCategory).toList();
-        }
-
-        expenses.sort((a, b) => b.date.compareTo(a.date));
+        var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
-          _expenses = expenses;
+          _expenses = _applyFilters(allExpenses);
           _isLoading = false;
         });
+
+        // 写入缓存（保存全部数据，不按月筛选）
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyExpenses,
+          allExpenses.map((e) => e.toJson()).toList(),
+        );
       } else {
         throw Exception('HTTP ${response.statusCode}');
       }
@@ -88,7 +116,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   Future<void> _addExpense(ExpenseModel expense) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/expenses'),
@@ -107,7 +134,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('添加失败: $e')),
@@ -136,7 +162,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     );
 
     if (confirm == true) {
-      setState(() => _isLoading = true);
       try {
         final response = await http.delete(
           Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.$id'),
@@ -154,7 +179,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
-        setState(() => _isLoading = false);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('删除失败: $e')),
@@ -165,7 +189,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   Future<void> _updateExpense(ExpenseModel expense) async {
-    setState(() => _isLoading = true);
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.${expense.id}'),
@@ -189,7 +212,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('更新失败: $e')),
@@ -319,73 +341,76 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 ? const Center(child: CircularProgressIndicator())
                 : _expenses.isEmpty
                     ? const Center(child: Text('暂无记录'))
-                    : ListView.builder(
-                        padding: const EdgeInsets.symmetric(horizontal: 16),
-                        itemCount: _expenses.length,
-                        itemBuilder: (context, index) {
-                          final expense = _expenses[index];
-                          final category = ExpenseCategory.values.firstWhere(
-                            (c) => c.name == expense.category,
-                            orElse: () => ExpenseCategory.other,
-                          );
+                    : RefreshIndicator(
+                        onRefresh: _loadExpenses,
+                        child: ListView.builder(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _expenses.length,
+                          itemBuilder: (context, index) {
+                            final expense = _expenses[index];
+                            final category = ExpenseCategory.values.firstWhere(
+                              (c) => c.name == expense.category,
+                              orElse: () => ExpenseCategory.other,
+                            );
 
-                          return Card(
-                            margin: const EdgeInsets.only(bottom: 8),
-                            child: ListTile(
-                              leading: Icon(category.icon),
-                              title: Text(category.label),
-                              subtitle: Text(
-                                '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
-                              ),
-                              trailing: Row(
-                                mainAxisSize: MainAxisSize.min,
-                                children: [
-                                  Text(
-                                    '¥${expense.amount.toStringAsFixed(2)}',
-                                    style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                      color: colorScheme.error,
-                                      fontWeight: FontWeight.bold,
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: Icon(category.icon),
+                                title: Text(category.label),
+                                subtitle: Text(
+                                  '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
+                                ),
+                                trailing: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: [
+                                    Text(
+                                      '¥${expense.amount.toStringAsFixed(2)}',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        color: colorScheme.error,
+                                        fontWeight: FontWeight.bold,
+                                      ),
                                     ),
-                                  ),
-                                  PopupMenuButton<String>(
-                                    onSelected: (value) {
-                                      switch (value) {
-                                        case 'edit':
-                                          _showEditExpenseForm(expense);
-                                          break;
-                                        case 'delete':
-                                          _deleteExpense(expense.id);
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 20),
-                                            SizedBox(width: 8),
-                                            Text('编辑'),
-                                          ],
+                                    PopupMenuButton<String>(
+                                      onSelected: (value) {
+                                        switch (value) {
+                                          case 'edit':
+                                            _showEditExpenseForm(expense);
+                                            break;
+                                          case 'delete':
+                                            _deleteExpense(expense.id);
+                                            break;
+                                        }
+                                      },
+                                      itemBuilder: (context) => [
+                                        const PopupMenuItem(
+                                          value: 'edit',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.edit, size: 20),
+                                              SizedBox(width: 8),
+                                              Text('编辑'),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, size: 20, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text('删除', style: TextStyle(color: Colors.red)),
-                                          ],
+                                        const PopupMenuItem(
+                                          value: 'delete',
+                                          child: Row(
+                                            children: [
+                                              Icon(Icons.delete, size: 20, color: Colors.red),
+                                              SizedBox(width: 8),
+                                              Text('删除', style: TextStyle(color: Colors.red)),
+                                            ],
+                                          ),
                                         ),
-                                      ),
-                                    ],
-                                  ),
-                                ],
+                                      ],
+                                    ),
+                                  ],
+                                ),
                               ),
-                            ),
-                          );
-                        },
+                            );
+                          },
+                        ),
                       ),
           ),
         ],
