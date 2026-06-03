@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
+import '../main.dart' show navigatorKey;
 
 /// 本地通知服务
 /// 支持即时通知、定时通知、每日重复通知

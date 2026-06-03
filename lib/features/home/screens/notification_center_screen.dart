@@ -236,7 +236,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
             width: 40,
             height: 40,
             decoration: BoxDecoration(
-              color: color.withValues(alpha: 0.1),
+              color: color.withOpacity(0.1),
               borderRadius: BorderRadius.circular(20),
             ),
             child: Icon(icon, color: color, size: 20),
@@ -283,7 +283,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                   Container(
                     padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                     decoration: BoxDecoration(
-                      border: Border.all(color: color.withValues(alpha: 0.3)),
+                      border: Border.all(color: color.withOpacity(0.3)),
                       borderRadius: BorderRadius.circular(3),
                     ),
                     child: Text(type, style: TextStyle(fontSize: 10, color: color)),
