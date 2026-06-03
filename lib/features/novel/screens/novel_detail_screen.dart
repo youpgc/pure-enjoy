@@ -215,7 +215,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       try {
         final response = await http.get(
           Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/chapters?id=eq.${chapter.id}&select=*',
+            '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${chapter.id}&select=*',
           ),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,

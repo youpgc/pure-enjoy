@@ -4,25 +4,31 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:shared_preferences/shared_preferences.dart';
+import 'package:uuid/uuid.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
-import '../../life/screens/expense_list_screen.dart';
-import '../../life/screens/mood_diary_screen.dart';
-import '../../life/screens/weight_record_screen.dart';
+import '../../life/screens/reminders_screen.dart';
 import '../../life/screens/favorites_screen.dart';
-import '../../novel/screens/novel_list_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
+import '../../novel/screens/novel_reader_screen.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/data_export_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
-import 'rich_text_page.dart';
 import 'reading_history_screen.dart';
-import 'data_sync_screen.dart';
 import 'notification_center_screen.dart';
 import 'settings_screen.dart';
+import '../../life/models/mood_diary_model.dart';
+import '../../life/models/expense_model.dart';
+import '../../life/models/weight_record_model.dart';
+import '../../life/models/note_model.dart';
+import '../../life/models/reminder_model.dart';
+import '../../life/models/habit_model.dart';
+import '../../novel/models/novel_model.dart';
+import '../../../utils/date_time_utils.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -96,6 +102,32 @@ class _HomeScreenState extends State<HomeScreen> {
   }
 }
 
+/// 工具项定义
+class _ToolItem {
+  final String id;
+  final String label;
+  final IconData icon;
+  final Color color;
+
+  const _ToolItem({
+    required this.id,
+    required this.label,
+    required this.icon,
+    required this.color,
+  });
+}
+
+const List<_ToolItem> _allTools = [
+  _ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Colors.amber),
+  _ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: Colors.green),
+  _ToolItem(id: 'weight', label: '记体重', icon: Icons.monitor_weight_outlined, color: Colors.blue),
+  _ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Colors.purple),
+  _ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Colors.orange),
+  _ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Colors.teal),
+];
+
+const String _prefsKeyTools = 'dashboard_visible_tools';
+
 /// 首页仪表板
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -108,10 +140,40 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _isLoadingActivities = true;
   List<Map<String, dynamic>> _recentActivities = [];
 
+  bool _isLoadingReminders = true;
+  List<ReminderModel> _pendingReminders = [];
+
+  bool _isLoadingNovels = true;
+  List<Map<String, dynamic>> _recentNovels = [];
+
+  List<String> _visibleToolIds = [];
+
   @override
   void initState() {
     super.initState();
     _loadRecentActivities();
+    _loadPendingReminders();
+    _loadRecentNovels();
+    _loadToolConfig();
+  }
+
+  /// 加载工具配置
+  Future<void> _loadToolConfig() async {
+    final prefs = await SharedPreferences.getInstance();
+    final saved = prefs.getStringList(_prefsKeyTools);
+    if (saved != null && saved.isNotEmpty) {
+      if (mounted) setState(() => _visibleToolIds = saved);
+    } else {
+      // 默认全部显示
+      if (mounted) setState(() => _visibleToolIds = _allTools.map((t) => t.id).toList());
+    }
+  }
+
+  /// 保存工具配置
+  Future<void> _saveToolConfig(List<String> ids) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setStringList(_prefsKeyTools, ids);
+    if (mounted) setState(() => _visibleToolIds = ids);
   }
 
   /// 从 Supabase 加载最近活动记录
@@ -216,6 +278,90 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
+  /// 加载待办提醒
+  Future<void> _loadPendingReminders() async {
+    try {
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) {
+        if (mounted) setState(() => _isLoadingReminders = false);
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/user_reminders?user_id=eq.$userId&is_completed=eq.false&select=*&order=remind_at.asc&limit=3',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
+        if (mounted) {
+          setState(() {
+            _pendingReminders = reminders;
+            _isLoadingReminders = false;
+          });
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('加载提醒失败: $e');
+      if (mounted) setState(() => _isLoadingReminders = false);
+    }
+  }
+
+  /// 加载最近阅读的小说
+  Future<void> _loadRecentNovels() async {
+    try {
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) {
+        if (mounted) setState(() => _isLoadingNovels = false);
+        return;
+      }
+
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=*,novels:novel_id(*)&order=last_read_at.desc&limit=5',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final novels = <Map<String, dynamic>>[];
+        for (final item in data) {
+          final novelData = item['novels'] as Map<String, dynamic>?;
+          if (novelData != null) {
+            novels.add({
+              'novel': NovelModel.fromJson(novelData),
+              'lastChapter': item['last_chapter'] as int? ?? 1,
+              'progress': item['progress'] as num? ?? 0.0,
+            });
+          }
+        }
+        if (mounted) {
+          setState(() {
+            _recentNovels = novels;
+            _isLoadingNovels = false;
+          });
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}');
+      }
+    } catch (e) {
+      print('加载最近阅读失败: $e');
+      if (mounted) setState(() => _isLoadingNovels = false);
+    }
+  }
+
   /// 格式化时间显示
   String _formatTime(String? createdAt) {
     if (createdAt == null) return '';
@@ -230,10 +376,312 @@ class _DashboardPageState extends State<DashboardPage> {
     return '${dateTime.month}/${dateTime.day}';
   }
 
+  /// 显示添加心情日记弹窗
+  void _showAddMoodSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddMoodSheet(
+        onSave: (diary) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/mood_diaries'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(diary.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('日记添加成功')),
+                );
+                _loadRecentActivities();
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示添加支出弹窗
+  void _showAddExpenseSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddExpenseSheet(
+        onSave: (expense) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/expenses'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(expense.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('支出添加成功')),
+                );
+                _loadRecentActivities();
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示添加体重弹窗
+  void _showAddWeightSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddWeightSheet(
+        onSave: (record) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/weight_records'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(record.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('体重记录添加成功')),
+                );
+                _loadRecentActivities();
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示添加笔记弹窗
+  void _showAddNoteSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddNoteSheet(
+        onSave: (note) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/notes'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(note.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('笔记添加成功')),
+                );
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示添加提醒弹窗
+  void _showAddReminderSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddReminderSheet(
+        onSave: (reminder) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_reminders'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(reminder.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('提醒添加成功')),
+                );
+                _loadPendingReminders();
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 显示添加习惯弹窗
+  void _showAddHabitSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _AddHabitSheet(
+        onSave: (habit) async {
+          try {
+            final response = await http.post(
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_habits'),
+              headers: {
+                'apikey': AppConfig.supabaseAnonKey,
+                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+                'Content-Type': 'application/json',
+                'Prefer': 'return=minimal',
+              },
+              body: jsonEncode(habit.toJson()),
+            );
+            if (response.statusCode == 201 || response.statusCode == 200) {
+              if (mounted) {
+                Navigator.pop(context);
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('习惯添加成功')),
+                );
+              }
+            } else {
+              throw Exception('HTTP ${response.statusCode}');
+            }
+          } catch (e) {
+            if (mounted) {
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(content: Text('添加失败: $e')),
+              );
+            }
+          }
+        },
+      ),
+    );
+  }
+
+  /// 工具点击处理
+  void _onToolTap(_ToolItem tool) {
+    switch (tool.id) {
+      case 'diary':
+        _showAddMoodSheet();
+        break;
+      case 'expense':
+        _showAddExpenseSheet();
+        break;
+      case 'weight':
+        _showAddWeightSheet();
+        break;
+      case 'note':
+        _showAddNoteSheet();
+        break;
+      case 'reminder':
+        _showAddReminderSheet();
+        break;
+      case 'habit':
+        _showAddHabitSheet();
+        break;
+    }
+  }
+
+  /// 显示工具配置弹窗
+  void _showToolConfigSheet() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _ToolConfigSheet(
+        visibleIds: _visibleToolIds,
+        onSave: _saveToolConfig,
+      ),
+    );
+  }
+
+  /// 跳转到提醒详情
+  void _goToReminderDetail(ReminderModel reminder) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const RemindersScreen()),
+    );
+  }
+
+  /// 继续阅读小说
+  void _continueReading(NovelModel novel, int lastChapter) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => NovelReaderScreen(
+          novel: novel,
+          startChapter: lastChapter,
+        ),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final supabaseService = SupabaseService.instance;
+
+    final visibleTools = _allTools.where((t) => _visibleToolIds.contains(t.id)).toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -250,175 +698,341 @@ class _DashboardPageState extends State<DashboardPage> {
           ),
         ],
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 欢迎卡片
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '欢迎回来',
-                    style: Theme.of(context).textTheme.headlineSmall,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    AuthService.instance.currentUserName ?? '用户',
-                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+      body: RefreshIndicator(
+        onRefresh: () async {
+          await _loadRecentActivities();
+          await _loadPendingReminders();
+          await _loadRecentNovels();
+        },
+        child: ListView(
+          padding: const EdgeInsets.all(16),
+          children: [
+            // 欢迎卡片
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(20),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '欢迎回来',
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
-                  ),
-                  const SizedBox(height: 16),
-                  Text(
-                    '今天想做些什么？',
-                    style: Theme.of(context).textTheme.bodyMedium,
-                  ),
-                ],
+                    const SizedBox(height: 8),
+                    Text(
+                      AuthService.instance.currentUserName ?? '用户',
+                      style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 16),
+                    Text(
+                      '今天想做些什么？',
+                      style: Theme.of(context).textTheme.bodyMedium,
+                    ),
+                  ],
+                ),
               ),
             ),
-          ),
-          const SizedBox(height: 24),
+            const SizedBox(height: 16),
 
-          // 快捷操作
-          Text(
-            '快捷操作',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.note_add_outlined,
-                  label: '写日记',
-                  color: colorScheme.primaryContainer,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const MoodDiaryScreen()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: '记一笔',
-                  color: colorScheme.secondaryContainer,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const ExpenseListScreen()),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.monitor_weight_outlined,
-                  label: '记体重',
-                  color: colorScheme.tertiaryContainer,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const WeightRecordScreen()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.menu_book_outlined,
-                  label: '小说库',
-                  color: colorScheme.errorContainer,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const NovelListScreen()),
-                    );
-                  },
-                ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: _QuickActionCard(
-                  icon: Icons.library_books_outlined,
-                  label: '我的书架',
-                  color: colorScheme.primaryContainer,
-                  onTap: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => const BookShelfScreen()),
-                    );
-                  },
-                ),
-              ),
-              const SizedBox(width: 12),
-              const Expanded(child: SizedBox()), // 占位保持对齐
-            ],
-          ),
-          const SizedBox(height: 24),
-
-          // 最近活动
-          Text(
-            '最近活动',
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 12),
-          Card(
-            child: _isLoadingActivities
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : _recentActivities.isEmpty
-                    ? Padding(
-                        padding: const EdgeInsets.all(24),
-                        child: Center(
-                          child: Text(
-                            '暂无最近活动',
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+            // 横幅通知区域 - 待办提醒
+            if (_pendingReminders.isNotEmpty) ...[
+              ..._pendingReminders.map((reminder) {
+                final isOverdue = reminder.remindAt.isBefore(DateTime.now());
+                return Padding(
+                  padding: const EdgeInsets.only(bottom: 8),
+                  child: InkWell(
+                    onTap: () => _goToReminderDetail(reminder),
+                    borderRadius: BorderRadius.circular(12),
+                    child: Card(
+                      color: isOverdue ? colorScheme.errorContainer : colorScheme.primaryContainer,
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Icon(
+                              isOverdue ? Icons.notification_important : Icons.notifications_active,
+                              color: isOverdue ? colorScheme.error : colorScheme.primary,
+                            ),
+                            const SizedBox(width: 12),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  Text(
+                                    reminder.title,
+                                    style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                    maxLines: 1,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                  if (reminder.description != null && reminder.description!.isNotEmpty)
+                                    Text(
+                                      reminder.description!,
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                      maxLines: 1,
+                                      overflow: TextOverflow.ellipsis,
+                                    ),
+                                  Text(
+                                    DateTimeUtils.formatStandard(reminder.remindAt),
+                                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                      color: isOverdue ? colorScheme.error : colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.chevron_right,
                               color: colorScheme.onSurfaceVariant,
                             ),
-                          ),
-                        ),
-                      )
-                    : Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 8),
-                        child: Column(
-                          children: List.generate(_recentActivities.length, (index) {
-                            final activity = _recentActivities[index];
-                            return Column(
-                              children: [
-                                _ActivityItem(
-                                  icon: activity['icon'] as IconData,
-                                  title: activity['title'] as String,
-                                  subtitle: activity['subtitle'] as String,
-                                  time: activity['time'] as String,
-                                ),
-                                if (index < _recentActivities.length - 1)
-                                  const Divider(),
-                              ],
-                            );
-                          }),
+                          ],
                         ),
                       ),
-          ),
-        ],
+                    ),
+                  ),
+                );
+              }),
+              const SizedBox(height: 16),
+            ],
+
+            // 常用工具
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '常用工具',
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                IconButton(
+                  icon: const Icon(Icons.settings_outlined, size: 20),
+                  onPressed: _showToolConfigSheet,
+                  tooltip: '配置',
+                ),
+              ],
+            ),
+            const SizedBox(height: 12),
+            if (visibleTools.isEmpty)
+              Card(
+                child: Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Center(
+                    child: Text(
+                      '点击右上角配置按钮添加工具',
+                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
+                ),
+              )
+            else
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 3,
+                  mainAxisSpacing: 12,
+                  crossAxisSpacing: 12,
+                  childAspectRatio: 1,
+                ),
+                itemCount: visibleTools.length,
+                itemBuilder: (context, index) {
+                  final tool = visibleTools[index];
+                  return _ToolCard(
+                    icon: tool.icon,
+                    label: tool.label,
+                    color: tool.color,
+                    onTap: () => _onToolTap(tool),
+                  );
+                },
+              ),
+            const SizedBox(height: 24),
+
+            // 最近阅读
+            Text(
+              '最近阅读',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: _isLoadingNovels
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _recentNovels.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(
+                            child: Text(
+                              '暂无阅读记录',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        )
+                      : SizedBox(
+                          height: 180,
+                          child: ListView.builder(
+                            scrollDirection: Axis.horizontal,
+                            padding: const EdgeInsets.all(12),
+                            itemCount: _recentNovels.length,
+                            itemBuilder: (context, index) {
+                              final item = _recentNovels[index];
+                              final novel = item['novel'] as NovelModel;
+                              final lastChapter = item['lastChapter'] as int;
+                              return Padding(
+                                padding: const EdgeInsets.only(right: 12),
+                                child: InkWell(
+                                  onTap: () => _continueReading(novel, lastChapter),
+                                  borderRadius: BorderRadius.circular(12),
+                                  child: SizedBox(
+                                    width: 120,
+                                    child: Column(
+                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      children: [
+                                        ClipRRect(
+                                          borderRadius: BorderRadius.circular(8),
+                                          child: novel.cover != null && novel.cover!.isNotEmpty
+                                              ? Image.network(
+                                                  novel.cover!,
+                                                  height: 100,
+                                                  width: 120,
+                                                  fit: BoxFit.cover,
+                                                  errorBuilder: (_, __, ___) => Container(
+                                                    height: 100,
+                                                    width: 120,
+                                                    color: colorScheme.surfaceContainerHighest,
+                                                    child: const Icon(Icons.book, size: 40),
+                                                  ),
+                                                )
+                                              : Container(
+                                                  height: 100,
+                                                  width: 120,
+                                                  color: colorScheme.surfaceContainerHighest,
+                                                  child: const Icon(Icons.book, size: 40),
+                                                ),
+                                        ),
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          novel.title,
+                                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                            fontWeight: FontWeight.bold,
+                                          ),
+                                          maxLines: 1,
+                                          overflow: TextOverflow.ellipsis,
+                                        ),
+                                        Text(
+                                          '第$lastChapter章',
+                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                            color: colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                      ],
+                                    ),
+                                  ),
+                                ),
+                              );
+                            },
+                          ),
+                        ),
+            ),
+            const SizedBox(height: 24),
+
+            // 最近活动
+            Text(
+              '最近活动',
+              style: Theme.of(context).textTheme.titleMedium,
+            ),
+            const SizedBox(height: 12),
+            Card(
+              child: _isLoadingActivities
+                  ? const Padding(
+                      padding: EdgeInsets.all(24),
+                      child: Center(child: CircularProgressIndicator()),
+                    )
+                  : _recentActivities.isEmpty
+                      ? Padding(
+                          padding: const EdgeInsets.all(24),
+                          child: Center(
+                            child: Text(
+                              '暂无最近活动',
+                              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                            ),
+                          ),
+                        )
+                      : Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 8),
+                          child: Column(
+                            children: List.generate(_recentActivities.length, (index) {
+                              final activity = _recentActivities[index];
+                              return Column(
+                                children: [
+                                  _ActivityItem(
+                                    icon: activity['icon'] as IconData,
+                                    title: activity['title'] as String,
+                                    subtitle: activity['subtitle'] as String,
+                                    time: activity['time'] as String,
+                                  ),
+                                  if (index < _recentActivities.length - 1)
+                                    const Divider(),
+                                ],
+                              );
+                            }),
+                          ),
+                        ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+class _ToolCard extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onTap;
+
+  const _ToolCard({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Card(
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(12),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
+              ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -481,6 +1095,752 @@ class _ActivityItem extends StatelessWidget {
       trailing: Text(
         time,
         style: Theme.of(context).textTheme.bodySmall,
+      ),
+    );
+  }
+}
+
+/// 工具配置弹窗
+class _ToolConfigSheet extends StatefulWidget {
+  final List<String> visibleIds;
+  final ValueChanged<List<String>> onSave;
+
+  const _ToolConfigSheet({
+    required this.visibleIds,
+    required this.onSave,
+  });
+
+  @override
+  State<_ToolConfigSheet> createState() => _ToolConfigSheetState();
+}
+
+class _ToolConfigSheetState extends State<_ToolConfigSheet> {
+  late List<String> _selectedIds;
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedIds = List.from(widget.visibleIds);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        24,
+        16,
+        24,
+        MediaQuery.of(context).viewInsets.bottom + 24,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Center(
+            child: Container(
+              width: 40,
+              height: 4,
+              decoration: BoxDecoration(
+                color: Colors.grey[300],
+                borderRadius: BorderRadius.circular(2),
+              ),
+            ),
+          ),
+          const SizedBox(height: 20),
+          Text(
+            '配置常用工具',
+            style: Theme.of(context).textTheme.titleLarge,
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '选择要在首页显示的工具',
+            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+              color: Theme.of(context).colorScheme.outline,
+            ),
+            textAlign: TextAlign.center,
+          ),
+          const SizedBox(height: 20),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: _allTools.map((tool) {
+              final isSelected = _selectedIds.contains(tool.id);
+              return FilterChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(tool.icon, size: 16, color: isSelected ? Colors.white : tool.color),
+                    const SizedBox(width: 6),
+                    Text(tool.label),
+                  ],
+                ),
+                selected: isSelected,
+                selectedColor: tool.color,
+                checkmarkColor: Colors.white,
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedIds.add(tool.id);
+                    } else {
+                      _selectedIds.remove(tool.id);
+                    }
+                  });
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 20),
+          FilledButton(
+            onPressed: () {
+              widget.onSave(_selectedIds);
+              Navigator.pop(context);
+            },
+            child: const Text('保存'),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 添加心情日记底部弹窗
+class _AddMoodSheet extends StatefulWidget {
+  final Function(MoodDiaryModel) onSave;
+
+  const _AddMoodSheet({required this.onSave});
+
+  @override
+  State<_AddMoodSheet> createState() => _AddMoodSheetState();
+}
+
+class _AddMoodSheetState extends State<_AddMoodSheet> {
+  final _contentController = TextEditingController();
+  final _tagsController = TextEditingController();
+  MoodType _selectedMood = MoodType.calm;
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _contentController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final tags = _tagsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final diary = MoodDiaryModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      mood: _selectedMood.name,
+      moodScore: _selectedMood.score,
+      content: _contentController.text.isEmpty ? null : _contentController.text,
+      tags: tags.isEmpty ? null : tags,
+      entryDate: _selectedDate,
+    );
+
+    widget.onSave(diary);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('写日记', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: MoodType.values.map((mood) => ChoiceChip(
+              label: Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Text(mood.emoji),
+                  const SizedBox(width: 4),
+                  Text(mood.label),
+                ],
+              ),
+              selected: _selectedMood == mood,
+              selectedColor: mood.color.withOpacity(0.3),
+              onSelected: (selected) {
+                if (selected) setState(() => _selectedMood = mood);
+              },
+            )).toList(),
+          ),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _contentController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: '写点什么...',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _tagsController,
+            decoration: const InputDecoration(
+              labelText: '标签（可选，逗号分隔）',
+            ),
+          ),
+          const SizedBox(height: 12),
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('日期'),
+            trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) setState(() => _selectedDate = picked);
+            },
+          ),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: _save, child: const Text('保存')),
+        ],
+      ),
+    );
+  }
+}
+
+/// 添加支出底部弹窗
+class _AddExpenseSheet extends StatefulWidget {
+  final Function(ExpenseModel) onSave;
+
+  const _AddExpenseSheet({required this.onSave});
+
+  @override
+  State<_AddExpenseSheet> createState() => _AddExpenseSheetState();
+}
+
+class _AddExpenseSheetState extends State<_AddExpenseSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _amountController = TextEditingController();
+  final _noteController = TextEditingController();
+  ExpenseCategory _selectedCategory = ExpenseCategory.food;
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final expense = ExpenseModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      amount: double.parse(_amountController.text),
+      category: _selectedCategory.name,
+      note: _noteController.text.isEmpty ? null : _noteController.text,
+      date: _selectedDate,
+    );
+
+    widget.onSave(expense);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('记一笔', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _amountController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: '金额',
+                prefixText: '¥ ',
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) return '请输入金额';
+                if (double.tryParse(value) == null) return '请输入有效数字';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            Text('分类', style: Theme.of(context).textTheme.bodyLarge),
+            const SizedBox(height: 8),
+            Wrap(
+              spacing: 8,
+              children: ExpenseCategory.values.map((cat) => ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(cat.icon, size: 16),
+                    const SizedBox(width: 4),
+                    Text(cat.label),
+                  ],
+                ),
+                selected: _selectedCategory == cat,
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedCategory = cat);
+                },
+              )).toList(),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _noteController,
+              decoration: const InputDecoration(labelText: '备注（可选）'),
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('日期'),
+              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _selectedDate = picked);
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _save, child: const Text('保存')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 添加体重底部弹窗
+class _AddWeightSheet extends StatefulWidget {
+  final Function(WeightRecordModel) onSave;
+
+  const _AddWeightSheet({required this.onSave});
+
+  @override
+  State<_AddWeightSheet> createState() => _AddWeightSheetState();
+}
+
+class _AddWeightSheetState extends State<_AddWeightSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _weightController = TextEditingController();
+  final _bodyFatController = TextEditingController();
+  final _bmiController = TextEditingController();
+  final _noteController = TextEditingController();
+  DateTime _selectedDate = DateTime.now();
+
+  @override
+  void dispose() {
+    _weightController.dispose();
+    _bodyFatController.dispose();
+    _bmiController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final record = WeightRecordModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      weight: double.parse(_weightController.text),
+      bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
+      bodyFat: _bodyFatController.text.isNotEmpty ? double.tryParse(_bodyFatController.text) : null,
+      note: _noteController.text.isEmpty ? null : _noteController.text,
+      date: _selectedDate,
+    );
+
+    widget.onSave(record);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('记体重', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _weightController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: '体重 (kg)',
+                suffixText: 'kg',
+              ),
+              validator: (value) {
+                if (value == null || value.isEmpty) return '请输入体重';
+                if (double.tryParse(value) == null) return '请输入有效数字';
+                return null;
+              },
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _bodyFatController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(
+                labelText: '体脂率（可选）',
+                suffixText: '%',
+              ),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _bmiController,
+              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              decoration: const InputDecoration(labelText: 'BMI（可选）'),
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _noteController,
+              decoration: const InputDecoration(labelText: '备注（可选）'),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('日期'),
+              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _selectedDate,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) setState(() => _selectedDate = picked);
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _save, child: const Text('保存')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 添加笔记底部弹窗
+class _AddNoteSheet extends StatefulWidget {
+  final Function(NoteModel) onSave;
+
+  const _AddNoteSheet({required this.onSave});
+
+  @override
+  State<_AddNoteSheet> createState() => _AddNoteSheetState();
+}
+
+class _AddNoteSheetState extends State<_AddNoteSheet> {
+  final _titleController = TextEditingController();
+  final _contentController = TextEditingController();
+  final _tagsController = TextEditingController();
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _contentController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_titleController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入标题')),
+      );
+      return;
+    }
+
+    final tags = _tagsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final note = NoteModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      title: _titleController.text,
+      content: _contentController.text.isEmpty ? null : _contentController.text,
+      tags: tags.isEmpty ? null : tags,
+    );
+
+    widget.onSave(note);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('记笔记', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _titleController,
+            decoration: const InputDecoration(
+              labelText: '标题',
+              hintText: '输入笔记标题',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _contentController,
+            maxLines: 4,
+            decoration: const InputDecoration(
+              labelText: '内容',
+              hintText: '写点什么...',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _tagsController,
+            decoration: const InputDecoration(
+              labelText: '标签（可选，逗号分隔）',
+            ),
+          ),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: _save, child: const Text('保存')),
+        ],
+      ),
+    );
+  }
+}
+
+/// 添加提醒底部弹窗
+class _AddReminderSheet extends StatefulWidget {
+  final Function(ReminderModel) onSave;
+
+  const _AddReminderSheet({required this.onSave});
+
+  @override
+  State<_AddReminderSheet> createState() => _AddReminderSheetState();
+}
+
+class _AddReminderSheetState extends State<_AddReminderSheet> {
+  final _formKey = GlobalKey<FormState>();
+  final _titleController = TextEditingController();
+  final _descController = TextEditingController();
+  DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+
+  @override
+  void dispose() {
+    _titleController.dispose();
+    _descController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (!_formKey.currentState!.validate()) return;
+
+    final reminder = ReminderModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      title: _titleController.text,
+      description: _descController.text.isEmpty ? null : _descController.text,
+      remindAt: _remindAt,
+    );
+
+    widget.onSave(reminder);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Form(
+        key: _formKey,
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('添加提醒', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextFormField(
+              controller: _titleController,
+              decoration: const InputDecoration(labelText: '标题'),
+              validator: (v) => v?.isEmpty == true ? '请输入标题' : null,
+            ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _descController,
+              decoration: const InputDecoration(labelText: '描述（可选）'),
+              maxLines: 2,
+            ),
+            const SizedBox(height: 12),
+            ListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('提醒时间'),
+              trailing: Text(DateTimeUtils.formatStandard(_remindAt)),
+              onTap: () async {
+                final date = await showDatePicker(
+                  context: context,
+                  initialDate: _remindAt,
+                  firstDate: DateTime.now(),
+                  lastDate: DateTime.now().add(const Duration(days: 365)),
+                );
+                if (date != null) {
+                  final time = await showTimePicker(
+                    context: context,
+                    initialTime: TimeOfDay.fromDateTime(_remindAt),
+                  );
+                  if (time != null) {
+                    setState(() {
+                      _remindAt = DateTime(
+                        date.year, date.month, date.day,
+                        time.hour, time.minute,
+                      );
+                    });
+                  }
+                }
+              },
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _save, child: const Text('保存')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 添加习惯底部弹窗
+class _AddHabitSheet extends StatefulWidget {
+  final Function(HabitModel) onSave;
+
+  const _AddHabitSheet({required this.onSave});
+
+  @override
+  State<_AddHabitSheet> createState() => _AddHabitSheetState();
+}
+
+class _AddHabitSheetState extends State<_AddHabitSheet> {
+  final _nameController = TextEditingController();
+  final _descController = TextEditingController();
+  final _targetDaysController = TextEditingController(text: '21');
+
+  @override
+  void dispose() {
+    _nameController.dispose();
+    _descController.dispose();
+    _targetDaysController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    if (_nameController.text.trim().isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请输入习惯名称')),
+      );
+      return;
+    }
+
+    final targetDays = int.tryParse(_targetDaysController.text) ?? 21;
+
+    final habit = HabitModel(
+      id: const Uuid().v4(),
+      userId: AuthService.instance.currentUserId ?? 'local_user',
+      name: _nameController.text.trim(),
+      description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+      targetDays: targetDays,
+      frequency: 'daily',
+      isActive: true,
+    );
+
+    widget.onSave(habit);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
+      ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text('添加习惯', style: Theme.of(context).textTheme.titleLarge),
+          const SizedBox(height: 16),
+          TextField(
+            controller: _nameController,
+            decoration: const InputDecoration(
+              labelText: '习惯名称 *',
+              hintText: '例如：早起、阅读、运动',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _descController,
+            decoration: const InputDecoration(
+              labelText: '描述（可选）',
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextField(
+            controller: _targetDaysController,
+            decoration: const InputDecoration(
+              labelText: '目标天数',
+            ),
+            keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 16),
+          FilledButton(onPressed: _save, child: const Text('保存')),
+        ],
       ),
     );
   }
@@ -1366,5 +2726,3 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
     );
   }
 }
-
-

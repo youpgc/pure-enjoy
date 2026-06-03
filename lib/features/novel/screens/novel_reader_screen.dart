@@ -184,7 +184,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/chapters?novel_id=eq.${widget.novel.id}&select=id,title,chapter_num&order=chapter_num.asc',
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?novel_id=eq.${widget.novel.id}&select=id,title,chapter_num&order=chapter_num.asc',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -287,7 +287,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
       // 无缓存，从网络加载
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/chapters?id=eq.${chapter.id}&select=*',
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${chapter.id}&select=*',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -349,7 +349,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/chapters?id=eq.${nextChapter.id}&select=id,content',
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${nextChapter.id}&select=id,content',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
