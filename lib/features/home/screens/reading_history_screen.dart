@@ -84,12 +84,18 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         final userId = _userId;
         if (userId == null) return;
 
-        final resp = await http.delete(
+        final resp = await http.patch(
           Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId'),
           headers: {
             'apikey': AppConfig.supabaseAnonKey,
             'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            'Content-Type': 'application/json',
           },
+          body: jsonEncode({
+            'last_chapter': 0,
+            'last_read_at': null,
+            'progress': 0,
+          }),
         );
 
         if (resp.statusCode == 200 || resp.statusCode == 204) {

@@ -95,13 +95,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.dispose();
-    _saveProgress();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (state == AppLifecycleState.paused || state == AppLifecycleState.inactive) {
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
       _saveProgress();
       _pauseReadingTimer();
     } else if (state == AppLifecycleState.resumed) {

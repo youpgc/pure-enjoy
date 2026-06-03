@@ -79,10 +79,15 @@ class DataExportService {
     String table,
     String userId,
   ) async {
+    // expenses/weight_records/mood_diaries 使用 date 排序，其他表使用 created_at
+    final orderField = (table == typeExpenses || table == typeWeight || table == typeMood)
+        ? 'date'
+        : 'created_at';
+
     final response = await http.get(
       Uri.parse(
         '${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId'
-        '&select=*&order=created_at.desc',
+        '&select=*&order=$orderField.desc',
       ),
       headers: {
         'apikey': SupabaseConfig.anonKey,

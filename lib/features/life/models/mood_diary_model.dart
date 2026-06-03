@@ -42,6 +42,7 @@ class MoodDiaryModel {
       'mood': mood,
       'mood_label': moodScore.toString(),
       'content': content,
+      'tags': tags,
       'date': entryDate.toIso8601String().split('T').first,
     };
     if (id.isNotEmpty) {
