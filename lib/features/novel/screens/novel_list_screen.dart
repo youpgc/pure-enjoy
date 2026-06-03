@@ -73,7 +73,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
         try {
           final shelfResponse = await http.get(
             Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,is_collected,last_chapter,last_read_at',
+              '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,is_collected,last_chapter,last_read_at,progress',
             ),
             headers: {
               'apikey': AppConfig.supabaseAnonKey,
@@ -168,6 +168,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
           'progress': 0,
           'last_chapter': 0,
           'is_collected': true,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         }),
@@ -200,10 +201,13 @@ class _NovelListScreenState extends State<NovelListScreen> {
     );
   }
 
-  /// 获取正在阅读的小说
+  /// 获取正在阅读的小说（只显示在读的：progress > 0 且 progress < 1）
   List<NovelModel> get _readingNovels {
-    final bookshelfNovelIds = _userNovels.map((un) => un['novel_id'] as String).toSet();
-    return _allNovels.where((n) => bookshelfNovelIds.contains(n.id)).toList();
+    final readingNovelIds = _userNovels.where((un) {
+      final progress = (un['progress'] as num?)?.toDouble() ?? 0.0;
+      return progress > 0 && progress < 1;
+    }).map((un) => un['novel_id'] as String).toSet();
+    return _allNovels.where((n) => readingNovelIds.contains(n.id)).toList();
   }
 
   /// 显示搜索对话框

@@ -171,7 +171,7 @@ class ReadingProgressModel {
   final double progress;
   final int? lastChapter;
   final bool? isCollected;
-  final DateTime lastReadAt;
+  final DateTime? lastReadAt;
   final DateTime createdAt;
   final DateTime? updatedAt;
 
@@ -182,7 +182,7 @@ class ReadingProgressModel {
     this.progress = 0.0,
     this.lastChapter,
     this.isCollected,
-    required this.lastReadAt,
+    this.lastReadAt,
     required this.createdAt,
     this.updatedAt,
   });
@@ -195,7 +195,9 @@ class ReadingProgressModel {
       progress: json['progress'] != null ? (json['progress'] as num).toDouble() : 0.0,
       lastChapter: json['last_chapter'] as int?,
       isCollected: json['is_collected'] as bool?,
-      lastReadAt: DateTime.parse(json['last_read_at'] as String),
+      lastReadAt: json['last_read_at'] != null
+          ? DateTime.tryParse(json['last_read_at'] as String)
+          : null,
       createdAt: DateTime.parse(json['created_at'] as String),
       updatedAt: json['updated_at'] != null
           ? DateTime.parse(json['updated_at'] as String)
@@ -210,7 +212,7 @@ class ReadingProgressModel {
       'progress': progress,
       'last_chapter': lastChapter,
       'is_collected': isCollected,
-      'last_read_at': lastReadAt.toUtc().toIso8601String(),
+      'last_read_at': lastReadAt?.toUtc().toIso8601String(),
       'created_at': createdAt.toUtc().toIso8601String(),
       'updated_at': updatedAt?.toUtc().toIso8601String(),
     };

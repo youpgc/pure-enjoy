@@ -86,6 +86,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+    _scrollController.addListener(_onScroll);
     _loadSettings();
     _loadChapters();
     _checkBookshelfStatus();
@@ -94,6 +95,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    _scrollController.removeListener(_onScroll);
+    _saveProgress();
     _scrollController.dispose();
     super.dispose();
   }
@@ -337,6 +340,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     }
   }
 
+  /// 滚动到底部自动加载下一章
+  void _onScroll() {
+    if (!_scrollController.hasClients) return;
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+      if (_currentChapterIndex < _chapters.length - 1 && !_isLoadingChapter) {
+        _nextChapter();
+      }
+    }
+  }
+
   /// 预加载下一章内容
   Future<void> _preloadNextChapter() async {
     final nextIndex = _currentChapterIndex + 1;
@@ -386,7 +399,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id,is_collected',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -400,6 +413,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           setState(() {
             _isInBookshelf = true;
             _bookshelfId = data.first['id'] as String;
+            _isCollected = data.first['is_collected'] as bool? ?? false;
           });
         }
       }
@@ -417,6 +431,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
 
     try {
       final chapterNum = _currentChapter!.chapterOrder;
+      final totalChapters = _chapters.length;
+      final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
       if (_isInBookshelf && _bookshelfId != null) {
         // 更新已有书架记录
@@ -431,6 +447,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           },
           body: jsonEncode({
             'last_chapter': chapterNum,
+            'progress': progress,
             'last_read_at': DateTime.now().toUtc().toIso8601String(),
           }),
         );
@@ -447,9 +464,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
-            'progress': 0,
+            'progress': progress,
             'last_chapter': chapterNum,
             'is_collected': true,
+            'last_read_at': DateTime.now().toUtc().toIso8601String(),
             'created_at': DateTime.now().toUtc().toIso8601String(),
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           }),
@@ -946,6 +964,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen> with WidgetsBindi
           : null,
       body: GestureDetector(
         onTap: _toggleMenu,
+        onHorizontalDragEnd: (details) {
+          if (details.primaryVelocity == null) return;
+          if (details.primaryVelocity! < 0) {
+            // 向左滑 -> 下一章
+            _nextChapter();
+          } else if (details.primaryVelocity! > 0) {
+            // 向右滑 -> 上一章
+            _previousChapter();
+          }
+        },
         child: _isLoading
             ? Center(
                 child: CircularProgressIndicator(

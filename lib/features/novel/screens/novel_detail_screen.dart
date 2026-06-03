@@ -64,6 +64,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             _isInBookshelf = true;
             _bookshelfId = data.first['id'] as String;
             _currentChapter = data.first['last_chapter'] as int? ?? 1;
+            _isCollected = data.first['is_collected'] as bool? ?? false;
             _isLoadingShelf = false;
           });
         } else {
@@ -164,6 +165,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             'progress': 0,
             'last_chapter': 0,
             'is_collected': true,
+            'last_read_at': DateTime.now().toUtc().toIso8601String(),
             'created_at': DateTime.now().toUtc().toIso8601String(),
             'updated_at': DateTime.now().toUtc().toIso8601String(),
           }),
@@ -187,6 +189,39 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             SnackBar(content: Text('操作失败: $e')),
           );
         }
+      }
+    }
+  }
+
+  /// 切换收藏状态
+  Future<void> _toggleCollect() async {
+    if (_bookshelfId == null) {
+      // 如果不在书架中，先加入书架
+      await _toggleBookshelf();
+      return;
+    }
+
+    try {
+      final response = await http.patch(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_collected': !_isCollected}),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        if (mounted) {
+          setState(() => _isCollected = !_isCollected);
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('操作失败: $e')),
+        );
       }
     }
   }
@@ -599,6 +634,25 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                               color: _cachedChapterCount > 0 ? Colors.green : null,
                             ),
                           ),
+                  ),
+                  const SizedBox(width: 12),
+                  // 收藏按钮
+                  SizedBox(
+                    width: 48,
+                    height: 48,
+                    child: OutlinedButton(
+                      onPressed: _isInBookshelf ? _toggleCollect : null,
+                      style: OutlinedButton.styleFrom(
+                        padding: EdgeInsets.zero,
+                        minimumSize: const Size(48, 48),
+                      ),
+                      child: Icon(
+                        _isCollected
+                            ? Icons.favorite
+                            : Icons.favorite_border,
+                        color: _isCollected ? Colors.red : null,
+                      ),
+                    ),
                   ),
                 ],
               ),

@@ -225,9 +225,37 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     }
   }
 
+  /// 更新阅读状态（不覆盖 progress，仅通过 PATCH 更新状态标记字段）
+  Future<void> _updateReadingStatus(String userNovelId, String status) async {
+    if (!_checkAuth()) return;
+
+    try {
+      final response = await http.patch(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
+        ),
+        headers: _buildAuthHeaders(jsonContent: true),
+        body: jsonEncode({
+          'reading_status': status,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
+        }),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadBookshelf();
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新状态失败: $e')),
+        );
+      }
+    }
+  }
+
   /// 根据 progress 计算阅读状态
   String _getReadingStatus(double? progress) {
-    if (progress == null || progress == 0) return 'paused';
+    if (progress == null || progress == 0) return 'unread';
     if (progress >= 1) return 'completed';
     return 'reading';
   }
@@ -250,10 +278,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return '在读';
       case 'completed':
         return '已读完';
-      case 'paused':
-        return '暂停';
+      case 'unread':
+        return '未读';
       default:
-        return '在读';
+        return '未读';
     }
   }
 
@@ -265,7 +293,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         return colorScheme.primary;
       case 'completed':
         return Colors.green;
-      case 'paused':
+      case 'unread':
         return Colors.orange;
       default:
         return colorScheme.primary;
@@ -376,7 +404,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'reading') {
-                  _updateProgress(userNovelId, 0.5); // 设置为在读状态 (progress > 0 && < 1)
+                  _updateReadingStatus(userNovelId, 'reading');
                 }
               },
             ),
@@ -389,20 +417,20 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               onTap: () {
                 Navigator.pop(context);
                 if (currentStatus != 'completed') {
-                  _updateProgress(userNovelId, 1.0); // 设置为已读完状态 (progress >= 1)
+                  _updateReadingStatus(userNovelId, 'completed');
                 }
               },
             ),
             ListTile(
               leading: const Icon(Icons.pause_circle_outline),
               title: const Text('暂停'),
-              trailing: currentStatus == 'paused'
+              trailing: currentStatus == 'unread'
                   ? const Icon(Icons.check, color: Colors.orange)
                   : null,
               onTap: () {
                 Navigator.pop(context);
-                if (currentStatus != 'paused') {
-                  _updateProgress(userNovelId, 0.0); // 设置为暂停状态 (progress == 0)
+                if (currentStatus != 'unread') {
+                  _updateReadingStatus(userNovelId, 'paused');
                 }
               },
             ),
@@ -503,7 +531,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                 Navigator.push(
                   context,
                   MaterialPageRoute(builder: (_) => const _NovelListForAddScreen()),
-                );
+                ).then((_) {
+                  if (mounted) _loadBookshelf();
+                });
               },
               tooltip: '添加小说',
             ),
@@ -627,6 +657,16 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                                     isSelected: _filterStatus == 'completed',
                                     onTap: () => setState(
                                         () => _filterStatus = 'completed'),
+                                  ),
+                                  _FilterChip(
+                                    label: '暂停',
+                                    count: _bookshelfItems.where((i) {
+                                      final p = (i['progress'] as num?)?.toDouble() ?? 0.0;
+                                      return p == 0;
+                                    }).length,
+                                    isSelected: _filterStatus == 'paused',
+                                    onTap: () => setState(
+                                        () => _filterStatus = 'paused'),
                                   ),
                                 ],
                               ),
@@ -804,6 +844,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
           'progress': 0,
           'last_chapter': 0,
           'is_collected': true,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         }),
@@ -1209,7 +1250,7 @@ class _BookshelfItem extends StatelessWidget {
 
   /// 根据 progress 计算阅读状态
   String _getReadingStatus(double? progress) {
-    if (progress == null || progress == 0) return 'paused';
+    if (progress == null || progress == 0) return 'unread';
     if (progress >= 1) return 'completed';
     return 'reading';
   }
