@@ -245,7 +245,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                           const SizedBox(height: 8),
                           Text(
                             _latestWeight != null
-                                ? '${_latestWeight!.toStringAsFixed(1)} kg'
+                                ? '${_latestWeight!.toStringAsFixed(2)} kg'
                                 : '-- kg',
                             style: Theme.of(context).textTheme.displaySmall?.copyWith(
                               fontWeight: FontWeight.bold,
@@ -263,7 +263,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                   color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
                                 ),
                                 Text(
-                                  '${_weightChange!.abs().toStringAsFixed(1)} kg',
+                                  '${_weightChange!.abs().toStringAsFixed(2)} kg',
                                   style: TextStyle(
                                     color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
                                   ),
@@ -304,7 +304,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                 title: Row(
                                   children: [
                                     Text(
-                                      '${record.weight.toStringAsFixed(1)} kg',
+                                      '${record.weight.toStringAsFixed(2)} kg',
                                       style: Theme.of(context).textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.bold,
                                       ),
