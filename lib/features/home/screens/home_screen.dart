@@ -10,6 +10,7 @@ import '../../life/screens/life_screen.dart';
 import '../../life/screens/expense_list_screen.dart';
 import '../../life/screens/mood_diary_screen.dart';
 import '../../life/screens/weight_record_screen.dart';
+import '../../life/screens/favorites_screen.dart';
 import '../../novel/screens/novel_list_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../../services/supabase_service.dart';
@@ -18,6 +19,8 @@ import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'rich_text_page.dart';
+import 'reading_history_screen.dart';
+import 'data_sync_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -668,7 +671,52 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
 
-          // 功能列表
+          // 功能列表 - 个人中心
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              '个人中心',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
+          ListTile(
+            leading: const Icon(Icons.bookmark_outline),
+            title: const Text('我的收藏'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.history_outlined),
+            title: const Text('阅读历史'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
+              );
+            },
+          ),
+          
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Text(
+              '系统设置',
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
+              ),
+            ),
+          ),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
             title: const Text('主题设置'),
@@ -680,7 +728,10 @@ class _ProfilePageState extends State<ProfilePage> {
             title: const Text('数据同步'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () {
-              // TODO: 数据同步
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const DataSyncScreen()),
+              );
             },
           ),
           
