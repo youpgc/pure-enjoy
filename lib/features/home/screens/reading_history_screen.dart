@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../services/supabase_service.dart';
 import '../../../config.dart';
-import '../../novel/screens/novel_reader_screen.dart';
+import '../../novel/screens/novel_detail_screen.dart';
+import '../../novel/models/novel_model.dart';
 
 /// 阅读历史页面
 class ReadingHistoryScreen extends StatefulWidget {
@@ -36,11 +37,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 
       final resp = await http.get(
         Uri.parse(
-          '$SUPABASE_URL/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_read_chapter,last_read_at,novels:novel_id(title,cover_url,author)&order=last_read_at.desc&limit=50',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_read_chapter,last_read_at,novels:novel_id(title,cover_url,author,description,category,status,word_count,chapter_count)&order=last_read_at.desc&limit=50',
         ),
         headers: {
-          'apikey': SUPABASE_KEY,
-          'Authorization': 'Bearer $SUPABASE_KEY',
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
         },
       );
 
@@ -84,10 +85,10 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         if (userId == null) return;
 
         final resp = await http.delete(
-          Uri.parse('$SUPABASE_URL/rest/v1/user_novels?user_id=eq.$userId'),
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId'),
           headers: {
-            'apikey': SUPABASE_KEY,
-            'Authorization': 'Bearer $SUPABASE_KEY',
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
           },
         );
 
@@ -163,12 +164,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       itemCount: _history.length,
       itemBuilder: (context, index) {
         final item = _history[index];
-        final novel = item['novels'] as Map<String, dynamic>? ?? {};
-        final title = novel['title'] ?? '未知小说';
-        final coverUrl = novel['cover_url'];
-        final author = novel['author'] ?? '';
+        final novelData = item['novels'] as Map<String, dynamic>? ?? {};
+        final title = novelData['title'] ?? '未知小说';
+        final coverUrl = novelData['cover_url'];
+        final author = novelData['author'] ?? '';
         final lastChapter = item['last_read_chapter'] ?? 0;
-        final lastReadAt = item['last_read_at'];
 
         return ListTile(
           leading: coverUrl != null
@@ -201,15 +201,23 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // 跳转到阅读页面
+            // 构建 NovelModel 并跳转到详情页
+            final novel = NovelModel(
+              id: item['novel_id'],
+              title: title,
+              author: author,
+              cover: coverUrl ?? '',
+              description: novelData['description'] ?? '',
+              category: novelData['category'] ?? '',
+              status: novelData['status'] ?? 'ongoing',
+              wordCount: novelData['word_count'] ?? 0,
+              chapterCount: novelData['chapter_count'] ?? 0,
+              createdAt: DateTime.now(),
+            );
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => NovelReaderScreen(
-                  novelId: item['novel_id'],
-                  novelTitle: title,
-                  initialChapterNum: lastChapter,
-                ),
+                builder: (_) => NovelDetailScreen(novel: novel),
               ),
             );
           },
