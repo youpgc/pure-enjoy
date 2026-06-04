@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flip_page/flip_page.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
@@ -51,8 +52,12 @@ class NovelReaderScreen extends StatefulWidget {
 }
 
 class _NovelReaderScreenState extends State<NovelReaderScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, SingleTickerProviderStateMixin {
   final _scrollController = ScrollController();
+
+  // 分页内容组件的 Key，用于获取当前页码
+  final _pagedContentKey = GlobalKey<_PagedChapterContentState>();
+  final _curlContentKey = GlobalKey<_CurlChapterContentState>();
 
   List<NovelChapterModel> _chapters = [];
   NovelChapterModel? _currentChapter;
@@ -60,6 +65,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   bool _isLoading = true;
   bool _isLoadingChapter = false;
   bool _showMenu = false;
+
+  // 悬浮工具栏动画控制器
+  late AnimationController _toolbarAnimationController;
+  late Animation<Offset> _topToolbarSlideAnimation;
+  late Animation<Offset> _bottomToolbarSlideAnimation;
+  late Animation<double> _toolbarFadeAnimation;
+
+  // 当前页码信息（由子组件回调更新）
+  int _currentPageIndex = 0;
+  int _totalPages = 1;
 
   // 阅读时长统计
   DateTime? _readingStartTime;
@@ -91,18 +106,52 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
+
+    // 初始化悬浮工具栏动画
+    _toolbarAnimationController = AnimationController(
+      vsync: this,
+      duration: const Duration(milliseconds: 250),
+    );
+    _topToolbarSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, -1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _toolbarAnimationController,
+      curve: Curves.easeOut,
+    ));
+    _bottomToolbarSlideAnimation = Tween<Offset>(
+      begin: const Offset(0, 1),
+      end: Offset.zero,
+    ).animate(CurvedAnimation(
+      parent: _toolbarAnimationController,
+      curve: Curves.easeOut,
+    ));
+    _toolbarFadeAnimation = Tween<double>(
+      begin: 0.0,
+      end: 1.0,
+    ).animate(CurvedAnimation(
+      parent: _toolbarAnimationController,
+      curve: Curves.easeOut,
+    ));
+
     _scrollController.addListener(_onScroll);
     _loadSettings();
     _loadChapters();
     _checkBookshelfStatus();
+
+    // 初始进入时设置沉浸式模式
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
   }
 
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
+    _toolbarAnimationController.dispose();
     _saveProgress();
     _scrollController.dispose();
+    // 退出阅读器时恢复系统UI
+    SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
   }
 
@@ -261,6 +310,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   Future<void> _loadChapterContent(NovelChapterModel chapter) async {
     setState(() => _isLoadingChapter = true);
     _hasTriggeredNextChapter = false;
+    // 重置页码信息
+    _currentPageIndex = 0;
+    _totalPages = 1;
 
     try {
       final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
@@ -561,6 +613,37 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
+  /// 子组件回调：页码变化
+  void _onPageChanged(int currentPage, int totalPages) {
+    setState(() {
+      _currentPageIndex = currentPage;
+      _totalPages = totalPages;
+    });
+  }
+
+  /// 子组件回调：PageView 到达边界
+  void _onPageBoundaryReached(bool isLastPage) {
+    if (isLastPage) {
+      // 到达最后一页，跳转下一章
+      if (_currentChapterIndex < _chapters.length - 1) {
+        _nextChapter();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已经是最后一章了')),
+        );
+      }
+    } else {
+      // 到达第一页，跳转上一章
+      if (_currentChapterIndex > 0) {
+        _previousChapter();
+      } else {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('已经是第一章了')),
+        );
+      }
+    }
+  }
+
   void _showChapterList() {
     showModalBottomSheet(
       context: context,
@@ -799,14 +882,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   void _toggleMenu() {
     setState(() => _showMenu = !_showMenu);
-    _setFullScreen(!_showMenu);
-  }
-
-  void _setFullScreen(bool fullScreen) {
-    if (fullScreen) {
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
-    } else {
+    if (_showMenu) {
+      _toolbarAnimationController.forward();
       SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+    } else {
+      _toolbarAnimationController.reverse();
+      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
   }
 
@@ -819,196 +900,320 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return '${(_readingProgress * 100).toStringAsFixed(1)}%';
   }
 
-  /// 处理屏幕点击分区：左30%上一页/上一章，中40%菜单，右30%下一页/下一章
+  /// 处理屏幕点击分区
+  /// 分页模式（slide/cover/simulation）：
+  ///   左侧30%：第一页则上一章，否则上一页
+  ///   右侧30%：最后一页则下一章，否则下一页
+  ///   中间40%：切换菜单
+  /// 滚动模式（scroll）：
+  ///   中间：切换菜单
+  ///   左/右：无操作
   void _handleScreenTap(TapUpDetails details) {
     final width = MediaQuery.of(context).size.width;
     final dx = details.globalPosition.dx;
 
+    if (_pageTurnMode == PageTurnMode.scroll) {
+      // 滚动模式下只有中间区域有操作
+      if (dx >= width * 0.3 && dx <= width * 0.7) {
+        _toggleMenu();
+      }
+      return;
+    }
+
+    // 分页模式
     if (dx < width * 0.3) {
-      // 左侧：上一章
-      _previousChapter();
+      // 左侧区域
+      if (_currentPageIndex <= 0) {
+        // 第一页，跳转上一章
+        _previousChapter();
+      } else {
+        // 上一页
+        _pagedContentKey.currentState?.previousPage();
+        _curlContentKey.currentState?.previousPage();
+      }
     } else if (dx > width * 0.7) {
-      // 右侧：下一章
-      _nextChapter();
+      // 右侧区域
+      if (_currentPageIndex >= _totalPages - 1) {
+        // 最后一页，跳转下一章
+        _nextChapter();
+      } else {
+        // 下一页
+        _pagedContentKey.currentState?.nextPage();
+        _curlContentKey.currentState?.nextPage();
+      }
     } else {
-      // 中间：切换菜单
+      // 中间区域：切换菜单
       _toggleMenu();
     }
   }
 
-  /// 处理滑动手势
-  void _handleHorizontalDrag(DragEndDetails details) {
-    if (details.primaryVelocity == null) return;
-    if (details.primaryVelocity! < -200) {
-      // 向左滑：下一章
-      _nextChapter();
-    } else if (details.primaryVelocity! > 200) {
-      // 向右滑：上一章
-      _previousChapter();
-    }
+  /// 构建顶部悬浮工具栏
+  Widget _buildTopToolbar() {
+    return FadeTransition(
+      opacity: _toolbarFadeAnimation,
+      child: SlideTransition(
+        position: _topToolbarSlideAnimation,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [
+                _background.bgColor.withOpacity(0.95),
+                _background.bgColor.withOpacity(0.0),
+              ],
+              stops: const [0.7, 1.0],
+            ),
+          ),
+          child: SafeArea(
+            bottom: false,
+            child: Padding(
+              padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+              child: Row(
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Text(
+                          _currentChapter?.title ?? widget.novel.title,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.w600,
+                            color: _background.textColor,
+                          ),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        if (_chapters.isNotEmpty)
+                          Text(
+                            '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: _background.textColor.withOpacity(0.6),
+                            ),
+                          ),
+                      ],
+                    ),
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isInBookshelf ? Icons.library_books : Icons.library_add_outlined,
+                      color: _background.textColor,
+                    ),
+                    onPressed: _isInBookshelf ? null : _addToBookshelf,
+                    tooltip: _isInBookshelf ? '已在书架' : '加入书架',
+                  ),
+                  IconButton(
+                    icon: Icon(
+                      _isCollected ? Icons.favorite : Icons.favorite_border,
+                      color: _isCollected ? Colors.red : _background.textColor,
+                    ),
+                    onPressed: () => _toggleCollection(),
+                    tooltip: '收藏',
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.info_outline, color: _background.textColor),
+                    onPressed: () {
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => NovelDetailScreen(novel: widget.novel)),
+                      );
+                    },
+                    tooltip: '详情',
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建底部悬浮工具栏
+  Widget _buildBottomToolbar() {
+    return FadeTransition(
+      opacity: _toolbarFadeAnimation,
+      child: SlideTransition(
+        position: _bottomToolbarSlideAnimation,
+        child: Container(
+          decoration: BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.bottomCenter,
+              end: Alignment.topCenter,
+              colors: [
+                _background.bgColor.withOpacity(0.95),
+                _background.bgColor.withOpacity(0.0),
+              ],
+              stops: const [0.7, 1.0],
+            ),
+          ),
+          child: SafeArea(
+            top: false,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: OutlinedButton(
+                            onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
+                            style: OutlinedButton.styleFrom(
+                              foregroundColor: _background.textColor,
+                              side: BorderSide(color: _background.textColor.withOpacity(0.3)),
+                            ),
+                            child: const Text('上一章'),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Expanded(
+                        child: SizedBox(
+                          height: 40,
+                          child: FilledButton(
+                            onPressed: _currentChapterIndex < _chapters.length - 1 ? _nextChapter : null,
+                            child: const Text('下一章'),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      _ToolbarButton(
+                        icon: Icons.list_outlined,
+                        label: '目录',
+                        textColor: _background.textColor,
+                        onTap: _showChapterList,
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.text_fields,
+                        label: '字体',
+                        textColor: _background.textColor,
+                        onTap: _showSettings,
+                      ),
+                      _ToolbarButton(
+                        icon: _pageTurnMode.icon,
+                        label: '翻页',
+                        textColor: _background.textColor,
+                        onTap: _showSettings,
+                      ),
+                      _ToolbarButton(
+                        icon: _background == ReaderBackground.dark
+                            ? Icons.light_mode_outlined
+                            : Icons.dark_mode_outlined,
+                        label: _background == ReaderBackground.dark ? '日间' : '夜间',
+                        textColor: _background.textColor,
+                        onTap: () {
+                          setState(() {
+                            _background = _background == ReaderBackground.dark
+                                ? ReaderBackground.white
+                                : ReaderBackground.dark;
+                          });
+                          _saveSettings();
+                        },
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 8),
+              ],
+            ),
+          ),
+        ),
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       backgroundColor: _background.bgColor,
-      appBar: _showMenu
-          ? AppBar(
-              title: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(
-                    _currentChapter?.title ?? widget.novel.title,
-                    style: const TextStyle(fontSize: 16),
-                  ),
-                  if (_chapters.isNotEmpty)
-                    Text(
-                      '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                ],
-              ),
-              actions: [
-                IconButton(
-                  icon: Icon(_isInBookshelf ? Icons.library_books : Icons.library_add_outlined),
-                  onPressed: _isInBookshelf ? null : _addToBookshelf,
-                  tooltip: _isInBookshelf ? '已在书架' : '加入书架',
-                ),
-                IconButton(
-                  icon: Icon(
-                    _isCollected ? Icons.favorite : Icons.favorite_border,
-                    color: _isCollected ? Colors.red : null,
-                  ),
-                  onPressed: () => _toggleCollection(),
-                  tooltip: '收藏',
-                ),
-                IconButton(
-                  icon: const Icon(Icons.info_outline),
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(builder: (_) => NovelDetailScreen(novel: widget.novel)),
-                    );
-                  },
-                  tooltip: '详情',
-                ),
-              ],
-            )
-          : null,
+      appBar: null, // 始终不显示 AppBar
       body: _isLoading
           ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
           : _currentChapter == null
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
-              : GestureDetector(
-                  onTapUp: _handleScreenTap,
-                  onHorizontalDragEnd: _handleHorizontalDrag,
-                  behavior: HitTestBehavior.translucent,
-                  child: Column(
-                    children: [
-                      if (_chapters.isNotEmpty)
-                        LinearProgressIndicator(
-                          value: _readingProgress,
-                          backgroundColor: _background.textColor.withOpacity(0.1),
-                          valueColor: AlwaysStoppedAnimation<Color>(
-                            _background == ReaderBackground.dark
-                                ? Colors.blue
-                                : Theme.of(context).colorScheme.primary,
-                          ),
-                          minHeight: 3,
-                        ),
-                      Expanded(
-                        child: _isLoadingChapter
-                            ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
-                            : _buildContent(),
-                      ),
-                      if (_showMenu)
-                        Container(
-                          decoration: BoxDecoration(
-                            color: _background.bgColor,
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.black.withOpacity(0.1),
-                                blurRadius: 8,
-                                offset: const Offset(0, -2),
-                              ),
-                            ],
-                          ),
-                          child: SafeArea(
-                            child: Column(
-                              mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                                  child: Row(
-                                    children: [
-                                      Expanded(
-                                        child: OutlinedButton(
-                                          onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
-                                          child: const Text('上一章'),
-                                        ),
-                                      ),
-                                      const SizedBox(width: 16),
-                                      Expanded(
-                                        child: FilledButton(
-                                          onPressed: _currentChapterIndex < _chapters.length - 1 ? _nextChapter : null,
-                                          child: const Text('下一章'),
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Padding(
-                                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
-                                  child: Row(
-                                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                    children: [
-                                      _ToolbarButton(
-                                        icon: Icons.list_outlined,
-                                        label: '目录',
-                                        textColor: _background.textColor,
-                                        onTap: _showChapterList,
-                                      ),
-                                      _ToolbarButton(
-                                        icon: Icons.text_fields,
-                                        label: '字体',
-                                        textColor: _background.textColor,
-                                        onTap: _showSettings,
-                                      ),
-                                      _ToolbarButton(
-                                        icon: _pageTurnMode.icon,
-                                        label: '翻页',
-                                        textColor: _background.textColor,
-                                        onTap: _showSettings,
-                                      ),
-                                      _ToolbarButton(
-                                        icon: _background == ReaderBackground.dark
-                                            ? Icons.light_mode_outlined
-                                            : Icons.dark_mode_outlined,
-                                        label: _background == ReaderBackground.dark ? '日间' : '夜间',
-                                        textColor: _background.textColor,
-                                        onTap: () {
-                                          setState(() {
-                                            _background = _background == ReaderBackground.dark
-                                                ? ReaderBackground.white
-                                                : ReaderBackground.dark;
-                                          });
-                                          _saveSettings();
-                                        },
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                              ],
+              : Stack(
+                  children: [
+                    // 底层：内容区域，填满整个屏幕
+                    Positioned.fill(
+                      child: _isLoadingChapter
+                          ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
+                          : _buildContent(),
+                    ),
+
+                    // 顶部进度条（始终显示）
+                    if (_chapters.isNotEmpty)
+                      Positioned(
+                        top: 0,
+                        left: 0,
+                        right: 0,
+                        child: SafeArea(
+                          bottom: false,
+                          child: LinearProgressIndicator(
+                            value: _readingProgress,
+                            backgroundColor: _background.textColor.withOpacity(0.1),
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              _background == ReaderBackground.dark
+                                  ? Colors.blue
+                                  : Theme.of(context).colorScheme.primary,
                             ),
+                            minHeight: 3,
                           ),
                         ),
-                    ],
-                  ),
+                      ),
+
+                    // 仿真翻页模式下的中间区域点击拦截层
+                    if (_pageTurnMode == PageTurnMode.simulation)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTapUp: (details) {
+                            final width = MediaQuery.of(context).size.width;
+                            final dx = details.globalPosition.dx;
+                            // 只在中间40%区域拦截点击
+                            if (dx >= width * 0.3 && dx <= width * 0.7) {
+                              _toggleMenu();
+                            }
+                          },
+                          behavior: HitTestBehavior.translucent,
+                        ),
+                      ),
+
+                    // 分页模式下的点击处理层（非仿真模式）
+                    if (_pageTurnMode != PageTurnMode.simulation && _pageTurnMode != PageTurnMode.scroll)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTapUp: _handleScreenTap,
+                          behavior: HitTestBehavior.translucent,
+                        ),
+                      ),
+
+                    // 滚动模式下的点击处理层
+                    if (_pageTurnMode == PageTurnMode.scroll)
+                      Positioned.fill(
+                        child: GestureDetector(
+                          onTapUp: _handleScreenTap,
+                          behavior: HitTestBehavior.translucent,
+                        ),
+                      ),
+
+                    // 顶部悬浮工具栏
+                    _buildTopToolbar(),
+
+                    // 底部悬浮工具栏
+                    _buildBottomToolbar(),
+                  ],
                 ),
     );
   }
@@ -1060,31 +1265,56 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       );
     }
 
-    // 分页模式：使用 PageView 实现左右翻页
+    // 仿真翻页模式：使用 FlipPage
+    if (_pageTurnMode == PageTurnMode.simulation) {
+      return _CurlChapterContent(
+        key: _curlContentKey,
+        chapter: _currentChapter!,
+        background: _background,
+        font: _font,
+        fontSize: _fontSize,
+        lineHeight: _lineHeight,
+        onPageChanged: _onPageChanged,
+        onBoundaryReached: _onPageBoundaryReached,
+      );
+    }
+
+    // 分页模式（slide/cover）：使用 PageView
     return _PagedChapterContent(
+      key: _pagedContentKey,
       chapter: _currentChapter!,
       background: _background,
       font: _font,
       fontSize: _fontSize,
       lineHeight: _lineHeight,
+      pageTurnMode: _pageTurnMode,
+      onPageChanged: _onPageChanged,
+      onBoundaryReached: _onPageBoundaryReached,
     );
   }
 }
 
-/// 分页章节内容组件
+/// 分页章节内容组件（slide/cover 模式）
 class _PagedChapterContent extends StatefulWidget {
   final NovelChapterModel chapter;
   final ReaderBackground background;
   final ReaderFont font;
   final double fontSize;
   final double lineHeight;
+  final PageTurnMode pageTurnMode;
+  final void Function(int currentPage, int totalPages) onPageChanged;
+  final void Function(bool isLastPage) onBoundaryReached;
 
   const _PagedChapterContent({
+    super.key,
     required this.chapter,
     required this.background,
     required this.font,
     required this.fontSize,
     required this.lineHeight,
+    required this.pageTurnMode,
+    required this.onPageChanged,
+    required this.onBoundaryReached,
   });
 
   @override
@@ -1093,12 +1323,13 @@ class _PagedChapterContent extends StatefulWidget {
 
 class _PagedChapterContentState extends State<_PagedChapterContent> {
   List<ContentPage> _pages = [];
-  final _pageController = PageController();
+  late PageController _pageController;
   bool _isCalculating = true;
 
   @override
   void initState() {
     super.initState();
+    _pageController = PageController();
   }
 
   @override
@@ -1112,7 +1343,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
     super.didUpdateWidget(oldWidget);
     if (oldWidget.chapter.id != widget.chapter.id ||
         oldWidget.fontSize != widget.fontSize ||
-        oldWidget.lineHeight != widget.lineHeight) {
+        oldWidget.lineHeight != widget.lineHeight ||
+        oldWidget.font != widget.font) {
       _calculatePages();
     }
   }
@@ -1123,10 +1355,31 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
     super.dispose();
   }
 
+  /// 编程式翻到下一页
+  void nextPage() {
+    if (_pageController.hasClients && _pageController.page! < _pages.length - 1) {
+      _pageController.nextPage(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
+  /// 编程式翻到上一页
+  void previousPage() {
+    if (_pageController.hasClients && _pageController.page! > 0) {
+      _pageController.previousPage(
+        duration: const Duration(milliseconds: 250),
+        curve: Curves.easeOut,
+      );
+    }
+  }
+
   void _calculatePages() {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 60;
+    // 只减去顶部进度条高度(3px)和底部页码文字预估高度(20px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 23;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1164,6 +1417,12 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
     return PageView.builder(
       controller: _pageController,
       itemCount: _pages.length,
+      onPageChanged: (index) {
+        widget.onPageChanged(index, _pages.length);
+        // 注意：不在边界页自动触发跳章
+        // PageView 会自然限制在第一页/最后一页
+        // 跳章由父组件的点击逻辑处理
+      },
       itemBuilder: (context, index) {
         final page = _pages[index];
         return Container(
@@ -1213,6 +1472,181 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
             ],
           ),
         );
+      },
+    );
+  }
+}
+
+/// 仿真翻页章节内容组件（simulation 模式，使用 FlipPage）
+class _CurlChapterContent extends StatefulWidget {
+  final NovelChapterModel chapter;
+  final ReaderBackground background;
+  final ReaderFont font;
+  final double fontSize;
+  final double lineHeight;
+  final void Function(int currentPage, int totalPages) onPageChanged;
+  final void Function(bool isLastPage) onBoundaryReached;
+
+  const _CurlChapterContent({
+    super.key,
+    required this.chapter,
+    required this.background,
+    required this.font,
+    required this.fontSize,
+    required this.lineHeight,
+    required this.onPageChanged,
+    required this.onBoundaryReached,
+  });
+
+  @override
+  State<_CurlChapterContent> createState() => _CurlChapterContentState();
+}
+
+class _CurlChapterContentState extends State<_CurlChapterContent> {
+  List<ContentPage> _pages = [];
+  late FlipPageController _flipPageController;
+  bool _isCalculating = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _flipPageController = FlipPageController();
+  }
+
+  @override
+  void didChangeDependencies() {
+    super.didChangeDependencies();
+    _calculatePages();
+  }
+
+  @override
+  void didUpdateWidget(covariant _CurlChapterContent oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.chapter.id != widget.chapter.id ||
+        oldWidget.fontSize != widget.fontSize ||
+        oldWidget.lineHeight != widget.lineHeight ||
+        oldWidget.font != widget.font) {
+      _calculatePages();
+    }
+  }
+
+  @override
+  void dispose() {
+    _flipPageController.dispose();
+    super.dispose();
+  }
+
+  /// 编程式翻到下一页
+  void nextPage() {
+    _flipPageController.next();
+  }
+
+  /// 编程式翻到上一页
+  void previousPage() {
+    _flipPageController.previous();
+  }
+
+  void _calculatePages() {
+    final mediaQuery = MediaQuery.of(context);
+    final width = mediaQuery.size.width;
+    // 只减去顶部进度条高度(3px)和底部页码文字预估高度(20px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 23;
+
+    final textStyle = TextStyle(
+      fontSize: widget.fontSize,
+      height: widget.lineHeight,
+      color: widget.background.textColor,
+      letterSpacing: 0.5,
+      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    );
+
+    final pages = TextPaginator.paginate(
+      text: widget.chapter.content,
+      width: width,
+      height: height,
+      style: textStyle,
+      lineHeight: widget.lineHeight,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+    );
+
+    setState(() {
+      _pages = pages;
+      _isCalculating = false;
+    });
+
+    // 翻页后重置到第一页
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        _flipPageController.jumpTo(0);
+      }
+    });
+  }
+
+  /// 构建单页内容 Widget
+  Widget _buildPageWidget(ContentPage page) {
+    return Container(
+      color: widget.background.bgColor,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (page.pageIndex == 0)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Text(
+                  widget.chapter.title,
+                  style: TextStyle(
+                    fontSize: widget.fontSize + 4,
+                    fontWeight: FontWeight.bold,
+                    color: widget.background.textColor,
+                    height: 1.6,
+                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                  ),
+                  textAlign: TextAlign.center,
+                ),
+              ),
+            ),
+          Expanded(
+            child: Text(
+              page.text,
+              style: TextStyle(
+                fontSize: widget.fontSize,
+                height: widget.lineHeight,
+                color: widget.background.textColor,
+                letterSpacing: 0.5,
+                fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+              ),
+            ),
+          ),
+          Center(
+            child: Text(
+              '${page.pageIndex + 1} / ${page.totalPages}',
+              style: TextStyle(
+                fontSize: 12,
+                color: widget.background.textColor.withOpacity(0.4),
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    if (_isCalculating || _pages.isEmpty) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    return FlipPage(
+      controller: _flipPageController,
+      pages: _pages.map((page) => _buildPageWidget(page)).toList(),
+      onPageChanged: (index) {
+        widget.onPageChanged(index, _pages.length);
+        // 注意：不在边界页自动触发跳章
+        // FlipPage 会自然限制在第一页/最后一页
+        // 跳章由父组件的点击逻辑处理
       },
     );
   }
