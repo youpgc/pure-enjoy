@@ -227,6 +227,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'title': '心情日记',
             'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
             'time': _formatTime(item['created_at']),
+            'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
       }
@@ -242,6 +243,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'title': '支出记录',
             'subtitle': '${item['category'] ?? '其他'} ¥${item['amount'] ?? 0}',
             'time': _formatTime(item['created_at']),
+            'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
       }
@@ -257,12 +259,13 @@ class _DashboardPageState extends State<DashboardPage> {
             'title': '体重记录',
             'subtitle': '${item['weight'] ?? 0} kg',
             'time': _formatTime(item['created_at']),
+            'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
       }
 
       // 按时间排序
-      activities.sort((a, b) => (b['time'] as String).compareTo(a['time'] as String));
+      activities.sort((a, b) => (b['created_at_raw'] as String).compareTo(a['created_at_raw'] as String));
 
       if (mounted) {
         setState(() {
@@ -365,7 +368,7 @@ class _DashboardPageState extends State<DashboardPage> {
   /// 格式化时间显示
   String _formatTime(String? createdAt) {
     if (createdAt == null) return '';
-    final dateTime = DateTime.tryParse(createdAt);
+    final dateTime = DateTime.tryParse(createdAt)?.toLocal();
     if (dateTime == null) return '';
     final now = DateTime.now();
     final diff = now.difference(dateTime);

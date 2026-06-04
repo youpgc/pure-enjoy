@@ -88,7 +88,7 @@ class _LifeScreenState extends State<LifeScreen> {
   String _formatDate(String? dateStr) {
     if (dateStr == null) return '';
     try {
-      final date = DateTime.parse(dateStr);
+      final date = DateTime.parse(dateStr).toLocal();
       final now = DateTime.now();
       final today = DateTime(now.year, now.month, now.day);
       final recordDate = DateTime(date.year, date.month, date.day);

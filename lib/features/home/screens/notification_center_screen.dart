@@ -306,7 +306,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   String _formatTime(String? timeStr) {
     if (timeStr == null) return '';
     try {
-      final time = DateTime.parse(timeStr);
+      final time = DateTime.parse(timeStr).toLocal();
       final now = DateTime.now();
       final diff = now.difference(time);
       if (diff.inMinutes < 1) return '刚刚';
