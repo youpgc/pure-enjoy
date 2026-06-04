@@ -1638,14 +1638,14 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return SimpleSimulationPageView(
+    return SimulationPageView(
       controller: _simulationController,
       backgroundColor: widget.background.bgColor,
       pages: _pages.map((page) => _buildPageWidget(page)).toList(),
       onPageChanged: (index) {
         widget.onPageChanged(index, _pages.length);
         // 注意：不在边界页自动触发跳章
-        // SimpleSimulationPageView 会自然限制在第一页/最后一页
+        // SimulationPageView 会自然限制在第一页/最后一页
         // 跳章由父组件的点击逻辑处理
       },
     );
