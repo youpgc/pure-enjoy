@@ -46,8 +46,6 @@ dependencies:
   image_picker: ^1.0.7
   # 图表库
   fl_chart: ^0.68.0
-  # 仿真翻页
-  flip_page: ^0.1.2
 
 dev_dependencies:
   flutter_test:

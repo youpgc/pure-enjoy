@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:flip_page/flip_page.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
@@ -1504,13 +1503,13 @@ class _CurlChapterContent extends StatefulWidget {
 
 class _CurlChapterContentState extends State<_CurlChapterContent> {
   List<ContentPage> _pages = [];
-  late FlipPageController _flipPageController;
+  late SimulationPageController _simulationController;
   bool _isCalculating = true;
 
   @override
   void initState() {
     super.initState();
-    _flipPageController = FlipPageController();
+    _simulationController = SimulationPageController();
   }
 
   @override
@@ -1532,18 +1531,18 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   @override
   void dispose() {
-    _flipPageController.dispose();
+    _simulationController._detach();
     super.dispose();
   }
 
   /// 编程式翻到下一页
   void nextPage() {
-    _flipPageController.next();
+    _simulationController.nextPage();
   }
 
   /// 编程式翻到上一页
   void previousPage() {
-    _flipPageController.previous();
+    _simulationController.previousPage();
   }
 
   void _calculatePages() {
@@ -1577,7 +1576,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
     // 翻页后重置到第一页
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
-        _flipPageController.jumpTo(0);
+        _simulationController.jumpToPage(0);
       }
     });
   }
@@ -1639,13 +1638,14 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return FlipPage(
-      controller: _flipPageController,
+    return SimpleSimulationPageView(
+      controller: _simulationController,
+      backgroundColor: widget.background.bgColor,
       pages: _pages.map((page) => _buildPageWidget(page)).toList(),
       onPageChanged: (index) {
         widget.onPageChanged(index, _pages.length);
         // 注意：不在边界页自动触发跳章
-        // FlipPage 会自然限制在第一页/最后一页
+        // SimpleSimulationPageView 会自然限制在第一页/最后一页
         // 跳章由父组件的点击逻辑处理
       },
     );
