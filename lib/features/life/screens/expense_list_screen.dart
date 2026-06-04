@@ -301,6 +301,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
                 CategoryChip(
+                  label: '全部',
                   isSelected: _selectedCategory == 'all',
                   onTap: () {
                     setState(() => _selectedCategory = 'all');
