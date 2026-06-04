@@ -1173,39 +1173,61 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         ),
                       ),
 
-                    // 仿真翻页模式下的中间区域点击拦截层
-                    if (_pageTurnMode == PageTurnMode.simulation)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          onTapUp: (details) {
-                            final width = MediaQuery.of(context).size.width;
-                            final dx = details.globalPosition.dx;
-                            // 只在中间40%区域拦截点击
-                            if (dx >= width * 0.3 && dx <= width * 0.7) {
-                              _toggleMenu();
-                            }
-                          },
-                          behavior: HitTestBehavior.translucent,
-                        ),
+                    // 中间区域点击层：只在屏幕中间40%区域放置点击检测，
+                    // 左右两侧不覆盖，让下层内容（ScrollView/PageView）正常接收手势
+                    Positioned.fill(
+                      child: Row(
+                        children: [
+                          // 左侧30%：透明，手势穿透到下层
+                          Expanded(
+                            flex: 3,
+                            child: _pageTurnMode != PageTurnMode.scroll
+                                ? GestureDetector(
+                                    // 分页模式：左侧点击上一页/上一章
+                                    onTap: () {
+                                      if (_currentPageIndex <= 0) {
+                                        _previousChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.previousPage();
+                                        _curlContentKey.currentState?.previousPage();
+                                      }
+                                    },
+                                    behavior: HitTestBehavior.translucent,
+                                    child: Container(color: Colors.transparent),
+                                  )
+                                : Container(color: Colors.transparent),
+                          ),
+                          // 中间40%：点击切换菜单
+                          Expanded(
+                            flex: 4,
+                            child: GestureDetector(
+                              onTap: _toggleMenu,
+                              behavior: HitTestBehavior.translucent,
+                              child: Container(color: Colors.transparent),
+                            ),
+                          ),
+                          // 右侧30%：透明，手势穿透到下层
+                          Expanded(
+                            flex: 3,
+                            child: _pageTurnMode != PageTurnMode.scroll
+                                ? GestureDetector(
+                                    // 分页模式：右侧点击下一页/下一章
+                                    onTap: () {
+                                      if (_currentPageIndex >= _totalPages - 1) {
+                                        _nextChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.nextPage();
+                                        _curlContentKey.currentState?.nextPage();
+                                      }
+                                    },
+                                    behavior: HitTestBehavior.translucent,
+                                    child: Container(color: Colors.transparent),
+                                  )
+                                : Container(color: Colors.transparent),
+                          ),
+                        ],
                       ),
-
-                    // 分页模式下的点击处理层（非仿真模式）
-                    if (_pageTurnMode != PageTurnMode.simulation && _pageTurnMode != PageTurnMode.scroll)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          onTapUp: _handleScreenTap,
-                          behavior: HitTestBehavior.translucent,
-                        ),
-                      ),
-
-                    // 滚动模式下的点击处理层
-                    if (_pageTurnMode == PageTurnMode.scroll)
-                      Positioned.fill(
-                        child: GestureDetector(
-                          onTapUp: _handleScreenTap,
-                          behavior: HitTestBehavior.translucent,
-                        ),
-                      ),
+                    ),
 
                     // 顶部悬浮工具栏
                     _buildTopToolbar(),
@@ -1459,15 +1481,6 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
                   ),
                 ),
               ),
-              Center(
-                child: Text(
-                  '${page.pageIndex + 1} / ${page.totalPages}',
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: widget.background.textColor.withOpacity(0.4),
-                  ),
-                ),
-              ),
             ],
           ),
         );
@@ -1476,7 +1489,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   }
 }
 
-/// 仿真翻页章节内容组件（simulation 模式，使用 FlipPage）
+/// 仿真翻页章节内容组件（simulation 模式，使用 SimulationPageView）
 class _CurlChapterContent extends StatefulWidget {
   final NovelChapterModel chapter;
   final ReaderBackground background;
@@ -1615,15 +1628,6 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
                 color: widget.background.textColor,
                 letterSpacing: 0.5,
                 fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-              ),
-            ),
-          ),
-          Center(
-            child: Text(
-              '${page.pageIndex + 1} / ${page.totalPages}',
-              style: TextStyle(
-                fontSize: 12,
-                color: widget.background.textColor.withOpacity(0.4),
               ),
             ),
           ),
