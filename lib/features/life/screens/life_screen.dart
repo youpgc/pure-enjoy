@@ -11,6 +11,7 @@ import 'favorites_screen.dart';
 import 'reminders_screen.dart';
 import 'habits_screen.dart';
 import 'statistics_screen.dart';
+import 'feedback_list_screen.dart';
 
 /// 生活模块主页面 - 展示最新记录 + 功能入口
 class LifeScreen extends StatefulWidget {
@@ -404,6 +405,18 @@ class _LifeScreenState extends State<LifeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const StatisticsScreen()),
+            );
+          },
+        ),
+        _FeatureItem(
+          icon: Icons.feedback,
+          title: '问题反馈',
+          subtitle: '提交问题与建议',
+          color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.7),
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const FeedbackListScreen()),
             );
           },
         ),

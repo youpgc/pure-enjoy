@@ -23,4 +23,5 @@ class AppConfig {
   static const String novelChaptersTable = 'novel_chapters';
   static const String userNovelsTable = 'user_novels';
   static const String readingProgressTable = 'user_novels';
+  static const String feedbackTable = 'user_feedback';
 }
