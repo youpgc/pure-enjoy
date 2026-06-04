@@ -6,6 +6,8 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/favorite_model.dart';
 
 /// 收藏夹页面 - Supabase 数据同步
@@ -107,23 +109,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _deleteFavorite(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这个收藏吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个收藏吗？');
 
     if (confirmed == true) {
       try {
@@ -345,28 +331,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingWidget()
           : _filteredFavorites.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.bookmark_border,
-                        size: 64,
-                        color: colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '暂无收藏',
-                        style: TextStyle(
-                          color: colorScheme.outline,
-                          fontSize: 16,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const EmptyWidget(icon: Icons.bookmark_border, message: '暂无收藏')
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _filteredFavorites.length,
@@ -486,39 +453,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                   ],
                                 ),
                               ),
-                              PopupMenuButton<String>(
-                                onSelected: (value) {
-                                  switch (value) {
-                                    case 'edit':
-                                      _showEditDialog(favorite: favorite);
-                                      break;
-                                    case 'delete':
-                                      _deleteFavorite(favorite.id);
-                                      break;
-                                  }
-                                },
-                                itemBuilder: (context) => [
-                                  const PopupMenuItem(
-                                    value: 'edit',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.edit, size: 20),
-                                        SizedBox(width: 8),
-                                        Text('编辑'),
-                                      ],
-                                    ),
-                                  ),
-                                  const PopupMenuItem(
-                                    value: 'delete',
-                                    child: Row(
-                                      children: [
-                                        Icon(Icons.delete, size: 20, color: Colors.red),
-                                        SizedBox(width: 8),
-                                        Text('删除', style: TextStyle(color: Colors.red)),
-                                      ],
-                                    ),
-                                  ),
-                                ],
+                              EditDeletePopupMenu(
+                                onEdit: () => _showEditDialog(favorite: favorite),
+                                onDelete: () => _deleteFavorite(favorite.id),
                               ),
                             ],
                           ),

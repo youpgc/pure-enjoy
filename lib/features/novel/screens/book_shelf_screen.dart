@@ -6,6 +6,7 @@ import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
@@ -506,10 +507,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   /// 格式化字数
   String _formatWordCount(int? wordCount) {
     if (wordCount == null || wordCount == 0) return '未知';
-    if (wordCount >= 10000) {
-      return '${(wordCount / 10000).toStringAsFixed(1)}万字';
-    }
-    return '$wordCount字';
+    return '${FormatUtils.formatWordCount(wordCount)}字';
   }
 
   @override

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
+import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 
@@ -403,10 +404,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   /// 格式化字数
   String _formatWordCount(int? wordCount) {
     if (wordCount == null) return '未知';
-    if (wordCount >= 10000) {
-      return '${(wordCount / 10000).toStringAsFixed(1)}万';
-    }
-    return '$wordCount';
+    return FormatUtils.formatWordCount(wordCount);
   }
 
   @override

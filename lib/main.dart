@@ -79,7 +79,7 @@ class AuthWrapper extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 检查是否已登录
+    // 检查是否已登录（AuthService.initialize() 已在 main() 中完成）
     if (AuthService.instance.isAuthenticated) {
       return const HomeScreen();
     }

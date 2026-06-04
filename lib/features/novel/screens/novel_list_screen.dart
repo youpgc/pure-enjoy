@@ -5,6 +5,7 @@ import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 import 'book_shelf_screen.dart';
@@ -347,7 +348,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                       itemCount: _categories.length,
                       itemBuilder: (context, index) {
                         final category = _categories[index];
-                        return _CategoryChip(
+                        return CategoryChip(
                           label: category,
                           isSelected: _selectedCategory == category,
                           onTap: () => _onCategoryChanged(category),
@@ -407,30 +408,6 @@ class _NovelListScreenState extends State<NovelListScreen> {
                 ],
               ),
             ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _CategoryChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) => onTap(),
-      ),
     );
   }
 }

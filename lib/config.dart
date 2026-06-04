@@ -1,8 +1,10 @@
 /// 应用配置文件
+import 'services/supabase_service.dart';
+
 class AppConfig {
-  // Supabase 配置
-  static const String supabaseUrl = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
-  static const String supabaseAnonKey = 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
+  // Supabase 配置（统一引用 SupabaseConfig）
+  static String get supabaseUrl => SupabaseConfig.url;
+  static String get supabaseAnonKey => SupabaseConfig.anonKey;
 
   // 应用信息
   static const String appName = '纯享';

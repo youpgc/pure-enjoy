@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/weight_record_model.dart';
 
 /// 体重记录页面 - Supabase 数据同步
@@ -121,23 +123,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   }
 
   Future<void> _deleteWeightRecord(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
 
     if (confirm == true) {
       try {
@@ -244,7 +230,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         title: const Text('体重记录'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingWidget()
           : RefreshIndicator(
               onRefresh: _loadRecords,
               child: SingleChildScrollView(
@@ -304,12 +290,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                     ),
                     const SizedBox(height: 12),
                     _records.isEmpty
-                        ? const Center(
-                            child: Padding(
-                              padding: EdgeInsets.all(32),
-                              child: Text('暂无记录'),
-                            ),
-                          )
+                        ? const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
                         : ListView.builder(
                             shrinkWrap: true,
                             physics: const NeverScrollableScrollPhysics(),
@@ -361,39 +342,9 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
                                         ),
                                     ],
                                   ),
-                                  trailing: PopupMenuButton<String>(
-                                    onSelected: (value) {
-                                      switch (value) {
-                                        case 'edit':
-                                          _showEditRecordForm(record);
-                                          break;
-                                        case 'delete':
-                                          _deleteWeightRecord(record.id);
-                                          break;
-                                      }
-                                    },
-                                    itemBuilder: (context) => [
-                                      const PopupMenuItem(
-                                        value: 'edit',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.edit, size: 20),
-                                            SizedBox(width: 8),
-                                            Text('编辑'),
-                                          ],
-                                        ),
-                                      ),
-                                      const PopupMenuItem(
-                                        value: 'delete',
-                                        child: Row(
-                                          children: [
-                                            Icon(Icons.delete, size: 20, color: Colors.red),
-                                            SizedBox(width: 8),
-                                            Text('删除', style: TextStyle(color: Colors.red)),
-                                          ],
-                                        ),
-                                      ),
-                                    ],
+                                  trailing: EditDeletePopupMenu(
+                                    onEdit: () => _showEditRecordForm(record),
+                                    onDelete: () => _deleteWeightRecord(record.id),
                                   ),
                                 ),
                               );

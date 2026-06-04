@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/reminder_model.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
@@ -156,23 +158,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   }
 
   Future<void> _deleteReminder(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这个提醒吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个提醒吗？');
     if (confirmed == true) {
       try {
         final response = await http.delete(
@@ -238,9 +224,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingWidget()
           : _filteredReminders.isEmpty
-              ? const Center(child: Text('暂无提醒事项'))
+              ? const EmptyWidget(icon: Icons.notifications_outlined, message: '暂无提醒事项')
               : ListView.builder(
                   itemCount: _filteredReminders.length,
                   itemBuilder: (context, index) {
@@ -307,21 +293,9 @@ class ReminderCard extends StatelessWidget {
             ),
           ],
         ),
-        trailing: PopupMenuButton<String>(
-          onSelected: (value) {
-            switch (value) {
-              case 'edit':
-                onEdit();
-                break;
-              case 'delete':
-                onDelete();
-                break;
-            }
-          },
-          itemBuilder: (context) => [
-            const PopupMenuItem(value: 'edit', child: Text('编辑')),
-            const PopupMenuItem(value: 'delete', child: Text('删除', style: TextStyle(color: Colors.red))),
-          ],
+        trailing: EditDeletePopupMenu(
+          onEdit: onEdit,
+          onDelete: onDelete,
         ),
       ),
     );

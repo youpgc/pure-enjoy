@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面 - Supabase 数据同步
@@ -149,23 +150,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _deleteNote(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条笔记吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条笔记吗？');
 
     if (confirm == true) {
       try {
@@ -282,25 +267,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
           // 笔记列表
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingWidget()
                 : _filteredNotes.isEmpty
-                    ? Center(
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            Icon(
-                              Icons.note_alt_outlined,
-                              size: 64,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                            const SizedBox(height: 16),
-                            Text(
-                              '暂无笔记',
-                              style: TextStyle(color: colorScheme.onSurfaceVariant),
-                            ),
-                          ],
-                        ),
-                      )
+                    ? const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记')
                     : RefreshIndicator(
                         onRefresh: _loadNotes,
                         child: GridView.builder(

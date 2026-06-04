@@ -6,6 +6,8 @@ import '../../../services/supabase_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/habit_model.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
@@ -158,23 +160,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 
   Future<void> _deleteHabit(String id) async {
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这个习惯吗？相关打卡记录也会被删除。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除', style: TextStyle(color: Colors.red)),
-          ),
-        ],
-      ),
-    );
+    final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个习惯吗？相关打卡记录也会被删除。');
 
     if (confirmed == true) {
       try {
@@ -432,36 +418,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
         title: const Text('习惯打卡'),
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const LoadingWidget()
           : _habits.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.track_changes_outlined,
-                        size: 64,
-                        color: colorScheme.outline,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '还没有习惯',
-                        style: TextStyle(
-                          color: colorScheme.outline,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '点击右下角添加新习惯',
-                        style: TextStyle(
-                          color: colorScheme.outline.withOpacity(0.7),
-                          fontSize: 14,
-                        ),
-                      ),
-                    ],
-                  ),
-                )
+              ? const EmptyWidget(icon: Icons.track_changes_outlined, message: '还没有习惯')
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: _habits.length,

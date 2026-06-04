@@ -5,6 +5,8 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
 import '../models/expense_model.dart';
 
 /// 支出列表页面 - Supabase 数据同步
@@ -143,23 +145,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   Future<void> _deleteExpense(String id) async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('确认删除'),
-        content: const Text('确定要删除这条记录吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('删除'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
 
     if (confirm == true) {
       try {
@@ -314,15 +300,14 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
               scrollDirection: Axis.horizontal,
               padding: const EdgeInsets.symmetric(horizontal: 16),
               children: [
-                _CategoryChip(
-                  label: '全部',
+                CategoryChip(
                   isSelected: _selectedCategory == 'all',
                   onTap: () {
                     setState(() => _selectedCategory = 'all');
                     _loadExpenses();
                   },
                 ),
-                ...ExpenseCategory.values.map((cat) => _CategoryChip(
+                ...ExpenseCategory.values.map((cat) => CategoryChip(
                   label: cat.label,
                   isSelected: _selectedCategory == cat.name,
                   onTap: () {
@@ -338,9 +323,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           // 支出列表
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const LoadingWidget()
                 : _expenses.isEmpty
-                    ? const Center(child: Text('暂无记录'))
+                    ? const EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录')
                     : RefreshIndicator(
                         onRefresh: _loadExpenses,
                         child: ListView.builder(
@@ -371,39 +356,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                                         fontWeight: FontWeight.bold,
                                       ),
                                     ),
-                                    PopupMenuButton<String>(
-                                      onSelected: (value) {
-                                        switch (value) {
-                                          case 'edit':
-                                            _showEditExpenseForm(expense);
-                                            break;
-                                          case 'delete':
-                                            _deleteExpense(expense.id);
-                                            break;
-                                        }
-                                      },
-                                      itemBuilder: (context) => [
-                                        const PopupMenuItem(
-                                          value: 'edit',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.edit, size: 20),
-                                              SizedBox(width: 8),
-                                              Text('编辑'),
-                                            ],
-                                          ),
-                                        ),
-                                        const PopupMenuItem(
-                                          value: 'delete',
-                                          child: Row(
-                                            children: [
-                                              Icon(Icons.delete, size: 20, color: Colors.red),
-                                              SizedBox(width: 8),
-                                              Text('删除', style: TextStyle(color: Colors.red)),
-                                            ],
-                                          ),
-                                        ),
-                                      ],
+                                    EditDeletePopupMenu(
+                                      onEdit: () => _showEditExpenseForm(expense),
+                                      onDelete: () => _deleteExpense(expense.id),
                                     ),
                                   ],
                                 ),
@@ -418,30 +373,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showExpenseForm(),
         child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class _CategoryChip extends StatelessWidget {
-  final String label;
-  final bool isSelected;
-  final VoidCallback onTap;
-
-  const _CategoryChip({
-    required this.label,
-    required this.isSelected,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(right: 8),
-      child: FilterChip(
-        label: Text(label),
-        selected: isSelected,
-        onSelected: (_) => onTap(),
       ),
     );
   }
