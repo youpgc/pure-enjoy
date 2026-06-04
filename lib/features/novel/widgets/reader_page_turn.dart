@@ -136,7 +136,7 @@ class SimulationPageController {
     _state = state;
   }
 
-  void _detach() {
+  void detach() {
     _state = null;
   }
 
@@ -203,7 +203,7 @@ class _SimulationPageViewState extends State<SimulationPageView>
 
   @override
   void dispose() {
-    widget.controller?._detach();
+    widget.controller?.detach();
     _animationController.dispose();
     super.dispose();
   }

@@ -1531,7 +1531,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   @override
   void dispose() {
-    _simulationController._detach();
+    _simulationController.detach();
     super.dispose();
   }
 
