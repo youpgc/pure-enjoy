@@ -9,7 +9,7 @@ class FeedbackDetailScreen extends StatelessWidget {
   const FeedbackDetailScreen({super.key, required this.feedback});
 
   /// 获取分类标签信息
-  _CategoryInfo _getCategoryInfo(String category) {
+  _CategoryInfo _getCategoryInfo(String category, BuildContext context) {
     switch (category) {
       case 'bug':
         return _CategoryInfo(label: 'Bug', color: Theme.of(context).colorScheme.error);
@@ -25,7 +25,7 @@ class FeedbackDetailScreen extends StatelessWidget {
   }
 
   /// 获取状态标签信息
-  _StatusInfo _getStatusInfo(String status) {
+  _StatusInfo _getStatusInfo(String status, BuildContext context) {
     switch (status) {
       case 'pending':
         return _StatusInfo(label: '待确认', color: Theme.of(context).colorScheme.onSurfaceVariant);
@@ -49,8 +49,8 @@ class FeedbackDetailScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final categoryInfo = _getCategoryInfo(feedback.category);
-    final statusInfo = _getStatusInfo(feedback.status);
+    final categoryInfo = _getCategoryInfo(feedback.category, context);
+    final statusInfo = _getStatusInfo(feedback.status, context);
     final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(

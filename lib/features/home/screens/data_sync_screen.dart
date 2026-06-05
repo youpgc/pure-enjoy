@@ -418,7 +418,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         style: TextStyle(
           fontSize: 12,
           color: result.status == TableSyncStatus.failed
-              ? Theme.of(context).colorScheme.error.shade700
+              ? AppTheme.error
               : Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),

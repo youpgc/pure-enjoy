@@ -101,12 +101,12 @@ class EditDeletePopupMenu extends StatelessWidget {
             ),
           ),
         if (onDelete != null)
-          const PopupMenuItem(
+          PopupMenuItem(
             value: 'delete',
             child: Row(
               children: [
                 Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
-                SizedBox(width: 8),
+                const SizedBox(width: 8),
                 Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
               ],
             ),
