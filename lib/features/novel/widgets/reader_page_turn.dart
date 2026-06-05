@@ -296,39 +296,41 @@ class _SimulationPageViewState extends State<SimulationPageView>
       onHorizontalDragStart: _onHorizontalDragStart,
       onHorizontalDragUpdate: _onHorizontalDragUpdate,
       onHorizontalDragEnd: _onHorizontalDragEnd,
-      child: AnimatedBuilder(
-        animation: _animationController,
-        builder: (context, child) {
-          final progress = _isDragging
-              ? _dragProgress.abs()
-              : _animationController.value;
-          final isForward = _dragProgress < 0;
+      child: SizedBox.expand(
+        child: AnimatedBuilder(
+          animation: _animationController,
+          builder: (context, child) {
+            final progress = _isDragging
+                ? _dragProgress.abs()
+                : _animationController.value;
+            final isForward = _dragProgress < 0;
 
-          return Stack(
-            fit: StackFit.expand,
-            children: [
-              // 下一页（底层）
-              if (isForward && _currentPage < widget.pages.length - 1)
-                widget.pages[_currentPage + 1]
-              else if (!isForward && _currentPage > 0)
-                widget.pages[_currentPage - 1]
-              else
-                Container(color: widget.backgroundColor),
+            return Stack(
+              fit: StackFit.expand,
+              children: [
+                // 下一页（底层）
+                if (isForward && _currentPage < widget.pages.length - 1)
+                  widget.pages[_currentPage + 1]
+                else if (!isForward && _currentPage > 0)
+                  widget.pages[_currentPage - 1]
+                else
+                  Container(color: widget.backgroundColor),
 
-              // 当前页（带3D翻转效果）
-              if (progress > 0)
-                Transform(
-                  transform: Matrix4.identity()
-                    ..setEntry(3, 2, 0.001) // 透视
-                    ..rotateY(isForward ? progress * math.pi / 2.5 : -progress * math.pi / 2.5),
-                  alignment: isForward ? Alignment.centerRight : Alignment.centerLeft,
-                  child: widget.pages[_currentPage],
-                )
-              else
-                widget.pages[_currentPage],
-            ],
-          );
-        },
+                // 当前页（带3D翻转效果）
+                if (progress > 0)
+                  Transform(
+                    transform: Matrix4.identity()
+                      ..setEntry(3, 2, 0.001) // 透视
+                      ..rotateY(isForward ? progress * math.pi / 2.5 : -progress * math.pi / 2.5),
+                    alignment: isForward ? Alignment.centerRight : Alignment.centerLeft,
+                    child: widget.pages[_currentPage],
+                  )
+                else
+                  widget.pages[_currentPage],
+              ],
+            );
+          },
+        ),
       ),
     );
   }
