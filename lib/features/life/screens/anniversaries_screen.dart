@@ -10,7 +10,10 @@ import '../models/anniversary_model.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
 class AnniversariesScreen extends StatefulWidget {
-  const AnniversariesScreen({super.key});
+  /// 类型过滤：'anniversary' 或 'birthday'
+  final String filterType;
+
+  const AnniversariesScreen({super.key, this.filterType = 'anniversary'});
 
   @override
   State<AnniversariesScreen> createState() => _AnniversariesScreenState();
@@ -58,7 +61,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=date.asc',
+          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&type=eq.${widget.filterType}&select=*&order=date.asc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -163,17 +166,20 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     final descController =
         TextEditingController(text: anniversary?.description ?? '');
 
-    String selectedType = anniversary?.type ?? 'birthday';
+    String selectedType = anniversary?.type ?? widget.filterType;
     DateTime selectedDate = anniversary?.date ?? DateTime.now();
     bool repeatYearly = anniversary?.repeatYearly ?? true;
     bool remindEnabled = anniversary?.remindEnabled ?? false;
     int? remindDaysBefore = anniversary?.remindDaysBefore ?? 0;
 
+    final isBirthday = widget.filterType == 'birthday';
+    final typeLabel = isBirthday ? '生日' : '纪念日';
+
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
         builder: (context, setDialogState) => AlertDialog(
-          title: Text(isEditing ? '编辑纪念日' : '添加纪念日'),
+          title: Text(isEditing ? '编辑$typeLabel' : '添加$typeLabel'),
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
@@ -182,33 +188,15 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                 // 名称输入
                 TextField(
                   controller: nameController,
-                  decoration: const InputDecoration(
+                  decoration: InputDecoration(
                     labelText: '名称 *',
-                    hintText: '例如：妈妈生日、结婚纪念日',
+                    hintText: isBirthday ? '例如：妈妈生日、爸爸生日' : '例如：结婚纪念日、入职纪念日',
                   ),
                 ),
                 const SizedBox(height: 12),
 
-                // 类型选择
-                const Text('类型 *', style: TextStyle(fontSize: 12)),
-                const SizedBox(height: 4),
-                SegmentedButton<String>(
-                  segments: const [
-                    ButtonSegment(
-                      value: 'birthday',
-                      label: Text('生日'),
-                      icon: Icon(Icons.cake, size: 18),
-                    ),
-                    ButtonSegment(
-                      value: 'anniversary',
-                      label: Text('纪念日'),
-                      icon: Icon(Icons.celebration, size: 18),
-                    ),
-                  ],
-                  selected: {selectedType},
-                  onSelectionChanged: (values) {
-                    setDialogState(() => selectedType = values.first);
-                  },
+                // 类型选择（仅在全部模式下显示）
+                const SizedBox.shrink(),
                 ),
                 const SizedBox(height: 16),
 
@@ -411,17 +399,19 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isBirthday = widget.filterType == 'birthday';
+    final title = isBirthday ? '生日' : '纪念日';
 
     return Scaffold(
       appBar: AppBar(
-        title: const Text('纪念日'),
+        title: Text(title),
       ),
       body: _isLoading
           ? const LoadingWidget()
           : _anniversaries.isEmpty
-              ? const EmptyWidget(
-                  icon: Icons.cake_outlined,
-                  message: '还没有纪念日',
+              ? EmptyWidget(
+                  icon: isBirthday ? Icons.cake_outlined : Icons.celebration_outlined,
+                  message: '还没有$title',
                 )
               : RefreshIndicator(
                   onRefresh: _loadAnniversaries,

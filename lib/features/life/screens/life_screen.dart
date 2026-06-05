@@ -411,13 +411,25 @@ class _LifeScreenState extends State<LifeScreen> {
         ),
         _FeatureItem(
           icon: Icons.cake,
-          title: '纪念日',
-          subtitle: '生日和重要日子',
+          title: '生日',
+          subtitle: '记录亲友生日',
           color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.7),
           onTap: (context) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AnniversariesScreen()),
+              MaterialPageRoute(builder: (_) => const AnniversariesScreen(filterType: 'birthday')),
+            );
+          },
+        ),
+        _FeatureItem(
+          icon: Icons.celebration,
+          title: '纪念日',
+          subtitle: '记录重要日子',
+          color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.7),
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AnniversariesScreen(filterType: 'anniversary')),
             );
           },
         ),
