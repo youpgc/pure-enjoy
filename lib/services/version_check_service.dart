@@ -139,13 +139,25 @@ class VersionCheckService {
       // Android 10+ 使用应用私有目录，不需要存储权限
       // 直接使用 getTemporaryDirectory() 保存到缓存目录
       final dir = await getTemporaryDirectory();
-      final savePath = '${dir.path}/pure_enjoy_update.apk';
+
+      // 从URL中提取版本号作为文件名，避免缓存旧版本
+      final uri = Uri.parse(apkUrl);
+      final urlFileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'pure_enjoy_update.apk';
+      final savePath = '${dir.path}/$urlFileName';
       final file = File(savePath);
 
       // 如果旧文件存在则删除
       if (await file.exists()) {
         await file.delete();
       }
+
+      // 同时清理旧格式的缓存文件
+      try {
+        final oldFile = File('${dir.path}/pure_enjoy_update.apk');
+        if (await oldFile.exists()) {
+          await oldFile.delete();
+        }
+      } catch (_) {}
 
       downloadStatus.value = '正在下载...';
 
