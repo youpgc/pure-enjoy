@@ -1,10 +1,15 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
+import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import '../../../config.dart';
 import 'data_sync_screen.dart';
 import 'rich_text_page.dart';
 import '../../../services/data_export_service.dart';
+import '../../../services/version_check_service.dart';
+import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
 
 /// 系统设置页面
@@ -24,7 +29,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _wifiOnly = true;
   bool _pushNotification = true;
   bool _dailyReminder = false;
+  bool _anniversaryReminder = true;
   String _currentVersion = '';
+  bool _isCheckingUpdate = false;
+  String? _latestVersion;
 
   @override
   void initState() {
@@ -126,6 +134,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _dailyReminder,
             onChanged: (val) => setState(() => _dailyReminder = val),
           ),
+          SwitchListTile(
+            secondary: const Icon(Icons.cake_outlined),
+            title: const Text('纪念日提醒'),
+            subtitle: const Text('纪念日到期前提醒'),
+            value: _anniversaryReminder,
+            onChanged: (val) => setState(() => _anniversaryReminder = val),
+          ),
 
           // 语言设置
           const _SectionHeader(title: '语言设置'),
@@ -152,6 +167,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             subtitle: const Text('清除本地缓存数据'),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showClearCacheDialog(),
+          ),
+          ListTile(
+            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
+            title: const Text('注销账号', style: TextStyle(color: Colors.red)),
+            subtitle: const Text('永久删除账号及所有数据'),
+            trailing: const Icon(Icons.chevron_right, color: Colors.red),
+            onTap: () => _showDeleteAccountDialog(),
           ),
 
           // 关于与法律
@@ -239,10 +261,22 @@ class _SettingsScreenState extends State<SettingsScreen> {
           const _SectionHeader(title: '版本'),
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
-            title: const Text('版本信息'),
-            subtitle: Text(_currentVersion.isEmpty ? '加载中...' : _currentVersion),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showVersionInfo(),
+            title: const Text('检查更新'),
+            subtitle: Text(_isCheckingUpdate
+                ? '检查中...'
+                : _latestVersion != null
+                    ? '发现新版本: $_latestVersion'
+                    : _currentVersion.isEmpty
+                        ? '加载中...'
+                        : '当前版本: $_currentVersion'),
+            trailing: _isCheckingUpdate
+                ? const SizedBox(
+                    width: 20,
+                    height: 20,
+                    child: CircularProgressIndicator(strokeWidth: 2),
+                  )
+                : const Icon(Icons.chevron_right),
+            onTap: _isCheckingUpdate ? null : () => _checkUpdate(),
           ),
         ],
       ),
@@ -321,17 +355,145 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('取消'),
           ),
           FilledButton(
-            onPressed: () {
+            onPressed: () async {
               Navigator.pop(context);
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('缓存已清除')),
-              );
+              await _clearCache();
             },
             child: const Text('确定'),
           ),
         ],
       ),
     );
+  }
+
+  Future<void> _clearCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.clear();
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('缓存已清除')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('清除缓存失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showDeleteAccountDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('注销账号', style: TextStyle(color: Colors.red)),
+        content: const Text(
+          '警告：此操作将永久删除您的账号及所有相关数据，包括消费记录、体重记录、心情日记、笔记、收藏等。此操作不可恢复！\n\n请确认您已备份重要数据。',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            onPressed: () async {
+              Navigator.pop(context);
+              await _deleteAccount();
+            },
+            child: const Text('确认注销'),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _deleteAccount() async {
+    try {
+      final auth = AuthService.instance;
+      final userId = auth.currentUserId;
+      if (userId == null) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('未登录，无法注销')),
+          );
+        }
+        return;
+      }
+
+      // 删除用户相关数据
+      final tables = [
+        'expenses',
+        'weight_records',
+        'mood_diaries',
+        'notes',
+        'user_habits',
+        'user_habit_checkins',
+        'user_favorites',
+        'user_feedback',
+        'user_reminders',
+        'reading_history',
+        'user_anniversaries',
+      ];
+
+      for (final table in tables) {
+        try {
+          await http.delete(
+            Uri.parse('${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId'),
+            headers: SupabaseConfig.writeHeaders,
+          );
+        } catch (_) {
+          // 忽略单个表删除失败
+        }
+      }
+
+      // 登出
+      await auth.signOut();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('账号已注销，所有数据已删除')),
+        );
+        // 返回首页
+        Navigator.of(context).popUntil((route) => route.isFirst);
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('注销失败: $e')),
+        );
+      }
+    }
+  }
+
+  Future<void> _checkUpdate() async {
+    setState(() => _isCheckingUpdate = true);
+    try {
+      final versionInfo = await VersionCheckService.instance.checkUpdate();
+      if (mounted) {
+        if (versionInfo != null) {
+          setState(() => _latestVersion = versionInfo['version'] as String?);
+          VersionCheckService.instance.showUpdateDialog(context, versionInfo);
+        } else {
+          setState(() => _latestVersion = null);
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('当前已是最新版本')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('检查更新失败: $e')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingUpdate = false);
+      }
+    }
   }
 
   Future<void> _showExportDialog() async {

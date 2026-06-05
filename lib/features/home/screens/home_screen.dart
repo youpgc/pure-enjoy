@@ -2173,7 +2173,6 @@ class _ProfilePageState extends State<ProfilePage> {
         backgroundImage: NetworkImage(avatarUrl),
         onBackgroundImageError: (_, __) {},
         backgroundColor: colorScheme.primaryContainer,
-        child: const Icon(Icons.person, size: 32),
       );
     }
     return CircleAvatar(
