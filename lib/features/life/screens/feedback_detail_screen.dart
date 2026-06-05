@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/feedback_model.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// 问题反馈详情页面
 class FeedbackDetailScreen extends StatelessWidget {

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// 单个表的同步结果
 enum TableSyncStatus { pending, syncing, success, failed }

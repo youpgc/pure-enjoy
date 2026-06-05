@@ -398,7 +398,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
                   color: AppTheme.error.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
-                child: const Text(
+                child: Text(
                   '此版本为强制更新，必须更新后才能继续使用。',
                   style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
                 ),

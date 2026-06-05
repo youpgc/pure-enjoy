@@ -516,7 +516,7 @@ class _HabitCard extends StatelessWidget {
                                 color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
-                              child: const Text(
+                              child: Text(
                                 '已暂停',
                                 style: TextStyle(
                                   fontSize: 10,
@@ -576,12 +576,12 @@ class _HabitCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
                           Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                         ],
                       ),

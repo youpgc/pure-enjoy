@@ -546,7 +546,7 @@ class _AnniversaryCard extends StatelessWidget {
                           const SizedBox(width: 4),
                           // 提醒图标
                           if (item.remindEnabled)
-                            const Icon(
+                            Icon(
                               Icons.notifications_active,
                               size: 16,
                               color: Theme.of(context).colorScheme.secondary,
@@ -589,12 +589,12 @@ class _AnniversaryCard extends StatelessWidget {
                         ],
                       ),
                     ),
-                    const PopupMenuItem(
+                    PopupMenuItem(
                       value: 'delete',
                       child: Row(
                         children: [
                           Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
-                          SizedBox(width: 8),
+                          const SizedBox(width: 8),
                           Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                         ],
                       ),

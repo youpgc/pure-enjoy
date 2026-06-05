@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';

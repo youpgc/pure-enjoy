@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// 统计图表页面
 class StatisticsScreen extends StatefulWidget {

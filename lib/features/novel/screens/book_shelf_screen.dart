@@ -414,7 +414,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '更改阅读状态',
-                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
