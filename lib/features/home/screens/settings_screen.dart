@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'data_sync_screen.dart';
 import 'rich_text_page.dart';
 import '../../../services/data_export_service.dart';
+import '../../life/screens/feedback_list_screen.dart';
 
 /// 系统设置页面
 class SettingsScreen extends StatefulWidget {
@@ -215,6 +216,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     configKey: 'help_center',
                     title: '帮助中心',
                   ),
+                ),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('问题反馈'),
+            subtitle: const Text('提交问题与建议'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const FeedbackListScreen(),
                 ),
               );
             },

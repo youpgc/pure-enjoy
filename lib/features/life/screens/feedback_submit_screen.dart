@@ -49,7 +49,10 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/user_feedback'),
-        headers: SupabaseConfig.writeHeaders,
+        headers: {
+          ...SupabaseConfig.writeHeaders,
+          'x-user-id': userId,
+        },
         body: jsonEncode({
           'user_id': userId,
           'title': _titleController.text.trim(),

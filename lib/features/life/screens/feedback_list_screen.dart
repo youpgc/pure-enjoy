@@ -43,7 +43,10 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/user_feedback?user_id=eq.$userId&select=*&order=created_at.desc',
         ),
-        headers: SupabaseConfig.headers,
+        headers: {
+          ...SupabaseConfig.headers,
+          'x-user-id': userId,
+        },
       );
 
       if (response.statusCode == 200) {
