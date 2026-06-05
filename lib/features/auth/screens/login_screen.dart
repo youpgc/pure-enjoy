@@ -204,7 +204,7 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text(message),
-        backgroundColor: isSuccess ? Colors.green : Theme.of(context).colorScheme.error,
+        backgroundColor: isSuccess ? AppTheme.success : Theme.of(context).colorScheme.error,
       ),
     );
   }

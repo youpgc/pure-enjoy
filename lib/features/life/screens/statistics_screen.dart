@@ -156,14 +156,14 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     final colors = [
-      Colors.blue,
-      Colors.orange,
-      Colors.green,
-      Colors.purple,
-      Colors.red,
-      Colors.teal,
-      Colors.pink,
-      Colors.indigo,
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.secondary,
+      AppTheme.success,
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.error,
+      Theme.of(context).colorScheme.tertiary,
+      Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.primary,
     ];
 
     return SingleChildScrollView(
@@ -185,7 +185,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
                   Text(
                     '¥${total.toStringAsFixed(2)}',
                     style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                          color: Colors.red,
+                          color: Theme.of(context).colorScheme.error,
                           fontWeight: FontWeight.bold,
                         ),
                   ),
@@ -364,7 +364,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                 child: _StatCard(
                   title: '当前',
                   value: '${currentWeight.toStringAsFixed(1)} kg',
-                  color: Colors.blue,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ),
               const SizedBox(width: 8),
@@ -372,7 +372,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                 child: _StatCard(
                   title: '最低',
                   value: '${minWeight.toStringAsFixed(1)} kg',
-                  color: Colors.green,
+                  color: AppTheme.success,
                 ),
               ),
               const SizedBox(width: 8),
@@ -380,7 +380,7 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                 child: _StatCard(
                   title: '最高',
                   value: '${maxWeight.toStringAsFixed(1)} kg',
-                  color: Colors.orange,
+                  color: Theme.of(context).colorScheme.secondary,
                 ),
               ),
             ],
@@ -447,14 +447,14 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
                   LineChartBarData(
                     spots: spots,
                     isCurved: true,
-                    color: Colors.blue,
+                    color: Theme.of(context).colorScheme.primary,
                     barWidth: 3,
                     dotData: FlDotData(
                       show: spots.length < 20,
                     ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: Colors.blue.withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
                     ),
                   ),
                 ],
@@ -619,14 +619,14 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
       ..sort((a, b) => b.value.compareTo(a.value));
 
     final colors = [
-      Colors.amber,
-      Colors.orange,
-      Colors.lightBlue,
-      Colors.grey,
-      Colors.blueGrey,
-      Colors.purple,
-      Colors.red,
-      Colors.brown,
+      Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.onSurfaceVariant,
+      Theme.of(context).colorScheme.outline,
+      Theme.of(context).colorScheme.primary,
+      Theme.of(context).colorScheme.error,
+      Theme.of(context).colorScheme.outline,
     ];
 
     final total = _diaries.length;
@@ -648,7 +648,7 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
                       Text(
                         '$total',
                         style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                              color: Colors.blue,
+                              color: Theme.of(context).colorScheme.primary,
                               fontWeight: FontWeight.bold,
                             ),
                       ),

@@ -291,7 +291,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   void _showError(String message) {
     if (mounted) {
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Colors.red),
+        SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
       );
     }
   }
@@ -347,7 +347,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               Positioned.fill(
                                 child: CircleAvatar(
                                   radius: 50,
-                                  backgroundColor: Colors.black.withOpacity(0.5),
+                                  backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
                                   child: const SizedBox(
                                     width: 24,
                                     height: 24,
@@ -534,7 +534,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           child: Text(
             _gender ?? '保密',
             style: TextStyle(
-              color: _gender == null ? Colors.grey : null,
+              color: _gender == null ? Theme.of(context).colorScheme.onSurfaceVariant : null,
             ),
           ),
         ),

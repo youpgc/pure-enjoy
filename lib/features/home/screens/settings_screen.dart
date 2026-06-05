@@ -176,10 +176,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showChangePasswordDialog(),
           ),
           ListTile(
-            leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
-            title: const Text('注销账号', style: TextStyle(color: Colors.red)),
+            leading: const Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+            title: const Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
             subtitle: const Text('永久删除账号及所有数据'),
-            trailing: const Icon(Icons.chevron_right, color: Colors.red),
+            trailing: const Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
             onTap: () => _showDeleteAccountDialog(),
           ),
 
@@ -395,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('注销账号', style: TextStyle(color: Colors.red)),
+        title: const Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
         content: const Text(
           '警告：此操作将永久删除您的账号及所有相关数据，包括消费记录、体重记录、心情日记、笔记、收藏等。此操作不可恢复！\n\n请确认您已备份重要数据。',
         ),
@@ -405,7 +405,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             child: const Text('取消'),
           ),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Colors.red),
+            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
             onPressed: () async {
               Navigator.pop(context);
               await _deleteAccount();
@@ -572,7 +572,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(result['message'] as String),
-                              backgroundColor: Colors.red,
+                              backgroundColor: Theme.of(context).colorScheme.error,
                             ),
                           );
                         }
@@ -666,7 +666,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
         children: [
-          Text(label, style: TextStyle(color: Colors.grey[600])),
+          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
           const Spacer(),
           Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
         ],
@@ -688,7 +688,7 @@ class _SectionHeader extends StatelessWidget {
         style: TextStyle(
           fontSize: 14,
           fontWeight: FontWeight.bold,
-          color: Colors.grey[600],
+          color: Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
     );

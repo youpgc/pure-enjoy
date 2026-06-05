@@ -442,7 +442,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Colors.black.withOpacity(0.3),
+                          Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
                           colorScheme.surface,
                         ],
                         stops: const [0.0, 0.5, 1.0],
@@ -632,7 +632,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                               _cachedChapterCount > 0
                                   ? Icons.download_done
                                   : Icons.download_outlined,
-                              color: _cachedChapterCount > 0 ? Colors.green : null,
+                              color: _cachedChapterCount > 0 ? AppTheme.success : null,
                             ),
                           ),
                   ),
@@ -651,7 +651,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                         _isCollected
                             ? Icons.favorite
                             : Icons.favorite_border,
-                        color: _isCollected ? Colors.red : null,
+                        color: _isCollected ? Theme.of(context).colorScheme.error : null,
                       ),
                     ),
                   ),

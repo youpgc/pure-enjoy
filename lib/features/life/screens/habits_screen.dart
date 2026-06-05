@@ -108,7 +108,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
     );
   }
 
@@ -151,7 +151,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${habit.name} 打卡成功！'),
-          backgroundColor: Colors.green,
+          backgroundColor: AppTheme.success,
         ),
       );
     } catch (e) {
@@ -378,7 +378,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   itemBuilder: (context, index) {
                     final checkin = checkins[index];
                     return ListTile(
-                      leading: const Icon(Icons.check_circle, color: Colors.green),
+                      leading: const Icon(Icons.check_circle, color: AppTheme.success),
                       title: Text(DateTimeUtils.formatStandard(checkin.checkinAt)),
                     );
                   },
@@ -512,14 +512,14 @@ class _HabitCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.grey.withOpacity(0.2),
+                                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: const Text(
                                 '已暂停',
                                 style: TextStyle(
                                   fontSize: 10,
-                                  color: Colors.grey,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 ),
                               ),
                             ),
@@ -579,9 +579,9 @@ class _HabitCard extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
                           SizedBox(width: 8),
-                          Text('删除', style: TextStyle(color: Colors.red)),
+                          Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                         ],
                       ),
                     ),
@@ -597,19 +597,19 @@ class _HabitCard extends StatelessWidget {
                   label: '目标天数',
                   value: '${habit.targetDays}',
                   icon: Icons.flag,
-                  color: Colors.blue,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
                 _StatItem(
                   label: '总打卡',
                   value: '$totalCheckins',
                   icon: Icons.check_circle,
-                  color: Colors.green,
+                  color: AppTheme.success,
                 ),
                 _StatItem(
                   label: '频率',
                   value: habit.frequency == 'daily' ? '每天' : habit.frequency,
                   icon: Icons.calendar_today,
-                  color: Colors.purple,
+                  color: Theme.of(context).colorScheme.primary,
                 ),
               ],
             ),
@@ -639,7 +639,7 @@ class _HabitCard extends StatelessWidget {
                 icon: Icon(isCheckedIn ? Icons.check : Icons.add),
                 label: Text(isCheckedIn ? '今日已打卡' : '立即打卡'),
                 style: FilledButton.styleFrom(
-                  backgroundColor: isCheckedIn ? Colors.green : habitColor,
+                  backgroundColor: isCheckedIn ? AppTheme.success : habitColor,
                   foregroundColor: Colors.white,
                 ),
               ),

@@ -142,14 +142,14 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
           Icon(
             Icons.history_outlined,
             size: 64,
-            color: Colors.grey[400],
+            color: Theme.of(context).colorScheme.onSurfaceVariant,
           ),
           const SizedBox(height: 16),
           Text(
             '暂无阅读历史',
             style: TextStyle(
               fontSize: 16,
-              color: Colors.grey[600],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
           const SizedBox(height: 8),
@@ -157,7 +157,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
             '开始阅读小说，记录将显示在这里',
             style: TextStyle(
               fontSize: 14,
-              color: Colors.grey[500],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
             ),
           ),
         ],
@@ -188,16 +188,16 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                     errorBuilder: (_, __, ___) => Container(
                       width: 50,
                       height: 70,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.book, color: Colors.grey),
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      child: const Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                 )
               : Container(
                   width: 50,
                   height: 70,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.book, color: Colors.grey),
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  child: const Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
           title: Text(title),
           subtitle: Text(

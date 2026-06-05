@@ -1007,7 +1007,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   IconButton(
                     icon: Icon(
                       _isCollected ? Icons.favorite : Icons.favorite_border,
-                      color: _isCollected ? Colors.red : _background.textColor,
+                      color: _isCollected ? Theme.of(context).colorScheme.error : _background.textColor,
                     ),
                     onPressed: () => _toggleCollection(),
                     tooltip: '收藏',
@@ -1165,7 +1165,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             backgroundColor: _background.textColor.withOpacity(0.1),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               _background == ReaderBackground.dark
-                                  ? Colors.blue
+                                  ? Theme.of(context).colorScheme.primary
                                   : Theme.of(context).colorScheme.primary,
                             ),
                             minHeight: 3,

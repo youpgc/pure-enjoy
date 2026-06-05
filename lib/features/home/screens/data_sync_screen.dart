@@ -242,7 +242,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
                 ? '数据同步成功，共 $totalRecords 条记录'
                 : '同步完成：$successCount 成功，$failCount 失败',
           ),
-          backgroundColor: failCount == 0 ? Colors.green : Colors.orange,
+          backgroundColor: failCount == 0 ? AppTheme.success : Theme.of(context).colorScheme.secondary,
         ),
       );
     }
@@ -277,7 +277,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
                       '将您的消费记录、心情日记、体重记录、笔记、收藏、提醒事项和习惯打卡同步到本地，确保数据安全。',
                       style: TextStyle(
                         fontSize: 14,
-                        color: Colors.grey[600],
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 12),
@@ -288,14 +288,14 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
                           Icon(
                             Icons.schedule,
                             size: 16,
-                            color: Colors.grey[500],
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
                           ),
                           const SizedBox(width: 4),
                           Text(
                             '上次同步: $_lastSyncTime',
                             style: TextStyle(
                               fontSize: 12,
-                              color: Colors.grey[500],
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
                             ),
                           ),
                         ],
@@ -321,8 +321,8 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
                           _syncStatus,
                           style: TextStyle(
                             color: _syncStatus.contains('失败')
-                                ? Colors.red
-                                : Colors.green,
+                                ? Theme.of(context).colorScheme.error
+                                : AppTheme.success,
                           ),
                         ),
                       ],
@@ -387,7 +387,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     switch (result.status) {
       case TableSyncStatus.pending:
         statusIcon = Icons.circle_outlined;
-        statusColor = Colors.grey;
+        statusColor = Theme.of(context).colorScheme.onSurfaceVariant;
         statusText = '等待同步';
         break;
       case TableSyncStatus.syncing:
@@ -397,12 +397,12 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         break;
       case TableSyncStatus.success:
         statusIcon = Icons.check_circle;
-        statusColor = Colors.green;
+        statusColor = AppTheme.success;
         statusText = '${result.recordCount} 条记录';
         break;
       case TableSyncStatus.failed:
         statusIcon = Icons.error;
-        statusColor = Colors.red;
+        statusColor = Theme.of(context).colorScheme.error;
         statusText = '同步失败';
         break;
     }
@@ -417,8 +417,8 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         style: TextStyle(
           fontSize: 12,
           color: result.status == TableSyncStatus.failed
-              ? Colors.red.shade700
-              : Colors.grey[600],
+              ? Theme.of(context).colorScheme.error.shade700
+              : Theme.of(context).colorScheme.onSurfaceVariant,
         ),
       ),
       trailing: Row(

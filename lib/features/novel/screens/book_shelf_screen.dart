@@ -314,9 +314,9 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       case 'reading':
         return colorScheme.primary;
       case 'completed':
-        return Colors.green;
+        return AppTheme.success;
       case 'unread':
-        return Colors.orange;
+        return Theme.of(context).colorScheme.secondary;
       default:
         return colorScheme.primary;
     }
@@ -389,7 +389,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           children: [
             // 继续阅读
             ListTile(
-              leading: const Icon(Icons.play_circle_outline, color: Colors.blue),
+              leading: const Icon(Icons.play_circle_outline, color: Theme.of(context).colorScheme.primary),
               title: const Text('继续阅读'),
               subtitle: Text('第 $lastChapter / $chapterCount 章'),
               onTap: () {
@@ -413,7 +413,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                 alignment: Alignment.centerLeft,
                 child: Text(
                   '更改阅读状态',
-                  style: TextStyle(fontSize: 12, color: Colors.grey),
+                  style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
               ),
             ),
@@ -421,7 +421,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               leading: const Icon(Icons.auto_stories),
               title: const Text('在读'),
               trailing: currentStatus == 'reading'
-                  ? const Icon(Icons.check, color: Colors.blue)
+                  ? const Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                   : null,
               onTap: () {
                 Navigator.pop(context);
@@ -434,7 +434,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               leading: const Icon(Icons.done_all),
               title: const Text('已读完'),
               trailing: currentStatus == 'completed'
-                  ? const Icon(Icons.check, color: Colors.green)
+                  ? const Icon(Icons.check, color: AppTheme.success)
                   : null,
               onTap: () {
                 Navigator.pop(context);
@@ -445,8 +445,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Colors.red),
-              title: const Text('移出书架', style: TextStyle(color: Colors.red)),
+              leading: const Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+              title: const Text('移出书架', style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onTap: () {
                 Navigator.pop(context);
                 _confirmRemove(userNovelId);

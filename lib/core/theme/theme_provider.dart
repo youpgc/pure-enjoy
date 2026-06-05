@@ -1,16 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
-/// 主题配色方案
+/// 主题配色方案 - 基于Logo的橙黄渐变色系
 enum AppColorScheme {
-  purple('默认紫', Color(0xFF6750A4)),
-  blue('海洋蓝', Color(0xFF1565C0)),
-  green('森林绿', Color(0xFF2E7D32)),
-  orange('暖阳橙', Color(0xFFE65100)),
-  pink('樱花粉', Color(0xFFAD1457)),
-  teal('薄荷青', Color(0xFF00695C)),
-  indigo('靛蓝', Color(0xFF283593)),
-  red('热情红', Color(0xFFC62828));
+  orange('活力橙', Color(0xFFF26522)),
+  yellow('暖阳黄', Color(0xFFFFC107)),
+  amber('琥珀金', Color(0xFFFFB300)),
+  coral('珊瑚橙', Color(0xFFFF7043)),
+  gold('香槟金', Color(0xFFFFD54F)),
+  sunset('夕阳橙', Color(0xFFFF8A65)),
+  mango('芒果黄', Color(0xFFFFCA28)),
+  tangerine('柑橘橙', Color(0xFFFF9800));
 
   const AppColorScheme(this.label, this.seedColor);
   final String label;
@@ -47,7 +47,7 @@ class ThemeProvider extends ChangeNotifier {
   bool get isDarkMode => _themeMode == ThemeMode.dark;
 
   // 配色方案
-  AppColorScheme _colorScheme = AppColorScheme.purple;
+  AppColorScheme _colorScheme = AppColorScheme.orange;
   AppColorScheme get colorScheme => _colorScheme;
 
   // 字体缩放 (0.8 ~ 1.4)

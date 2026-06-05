@@ -394,12 +394,12 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Colors.red.shade50,
+                  color: Theme.of(context).colorScheme.error.shade50,
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(
                   '此版本为强制更新，必须更新后才能继续使用。',
-                  style: TextStyle(color: Colors.red, fontSize: 12),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontSize: 12),
                 ),
               ),
             if (_isDownloading) ...[

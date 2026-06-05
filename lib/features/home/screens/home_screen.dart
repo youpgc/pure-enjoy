@@ -118,12 +118,12 @@ class _ToolItem {
 }
 
 const List<_ToolItem> _allTools = [
-  _ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Colors.amber),
-  _ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: Colors.green),
-  _ToolItem(id: 'weight', label: '记体重', icon: Icons.monitor_weight_outlined, color: Colors.blue),
-  _ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Colors.purple),
-  _ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Colors.orange),
-  _ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Colors.teal),
+  _ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Theme.of(context).colorScheme.secondary),
+  _ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: AppTheme.success),
+  _ToolItem(id: 'weight', label: '记体重', icon: Icons.monitor_weight_outlined, color: Theme.of(context).colorScheme.primary),
+  _ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Theme.of(context).colorScheme.primary),
+  _ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Theme.of(context).colorScheme.secondary),
+  _ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Theme.of(context).colorScheme.tertiary),
 ];
 
 const String _prefsKeyTools = 'dashboard_visible_tools';
@@ -1144,7 +1144,7 @@ class _ToolConfigSheetState extends State<_ToolConfigSheet> {
               width: 40,
               height: 4,
               decoration: BoxDecoration(
-                color: Colors.grey[300],
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
                 borderRadius: BorderRadius.circular(2),
               ),
             ),
@@ -1928,7 +1928,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (_isForceUpdate)
                 const Text(
                   '【强制更新】',
-                  style: TextStyle(color: Colors.red, fontWeight: FontWeight.bold),
+                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold),
                 ),
             ],
           ],
@@ -2042,7 +2042,7 @@ class _ProfilePageState extends State<ProfilePage> {
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Colors.grey,
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -2083,7 +2083,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     height: 8,
                     margin: const EdgeInsets.only(right: 8),
                     decoration: const BoxDecoration(
-                      color: Colors.red,
+                      color: Theme.of(context).colorScheme.error,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -2366,7 +2366,7 @@ class _ThemeSettingsScreen extends StatelessWidget {
                             border: Border.all(
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
-                                  : Colors.grey.withOpacity(0.3),
+                                  : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
                               width: isSelected ? 3 : 1,
                             ),
                           ),
@@ -2476,9 +2476,9 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
   };
 
   static const _typeColors = {
-    DataExportService.typeExpenses: Colors.orange,
-    DataExportService.typeWeight: Colors.blue,
-    DataExportService.typeMood: Colors.purple,
+    DataExportService.typeExpenses: Theme.of(context).colorScheme.secondary,
+    DataExportService.typeWeight: Theme.of(context).colorScheme.primary,
+    DataExportService.typeMood: Theme.of(context).colorScheme.primary,
   };
 
   @override
@@ -2510,14 +2510,14 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('导出成功！共 ${result.count} 条数据'),
-            backgroundColor: Colors.green,
+            backgroundColor: AppTheme.success,
           ),
         );
       } else {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('导出失败：${result.error}'),
-            backgroundColor: Colors.red,
+            backgroundColor: Theme.of(context).colorScheme.error,
           ),
         );
       }
@@ -2541,7 +2541,7 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.grey[300],
+              color: Theme.of(context).colorScheme.onSurfaceVariant,
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -2578,7 +2578,7 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: (_typeColors[type] ?? Colors.grey).withOpacity(0.1),
+                              color: (_typeColors[type] ?? Theme.of(context).colorScheme.onSurfaceVariant).withOpacity(0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(
@@ -2708,13 +2708,13 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
             _status,
             textAlign: TextAlign.center,
             style: TextStyle(
-              color: _hasError ? Colors.red : null,
+              color: _hasError ? Theme.of(context).colorScheme.error : null,
               fontWeight: _isComplete || _hasError ? FontWeight.bold : null,
             ),
           ),
           if (_isComplete) ...[
             const SizedBox(height: 8),
-            const Icon(Icons.check_circle, color: Colors.green, size: 48),
+            const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
           ],
         ],
       ),

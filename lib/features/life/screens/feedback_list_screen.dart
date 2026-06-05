@@ -76,15 +76,15 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
   _CategoryInfo _getCategoryInfo(String category) {
     switch (category) {
       case 'bug':
-        return _CategoryInfo(label: 'Bug', color: Colors.red);
+        return _CategoryInfo(label: 'Bug', color: Theme.of(context).colorScheme.error);
       case 'feature':
-        return _CategoryInfo(label: '功能建议', color: Colors.blue);
+        return _CategoryInfo(label: '功能建议', color: Theme.of(context).colorScheme.primary);
       case 'improvement':
-        return _CategoryInfo(label: '体验优化', color: Colors.purple);
+        return _CategoryInfo(label: '体验优化', color: Theme.of(context).colorScheme.primary);
       case 'other':
-        return _CategoryInfo(label: '其他', color: Colors.grey);
+        return _CategoryInfo(label: '其他', color: Theme.of(context).colorScheme.onSurfaceVariant);
       default:
-        return _CategoryInfo(label: category, color: Colors.grey);
+        return _CategoryInfo(label: category, color: Theme.of(context).colorScheme.onSurfaceVariant);
     }
   }
 
@@ -92,15 +92,15 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
   _StatusInfo _getStatusInfo(String status) {
     switch (status) {
       case 'pending':
-        return _StatusInfo(label: '待确认', color: Colors.grey);
+        return _StatusInfo(label: '待确认', color: Theme.of(context).colorScheme.onSurfaceVariant);
       case 'confirmed':
-        return _StatusInfo(label: '已确认', color: Colors.blue);
+        return _StatusInfo(label: '已确认', color: Theme.of(context).colorScheme.primary);
       case 'in_progress':
-        return _StatusInfo(label: '进行中', color: Colors.orange);
+        return _StatusInfo(label: '进行中', color: Theme.of(context).colorScheme.secondary);
       case 'resolved':
-        return _StatusInfo(label: '已完结', color: Colors.green);
+        return _StatusInfo(label: '已完结', color: AppTheme.success);
       default:
-        return _StatusInfo(label: status, color: Colors.grey);
+        return _StatusInfo(label: status, color: Theme.of(context).colorScheme.onSurfaceVariant);
     }
   }
 
@@ -185,7 +185,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
                             Text(
                               _formatDate(feedback.createdAt),
                               style: TextStyle(
-                                color: Colors.grey,
+                                color: Theme.of(context).colorScheme.onSurfaceVariant,
                                 fontSize: 12,
                               ),
                             ),

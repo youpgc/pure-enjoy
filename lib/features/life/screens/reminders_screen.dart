@@ -286,8 +286,8 @@ class ReminderCard extends StatelessWidget {
               DateTimeUtils.formatStandard(reminder.remindAt),
               style: TextStyle(
                 color: reminder.remindAt.isBefore(DateTime.now()) && !reminder.isCompleted
-                    ? Colors.red
-                    : Colors.grey,
+                    ? Theme.of(context).colorScheme.error
+                    : Theme.of(context).colorScheme.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),

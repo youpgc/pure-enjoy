@@ -122,7 +122,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Colors.red),
+      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
     );
   }
 
@@ -549,7 +549,7 @@ class _AnniversaryCard extends StatelessWidget {
                             const Icon(
                               Icons.notifications_active,
                               size: 16,
-                              color: Colors.orange,
+                              color: Theme.of(context).colorScheme.secondary,
                             ),
                         ],
                       ),
@@ -593,9 +593,9 @@ class _AnniversaryCard extends StatelessWidget {
                       value: 'delete',
                       child: Row(
                         children: [
-                          Icon(Icons.delete, size: 20, color: Colors.red),
+                          Icon(Icons.delete, size: 20, color: Theme.of(context).colorScheme.error),
                           SizedBox(width: 8),
-                          Text('删除', style: TextStyle(color: Colors.red)),
+                          Text('删除', style: TextStyle(color: Theme.of(context).colorScheme.error)),
                         ],
                       ),
                     ),

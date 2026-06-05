@@ -139,11 +139,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   }
 
   Color _getColor(String? color) {
-    if (color == null) return Colors.blue;
+    if (color == null) return Theme.of(context).colorScheme.primary;
     try {
       return Color(int.parse(color.replaceFirst('#', '0xFF')));
     } catch (_) {
-      return Colors.blue;
+      return Theme.of(context).colorScheme.primary;
     }
   }
 
@@ -192,9 +192,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.error_outline, size: 48, color: Colors.grey[400]),
+            Icon(Icons.error_outline, size: 48, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
-            Text(_error!, style: TextStyle(color: Colors.grey[600])),
+            Text(_error!, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
             const SizedBox(height: 16),
             FilledButton.tonal(
               onPressed: _loadNotifications,
@@ -209,9 +209,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.notifications_none_outlined, size: 64, color: Colors.grey[400]),
+            Icon(Icons.notifications_none_outlined, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
             const SizedBox(height: 16),
-            Text('暂无通知', style: TextStyle(fontSize: 16, color: Colors.grey[600])),
+            Text('暂无通知', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
           ],
         ),
       );
@@ -249,7 +249,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                   height: 8,
                   margin: const EdgeInsets.only(right: 6),
                   decoration: const BoxDecoration(
-                    color: Colors.red,
+                    color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),
                 ),
@@ -274,7 +274,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                 overflow: TextOverflow.ellipsis,
                 style: TextStyle(
                   fontSize: 13,
-                  color: isRead ? Colors.grey : null,
+                  color: isRead ? Theme.of(context).colorScheme.onSurfaceVariant : null,
                 ),
               ),
               const SizedBox(height: 2),
@@ -291,7 +291,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                   const SizedBox(width: 8),
                   Text(
                     _formatTime(createdAt),
-                    style: TextStyle(fontSize: 11, color: Colors.grey[500]),
+                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ],
               ),
