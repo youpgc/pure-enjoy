@@ -1,0 +1,50 @@
+name: Create Anniversaries Table
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-table:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create user_anniversaries table via Supabase pg endpoint
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          SUPABASE_URL="https://mhdrbjpqmzswswoazwjg.supabase.co"
+          
+          # Check if table already exists
+          CHECK=$(curl -s -o /dev/null -w "%{http_code}" "$SUPABASE_URL/rest/v1/user_anniversaries?limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          
+          if [ "$CHECK" = "200" ]; then
+            echo "✅ Table user_anniversaries already exists"
+            exit 0
+          fi
+          
+          echo "Table does not exist, creating..."
+          
+          # Execute DDL via pg endpoint
+          RESULT=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/pg/query" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "CREATE TABLE IF NOT EXISTS user_anniversaries (id TEXT PRIMARY KEY, user_id TEXT NOT NULL, user_nickname VARCHAR(100), title VARCHAR(255) NOT NULL, date TIMESTAMPTZ NOT NULL, type VARCHAR(20) DEFAULT '"'"'anniversary'"'"', description TEXT, repeat_yearly BOOLEAN DEFAULT TRUE, remind_enabled BOOLEAN DEFAULT FALSE, remind_days_before INTEGER, created_at TIMESTAMPTZ DEFAULT NOW()); CREATE INDEX IF NOT EXISTS idx_anniversaries_user_id ON user_anniversaries(user_id); CREATE INDEX IF NOT EXISTS idx_anniversaries_type ON user_anniversaries(type); ALTER TABLE user_anniversaries ENABLE ROW LEVEL SECURITY; CREATE POLICY \"Users can view own anniversaries\" ON user_anniversaries FOR SELECT USING (user_id = auth.uid()::TEXT); CREATE POLICY \"Users can insert own anniversaries\" ON user_anniversaries FOR INSERT WITH CHECK (user_id = auth.uid()::TEXT); CREATE POLICY \"Users can update own anniversaries\" ON user_anniversaries FOR UPDATE USING (user_id = auth.uid()::TEXT); CREATE POLICY \"Users can delete own anniversaries\" ON user_anniversaries FOR DELETE USING (user_id = auth.uid()::TEXT); CREATE POLICY \"Admin can view all anniversaries\" ON user_anniversaries FOR SELECT USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid()::TEXT AND role = '"'"'admin'"'"')); CREATE POLICY \"Admin can manage all anniversaries\" ON user_anniversaries FOR ALL USING (EXISTS (SELECT 1 FROM users WHERE id = auth.uid()::TEXT AND role = '"'"'admin'"'"'));"
+            }')
+          
+          HTTP_CODE=$(echo "$RESULT" | tail -1)
+          echo "Create table result: HTTP $HTTP_CODE"
+          echo "$RESULT"
+          
+          # Verify
+          VERIFY=$(curl -s -o /dev/null -w "%{http_code}" "$SUPABASE_URL/rest/v1/user_anniversaries?limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          
+          if [ "$VERIFY" = "200" ]; then
+            echo "✅ Table user_anniversaries created successfully"
+          else
+            echo "❌ Failed to create table (HTTP $VERIFY)"
+          fi
