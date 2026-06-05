@@ -39,6 +39,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final userId = AuthService.instance.currentUserId;
+    final userNickname = AuthService.instance.currentUserName;
     if (userId == null) {
       showSnackBar(context, '请先登录', isError: true);
       return;
@@ -55,6 +56,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
         },
         body: jsonEncode({
           'user_id': userId,
+          'user_nickname': userNickname,
           'title': _titleController.text.trim(),
           'description': _descController.text.trim().isEmpty
               ? null
