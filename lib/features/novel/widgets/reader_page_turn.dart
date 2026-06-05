@@ -63,7 +63,9 @@ class TextPaginator {
       // 计算当前页能容纳多少行
       final lineMetrics = textPainter.computeLineMetrics();
       final lineCount = lineMetrics.length;
-      final maxLines = (availableHeight / (style.fontSize! * lineHeight)).floor();
+      final fontSize = style.fontSize ?? 16.0;
+      final lineHeightPx = fontSize * lineHeight;
+      final maxLines = lineHeightPx > 0 ? (availableHeight / lineHeightPx).floor() : 1;
 
       if (lineCount <= maxLines) {
         // 剩余内容可以放在一页
