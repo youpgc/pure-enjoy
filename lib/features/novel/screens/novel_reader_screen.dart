@@ -1446,42 +1446,44 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       },
       itemBuilder: (context, index) {
         final page = _pages[index];
-        return Container(
-          color: widget.background.bgColor,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (index == 0)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Text(
-                      widget.chapter.title,
-                      style: TextStyle(
-                        fontSize: widget.fontSize + 4,
-                        fontWeight: FontWeight.bold,
-                        color: widget.background.textColor,
-                        height: 1.6,
-                        fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+        return SizedBox.expand(
+          child: Container(
+            color: widget.background.bgColor,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (index == 0)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Text(
+                        widget.chapter.title,
+                        style: TextStyle(
+                          fontSize: widget.fontSize + 4,
+                          fontWeight: FontWeight.bold,
+                          color: widget.background.textColor,
+                          height: 1.6,
+                          fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
                     ),
                   ),
-                ),
-              Expanded(
-                child: Text(
-                  page.text,
-                  style: TextStyle(
-                    fontSize: widget.fontSize,
-                    height: widget.lineHeight,
-                    color: widget.background.textColor,
-                    letterSpacing: 0.5,
-                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                  Expanded(
+                    child: Text(
+                      page.text,
+                      style: TextStyle(
+                        fontSize: widget.fontSize,
+                        height: widget.lineHeight,
+                        color: widget.background.textColor,
+                        letterSpacing: 0.5,
+                        fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
         );
       },
@@ -1596,42 +1598,44 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
-    return Container(
-      color: widget.background.bgColor,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (page.pageIndex == 0)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Text(
-                  widget.chapter.title,
-                  style: TextStyle(
-                    fontSize: widget.fontSize + 4,
-                    fontWeight: FontWeight.bold,
-                    color: widget.background.textColor,
-                    height: 1.6,
-                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    return SizedBox.expand(
+      child: Container(
+        color: widget.background.bgColor,
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (page.pageIndex == 0)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Text(
+                    widget.chapter.title,
+                    style: TextStyle(
+                      fontSize: widget.fontSize + 4,
+                      fontWeight: FontWeight.bold,
+                      color: widget.background.textColor,
+                      height: 1.6,
+                      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
+                ),
+              ),
+            Expanded(
+              child: Text(
+                page.text,
+                style: TextStyle(
+                  fontSize: widget.fontSize,
+                  height: widget.lineHeight,
+                  color: widget.background.textColor,
+                  letterSpacing: 0.5,
+                  fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
                 ),
               ),
             ),
-          Expanded(
-            child: Text(
-              page.text,
-              style: TextStyle(
-                fontSize: widget.fontSize,
-                height: widget.lineHeight,
-                color: widget.background.textColor,
-                letterSpacing: 0.5,
-                fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }

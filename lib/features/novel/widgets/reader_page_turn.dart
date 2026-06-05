@@ -305,6 +305,7 @@ class _SimulationPageViewState extends State<SimulationPageView>
           final isForward = _dragProgress < 0;
 
           return Stack(
+            fit: StackFit.expand,
             children: [
               // 下一页（底层）
               if (isForward && _currentPage < widget.pages.length - 1)
