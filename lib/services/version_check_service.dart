@@ -245,7 +245,7 @@ class VersionCheckService {
       );
 
       if (result.type == ResultType.done) {
-        downloadStatus.value = '安装成功';
+        downloadStatus.value = '已打开安装页面，请在弹出的安装窗口中点击"安装"';
         return true;
       } else if (result.type == ResultType.error) {
         downloadStatus.value = '安装出错: ${result.message}';
