@@ -66,7 +66,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       filtered = filtered.where((e) => e.category == _selectedCategory).toList();
     }
 
-    filtered.sort((a, b) => b.date.compareTo(a.date));
+    filtered.sort((a, b) => (b.createdAt ?? b.date).compareTo(a.createdAt ?? a.date));
     return filtered;
   }
 
@@ -85,7 +85,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc',
+          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=created_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );

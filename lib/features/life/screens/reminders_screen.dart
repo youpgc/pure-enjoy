@@ -55,7 +55,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_reminders?user_id=eq.$userId&select=*&order=remind_at.desc',
+          '${SupabaseConfig.url}/rest/v1/user_reminders?user_id=eq.$userId&select=*&order=created_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );

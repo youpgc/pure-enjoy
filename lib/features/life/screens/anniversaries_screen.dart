@@ -58,7 +58,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=date.asc',
+          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=created_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );
