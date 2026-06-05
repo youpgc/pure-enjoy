@@ -118,12 +118,12 @@ class _ToolItem {
 }
 
 const List<_ToolItem> _allTools = [
-  _ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Theme.of(context).colorScheme.secondary),
-  _ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: AppTheme.success),
-  _ToolItem(id: 'weight', label: '记体重', icon: Icons.monitor_weight_outlined, color: Theme.of(context).colorScheme.primary),
-  _ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Theme.of(context).colorScheme.primary),
-  _ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Theme.of(context).colorScheme.secondary),
-  _ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Theme.of(context).colorScheme.tertiary),
+  _ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Color(0xFFFFB300)),
+  _ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: Color(0xFF4CAF50)),
+  _ToolItem(id: 'weight', label: '记体重', icon: Icons.monitor_weight_outlined, color: Color(0xFFF26522)),
+  _ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Color(0xFFF26522)),
+  _ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Color(0xFFFFB300)),
+  _ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Color(0xFFFF9800)),
 ];
 
 const String _prefsKeyTools = 'dashboard_visible_tools';
@@ -1926,7 +1926,7 @@ class _ProfilePageState extends State<ProfilePage> {
               const SizedBox(height: 8),
               Text('最新版本: $_latestVersion'),
               if (_isForceUpdate)
-                const Text(
+                Text(
                   '【强制更新】',
                   style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold),
                 ),
@@ -2476,9 +2476,9 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
   };
 
   static const _typeColors = {
-    DataExportService.typeExpenses: Theme.of(context).colorScheme.secondary,
-    DataExportService.typeWeight: Theme.of(context).colorScheme.primary,
-    DataExportService.typeMood: Theme.of(context).colorScheme.primary,
+    DataExportService.typeExpenses: Color(0xFFFFB300),
+    DataExportService.typeWeight: Color(0xFFF26522),
+    DataExportService.typeMood: Color(0xFFF26522),
   };
 
   @override

@@ -189,7 +189,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                       width: 50,
                       height: 70,
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      child: const Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                      child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
                     ),
                   ),
                 )
@@ -197,7 +197,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
                   width: 50,
                   height: 70,
                   color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  child: const Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                  child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 ),
           title: Text(title),
           subtitle: Text(

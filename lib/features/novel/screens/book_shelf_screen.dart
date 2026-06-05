@@ -389,7 +389,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           children: [
             // 继续阅读
             ListTile(
-              leading: const Icon(Icons.play_circle_outline, color: Theme.of(context).colorScheme.primary),
+              leading: Icon(Icons.play_circle_outline, color: Theme.of(context).colorScheme.primary),
               title: const Text('继续阅读'),
               subtitle: Text('第 $lastChapter / $chapterCount 章'),
               onTap: () {
@@ -421,7 +421,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               leading: const Icon(Icons.auto_stories),
               title: const Text('在读'),
               trailing: currentStatus == 'reading'
-                  ? const Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
+                  ? Icon(Icons.check, color: Theme.of(context).colorScheme.primary)
                   : null,
               onTap: () {
                 Navigator.pop(context);
@@ -445,8 +445,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
             ),
             const Divider(),
             ListTile(
-              leading: const Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
-              title: const Text('移出书架', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+              leading: Icon(Icons.delete_outline, color: Theme.of(context).colorScheme.error),
+              title: Text('移出书架', style: TextStyle(color: Theme.of(context).colorScheme.error)),
               onTap: () {
                 Navigator.pop(context);
                 _confirmRemove(userNovelId);

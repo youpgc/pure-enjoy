@@ -176,10 +176,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showChangePasswordDialog(),
           ),
           ListTile(
-            leading: const Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
-            title: const Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+            leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
+            title: Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
             subtitle: const Text('永久删除账号及所有数据'),
-            trailing: const Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
+            trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
             onTap: () => _showDeleteAccountDialog(),
           ),
 
@@ -395,7 +395,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: const Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
+        title: Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
         content: const Text(
           '警告：此操作将永久删除您的账号及所有相关数据，包括消费记录、体重记录、心情日记、笔记、收藏等。此操作不可恢复！\n\n请确认您已备份重要数据。',
         ),
