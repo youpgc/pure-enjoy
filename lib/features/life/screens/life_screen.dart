@@ -10,6 +10,7 @@ import 'weight_record_screen.dart';
 import 'favorites_screen.dart';
 import 'reminders_screen.dart';
 import 'habits_screen.dart';
+import 'anniversaries_screen.dart';
 import 'statistics_screen.dart';
 
 
@@ -405,6 +406,18 @@ class _LifeScreenState extends State<LifeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const StatisticsScreen()),
+            );
+          },
+        ),
+        _FeatureItem(
+          icon: Icons.cake,
+          title: '纪念日',
+          subtitle: '生日和重要日子',
+          color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.7),
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const AnniversariesScreen()),
             );
           },
         ),
