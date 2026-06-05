@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
 
 /// 登录方式枚举

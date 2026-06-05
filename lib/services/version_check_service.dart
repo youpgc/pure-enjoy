@@ -7,6 +7,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
 import '../config.dart';
+import '../core/theme/app_theme.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -394,7 +395,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
               Container(
                 padding: const EdgeInsets.all(8),
                 decoration: BoxDecoration(
-                  color: Theme.of(context).colorScheme.error.shade50,
+                  color: AppTheme.error.withOpacity(0.1),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: const Text(

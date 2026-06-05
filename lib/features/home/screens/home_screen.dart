@@ -7,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/theme_provider.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/reminders_screen.dart';
@@ -2035,14 +2036,14 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
 
           // 功能列表 - 个人中心
-          const Padding(
-            padding: EdgeInsets.fromLTRB(16, 16, 16, 8),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
             child: Text(
               '个人中心',
               style: TextStyle(
                 fontSize: 14,
                 fontWeight: FontWeight.bold,
-                color: Theme.of(context).colorScheme.onSurfaceVariant,
+                color: colorScheme.onSurfaceVariant,
               ),
             ),
           ),
@@ -2082,8 +2083,8 @@ class _ProfilePageState extends State<ProfilePage> {
                     width: 8,
                     height: 8,
                     margin: const EdgeInsets.only(right: 8),
-                    decoration: const BoxDecoration(
-                      color: Theme.of(context).colorScheme.error,
+                    decoration: BoxDecoration(
+                      color: colorScheme.error,
                       shape: BoxShape.circle,
                     ),
                   ),
@@ -2714,7 +2715,7 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
           ),
           if (_isComplete) ...[
             const SizedBox(height: 8),
-            const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
+            Icon(Icons.check_circle, color: AppTheme.success, size: 48),
           ],
         ],
       ),

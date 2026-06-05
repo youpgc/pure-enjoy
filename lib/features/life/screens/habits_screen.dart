@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/notification_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -378,7 +379,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   itemBuilder: (context, index) {
                     final checkin = checkins[index];
                     return ListTile(
-                      leading: const Icon(Icons.check_circle, color: AppTheme.success),
+                      leading: Icon(Icons.check_circle, color: AppTheme.success),
                       title: Text(DateTimeUtils.formatStandard(checkin.checkinAt)),
                     );
                   },

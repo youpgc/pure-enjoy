@@ -248,7 +248,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
                   width: 8,
                   height: 8,
                   margin: const EdgeInsets.only(right: 6),
-                  decoration: const BoxDecoration(
+                  decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.error,
                     shape: BoxShape.circle,
                   ),

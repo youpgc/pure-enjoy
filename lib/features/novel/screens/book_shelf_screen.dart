@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../utils/format_utils.dart';
@@ -434,7 +435,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
               leading: const Icon(Icons.done_all),
               title: const Text('已读完'),
               trailing: currentStatus == 'completed'
-                  ? const Icon(Icons.check, color: AppTheme.success)
+                  ? Icon(Icons.check, color: AppTheme.success)
                   : null,
               onTap: () {
                 Navigator.pop(context);
