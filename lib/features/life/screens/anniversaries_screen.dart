@@ -195,11 +195,6 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                 ),
                 const SizedBox(height: 12),
 
-                // 类型选择（仅在全部模式下显示）
-                const SizedBox.shrink(),
-                ),
-                const SizedBox(height: 16),
-
                 // 日期选择
                 ListTile(
                   contentPadding: EdgeInsets.zero,
