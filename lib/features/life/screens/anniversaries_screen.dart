@@ -135,11 +135,15 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
     if (confirmed == true) {
       try {
+        final userId = _userId;
         final response = await http.delete(
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/user_anniversaries?id=eq.$id',
           ),
-          headers: SupabaseConfig.writeHeaders,
+          headers: {
+            ...SupabaseConfig.writeHeaders,
+            'x-user-id': userId ?? '',
+          },
         );
 
         if (response.statusCode == 204 || response.statusCode == 200) {
@@ -316,7 +320,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                       Uri.parse(
                         '${SupabaseConfig.url}/rest/v1/user_anniversaries?id=eq.${anniversary.id}',
                       ),
-                      headers: SupabaseConfig.writeHeaders,
+                      headers: {
+                        ...SupabaseConfig.writeHeaders,
+                        'x-user-id': userId,
+                      },
                       body: jsonEncode({
                         'user_nickname': nickname,
                         'title': nameController.text.trim(),
@@ -342,7 +349,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                       Uri.parse(
                         '${SupabaseConfig.url}/rest/v1/user_anniversaries',
                       ),
-                      headers: SupabaseConfig.writeHeaders,
+                      headers: {
+                        ...SupabaseConfig.writeHeaders,
+                        'x-user-id': userId,
+                      },
                       body: jsonEncode({
                         'id': anniversaryId,
                         'user_id': userId,
