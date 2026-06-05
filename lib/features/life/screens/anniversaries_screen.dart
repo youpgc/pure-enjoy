@@ -118,7 +118,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   }
 
   /// 获取 SharedPreferences
-  Future<SharedPreferences> get _getPrefs => SharedPreferences.getInstance();
+  Future<SharedPreferences> _getPrefs() => SharedPreferences.getInstance();
 
   void _showError(String message) {
     ScaffoldMessenger.of(context).showSnackBar(
