@@ -1399,8 +1399,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages() {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 只减去顶部进度条高度(3px)和底部页码文字预估高度(20px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 23;
+    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1561,8 +1561,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages() {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 只减去顶部进度条高度(3px)和底部页码文字预估高度(20px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 23;
+    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
