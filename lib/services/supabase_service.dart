@@ -495,6 +495,63 @@ class AuthService {
     }
   }
 
+  /// 修改密码
+  /// 需要验证旧密码，然后更新为新密码
+  Future<Map<String, dynamic>> changePassword({
+    required String oldPassword,
+    required String newPassword,
+  }) async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) {
+        return {'success': false, 'message': '未登录，无法修改密码'};
+      }
+
+      // 1. 验证旧密码
+      final oldPasswordHash = _hashPassword(oldPassword);
+      final verifyResponse = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&password_hash=eq.$oldPasswordHash&select=id',
+        ),
+        headers: SupabaseConfig.headers,
+      );
+
+      if (verifyResponse.statusCode != 200) {
+        return {'success': false, 'message': '验证旧密码失败，请重试'};
+      }
+
+      final users = jsonDecode(verifyResponse.body) as List;
+      if (users.isEmpty) {
+        return {'success': false, 'message': '旧密码不正确'};
+      }
+
+      // 2. 更新为新密码
+      final newPasswordHash = _hashPassword(newPassword);
+      final updateResponse = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/users?id=eq.$userId'),
+        headers: {
+          ...SupabaseConfig.writeHeaders,
+          'x-user-id': userId,
+        },
+        body: jsonEncode({
+          'password_hash': newPasswordHash,
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        }),
+      );
+
+      if (updateResponse.statusCode == 200 || updateResponse.statusCode == 204) {
+        debugPrint('✅ 密码修改成功: $userId');
+        return {'success': true, 'message': '密码修改成功'};
+      } else {
+        debugPrint('❌ 密码修改失败: ${updateResponse.statusCode} ${updateResponse.body}');
+        return {'success': false, 'message': '密码修改失败，请重试'};
+      }
+    } catch (e) {
+      debugPrint('❌ 修改密码出错: $e');
+      return {'success': false, 'message': '修改密码出错: $e'};
+    }
+  }
+
   /// 获取当前用户的认证 Headers
   /// 不再使用 Supabase Auth 的 JWT token，使用 anon key
   Map<String, String> get authHeaders => {

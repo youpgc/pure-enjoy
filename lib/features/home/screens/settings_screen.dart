@@ -169,6 +169,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             onTap: () => _showClearCacheDialog(),
           ),
           ListTile(
+            leading: const Icon(Icons.lock_outline),
+            title: const Text('修改密码'),
+            subtitle: const Text('修改登录密码'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () => _showChangePasswordDialog(),
+          ),
+          ListTile(
             leading: const Icon(Icons.delete_forever_outlined, color: Colors.red),
             title: const Text('注销账号', style: TextStyle(color: Colors.red)),
             subtitle: const Text('永久删除账号及所有数据'),
@@ -466,6 +473,123 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
+  }
+
+  void _showChangePasswordDialog() {
+    final oldPasswordController = TextEditingController();
+    final newPasswordController = TextEditingController();
+    final confirmPasswordController = TextEditingController();
+    bool isLoading = false;
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('修改密码'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(
+                  controller: oldPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '旧密码',
+                    hintText: '请输入当前密码',
+                    prefixIcon: Icon(Icons.lock_outline),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: newPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '新密码',
+                    hintText: '请输入新密码（至少6位）',
+                    prefixIcon: Icon(Icons.lock),
+                  ),
+                ),
+                const SizedBox(height: 12),
+                TextField(
+                  controller: confirmPasswordController,
+                  obscureText: true,
+                  decoration: const InputDecoration(
+                    labelText: '确认新密码',
+                    hintText: '请再次输入新密码',
+                    prefixIcon: Icon(Icons.lock_person),
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: isLoading ? null : () => Navigator.pop(context),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: isLoading
+                  ? null
+                  : () async {
+                      final oldPassword = oldPasswordController.text.trim();
+                      final newPassword = newPasswordController.text.trim();
+                      final confirmPassword = confirmPasswordController.text.trim();
+
+                      if (oldPassword.isEmpty) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('请输入旧密码')),
+                        );
+                        return;
+                      }
+                      if (newPassword.length < 6) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('新密码至少6位')),
+                        );
+                        return;
+                      }
+                      if (newPassword != confirmPassword) {
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(content: Text('两次输入的新密码不一致')),
+                        );
+                        return;
+                      }
+
+                      setDialogState(() => isLoading = true);
+
+                      final result = await AuthService.instance.changePassword(
+                        oldPassword: oldPassword,
+                        newPassword: newPassword,
+                      );
+
+                      if (mounted) {
+                        setDialogState(() => isLoading = false);
+                        if (result['success'] == true) {
+                          Navigator.pop(context);
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(content: Text(result['message'] as String)),
+                          );
+                        } else {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text(result['message'] as String),
+                              backgroundColor: Colors.red,
+                            ),
+                          );
+                        }
+                      }
+                    },
+              child: isLoading
+                  ? const SizedBox(
+                      width: 20,
+                      height: 20,
+                      child: CircularProgressIndicator(strokeWidth: 2, color: Colors.white),
+                    )
+                  : const Text('确认修改'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _checkUpdate() async {
