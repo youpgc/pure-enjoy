@@ -63,7 +63,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=created_at.desc',
+          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc',
         ),
         headers: SupabaseConfig.headers,
       );

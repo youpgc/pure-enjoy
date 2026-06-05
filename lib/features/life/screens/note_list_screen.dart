@@ -63,7 +63,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/notes?user_id=eq.$userId&select=*&order=is_pinned.desc,created_at.desc',
+          '${SupabaseConfig.url}/rest/v1/notes?user_id=eq.$userId&select=*&order=is_pinned.desc,updated_at.desc',
         ),
         headers: SupabaseConfig.headers,
       );
