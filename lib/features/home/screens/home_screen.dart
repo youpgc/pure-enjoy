@@ -11,7 +11,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/reminders_screen.dart';
-import '../../life/screens/favorites_screen.dart';
+
 import '../../life/screens/habits_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../novel/screens/novel_reader_screen.dart';
@@ -930,7 +930,6 @@ class _DashboardPageState extends State<DashboardPage> {
                   ),
                   TextButton(
                     onPressed: () {
-                      // 跳转到习惯打卡页面
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const HabitsScreen()),
@@ -941,58 +940,59 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              SizedBox(
-                height: 80,
-                child: ListView.separated(
-                  scrollDirection: Axis.horizontal,
-                  itemCount: _pendingHabits.length,
-                  separatorBuilder: (_, __) => const SizedBox(width: 12),
-                  itemBuilder: (context, index) {
-                    final habit = _pendingHabits[index];
-                    final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
-                    final habitColor = Color(colorValue);
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 3.5,
+                ),
+                itemCount: _pendingHabits.length,
+                itemBuilder: (context, index) {
+                  final habit = _pendingHabits[index];
+                  final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
+                  final habitColor = Color(colorValue);
 
-                    return SizedBox(
-                      width: 140,
-                      child: Card(
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () => _quickCheckIn(habit),
-                          child: Padding(
-                            padding: const EdgeInsets.all(12),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Container(
-                                  width: 36,
-                                  height: 36,
-                                  decoration: BoxDecoration(
-                                    color: habitColor.withOpacity(0.15),
-                                    shape: BoxShape.circle,
-                                  ),
-                                  child: Icon(
-                                    Icons.check_circle_outline,
-                                    color: habitColor,
-                                    size: 20,
-                                  ),
+                  return Card(
+                    clipBehavior: Clip.antiAlias,
+                    child: InkWell(
+                      onTap: () => _quickCheckIn(habit),
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Text(
+                                habit.name,
+                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                  fontWeight: FontWeight.w500,
                                 ),
-                                const SizedBox(height: 6),
-                                Text(
-                                  habit.name,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                              ],
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
                             ),
-                          ),
+                            const SizedBox(width: 8),
+                            Container(
+                              width: 32,
+                              height: 32,
+                              decoration: BoxDecoration(
+                                color: habitColor.withOpacity(0.15),
+                                shape: BoxShape.circle,
+                              ),
+                              child: Icon(
+                                Icons.check_circle_outline,
+                                color: habitColor,
+                                size: 18,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
-                    );
-                  },
-                ),
+                    ),
+                  );
+                },
               ),
               const SizedBox(height: 24),
             ],
@@ -2257,17 +2257,6 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
           ListTile(
-            leading: const Icon(Icons.bookmark_outline),
-            title: const Text('我的收藏'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FavoritesScreen()),
-              );
-            },
-          ),
-          ListTile(
             leading: const Icon(Icons.history_outlined),
             title: const Text('阅读历史'),
             trailing: const Icon(Icons.chevron_right),
@@ -2443,9 +2432,32 @@ class _ProfilePageState extends State<ProfilePage> {
     if (avatarUrl != null && avatarUrl.isNotEmpty) {
       return CircleAvatar(
         radius: 32,
-        backgroundImage: NetworkImage(avatarUrl),
-        onBackgroundImageError: (_, __) {},
         backgroundColor: colorScheme.primaryContainer,
+        child: ClipOval(
+          child: Image.network(
+            avatarUrl,
+            width: 64,
+            height: 64,
+            fit: BoxFit.cover,
+            cacheWidth: 128,
+            cacheHeight: 128,
+            loadingBuilder: (context, child, loadingProgress) {
+              if (loadingProgress == null) return child;
+              return Icon(
+                Icons.person,
+                size: 32,
+                color: colorScheme.onPrimaryContainer,
+              );
+            },
+            errorBuilder: (context, error, stackTrace) {
+              return Icon(
+                Icons.person,
+                size: 32,
+                color: colorScheme.onPrimaryContainer,
+              );
+            },
+          ),
+        ),
       );
     }
     return CircleAvatar(

@@ -154,8 +154,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         novelsMap[novel['id'] as String] = novel as Map<String, dynamic>;
       }
 
-      // 合并数据：将小说详情嵌入 user_novels 记录
-      final bookshelfItems = userNovelsData.map((userNovel) {
+      // 合并数据：只展示已加入书架的小说（is_collected=true）
+      final bookshelfItems = userNovelsData
+          .where((userNovel) => userNovel['is_collected'] == true)
+          .map((userNovel) {
         final novelId = userNovel['novel_id'] as String?;
         return {
           'id': userNovel['id'],

@@ -90,20 +90,7 @@ class _LifeScreenState extends State<LifeScreen> {
     if (dateStr == null) return '';
     try {
       final date = DateTime.parse(dateStr).toLocal();
-      final now = DateTime.now();
-      final today = DateTime(now.year, now.month, now.day);
-      final recordDate = DateTime(date.year, date.month, date.day);
-      final diff = today.difference(recordDate).inDays;
-
-      if (diff == 0) {
-        return '今天 ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}';
-      } else if (diff == 1) {
-        return '昨天';
-      } else if (diff < 7) {
-        return '$diff天前';
-      } else {
-        return '${date.month}/${date.day}';
-      }
+      return '${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
     } catch (e) {
       debugPrint('格式化日期失败: $e');
       return '';
@@ -397,18 +384,7 @@ class _LifeScreenState extends State<LifeScreen> {
             );
           },
         ),
-        _FeatureItem(
-          icon: Icons.bar_chart,
-          title: '数据统计',
-          subtitle: '消费/体重/心情图表',
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
-          onTap: (context) {
-            Navigator.push(
-              context,
-              MaterialPageRoute(builder: (_) => const StatisticsScreen()),
-            );
-          },
-        ),
+
         _FeatureItem(
           icon: Icons.cake,
           title: '生日',
@@ -430,6 +406,18 @@ class _LifeScreenState extends State<LifeScreen> {
             Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const AnniversariesScreen(filterType: 'anniversary')),
+            );
+          },
+        ),
+        _FeatureItem(
+          icon: Icons.bar_chart,
+          title: '数据统计',
+          subtitle: '消费/体重/心情图表',
+          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+          onTap: (context) {
+            Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const StatisticsScreen()),
             );
           },
         ),
