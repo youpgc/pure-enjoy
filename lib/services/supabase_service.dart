@@ -57,6 +57,15 @@ class AuthService {
   /// 检查是否已登录
   bool get isAuthenticated => _user != null;
 
+  /// 获取当前用户积分
+  int? get currentPoints => _user?['points'] as int?;
+
+  /// 获取当前用户角色
+  String? get currentRole => _user?['role'] as String?;
+
+  /// 获取当前用户会员等级
+  String? get currentMemberLevel => _user?['member_level'] as String?;
+
   /// 对密码进行 SHA-256 哈希
   String _hashPassword(String password) {
     final bytes = utf8.encode(password);

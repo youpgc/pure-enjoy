@@ -30,6 +30,7 @@ import '../../life/models/reminder_model.dart';
 import '../../life/models/habit_model.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../utils/date_time_utils.dart';
+import '../profile/screens/point_records_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -2035,6 +2036,20 @@ class _ProfilePageState extends State<ProfilePage> {
             ),
           ),
 
+          // 用户信息展示列
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                _buildStatItem(Icons.stars_outlined, '角色', _getRoleLabel(supabaseService.currentRole), onTap: () {}),
+                _buildStatItem(Icons.workspace_premium_outlined, '会员', _getMemberLevelLabel(supabaseService.currentMemberLevel), onTap: () {}),
+                _buildStatItem(Icons.monetization_on_outlined, '积分', '${supabaseService.currentPoints ?? 0}', onTap: () {
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PointRecordsScreen()));
+                }),
+              ],
+            ),
+          ),
+
           // 功能列表 - 个人中心
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -2163,6 +2178,69 @@ class _ProfilePageState extends State<ProfilePage> {
       context,
       MaterialPageRoute(builder: (_) => const _ThemeSettingsScreen()),
     );
+  }
+
+  /// 构建统计项
+  Widget _buildStatItem(IconData icon, String label, String value, {required VoidCallback onTap}) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Expanded(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4),
+        child: Card(
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(12),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
+              child: Column(
+                children: [
+                  Icon(icon, size: 20, color: colorScheme.primary),
+                  const SizedBox(height: 4),
+                  Text(
+                    value,
+                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
+                  ),
+                  const SizedBox(height: 2),
+                  Text(
+                    label,
+                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 获取角色标签
+  String _getRoleLabel(String? role) {
+    switch (role) {
+      case 'admin':
+        return '管理员';
+      case 'super_admin':
+        return '超级管理员';
+      default:
+        return '普通用户';
+    }
+  }
+
+  /// 获取会员等级标签
+  String _getMemberLevelLabel(String? level) {
+    switch (level) {
+      case 'member':
+        return '高级会员';
+      case 'super_member':
+        return '超级会员';
+      default:
+        return '普通会员';
+    }
   }
 
   /// 构建用户头像
