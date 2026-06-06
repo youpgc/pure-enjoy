@@ -1,7 +1,7 @@
 name: pure_enjoy
 description: 纯享App - 记录生活，享受每一天
 publish_to: 'none'
-version: 1.9.72+114
+version: 1.9.73+115
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
