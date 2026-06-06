@@ -1187,58 +1187,46 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
                     // 中间区域点击层：只在屏幕中间40%区域放置点击检测，
                     // 左右两侧不覆盖，让下层内容（ScrollView/PageView）正常接收手势
+                    // 滚动模式：整层忽略指针事件，让ScrollView自行处理滚动和点击
+                    // 分页模式：仅中间40%响应点击（切换菜单），左右滑动交给下层PageView
                     Positioned.fill(
-                      child: Row(
-                        children: [
-                          // 左侧30%：透明，手势穿透到下层
-                          Expanded(
-                            flex: 3,
-                            child: _pageTurnMode != PageTurnMode.scroll
-                                ? GestureDetector(
-                                    // 分页模式：左侧点击上一页/上一章
-                                    onTap: () {
-                                      if (_currentPageIndex <= 0) {
-                                        _previousChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.previousPage();
-                                        _curlContentKey.currentState?.previousPage();
-                                      }
-                                    },
-                                    behavior: HitTestBehavior.translucent,
-                                    child: Container(color: Colors.transparent),
-                                  )
-                                : Container(color: Colors.transparent),
-                          ),
-                          // 中间40%：点击切换菜单
-                          Expanded(
-                            flex: 4,
-                            child: GestureDetector(
-                              onTap: _toggleMenu,
+                      child: _pageTurnMode == PageTurnMode.scroll
+                          ? GestureDetector(
                               behavior: HitTestBehavior.translucent,
+                              onTapUp: _handleScreenTap,
                               child: Container(color: Colors.transparent),
-                            ),
-                          ),
-                          // 右侧30%：透明，手势穿透到下层
-                          Expanded(
-                            flex: 3,
-                            child: _pageTurnMode != PageTurnMode.scroll
-                                ? GestureDetector(
-                                    // 分页模式：右侧点击下一页/下一章
-                                    onTap: () {
-                                      if (_currentPageIndex >= _totalPages - 1) {
-                                        _nextChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.nextPage();
-                                        _curlContentKey.currentState?.nextPage();
-                                      }
-                                    },
+                            )
+                          : Row(
+                              children: [
+                                // 左侧30%：透明，手势穿透到下层PageView处理滑动
+                                Expanded(
+                                  flex: 3,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTapUp: _handleScreenTap,
+                                    child: Container(color: Colors.transparent),
+                                  ),
+                                ),
+                                // 中间40%：点击切换菜单
+                                Expanded(
+                                  flex: 4,
+                                  child: GestureDetector(
+                                    onTap: _toggleMenu,
                                     behavior: HitTestBehavior.translucent,
                                     child: Container(color: Colors.transparent),
-                                  )
-                                : Container(color: Colors.transparent),
-                          ),
-                        ],
-                      ),
+                                  ),
+                                ),
+                                // 右侧30%：透明，手势穿透到下层PageView处理滑动
+                                Expanded(
+                                  flex: 3,
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTapUp: _handleScreenTap,
+                                    child: Container(color: Colors.transparent),
+                                  ),
+                                ),
+                              ],
+                            ),
                     ),
 
                     // 顶部悬浮工具栏
