@@ -1,5 +1,0 @@
-<?xml version="1.0" encoding="utf-8"?>
-<resources>
-    <!-- 启动页背景色，与 App 主题 warmWhite #FFF8F0 保持一致 -->
-    <color name="launch_background">#FFF8F0</color>
-</resources>
