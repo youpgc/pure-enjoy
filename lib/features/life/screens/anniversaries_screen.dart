@@ -61,7 +61,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&type=eq.${widget.filterType}&select=*&order=date.asc',
+          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=date.asc',
         ),
         headers: SupabaseConfig.headers,
       );
@@ -71,7 +71,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
       }
 
       final List data = jsonDecode(response.body);
-      final items = data.map((e) => AnniversaryModel.fromJson(e)).toList();
+      final items = data
+          .map((e) => AnniversaryModel.fromJson(e))
+          .where((item) => item.type == widget.filterType)
+          .toList();
 
       // 保存缓存
       await _saveCachedList(data);
@@ -310,7 +313,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                       body: jsonEncode({
                         'user_nickname': nickname,
                         'title': nameController.text.trim(),
-                        'date': selectedDate.toUtc().toIso8601String(),
+                        'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
                         'type': selectedType,
                         'description':
                             descController.text.trim().isEmpty
@@ -341,7 +344,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                         'user_id': userId,
                         'user_nickname': nickname,
                         'title': nameController.text.trim(),
-                        'date': selectedDate.toUtc().toIso8601String(),
+                        'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
                         'type': selectedType,
                         'description':
                             descController.text.trim().isEmpty

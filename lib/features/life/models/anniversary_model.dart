@@ -53,7 +53,7 @@ class AnniversaryModel {
       'user_id': userId,
       'user_nickname': userNickname,
       'title': title,
-      'date': date.toUtc().toIso8601String(),
+      'date': DateTime(date.year, date.month, date.day, 12).toIso8601String(),
       'type': type,
       'description': description,
       'repeat_yearly': repeatYearly,
@@ -67,7 +67,7 @@ class AnniversaryModel {
     return {
       'user_nickname': userNickname,
       'title': title,
-      'date': date.toUtc().toIso8601String(),
+      'date': DateTime(date.year, date.month, date.day, 12).toIso8601String(),
       'type': type,
       'description': description,
       'repeat_yearly': repeatYearly,
