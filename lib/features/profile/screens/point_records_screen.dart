@@ -200,7 +200,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          _totalPoints = PointService.instance.getTotalPoints();
+          await _loadAvailablePoints();
           await _loadRecords(refresh: true);
         },
         child: ListView(
