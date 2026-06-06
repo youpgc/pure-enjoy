@@ -15,7 +15,7 @@ import 'services/notification_service.dart';
 /// 全局 NavigatorKey，用于通知点击跳转
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
-void main() async {
+void main() {
   WidgetsFlutterBinding.ensureInitialized();
 
   // 设置状态栏样式
@@ -27,23 +27,60 @@ void main() async {
     ));
   }
 
-  // 初始化认证服务（从本地存储恢复会话）
-  await AuthService.instance.initialize();
-
-  // 初始化字典服务（预加载字典数据）
-  await DictService.instance.initialize();
-
-  // 初始化通知服务
-  await NotificationService.instance.initialize();
-
   runApp(const PureEnjoyApp());
 }
 
-class PureEnjoyApp extends StatelessWidget {
+class PureEnjoyApp extends StatefulWidget {
   const PureEnjoyApp({super.key});
 
   @override
+  State<PureEnjoyApp> createState() => _PureEnjoyAppState();
+}
+
+class _PureEnjoyAppState extends State<PureEnjoyApp> {
+  bool _initialized = false;
+
+  @override
+  void initState() {
+    super.initState();
+    _initialize();
+  }
+
+  Future<void> _initialize() async {
+    // 初始化认证服务（从本地存储恢复会话）
+    await AuthService.instance.initialize();
+    // 初始化字典服务（预加载字典数据）
+    await DictService.instance.initialize();
+    // 初始化通知服务
+    await NotificationService.instance.initialize();
+
+    if (mounted) {
+      setState(() => _initialized = true);
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    if (!_initialized) {
+      // 初始化完成前显示闪屏
+      return MaterialApp(
+        debugShowCheckedModeBanner: false,
+        theme: ThemeData(
+          scaffoldBackgroundColor: AppTheme.warmWhite,
+        ),
+        home: Scaffold(
+          backgroundColor: AppTheme.warmWhite,
+          body: Center(
+            child: Image.asset(
+              'assets/images/splash_icon.png',
+              width: 120,
+              height: 120,
+            ),
+          ),
+        ),
+      );
+    }
+
     return ChangeNotifierProvider(
       create: (_) => ThemeProvider(),
       child: Consumer<ThemeProvider>(
@@ -56,14 +93,13 @@ class PureEnjoyApp extends StatelessWidget {
             darkTheme: AppTheme.darkTheme(themeProvider.colorScheme.seedColor),
             themeMode: themeProvider.themeMode,
             home: const AuthWrapper(),
-            // 中文本地化配置
             localizationsDelegates: const [
               GlobalMaterialLocalizations.delegate,
               GlobalWidgetsLocalizations.delegate,
               GlobalCupertinoLocalizations.delegate,
             ],
             supportedLocales: const [
-              Locale('zh', 'CN'), // 简体中文
+              Locale('zh', 'CN'),
             ],
             locale: const Locale('zh', 'CN'),
           );
