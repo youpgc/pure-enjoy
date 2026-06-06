@@ -12,6 +12,7 @@ import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/reminders_screen.dart';
 import '../../life/screens/favorites_screen.dart';
+import '../../life/screens/habits_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../novel/screens/novel_reader_screen.dart';
 import '../../../services/supabase_service.dart';
@@ -150,6 +151,11 @@ class _DashboardPageState extends State<DashboardPage> {
 
   List<String> _visibleToolIds = [];
 
+  // 习惯打卡数据
+  bool _isLoadingHabits = true;
+  List<HabitModel> _habits = [];
+  Map<String, List<HabitCheckinModel>> _checkinHistory = {};
+
   @override
   void initState() {
     super.initState();
@@ -157,6 +163,125 @@ class _DashboardPageState extends State<DashboardPage> {
     _loadPendingReminders();
     _loadRecentNovels();
     _loadToolConfig();
+    _loadHabitsForCheckin();
+  }
+
+  /// 加载习惯数据（用于首页快捷打卡）
+  Future<void> _loadHabitsForCheckin() async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) {
+      setState(() => _isLoadingHabits = false);
+      return;
+    }
+
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/user_habits?user_id=eq.$userId&is_active=eq.true&select=*&order=created_at.desc',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final habits = data.map((e) => HabitModel.fromJson(e)).toList();
+
+        // 加载每个习惯的打卡记录
+        final history = <String, List<HabitCheckinModel>>{};
+        for (final habit in habits) {
+          final checkinsResponse = await http.get(
+            Uri.parse(
+              '${AppConfig.supabaseUrl}/rest/v1/habit_checkins?habit_id=eq.${habit.id}&select=*&order=checkin_at.desc',
+            ),
+            headers: {
+              'apikey': AppConfig.supabaseAnonKey,
+              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            },
+          );
+
+          if (checkinsResponse.statusCode == 200) {
+            final List checkinsData = jsonDecode(checkinsResponse.body);
+            history[habit.id] = checkinsData.map((e) => HabitCheckinModel.fromJson(e)).toList();
+          } else {
+            history[habit.id] = [];
+          }
+        }
+
+        if (mounted) {
+          setState(() {
+            _habits = habits;
+            _checkinHistory = history;
+            _isLoadingHabits = false;
+          });
+        }
+      } else {
+        setState(() => _isLoadingHabits = false);
+      }
+    } catch (e) {
+      debugPrint('加载习惯数据失败: $e');
+      if (mounted) setState(() => _isLoadingHabits = false);
+    }
+  }
+
+  /// 获取今日待打卡的习惯列表
+  List<HabitModel> get _pendingHabits {
+    final today = DateTime.now();
+    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+
+    return _habits.where((habit) {
+      final checkins = _checkinHistory[habit.id] ?? [];
+      return !checkins.any((c) {
+        final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
+        return dateStr == todayStr;
+      });
+    }).toList();
+  }
+
+  /// 一键打卡
+  Future<void> _quickCheckIn(HabitModel habit) async {
+    try {
+      final today = DateTime.now();
+
+      final checkinResponse = await http.post(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/habit_checkins'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=minimal',
+        },
+        body: jsonEncode({
+          'id': const Uuid().v4(),
+          'habit_id': habit.id,
+          'checkin_at': today.toUtc().toIso8601String(),
+        }),
+      );
+
+      if (checkinResponse.statusCode != 201 && checkinResponse.statusCode != 200) {
+        throw Exception('打卡失败: HTTP ${checkinResponse.statusCode}');
+      }
+
+      // 刷新习惯数据
+      await _loadHabitsForCheckin();
+
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('${habit.name} 打卡成功！'),
+            backgroundColor: AppTheme.success,
+          ),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('打卡失败: $e')),
+        );
+      }
+    }
   }
 
   /// 加载工具配置
@@ -801,6 +926,84 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }),
               const SizedBox(height: 16),
+            ],
+
+            // 快捷打卡 - 习惯打卡
+            if (_pendingHabits.isNotEmpty) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                children: [
+                  Text(
+                    '今日打卡',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  TextButton(
+                    onPressed: () {
+                      // 跳转到习惯打卡页面
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(builder: (_) => const HabitsScreen()),
+                      );
+                    },
+                    child: const Text('查看全部'),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 12),
+              SizedBox(
+                height: 80,
+                child: ListView.separated(
+                  scrollDirection: Axis.horizontal,
+                  itemCount: _pendingHabits.length,
+                  separatorBuilder: (_, __) => const SizedBox(width: 12),
+                  itemBuilder: (context, index) {
+                    final habit = _pendingHabits[index];
+                    final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
+                    final habitColor = Color(colorValue);
+
+                    return SizedBox(
+                      width: 140,
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () => _quickCheckIn(habit),
+                          child: Padding(
+                            padding: const EdgeInsets.all(12),
+                            child: Column(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Container(
+                                  width: 36,
+                                  height: 36,
+                                  decoration: BoxDecoration(
+                                    color: habitColor.withOpacity(0.15),
+                                    shape: BoxShape.circle,
+                                  ),
+                                  child: Icon(
+                                    Icons.check_circle_outline,
+                                    color: habitColor,
+                                    size: 20,
+                                  ),
+                                ),
+                                const SizedBox(height: 6),
+                                Text(
+                                  habit.name,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              const SizedBox(height: 24),
             ],
 
             // 常用工具
