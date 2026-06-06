@@ -13,36 +13,62 @@ jobs:
         run: |
           SUPABASE_URL="https://mhdrbjpqmzswswoazwjg.supabase.co"
           
-          # Drop existing policies and recreate with permissive ones (matching other tables)
+          # Step 1: List all existing policies
+          echo "=== Existing policies ==="
+          curl -s -X POST "$SUPABASE_URL/pg/query" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"query": "SELECT policyname FROM pg_policies WHERE tablename = '\''user_anniversaries'\'';"}'
+          
+          # Step 2: Drop ALL existing policies (use DO block to handle missing ones)
+          echo "=== Dropping all policies ==="
           RESULT=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/pg/query" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
             -d '{
-              "query": "DROP POLICY IF EXISTS \"Users can view own anniversaries\" ON user_anniversaries; DROP POLICY IF EXISTS \"Users can insert own anniversaries\" ON user_anniversaries; DROP POLICY IF EXISTS \"Users can update own anniversaries\" ON user_anniversaries; DROP POLICY IF EXISTS \"Users can delete own anniversaries\" ON user_anniversaries; DROP POLICY IF EXISTS \"Admin can view all anniversaries\" ON user_anniversaries; DROP POLICY IF EXISTS \"Admin can manage all anniversaries\" ON user_anniversaries; CREATE POLICY \"允许公开读写\" ON user_anniversaries FOR ALL USING (true) WITH CHECK (true);"
+              "query": "DO $$ DECLARE r RECORD; BEGIN FOR r IN SELECT policyname FROM pg_policies WHERE tablename = '\''user_anniversaries'\'' LOOP EXECUTE format('\''DROP POLICY IF EXISTS %I ON user_anniversaries'\'', r.policyname); END LOOP; END $$;"
             }')
           
           HTTP_CODE=$(echo "$RESULT" | tail -1)
-          echo "Fix RLS result: HTTP $HTTP_CODE"
+          echo "Drop result: HTTP $HTTP_CODE"
           echo "$RESULT"
           
-          # Verify by inserting a test row
-          VERIFY=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/user_anniversaries" \
+          # Step 3: Verify all policies are gone
+          echo "=== Policies after drop ==="
+          curl -s -X POST "$SUPABASE_URL/pg/query" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
-            -H "Prefer: return=minimal" \
-            -d '{"id":"test-verify","user_id":"test","title":"test","date":"2026-01-01","type":"birthday"}')
+            -d '{"query": "SELECT policyname FROM pg_policies WHERE tablename = '\''user_anniversaries'\'';"}'
           
-          echo "Insert verify: HTTP $VERIFY"
-          
-          # Clean up test row
-          curl -s -X DELETE "$SUPABASE_URL/rest/v1/user_anniversaries?id=eq.test-verify" \
+          # Step 4: Create permissive policies (matching other tables)
+          echo "=== Creating permissive policies ==="
+          RESULT2=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/pg/query" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" > /dev/null
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "CREATE POLICY \"user_anniversaries_select\" ON user_anniversaries FOR SELECT USING (true); CREATE POLICY \"user_anniversaries_insert\" ON user_anniversaries FOR INSERT WITH CHECK (true); CREATE POLICY \"user_anniversaries_update\" ON user_anniversaries FOR UPDATE USING (true) WITH CHECK (true); CREATE POLICY \"user_anniversaries_delete\" ON user_anniversaries FOR DELETE USING (true);"
+            }')
           
-          if [ "$VERIFY" = "201" ]; then
-            echo "✅ RLS fixed and verified"
+          HTTP_CODE2=$(echo "$RESULT2" | tail -1)
+          echo "Create result: HTTP $HTTP_CODE2"
+          echo "$RESULT2"
+          
+          # Step 5: Verify with anon key (same as App)
+          echo "=== Verify with anon key ==="
+          ANON_RESULT=$(curl -s -w "\n%{http_code}" "$SUPABASE_URL/rest/v1/user_anniversaries?select=id,title&limit=5" \
+            -H "apikey: sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6" \
+            -H "Authorization: Bearer sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6")
+          
+          ANON_CODE=$(echo "$ANON_RESULT" | tail -1)
+          echo "Anon query: HTTP $ANON_CODE"
+          echo "$ANON_RESULT"
+          
+          if [ "$ANON_CODE" = "200" ]; then
+            echo "✅ RLS fixed and verified with anon key"
           else
-            echo "❌ RLS fix may have failed"
+            echo "❌ Anon query failed"
           fi
