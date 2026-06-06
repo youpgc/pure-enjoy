@@ -945,58 +945,55 @@ class _DashboardPageState extends State<DashboardPage> {
                 ],
               ),
               const SizedBox(height: 12),
-              GridView.builder(
-                shrinkWrap: true,
-                physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 2,
-                  crossAxisSpacing: 12,
-                  mainAxisSpacing: 12,
-                  childAspectRatio: 4,
-                ),
-                itemCount: _pendingHabits.length,
-                itemBuilder: (context, index) {
-                  final habit = _pendingHabits[index];
+              Wrap(
+                spacing: 12,
+                runSpacing: 12,
+                children: _pendingHabits.map((habit) {
                   final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
                   final habitColor = Color(colorValue);
                   final isChecking = _checkingHabitId == habit.id;
 
-                  return Card(
-                    clipBehavior: Clip.antiAlias,
-                    child: InkWell(
-                      onTap: isChecking ? null : () => _quickCheckIn(habit),
-                      child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-                        child: Row(
-                          children: [
-                            Expanded(
-                              child: Text(
-                                habit.name,
-                                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                  fontWeight: FontWeight.w500,
+                  return SizedBox(
+                    width: (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2,
+                    height: 52,
+                    child: Card(
+                      clipBehavior: Clip.antiAlias,
+                      margin: EdgeInsets.zero,
+                      child: InkWell(
+                        onTap: isChecking ? null : () => _quickCheckIn(habit),
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          child: Row(
+                            children: [
+                              Expanded(
+                                child: Text(
+                                  habit.name,
+                                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                            ),
-                            if (isChecking)
-                              const SizedBox(
-                                width: 24,
-                                height: 24,
-                                child: CircularProgressIndicator(strokeWidth: 2.5),
-                              )
-                            else
-                              Icon(
-                                Icons.check_circle_outline,
-                                color: habitColor,
-                                size: 22,
-                              ),
-                          ],
+                              if (isChecking)
+                                const SizedBox(
+                                  width: 24,
+                                  height: 24,
+                                  child: CircularProgressIndicator(strokeWidth: 2.5),
+                                )
+                              else
+                                Icon(
+                                  Icons.check_circle_outline,
+                                  color: habitColor,
+                                  size: 22,
+                                ),
+                            ],
+                          ),
                         ),
                       ),
                     ),
                   );
-                },
+                }).toList(),
               ),
               const SizedBox(height: 24),
             ],
