@@ -1435,19 +1435,19 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: _pages.length,
-      onPageChanged: (index) {
-        widget.onPageChanged(index, _pages.length);
-        // 注意：不在边界页自动触发跳章
-        // PageView 会自然限制在第一页/最后一页
-        // 跳章由父组件的点击逻辑处理
-      },
-      itemBuilder: (context, index) {
-        final page = _pages[index];
-        return SizedBox.expand(
-          child: Container(
+    return SizedBox.expand(
+      child: PageView.builder(
+        controller: _pageController,
+        itemCount: _pages.length,
+        onPageChanged: (index) {
+          widget.onPageChanged(index, _pages.length);
+          // 注意：不在边界页自动触发跳章
+          // PageView 会自然限制在第一页/最后一页
+          // 跳章由父组件的点击逻辑处理
+        },
+        itemBuilder: (context, index) {
+          final page = _pages[index];
+          return Container(
             color: widget.background.bgColor,
             padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
             child: Column(
@@ -1470,7 +1470,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
                       ),
                     ),
                   ),
-                  Expanded(
+                Expanded(
+                  child: SingleChildScrollView(
                     child: Text(
                       page.text,
                       style: TextStyle(
@@ -1482,11 +1483,12 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
                       ),
                     ),
                   ),
+                ),
               ],
             ),
-          ),
-        );
-      },
+          );
+        },
+      ),
     );
   }
 }

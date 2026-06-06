@@ -85,12 +85,40 @@ class AuthService {
     return 'U$timestamp$random$checksum';
   }
 
-  /// 初始化（从本地存储恢复会话）
+  /// 初始化（从本地存储恢复会话，并静默刷新用户信息）
   Future<void> initialize() async {
     final prefs = await SharedPreferences.getInstance();
     final userJson = prefs.getString('user');
     if (userJson != null) {
       _user = jsonDecode(userJson);
+      // 静默刷新用户信息（不阻塞启动）
+      _silentRefreshUser();
+    }
+  }
+
+  /// 静默刷新用户信息（从服务器获取最新数据）
+  Future<void> _silentRefreshUser() async {
+    try {
+      final userId = currentUserId;
+      if (userId == null) return;
+
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
+        ),
+        headers: authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final users = jsonDecode(response.body) as List;
+        if (users.isNotEmpty) {
+          await _saveUser(users[0] as Map<String, dynamic>);
+          debugPrint('✅ 用户信息已静默刷新');
+        }
+      }
+    } catch (e) {
+      debugPrint('⚠️ 静默刷新用户信息失败: $e');
+      // 静默失败不影响使用，继续使用本地缓存
     }
   }
 
