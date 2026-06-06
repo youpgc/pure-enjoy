@@ -95,6 +95,7 @@ jobs:
             git config user.email "actions@github.com"
             git add pubspec.yaml
             git commit -m "chore: 自动迭代版本号 v${CURRENT_VERSION}+${CURRENT_BUILD} → v${VERSION}+${BUILD_NUMBER}"
+            git pull --rebase origin ${{ github.ref_name }}
             git push origin HEAD:${{ github.ref_name }}
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
