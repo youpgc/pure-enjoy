@@ -6,6 +6,8 @@ class PointRecord {
   final String? remark;
   final String? operatorName;
   final DateTime? createdAt;
+  final DateTime? expiresAt;
+  final String status; // active, expired
 
   PointRecord({
     required this.id,
@@ -15,6 +17,8 @@ class PointRecord {
     this.remark,
     this.operatorName,
     this.createdAt,
+    this.expiresAt,
+    this.status = 'active',
   });
 
   factory PointRecord.fromJson(Map<String, dynamic> json) {
@@ -28,6 +32,10 @@ class PointRecord {
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
+      expiresAt: json['expires_at'] != null
+          ? DateTime.parse(json['expires_at'])
+          : null,
+      status: json['status'] ?? 'active',
     );
   }
 }

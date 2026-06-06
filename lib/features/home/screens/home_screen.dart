@@ -391,9 +391,6 @@ class _DashboardPageState extends State<DashboardPage> {
         }
       }
 
-      // 按时间排序
-      activities.sort((a, b) => (b['created_at_raw'] as String).compareTo(a['created_at_raw'] as String));
-
       if (mounted) {
         setState(() {
           _recentActivities = activities;
@@ -497,13 +494,7 @@ class _DashboardPageState extends State<DashboardPage> {
     if (createdAt == null) return '';
     final dateTime = DateTime.tryParse(createdAt)?.toLocal();
     if (dateTime == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dateTime);
-    if (diff.inMinutes < 1) return '刚刚';
-    if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
-    if (diff.inHours < 24) return '${diff.inHours}小时前';
-    if (diff.inDays < 7) return '${diff.inDays}天前';
-    return '${dateTime.month}/${dateTime.day}';
+    return DateTimeUtils.formatStandard(dateTime);
   }
 
   /// 显示添加心情日记弹窗

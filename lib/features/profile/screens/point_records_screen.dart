@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
 
@@ -17,13 +18,21 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
   bool _isLoading = false;
   bool _hasMore = true;
   bool _isCheckingIn = false;
-  int _totalPoints = 0;
+  int _availablePoints = 0;
 
   @override
   void initState() {
     super.initState();
-    _totalPoints = PointService.instance.getTotalPoints();
+    _loadAvailablePoints();
     _loadRecords();
+  }
+
+  /// 加载可用积分
+  Future<void> _loadAvailablePoints() async {
+    final points = await PointService.instance.getAvailablePoints();
+    if (mounted) {
+      setState(() => _availablePoints = points);
+    }
   }
 
   /// 加载积分记录
@@ -65,8 +74,8 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
     if (mounted) {
       setState(() {
         _isCheckingIn = false;
-        _totalPoints = PointService.instance.getTotalPoints();
       });
+      _loadAvailablePoints();
 
       if (result['success'] == true) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -129,15 +138,50 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
     }
   }
 
-  /// 格式化时间
-  String _formatTime(DateTime? dateTime) {
-    if (dateTime == null) return '';
-    final year = dateTime.year;
-    final month = dateTime.month.toString().padLeft(2, '0');
-    final day = dateTime.day.toString().padLeft(2, '0');
-    final hour = dateTime.hour.toString().padLeft(2, '0');
-    final minute = dateTime.minute.toString().padLeft(2, '0');
-    return '$year-$month-$day $hour:$minute';
+  /// 获取过期状态标签信息
+  _ExpiryInfo _getExpiryInfo(PointRecord record) {
+    if (record.status == 'expired') {
+      return _ExpiryInfo(
+        label: '已过期',
+        color: Colors.grey,
+      );
+    }
+    if (record.expiresAt != null) {
+      final now = DateTime.now();
+      final diff = record.expiresAt!.difference(now);
+      if (diff.inDays <= 30 && diff.inDays >= 0) {
+        return _ExpiryInfo(
+          label: '即将过期',
+          color: Colors.orange,
+        );
+      }
+    }
+    return _ExpiryInfo(
+      label: '有效',
+      color: Colors.green,
+    );
+  }
+
+  /// 显示积分规则说明
+  void _showRulesDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('积分规则说明'),
+        content: const Text(
+          '1. 积分有效期为180天，从获取当天开始计算\n'
+          '2. 积分过期后将自动失效，不可继续使用\n'
+          '3. 距离过期30天时，系统将发送提醒通知\n'
+          '4. 每日0:00系统自动更新积分过期状态',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(context),
+            child: const Text('知道了'),
+          ),
+        ],
+      ),
+    );
   }
 
   @override
@@ -147,6 +191,12 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('积分记录'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.help_outline),
+            onPressed: _showRulesDialog,
+          ),
+        ],
       ),
       body: RefreshIndicator(
         onRefresh: () async {
@@ -168,7 +218,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
                             Text(
-                              '$_totalPoints',
+                              '$_availablePoints',
                               style: Theme.of(context)
                                   .textTheme
                                   .displayMedium
@@ -179,7 +229,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
                             ),
                             const SizedBox(height: 4),
                             Text(
-                              '总积分',
+                              '可用积分',
                               style: Theme.of(context)
                                   .textTheme
                                   .bodyMedium
@@ -244,6 +294,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
             ..._records.map((record) {
               final typeInfo = _getTypeInfo(record.type);
               final isPositive = record.amount > 0;
+              final expiryInfo = _getExpiryInfo(record);
               return ListTile(
                 leading: CircleAvatar(
                   backgroundColor: typeInfo.color.withOpacity(0.1),
@@ -256,6 +307,21 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
                 title: Row(
                   children: [
                     Text(typeInfo.label),
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: expiryInfo.color.withOpacity(0.1),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: Text(
+                        expiryInfo.label,
+                        style: TextStyle(
+                          fontSize: 11,
+                          color: expiryInfo.color,
+                        ),
+                      ),
+                    ),
                     const Spacer(),
                     Text(
                       isPositive
@@ -280,7 +346,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
                         ),
                       ),
                     Text(
-                      _formatTime(record.createdAt),
+                      DateTimeUtils.formatStandard(record.createdAt),
                       style: TextStyle(
                         fontSize: 12,
                         color: colorScheme.onSurfaceVariant.withOpacity(0.7),
@@ -326,6 +392,17 @@ class _PointTypeInfo {
 
   _PointTypeInfo({
     required this.icon,
+    required this.label,
+    required this.color,
+  });
+}
+
+/// 过期状态信息
+class _ExpiryInfo {
+  final String label;
+  final Color color;
+
+  _ExpiryInfo({
     required this.label,
     required this.color,
   });

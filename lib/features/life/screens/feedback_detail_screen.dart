@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/feedback_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 
 /// 问题反馈详情页面（含流转记录）
 class FeedbackDetailScreen extends StatefulWidget {
@@ -110,8 +111,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
     if (dateStr == null) return '未知';
     try {
       final dt = DateTime.parse(dateStr);
-      return '${dt.year}-${dt.month.toString().padLeft(2, '0')}-${dt.day.toString().padLeft(2, '0')} '
-          '${dt.hour.toString().padLeft(2, '0')}:${dt.minute.toString().padLeft(2, '0')}';
+      return DateTimeUtils.formatStandard(dt);
     } catch (_) {
       return dateStr;
     }

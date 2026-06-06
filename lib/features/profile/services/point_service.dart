@@ -160,7 +160,9 @@ class PointService {
       final points = streak > 7 ? 7 : streak;
 
       // 4. 插入 point_records 记录
-      final now = DateTime.now().toUtc().toIso8601String();
+      final now = DateTime.now();
+      final nowIso = now.toUtc().toIso8601String();
+      final expiresAt = now.add(const Duration(days: 180)).toUtc().toIso8601String();
       final insertResponse = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/point_records'),
         headers: AuthService.instance.authHeaders,
@@ -169,7 +171,9 @@ class PointService {
           'type': 'checkin',
           'amount': points,
           'remark': '连续打卡$streak天',
-          'created_at': now,
+          'created_at': nowIso,
+          'expires_at': expiresAt,
+          'status': 'active',
         }),
       );
 
@@ -247,5 +251,67 @@ class PointService {
   /// 从 AuthService 获取用户总积分
   int getTotalPoints() {
     return AuthService.instance.currentPoints ?? 0;
+  }
+
+  /// 查询30天内即将过期的积分总数
+  Future<int> getExpiringSoonPoints() async {
+    try {
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) return 0;
+
+      final url = Uri.parse(
+        '${SupabaseConfig.url}/rest/v1/v_points_expiring_soon?user_id=eq.$userId&select=*',
+      );
+
+      final response = await http.get(
+        url,
+        headers: AuthService.instance.authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final records = jsonDecode(response.body) as List;
+        int total = 0;
+        for (final record in records) {
+          total += (record['amount'] as num?)?.toInt() ?? 0;
+        }
+        return total;
+      }
+
+      return 0;
+    } catch (e) {
+      debugPrint('获取即将过期积分失败: $e');
+      return 0;
+    }
+  }
+
+  /// 查询用户可用积分（排除过期）
+  Future<int> getAvailablePoints() async {
+    try {
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) return 0;
+
+      final url = Uri.parse(
+        '${SupabaseConfig.url}/rest/v1/point_records?user_id=eq.$userId&status=eq.active&select=amount',
+      );
+
+      final response = await http.get(
+        url,
+        headers: AuthService.instance.authHeaders,
+      );
+
+      if (response.statusCode == 200) {
+        final records = jsonDecode(response.body) as List;
+        int total = 0;
+        for (final record in records) {
+          total += (record['amount'] as num?)?.toInt() ?? 0;
+        }
+        return total;
+      }
+
+      return 0;
+    } catch (e) {
+      debugPrint('获取可用积分失败: $e');
+      return 0;
+    }
   }
 }
