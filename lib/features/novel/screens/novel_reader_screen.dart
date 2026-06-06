@@ -316,13 +316,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     try {
       final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
       if (cachedContent != null) {
+        // 归一化换行符，避免 \r\n 导致渲染异常
+        final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         setState(() {
           _currentChapter = NovelChapterModel(
             id: chapter.id,
             novelId: chapter.novelId,
             title: chapter.title,
             chapterOrder: chapter.chapterOrder,
-            content: cachedContent,
+            content: normalizedContent,
             createdAt: chapter.createdAt,
           );
           _isLoadingChapter = false;
@@ -347,8 +349,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
           final chapterData = data.first;
+          final parsedChapter = NovelChapterModel.fromJson(chapterData);
+          // 归一化换行符，避免 \r\n 导致渲染异常
+          final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
           setState(() {
-            _currentChapter = NovelChapterModel.fromJson(chapterData);
+            _currentChapter = NovelChapterModel(
+              id: parsedChapter.id,
+              novelId: parsedChapter.novelId,
+              title: parsedChapter.title,
+              chapterOrder: parsedChapter.chapterOrder,
+              content: normalizedContent,
+              createdAt: parsedChapter.createdAt,
+            );
             _isLoadingChapter = false;
           });
           _scrollToTop();
@@ -1230,10 +1242,20 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                     ),
 
                     // 顶部悬浮工具栏
-                    _buildTopToolbar(),
+                    Positioned(
+                      top: 0,
+                      left: 0,
+                      right: 0,
+                      child: _buildTopToolbar(),
+                    ),
 
                     // 底部悬浮工具栏
-                    _buildBottomToolbar(),
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: _buildBottomToolbar(),
+                    ),
                   ],
                 ),
     );
@@ -1410,6 +1432,20 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
     );
 
+    // 计算首页标题占用的额外高度（标题字号 + 行高 + 底部间距24）
+    final titleStyle = TextStyle(
+      fontSize: widget.fontSize + 4,
+      height: 1.6,
+      fontWeight: FontWeight.bold,
+      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    );
+    final titlePainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(text: widget.chapter.title, style: titleStyle),
+    )..layout(maxWidth: width - 40); // 减去左右 padding 20*2
+    final titleLineCount = (titlePainter.computeLineMetrics()).length;
+    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24; // 标题行高 + 底部间距
+
     final pages = TextPaginator.paginate(
       text: widget.chapter.content,
       width: width,
@@ -1417,6 +1453,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       style: textStyle,
       lineHeight: widget.lineHeight,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      firstPageExtraHeight: firstPageExtraHeight,
     );
 
     setState(() {
@@ -1576,6 +1613,20 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
     );
 
+    // 计算首页标题占用的额外高度（标题字号 + 行高 + 底部间距24）
+    final titleStyle = TextStyle(
+      fontSize: widget.fontSize + 4,
+      height: 1.6,
+      fontWeight: FontWeight.bold,
+      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    );
+    final titlePainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(text: widget.chapter.title, style: titleStyle),
+    )..layout(maxWidth: width - 40); // 减去左右 padding 20*2
+    final titleLineCount = (titlePainter.computeLineMetrics()).length;
+    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24; // 标题行高 + 底部间距
+
     final pages = TextPaginator.paginate(
       text: widget.chapter.content,
       width: width,
@@ -1583,6 +1634,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       style: textStyle,
       lineHeight: widget.lineHeight,
       padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      firstPageExtraHeight: firstPageExtraHeight,
     );
 
     setState(() {

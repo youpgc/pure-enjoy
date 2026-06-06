@@ -29,6 +29,7 @@ class ContentPage {
 /// 文本分页工具
 class TextPaginator {
   /// 将长文本分页
+  /// [firstPageExtraHeight] 首页额外占用的高度（如章节标题），首页可用高度会减去该值
   static List<ContentPage> paginate({
     required String text,
     required double width,
@@ -36,13 +37,16 @@ class TextPaginator {
     required TextStyle style,
     required double lineHeight,
     EdgeInsets padding = EdgeInsets.zero,
+    double firstPageExtraHeight = 0,
   }) {
     if (text.isEmpty) {
       return [ContentPage(text: '', pageIndex: 0, totalPages: 1)];
     }
 
     final availableWidth = width - padding.horizontal;
-    final availableHeight = height - padding.vertical;
+    // 首页可用高度需减去额外占用的空间（如章节标题）
+    final firstPageAvailableHeight = height - padding.vertical - firstPageExtraHeight;
+    final otherPageAvailableHeight = height - padding.vertical;
 
     final pages = <ContentPage>[];
     final textPainter = TextPainter(
@@ -54,6 +58,8 @@ class TextPaginator {
     int pageIndex = 0;
 
     while (start < text.length) {
+      final currentAvailableHeight = pageIndex == 0 ? firstPageAvailableHeight : otherPageAvailableHeight;
+
       textPainter.text = TextSpan(
         text: text.substring(start),
         style: style,
@@ -65,10 +71,10 @@ class TextPaginator {
       final lineCount = lineMetrics.length;
       final fontSize = style.fontSize ?? 16.0;
       final lineHeightPx = fontSize * lineHeight;
-      final maxLines = lineHeightPx > 0 ? (availableHeight / lineHeightPx).floor() : 1;
+      final maxLines = lineHeightPx > 0 ? (currentAvailableHeight / lineHeightPx).floor() : 1;
 
-      if (lineCount <= maxLines) {
-        // 剩余内容可以放在一页
+      if (maxLines <= 0 || lineCount <= maxLines) {
+        // 剩余内容可以放在一页（或首页空间不足时整段放入首页）
         pages.add(ContentPage(
           text: text.substring(start),
           pageIndex: pageIndex,
