@@ -516,8 +516,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             Uri.parse('${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId'),
             headers: SupabaseConfig.writeHeaders,
           );
-        } catch (_) {
-          // 忽略单个表删除失败
+        } catch (e) {
+          debugPrint('删除表 $table 失败: $e');
         }
       }
 
@@ -686,6 +686,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   Future<void> _showExportDialog() async {
+    if (!AuthService.instance.isAuthenticated) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录后再导出数据')),
+        );
+      }
+      return;
+    }
     final result = await DataExportService.exportAndShare(type: DataExportService.typeAll);
     if (mounted) {
       if (result.success) {

@@ -171,7 +171,7 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadHabitsForCheckin() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) {
-      setState(() => _isLoadingHabits = false);
+      if (mounted) setState(() => _isLoadingHabits = false);
       return;
     }
 
@@ -219,7 +219,7 @@ class _DashboardPageState extends State<DashboardPage> {
           });
         }
       } else {
-        setState(() => _isLoadingHabits = false);
+        if (mounted) setState(() => _isLoadingHabits = false);
       }
     } catch (e) {
       debugPrint('加载习惯数据失败: $e');
@@ -403,7 +403,7 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     } catch (e) {
-      print('加载最近活动失败: $e');
+      debugPrint('加载最近活动失败: $e');
       if (mounted) {
         setState(() => _isLoadingActivities = false);
       }
@@ -442,7 +442,7 @@ class _DashboardPageState extends State<DashboardPage> {
         throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('加载提醒失败: $e');
+      debugPrint('加载提醒失败: $e');
       if (mounted) setState(() => _isLoadingReminders = false);
     }
   }
@@ -489,7 +489,7 @@ class _DashboardPageState extends State<DashboardPage> {
         throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
-      print('加载最近阅读失败: $e');
+      debugPrint('加载最近阅读失败: $e');
       if (mounted) setState(() => _isLoadingNovels = false);
     }
   }
@@ -787,7 +787,7 @@ class _DashboardPageState extends State<DashboardPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RemindersScreen()),
-    );
+    ).then((_) => _loadPendingReminders());
   }
 
   /// 继续阅读小说
@@ -800,7 +800,7 @@ class _DashboardPageState extends State<DashboardPage> {
           startChapter: lastChapter,
         ),
       ),
-    );
+    ).then((_) => _loadRecentNovels());
   }
 
   @override
@@ -819,7 +819,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
-              );
+              ).then((_) => _loadPendingReminders());
             },
           ),
         ],
@@ -938,7 +938,7 @@ class _DashboardPageState extends State<DashboardPage> {
                       Navigator.push(
                         context,
                         MaterialPageRoute(builder: (_) => const HabitsScreen()),
-                      );
+                      ).then((_) => _loadHabitsForCheckin());
                     },
                     child: const Text('查看全部'),
                   ),
@@ -2083,11 +2083,13 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadCurrentVersion() async {
     try {
       final packageInfo = await PackageInfo.fromPlatform();
-      setState(() {
-        _currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
-      });
+      if (mounted) {
+        setState(() {
+          _currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
+        });
+      }
     } catch (e) {
-      print('获取版本信息失败: $e');
+      debugPrint('获取版本信息失败: $e');
     }
   }
 
@@ -2104,7 +2106,7 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      print('检查版本失败: $e');
+      debugPrint('检查版本失败: $e');
     }
   }
 
@@ -2175,7 +2177,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              );
+              ).then((_) => _loadUserData());
             },
           ),
         ],
@@ -2239,7 +2241,7 @@ class _ProfilePageState extends State<ProfilePage> {
                 _buildStatItem(Icons.stars_outlined, '角色', _getRoleLabel(supabaseService.currentRole), onTap: () {}),
                 _buildStatItem(Icons.workspace_premium_outlined, '会员', _getMemberLevelLabel(supabaseService.currentMemberLevel), onTap: () {}),
                 _buildStatItem(Icons.monetization_on_outlined, '积分', '${supabaseService.currentPoints ?? 0}', onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PointRecordsScreen()));
+                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PointRecordsScreen())).then((_) => _loadUserData());
                 }),
               ],
             ),
@@ -2265,7 +2267,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
-              );
+              ).then((_) => _loadRecentNovels());
             },
           ),
           
@@ -2347,6 +2349,12 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   void _showExportDialog(BuildContext context) {
+    if (!AuthService.instance.isAuthenticated) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请先登录后再导出数据')),
+      );
+      return;
+    }
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -2361,7 +2369,7 @@ class _ProfilePageState extends State<ProfilePage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const _ThemeSettingsScreen()),
-    );
+    ).then((_) => _loadUserData());
   }
 
   /// 构建统计项

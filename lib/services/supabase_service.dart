@@ -5,6 +5,16 @@ import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 
+/// 缓存条目
+class _CacheEntry {
+  final http.Response response;
+  final DateTime cachedAt;
+
+  _CacheEntry(this.response, this.cachedAt);
+
+  bool isExpired(Duration ttl) => DateTime.now().difference(cachedAt) > ttl;
+}
+
 /// Supabase 配置
 class SupabaseConfig {
   static const String url = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
@@ -39,6 +49,15 @@ class AuthService {
   }
 
   Map<String, dynamic>? _user;
+
+  /// 请求缓存（仅 GET 请求）
+  final Map<String, _CacheEntry> _cache = {};
+
+  /// 缓存有效期
+  static const Duration _cacheTtl = Duration(minutes: 5);
+
+  /// 最大重试次数
+  static const int _maxRetries = 3;
 
   /// 获取当前用户ID
   String? get currentUserId => _user?['id'];
@@ -599,6 +618,111 @@ class AuthService {
     // 自定义 header 传递当前用户ID（供 RLS 或业务逻辑使用）
     if (_user?['id'] != null) 'x-user-id': _user!['id'] as String,
   };
+
+  /// 生成缓存 key
+  String _cacheKey(String method, String url, Map<String, String>? headers, Object? body) {
+    return '$method|$url|${jsonEncode(headers)}|${jsonEncode(body)}';
+  }
+
+  /// 通用 HTTP 请求方法
+  /// - 自动添加 authHeaders
+  /// - 自动处理 401 错误（token 过期，此处为静默刷新用户信息）
+  /// - 自动重试机制（最多3次）
+  /// - GET 请求缓存（5分钟）
+  Future<http.Response> httpRequest(
+    String method,
+    String url, {
+    Map<String, String>? headers,
+    Object? body,
+    bool useCache = false,
+  }) async {
+    final mergedHeaders = {
+      ...authHeaders,
+      ...?headers,
+    };
+
+    final cacheKey = _cacheKey(method, url, mergedHeaders, body);
+
+    // 1. 检查缓存（仅 GET 请求）
+    if (method.toUpperCase() == 'GET' && useCache) {
+      final cached = _cache[cacheKey];
+      if (cached != null && !cached.isExpired(_cacheTtl)) {
+        debugPrint('📦 缓存命中: $url');
+        return cached.response;
+      }
+    }
+
+    // 2. 执行请求（带重试）
+    http.Response? response;
+    Exception? lastError;
+
+    for (int attempt = 1; attempt <= _maxRetries; attempt++) {
+      try {
+        debugPrint('🌐 HTTP $method $url (attempt $attempt)');
+
+        final uri = Uri.parse(url);
+        switch (method.toUpperCase()) {
+          case 'GET':
+            response = await http.get(uri, headers: mergedHeaders);
+            break;
+          case 'POST':
+            response = await http.post(uri, headers: mergedHeaders, body: body);
+            break;
+          case 'PATCH':
+            response = await http.patch(uri, headers: mergedHeaders, body: body);
+            break;
+          case 'PUT':
+            response = await http.put(uri, headers: mergedHeaders, body: body);
+            break;
+          case 'DELETE':
+            response = await http.delete(uri, headers: mergedHeaders);
+            break;
+          default:
+            throw Exception('不支持的 HTTP 方法: $method');
+        }
+
+        // 3. 处理 401 未授权（token 过期）
+        if (response.statusCode == 401) {
+          debugPrint('🔒 收到 401，尝试静默刷新用户...');
+          await _silentRefreshUser();
+          // 刷新后继续重试
+          continue;
+        }
+
+        // 4. 请求成功，跳出重试循环
+        break;
+      } catch (e) {
+        lastError = e is Exception ? e : Exception(e.toString());
+        debugPrint('⚠️ 请求失败 (attempt $attempt): $e');
+
+        if (attempt < _maxRetries) {
+          // 指数退避：1s, 2s, 4s
+          final delay = Duration(seconds: 1 << (attempt - 1));
+          debugPrint('⏳ ${_maxRetries - attempt} 秒后重试...');
+          await Future.delayed(delay);
+        }
+      }
+    }
+
+    // 5. 所有重试都失败
+    if (response == null) {
+      throw lastError ?? Exception('请求失败: $method $url');
+    }
+
+    // 6. 缓存 GET 请求响应
+    if (method.toUpperCase() == 'GET' && useCache && response.statusCode >= 200 && response.statusCode < 300) {
+      _cache[cacheKey] = _CacheEntry(response, DateTime.now());
+      debugPrint('💾 缓存已更新: $url');
+    }
+
+    return response;
+  }
+
+  /// 清除请求缓存
+  void clearCache() {
+    _cache.clear();
+    debugPrint('🧹 请求缓存已清除');
+  }
 }
 
 // 为了兼容旧代码，保留别名

@@ -2,10 +2,10 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
-import 'package:intl/intl.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
@@ -107,7 +107,8 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
       final decoded = jsonDecode(jsonStr);
       if (decoded is List) return decoded;
       return [];
-    } catch (_) {
+    } catch (e) {
+      debugPrint('错误: $e');
       return [];
     }
   }
@@ -117,7 +118,9 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     try {
       final prefs = await _getPrefs();
       await prefs.setString(_cacheKey, jsonEncode(data));
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('错误: $e');
+    }
   }
 
   /// 获取 SharedPreferences
@@ -130,6 +133,12 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   }
 
   Future<void> _deleteAnniversary(String id) async {
+    final userId = _userId;
+    if (userId == null) {
+      _showError('请先登录后再删除');
+      return;
+    }
+
     final confirmed = await showConfirmDialog(
       context,
       title: '确认删除',
@@ -138,14 +147,13 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
     if (confirmed == true) {
       try {
-        final userId = _userId;
         final response = await http.delete(
           Uri.parse(
             '${SupabaseConfig.url}/rest/v1/user_anniversaries?id=eq.$id',
           ),
           headers: {
             ...SupabaseConfig.writeHeaders,
-            'x-user-id': userId ?? '',
+            'x-user-id': userId,
           },
         );
 
@@ -200,7 +208,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('日期 *'),
                   subtitle: Text(
-                    DateFormat('yyyy-MM-dd').format(selectedDate),
+                    DateTimeUtils.formatDate(selectedDate),
                   ),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
@@ -294,7 +302,11 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                   return;
                 }
 
-                final userId = _userId ?? 'local_user';
+                final userId = _userId;
+                if (userId == null) {
+                  _showError('请先登录后再保存');
+                  return;
+                }
                 final nickname = _userNickname;
 
                 try {
@@ -374,7 +386,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
   /// 格式化日期显示
   String _formatDate(DateTime date) {
-    return DateFormat('yyyy年M月d日').format(date);
+    return DateTimeUtils.formatStandard(date);
   }
 
   /// 获取距离天数的描述文本
