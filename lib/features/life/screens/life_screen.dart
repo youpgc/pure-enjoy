@@ -53,13 +53,13 @@ class _LifeScreenState extends State<LifeScreen> {
       final results = await Future.wait([
         http.get(
           Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc&limit=1',
+            '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*&order=created_at.desc&limit=1',
           ),
           headers: headers,
         ),
         http.get(
           Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc&limit=1',
+            '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=created_at.desc&limit=1',
           ),
           headers: headers,
         ),
@@ -289,7 +289,7 @@ class _LifeScreenState extends State<LifeScreen> {
                   ? '${_latestExpense!['category'] ?? ''} ${_latestExpense!['amount'] ?? ''}'
                   : null,
               description: _latestExpense?['note'] as String?,
-              date: _formatDate(_latestExpense?['date'] as String?),
+              date: _formatDate(_latestExpense?['created_at'] as String?),
               onTap: () {
                 Navigator.push(
                   context,
@@ -308,7 +308,7 @@ class _LifeScreenState extends State<LifeScreen> {
                   ? '${_latestWeight!['weight']} kg'
                   : null,
               description: null,
-              date: _formatDate(_latestWeight?['date'] as String?),
+              date: _formatDate(_latestWeight?['created_at'] as String?),
               onTap: () {
                 Navigator.push(
                   context,

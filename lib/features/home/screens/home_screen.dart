@@ -155,6 +155,7 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _isLoadingHabits = true;
   List<HabitModel> _habits = [];
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
+  String? _checkingHabitId; // 正在打卡的习惯ID，用于loading阻断
 
   @override
   void initState() {
@@ -242,6 +243,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   /// 一键打卡
   Future<void> _quickCheckIn(HabitModel habit) async {
+    if (_checkingHabitId != null) return; // 防止重复请求
+    setState(() => _checkingHabitId = habit.id);
     try {
       final today = DateTime.now();
 
@@ -281,6 +284,8 @@ class _DashboardPageState extends State<DashboardPage> {
           SnackBar(content: Text('打卡失败: $e')),
         );
       }
+    } finally {
+      if (mounted) setState(() => _checkingHabitId = null);
     }
   }
 
@@ -453,7 +458,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=*,novels:novel_id(*)&order=last_read_at.desc&limit=5',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&is_collected=eq.true&select=*,novels:novel_id(*)&order=last_read_at.desc.nullslast&limit=5',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -947,20 +952,21 @@ class _DashboardPageState extends State<DashboardPage> {
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 3.5,
+                  childAspectRatio: 4,
                 ),
                 itemCount: _pendingHabits.length,
                 itemBuilder: (context, index) {
                   final habit = _pendingHabits[index];
                   final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
                   final habitColor = Color(colorValue);
+                  final isChecking = _checkingHabitId == habit.id;
 
                   return Card(
                     clipBehavior: Clip.antiAlias,
                     child: InkWell(
-                      onTap: () => _quickCheckIn(habit),
+                      onTap: isChecking ? null : () => _quickCheckIn(habit),
                       child: Padding(
-                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
                         child: Row(
                           children: [
                             Expanded(
@@ -973,20 +979,18 @@ class _DashboardPageState extends State<DashboardPage> {
                                 overflow: TextOverflow.ellipsis,
                               ),
                             ),
-                            const SizedBox(width: 8),
-                            Container(
-                              width: 32,
-                              height: 32,
-                              decoration: BoxDecoration(
-                                color: habitColor.withOpacity(0.15),
-                                shape: BoxShape.circle,
-                              ),
-                              child: Icon(
+                            if (isChecking)
+                              const SizedBox(
+                                width: 24,
+                                height: 24,
+                                child: CircularProgressIndicator(strokeWidth: 2.5),
+                              )
+                            else
+                              Icon(
                                 Icons.check_circle_outline,
                                 color: habitColor,
-                                size: 18,
+                                size: 22,
                               ),
-                            ),
                           ],
                         ),
                       ),
