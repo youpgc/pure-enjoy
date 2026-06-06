@@ -171,6 +171,17 @@ Dart: >=3.0.0
 - image_picker: ^1.0.7 (头像上传)
 ```
 
+## 🔐 关键凭证
+
+| 项目 | 值 | 说明 |
+|------|-----|------|
+| Supabase Project Ref | `mhdrbjpqmzswswoazwjg` | 项目标识 |
+| Supabase Anon Key | `sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6` | 客户端 API Key |
+| Supabase DB Password | `1@youpgc@VIP` | 数据库连接密码 |
+| APK Keystore | `android/app/keys/release.keystore` | 签名文件（密码: pureenjoy123） |
+
+> ⚠️ 这些凭证仅用于项目内部自动化，请勿泄露到公共仓库
+
 ---
 
 ## 📦 构建配置
