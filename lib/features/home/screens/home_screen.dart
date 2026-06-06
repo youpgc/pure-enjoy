@@ -30,7 +30,7 @@ import '../../life/models/reminder_model.dart';
 import '../../life/models/habit_model.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../utils/date_time_utils.dart';
-import '../profile/screens/point_records_screen.dart';
+import '../../profile/screens/point_records_screen.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
