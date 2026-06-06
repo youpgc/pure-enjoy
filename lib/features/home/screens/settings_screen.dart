@@ -21,18 +21,29 @@ class SettingsScreen extends StatefulWidget {
 }
 
 class _SettingsScreenState extends State<SettingsScreen> {
+  // 从 ThemeProvider 同步的状态
   bool _isDarkMode = false;
-  String _fontSize = '中';
-  String _readingBg = '默认';
-  String _language = '简体中文';
+  double _fontScale = 1.0;
+  ReaderBackgroundTheme _readerBg = ReaderBackgroundTheme.defaultWhite;
+
+  // 持久化到 SharedPreferences 的设置
   bool _autoSync = true;
   bool _wifiOnly = true;
   bool _pushNotification = true;
   bool _dailyReminder = false;
   bool _anniversaryReminder = true;
+
+  // 版本信息
   String _currentVersion = '';
   bool _isCheckingUpdate = false;
   String? _latestVersion;
+
+  // SharedPreferences keys
+  static const _autoSyncKey = 'setting_auto_sync';
+  static const _wifiOnlyKey = 'setting_wifi_only';
+  static const _pushNotifKey = 'setting_push_notification';
+  static const _dailyReminderKey = 'setting_daily_reminder';
+  static const _anniversaryReminderKey = 'setting_anniversary_reminder';
 
   @override
   void initState() {
@@ -43,7 +54,28 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
   void _loadSettings() {
     final themeProvider = context.read<ThemeProvider>();
-    _isDarkMode = themeProvider.themeMode == ThemeMode.dark;
+    _isDarkMode = themeProvider.isDarkMode;
+    _fontScale = themeProvider.fontScale;
+    _readerBg = themeProvider.readerBg;
+
+    // 加载持久化设置
+    SharedPreferences.getInstance().then((prefs) {
+      if (mounted) {
+        setState(() {
+          _autoSync = prefs.getBool(_autoSyncKey) ?? true;
+          _wifiOnly = prefs.getBool(_wifiOnlyKey) ?? true;
+          _pushNotification = prefs.getBool(_pushNotifKey) ?? true;
+          _dailyReminder = prefs.getBool(_dailyReminderKey) ?? false;
+          _anniversaryReminder = prefs.getBool(_anniversaryReminderKey) ?? true;
+        });
+      }
+    });
+  }
+
+  /// 保存布尔设置到 SharedPreferences
+  Future<void> _saveBoolSetting(String key, bool value) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(key, value);
   }
 
   Future<void> _loadVersion() async {
@@ -51,6 +83,38 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (mounted) {
       setState(() => _currentVersion = '${info.version}+${info.buildNumber}');
     }
+  }
+
+  /// 字体大小 -> fontScale 映射
+  double _fontSizeToScale(String size) {
+    switch (size) {
+      case '小': return 0.85;
+      case '中': return 1.0;
+      case '大': return 1.15;
+      case '特大': return 1.3;
+      default: return 1.0;
+    }
+  }
+
+  /// fontScale -> 字体大小名称映射
+  String _scaleToFontSize(double scale) {
+    if (scale <= 0.88) return '小';
+    if (scale <= 1.05) return '中';
+    if (scale <= 1.2) return '大';
+    return '特大';
+  }
+
+  /// 阅读背景名称映射
+  String _bgToName(ReaderBackgroundTheme bg) {
+    if (bg == ReaderBackgroundTheme.defaultWhite) return '默认';
+    if (bg == ReaderBackgroundTheme.warmYellow) return '暖黄';
+    if (bg == ReaderBackgroundTheme.darkGray) return '深色';
+    if (bg == ReaderBackgroundTheme.pureBlack) return '纯黑';
+    if (bg == ReaderBackgroundTheme.lightGreen) return '护眼绿';
+    if (bg == ReaderBackgroundTheme.lightBlue) return '淡蓝';
+    if (bg == ReaderBackgroundTheme.lightPink) return '淡粉';
+    if (bg == ReaderBackgroundTheme.kraftPaper) return '牛皮纸';
+    return bg.label;
   }
 
   @override
@@ -77,14 +141,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
           ListTile(
             leading: const Icon(Icons.text_fields),
             title: const Text('字体大小'),
-            subtitle: Text(_fontSize),
+            subtitle: Text(_scaleToFontSize(_fontScale)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showFontSizeDialog(),
           ),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
             title: const Text('阅读背景'),
-            subtitle: Text(_readingBg),
+            subtitle: Text(_bgToName(_readerBg)),
             trailing: const Icon(Icons.chevron_right),
             onTap: () => _showReadingBgDialog(),
           ),
@@ -96,14 +160,20 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('自动同步'),
             subtitle: const Text('连接网络时自动同步数据'),
             value: _autoSync,
-            onChanged: (val) => setState(() => _autoSync = val),
+            onChanged: (val) {
+              setState(() => _autoSync = val);
+              _saveBoolSetting(_autoSyncKey, val);
+            },
           ),
           SwitchListTile(
             secondary: const Icon(Icons.wifi),
             title: const Text('仅WiFi同步'),
             subtitle: const Text('移动网络下不同步数据'),
             value: _wifiOnly,
-            onChanged: (val) => setState(() => _wifiOnly = val),
+            onChanged: (val) {
+              setState(() => _wifiOnly = val);
+              _saveBoolSetting(_wifiOnlyKey, val);
+            },
           ),
           ListTile(
             leading: const Icon(Icons.cloud_sync_outlined),
@@ -125,31 +195,30 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: const Text('推送通知'),
             subtitle: const Text('接收系统推送通知'),
             value: _pushNotification,
-            onChanged: (val) => setState(() => _pushNotification = val),
+            onChanged: (val) {
+              setState(() => _pushNotification = val);
+              _saveBoolSetting(_pushNotifKey, val);
+            },
           ),
           SwitchListTile(
             secondary: const Icon(Icons.alarm),
             title: const Text('每日提醒'),
             subtitle: const Text('每天提醒记录体重和心情'),
             value: _dailyReminder,
-            onChanged: (val) => setState(() => _dailyReminder = val),
+            onChanged: (val) {
+              setState(() => _dailyReminder = val);
+              _saveBoolSetting(_dailyReminderKey, val);
+            },
           ),
           SwitchListTile(
             secondary: const Icon(Icons.cake_outlined),
             title: const Text('纪念日提醒'),
             subtitle: const Text('纪念日到期前提醒'),
             value: _anniversaryReminder,
-            onChanged: (val) => setState(() => _anniversaryReminder = val),
-          ),
-
-          // 语言设置
-          const _SectionHeader(title: '语言设置'),
-          ListTile(
-            leading: const Icon(Icons.language),
-            title: const Text('语言'),
-            subtitle: Text(_language),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showLanguageDialog(),
+            onChanged: (val) {
+              setState(() => _anniversaryReminder = val);
+              _saveBoolSetting(_anniversaryReminderKey, val);
+            },
           ),
 
           // 数据管理
@@ -291,6 +360,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _showFontSizeDialog() {
+    final currentSize = _scaleToFontSize(_fontScale);
     showDialog(
       context: context,
       builder: (context) => SimpleDialog(
@@ -299,9 +369,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return RadioListTile<String>(
             title: Text(size),
             value: size,
-            groupValue: _fontSize,
+            groupValue: currentSize,
             onChanged: (val) {
-              setState(() => _fontSize = val!);
+              final scale = _fontSizeToScale(val!);
+              context.read<ThemeProvider>().setFontScale(scale);
+              setState(() => _fontScale = scale);
               Navigator.pop(context);
             },
           );
@@ -315,33 +387,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       context: context,
       builder: (context) => SimpleDialog(
         title: const Text('阅读背景'),
-        children: ['默认', '护眼绿', '暖黄', '深色'].map((bg) {
-          return RadioListTile<String>(
-            title: Text(bg),
+        children: ReaderBackgroundTheme.values.map((bg) {
+          return RadioListTile<ReaderBackgroundTheme>(
+            title: Text(bg.label),
             value: bg,
-            groupValue: _readingBg,
+            groupValue: _readerBg,
             onChanged: (val) {
-              setState(() => _readingBg = val!);
-              Navigator.pop(context);
-            },
-          );
-        }).toList(),
-      ),
-    );
-  }
-
-  void _showLanguageDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => SimpleDialog(
-        title: const Text('语言'),
-        children: ['简体中文', 'English'].map((lang) {
-          return RadioListTile<String>(
-            title: Text(lang),
-            value: lang,
-            groupValue: _language,
-            onChanged: (val) {
-              setState(() => _language = val!);
+              context.read<ThemeProvider>().setReaderBackground(val);
+              setState(() => _readerBg = val);
               Navigator.pop(context);
             },
           );
@@ -376,10 +429,21 @@ class _SettingsScreenState extends State<SettingsScreen> {
   Future<void> _clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      await prefs.clear();
+      // 只清除非设置类的缓存，保留用户设置
+      final keysToRemove = prefs.getKeys().where((key) =>
+        !key.startsWith('theme_') &&
+        !key.startsWith('font_') &&
+        !key.startsWith('reader_') &&
+        !key.startsWith('color_') &&
+        !key.startsWith('setting_') &&
+        key != 'user'
+      ).toList();
+      for (final key in keysToRemove) {
+        await prefs.remove(key);
+      }
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('缓存已清除')),
+          SnackBar(content: Text('缓存已清除（${keysToRemove.length}项）')),
         );
       }
     } catch (e) {
@@ -633,45 +697,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
         );
       }
     }
-  }
-
-  Future<void> _showVersionInfo() async {
-    final info = await PackageInfo.fromPlatform();
-    if (!mounted) return;
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('版本信息'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildInfoRow('应用名称', info.appName),
-            _buildInfoRow('版本号', '${info.version}+${info.buildNumber}'),
-            _buildInfoRow('包名', info.packageName),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInfoRow(String label, String value) {
-    return Padding(
-      padding: const EdgeInsets.symmetric(vertical: 4),
-      child: Row(
-        children: [
-          Text(label, style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          const Spacer(),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.bold)),
-        ],
-      ),
-    );
   }
 }
 
