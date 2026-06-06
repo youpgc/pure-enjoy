@@ -26,7 +26,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   String? get _userId => AuthService.instance.currentUserId;
   String? get _userNickname => AuthService.instance.currentUserName;
 
-  static const String _cacheKey = 'cached_anniversaries';
+  String get _cacheKey => 'cached_anniversaries_${widget.filterType}';
 
   @override
   void initState() {
@@ -61,7 +61,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=date.asc',
+          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&type=eq.${widget.filterType}&select=*&order=date.asc',
         ),
         headers: AuthService.instance.authHeaders,
       );
@@ -71,16 +71,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
       }
 
       final List data = jsonDecode(response.body);
-      final items = data
-          .map((e) => AnniversaryModel.fromJson(e))
-          .where((item) => item.type == widget.filterType)
-          .toList();
+      final items = data.map((e) => AnniversaryModel.fromJson(e)).toList();
 
-      // 保存缓存（只保存当前用户的数据）
-      final userItems = data
-          .where((e) => e['user_id'] == userId)
-          .toList();
-      await _saveCachedList(userItems);
+      // 保存缓存（只保存当前用户、当前类型的数据）
+      await _saveCachedList(data);
 
       if (mounted) {
         setState(() {
