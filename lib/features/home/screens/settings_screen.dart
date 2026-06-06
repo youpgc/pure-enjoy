@@ -113,7 +113,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     if (bg == ReaderBackgroundTheme.lightGreen) return '护眼绿';
     if (bg == ReaderBackgroundTheme.lightBlue) return '淡蓝';
     if (bg == ReaderBackgroundTheme.lightPink) return '淡粉';
-    if (bg == ReaderBackgroundTheme.kraftPaper) return '牛皮纸';
+    if (bg == ReaderBackgroundTheme.brown) return '牛皮纸';
     return bg.label;
   }
 
@@ -392,7 +392,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
             title: Text(bg.label),
             value: bg,
             groupValue: _readerBg,
-            onChanged: (val) {
+            onChanged: (ReaderBackgroundTheme? val) {
+              if (val == null) return;
               context.read<ThemeProvider>().setReaderBackground(val);
               setState(() => _readerBg = val);
               Navigator.pop(context);
