@@ -63,7 +63,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
         Uri.parse(
           '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&select=*&order=date.asc',
         ),
-        headers: SupabaseConfig.headers,
+        headers: AuthService.instance.authHeaders,
       );
 
       if (response.statusCode != 200) {
@@ -76,8 +76,11 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
           .where((item) => item.type == widget.filterType)
           .toList();
 
-      // 保存缓存
-      await _saveCachedList(data);
+      // 保存缓存（只保存当前用户的数据）
+      final userItems = data
+          .where((e) => e['user_id'] == userId)
+          .toList();
+      await _saveCachedList(userItems);
 
       if (mounted) {
         setState(() {
