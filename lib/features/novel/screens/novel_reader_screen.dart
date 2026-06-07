@@ -232,7 +232,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
+      // 并行加载章节列表和阅读进度
+      final chaptersFuture = http.get(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?novel_id=eq.${widget.novel.id}&select=id,title,chapter_num&order=chapter_num.asc',
         ),
@@ -241,6 +242,22 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
         },
       );
+
+      final userId = _userId;
+      Future<http.Response>? progressFuture;
+      if (userId != null) {
+        progressFuture = http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=last_chapter',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          },
+        );
+      }
+
+      final response = await chaptersFuture;
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -255,18 +272,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           }
         }
 
-        final userId = _userId;
-        if (userId != null) {
+        // 并行获取阅读进度
+        if (progressFuture != null) {
           try {
-            final progressResponse = await http.get(
-              Uri.parse(
-                '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=last_chapter',
-              ),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-              },
-            );
+            final progressResponse = await progressFuture;
             if (progressResponse.statusCode == 200) {
               final progressData = jsonDecode(progressResponse.body);
               if (progressData.isNotEmpty) {
@@ -314,9 +323,22 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _totalPages = 1;
 
     try {
-      final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
+      // 先检查缓存，同时发起网络请求（并行加载）
+      final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
+      final networkFuture = http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${chapter.id}&select=*',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      // 等待缓存结果
+      final cachedContent = await cacheFuture;
       if (cachedContent != null) {
-        // 归一化换行符，避免 \r\n 导致渲染异常
+        // 有缓存，先显示缓存内容
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         setState(() {
           _currentChapter = NovelChapterModel(
@@ -332,18 +354,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _scrollToTop();
         _saveProgress();
         _startReadingTimer();
-        return;
+        // 继续等待网络请求更新缓存
       }
 
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${chapter.id}&select=*',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
+      // 等待网络请求
+      final response = await networkFuture;
 
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -352,38 +367,42 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           final parsedChapter = NovelChapterModel.fromJson(chapterData);
           // 归一化换行符，避免 \r\n 导致渲染异常
           final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-          setState(() {
-            _currentChapter = NovelChapterModel(
-              id: parsedChapter.id,
-              novelId: parsedChapter.novelId,
+
+          // 只有当网络内容比缓存新或不同才更新UI
+          if (_currentChapter == null || _currentChapter!.content != normalizedContent) {
+            setState(() {
+              _currentChapter = NovelChapterModel(
+                id: parsedChapter.id,
+                novelId: parsedChapter.novelId,
+                title: parsedChapter.title,
+                chapterOrder: parsedChapter.chapterOrder,
+                content: normalizedContent,
+                createdAt: parsedChapter.createdAt,
+              );
+              _isLoadingChapter = false;
+            });
+            _scrollToTop();
+            _saveProgress();
+            _startReadingTimer();
+          }
+
+          if (normalizedContent.isNotEmpty) {
+            ChapterCacheService.instance.cacheChapter(
+              chapterId: parsedChapter.id,
+              novelId: widget.novel.id,
               title: parsedChapter.title,
               chapterOrder: parsedChapter.chapterOrder,
               content: normalizedContent,
-              createdAt: parsedChapter.createdAt,
-            );
-            _isLoadingChapter = false;
-          });
-          _scrollToTop();
-          _saveProgress();
-          _startReadingTimer();
-
-          if (_currentChapter!.content.isNotEmpty) {
-            ChapterCacheService.instance.cacheChapter(
-              chapterId: _currentChapter!.id,
-              novelId: widget.novel.id,
-              title: _currentChapter!.title,
-              chapterOrder: _currentChapter!.chapterOrder,
-              content: _currentChapter!.content,
             );
           }
-        } else {
+        } else if (_currentChapter == null) {
           setState(() {
             _currentChapter = chapter;
             _isLoadingChapter = false;
           });
           _scrollToTop();
         }
-      } else {
+      } else if (_currentChapter == null) {
         setState(() {
           _currentChapter = chapter;
           _isLoadingChapter = false;
@@ -391,11 +410,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _scrollToTop();
       }
     } catch (e) {
-      setState(() {
-        _currentChapter = chapter;
-        _isLoadingChapter = false;
-      });
-      _scrollToTop();
+      if (_currentChapter == null) {
+        setState(() {
+          _currentChapter = chapter;
+          _isLoadingChapter = false;
+        });
+        _scrollToTop();
+      }
     }
   }
 
@@ -1202,19 +1223,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             )
                           : Row(
                               children: [
-                                // 左侧30%：点击上一页/上一章，不拦截滑动手势
+                                // 左侧30%：忽略指针事件，让下层PageView处理滑动手势
+                                // 点击翻页由PageView的onPageChanged处理
                                 Expanded(
                                   flex: 3,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTapUp: (details) {
-                                      if (_currentPageIndex <= 0) {
-                                        _previousChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.previousPage();
-                                        _curlContentKey.currentState?.previousPage();
-                                      }
-                                    },
+                                  child: IgnorePointer(
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1227,19 +1240,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
-                                // 右侧30%：点击下一页/下一章，不拦截滑动手势
+                                // 右侧30%：忽略指针事件，让下层PageView处理滑动手势
                                 Expanded(
                                   flex: 3,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTapUp: (details) {
-                                      if (_currentPageIndex >= _totalPages - 1) {
-                                        _nextChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.nextPage();
-                                        _curlContentKey.currentState?.nextPage();
-                                      }
-                                    },
+                                  child: IgnorePointer(
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1656,44 +1660,42 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
-    return SizedBox.expand(
-      child: Container(
-        color: widget.background.bgColor,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            if (page.pageIndex == 0)
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: Text(
-                    widget.chapter.title,
-                    style: TextStyle(
-                      fontSize: widget.fontSize + 4,
-                      fontWeight: FontWeight.bold,
-                      color: widget.background.textColor,
-                      height: 1.6,
-                      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-                    ),
-                    textAlign: TextAlign.center,
+    return Container(
+      color: widget.background.bgColor,
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          if (page.pageIndex == 0)
+            Center(
+              child: Padding(
+                padding: const EdgeInsets.only(bottom: 24),
+                child: Text(
+                  widget.chapter.title,
+                  style: TextStyle(
+                    fontSize: widget.fontSize + 4,
+                    fontWeight: FontWeight.bold,
+                    color: widget.background.textColor,
+                    height: 1.6,
+                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
                   ),
-                ),
-              ),
-            Expanded(
-              child: Text(
-                page.text,
-                style: TextStyle(
-                  fontSize: widget.fontSize,
-                  height: widget.lineHeight,
-                  color: widget.background.textColor,
-                  letterSpacing: 0.5,
-                  fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                  textAlign: TextAlign.center,
                 ),
               ),
             ),
-          ],
-        ),
+          Expanded(
+            child: Text(
+              page.text,
+              style: TextStyle(
+                fontSize: widget.fontSize,
+                height: widget.lineHeight,
+                color: widget.background.textColor,
+                letterSpacing: 0.5,
+                fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+              ),
+            ),
+          ),
+        ],
       ),
     );
   }
