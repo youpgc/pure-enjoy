@@ -1194,16 +1194,27 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           ? GestureDetector(
                               behavior: HitTestBehavior.translucent,
                               onTapUp: _handleScreenTap,
+                              // 明确不处理垂直方向手势，让ScrollView处理
+                              onVerticalDragStart: null,
+                              onVerticalDragUpdate: null,
+                              onVerticalDragEnd: null,
                               child: Container(color: Colors.transparent),
                             )
                           : Row(
                               children: [
-                                // 左侧30%：透明，手势穿透到下层PageView处理滑动
+                                // 左侧30%：点击上一页/上一章，不拦截滑动手势
                                 Expanded(
                                   flex: 3,
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.translucent,
-                                    onTapUp: _handleScreenTap,
+                                    onTapUp: (details) {
+                                      if (_currentPageIndex <= 0) {
+                                        _previousChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.previousPage();
+                                        _curlContentKey.currentState?.previousPage();
+                                      }
+                                    },
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1216,12 +1227,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
-                                // 右侧30%：透明，手势穿透到下层PageView处理滑动
+                                // 右侧30%：点击下一页/下一章，不拦截滑动手势
                                 Expanded(
                                   flex: 3,
                                   child: GestureDetector(
                                     behavior: HitTestBehavior.translucent,
-                                    onTapUp: _handleScreenTap,
+                                    onTapUp: (details) {
+                                      if (_currentPageIndex >= _totalPages - 1) {
+                                        _nextChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.nextPage();
+                                        _curlContentKey.currentState?.nextPage();
+                                      }
+                                    },
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1409,8 +1427,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages() {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3;
+    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3 - 48;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1460,60 +1478,58 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return SizedBox.expand(
-      child: PageView.builder(
-        controller: _pageController,
-        itemCount: _pages.length,
-        onPageChanged: (index) {
-          widget.onPageChanged(index, _pages.length);
-          // 注意：不在边界页自动触发跳章
-          // PageView 会自然限制在第一页/最后一页
-          // 跳章由父组件的点击逻辑处理
-        },
-        itemBuilder: (context, index) {
-          final page = _pages[index];
-          return Container(
-            color: widget.background.bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                if (index == 0)
-                  Center(
-                    child: Padding(
-                      padding: const EdgeInsets.only(bottom: 24),
-                      child: Text(
-                        widget.chapter.title,
-                        style: TextStyle(
-                          fontSize: widget.fontSize + 4,
-                          fontWeight: FontWeight.bold,
-                          color: widget.background.textColor,
-                          height: 1.6,
-                          fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-                        ),
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  ),
-                Expanded(
-                  child: SingleChildScrollView(
+    return PageView.builder(
+      controller: _pageController,
+      itemCount: _pages.length,
+      onPageChanged: (index) {
+        widget.onPageChanged(index, _pages.length);
+        // 注意：不在边界页自动触发跳章
+        // PageView 会自然限制在第一页/最后一页
+        // 跳章由父组件的点击逻辑处理
+      },
+      itemBuilder: (context, index) {
+        final page = _pages[index];
+        return Container(
+          color: widget.background.bgColor,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              if (index == 0)
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
                     child: Text(
-                      page.text,
+                      widget.chapter.title,
                       style: TextStyle(
-                        fontSize: widget.fontSize,
-                        height: widget.lineHeight,
+                        fontSize: widget.fontSize + 4,
+                        fontWeight: FontWeight.bold,
                         color: widget.background.textColor,
-                        letterSpacing: 0.5,
+                        height: 1.6,
                         fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
                       ),
+                      textAlign: TextAlign.center,
                     ),
                   ),
                 ),
-              ],
-            ),
-          );
-        },
-      ),
+              // 分页内容直接显示，不需要SingleChildScrollView
+              // TextPaginator已经确保内容在一页内
+              Expanded(
+                child: Text(
+                  page.text,
+                  style: TextStyle(
+                    fontSize: widget.fontSize,
+                    height: widget.lineHeight,
+                    color: widget.background.textColor,
+                    letterSpacing: 0.5,
+                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }
@@ -1590,8 +1606,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages() {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3;
+    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
+    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3 - 48;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
