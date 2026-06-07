@@ -1394,11 +1394,13 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   @override
   void didUpdateWidget(covariant _PagedChapterContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.chapter.id != widget.chapter.id ||
-        oldWidget.fontSize != widget.fontSize ||
+    // 只有章节切换时才重置页签，字体/行高/背景调整不重置
+    if (oldWidget.chapter.id != widget.chapter.id) {
+      _calculatePages(resetPage: true);
+    } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
         oldWidget.font != widget.font) {
-      _calculatePages();
+      _calculatePages(resetPage: false);
     }
   }
 
@@ -1428,7 +1430,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
     }
   }
 
-  void _calculatePages() {
+  void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
@@ -1471,7 +1473,9 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       _isCalculating = false;
     });
 
-    if (_pageController.hasClients) {
+    // 只有在明确需要重置页签时才跳转到第一页（如切换章节）
+    // 菜单唤起、字体调整等操作不应重置页签
+    if (resetPage && _pageController.hasClients) {
       _pageController.jumpToPage(0);
     }
   }
@@ -1583,11 +1587,13 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   @override
   void didUpdateWidget(covariant _CurlChapterContent oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.chapter.id != widget.chapter.id ||
-        oldWidget.fontSize != widget.fontSize ||
+    // 只有章节切换时才重置页签，字体/行高/背景调整不重置
+    if (oldWidget.chapter.id != widget.chapter.id) {
+      _calculatePages(resetPage: true);
+    } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
         oldWidget.font != widget.font) {
-      _calculatePages();
+      _calculatePages(resetPage: false);
     }
   }
 
@@ -1607,7 +1613,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
     _simulationController.previousPage();
   }
 
-  void _calculatePages() {
+  void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
@@ -1650,12 +1656,15 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       _isCalculating = false;
     });
 
-    // 翻页后重置到第一页
-    WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _simulationController.jumpToPage(0);
-      }
-    });
+    // 只有在明确需要重置页签时才跳转到第一页（如切换章节）
+    // 菜单唤起、字体调整等操作不应重置页签
+    if (resetPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted) {
+          _simulationController.jumpToPage(0);
+        }
+      });
+    }
   }
 
   /// 构建单页内容 Widget
