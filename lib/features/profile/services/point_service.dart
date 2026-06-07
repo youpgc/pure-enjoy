@@ -110,7 +110,8 @@ class PointService {
           if (lastDate.year == yesterday.year &&
               lastDate.month == yesterday.month &&
               lastDate.day == yesterday.day) {
-            // 查询连续打卡天数
+            // 最近一次是昨天，今天打卡后连续天数 = 已有连续天数 + 1
+            // 查询所有打卡记录，计算已有连续天数
             final streakUrl = Uri.parse(
               '${SupabaseConfig.url}/rest/v1/point_records'
               '?user_id=eq.$userId&type=eq.checkin'
@@ -124,9 +125,9 @@ class PointService {
             );
 
             if (streakResponse.statusCode == 200) {
-              final allCheckins =
-                  jsonDecode(streakResponse.body) as List;
-              streak = 1;
+              final allCheckins = jsonDecode(streakResponse.body) as List;
+              // 从昨天的记录开始，向前统计连续天数
+              int consecutiveDays = 1; // 昨天是第1天
               for (int i = 1; i < allCheckins.length; i++) {
                 final prev = tz.TZDateTime.from(
                   DateTime.parse(allCheckins[i - 1]['created_at']),
@@ -136,23 +137,23 @@ class PointService {
                   DateTime.parse(allCheckins[i]['created_at']),
                   beijing,
                 );
-                final prevDate =
-                    DateTime(prev.year, prev.month, prev.day);
-                final currDate =
-                    DateTime(curr.year, curr.month, curr.day);
+                final prevDate = DateTime(prev.year, prev.month, prev.day);
+                final currDate = DateTime(curr.year, curr.month, curr.day);
                 final diff = prevDate.difference(currDate).inDays;
                 if (diff == 1) {
-                  streak++;
+                  consecutiveDays++;
                 } else {
                   break;
                 }
               }
+              // 今天打卡后，连续天数 = 已有连续天数 + 今天
+              streak = consecutiveDays + 1;
             }
           } else if (lastDate.isAtSameMomentAs(today)) {
             // 今天已经打过卡（双重检查）
             return {'success': false, 'message': '今天已打卡'};
           }
-          // 否则不是昨天，streak 保持为 1
+          // 否则不是昨天，streak 保持为 1（今天首次打卡）
         }
       }
 
