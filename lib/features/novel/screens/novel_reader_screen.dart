@@ -916,10 +916,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _showMenu = !_showMenu);
     if (_showMenu) {
       _toolbarAnimationController.forward();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
+      // 保持沉浸式模式，避免状态栏显示导致内容偏移
+      // 工具栏使用 SafeArea 自动适配状态栏高度
     } else {
       _toolbarAnimationController.reverse();
-      SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
     }
   }
 
@@ -1223,11 +1223,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             )
                           : Row(
                               children: [
-                                // 左侧30%：忽略指针事件，让下层PageView处理滑动手势
-                                // 点击翻页由PageView的onPageChanged处理
+                                // 左侧30%：点击上一页/上一章
                                 Expanded(
                                   flex: 3,
-                                  child: IgnorePointer(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTapUp: (details) {
+                                      if (_currentPageIndex <= 0) {
+                                        _previousChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.previousPage();
+                                        _curlContentKey.currentState?.previousPage();
+                                      }
+                                    },
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1240,10 +1248,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
-                                // 右侧30%：忽略指针事件，让下层PageView处理滑动手势
+                                // 右侧30%：点击下一页/下一章
                                 Expanded(
                                   flex: 3,
-                                  child: IgnorePointer(
+                                  child: GestureDetector(
+                                    behavior: HitTestBehavior.translucent,
+                                    onTapUp: (details) {
+                                      if (_currentPageIndex >= _totalPages - 1) {
+                                        _nextChapter();
+                                      } else {
+                                        _pagedContentKey.currentState?.nextPage();
+                                        _curlContentKey.currentState?.nextPage();
+                                      }
+                                    },
                                     child: Container(color: Colors.transparent),
                                   ),
                                 ),
@@ -1433,8 +1450,10 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3 - 48;
+    // 可用高度 = 屏幕高度 - 固定状态栏高度(44px) - 底部安全区 - 顶部进度条(3px)
+    // 使用固定值避免状态栏显示/隐藏导致内容重新计算和偏移
+    final statusBarHeight = 44.0; // iOS标准状态栏高度，Android通常更小
+    final height = mediaQuery.size.height - statusBarHeight - mediaQuery.padding.bottom - 3;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1444,7 +1463,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
     );
 
-    // 计算首页标题占用的额外高度（标题字号 + 行高 + 底部间距24）
+    // 计算首页标题占用的额外高度
+    // 标题使用 Padding(bottom: 24) + Text(height: 1.6)
     final titleStyle = TextStyle(
       fontSize: widget.fontSize + 4,
       height: 1.6,
@@ -1456,7 +1476,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       text: TextSpan(text: widget.chapter.title, style: titleStyle),
     )..layout(maxWidth: width - 40); // 减去左右 padding 20*2
     final titleLineCount = (titlePainter.computeLineMetrics()).length;
-    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24; // 标题行高 + 底部间距
+    // 标题实际高度 = 行数 * 行高 + Padding(bottom: 24)
+    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24;
 
     final pages = TextPaginator.paginate(
       text: widget.chapter.content,
@@ -1464,7 +1485,9 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       height: height,
       style: textStyle,
       lineHeight: widget.lineHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      // 垂直方向不额外加 padding，因为 Container 已经加了 padding
+      // 水平方向保留 padding 用于文本宽度计算
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       firstPageExtraHeight: firstPageExtraHeight,
     );
 
@@ -1616,8 +1639,10 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 顶部状态栏 - 底部安全区 - 顶部进度条(3px) - 底部工具栏预留(48px)
-    final height = mediaQuery.size.height - mediaQuery.padding.top - mediaQuery.padding.bottom - 3 - 48;
+    // 可用高度 = 屏幕高度 - 固定状态栏高度(44px) - 底部安全区 - 顶部进度条(3px)
+    // 使用固定值避免状态栏显示/隐藏导致内容重新计算和偏移
+    final statusBarHeight = 44.0; // iOS标准状态栏高度，Android通常更小
+    final height = mediaQuery.size.height - statusBarHeight - mediaQuery.padding.bottom - 3;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1627,7 +1652,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
     );
 
-    // 计算首页标题占用的额外高度（标题字号 + 行高 + 底部间距24）
+    // 计算首页标题占用的额外高度
+    // 标题使用 Padding(bottom: 24) + Text(height: 1.6)
     final titleStyle = TextStyle(
       fontSize: widget.fontSize + 4,
       height: 1.6,
@@ -1639,7 +1665,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       text: TextSpan(text: widget.chapter.title, style: titleStyle),
     )..layout(maxWidth: width - 40); // 减去左右 padding 20*2
     final titleLineCount = (titlePainter.computeLineMetrics()).length;
-    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24; // 标题行高 + 底部间距
+    // 标题实际高度 = 行数 * 行高 + Padding(bottom: 24)
+    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24;
 
     final pages = TextPaginator.paginate(
       text: widget.chapter.content,
@@ -1647,7 +1674,9 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       height: height,
       style: textStyle,
       lineHeight: widget.lineHeight,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      // 垂直方向不额外加 padding，因为 Container 已经加了 padding
+      // 水平方向保留 padding 用于文本宽度计算
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
       firstPageExtraHeight: firstPageExtraHeight,
     );
 
