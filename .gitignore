@@ -3,3 +3,7 @@
 # 非功能性文档和脚本（本地开发参考，不上传仓库）
 docs/
 sql/
+
+# 数据库迁移文件和Supabase配置（敏感/本地开发用，不上传仓库）
+database/
+supabase/
