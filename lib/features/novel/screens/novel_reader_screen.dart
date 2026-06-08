@@ -1179,6 +1179,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               : Stack(
                   children: [
                     // 底层：内容区域，填满整个屏幕
+                    // 点击处理已集成到各内容组件内部，无需覆盖层
                     Positioned.fill(
                       child: _isLoadingChapter
                           ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
@@ -1186,13 +1187,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                     ),
 
                     // 顶部进度条（始终显示）
+                    // 使用固定 top padding 而非 SafeArea，避免状态栏变化导致偏移
                     if (_chapters.isNotEmpty)
                       Positioned(
                         top: 0,
                         left: 0,
                         right: 0,
-                        child: SafeArea(
-                          bottom: false,
+                        child: Padding(
+                          padding: const EdgeInsets.only(top: 44),
                           child: LinearProgressIndicator(
                             value: _readingProgress,
                             backgroundColor: _background.textColor.withOpacity(0.1),
@@ -1205,68 +1207,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           ),
                         ),
                       ),
-
-                    // 中间区域点击层：只在屏幕中间40%区域放置点击检测，
-                    // 左右两侧不覆盖，让下层内容（ScrollView/PageView）正常接收手势
-                    // 滚动模式：整层忽略指针事件，让ScrollView自行处理滚动和点击
-                    // 分页模式：仅中间40%响应点击（切换菜单），左右滑动交给下层PageView
-                    Positioned.fill(
-                      child: _pageTurnMode == PageTurnMode.scroll
-                          ? GestureDetector(
-                              behavior: HitTestBehavior.translucent,
-                              onTapUp: _handleScreenTap,
-                              // 明确不处理垂直方向手势，让ScrollView处理
-                              onVerticalDragStart: null,
-                              onVerticalDragUpdate: null,
-                              onVerticalDragEnd: null,
-                              child: Container(color: Colors.transparent),
-                            )
-                          : Row(
-                              children: [
-                                // 左侧30%：点击上一页/上一章
-                                Expanded(
-                                  flex: 3,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTapUp: (details) {
-                                      if (_currentPageIndex <= 0) {
-                                        _previousChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.previousPage();
-                                        _curlContentKey.currentState?.previousPage();
-                                      }
-                                    },
-                                    child: Container(color: Colors.transparent),
-                                  ),
-                                ),
-                                // 中间40%：点击切换菜单
-                                Expanded(
-                                  flex: 4,
-                                  child: GestureDetector(
-                                    onTap: _toggleMenu,
-                                    behavior: HitTestBehavior.translucent,
-                                    child: Container(color: Colors.transparent),
-                                  ),
-                                ),
-                                // 右侧30%：点击下一页/下一章
-                                Expanded(
-                                  flex: 3,
-                                  child: GestureDetector(
-                                    behavior: HitTestBehavior.translucent,
-                                    onTapUp: (details) {
-                                      if (_currentPageIndex >= _totalPages - 1) {
-                                        _nextChapter();
-                                      } else {
-                                        _pagedContentKey.currentState?.nextPage();
-                                        _curlContentKey.currentState?.nextPage();
-                                      }
-                                    },
-                                    child: Container(color: Colors.transparent),
-                                  ),
-                                ),
-                              ],
-                            ),
-                    ),
 
                     // 顶部悬浮工具栏
                     Positioned(
@@ -1290,52 +1230,57 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   Widget _buildContent() {
     if (_pageTurnMode == PageTurnMode.scroll) {
-      return SingleChildScrollView(
-        controller: _scrollController,
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Text(
-                  _currentChapter!.title,
-                  style: TextStyle(
-                    fontSize: _fontSize + 4,
-                    fontWeight: FontWeight.bold,
-                    color: _background.textColor,
-                    height: 1.6,
-                    fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+      // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
+      // onTap 和 onVerticalDrag 在手势竞技场中可以共存
+      return GestureDetector(
+        onTapUp: _handleScreenTap,
+        child: SingleChildScrollView(
+          controller: _scrollController,
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Text(
+                    _currentChapter!.title,
+                    style: TextStyle(
+                      fontSize: _fontSize + 4,
+                      fontWeight: FontWeight.bold,
+                      color: _background.textColor,
+                      height: 1.6,
+                      fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
                 ),
               ),
-            ),
-            Text(
-              _currentChapter!.content,
-              style: TextStyle(
-                fontSize: _fontSize,
-                height: _lineHeight,
-                color: _background.textColor,
-                letterSpacing: 0.5,
-                fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+              Text(
+                _currentChapter!.content,
+                style: TextStyle(
+                  fontSize: _fontSize,
+                  height: _lineHeight,
+                  color: _background.textColor,
+                  letterSpacing: 0.5,
+                  fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+                ),
               ),
-            ),
-            const SizedBox(height: 40),
-            Center(
-              child: Text(
-                '${_currentChapter!.title} - 完',
-                style: TextStyle(fontSize: 14, color: _background.textColor.withOpacity(0.5)),
+              const SizedBox(height: 40),
+              Center(
+                child: Text(
+                  '${_currentChapter!.title} - 完',
+                  style: TextStyle(fontSize: 14, color: _background.textColor.withOpacity(0.5)),
+                ),
               ),
-            ),
-            const SizedBox(height: 24),
-          ],
+              const SizedBox(height: 24),
+            ],
+          ),
         ),
       );
     }
 
-    // 仿真翻页模式：使用 FlipPage
+    // 仿真翻页模式：使用 SimulationPageView
     if (_pageTurnMode == PageTurnMode.simulation) {
       return _CurlChapterContent(
         key: _curlContentKey,
@@ -1346,6 +1291,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         lineHeight: _lineHeight,
         onPageChanged: _onPageChanged,
         onBoundaryReached: _onPageBoundaryReached,
+        onTapScreen: _handleScreenTap,
       );
     }
 
@@ -1360,6 +1306,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       pageTurnMode: _pageTurnMode,
       onPageChanged: _onPageChanged,
       onBoundaryReached: _onPageBoundaryReached,
+      onTapScreen: _handleScreenTap,
     );
   }
 }
@@ -1374,6 +1321,8 @@ class _PagedChapterContent extends StatefulWidget {
   final PageTurnMode pageTurnMode;
   final void Function(int currentPage, int totalPages) onPageChanged;
   final void Function(bool isLastPage) onBoundaryReached;
+  /// 屏幕点击回调，由内容层统一处理点击区域逻辑
+  final void Function(TapUpDetails details) onTapScreen;
 
   const _PagedChapterContent({
     super.key,
@@ -1385,6 +1334,7 @@ class _PagedChapterContent extends StatefulWidget {
     required this.pageTurnMode,
     required this.onPageChanged,
     required this.onBoundaryReached,
+    required this.onTapScreen,
   });
 
   @override
@@ -1509,58 +1459,58 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return PageView.builder(
-      controller: _pageController,
-      itemCount: _pages.length,
-      onPageChanged: (index) {
-        widget.onPageChanged(index, _pages.length);
-        // 注意：不在边界页自动触发跳章
-        // PageView 会自然限制在第一页/最后一页
-        // 跳章由父组件的点击逻辑处理
-      },
-      itemBuilder: (context, index) {
-        final page = _pages[index];
-        return Container(
-          color: widget.background.bgColor,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              if (index == 0)
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Text(
-                      widget.chapter.title,
-                      style: TextStyle(
-                        fontSize: widget.fontSize + 4,
-                        fontWeight: FontWeight.bold,
-                        color: widget.background.textColor,
-                        height: 1.6,
-                        fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    // GestureDetector 处理点击翻页/菜单，PageView 处理滑动手势
+    // Flutter 手势竞技场中 onTap 和 onHorizontalDrag 是不同类型，可以共存
+    return GestureDetector(
+      onTapUp: widget.onTapScreen,
+      child: PageView.builder(
+        controller: _pageController,
+        itemCount: _pages.length,
+        onPageChanged: (index) {
+          widget.onPageChanged(index, _pages.length);
+        },
+        itemBuilder: (context, index) {
+          final page = _pages[index];
+          return Container(
+            color: widget.background.bgColor,
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                if (index == 0)
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Text(
+                        widget.chapter.title,
+                        style: TextStyle(
+                          fontSize: widget.fontSize + 4,
+                          fontWeight: FontWeight.bold,
+                          color: widget.background.textColor,
+                          height: 1.6,
+                          fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                        ),
+                        textAlign: TextAlign.center,
                       ),
-                      textAlign: TextAlign.center,
+                    ),
+                  ),
+                Expanded(
+                  child: Text(
+                    page.text,
+                    style: TextStyle(
+                      fontSize: widget.fontSize,
+                      height: widget.lineHeight,
+                      color: widget.background.textColor,
+                      letterSpacing: 0.5,
+                      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
                     ),
                   ),
                 ),
-              // 分页内容直接显示，不需要SingleChildScrollView
-              // TextPaginator已经确保内容在一页内
-              Expanded(
-                child: Text(
-                  page.text,
-                  style: TextStyle(
-                    fontSize: widget.fontSize,
-                    height: widget.lineHeight,
-                    color: widget.background.textColor,
-                    letterSpacing: 0.5,
-                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-                  ),
-                ),
-              ),
-            ],
-          ),
-        );
-      },
+              ],
+            ),
+          );
+        },
+      ),
     );
   }
 }
@@ -1574,6 +1524,8 @@ class _CurlChapterContent extends StatefulWidget {
   final double lineHeight;
   final void Function(int currentPage, int totalPages) onPageChanged;
   final void Function(bool isLastPage) onBoundaryReached;
+  /// 屏幕点击回调，由内容层统一处理点击区域逻辑
+  final void Function(TapUpDetails details) onTapScreen;
 
   const _CurlChapterContent({
     super.key,
@@ -1584,6 +1536,7 @@ class _CurlChapterContent extends StatefulWidget {
     required this.lineHeight,
     required this.onPageChanged,
     required this.onBoundaryReached,
+    required this.onTapScreen,
   });
 
   @override
@@ -1744,16 +1697,18 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    return SimulationPageView(
-      controller: _simulationController,
-      backgroundColor: widget.background.bgColor,
-      pages: _pages.map((page) => _buildPageWidget(page)).toList(),
-      onPageChanged: (index) {
-        widget.onPageChanged(index, _pages.length);
-        // 注意：不在边界页自动触发跳章
-        // SimulationPageView 会自然限制在第一页/最后一页
-        // 跳章由父组件的点击逻辑处理
-      },
+    // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势
+    // onTap 和 onHorizontalDrag 在手势竞技场中可以共存
+    return GestureDetector(
+      onTapUp: widget.onTapScreen,
+      child: SimulationPageView(
+        controller: _simulationController,
+        backgroundColor: widget.background.bgColor,
+        pages: _pages.map((page) => _buildPageWidget(page)).toList(),
+        onPageChanged: (index) {
+          widget.onPageChanged(index, _pages.length);
+        },
+      ),
     );
   }
 }
