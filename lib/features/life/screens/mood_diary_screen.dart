@@ -99,7 +99,10 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
-        headers: SupabaseConfig.writeHeaders,
+        headers: {
+          ...SupabaseConfig.writeHeaders,
+          'x-user-id': diary.userId,
+        },
         body: jsonEncode(diary.toJson()),
       );
 
