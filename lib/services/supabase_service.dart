@@ -681,12 +681,15 @@ class AuthService {
             throw Exception('不支持的 HTTP 方法: $method');
         }
 
-        // 3. 处理 401 未授权（token 过期）
+        // 3. 处理 401 未授权（用户未登录或会话过期）
         if (response.statusCode == 401) {
-          debugPrint('🔒 收到 401，尝试静默刷新用户...');
-          await _silentRefreshUser();
-          // 刷新后继续重试
-          continue;
+          debugPrint('🔒 收到 401，用户未登录或会话过期');
+          // 清除本地用户状态，触发重新登录
+          _user = null;
+          final prefs = await SharedPreferences.getInstance();
+          await prefs.remove('user');
+          // 抛出401异常，由上层处理跳转登录页
+          throw Exception('401_UNAUTHORIZED');
         }
 
         // 4. 请求成功，跳出重试循环
