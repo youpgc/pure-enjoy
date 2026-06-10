@@ -133,9 +133,12 @@ class _NovelListScreenState extends State<NovelListScreen> {
   List<NovelModel> _applyFilters(List<NovelModel> novels) {
     var filtered = novels;
 
-    // 分类筛选
+    // 分类筛选（根据 label 找到对应的 code 再筛选）
     if (_selectedCategory != '全部') {
-      filtered = filtered.where((n) => n.category == _selectedCategory).toList();
+      final categoryItem = DictService.instance.getItemsSync(DictService.novelCategory)
+          .firstWhere((item) => item.label == _selectedCategory, orElse: () => null as dynamic);
+      final categoryCode = categoryItem?.code ?? _selectedCategory;
+      filtered = filtered.where((n) => n.category == categoryCode).toList();
     }
 
     // 搜索筛选
@@ -528,12 +531,24 @@ class _NovelCard extends StatelessWidget {
                       maxLines: 1,
                     ),
                     const Spacer(),
-                    Text(
-                      '${novel.chapterCount} 章',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.primary,
+                    if (novel.category != null)
+                      Text(
+                        DictService.instance.getLabel(
+                          DictService.novelCategory,
+                          novel.category!,
+                          defaultValue: novel.category!,
+                        ),
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.primary,
+                        ),
+                      )
+                    else
+                      Text(
+                        '${novel.chapterCount} 章',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: colorScheme.primary,
+                        ),
                       ),
-                    ),
                   ],
                 ),
               ),

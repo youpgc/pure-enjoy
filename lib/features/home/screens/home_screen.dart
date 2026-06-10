@@ -16,6 +16,7 @@ import '../../life/screens/habits_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../novel/screens/novel_reader_screen.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../services/data_export_service.dart';
 import '../../../services/version_check_service.dart';
 import '../../auth/screens/login_screen.dart';
@@ -1417,8 +1418,22 @@ class _AddMoodSheet extends StatefulWidget {
 class _AddMoodSheetState extends State<_AddMoodSheet> {
   final _contentController = TextEditingController();
   final _tagsController = TextEditingController();
-  MoodType _selectedMood = MoodType.calm;
+  String _selectedMoodCode = '';
   DateTime _selectedDate = DateTime.now();
+
+  /// 获取心情选项列表（从字典服务）
+  List<String> get _moodCodes {
+    return DictService.instance.getItemsSync(DictService.moodType).map((e) => e.code).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedMoodCode = DictService.instance.getDefaultCode(DictService.moodType);
+    if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+      _selectedMoodCode = _moodCodes.first;
+    }
+  }
 
   @override
   void dispose() {
@@ -1437,8 +1452,8 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
     final diary = MoodDiaryModel(
       id: const Uuid().v4(),
       userId: AuthService.instance.currentUserId ?? 'local_user',
-      mood: _selectedMood.name,
-      moodScore: _selectedMood.score,
+      mood: _selectedMoodCode,
+      moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       tags: tags.isEmpty ? null : tags,
       entryDate: _selectedDate,
@@ -1467,21 +1482,25 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: MoodType.values.map((mood) => ChoiceChip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(mood.emoji),
-                  const SizedBox(width: 4),
-                  Text(mood.label),
-                ],
-              ),
-              selected: _selectedMood == mood,
-              selectedColor: mood.color.withOpacity(0.3),
-              onSelected: (selected) {
-                if (selected) setState(() => _selectedMood = mood);
-              },
-            )).toList(),
+            children: _moodCodes.map((code) {
+              final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
+              final emoji = DictService.instance.getEmoji(DictService.moodType, code);
+              return ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(emoji.isNotEmpty ? emoji : '😊'),
+                    const SizedBox(width: 4),
+                    Text(label),
+                  ],
+                ),
+                selected: _selectedMoodCode == code,
+                selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedMoodCode = code);
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 16),
           TextField(
@@ -1536,8 +1555,22 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
   final _noteController = TextEditingController();
-  ExpenseCategory _selectedCategory = ExpenseCategory.food;
+  String _selectedCategoryCode = '';
   DateTime _selectedDate = DateTime.now();
+
+  /// 获取支出分类选项列表（从字典服务）
+  List<String> get _categoryCodes {
+    return DictService.instance.getItemsSync(DictService.expenseCategory).map((e) => e.code).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    _selectedCategoryCode = DictService.instance.getDefaultCode(DictService.expenseCategory);
+    if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
+      _selectedCategoryCode = _categoryCodes.first;
+    }
+  }
 
   @override
   void dispose() {
@@ -1553,7 +1586,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
       id: const Uuid().v4(),
       userId: AuthService.instance.currentUserId ?? 'local_user',
       amount: double.parse(_amountController.text),
-      category: _selectedCategory.name,
+      category: _selectedCategoryCode,
       note: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
@@ -1596,20 +1629,16 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: ExpenseCategory.values.map((cat) => ChoiceChip(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(cat.icon, size: 16),
-                    const SizedBox(width: 4),
-                    Text(cat.label),
-                  ],
-                ),
-                selected: _selectedCategory == cat,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedCategory = cat);
-                },
-              )).toList(),
+              children: _categoryCodes.map((code) {
+                final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
+                return ChoiceChip(
+                  label: Text(label),
+                  selected: _selectedCategoryCode == code,
+                  onSelected: (selected) {
+                    if (selected) setState(() => _selectedCategoryCode = code);
+                  },
+                );
+              }).toList(),
             ),
             const SizedBox(height: 12),
             TextFormField(
@@ -1994,7 +2023,9 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
       name: _nameController.text.trim(),
       description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
       targetDays: targetDays,
-      frequency: 'daily',
+      frequency: DictService.instance.getDefaultCode(DictService.habitFrequency).isNotEmpty
+          ? DictService.instance.getDefaultCode(DictService.habitFrequency)
+          : 'daily',
       isActive: true,
     );
 
@@ -2413,26 +2444,14 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// 获取角色标签
   String _getRoleLabel(String? role) {
-    switch (role) {
-      case 'admin':
-        return '管理员';
-      case 'super_admin':
-        return '超级管理员';
-      default:
-        return '普通用户';
-    }
+    if (role == null || role.isEmpty) return '普通用户';
+    return DictService.instance.getLabel('user_role', role, defaultValue: '普通用户');
   }
 
   /// 获取会员等级标签
   String _getMemberLevelLabel(String? level) {
-    switch (level) {
-      case 'member':
-        return '高级会员';
-      case 'super_member':
-        return '超级会员';
-      default:
-        return '普通会员';
-    }
+    if (level == null || level.isEmpty) return '普通会员';
+    return DictService.instance.getLabel('member_level', level, defaultValue: '普通会员');
   }
 
   /// 构建用户头像

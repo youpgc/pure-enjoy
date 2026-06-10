@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import 'expense_list_screen.dart';
 import 'mood_diary_screen.dart';
 import 'note_list_screen.dart';
@@ -97,48 +98,17 @@ class _LifeScreenState extends State<LifeScreen> {
     }
   }
 
-  /// 心情 emoji 映射
+  /// 心情 emoji 映射（从字典服务获取）
   String _moodEmoji(String? mood) {
-    switch (mood) {
-      case 'happy':
-        return '\u{1F60A}';
-      case 'sad':
-        return '\u{1F622}';
-      case 'angry':
-        return '\u{1F621}';
-      case 'anxious':
-        return '\u{1F630}';
-      case 'calm':
-        return '\u{1F60C}';
-      case 'excited':
-        return '\u{1F929}';
-      case 'tired':
-        return '\u{1F634}';
-      default:
-        return '\u{1F60A}';
-    }
+    if (mood == null || mood.isEmpty) return '\u{1F60A}';
+    final emoji = DictService.instance.getEmoji(DictService.moodType, mood);
+    return emoji.isNotEmpty ? emoji : '\u{1F60A}';
   }
 
-  /// 心情文字映射
+  /// 心情文字映射（从字典服务获取）
   String _moodText(String? mood) {
-    switch (mood) {
-      case 'happy':
-        return '开心';
-      case 'sad':
-        return '难过';
-      case 'angry':
-        return '生气';
-      case 'anxious':
-        return '焦虑';
-      case 'calm':
-        return '平静';
-      case 'excited':
-        return '兴奋';
-      case 'tired':
-        return '疲惫';
-      default:
-        return '开心';
-    }
+    if (mood == null || mood.isEmpty) return '开心';
+    return DictService.instance.getLabel(DictService.moodType, mood, defaultValue: '开心');
   }
 
   @override

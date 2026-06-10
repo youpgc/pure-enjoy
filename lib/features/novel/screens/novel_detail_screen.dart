@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../utils/format_utils.dart';
@@ -524,7 +525,11 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    novel.category!,
+                                    DictService.instance.getLabel(
+                                      DictService.novelCategory,
+                                      novel.category!,
+                                      defaultValue: novel.category!,
+                                    ),
                                     style: const TextStyle(
                                       fontSize: 11,
                                       color: Colors.white,

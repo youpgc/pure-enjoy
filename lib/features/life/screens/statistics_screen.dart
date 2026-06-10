@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// 统计图表页面
@@ -517,28 +518,16 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
   bool _isLoading = true;
   String _error = '';
 
-  // 心情表情映射
-  static const moodEmojis = {
-    'happy': '😊',
-    'excited': '🤩',
-    'calm': '😌',
-    'neutral': '😐',
-    'sad': '😢',
-    'anxious': '😰',
-    'angry': '😠',
-    'tired': '😴',
-  };
+  /// 获取心情表情（从字典服务）
+  String _getMoodEmoji(String mood) {
+    final emoji = DictService.instance.getEmoji(DictService.moodType, mood);
+    return emoji.isNotEmpty ? emoji : '😐';
+  }
 
-  static const moodLabels = {
-    'happy': '开心',
-    'excited': '兴奋',
-    'calm': '平静',
-    'neutral': '一般',
-    'sad': '难过',
-    'anxious': '焦虑',
-    'angry': '生气',
-    'tired': '疲惫',
-  };
+  /// 获取心情标签（从字典服务）
+  String _getMoodLabel(String mood) {
+    return DictService.instance.getLabel(DictService.moodType, mood, defaultValue: mood);
+  }
 
   @override
   void initState() {
@@ -660,7 +649,7 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
                     children: [
                       Text(
                         moods.isNotEmpty
-                            ? moodEmojis[moods.first.key] ?? '😊'
+                            ? _getMoodEmoji(moods.first.key)
                             : '😊',
                         style: const TextStyle(fontSize: 32),
                       ),
@@ -712,10 +701,10 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
             final mood = entry.value;
             return ListTile(
               leading: Text(
-                moodEmojis[mood.key] ?? '😐',
+                _getMoodEmoji(mood.key),
                 style: const TextStyle(fontSize: 24),
               ),
-              title: Text(moodLabels[mood.key] ?? mood.key),
+              title: Text(_getMoodLabel(mood.key)),
               trailing: Row(
                 mainAxisSize: MainAxisSize.min,
                 children: [

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -234,9 +235,14 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                     itemCount: _diaries.length,
                     itemBuilder: (context, index) {
                       final diary = _diaries[index];
-                      final moodType = MoodType.values.firstWhere(
-                        (m) => m.name == diary.mood,
-                        orElse: () => MoodType.calm,
+                      final moodLabel = DictService.instance.getLabel(
+                        DictService.moodType,
+                        diary.mood,
+                        defaultValue: diary.mood,
+                      );
+                      final moodEmoji = DictService.instance.getEmoji(
+                        DictService.moodType,
+                        diary.mood,
                       );
 
                       return Card(
@@ -257,18 +263,18 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                                         vertical: 6,
                                       ),
                                       decoration: BoxDecoration(
-                                        color: moodType.color.withOpacity(0.2),
+                                        color: Theme.of(context).colorScheme.primaryContainer,
                                         borderRadius: BorderRadius.circular(20),
                                       ),
                                       child: Row(
                                         mainAxisSize: MainAxisSize.min,
                                         children: [
                                           Text(
-                                            moodType.emoji,
+                                            moodEmoji.isNotEmpty ? moodEmoji : '😊',
                                             style: const TextStyle(fontSize: 16),
                                           ),
                                           const SizedBox(width: 4),
-                                          Text(moodType.label),
+                                          Text(moodLabel),
                                         ],
                                       ),
                                     ),
@@ -332,10 +338,15 @@ class _DiaryForm extends StatefulWidget {
 class _DiaryFormState extends State<_DiaryForm> {
   late final TextEditingController _contentController;
   late final TextEditingController _tagsController;
-  late MoodType _selectedMood;
+  late String _selectedMoodCode;
   late DateTime _selectedDate;
 
   bool get _isEditing => widget.diary != null;
+
+  /// 获取心情选项列表（从字典服务）
+  List<String> get _moodCodes {
+    return DictService.instance.getItemsSync(DictService.moodType).map((e) => e.code).toList();
+  }
 
   @override
   void initState() {
@@ -345,12 +356,10 @@ class _DiaryFormState extends State<_DiaryForm> {
     _tagsController = TextEditingController(
       text: diary?.tags?.join(', ') ?? '',
     );
-    _selectedMood = diary != null
-        ? MoodType.values.firstWhere(
-            (m) => m.name == diary.mood,
-            orElse: () => MoodType.calm,
-          )
-        : MoodType.calm;
+    _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);
+    if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+      _selectedMoodCode = _moodCodes.first;
+    }
     _selectedDate = diary?.entryDate ?? DateTime.now();
   }
 
@@ -371,8 +380,8 @@ class _DiaryFormState extends State<_DiaryForm> {
     final newDiary = MoodDiaryModel(
       id: _isEditing ? widget.diary!.id : const Uuid().v4(),
       userId: _isEditing ? widget.diary!.userId : widget.userId,
-      mood: _selectedMood.name,
-      moodScore: _selectedMood.score,
+      mood: _selectedMoodCode,
+      moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       tags: tags.isEmpty ? null : tags,
       entryDate: _selectedDate,
@@ -406,21 +415,25 @@ class _DiaryFormState extends State<_DiaryForm> {
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: MoodType.values.map((mood) => ChoiceChip(
-              label: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Text(mood.emoji),
-                  const SizedBox(width: 4),
-                  Text(mood.label),
-                ],
-              ),
-              selected: _selectedMood == mood,
-              selectedColor: mood.color.withOpacity(0.3),
-              onSelected: (selected) {
-                if (selected) setState(() => _selectedMood = mood);
-              },
-            )).toList(),
+            children: _moodCodes.map((code) {
+              final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
+              final emoji = DictService.instance.getEmoji(DictService.moodType, code);
+              return ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(emoji.isNotEmpty ? emoji : '😊'),
+                    const SizedBox(width: 4),
+                    Text(label),
+                  ],
+                ),
+                selected: _selectedMoodCode == code,
+                selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedMoodCode = code);
+                },
+              );
+            }).toList(),
           ),
           const SizedBox(height: 16),
 

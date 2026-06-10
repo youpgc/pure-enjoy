@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -307,11 +308,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                     _loadExpenses();
                   },
                 ),
-                ...ExpenseCategory.values.map((cat) => CategoryChip(
+                ...DictService.instance.getItemsSync(DictService.expenseCategory).map((cat) => CategoryChip(
                   label: cat.label,
-                  isSelected: _selectedCategory == cat.name,
+                  isSelected: _selectedCategory == cat.code,
                   onTap: () {
-                    setState(() => _selectedCategory = cat.name);
+                    setState(() => _selectedCategory = cat.code);
                     _loadExpenses();
                   },
                 )),
@@ -333,16 +334,17 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           itemCount: _expenses.length,
                           itemBuilder: (context, index) {
                             final expense = _expenses[index];
-                            final category = ExpenseCategory.values.firstWhere(
-                              (c) => c.name == expense.category,
-                              orElse: () => ExpenseCategory.other,
+                            final categoryLabel = DictService.instance.getLabel(
+                              DictService.expenseCategory,
+                              expense.category,
+                              defaultValue: expense.category,
                             );
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(
-                                leading: Icon(category.icon),
-                                title: Text(category.label),
+                                leading: const Icon(Icons.receipt),
+                                title: Text(categoryLabel),
                                 subtitle: Text(
                                   '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
                                 ),
@@ -393,10 +395,15 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _noteController;
-  late ExpenseCategory _selectedCategory;
+  String _selectedCategoryCode = '';
   late DateTime _selectedDate;
 
   bool get _isEditing => widget.expense != null;
+
+  /// 获取支出分类选项列表（从字典服务）
+  List<String> get _categoryCodes {
+    return DictService.instance.getItemsSync(DictService.expenseCategory).map((e) => e.code).toList();
+  }
 
   @override
   void initState() {
@@ -408,12 +415,10 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     _noteController = TextEditingController(
       text: expense?.note ?? '',
     );
-    _selectedCategory = expense != null
-        ? ExpenseCategory.values.firstWhere(
-            (c) => c.name == expense.category,
-            orElse: () => ExpenseCategory.food,
-          )
-        : ExpenseCategory.food;
+    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(DictService.expenseCategory);
+    if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
+      _selectedCategoryCode = _categoryCodes.first;
+    }
     _selectedDate = expense?.date ?? DateTime.now();
   }
 
@@ -431,7 +436,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       id: _isEditing ? widget.expense!.id : const Uuid().v4(),
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
-      category: _selectedCategory.name,
+      category: _selectedCategoryCode,
       note: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
@@ -481,20 +486,16 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
-              children: ExpenseCategory.values.map((cat) => ChoiceChip(
-                label: Row(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
-                    Icon(cat.icon, size: 16),
-                    const SizedBox(width: 4),
-                    Text(cat.label),
-                  ],
-                ),
-                selected: _selectedCategory == cat,
-                onSelected: (selected) {
-                  if (selected) setState(() => _selectedCategory = cat);
-                },
-              )).toList(),
+              children: _categoryCodes.map((code) {
+                final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
+                return ChoiceChip(
+                  label: Text(label),
+                  selected: _selectedCategoryCode == code,
+                  onSelected: (selected) {
+                    if (selected) setState(() => _selectedCategoryCode = code);
+                  },
+                );
+              }).toList(),
             ),
             const SizedBox(height: 16),
 

@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
@@ -328,7 +329,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
-                        'frequency': 'daily',
+                        'frequency': DictService.instance.getDefaultCode(DictService.habitFrequency).isNotEmpty
+                            ? DictService.instance.getDefaultCode(DictService.habitFrequency)
+                            : 'daily',
                         'is_active': true,
                         'reminder_enabled': enableReminder,
                         'reminder_hour': enableReminder ? reminderHour : null,
@@ -608,7 +611,11 @@ class _HabitCard extends StatelessWidget {
                 ),
                 _StatItem(
                   label: '频率',
-                  value: habit.frequency == 'daily' ? '每天' : habit.frequency,
+                  value: DictService.instance.getLabel(
+                    DictService.habitFrequency,
+                    habit.frequency,
+                    defaultValue: habit.frequency,
+                  ),
                   icon: Icons.calendar_today,
                   color: Theme.of(context).colorScheme.primary,
                 ),
