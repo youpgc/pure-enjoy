@@ -96,7 +96,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
           '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId'
           '&date=gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)}'
           '&date=lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)}'
-          '&select=*&order=date.desc',
+          '&select=*&order=date.desc&limit=500',
         ),
         headers: {
           'apikey': SupabaseConfig.anonKey,

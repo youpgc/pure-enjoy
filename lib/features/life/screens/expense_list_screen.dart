@@ -84,7 +84,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc',
+          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc&limit=500',
         ),
         headers: SupabaseConfig.headers,
       );

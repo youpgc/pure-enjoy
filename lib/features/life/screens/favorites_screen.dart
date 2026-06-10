@@ -56,7 +56,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_favorites?user_id=eq.$userId&select=*&order=created_at.desc',
+          '${SupabaseConfig.url}/rest/v1/user_favorites?user_id=eq.$userId&select=*&order=created_at.desc&limit=500',
         ),
         headers: SupabaseConfig.headers,
       );

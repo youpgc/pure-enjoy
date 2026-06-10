@@ -63,7 +63,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId&select=*&order=date.desc',
+          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId&select=*&order=date.desc&limit=500',
         ),
         headers: SupabaseConfig.headers,
       );

@@ -217,16 +217,16 @@ class AuthService {
   }
 
   /// 通过用户名+密码登录
-  /// 注意: users 表没有 username 字段，此方法改用 nickname 查询
+  /// 使用 username 字段查询（users 表已支持 username 字段）
   Future<bool> signInWithUsername(String username, String password) async {
     try {
       final passwordHash = _hashPassword(password);
 
-      debugPrint('🔐 用户名登录: nickname=$username, hash=${passwordHash.substring(0, 8)}...');
+      debugPrint('🔐 用户名登录: username=$username, hash=${passwordHash.substring(0, 8)}...');
 
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?nickname=eq.$username&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
+          '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );

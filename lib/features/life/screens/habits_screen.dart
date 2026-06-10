@@ -58,7 +58,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     try {
       final habitsResponse = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_habits?user_id=eq.$userId&select=*&order=is_active.desc',
+          '${SupabaseConfig.url}/rest/v1/user_habits?user_id=eq.$userId&select=*&order=is_active.desc&limit=200',
         ),
         headers: SupabaseConfig.headers,
       );

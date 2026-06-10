@@ -42,7 +42,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_feedback?user_id=eq.$userId&select=*&order=created_at.desc',
+          '${SupabaseConfig.url}/rest/v1/user_feedback?user_id=eq.$userId&select=*&order=created_at.desc&limit=200',
         ),
         headers: {
           ...SupabaseConfig.headers,

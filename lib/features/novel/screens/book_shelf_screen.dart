@@ -99,7 +99,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 第一步：查询 user_novels 获取用户的书架记录
       final userNovelsResponse = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,progress,last_chapter,last_read_at,is_collected&order=last_read_at.desc.nullslast',
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,progress,last_chapter,last_read_at,is_collected&order=last_read_at.desc.nullslast&limit=200',
         ),
         headers: _buildAuthHeaders(),
       );

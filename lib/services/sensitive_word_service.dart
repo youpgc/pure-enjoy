@@ -292,11 +292,15 @@ class SensitiveWordService {
 
   /// 判断文本是否匹配敏感词
   bool _isMatch(String text, SensitiveWordModel sw) {
+    final lowerText = text.toLowerCase();
+    final lowerWord = sw.word.toLowerCase();
     switch (sw.matchMode) {
       case 'exact':
-        return text.toLowerCase().contains(sw.word.toLowerCase());
+        // 完全匹配：文本与敏感词完全一致（去除首尾空格后比较）
+        return lowerText.trim() == lowerWord.trim();
       case 'contains':
-        return text.toLowerCase().contains(sw.word.toLowerCase());
+        // 包含匹配：文本中包含敏感词
+        return lowerText.contains(lowerWord);
       case 'regex':
         try {
           return RegExp(sw.word, caseSensitive: false).hasMatch(text);
@@ -305,7 +309,7 @@ class SensitiveWordService {
           return false;
         }
       default:
-        return text.toLowerCase().contains(sw.word.toLowerCase());
+        return lowerText.contains(lowerWord);
     }
   }
 
