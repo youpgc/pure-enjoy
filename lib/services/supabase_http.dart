@@ -56,6 +56,7 @@ class SupabaseHttp {
   }
 
   /// 构建 URI
+  /// 使用 Uri.https 的 queryParameters 避免手动拼接导致的 ?key1=v1?key2=v2 错误
   static Uri _buildUri(
     String table, {
     String? select,
@@ -64,56 +65,33 @@ class SupabaseHttp {
     int? limit,
     int? offset,
   }) {
-    final buffer = StringBuffer('$_baseUrl/$table');
+    final params = <String, String>{};
 
     // filters
     if (filters != null && filters.isNotEmpty) {
-      filters.forEach((key, value) {
-        buffer.write('?');
-        // 如果已经有参数了，用 & 连接
-        if (buffer.toString().contains('?') && !buffer.toString().endsWith('?')) {
-          buffer.write('&');
-        }
-        buffer.write('$key=$value');
-      });
+      params.addAll(filters);
     }
 
     // select
     if (select != null) {
-      if (buffer.toString().contains('?')) {
-        buffer.write('&select=$select');
-      } else {
-        buffer.write('?select=$select');
-      }
+      params['select'] = select;
     }
 
     // order
     if (order != null) {
-      if (buffer.toString().contains('?')) {
-        buffer.write('&order=$order');
-      } else {
-        buffer.write('?order=$order');
-      }
+      params['order'] = order;
     }
 
     // limit
     if (limit != null) {
-      if (buffer.toString().contains('?')) {
-        buffer.write('&limit=$limit');
-      } else {
-        buffer.write('?limit=$limit');
-      }
+      params['limit'] = limit.toString();
     }
 
     // offset
     if (offset != null) {
-      if (buffer.toString().contains('?')) {
-        buffer.write('&offset=$offset');
-      } else {
-        buffer.write('?offset=$offset');
-      }
+      params['offset'] = offset.toString();
     }
 
-    return Uri.parse(buffer.toString());
+    return Uri.parse('$_baseUrl/$table').replace(queryParameters: params);
   }
 }
