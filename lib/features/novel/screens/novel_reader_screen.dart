@@ -99,6 +99,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 防止重复触发下一章
   bool _hasTriggeredNextChapter = false;
 
+  /// 标记是否需要跳转到最后一页（上一章时）
+  bool _shouldJumpToLastPage = false;
+
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
@@ -351,7 +354,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           );
           _isLoadingChapter = false;
         });
-        _scrollToTop();
+        // 根据方向决定滚动位置：上一章到末尾，下一章到顶部
+        _scrollToPosition();
         _saveProgress();
         _startReadingTimer();
         // 继续等待网络请求更新缓存
@@ -381,7 +385,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               );
               _isLoadingChapter = false;
             });
-            _scrollToTop();
+            // 根据方向决定滚动位置
+            _scrollToPosition();
             _saveProgress();
             _startReadingTimer();
           }
@@ -400,14 +405,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             _currentChapter = chapter;
             _isLoadingChapter = false;
           });
-          _scrollToTop();
+          _scrollToPosition();
         }
       } else if (_currentChapter == null) {
         setState(() {
           _currentChapter = chapter;
           _isLoadingChapter = false;
         });
-        _scrollToTop();
+        _scrollToPosition();
       }
     } catch (e) {
       if (_currentChapter == null) {
@@ -415,7 +420,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           _currentChapter = chapter;
           _isLoadingChapter = false;
         });
-        _scrollToTop();
+        _scrollToPosition();
       }
     }
   }
@@ -424,6 +429,25 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_scrollController.hasClients) {
       _scrollController.jumpTo(0);
     }
+  }
+
+  /// 根据阅读方向滚动到合适位置
+  /// - 上一章：滚动到末尾（显示最后一页/底部）
+  /// - 下一章：滚动到顶部（显示第一页/顶部）
+  void _scrollToPosition() {
+    if (_pageTurnMode == PageTurnMode.scroll) {
+      // 滚动模式：使用 ScrollController
+      if (_scrollController.hasClients) {
+        if (_shouldJumpToLastPage) {
+          // 上一章：跳转到末尾
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        } else {
+          // 下一章：跳转到顶部
+          _scrollController.jumpTo(0);
+        }
+      }
+    }
+    // 分页模式：通过 _shouldJumpToLastPage 标志，在 _calculatePages 中处理
   }
 
   /// 滚动到底部自动加载下一章 - 带防重复触发
@@ -616,6 +640,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   void _previousChapter() {
     if (_currentChapterIndex > 0) {
+      // 标记需要跳转到最后一页（上一章）
+      _shouldJumpToLastPage = true;
       setState(() {
         _currentChapterIndex--;
       });
@@ -631,6 +657,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   void _nextChapter() {
     if (_currentChapterIndex < _chapters.length - 1) {
+      // 标记需要跳转到第一页（下一章）
+      _shouldJumpToLastPage = false;
       final nextIndex = _currentChapterIndex + 1;
       setState(() {
         _currentChapterIndex = nextIndex;
@@ -1292,6 +1320,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         onPageChanged: _onPageChanged,
         onBoundaryReached: _onPageBoundaryReached,
         onTapScreen: _handleScreenTap,
+        jumpToLastPage: _shouldJumpToLastPage,
       );
     }
 
@@ -1307,6 +1336,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       onPageChanged: _onPageChanged,
       onBoundaryReached: _onPageBoundaryReached,
       onTapScreen: _handleScreenTap,
+      jumpToLastPage: _shouldJumpToLastPage,
     );
   }
 }
@@ -1323,6 +1353,8 @@ class _PagedChapterContent extends StatefulWidget {
   final void Function(bool isLastPage) onBoundaryReached;
   /// 屏幕点击回调，由内容层统一处理点击区域逻辑
   final void Function(TapUpDetails details) onTapScreen;
+  /// 是否跳转到最后一页（上一章时使用）
+  final bool jumpToLastPage;
 
   const _PagedChapterContent({
     super.key,
@@ -1335,6 +1367,7 @@ class _PagedChapterContent extends StatefulWidget {
     required this.onPageChanged,
     required this.onBoundaryReached,
     required this.onTapScreen,
+    this.jumpToLastPage = false,
   });
 
   @override
@@ -1446,10 +1479,12 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       _isCalculating = false;
     });
 
-    // 只有在明确需要重置页签时才跳转到第一页（如切换章节）
+    // 只有在明确需要重置页签时才跳转（如切换章节）
     // 菜单唤起、字体调整等操作不应重置页签
     if (resetPage && _pageController.hasClients) {
-      _pageController.jumpToPage(0);
+      // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
+      final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
+      _pageController.jumpToPage(targetPage);
     }
   }
 
@@ -1459,12 +1494,14 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       return const Center(child: CircularProgressIndicator());
     }
 
-    // GestureDetector 处理点击翻页/菜单，PageView 处理滑动手势
-    // Flutter 手势竞技场中 onTap 和 onHorizontalDrag 是不同类型，可以共存
+    // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
+    // PageView 处理滑动手势，点击通过 behavior + onTapUp 处理
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onTapUp: widget.onTapScreen,
       child: PageView.builder(
         controller: _pageController,
+        physics: const PageScrollPhysics(),
         itemCount: _pages.length,
         onPageChanged: (index) {
           widget.onPageChanged(index, _pages.length);
@@ -1526,6 +1563,8 @@ class _CurlChapterContent extends StatefulWidget {
   final void Function(bool isLastPage) onBoundaryReached;
   /// 屏幕点击回调，由内容层统一处理点击区域逻辑
   final void Function(TapUpDetails details) onTapScreen;
+  /// 是否跳转到最后一页（上一章时使用）
+  final bool jumpToLastPage;
 
   const _CurlChapterContent({
     super.key,
@@ -1537,6 +1576,7 @@ class _CurlChapterContent extends StatefulWidget {
     required this.onPageChanged,
     required this.onBoundaryReached,
     required this.onTapScreen,
+    this.jumpToLastPage = false,
   });
 
   @override
@@ -1638,12 +1678,14 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       _isCalculating = false;
     });
 
-    // 只有在明确需要重置页签时才跳转到第一页（如切换章节）
+    // 只有在明确需要重置页签时才跳转（如切换章节）
     // 菜单唤起、字体调整等操作不应重置页签
     if (resetPage) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (mounted) {
-          _simulationController.jumpToPage(0);
+          // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
+          final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
+          _simulationController.jumpToPage(targetPage);
         }
       });
     }
@@ -1700,6 +1742,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
     // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势
     // onTap 和 onHorizontalDrag 在手势竞技场中可以共存
     return GestureDetector(
+      behavior: HitTestBehavior.translucent,
       onTapUp: widget.onTapScreen,
       child: SimulationPageView(
         controller: _simulationController,
