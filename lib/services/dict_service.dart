@@ -23,21 +23,71 @@ class DictService {
   bool _initialized = false;
 
   /// 字典类型编码常量
+  // 用户相关
+  static const String userRole = 'user_role';
+  static const String memberLevel = 'member_level';
+  static const String userStatus = 'user_status';
+  // 业务数据
   static const String expenseCategory = 'expense_category';
   static const String moodType = 'mood_type';
-  static const String novelCategory = 'novel_category';
   static const String habitFrequency = 'habit_frequency';
   static const String habitColor = 'habit_color';
+  static const String novelCategory = 'novel_category';
+  static const String novelStatus = 'novel_status';
+  // 反馈相关
+  static const String feedbackCategory = 'feedback_category';
+  static const String feedbackStatus = 'feedback_status';
+  // 通知公告
+  static const String notificationType = 'notification_type';
+  static const String announcementType = 'announcement_type';
+  static const String priorityLevel = 'priority_level';
+  // 版本发布
+  static const String releaseType = 'release_type';
+  static const String versionStatus = 'version_status';
+  // 敏感词
+  static const String sensitiveWordCategory = 'sensitive_word_category';
+  static const String sensitiveWordLevel = 'sensitive_word_level';
+  static const String matchMode = 'match_mode';
+  // 操作日志
+  static const String operationModule = 'operation_module';
+  static const String operationAction = 'operation_action';
+  // 文件类型
+  static const String fileType = 'file_type';
 
   /// 初始化：预加载所有字典
   Future<void> initialize() async {
     if (_initialized) return;
     await Future.wait([
+      // 用户相关
+      getItems(userRole),
+      getItems(memberLevel),
+      getItems(userStatus),
+      // 业务数据
       getItems(expenseCategory),
       getItems(moodType),
-      getItems(novelCategory),
       getItems(habitFrequency),
       getItems(habitColor),
+      getItems(novelCategory),
+      getItems(novelStatus),
+      // 反馈相关
+      getItems(feedbackCategory),
+      getItems(feedbackStatus),
+      // 通知公告
+      getItems(notificationType),
+      getItems(announcementType),
+      getItems(priorityLevel),
+      // 版本发布
+      getItems(releaseType),
+      getItems(versionStatus),
+      // 敏感词
+      getItems(sensitiveWordCategory),
+      getItems(sensitiveWordLevel),
+      getItems(matchMode),
+      // 操作日志
+      getItems(operationModule),
+      getItems(operationAction),
+      // 文件类型
+      getItems(fileType),
     ]);
     _initialized = true;
     debugPrint('✅ 字典服务初始化完成，缓存 ${_cache.length} 个类型');
@@ -57,7 +107,7 @@ class DictService {
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/dict_items?dict_types!inner(code)=eq.$typeCode&select=id,type_id,code,label,value,extra_data,sort_order,is_default,status&order=sort_order.asc',
+          '${AppConfig.supabaseUrl}/rest/v1/dict_items?dict_types!inner(code)=eq.$typeCode&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
