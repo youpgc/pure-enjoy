@@ -442,13 +442,6 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     super.dispose();
   }
 
-  @override
-  void dispose() {
-    _amountController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
   void _save() {
     if (!_formKey.currentState!.validate()) return;
 
