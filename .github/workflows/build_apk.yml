@@ -238,7 +238,15 @@ jobs:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          # 获取本次 push 的 commit message 作为更新内容
+          COMMIT_MSG="${{ github.event.head_commit.message }}"
+          # 取第一行作为 release notes
+          RELEASE_NOTES=$(echo "$COMMIT_MSG" | head -n 1)
+          # 如果为空则使用默认
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          fi
+          echo "Release notes: $RELEASE_NOTES"
           
           echo "Creating database record..."
           
