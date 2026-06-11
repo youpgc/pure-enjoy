@@ -1,17 +1,10 @@
-import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
 
-/// 登录方式枚举
-enum LoginMethod {
-  usernamePassword,
-  phonePassword,
-  phoneCode,
-}
-
 /// 登录页面
+/// 统一登录方式：账号（用户名/昵称/邮箱/手机号）+ 密码
 class LoginScreen extends StatefulWidget {
   const LoginScreen({super.key});
 
@@ -19,21 +12,12 @@ class LoginScreen extends StatefulWidget {
   State<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStateMixin {
-  late TabController _tabController;
+class _LoginScreenState extends State<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // 用户名+密码
-  final _usernameController = TextEditingController();
-  final _passwordController1 = TextEditingController();
-
-  // 手机号+密码
-  final _phoneController1 = TextEditingController();
-  final _passwordController2 = TextEditingController();
-
-  // 手机号+验证码
-  final _phoneController2 = TextEditingController();
-  final _smsCodeController = TextEditingController();
+  // 账号+密码
+  final _accountController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   // 注册字段
   final _regUsernameController = TextEditingController();
@@ -42,78 +26,19 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
   final _regPasswordController = TextEditingController();
 
   bool _isLoading = false;
-  bool _obscurePassword1 = true;
-  bool _obscurePassword2 = true;
+  bool _obscurePassword = true;
   bool _obscureRegPassword = true;
   bool _isRegister = false;
 
-  // 验证码倒计时
-  int _countdown = 0;
-  Timer? _countdownTimer;
-
-  @override
-  void initState() {
-    super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-  }
-
   @override
   void dispose() {
-    _tabController.dispose();
-    _usernameController.dispose();
-    _passwordController1.dispose();
-    _phoneController1.dispose();
-    _passwordController2.dispose();
-    _phoneController2.dispose();
-    _smsCodeController.dispose();
+    _accountController.dispose();
+    _passwordController.dispose();
     _regUsernameController.dispose();
     _regEmailController.dispose();
     _regPhoneController.dispose();
     _regPasswordController.dispose();
-    _countdownTimer?.cancel();
     super.dispose();
-  }
-
-  /// 开始倒计时
-  void _startCountdown() {
-    setState(() => _countdown = 60);
-    _countdownTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
-      setState(() {
-        _countdown--;
-        if (_countdown <= 0) {
-          timer.cancel();
-        }
-      });
-    });
-  }
-
-  /// 发送验证码
-  Future<void> _sendSmsCode() async {
-    final phone = _phoneController2.text.trim();
-    if (phone.isEmpty || phone.length != 11) {
-      _showSnackBar('请输入正确的11位手机号');
-      return;
-    }
-    if (_countdown > 0) return;
-
-    setState(() => _isLoading = true);
-    try {
-      final success = await SupabaseService.instance.sendSmsCode(phone);
-      if (success && mounted) {
-        _showSnackBar('验证码已发送', isSuccess: true);
-        _startCountdown();
-      } else if (mounted) {
-        _showSnackBar('验证码发送失败，请重试');
-      }
-    } catch (e) {
-      if (mounted) {
-        _showSnackBar('发送验证码出错: $e');
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isLoading = false);
-      }
-    }
   }
 
   /// 登录提交
@@ -123,36 +48,20 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     setState(() => _isLoading = true);
 
     try {
-      final supabaseService = SupabaseService.instance;
-      bool success = false;
+      final account = _accountController.text.trim();
+      final password = _passwordController.text;
 
-      switch (_tabController.index) {
-        case 0: // 用户名+密码
-          success = await supabaseService.signInWithUsername(
-            _usernameController.text.trim(),
-            _passwordController1.text,
-          );
-          break;
-        case 1: // 手机号+密码
-          success = await supabaseService.signInWithPhone(
-            _phoneController1.text.trim(),
-            _passwordController2.text,
-          );
-          break;
-        case 2: // 手机号+验证码
-          success = await supabaseService.signInWithPhoneCode(
-            _phoneController2.text.trim(),
-            _smsCodeController.text.trim(),
-          );
-          break;
-      }
+      final success = await AuthService.instance.signInWithAccount(
+        account: account,
+        password: password,
+      );
 
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else if (mounted) {
-        _showSnackBar('登录失败，请检查用户名和密码');
+        _showSnackBar('登录失败，请检查账号和密码');
       }
     } catch (e) {
       if (mounted) {
@@ -253,50 +162,8 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
                     const SizedBox(height: 32),
 
                     if (!_isRegister) ...[
-                      // 登录方式 Tab 切换
-                      Container(
-                        margin: const EdgeInsets.only(bottom: 24),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
-                          borderRadius: BorderRadius.circular(12),
-                        ),
-                        child: TabBar(
-                          controller: _tabController,
-                          indicator: BoxDecoration(
-                            color: colorScheme.primary,
-                            borderRadius: BorderRadius.circular(10),
-                          ),
-                          indicatorSize: TabBarIndicatorSize.tab,
-                          dividerColor: Colors.transparent,
-                          labelColor: colorScheme.onPrimary,
-                          unselectedLabelColor: colorScheme.onSurfaceVariant,
-                          labelStyle: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600),
-                          unselectedLabelStyle: const TextStyle(fontSize: 13),
-                          tabs: const [
-                            Tab(text: '用户名登录'),
-                            Tab(text: '手机号登录'),
-                            Tab(text: '验证码登录'),
-                          ],
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-
-                      // Tab 内容
-                      SizedBox(
-                        height: 280,
-                        child: TabBarView(
-                          controller: _tabController,
-                          children: [
-                            // 用户名+密码
-                            _buildUsernamePasswordForm(colorScheme),
-                            // 手机号+密码
-                            _buildPhonePasswordForm(colorScheme),
-                            // 手机号+验证码
-                            _buildPhoneCodeForm(colorScheme),
-                          ],
-                        ),
-                      ),
-
+                      // 登录表单
+                      _buildLoginForm(colorScheme),
                       const SizedBox(height: 24),
 
                       // 登录按钮
@@ -359,29 +226,29 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
     );
   }
 
-  /// 用户名+密码表单
-  Widget _buildUsernamePasswordForm(ColorScheme colorScheme) {
+  /// 登录表单（统一账号+密码）
+  Widget _buildLoginForm(ColorScheme colorScheme) {
     return Column(
       children: [
         TextFormField(
-          controller: _usernameController,
+          controller: _accountController,
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
-            labelText: '用户名',
-            hintText: '请输入用户名',
+            labelText: '账号',
+            hintText: '请输入用户名/昵称/邮箱/手机号',
             prefixIcon: Icon(Icons.person_outline),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return '请输入用户名';
+              return '请输入账号';
             }
             return null;
           },
         ),
         const SizedBox(height: 16),
         TextFormField(
-          controller: _passwordController1,
-          obscureText: _obscurePassword1,
+          controller: _passwordController,
+          obscureText: _obscurePassword,
           textInputAction: TextInputAction.done,
           onFieldSubmitted: (_) => _submitLogin(),
           decoration: InputDecoration(
@@ -390,10 +257,10 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             prefixIcon: const Icon(Icons.lock_outlined),
             suffixIcon: IconButton(
               icon: Icon(
-                _obscurePassword1 ? Icons.visibility_outlined : Icons.visibility_off_outlined,
+                _obscurePassword ? Icons.visibility_outlined : Icons.visibility_off_outlined,
               ),
               onPressed: () {
-                setState(() => _obscurePassword1 = !_obscurePassword1);
+                setState(() => _obscurePassword = !_obscurePassword);
               },
             ),
           ),
@@ -403,123 +270,6 @@ class _LoginScreenState extends State<LoginScreen> with SingleTickerProviderStat
             }
             if (value.length < 6) {
               return '密码至少需要6个字符';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  /// 手机号+密码表单
-  Widget _buildPhonePasswordForm(ColorScheme colorScheme) {
-    return Column(
-      children: [
-        TextFormField(
-          controller: _phoneController1,
-          keyboardType: TextInputType.phone,
-          maxLength: 11,
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            labelText: '手机号',
-            hintText: '请输入11位手机号',
-            prefixIcon: Icon(Icons.phone_outlined),
-            counterText: '',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return '请输入手机号';
-            }
-            if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
-              return '请输入正确的11位手机号';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _passwordController2,
-          obscureText: _obscurePassword2,
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _submitLogin(),
-          decoration: InputDecoration(
-            labelText: '密码',
-            hintText: '请输入密码',
-            prefixIcon: const Icon(Icons.lock_outlined),
-            suffixIcon: IconButton(
-              icon: Icon(
-                _obscurePassword2 ? Icons.visibility_outlined : Icons.visibility_off_outlined,
-              ),
-              onPressed: () {
-                setState(() => _obscurePassword2 = !_obscurePassword2);
-              },
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return '请输入密码';
-            }
-            if (value.length < 6) {
-              return '密码至少需要6个字符';
-            }
-            return null;
-          },
-        ),
-      ],
-    );
-  }
-
-  /// 手机号+验证码表单
-  Widget _buildPhoneCodeForm(ColorScheme colorScheme) {
-    return Column(
-      children: [
-        TextFormField(
-          controller: _phoneController2,
-          keyboardType: TextInputType.phone,
-          maxLength: 11,
-          textInputAction: TextInputAction.next,
-          decoration: const InputDecoration(
-            labelText: '手机号',
-            hintText: '请输入11位手机号',
-            prefixIcon: Icon(Icons.phone_outlined),
-            counterText: '',
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return '请输入手机号';
-            }
-            if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
-              return '请输入正确的11位手机号';
-            }
-            return null;
-          },
-        ),
-        const SizedBox(height: 16),
-        TextFormField(
-          controller: _smsCodeController,
-          keyboardType: TextInputType.number,
-          maxLength: 6,
-          textInputAction: TextInputAction.done,
-          onFieldSubmitted: (_) => _submitLogin(),
-          decoration: InputDecoration(
-            labelText: '验证码',
-            hintText: '请输入验证码',
-            prefixIcon: const Icon(Icons.message_outlined),
-            counterText: '',
-            suffixIcon: SizedBox(
-              width: 100,
-              child: TextButton(
-                onPressed: _countdown > 0 ? null : (_isLoading ? null : _sendSmsCode),
-                child: Text(
-                  _countdown > 0 ? '${_countdown}s' : '获取验证码',
-                  style: const TextStyle(fontSize: 13),
-                ),
-              ),
-            ),
-          ),
-          validator: (value) {
-            if (value == null || value.isEmpty) {
-              return '请输入验证码';
             }
             return null;
           },

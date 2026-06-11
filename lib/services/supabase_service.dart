@@ -216,114 +216,130 @@ class AuthService {
     }
   }
 
-  /// 通过用户名+密码登录
-  /// 使用 username 字段查询（users 表已支持 username 字段）
-  Future<bool> signInWithUsername(String username, String password) async {
+  /// 统一账号登录（用户名/昵称/邮箱/手机号 + 密码）
+  /// 自动识别账号类型并查询对应字段
+  Future<bool> signInWithAccount({
+    required String account,
+    required String password,
+  }) async {
     try {
       final passwordHash = _hashPassword(password);
 
-      debugPrint('🔐 用户名登录: username=$username, hash=${passwordHash.substring(0, 8)}...');
+      debugPrint('🔐 账号登录: account=$account, hash=${passwordHash.substring(0, 8)}...');
 
+      // 判断账号类型
+      final accountType = _detectAccountType(account);
+      String queryField;
+
+      switch (accountType) {
+        case 'email':
+          queryField = 'email';
+          break;
+        case 'phone':
+          queryField = 'phone';
+          break;
+        case 'username':
+        default:
+          // 用户名或昵称，使用 or 查询
+          return await _signInWithUsernameOrNickname(
+            account: account,
+            passwordHash: passwordHash,
+          );
+      }
+
+      // 邮箱或手机号直接查询
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?username=eq.$username&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
+          '${SupabaseConfig.url}/rest/v1/users?$queryField=eq.${Uri.encodeComponent(account)}&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
         ),
         headers: SupabaseConfig.headers,
       );
 
-      debugPrint('🔐 用户名登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      return await _processLoginResponse(response);
+    } catch (e) {
+      debugPrint('❌ signInWithAccount error: $e');
+      return false;
+    }
+  }
 
-      if (response.statusCode == 200) {
-        final users = jsonDecode(response.body) as List;
-        if (users.isEmpty) {
-          debugPrint('❌ 用户名或密码错误');
-          return false;
-        }
+  /// 检测账号类型
+  String _detectAccountType(String account) {
+    // 邮箱格式
+    if (RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(account)) {
+      return 'email';
+    }
+    // 手机号格式
+    if (RegExp(r'^1[3-9]\d{9}$').hasMatch(account)) {
+      return 'phone';
+    }
+    // 默认用户名/昵称
+    return 'username';
+  }
 
-        final user = users[0] as Map<String, dynamic>;
+  /// 通过用户名或昵称登录（使用 or 查询）
+  Future<bool> _signInWithUsernameOrNickname({
+    required String account,
+    required String passwordHash,
+  }) async {
+    try {
+      // 使用 or 查询：username=account or nickname=account
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?or=(username.eq.${Uri.encodeComponent(account)},nickname.eq.${Uri.encodeComponent(account)})&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
+        ),
+        headers: SupabaseConfig.headers,
+      );
 
-        if (user['status'] != 'active') {
-          debugPrint('❌ 用户已被禁用: ${user['status']}');
-          return false;
-        }
+      return await _processLoginResponse(response);
+    } catch (e) {
+      debugPrint('❌ _signInWithUsernameOrNickname error: $e');
+      return false;
+    }
+  }
 
-        await _saveUser(user);
+  /// 处理登录响应
+  Future<bool> _processLoginResponse(http.Response response) async {
+    debugPrint('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
 
-        await http.patch(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
-          ),
-          headers: SupabaseConfig.writeHeaders,
-          body: jsonEncode({
-            'last_login_at': DateTime.now().toUtc().toIso8601String(),
-            'login_count': (user['login_count'] ?? 0) + 1,
-          }),
-        );
-
-        debugPrint('✅ 用户名登录成功: ${user['nickname']}');
-        return true;
-      } else {
-        debugPrint('❌ 用户名登录失败: HTTP ${response.statusCode}');
+    if (response.statusCode == 200) {
+      final users = jsonDecode(response.body) as List;
+      if (users.isEmpty) {
+        debugPrint('❌ 账号或密码错误');
         return false;
       }
-    } catch (e) {
-      debugPrint('❌ signInWithUsername error: $e');
-      return false;
-    }
-  }
 
-  /// 通过手机号+密码登录
-  /// 先通过 users 表查询手机号对应的用户，再用密码验证
-  Future<bool> signInWithPhone(String phone, String password) async {
-    try {
-      final passwordHash = _hashPassword(password);
+      final user = users[0] as Map<String, dynamic>;
 
-      // 直接通过手机号+密码哈希查询
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?phone=eq.$phone&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
-        ),
-        headers: SupabaseConfig.headers,
-      );
-
-      if (response.statusCode == 200) {
-        final users = jsonDecode(response.body) as List;
-        if (users.isEmpty) {
-          debugPrint('手机号或密码错误');
-          return false;
-        }
-
-        final user = users[0] as Map<String, dynamic>;
-
-        // 检查用户状态
-        if (user['status'] != 'active') {
-          debugPrint('用户已被禁用');
-          return false;
-        }
-
-        await _saveUser(user);
-
-        // 更新最后登录信息
-        await http.patch(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
-          ),
-          headers: SupabaseConfig.writeHeaders,
-          body: jsonEncode({
-            'last_login_at': DateTime.now().toUtc().toIso8601String(),
-            'login_count': (user['login_count'] ?? 0) + 1,
-          }),
-        );
-
-        return true;
+      if (user['status'] != 'active') {
+        debugPrint('❌ 用户已被禁用: ${user['status']}');
+        return false;
       }
 
-      return false;
-    } catch (e) {
-      debugPrint('signInWithPhone error: $e');
+      await _saveUser(user);
+
+      await http.patch(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
+        ),
+        headers: SupabaseConfig.writeHeaders,
+        body: jsonEncode({
+          'last_login_at': DateTime.now().toUtc().toIso8601String(),
+          'login_count': (user['login_count'] ?? 0) + 1,
+        }),
+      );
+
+      debugPrint('✅ 登录成功: ${user['nickname']}');
+      return true;
+    } else {
+      debugPrint('❌ 登录失败: HTTP ${response.statusCode}');
       return false;
     }
   }
+
+  /*
+  // ============================================
+  // 验证码登录相关方法（已注释，待对接短信平台后启用）
+  // ============================================
 
   /// 通过手机号+验证码登录
   /// 先验证验证码，再通过手机号查找用户并登录
@@ -439,6 +455,7 @@ class AuthService {
       return false;
     }
   }
+  */
 
   /// 注册（包含用户名、邮箱、手机号）
   /// 直接 INSERT 到 users 表，密码使用 SHA-256 哈希
