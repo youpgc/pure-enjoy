@@ -427,6 +427,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   void _onDictRefresh() {
     if (mounted) {
       setState(() {
+        // 字典数据加载完成，刷新 UI
         if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
           _selectedCategoryCode = _categoryCodes.first;
         }

@@ -102,8 +102,8 @@ class DictService {
 
   /// 获取某类型的所有字典项
   Future<List<DictItem>> getItems(String typeCode) async {
-    // 检查缓存
-    if (_cache.containsKey(typeCode)) {
+    // 检查缓存（缓存存在且非空且在有效期内）
+    if (_cache.containsKey(typeCode) && _cache[typeCode]!.isNotEmpty) {
       final cacheTime = _cacheTime[typeCode];
       if (cacheTime != null &&
           DateTime.now().difference(cacheTime).inHours < _cacheHours) {
