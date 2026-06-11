@@ -61,47 +61,35 @@ class DictService {
   // 文件类型
   static const String fileType = 'file_type';
 
-  /// 初始化：预加载所有字典
+  /// 初始化：预加载所有字典（分批加载，避免 API 限流）
   Future<void> initialize() async {
     if (_initialized) return;
-    await Future.wait([
-      // 用户相关
-      getItems(userRole),
-      getItems(memberLevel),
-      getItems(userStatus),
-      // 业务数据
-      getItems(expenseCategory),
-      getItems(moodType),
-      getItems(habitFrequency),
-      getItems(habitColor),
-      getItems(novelCategory),
-      getItems(novelStatus),
-      // 反馈相关
-      getItems(feedbackCategory),
-      getItems(feedbackStatus),
-      // 通知公告
-      getItems(notificationType),
-      getItems(announcementType),
-      getItems(priorityLevel),
-      // 版本发布
-      getItems(releaseType),
-      getItems(versionStatus),
-      // 敏感词
-      getItems(sensitiveWordCategory),
-      getItems(sensitiveWordLevel),
-      getItems(matchMode),
-      // 操作日志
-      getItems(operationModule),
-      getItems(operationAction),
-      // 文件类型
-      getItems(fileType),
-    ]);
+
+    final allTypes = [
+      userRole, memberLevel, userStatus,
+      expenseCategory, moodType, habitFrequency, habitColor,
+      novelCategory, novelStatus,
+      feedbackCategory, feedbackStatus,
+      notificationType, announcementType, priorityLevel,
+      releaseType, versionStatus,
+      sensitiveWordCategory, sensitiveWordLevel, matchMode,
+      operationModule, operationAction,
+      fileType,
+    ];
+
+    // 分批加载，每批 5 个，避免并发限流
+    const batchSize = 5;
+    for (var i = 0; i < allTypes.length; i += batchSize) {
+      final batch = allTypes.sublist(i, i + batchSize > allTypes.length ? allTypes.length : i + batchSize);
+      await Future.wait(batch.map((type) => getItems(type).catchError((_) => <DictItem>[])));
+    }
+
     _initialized = true;
     debugPrint('✅ 字典服务初始化完成，缓存 ${_cache.length} 个类型');
   }
 
-  /// 获取某类型的所有字典项
-  Future<List<DictItem>> getItems(String typeCode) async {
+  /// 获取某类型的所有字典项（带重试）
+  Future<List<DictItem>> getItems(String typeCode, {int retryCount = 2}) async {
     // 检查缓存（缓存存在且非空且在有效期内）
     if (_cache.containsKey(typeCode) && _cache[typeCode]!.isNotEmpty) {
       final cacheTime = _cacheTime[typeCode];
@@ -111,58 +99,65 @@ class DictService {
       }
     }
 
-    try {
-      // Step 1: 先查 dict_types 获取 type_id
-      final typeResponse = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/dict_types?code=eq.$typeCode&select=id',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
+    for (var attempt = 0; attempt <= retryCount; attempt++) {
+      try {
+        if (attempt > 0) {
+          debugPrint('🔄 字典加载重试 [$typeCode]: 第 $attempt 次');
+          await Future.delayed(const Duration(seconds: 1));
+        }
 
-      if (typeResponse.statusCode != 200) {
-        debugPrint('❌ 查询 dict_types 失败: ${typeResponse.statusCode}');
-        return _cache[typeCode] ?? [];
+        // Step 1: 先查 dict_types 获取 type_id
+        final typeResponse = await http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/dict_types?code=eq.$typeCode&select=id',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          },
+        );
+
+        if (typeResponse.statusCode != 200) {
+          debugPrint('❌ 查询 dict_types 失败: ${typeResponse.statusCode}');
+          continue;
+        }
+
+        final typeData = jsonDecode(typeResponse.body) as List;
+        if (typeData.isEmpty) {
+          debugPrint('❌ 字典类型不存在: $typeCode');
+          break;
+        }
+
+        final typeId = typeData[0]['id'] as String;
+
+        // Step 2: 通过 type_id 查 dict_items
+        final response = await http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/dict_items?type_id=eq.$typeId&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          },
+        );
+
+        if (response.statusCode == 200) {
+          final List<dynamic> data = jsonDecode(response.body);
+          final items = data
+              .map((json) => DictItem.fromJson(json as Map<String, dynamic>))
+              .where((item) => item.status == 'active')
+              .toList();
+
+          _cache[typeCode] = items;
+          _cacheTime[typeCode] = DateTime.now();
+          debugPrint('✅ 字典加载成功 [$typeCode]: ${items.length} 项');
+          return items;
+        } else {
+          debugPrint('❌ 查询 dict_items 失败: ${response.statusCode}');
+        }
+      } catch (e) {
+        debugPrint('❌ 加载字典失败 [$typeCode]: $e (attempt $attempt/$retryCount)');
       }
-
-      final typeData = jsonDecode(typeResponse.body) as List;
-      if (typeData.isEmpty) {
-        debugPrint('❌ 字典类型不存在: $typeCode');
-        return _cache[typeCode] ?? [];
-      }
-
-      final typeId = typeData[0]['id'] as String;
-
-      // Step 2: 通过 type_id 查 dict_items
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/dict_items?type_id=eq.$typeId&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        final items = data
-            .map((json) => DictItem.fromJson(json as Map<String, dynamic>))
-            .where((item) => item.status == 'active')
-            .toList();
-
-        _cache[typeCode] = items;
-        _cacheTime[typeCode] = DateTime.now();
-        debugPrint('✅ 字典加载成功 [$typeCode]: ${items.length} 项');
-        return items;
-      } else {
-        debugPrint('❌ 查询 dict_items 失败: ${response.statusCode}');
-      }
-    } catch (e) {
-      debugPrint('❌ 加载字典失败 [$typeCode]: $e');
     }
 
     // 返回缓存（可能过期）或空列表
