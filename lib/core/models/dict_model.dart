@@ -61,17 +61,20 @@ class DictItem {
   });
 
   factory DictItem.fromJson(Map<String, dynamic> json) {
+    // 安全解析 extra 字段（可能是 null、dict 或空字符串）
+    Map<String, dynamic>? parsedExtra;
+    final rawExtra = json['extra'] ?? json['extra_data'];
+    if (rawExtra is Map) {
+      parsedExtra = Map<String, dynamic>.from(rawExtra);
+    }
+
     return DictItem(
       id: json['id'] as String,
       typeId: json['type_id'] as String,
       code: json['code'] as String,
       label: json['label'] as String,
       value: json['value'] as String?,
-      extra: json['extra'] != null
-          ? Map<String, dynamic>.from(json['extra'] as Map)
-          : json['extra_data'] != null
-              ? Map<String, dynamic>.from(json['extra_data'] as Map)
-              : null,
+      extra: parsedExtra,
       sortOrder: json['sort_order'] as int? ?? 0,
       isDefault: json['is_default'] as bool? ?? false,
       status: json['status'] as String? ?? 'active',
