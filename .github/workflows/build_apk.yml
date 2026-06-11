@@ -65,8 +65,8 @@ jobs:
       - name: Run tests
         run: flutter test || true
 
-      # 8. 提取版本信息
-      - name: Extract version
+      # 8. 提取版本信息并自动迭代
+      - name: Extract and increment version
         id: version
         run: |
           if [[ "${{ github.ref }}" == refs/tags/v* ]]; then
@@ -74,9 +74,52 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
             BUILD_NUMBER=$(git rev-list --count HEAD)
           else
-            # push 或 workflow_dispatch：直接使用 pubspec.yaml 中的版本号
-            VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
-            BUILD_NUMBER=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
+            # push 或 workflow_dispatch：读取当前版本并自动迭代
+            CURRENT_VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
+            CURRENT_BUILD=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
+            
+            # 解析版本号：major.minor.patch
+            MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f1)
+            MINOR=$(echo $CURRENT_VERSION | cut -d'.' -f2)
+            PATCH=$(echo $CURRENT_VERSION | cut -d'.' -f3)
+            
+            # 自动递增修订号（patch）和构建号
+            NEW_PATCH=$((PATCH + 1))
+            NEW_BUILD=$((CURRENT_BUILD + 1))
+            
+            VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+            BUILD_NUMBER="${NEW_BUILD}"
+            
+            echo "🔄 版本自动迭代: v${CURRENT_VERSION}+${CURRENT_BUILD} → v${VERSION}+${BUILD_NUMBER}"
+            
+            # 更新 pubspec.yaml 中的版本号
+            sed -i "s/version: ${CURRENT_VERSION}+${CURRENT_BUILD}/version: ${VERSION}+${BUILD_NUMBER}/" pubspec.yaml
+            
+            # 配置 git 并提交版本更新
+            git config user.name "GitHub Actions"
+            git config user.email "actions@github.com"
+            git add pubspec.yaml
+            git commit -m "chore: 自动迭代版本号 v${CURRENT_VERSION}+${CURRENT_BUILD} → v${VERSION}+${BUILD_NUMBER}"
+            
+            # 带重试的 push，避免竞态冲突
+            for i in 1 2 3; do
+              git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }} && break
+              echo "⚠️ Push failed, retrying in 3s... (attempt $i/3)"
+              sleep 3
+              # 重新读取可能被其他构建更新的版本号
+              CURRENT_VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
+              CURRENT_BUILD=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
+              MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f1)
+              MINOR=$(echo $CURRENT_VERSION | cut -d'.' -f2)
+              PATCH=$(echo $CURRENT_VERSION | cut -d'.' -f3)
+              NEW_PATCH=$((PATCH + 1))
+              NEW_BUILD=$((CURRENT_BUILD + 1))
+              VERSION="${MAJOR}.${MINOR}.${NEW_PATCH}"
+              BUILD_NUMBER="${NEW_BUILD}"
+              sed -i "s/version: ${CURRENT_VERSION}+${CURRENT_BUILD}/version: ${VERSION}+${BUILD_NUMBER}/" pubspec.yaml
+              git add pubspec.yaml
+              git commit --amend -m "chore: 自动迭代版本号 v${CURRENT_VERSION}+${CURRENT_BUILD} → v${VERSION}+${BUILD_NUMBER}"
+            done
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
