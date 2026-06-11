@@ -112,9 +112,34 @@ class DictService {
     }
 
     try {
+      // Step 1: 先查 dict_types 获取 type_id
+      final typeResponse = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/dict_types?code=eq.$typeCode&select=id',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
+      );
+
+      if (typeResponse.statusCode != 200) {
+        debugPrint('❌ 查询 dict_types 失败: ${typeResponse.statusCode}');
+        return _cache[typeCode] ?? [];
+      }
+
+      final typeData = jsonDecode(typeResponse.body) as List;
+      if (typeData.isEmpty) {
+        debugPrint('❌ 字典类型不存在: $typeCode');
+        return _cache[typeCode] ?? [];
+      }
+
+      final typeId = typeData[0]['id'] as String;
+
+      // Step 2: 通过 type_id 查 dict_items
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/dict_items?dict_types!inner(code)=eq.$typeCode&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
+          '${AppConfig.supabaseUrl}/rest/v1/dict_items?type_id=eq.$typeId&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -131,7 +156,10 @@ class DictService {
 
         _cache[typeCode] = items;
         _cacheTime[typeCode] = DateTime.now();
+        debugPrint('✅ 字典加载成功 [$typeCode]: ${items.length} 项');
         return items;
+      } else {
+        debugPrint('❌ 查询 dict_items 失败: ${response.statusCode}');
       }
     } catch (e) {
       debugPrint('❌ 加载字典失败 [$typeCode]: $e');
