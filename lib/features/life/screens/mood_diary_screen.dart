@@ -361,10 +361,23 @@ class _DiaryFormState extends State<_DiaryForm> {
       _selectedMoodCode = _moodCodes.first;
     }
     _selectedDate = diary?.entryDate ?? DateTime.now();
+    // 监听字典刷新
+    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+  }
+
+  void _onDictRefresh() {
+    if (mounted) {
+      setState(() {
+        if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+          _selectedMoodCode = _moodCodes.first;
+        }
+      });
+    }
   }
 
   @override
   void dispose() {
+    DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _contentController.dispose();
     _tagsController.dispose();
     super.dispose();

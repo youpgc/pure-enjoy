@@ -420,6 +420,26 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       _selectedCategoryCode = _categoryCodes.first;
     }
     _selectedDate = expense?.date ?? DateTime.now();
+    // 监听字典刷新
+    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+  }
+
+  void _onDictRefresh() {
+    if (mounted) {
+      setState(() {
+        if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
+          _selectedCategoryCode = _categoryCodes.first;
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
+    _amountController.dispose();
+    _noteController.dispose();
+    super.dispose();
   }
 
   @override

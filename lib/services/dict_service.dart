@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
@@ -21,6 +22,12 @@ class DictService {
 
   /// 是否已初始化
   bool _initialized = false;
+
+  /// 加载中的类型
+  final Set<String> _loading = {};
+
+  /// 通知 UI 刷新
+  final ValueNotifier<bool> refreshNotifier = ValueNotifier<bool>(false);
 
   /// 字典类型编码常量
   // 用户相关
@@ -134,9 +141,33 @@ class DictService {
     return _cache[typeCode] ?? [];
   }
 
-  /// 同步获取（需先调用 initialize）
+  /// 同步获取（如果未加载，自动触发异步加载并返回空列表）
   List<DictItem> getItemsSync(String typeCode) {
+    // 如果缓存中有数据，直接返回
+    if (_cache.containsKey(typeCode) && _cache[typeCode]!.isNotEmpty) {
+      return _cache[typeCode]!;
+    }
+    // 如果未加载且不在加载中，触发异步加载
+    if (!_loading.contains(typeCode)) {
+      _ensureLoaded(typeCode);
+    }
     return _cache[typeCode] ?? [];
+  }
+
+  /// 确保某类型已加载（异步）
+  Future<void> _ensureLoaded(String typeCode) async {
+    if (_cache.containsKey(typeCode) && _cache[typeCode]!.isNotEmpty) return;
+    if (_loading.contains(typeCode)) return;
+
+    _loading.add(typeCode);
+    try {
+      final items = await getItems(typeCode);
+      if (items.isNotEmpty) {
+        refreshNotifier.value = !refreshNotifier.value;
+      }
+    } finally {
+      _loading.remove(typeCode);
+    }
   }
 
   /// 根据 code 查找字典项
@@ -145,7 +176,6 @@ class DictService {
     try {
       return items.firstWhere((item) => item.code == itemCode);
     } catch (e) {
-      debugPrint('根据code查找字典项失败: $e');
       return null;
     }
   }
@@ -171,7 +201,6 @@ class DictService {
     try {
       return items.firstWhere((item) => item.isDefault);
     } catch (e) {
-      debugPrint('获取默认字典项失败: $e');
       return items.isNotEmpty ? items.first : null;
     }
   }
