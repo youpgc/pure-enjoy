@@ -13,7 +13,7 @@ import 'novel_detail_screen.dart';
 /// 背景主题枚举
 enum ReaderBackground {
   white('白色', Colors.white, Colors.black87),
-  yellow('护眼黄', Color(0xFFF5E6C8), Color(0xFF5C4B37)),
+  yellow('护眼黄', Color(0xFFF5F0E6), Color(0xFF333333)),
   dark('深色', Color(0xFF1A1A2E), Color(0xFFE0E0E0)),
   gray('灰色', Color(0xFFE8E8E8), Color(0xFF333333));
 
@@ -82,13 +82,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   // 阅读设置
   static const List<double> _fontSizes = [12, 14, 16, 18, 20, 22, 24, 26, 28];
-  int _fontSizeIndex = 3; // 默认 18
+  int _fontSizeIndex = 4; // 默认 20
   double get _fontSize => _fontSizes[_fontSizeIndex];
   static const List<double> _lineHeights = [1.4, 1.6, 1.8, 2.0, 2.2];
   int _lineHeightIndex = 2; // 默认 1.8
   double get _lineHeight => _lineHeights[_lineHeightIndex];
-  ReaderBackground _background = ReaderBackground.white;
-  ReaderFont _font = ReaderFont.system;
+  ReaderBackground _background = ReaderBackground.yellow;
+  ReaderFont _font = ReaderFont.serif;
   PageTurnMode _pageTurnMode = PageTurnMode.scroll;
 
   // 书架状态
@@ -960,6 +960,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return '${(_readingProgress * 100).toStringAsFixed(1)}%';
   }
 
+  String get _currentTime {
+    final now = DateTime.now();
+    return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
+  }
+
   /// 处理屏幕点击分区
   /// 分页模式（slide/cover/simulation）：
   ///   左侧30%：第一页则上一章，否则上一页
@@ -1031,6 +1036,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
               child: Row(
                 children: [
+                  IconButton(
+                    icon: Icon(
+                      Icons.arrow_back_ios_new,
+                      size: 20,
+                      color: _background.textColor,
+                    ),
+                    onPressed: () => Navigator.pop(context),
+                    tooltip: '返回',
+                  ),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1039,9 +1053,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         Text(
                           _currentChapter?.title ?? widget.novel.title,
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _background.textColor,
+                            color: _background.textColor.withOpacity(0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1214,9 +1228,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           : _buildContent(),
                     ),
 
-                    // 顶部进度条（始终显示）
+                    // 顶部进度条（菜单显示时才显示）
                     // 使用固定 top padding 而非 SafeArea，避免状态栏变化导致偏移
-                    if (_chapters.isNotEmpty)
+                    if (_chapters.isNotEmpty && _showMenu)
                       Positioned(
                         top: 0,
                         left: 0,
@@ -1251,6 +1265,48 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       bottom: 0,
                       child: _buildBottomToolbar(),
                     ),
+
+                    // 底部常驻状态栏（始终显示，不受菜单控制）
+                    Positioned(
+                      left: 0,
+                      right: 0,
+                      bottom: 0,
+                      child: SafeArea(
+                        top: false,
+                        child: Padding(
+                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+                          child: Row(
+                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                            children: [
+                              Row(
+                                children: [
+                                  Icon(
+                                    Icons.battery_outline,
+                                    size: 14,
+                                    color: _background.textColor.withOpacity(0.5),
+                                  ),
+                                  const SizedBox(width: 4),
+                                  Text(
+                                    _currentTime,
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: _background.textColor.withOpacity(0.5),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                              Text(
+                                '${(_readingProgress * 100).toStringAsFixed(2)}%',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: _background.textColor.withOpacity(0.5),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
                   ],
                 ),
     );
@@ -1264,7 +1320,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1510,7 +1566,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
           final page = _pages[index];
           return Container(
             color: widget.background.bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1695,7 +1751,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   Widget _buildPageWidget(ContentPage page) {
     return Container(
       color: widget.background.bgColor,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 24),
+      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
