@@ -310,9 +310,9 @@ jobs:
 
           # 格式化 release notes
           if [ -n "$COMMIT_LIST" ]; then
-            RELEASE_NOTES="更新内容：\n${COMMIT_LIST}\n---\nSHA: ${CURRENT_SHA:0:8}"
+            RELEASE_NOTES="$COMMIT_LIST"
           else
-            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}\n---\nSHA: ${CURRENT_SHA:0:8}"
+            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
           echo "Release notes:"
