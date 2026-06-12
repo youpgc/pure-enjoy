@@ -182,6 +182,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           'amount': expense.amount,
           'category': expense.category,
           'description': expense.description,
+          'note': expense.note,
           'date': expense.date.toIso8601String().split('T').first,
         },
       );
@@ -393,6 +394,7 @@ class _ExpenseForm extends StatefulWidget {
 class _ExpenseFormState extends State<_ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
+  late final TextEditingController _descriptionController;
   late final TextEditingController _noteController;
   String _selectedCategoryCode = '';
   late DateTime _selectedDate;
@@ -411,8 +413,11 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     _amountController = TextEditingController(
       text: expense != null ? expense.amount.toString() : '',
     );
-    _noteController = TextEditingController(
+    _descriptionController = TextEditingController(
       text: expense?.description ?? '',
+    );
+    _noteController = TextEditingController(
+      text: expense?.note ?? '',
     );
     _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(DictService.expenseCategory);
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
@@ -438,6 +443,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   void dispose() {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _amountController.dispose();
+    _descriptionController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -450,7 +456,8 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategoryCode,
-      description: _noteController.text.isEmpty ? null : _noteController.text,
+      description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+      note: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
 
@@ -509,6 +516,15 @@ class _ExpenseFormState extends State<_ExpenseForm> {
                   },
                 );
               }).toList(),
+            ),
+            const SizedBox(height: 16),
+
+            // 描述
+            TextFormField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(
+                labelText: '描述（可选）',
+              ),
             ),
             const SizedBox(height: 16),
 

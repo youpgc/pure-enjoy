@@ -91,17 +91,19 @@ class HabitModel {
 }
 
 /// 习惯打卡记录模型 - 对应 Supabase habit_checkins 表
-/// 字段: id(UUID), habit_id(UUID), checkin_at(TIMESTAMPTZ), created_at
+/// 字段: id(UUID), habit_id(UUID), checkin_at(TIMESTAMPTZ), note(TEXT), created_at
 class HabitCheckinModel {
   final String id;
   final String habitId;
   final DateTime checkinAt;
+  final String? note;
   final DateTime? createdAt;
 
   HabitCheckinModel({
     required this.id,
     required this.habitId,
     required this.checkinAt,
+    this.note,
     this.createdAt,
   });
 
@@ -110,6 +112,7 @@ class HabitCheckinModel {
       id: json['id'] as String,
       habitId: json['habit_id'] as String,
       checkinAt: DateTime.parse(json['checkin_at'] as String).toLocal(),
+      note: json['note'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
@@ -118,6 +121,7 @@ class HabitCheckinModel {
     final json = <String, dynamic>{
       'habit_id': habitId,
       'checkin_at': checkinAt.toUtc().toIso8601String(),
+      'note': note,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
