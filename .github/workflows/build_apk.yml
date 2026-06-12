@@ -242,20 +242,7 @@ jobs:
           LAST_BUILD_SHA=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=release_notes&order=created_at.desc&limit=1" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
-            python3 -c "
-import sys, json, re
-data = json.load(sys.stdin)
-if data:
-    notes = data[0].get('release_notes', '')
-    # 尝试从 release_notes 中提取 commit SHA（格式：\n---\nSHA: xxx）
-    m = re.search(r'SHA:\s*([a-f0-9]+)', notes)
-    if m:
-        print(m.group(1))
-    else:
-        print('')
-else:
-    print('')
-" 2>/dev/null || echo '')
+            python3 -c 'import sys, json, re; data=json.load(sys.stdin); notes=data[0].get("release_notes","") if data else ""; m=re.search(r"SHA:\s*([a-f0-9]+)",notes); print(m.group(1) if m else "")' 2>/dev/null || echo '')
 
           CURRENT_SHA="${{ github.sha }}"
           echo "Last build SHA: ${LAST_BUILD_SHA:-none}"
