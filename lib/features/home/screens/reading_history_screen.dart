@@ -1,12 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import 'package:intl/intl.dart';
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../../config.dart';
-import '../../novel/screens/novel_detail_screen.dart';
-import '../../novel/models/novel_model.dart';
 
-/// 阅读历史页面
 class ReadingHistoryScreen extends StatefulWidget {
   const ReadingHistoryScreen({super.key});
 
@@ -17,97 +13,75 @@ class ReadingHistoryScreen extends StatefulWidget {
 class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   List<Map<String, dynamic>> _history = [];
   bool _isLoading = true;
-
-  String? get _userId => AuthService.instance.currentUserId;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
+    _userId = AuthService.instance.currentUserId;
     _loadHistory();
   }
 
   Future<void> _loadHistory() async {
-    setState(() => _isLoading = true);
-    try {
-      final userId = _userId;
-      if (userId == null) {
-        setState(() => _isLoading = false);
-        return;
-      }
+    if (_userId == null) return;
 
-      final resp = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_chapter,last_read_at,novels:novel_id(title,cover_url,author,description,category,status,word_count,chapter_count)&order=last_read_at.desc&limit=50',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+    setState(() => _isLoading = true);
+
+    try {
+      final result = await ApiClient.get(
+        'reading_history',
+        filters: {'user_id': 'eq.$_userId'},
+        order: 'created_at.desc',
+        limit: 500,
       );
 
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List;
+      if (result.isSuccess) {
         setState(() {
-          _history = data.cast<Map<String, dynamic>>();
+          _history = result.data!;
           _isLoading = false;
         });
       } else {
         setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载失败: ${result.errorMessage}')),
+          );
+        }
       }
     } catch (e) {
-      print('加载阅读历史失败: $e');
       setState(() => _isLoading = false);
     }
   }
 
   Future<void> _clearHistory() async {
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清空历史'),
-        content: const Text('确定要清空所有阅读历史吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, true),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
+    final userId = _userId;
+    if (userId == null) return;
 
-    if (confirm == true) {
-      try {
-        final userId = _userId;
-        if (userId == null) return;
+    try {
+      final result = await ApiClient.delete(
+        'reading_history',
+        filters: {'user_id': 'eq.$userId'},
+      );
 
-        final resp = await http.patch(
-          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId'),
-          headers: {
-            'apikey': AppConfig.supabaseAnonKey,
-            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
-            'last_chapter': 0,
-            'last_read_at': null,
-            'progress': 0,
-          }),
-        );
-
-        if (resp.statusCode == 200 || resp.statusCode == 204) {
-          setState(() => _history = []);
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('阅读历史已清空')),
-            );
-          }
+      if (result.isSuccess) {
+        _loadHistory();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('已清空阅读历史')),
+          );
         }
-      } catch (e) {
-        print('清空阅读历史失败: $e');
+      } else {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('清空失败: ${result.errorMessage}')),
+          );
+        }
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('清空失败: $e')),
+        );
       }
     }
   }
@@ -121,114 +95,51 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
           if (_history.isNotEmpty)
             IconButton(
               icon: const Icon(Icons.delete_outline),
-              onPressed: _clearHistory,
-              tooltip: '清空历史',
+              onPressed: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('确认清空'),
+                    content: const Text('确定要清空所有阅读历史吗？'),
+                    actions: [
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('取消'),
+                      ),
+                      FilledButton(
+                        onPressed: () {
+                          Navigator.pop(context);
+                          _clearHistory();
+                        },
+                        child: const Text('清空'),
+                      ),
+                    ],
+                  ),
+                );
+              },
             ),
         ],
       ),
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _history.isEmpty
-              ? _buildEmptyView()
-              : _buildHistoryList(),
-    );
-  }
-
-  Widget _buildEmptyView() {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(
-            Icons.history_outlined,
-            size: 64,
-            color: Theme.of(context).colorScheme.onSurfaceVariant,
-          ),
-          const SizedBox(height: 16),
-          Text(
-            '暂无阅读历史',
-            style: TextStyle(
-              fontSize: 16,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '开始阅读小说，记录将显示在这里',
-            style: TextStyle(
-              fontSize: 14,
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildHistoryList() {
-    return ListView.builder(
-      itemCount: _history.length,
-      itemBuilder: (context, index) {
-        final item = _history[index];
-        final novelData = item['novels'] as Map<String, dynamic>? ?? {};
-        final title = novelData['title'] ?? '未知小说';
-        final coverUrl = novelData['cover_url'];
-        final author = novelData['author'] ?? '';
-        final lastChapter = item['last_chapter'] ?? 0;
-
-        return ListTile(
-          leading: coverUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.network(
-                    coverUrl,
-                    width: 50,
-                    height: 70,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 50,
-                      height: 70,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 50,
-                  height: 70,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
+              ? const Center(child: Text('暂无阅读历史'))
+              : ListView.builder(
+                  itemCount: _history.length,
+                  itemBuilder: (context, index) {
+                    final item = _history[index];
+                    final createdAt = DateTime.parse(item['created_at']);
+                    return ListTile(
+                      leading: const Icon(Icons.book),
+                      title: Text(item['novel_title'] ?? '未知小说'),
+                      subtitle: Text('第 ${item['chapter_num'] ?? 0} 章'),
+                      trailing: Text(
+                        DateFormat('MM-dd HH:mm').format(createdAt),
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    );
+                  },
                 ),
-          title: Text(title),
-          subtitle: Text(
-            '$author · 读到第$lastChapter章',
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: () {
-            // 构建 NovelModel 并跳转到详情页
-            final novel = NovelModel(
-              id: item['novel_id'],
-              title: title,
-              author: author,
-              cover: coverUrl ?? '',
-              description: novelData['description'] ?? '',
-              category: novelData['category'] ?? '',
-              status: novelData['status'] ?? 'ongoing',
-              wordCount: novelData['word_count'] ?? 0,
-              chapterCount: novelData['chapter_count'] ?? 0,
-              createdAt: DateTime.now(),
-            );
-            Navigator.push(
-              context,
-              MaterialPageRoute(
-                builder: (_) => NovelDetailScreen(novel: novel),
-              ),
-            );
-          },
-        );
-      },
     );
   }
 }

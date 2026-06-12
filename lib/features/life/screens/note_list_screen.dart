@@ -1,14 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../../utils/date_time_utils.dart';
-import '../../../utils/cache_helper.dart';
-import '../../../core/widgets/widgets.dart';
-import '../models/note_model.dart';
 
-/// 笔记列表页面 - Supabase 数据同步
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
 
@@ -17,487 +11,254 @@ class NoteListScreen extends StatefulWidget {
 }
 
 class _NoteListScreenState extends State<NoteListScreen> {
-  List<NoteModel> _notes = [];
+  List<Map<String, dynamic>> _notes = [];
   bool _isLoading = true;
-  String _searchQuery = '';
-
-  String? get _userId => AuthService.instance.currentUserId;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _initLoad();
-  }
-
-  /// 初始化加载：先读缓存，再静默刷新
-  Future<void> _initLoad() async {
-    await _loadCache();
-    await _loadNotes();
-  }
-
-  /// 从 SharedPreferences 加载缓存数据
-  Future<void> _loadCache() async {
-    final userId = _userId;
-    if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyNotes);
-    if (cached.isNotEmpty && mounted) {
-      setState(() {
-        _notes = cached.map((e) => NoteModel.fromJson(e)).toList();
-        _isLoading = false;
-      });
-    }
+    _userId = AuthService.instance.currentUserId;
+    _loadNotes();
   }
 
   Future<void> _loadNotes() async {
-    final userId = _userId;
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
-      }
-      return;
-    }
+    if (_userId == null) return;
+
+    setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/notes?user_id=eq.$userId&select=*&order=is_pinned.desc,updated_at.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'notes',
+        filters: {'user_id': 'eq.$_userId'},
+        order: 'updated_at.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final notes = data.map((e) => NoteModel.fromJson(e)).toList();
-
+      if (result.isSuccess) {
         setState(() {
-          _notes = notes;
+          _notes = result.data!;
           _isLoading = false;
         });
-
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyNotes,
-          notes.map((n) => n.toJson()).toList(),
-        );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载失败: ${result.errorMessage}')),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
+    }
+  }
+
+  Future<void> _addNote() async {
+    if (_userId == null) return;
+
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _NoteDialog(),
+    );
+
+    if (result != null) {
+      try {
+        final insertResult = await ApiClient.post(
+          'notes',
+          body: {
+            ...result,
+            'user_id': _userId,
+          },
         );
+
+        if (insertResult.isSuccess) {
+          _loadNotes();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('添加失败: ${insertResult.errorMessage}')),
+            );
+          }
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('添加失败: $e')),
+          );
+        }
       }
     }
   }
 
-  Future<void> _createNote(NoteModel note) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(note.toJson()),
-      );
+  Future<void> _editNote(Map<String, dynamic> note) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => _NoteDialog(
+        title: note['title'] ?? '',
+        content: note['content'] ?? '',
+      ),
+    );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await _loadNotes();
+    if (result != null) {
+      try {
+        final updateResult = await ApiClient.patch(
+          'notes',
+          filters: {'id': 'eq.${note['id']}'},
+          body: {
+            ...result,
+            'updated_at': DateTime.now().toUtc().toIso8601String(),
+          },
+        );
+
+        if (updateResult.isSuccess) {
+          _loadNotes();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('更新失败: ${updateResult.errorMessage}')),
+            );
+          }
+        }
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('创建成功')),
+            SnackBar(content: Text('更新失败: $e')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败: $e')),
-        );
-      }
-    }
-  }
-
-  Future<void> _updateNote(NoteModel note) async {
-    try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(note.toJsonForUpdate()),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadNotes();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
-          );
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
-        );
       }
     }
   }
 
   Future<void> _deleteNote(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条笔记吗？');
-
-    if (confirm == true) {
-      try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
-        );
-
-        if (response.statusCode == 204 || response.statusCode == 200) {
-          await _loadNotes();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
-            );
-          }
-        } else {
-          throw Exception('HTTP ${response.statusCode}');
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _togglePin(NoteModel note) async {
     try {
-      final updated = note.copyWith(isPinned: !note.isPinned);
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({'is_pinned': updated.isPinned}),
+      final result = await ApiClient.delete(
+        'notes',
+        filters: {'id': 'eq.$id'},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadNotes();
+      if (result.isSuccess) {
+        _loadNotes();
+      } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(note.isPinned ? '已取消置顶' : '已置顶')),
+            SnackBar(content: Text('删除失败: ${result.errorMessage}')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
+          SnackBar(content: Text('删除失败: $e')),
         );
       }
     }
   }
 
-  void _showNoteForm([NoteModel? note]) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => _NoteEditScreen(
-          note: note,
-          userId: _userId ?? 'local_user',
-          onSave: (newNote) {
-            if (note != null) {
-              _updateNote(newNote);
-            } else {
-              _createNote(newNote);
-            }
-          },
-          onTogglePin: note != null ? () => _togglePin(note) : null,
-        ),
-      ),
-    );
-  }
-
-  List<NoteModel> get _filteredNotes {
-    if (_searchQuery.isEmpty) return _notes;
-    return _notes.where((note) {
-      final titleMatch = note.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final contentMatch = note.content?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
-      return titleMatch || contentMatch;
-    }).toList();
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('笔记'),
-      ),
-      body: Column(
-        children: [
-          // 搜索框
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
-              decoration: InputDecoration(
-                hintText: '搜索笔记...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchQuery = ''),
-                      )
-                    : null,
-              ),
-            ),
-          ),
-
-          // 笔记列表
-          Expanded(
-            child: _isLoading
-                ? const LoadingWidget()
-                : _filteredNotes.isEmpty
-                    ? const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记')
-                    : RefreshIndicator(
-                        onRefresh: _loadNotes,
-                        child: GridView.builder(
-                          padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
-                            maxCrossAxisExtent: 200,
-                            mainAxisSpacing: 12,
-                            crossAxisSpacing: 12,
-                            childAspectRatio: 1,
-                          ),
-                          itemCount: _filteredNotes.length,
-                          itemBuilder: (context, index) {
-                            final note = _filteredNotes[index];
-
-                            return Card(
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: () => _showNoteForm(note),
-                                onLongPress: () => _deleteNote(note.id),
-                                child: Stack(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            note.title,
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Expanded(
-                                            child: Text(
-                                              note.content ?? '',
-                                              style: Theme.of(context).textTheme.bodySmall,
-                                              overflow: TextOverflow.fade,
-                                            ),
-                                          ),
-                                          if (note.tags != null && note.tags!.isNotEmpty)
-                                            Wrap(
-                                              spacing: 4,
-                                              children: note.tags!.take(2).map((tag) => Text(
-                                                '#$tag',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: colorScheme.primary,
-                                                ),
-                                              )).toList(),
-                                            ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            DateTimeUtils.formatStandard(note.createdAt),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: colorScheme.outline.withOpacity(0.7),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (note.isPinned)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Icon(
-                                          Icons.push_pin,
-                                          size: 16,
-                                          color: colorScheme.primary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showNoteForm(),
-        child: const Icon(Icons.add),
-      ),
-    );
-  }
-}
-
-class _NoteEditScreen extends StatefulWidget {
-  final NoteModel? note;
-  final String userId;
-  final Function(NoteModel) onSave;
-  final VoidCallback? onTogglePin;
-
-  const _NoteEditScreen({
-    this.note,
-    required this.userId,
-    required this.onSave,
-    this.onTogglePin,
-  });
-
-  @override
-  State<_NoteEditScreen> createState() => _NoteEditScreenState();
-}
-
-class _NoteEditScreenState extends State<_NoteEditScreen> {
-  final _titleController = TextEditingController();
-  final _contentController = TextEditingController();
-  final _tagsController = TextEditingController();
-  bool _isPinned = false;
-  bool _isSaving = false;
-
-  @override
-  void initState() {
-    super.initState();
-    if (widget.note != null) {
-      _titleController.text = widget.note!.title;
-      _contentController.text = widget.note!.content ?? '';
-      _tagsController.text = widget.note!.tags?.join(', ') ?? '';
-      _isPinned = widget.note!.isPinned;
-    }
-  }
-
-  @override
-  void dispose() {
-    _titleController.dispose();
-    _contentController.dispose();
-    _tagsController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _save() async {
-    if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入标题')),
-      );
-      return;
-    }
-
-    setState(() => _isSaving = true);
-
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
-    final newNote = NoteModel(
-      id: widget.note?.id ?? const Uuid().v4(),
-      userId: widget.userId,
-      title: _titleController.text,
-      content: _contentController.text.isEmpty ? null : _contentController.text,
-      tags: tags.isEmpty ? null : tags,
-      isPinned: _isPinned,
-    );
-
-    widget.onSave(newNote);
-    if (mounted) Navigator.pop(context);
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.note != null ? '编辑笔记' : '新建笔记'),
+        title: const Text('备忘录'),
         actions: [
-          if (widget.onTogglePin != null)
-            IconButton(
-              icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
-              onPressed: () {
-                setState(() => _isPinned = !_isPinned);
-                widget.onTogglePin!();
-              },
-            ),
           IconButton(
-            icon: _isSaving
-                ? const SizedBox(
-                    height: 20,
-                    width: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.save),
-            onPressed: _isSaving ? null : _save,
+            icon: const Icon(Icons.add),
+            onPressed: _addNote,
           ),
         ],
       ),
-      body: Padding(
-        padding: const EdgeInsets.all(16),
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : _notes.isEmpty
+              ? const Center(child: Text('暂无笔记'))
+              : ListView.builder(
+                  itemCount: _notes.length,
+                  itemBuilder: (context, index) {
+                    final note = _notes[index];
+                    final updatedAt = DateTime.parse(note['updated_at']);
+                    return Dismissible(
+                      key: Key(note['id']),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (_) => _deleteNote(note['id']),
+                      child: ListTile(
+                        title: Text(note['title'] ?? '无标题'),
+                        subtitle: Text(
+                          note['content'] ?? '',
+                          maxLines: 2,
+                          overflow: TextOverflow.ellipsis,
+                        ),
+                        trailing: Text(
+                          DateFormat('MM-dd HH:mm').format(updatedAt),
+                          style: Theme.of(context).textTheme.bodySmall,
+                        ),
+                        onTap: () => _editNote(note),
+                      ),
+                    );
+                  },
+                ),
+    );
+  }
+}
+
+class _NoteDialog extends StatefulWidget {
+  final String title;
+  final String content;
+
+  const _NoteDialog({this.title = '', this.content = ''});
+
+  @override
+  State<_NoteDialog> createState() => _NoteDialogState();
+}
+
+class _NoteDialogState extends State<_NoteDialog> {
+  late final _titleController = TextEditingController(text: widget.title);
+  late final _contentController = TextEditingController(text: widget.content);
+
+  @override
+  Widget build(BuildContext context) {
+    return AlertDialog(
+      title: Text(widget.title.isEmpty ? '新建笔记' : '编辑笔记'),
+      content: SingleChildScrollView(
         child: Column(
+          mainAxisSize: MainAxisSize.min,
           children: [
             TextField(
               controller: _titleController,
-              style: Theme.of(context).textTheme.titleLarge,
               decoration: const InputDecoration(
-                hintText: '标题',
-                border: InputBorder.none,
+                labelText: '标题',
               ),
             ),
-            const SizedBox(height: 8),
-            const Divider(),
-            const SizedBox(height: 8),
-            Expanded(
-              child: TextField(
-                controller: _contentController,
-                maxLines: null,
-                expands: true,
-                decoration: const InputDecoration(
-                  hintText: '写点什么...',
-                  border: InputBorder.none,
-                ),
-              ),
-            ),
-            const SizedBox(height: 8),
+            const SizedBox(height: 16),
             TextField(
-              controller: _tagsController,
+              controller: _contentController,
+              maxLines: 5,
               decoration: const InputDecoration(
-                hintText: '标签（可选，逗号分隔）',
-                prefixIcon: Icon(Icons.tag),
-                border: InputBorder.none,
+                labelText: '内容',
               ),
             ),
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            Navigator.pop(context, {
+              'title': _titleController.text,
+              'content': _contentController.text,
+            });
+          },
+          child: const Text('保存'),
+        ),
+      ],
     );
   }
 }

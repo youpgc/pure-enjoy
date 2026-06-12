@@ -1,15 +1,8 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../../utils/date_time_utils.dart';
-import '../../../utils/cache_helper.dart';
-import '../../../core/widgets/widgets.dart';
-import '../../../widgets/common_widgets.dart';
-import '../models/weight_record_model.dart';
 
-/// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
   const WeightRecordScreen({super.key});
 
@@ -18,507 +11,217 @@ class WeightRecordScreen extends StatefulWidget {
 }
 
 class _WeightRecordScreenState extends State<WeightRecordScreen> {
-  List<WeightRecordModel> _records = [];
+  List<Map<String, dynamic>> _records = [];
   bool _isLoading = true;
-
-  String? get _userId => AuthService.instance.currentUserId;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _initLoad();
-  }
-
-  /// 初始化加载：先读缓存，再静默刷新
-  Future<void> _initLoad() async {
-    await _loadCache();
-    await _loadRecords();
-  }
-
-  /// 从 SharedPreferences 加载缓存数据
-  Future<void> _loadCache() async {
-    final userId = _userId;
-    if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyWeightRecords);
-    if (cached.isNotEmpty && mounted) {
-      setState(() {
-        _records = cached.map((e) => WeightRecordModel.fromJson(e)).toList();
-        _isLoading = false;
-      });
-    }
+    _userId = AuthService.instance.currentUserId;
+    _loadRecords();
   }
 
   Future<void> _loadRecords() async {
-    final userId = _userId;
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
-      }
-      return;
-    }
+    if (_userId == null) return;
+
+    setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc&limit=365',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'weight_records',
+        filters: {'user_id': 'eq.$_userId'},
+        order: 'date.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
-
+      if (result.isSuccess) {
         setState(() {
-          _records = records.length > 30 ? records.sublist(0, 30) : records;
+          _records = result.data!;
           _isLoading = false;
         });
-
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyWeightRecords,
-          records.map((r) => r.toJson()).toList(),
-        );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载失败: ${result.errorMessage}')),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
-      }
     }
   }
 
-  Future<void> _createWeightRecord(WeightRecordModel record) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(record.toJson()),
-      );
+  Future<void> _addRecord() async {
+    if (_userId == null) return;
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await _loadRecords();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('添加成功')),
-          );
-        }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
-      }
-    }
-  }
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _WeightDialog(),
+    );
 
-  Future<void> _deleteWeightRecord(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
-
-    if (confirm == true) {
+    if (result != null) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final insertResult = await ApiClient.post(
+          'weight_records',
+          body: {
+            ...result,
+            'user_id': _userId,
+          },
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
-          await _loadRecords();
+        if (insertResult.isSuccess) {
+          _loadRecords();
+        } else {
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
+              SnackBar(content: Text('添加失败: ${insertResult.errorMessage}')),
             );
           }
-        } else {
-          throw Exception('HTTP ${response.statusCode}');
         }
       } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
+            SnackBar(content: Text('添加失败: $e')),
           );
         }
       }
     }
   }
 
-  Future<void> _updateWeightRecord(WeightRecordModel record) async {
+  Future<void> _deleteRecord(String id) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.${record.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
-          'weight': record.weight,
-          'bmi': record.bmi,
-          'body_fat': record.bodyFat,
-          'note': record.note,
-          'date': record.date.toIso8601String().split('T').first,
-        }),
+      final result = await ApiClient.delete(
+        'weight_records',
+        filters: {'id': 'eq.$id'},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadRecords();
+      if (result.isSuccess) {
+        _loadRecords();
+      } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
+            SnackBar(content: Text('删除失败: ${result.errorMessage}')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
+          SnackBar(content: Text('删除失败: $e')),
         );
       }
     }
   }
 
-  void _showEditRecordForm(WeightRecordModel record) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _RecordForm(
-        userId: _userId ?? 'local_user',
-        record: record,
-        onSave: (updatedRecord) {
-          Navigator.pop(context);
-          _updateWeightRecord(updatedRecord);
-        },
-      ),
-    );
-  }
-
-  void _showRecordForm() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _RecordForm(
-        userId: _userId ?? 'local_user',
-        onSave: (newRecord) {
-          Navigator.pop(context);
-          _createWeightRecord(newRecord);
-        },
-      ),
-    );
-  }
-
-  double? get _latestWeight => _records.isNotEmpty ? _records.first.weight : null;
-  double? get _previousWeight => _records.length > 1 ? _records[1].weight : null;
-  double? get _weightChange {
-    if (_latestWeight == null || _previousWeight == null) return null;
-    return _latestWeight! - _previousWeight!;
-  }
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('体重记录'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add),
+            onPressed: _addRecord,
+          ),
+        ],
       ),
       body: _isLoading
-          ? const LoadingWidget()
-          : RefreshIndicator(
-              onRefresh: _loadRecords,
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 当前体重卡片
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Text(
-                              '当前体重',
-                              style: Theme.of(context).textTheme.bodyMedium,
-                            ),
-                            const SizedBox(height: 8),
-                            Text(
-                              _latestWeight != null
-                                  ? '${_latestWeight!.toStringAsFixed(2)} kg'
-                                  : '-- kg',
-                              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            if (_weightChange != null) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                                    size: 16,
-                                    color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                  ),
-                                  Text(
-                                    '${_weightChange!.abs().toStringAsFixed(2)} kg',
-                                    style: TextStyle(
-                                      color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ],
-                          ],
+          ? const Center(child: CircularProgressIndicator())
+          : _records.isEmpty
+              ? const Center(child: Text('暂无记录'))
+              : ListView.builder(
+                  itemCount: _records.length,
+                  itemBuilder: (context, index) {
+                    final record = _records[index];
+                    final date = DateTime.parse(record['date']);
+                    return Dismissible(
+                      key: Key(record['id']),
+                      direction: DismissDirection.endToStart,
+                      background: Container(
+                        color: Colors.red,
+                        alignment: Alignment.centerRight,
+                        padding: const EdgeInsets.only(right: 20),
+                        child: const Icon(Icons.delete, color: Colors.white),
+                      ),
+                      onDismissed: (_) => _deleteRecord(record['id']),
+                      child: ListTile(
+                        leading: const Icon(Icons.monitor_weight),
+                        title: Text('${record['weight']} kg'),
+                        subtitle: Text(
+                          DateFormat('yyyy-MM-dd').format(date),
                         ),
                       ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 记录列表
-                    Text(
-                      '历史记录',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    _records.isEmpty
-                        ? const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _records.length,
-                            itemBuilder: (context, index) {
-                              final record = _records[index];
-
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: const Icon(Icons.monitor_weight),
-                                  title: Row(
-                                    children: [
-                                      Text(
-                                        '${record.weight.toStringAsFixed(2)} kg',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (record.bodyFat != null) ...[
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                      if (record.bmi != null) ...[
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
-                                      if (record.note != null && record.note!.isNotEmpty)
-                                        Text(
-                                          record.note!,
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.outline,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                    ],
-                                  ),
-                                  trailing: EditDeletePopupMenu(
-                                    onEdit: () => _showEditRecordForm(record),
-                                    onDelete: () => _deleteWeightRecord(record.id),
-                                  ),
-                                ),
-                              );
-                            },
-                          ),
-                  ],
+                    );
+                  },
                 ),
-              ),
-            ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showRecordForm(),
-        child: const Icon(Icons.add),
-      ),
     );
   }
 }
 
-class _RecordForm extends StatefulWidget {
-  final String userId;
-  final WeightRecordModel? record;
-  final Function(WeightRecordModel) onSave;
-
-  const _RecordForm({required this.userId, this.record, required this.onSave});
+class _WeightDialog extends StatefulWidget {
+  const _WeightDialog();
 
   @override
-  State<_RecordForm> createState() => _RecordFormState();
+  State<_WeightDialog> createState() => _WeightDialogState();
 }
 
-class _RecordFormState extends State<_RecordForm> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _weightController;
-  late final TextEditingController _bodyFatController;
-  late final TextEditingController _bmiController;
-  late final TextEditingController _noteController;
-  late DateTime _selectedDate;
-
-  bool get _isEditing => widget.record != null;
-
-  @override
-  void initState() {
-    super.initState();
-    final record = widget.record;
-    _weightController = TextEditingController(
-      text: record != null ? record.weight.toString() : '',
-    );
-    _bodyFatController = TextEditingController(
-      text: record?.bodyFat?.toString() ?? '',
-    );
-    _bmiController = TextEditingController(
-      text: record?.bmi?.toString() ?? '',
-    );
-    _noteController = TextEditingController(
-      text: record?.note ?? '',
-    );
-    _selectedDate = record?.date ?? DateTime.now();
-  }
-
-  @override
-  void dispose() {
-    _weightController.dispose();
-    _bodyFatController.dispose();
-    _bmiController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final newRecord = WeightRecordModel(
-      id: _isEditing ? widget.record!.id : const Uuid().v4(),
-      userId: _isEditing ? widget.record!.userId : widget.userId,
-      weight: double.parse(_weightController.text),
-      bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
-      bodyFat: _bodyFatController.text.isNotEmpty
-          ? double.tryParse(_bodyFatController.text)
-          : null,
-      note: _noteController.text.isNotEmpty ? _noteController.text : null,
-      date: _selectedDate,
-    );
-
-    widget.onSave(newRecord);
-  }
+class _WeightDialogState extends State<_WeightDialog> {
+  final _weightController = TextEditingController();
+  DateTime _date = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Form(
-        key: _formKey,
+    return AlertDialog(
+      title: const Text('记录体重'),
+      content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '添加记录',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
+            TextField(
               controller: _weightController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: '体重 (kg)',
-                suffixText: 'kg',
-              ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '请输入体重';
-                if (double.tryParse(value) == null) return '请输入有效数字';
-                return null;
-              },
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _bodyFatController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: '体脂率（可选）',
-                suffixText: '%',
               ),
             ),
             const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _bmiController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
-              decoration: const InputDecoration(
-                labelText: 'BMI（可选）',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            TextFormField(
-              controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: '备注（可选）',
-                hintText: '添加备注信息',
-              ),
-              maxLines: 2,
-            ),
-            const SizedBox(height: 16),
-
             ListTile(
-              contentPadding: EdgeInsets.zero,
               title: const Text('日期'),
-              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
+              subtitle: Text(DateFormat('yyyy-MM-dd').format(_date)),
+              trailing: const Icon(Icons.calendar_today),
               onTap: () async {
                 final picked = await showDatePicker(
                   context: context,
-                  initialDate: _selectedDate,
+                  initialDate: _date,
                   firstDate: DateTime(2020),
                   lastDate: DateTime.now(),
                 );
                 if (picked != null) {
-                  setState(() => _selectedDate = picked);
+                  setState(() => _date = picked);
                 }
               },
-            ),
-            const SizedBox(height: 16),
-
-            FilledButton(
-              onPressed: _save,
-              child: const Text('保存'),
             ),
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_weightController.text.isEmpty) return;
+            Navigator.pop(context, {
+              'weight': double.parse(_weightController.text),
+              'date': DateFormat('yyyy-MM-dd').format(_date),
+            });
+          },
+          child: const Text('保存'),
+        ),
+      ],
     );
   }
 }

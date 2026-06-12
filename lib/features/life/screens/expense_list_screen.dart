@@ -1,16 +1,9 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import 'package:uuid/uuid.dart';
+import 'package:intl/intl.dart';
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/dict_service.dart';
-import '../../../utils/date_time_utils.dart';
-import '../../../utils/cache_helper.dart';
-import '../../../core/widgets/widgets.dart';
-import '../../../widgets/common_widgets.dart';
-import '../models/expense_model.dart';
+import '../../../core/theme/app_theme.dart';
 
-/// 支出列表页面 - Supabase 数据同步
 class ExpenseListScreen extends StatefulWidget {
   const ExpenseListScreen({super.key});
 
@@ -19,534 +12,326 @@ class ExpenseListScreen extends StatefulWidget {
 }
 
 class _ExpenseListScreenState extends State<ExpenseListScreen> {
-  List<ExpenseModel> _expenses = [];
+  List<Map<String, dynamic>> _expenses = [];
   bool _isLoading = true;
-  String _selectedCategory = 'all';
-  DateTime _selectedMonth = DateTime.now();
-
-  String? get _userId => AuthService.instance.currentUserId;
+  double _totalAmount = 0;
+  String? _userId;
 
   @override
   void initState() {
     super.initState();
-    _initLoad();
-  }
-
-  /// 初始化加载：先读缓存，再静默刷新
-  Future<void> _initLoad() async {
-    await _loadCache();
-    await _loadExpenses();
-  }
-
-  /// 从 SharedPreferences 加载缓存数据
-  Future<void> _loadCache() async {
-    final userId = _userId;
-    if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyExpenses);
-    if (cached.isNotEmpty && mounted) {
-      final allExpenses = cached.map((e) => ExpenseModel.fromJson(e)).toList();
-      setState(() {
-        _expenses = _applyFilters(allExpenses);
-        _isLoading = false;
-      });
-    }
-  }
-
-  List<ExpenseModel> _applyFilters(List<ExpenseModel> expenses) {
-    // 按月份筛选
-    final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-
-    var filtered = expenses.where((e) {
-      return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-             e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
-    }).toList();
-
-    // 按分类筛选
-    if (_selectedCategory != 'all') {
-      filtered = filtered.where((e) => e.category == _selectedCategory).toList();
-    }
-
-    return filtered;
+    _userId = AuthService.instance.currentUserId;
+    _loadExpenses();
   }
 
   Future<void> _loadExpenses() async {
-    final userId = _userId;
-    if (userId == null) {
-      setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
-      }
-      return;
-    }
+    if (_userId == null) return;
+
+    setState(() => _isLoading = true);
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'expenses',
+        filters: {'user_id': 'eq.$_userId'},
+        order: 'date.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
-
+      if (result.isSuccess) {
+        final data = result.data!;
+        double total = 0;
+        for (final item in data) {
+          total += (item['amount'] as num?)?.toDouble() ?? 0;
+        }
         setState(() {
-          _expenses = _applyFilters(allExpenses);
+          _expenses = data;
+          _totalAmount = total;
           _isLoading = false;
         });
-
-        // 写入缓存（保存全部数据，不按月筛选）
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyExpenses,
-          allExpenses.map((e) => e.toJson()).toList(),
-        );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        setState(() => _isLoading = false);
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('加载失败: ${result.errorMessage}')),
+          );
+        }
       }
     } catch (e) {
       setState(() => _isLoading = false);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
-      }
     }
   }
 
-  Future<void> _addExpense(ExpenseModel expense) async {
-    try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(expense.toJson()),
-      );
+  Future<void> _addExpense() async {
+    if (_userId == null) return;
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
-        await _loadExpenses();
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => const _ExpenseDialog(),
+    );
+
+    if (result != null) {
+      try {
+        final insertResult = await ApiClient.post(
+          'expenses',
+          body: {
+            ...result,
+            'user_id': _userId,
+          },
+        );
+
+        if (insertResult.isSuccess) {
+          _loadExpenses();
+        } else {
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(content: Text('添加失败: ${insertResult.errorMessage}')),
+            );
+          }
+        }
+      } catch (e) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('添加成功')),
+            SnackBar(content: Text('添加失败: $e')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
       }
     }
   }
 
   Future<void> _deleteExpense(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
-
-    if (confirm == true) {
-      try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
-        );
-
-        if (response.statusCode == 204 || response.statusCode == 200) {
-          await _loadExpenses();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
-            );
-          }
-        } else {
-          throw Exception('HTTP ${response.statusCode}');
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
-          );
-        }
-      }
-    }
-  }
-
-  Future<void> _updateExpense(ExpenseModel expense) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.${expense.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
-          'amount': expense.amount,
-          'category': expense.category,
-          'note': expense.note,
-          'date': expense.date.toIso8601String().split('T').first,
-        }),
+      final result = await ApiClient.delete(
+        'expenses',
+        filters: {'id': 'eq.$id'},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
-        await _loadExpenses();
+      if (result.isSuccess) {
+        _loadExpenses();
+      } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
+            SnackBar(content: Text('删除失败: ${result.errorMessage}')),
           );
         }
-      } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
+          SnackBar(content: Text('删除失败: $e')),
         );
       }
     }
   }
 
-  void _showEditExpenseForm(ExpenseModel expense) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ExpenseForm(
-        userId: _userId ?? 'local_user',
-        expense: expense,
-        onSave: (updatedExpense) {
-          Navigator.pop(context);
-          _updateExpense(updatedExpense);
-        },
-      ),
-    );
-  }
-
-  void _showExpenseForm() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => _ExpenseForm(
-        userId: _userId ?? 'local_user',
-        onSave: (newExpense) {
-          Navigator.pop(context);
-          _addExpense(newExpense);
-        },
-      ),
-    );
-  }
-
-  double get _totalAmount {
-    return _expenses.fold(0.0, (sum, e) => sum + e.amount);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
-        title: const Text('记账'),
+        title: const Text('记账本'),
         actions: [
           IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedMonth,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() => _selectedMonth = picked);
-                _loadExpenses();
-              }
-            },
+            icon: const Icon(Icons.add),
+            onPressed: _addExpense,
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 统计卡片
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
+      body: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : Column(
               children: [
-                Text(
-                  '${_selectedMonth.year}年${_selectedMonth.month.toString().padLeft(2, '0')}月',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  '总支出: ¥${_totalAmount.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
+                // 总支出卡片
+                Container(
+                  margin: const EdgeInsets.all(16),
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        Theme.of(context).colorScheme.primary,
+                        Theme.of(context).colorScheme.primaryContainer,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                  child: Column(
+                    children: [
+                      const Text(
+                        '总支出',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        '¥${_totalAmount.toStringAsFixed(2)}',
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 32,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
                   ),
                 ),
-              ],
-            ),
-          ),
-
-          // 分类筛选
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                CategoryChip(
-                  label: '全部',
-                  isSelected: _selectedCategory == 'all',
-                  onTap: () {
-                    setState(() => _selectedCategory = 'all');
-                    _loadExpenses();
-                  },
-                ),
-                ...DictService.instance.getItemsSync(DictService.expenseCategory).map((cat) => CategoryChip(
-                  label: cat.label,
-                  isSelected: _selectedCategory == cat.code,
-                  onTap: () {
-                    setState(() => _selectedCategory = cat.code);
-                    _loadExpenses();
-                  },
-                )),
-              ],
-            ),
-          ),
-          const SizedBox(height: 8),
-
-          // 支出列表
-          Expanded(
-            child: _isLoading
-                ? const LoadingWidget()
-                : _expenses.isEmpty
-                    ? const EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录')
-                    : RefreshIndicator(
-                        onRefresh: _loadExpenses,
-                        child: ListView.builder(
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                // 支出列表
+                Expanded(
+                  child: _expenses.isEmpty
+                      ? const Center(child: Text('暂无记录'))
+                      : ListView.builder(
                           itemCount: _expenses.length,
                           itemBuilder: (context, index) {
                             final expense = _expenses[index];
-                            final categoryLabel = DictService.instance.getLabel(
-                              DictService.expenseCategory,
-                              expense.category,
-                              defaultValue: expense.category,
-                            );
-
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
+                            final date = DateTime.parse(expense['date']);
+                            return Dismissible(
+                              key: Key(expense['id']),
+                              direction: DismissDirection.endToStart,
+                              background: Container(
+                                color: Colors.red,
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 20),
+                                child: const Icon(Icons.delete, color: Colors.white),
+                              ),
+                              onDismissed: (_) => _deleteExpense(expense['id']),
                               child: ListTile(
-                                leading: const Icon(Icons.receipt),
-                                title: Text(categoryLabel),
-                                subtitle: Text(
-                                  '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
+                                leading: CircleAvatar(
+                                  backgroundColor: AppTheme.primaryColor.withOpacity(0.1),
+                                  child: Icon(
+                                    _getCategoryIcon(expense['category']),
+                                    color: AppTheme.primaryColor,
+                                  ),
                                 ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '¥${expense.amount.toStringAsFixed(2)}',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: colorScheme.error,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    EditDeletePopupMenu(
-                                      onEdit: () => _showEditExpenseForm(expense),
-                                      onDelete: () => _deleteExpense(expense.id),
-                                    ),
-                                  ],
+                                title: Text(expense['description'] ?? '未命名'),
+                                subtitle: Text(
+                                  DateFormat('MM-dd').format(date),
+                                ),
+                                trailing: Text(
+                                  '-¥${(expense['amount'] as num).toStringAsFixed(2)}',
+                                  style: const TextStyle(
+                                    color: Colors.red,
+                                    fontWeight: FontWeight.bold,
+                                  ),
                                 ),
                               ),
                             );
                           },
                         ),
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showExpenseForm(),
-        child: const Icon(Icons.add),
-      ),
+                ),
+              ],
+            ),
     );
+  }
+
+  IconData _getCategoryIcon(String? category) {
+    switch (category) {
+      case 'food':
+        return Icons.restaurant;
+      case 'transport':
+        return Icons.directions_bus;
+      case 'shopping':
+        return Icons.shopping_bag;
+      case 'entertainment':
+        return Icons.movie;
+      case 'housing':
+        return Icons.home;
+      default:
+        return Icons.attach_money;
+    }
   }
 }
 
-class _ExpenseForm extends StatefulWidget {
-  final String userId;
-  final ExpenseModel? expense;
-  final Function(ExpenseModel) onSave;
-
-  const _ExpenseForm({required this.userId, this.expense, required this.onSave});
+class _ExpenseDialog extends StatefulWidget {
+  const _ExpenseDialog();
 
   @override
-  State<_ExpenseForm> createState() => _ExpenseFormState();
+  State<_ExpenseDialog> createState() => _ExpenseDialogState();
 }
 
-class _ExpenseFormState extends State<_ExpenseForm> {
-  final _formKey = GlobalKey<FormState>();
-  late final TextEditingController _amountController;
-  late final TextEditingController _noteController;
-  String _selectedCategoryCode = '';
-  late DateTime _selectedDate;
-
-  bool get _isEditing => widget.expense != null;
-
-  /// 获取支出分类选项列表（从字典服务）
-  List<String> get _categoryCodes {
-    return DictService.instance.getItemsSync(DictService.expenseCategory).map((e) => e.code).toList();
-  }
-
-  @override
-  void initState() {
-    super.initState();
-    final expense = widget.expense;
-    _amountController = TextEditingController(
-      text: expense != null ? expense.amount.toString() : '',
-    );
-    _noteController = TextEditingController(
-      text: expense?.note ?? '',
-    );
-    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(DictService.expenseCategory);
-    if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
-      _selectedCategoryCode = _categoryCodes.first;
-    }
-    _selectedDate = expense?.date ?? DateTime.now();
-    // 监听字典刷新
-    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
-  }
-
-  void _onDictRefresh() {
-    if (mounted) {
-      setState(() {
-        // 字典数据加载完成，刷新 UI
-        if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
-          _selectedCategoryCode = _categoryCodes.first;
-        }
-      });
-    }
-  }
-
-  @override
-  void dispose() {
-    DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
-    _amountController.dispose();
-    _noteController.dispose();
-    super.dispose();
-  }
-
-  void _save() {
-    if (!_formKey.currentState!.validate()) return;
-
-    final newExpense = ExpenseModel(
-      id: _isEditing ? widget.expense!.id : const Uuid().v4(),
-      userId: _isEditing ? widget.expense!.userId : widget.userId,
-      amount: double.parse(_amountController.text),
-      category: _selectedCategoryCode,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
-      date: _selectedDate,
-    );
-
-    widget.onSave(newExpense);
-  }
+class _ExpenseDialogState extends State<_ExpenseDialog> {
+  final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
+  String _category = 'food';
+  DateTime _date = DateTime.now();
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: Form(
-        key: _formKey,
+    return AlertDialog(
+      title: const Text('记一笔'),
+      content: SingleChildScrollView(
         child: Column(
           mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            Text(
-              '添加支出',
-              style: Theme.of(context).textTheme.titleLarge,
-            ),
-            const SizedBox(height: 16),
-
-            // 金额输入
-            TextFormField(
+            TextField(
               controller: _amountController,
-              keyboardType: const TextInputType.numberWithOptions(decimal: true),
+              keyboardType: TextInputType.number,
               decoration: const InputDecoration(
                 labelText: '金额',
-                prefixText: '¥ ',
+                prefixText: '¥',
               ),
-              validator: (value) {
-                if (value == null || value.isEmpty) return '请输入金额';
-                if (double.tryParse(value) == null) return '请输入有效数字';
-                return null;
-              },
             ),
-            const SizedBox(height: 16),
-
-            // 分类选择
-            Text('分类', style: Theme.of(context).textTheme.bodyLarge),
-            const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _categoryCodes.map((code) {
-                final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: _selectedCategoryCode == code,
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedCategoryCode = code);
-                  },
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-
-            // 备注
-            TextFormField(
-              controller: _noteController,
+            TextField(
+              controller: _descriptionController,
               decoration: const InputDecoration(
-                labelText: '备注（可选）',
+                labelText: '描述',
               ),
             ),
             const SizedBox(height: 16),
-
-            // 日期选择
-            ListTile(
-              title: const Text('日期'),
-              trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  setState(() => _selectedDate = picked);
+            DropdownButtonFormField<String>(
+              value: _category,
+              decoration: const InputDecoration(
+                labelText: '分类',
+              ),
+              items: const [
+                DropdownMenuItem(value: 'food', child: Text('餐饮')),
+                DropdownMenuItem(value: 'transport', child: Text('交通')),
+                DropdownMenuItem(value: 'shopping', child: Text('购物')),
+                DropdownMenuItem(value: 'entertainment', child: Text('娱乐')),
+                DropdownMenuItem(value: 'housing', child: Text('住房')),
+                DropdownMenuItem(value: 'other', child: Text('其他')),
+              ],
+              onChanged: (value) {
+                if (value != null) {
+                  setState(() => _category = value);
                 }
               },
             ),
             const SizedBox(height: 16),
-
-            FilledButton(
-              onPressed: _save,
-              child: const Text('保存'),
+            ListTile(
+              title: const Text('日期'),
+              subtitle: Text(DateFormat('yyyy-MM-dd').format(_date)),
+              trailing: const Icon(Icons.calendar_today),
+              onTap: () async {
+                final picked = await showDatePicker(
+                  context: context,
+                  initialDate: _date,
+                  firstDate: DateTime(2020),
+                  lastDate: DateTime.now(),
+                );
+                if (picked != null) {
+                  setState(() => _date = picked);
+                }
+              },
             ),
           ],
         ),
       ),
+      actions: [
+        TextButton(
+          onPressed: () => Navigator.pop(context),
+          child: const Text('取消'),
+        ),
+        FilledButton(
+          onPressed: () {
+            if (_amountController.text.isEmpty) return;
+            Navigator.pop(context, {
+              'amount': double.parse(_amountController.text),
+              'description': _descriptionController.text,
+              'category': _category,
+              'date': DateFormat('yyyy-MM-dd').format(_date),
+            });
+          },
+          child: const Text('保存'),
+        ),
+      ],
     );
   }
 }

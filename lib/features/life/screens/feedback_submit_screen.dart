@@ -1,11 +1,7 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/dict_service.dart';
-import '../../../core/widgets/widgets.dart';
 
-/// 提交问题反馈页面
 class FeedbackSubmitScreen extends StatefulWidget {
   const FeedbackSubmitScreen({super.key});
 
@@ -14,61 +10,58 @@ class FeedbackSubmitScreen extends StatefulWidget {
 }
 
 class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
-  final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
-  final _descController = TextEditingController();
-  String _category = 'bug'; // 默认分类
+  final _contentController = TextEditingController();
   bool _isSubmitting = false;
+  String? _userId;
 
   @override
-  void dispose() {
-    _titleController.dispose();
-    _descController.dispose();
-    super.dispose();
+  void initState() {
+    super.initState();
+    _userId = AuthService.instance.currentUserId;
   }
 
-  /// 提交反馈
   Future<void> _submitFeedback() async {
-    if (!_formKey.currentState!.validate()) return;
-
-    final userId = AuthService.instance.currentUserId;
-    final userNickname = AuthService.instance.currentUserName;
-    if (userId == null) {
-      showSnackBar(context, '请先登录', isError: true);
+    if (_userId == null) return;
+    if (_titleController.text.isEmpty || _contentController.text.isEmpty) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('请填写标题和内容')),
+      );
       return;
     }
 
     setState(() => _isSubmitting = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/user_feedback'),
-        headers: {
-          ...SupabaseConfig.writeHeaders,
-          'x-user-id': userId,
+      final result = await ApiClient.post(
+        'feedbacks',
+        body: {
+          'user_id': _userId,
+          'title': _titleController.text,
+          'content': _contentController.text,
+          'status': 'pending',
         },
-        body: jsonEncode({
-          'user_id': userId,
-          'user_nickname': userNickname,
-          'title': _titleController.text.trim(),
-          'description': _descController.text.trim().isEmpty
-              ? null
-              : _descController.text.trim(),
-          'category': _category,
-        }),
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      if (result.isSuccess) {
         if (mounted) {
-          showSnackBar(context, '反馈提交成功');
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('提交成功')),
+          );
           Navigator.pop(context);
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('提交失败: ${result.errorMessage}')),
+          );
+        }
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '提交失败: $e', isError: true);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('提交失败: $e')),
+        );
       }
     } finally {
       if (mounted) {
@@ -83,81 +76,41 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       appBar: AppBar(
         title: const Text('提交反馈'),
       ),
-      body: SingleChildScrollView(
+      body: Padding(
         padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题输入
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: '问题标题',
-                  hintText: '请简要描述问题',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                validator: (v) => v?.trim().isEmpty == true ? '请输入标题' : null,
+        child: Column(
+          children: [
+            TextField(
+              controller: _titleController,
+              decoration: const InputDecoration(
+                labelText: '标题',
+                hintText: '请输入反馈标题',
               ),
-              const SizedBox(height: 16),
-
-              // 分类选择
-              Builder(builder: (context) {
-                final categoryOptions = DictService.instance.getItemsSync(DictService.feedbackCategory);
-                return DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: const InputDecoration(
-                    labelText: '分类',
-                    prefixIcon: Icon(Icons.category),
-                  ),
-                  items: categoryOptions
-                      .map((item) => DropdownMenuItem(
-                            value: item.code,
-                            child: Text(item.label),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _category = value);
-                    }
-                  },
-                );
-              }),
-              const SizedBox(height: 16),
-
-              // 描述输入
-              TextFormField(
-                controller: _descController,
-                decoration: const InputDecoration(
-                  labelText: '问题描述（可选）',
-                  hintText: '请详细描述问题或建议',
-                  prefixIcon: Icon(Icons.description),
-                  alignLabelWithHint: true,
-                ),
-                maxLines: 5,
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _contentController,
+              maxLines: 5,
+              decoration: const InputDecoration(
+                labelText: '内容',
+                hintText: '请详细描述您的问题或建议',
               ),
-              const SizedBox(height: 32),
-
-              // 提交按钮
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isSubmitting ? null : _submitFeedback,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('提交反馈'),
-                ),
+            ),
+            const SizedBox(height: 24),
+            SizedBox(
+              width: double.infinity,
+              child: FilledButton(
+                onPressed: _isSubmitting ? null : _submitFeedback,
+                child: _isSubmitting
+                    ? const SizedBox(
+                        width: 20,
+                        height: 20,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text('提交'),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
