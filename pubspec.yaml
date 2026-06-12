@@ -46,6 +46,8 @@ dependencies:
   image_picker: ^1.0.7
   # 图表库
   fl_chart: ^0.68.0
+  # 电池电量
+  battery_plus: ^6.5.0
 
 dev_dependencies:
   flutter_test:

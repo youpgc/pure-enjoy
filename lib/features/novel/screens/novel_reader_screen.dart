@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:battery_plus/battery_plus.dart';
 import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
@@ -57,6 +58,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 分页内容组件的 Key，用于获取当前页码
   final _pagedContentKey = GlobalKey<_PagedChapterContentState>();
   final _curlContentKey = GlobalKey<_CurlChapterContentState>();
+
+  // 电池相关
+  final Battery _battery = Battery();
+  int _batteryLevel = 100;
 
   List<NovelChapterModel> _chapters = [];
   NovelChapterModel? _currentChapter;
@@ -140,6 +145,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _loadSettings();
     _loadChapters();
     _checkBookshelfStatus();
+
+    // 初始化电池电量
+    _battery.batteryLevel.then((level) {
+      if (mounted) setState(() => _batteryLevel = level);
+    });
 
     // 初始进入时设置沉浸式模式
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.immersiveSticky);
@@ -951,29 +961,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
         child: Row(
           mainAxisAlignment: MainAxisAlignment.spaceBetween,
           children: [
-            Row(
-              children: [
-                Icon(
-                  Icons.battery_0_bar,
-                  size: 14,
-                  color: _background.textColor.withOpacity(0.5),
-                ),
-                const SizedBox(width: 4),
-                Text(
-                  _currentTime,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: _background.textColor.withOpacity(0.5),
-                  ),
-                ),
-              ],
+            Text(
+              '$_currentTime  $_batteryLevel%',
+              style: TextStyle(
+                fontSize: 12,
+                color: _background.textColor.withOpacity(0.5),
+              ),
             ),
             Text(
-              '${(_readingProgress * 100).toStringAsFixed(2)}%',
+              '${(_readingProgress * 100).toStringAsFixed(1)}%',
               style: TextStyle(
                 fontSize: 12,
                 color: _background.textColor.withOpacity(0.5),
@@ -1057,39 +1057,57 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 构建顶部悬浮工具栏
-  Widget _buildTopToolbar() {
+  /// 构建顶部状态栏（始终显示，层级低）
+  Widget _buildTopStatusBar() {
+    return SafeArea(
+      bottom: false,
+      child: Container(
+        height: 44,
+        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
+        child: Row(
+          children: [
+            IconButton(
+              icon: Icon(
+                Icons.arrow_back_ios_new,
+                size: 18,
+                color: _background.textColor.withOpacity(0.7),
+              ),
+              onPressed: () => Navigator.pop(context),
+              padding: EdgeInsets.zero,
+              constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+              tooltip: '返回',
+            ),
+            Expanded(
+              child: Text(
+                _currentChapter?.title ?? widget.novel.title,
+                style: TextStyle(
+                  fontSize: 13,
+                  color: _background.textColor.withOpacity(0.6),
+                ),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 构建顶部菜单（菜单显示时才显示，层级高）
+  Widget _buildTopMenu() {
     return FadeTransition(
       opacity: _toolbarFadeAnimation,
       child: SlideTransition(
         position: _topToolbarSlideAnimation,
         child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [
-                _background.bgColor.withOpacity(0.95),
-                _background.bgColor.withOpacity(0.0),
-              ],
-              stops: const [0.7, 1.0],
-            ),
-          ),
+          color: Colors.black.withOpacity(0.5),
           child: SafeArea(
             bottom: false,
             child: Padding(
               padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
               child: Row(
                 children: [
-                  IconButton(
-                    icon: Icon(
-                      Icons.arrow_back_ios_new,
-                      size: 20,
-                      color: _background.textColor,
-                    ),
-                    onPressed: () => Navigator.pop(context),
-                    tooltip: '返回',
-                  ),
                   Expanded(
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
@@ -1097,10 +1115,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       children: [
                         Text(
                           _currentChapter?.title ?? widget.novel.title,
-                          style: TextStyle(
+                          style: const TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _background.textColor.withOpacity(0.7),
+                            color: Colors.white70,
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1108,9 +1126,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         if (_chapters.isNotEmpty)
                           Text(
                             '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
-                            style: TextStyle(
+                            style: const TextStyle(
                               fontSize: 11,
-                              color: _background.textColor.withOpacity(0.6),
+                              color: Colors.white60,
                             ),
                           ),
                       ],
@@ -1119,7 +1137,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   IconButton(
                     icon: Icon(
                       _isInBookshelf ? Icons.library_books : Icons.library_add_outlined,
-                      color: _background.textColor,
+                      color: Colors.white,
                     ),
                     onPressed: _isInBookshelf ? null : _addToBookshelf,
                     tooltip: _isInBookshelf ? '已在书架' : '加入书架',
@@ -1127,13 +1145,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   IconButton(
                     icon: Icon(
                       _isCollected ? Icons.favorite : Icons.favorite_border,
-                      color: _isCollected ? Theme.of(context).colorScheme.error : _background.textColor,
+                      color: _isCollected ? Theme.of(context).colorScheme.error : Colors.white,
                     ),
                     onPressed: () => _toggleCollection(),
                     tooltip: '收藏',
                   ),
                   IconButton(
-                    icon: Icon(Icons.info_outline, color: _background.textColor),
+                    icon: const Icon(Icons.info_outline, color: Colors.white),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -1158,17 +1176,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       child: SlideTransition(
         position: _bottomToolbarSlideAnimation,
         child: Container(
-          decoration: BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.bottomCenter,
-              end: Alignment.topCenter,
-              colors: [
-                _background.bgColor.withOpacity(0.95),
-                _background.bgColor.withOpacity(0.0),
-              ],
-              stops: const [0.7, 1.0],
-            ),
-          ),
+          color: Colors.black.withOpacity(0.5),
           child: SafeArea(
             top: false,
             child: Column(
@@ -1265,21 +1273,43 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
               : Stack(
                   children: [
-                    // 底层：内容区域，填满整个屏幕
-                    // 点击处理已集成到各内容组件内部，无需覆盖层
+                    // 第1层：内容区域
                     Positioned.fill(
                       child: _isLoadingChapter
                           ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
                           : _buildContent(),
                     ),
 
-                    // 顶部进度条（菜单显示时才显示）
-                    // 使用固定 top padding 而非 SafeArea，避免状态栏变化导致偏移
+                    // 第2层：顶部状态栏（始终显示）
+                    Positioned(
+                      top: 0, left: 0, right: 0,
+                      child: _buildTopStatusBar(),
+                    ),
+
+                    // 第3层：底部状态栏（始终显示）
+                    Positioned(
+                      left: 0, right: 0, bottom: 0,
+                      child: _buildBottomStatusBar(),
+                    ),
+
+                    // 第4层：顶部菜单（菜单显示时才显示，覆盖状态栏）
+                    if (_showMenu)
+                      Positioned(
+                        top: 0, left: 0, right: 0,
+                        child: _buildTopMenu(),
+                      ),
+
+                    // 第5层：底部菜单（菜单显示时才显示，覆盖状态栏）
+                    if (_showMenu)
+                      Positioned(
+                        left: 0, right: 0, bottom: 0,
+                        child: _buildBottomToolbar(),
+                      ),
+
+                    // 第6层：进度条（菜单显示时才显示）
                     if (_chapters.isNotEmpty && _showMenu)
                       Positioned(
-                        top: 0,
-                        left: 0,
-                        right: 0,
+                        top: 0, left: 0, right: 0,
                         child: Padding(
                           padding: const EdgeInsets.only(top: 44),
                           child: LinearProgressIndicator(
@@ -1294,30 +1324,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           ),
                         ),
                       ),
-
-                    // 顶部悬浮工具栏
-                    Positioned(
-                      top: 0,
-                      left: 0,
-                      right: 0,
-                      child: _buildTopToolbar(),
-                    ),
-
-                    // 底部悬浮工具栏
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: _buildBottomToolbar(),
-                    ),
-
-                    // 底部常驻状态栏（始终显示，不受菜单控制）
-                    Positioned(
-                      left: 0,
-                      right: 0,
-                      bottom: 0,
-                      child: _buildBottomStatusBar(),
-                    ),
                   ],
                 ),
     );
@@ -1331,25 +1337,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
+          padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              // 菜单隐藏时显示章节标题
-              if (!_showMenu)
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 16),
-                  child: Text(
-                    _currentChapter!.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      fontWeight: FontWeight.w500,
-                      color: _background.textColor.withOpacity(0.6),
-                      height: 1.4,
-                      fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
-                    ),
-                  ),
-                ),
               Center(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 24),
@@ -1515,10 +1506,10 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 固定状态栏高度(44px) - 底部安全区 - 顶部进度条(3px)
-    // 使用固定值避免状态栏显示/隐藏导致内容重新计算和偏移
-    final statusBarHeight = 44.0; // iOS标准状态栏高度，Android通常更小
-    final height = mediaQuery.size.height - statusBarHeight - mediaQuery.padding.bottom - 3;
+    // 减去顶部状态栏(44) + 底部状态栏(~36) + 间距
+    final topStatusBarHeight = 56.0; // 状态栏44 + 间距12
+    final bottomStatusBarHeight = 48.0; // 状态栏~36 + 间距12
+    final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1592,7 +1583,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
           final page = _pages[index];
           return Container(
             color: widget.background.bgColor,
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
+            padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1714,10 +1705,10 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 可用高度 = 屏幕高度 - 固定状态栏高度(44px) - 底部安全区 - 顶部进度条(3px)
-    // 使用固定值避免状态栏显示/隐藏导致内容重新计算和偏移
-    final statusBarHeight = 44.0; // iOS标准状态栏高度，Android通常更小
-    final height = mediaQuery.size.height - statusBarHeight - mediaQuery.padding.bottom - 3;
+    // 减去顶部状态栏(44) + 底部状态栏(~36) + 间距
+    final topStatusBarHeight = 56.0; // 状态栏44 + 间距12
+    final bottomStatusBarHeight = 48.0; // 状态栏~36 + 间距12
+    final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -1777,7 +1768,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   Widget _buildPageWidget(ContentPage page) {
     return Container(
       color: widget.background.bgColor,
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
+      padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
