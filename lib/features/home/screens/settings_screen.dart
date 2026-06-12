@@ -502,11 +502,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'notes',
         'habits',
         'habit_checkins',
-        'favorites',
-        'feedback',
+        'user_favorites',
+        'user_feedback',
         'reminders',
-        'reading_history',
+        'user_novels',
         'user_anniversaries',
+        'point_records',
       ];
 
       for (final table in tables) {

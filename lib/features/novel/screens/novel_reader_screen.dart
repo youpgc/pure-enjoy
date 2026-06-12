@@ -495,7 +495,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   Future<void> _saveProgress() async {
-    if (!mounted || _currentChapter == null) return;
+    if (_currentChapter == null) return;
     final userId = _userId;
     if (userId == null) return;
 

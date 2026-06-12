@@ -1,11 +1,12 @@
 /// 支出记录模型 - 对应 Supabase expenses 表
-/// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), date(DATE), created_at, updated_at
+/// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), note(TEXT), date(DATE), created_at, updated_at
 class ExpenseModel {
   final String id;
   final String userId;
   final double amount;
   final String category;
   final String? description;
+  final String? note;
   final DateTime date;
   final String? userNickname;
   final DateTime? createdAt;
@@ -17,6 +18,7 @@ class ExpenseModel {
     required this.amount,
     required this.category,
     this.description,
+    this.note,
     required this.date,
     this.userNickname,
     this.createdAt,
@@ -30,6 +32,7 @@ class ExpenseModel {
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
       description: json['description'] as String?,
+      note: json['note'] as String?,
       date: DateTime.parse(json['date'] as String),
       userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
@@ -43,6 +46,7 @@ class ExpenseModel {
       'amount': amount,
       'category': category,
       'description': description,
+      'note': note,
       'date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
@@ -58,6 +62,7 @@ class ExpenseModel {
       'amount': amount,
       'category': category,
       'description': description,
+      'note': note,
       'date': date.toIso8601String().split('T').first,
     };
   }
@@ -68,6 +73,7 @@ class ExpenseModel {
     double? amount,
     String? category,
     String? description,
+    String? note,
     DateTime? date,
     String? userNickname,
     DateTime? createdAt,
@@ -79,6 +85,7 @@ class ExpenseModel {
       amount: amount ?? this.amount,
       category: category ?? this.category,
       description: description ?? this.description,
+      note: note ?? this.note,
       date: date ?? this.date,
       userNickname: userNickname ?? this.userNickname,
       createdAt: createdAt ?? this.createdAt,

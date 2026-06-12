@@ -191,12 +191,13 @@ class _DashboardPageState extends State<DashboardPage> {
         final List data = jsonDecode(response.body);
         final habits = data.map((e) => HabitModel.fromJson(e)).toList();
 
-        // 加载每个习惯的打卡记录
+        // 批量加载所有习惯的打卡记录
         final history = <String, List<HabitCheckinModel>>{};
-        for (final habit in habits) {
+        if (habits.isNotEmpty) {
+          final habitIds = habits.map((h) => h.id).join(',');
           final checkinsResponse = await http.get(
             Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/habit_checkins?habit_id=eq.${habit.id}&select=*&order=checkin_at.desc',
+              '${AppConfig.supabaseUrl}/rest/v1/habit_checkins?habit_id=in.($habitIds)&select=*&order=checkin_at.desc',
             ),
             headers: {
               'apikey': AppConfig.supabaseAnonKey,
@@ -206,9 +207,15 @@ class _DashboardPageState extends State<DashboardPage> {
 
           if (checkinsResponse.statusCode == 200) {
             final List checkinsData = jsonDecode(checkinsResponse.body);
-            history[habit.id] = checkinsData.map((e) => HabitCheckinModel.fromJson(e)).toList();
-          } else {
-            history[habit.id] = [];
+            for (final checkin in checkinsData) {
+              final model = HabitCheckinModel.fromJson(checkin);
+              final habitId = model.habitId;
+              history.putIfAbsent(habitId, () => []).add(model);
+            }
+          }
+          // 确保所有习惯都有条目
+          for (final habit in habits) {
+            history.putIfAbsent(habit.id, () => []);
           }
         }
 
