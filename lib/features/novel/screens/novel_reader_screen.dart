@@ -253,7 +253,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       );
 
       final userId = _userId;
-      Future<ApiResult>? progressFuture;
+      Future<ApiResponse<List<Map<String, dynamic>>>>? progressFuture;
       if (userId != null) {
         progressFuture = ApiClient.get(
           'user_novels',
@@ -534,7 +534,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           if (mounted) {
             setState(() {
               _isInBookshelf = true;
-              _bookshelfId = data.first['id'] as String;
+              _bookshelfId = data['id'] as String;
             });
           }
         }
@@ -573,7 +573,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         final data = result.data!;
         setState(() {
           _isInBookshelf = true;
-          _bookshelfId = data.first['id'] as String;
+          _bookshelfId = data['id'] as String;
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

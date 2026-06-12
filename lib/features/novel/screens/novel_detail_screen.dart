@@ -165,7 +165,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           final data = result.data!;
           setState(() {
             _isInBookshelf = true;
-            _bookshelfId = data.first['id'] as String;
+            _bookshelfId = data['id'] as String;
           });
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

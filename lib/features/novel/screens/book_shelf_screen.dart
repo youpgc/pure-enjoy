@@ -743,24 +743,20 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
       }
 
       // 并行请求：公共小说列表 + 用户已添加的书架
-      final results = await Future.wait([
-        // 查询公共小说列表（user_id IS NULL 表示公共小说）
-        ApiClient.get(
-          'novels',
-          filters: {'user_id': 'is.null'},
-          columns: 'id,title,author,cover_url,category,description,chapter_count,word_count,status',
-          order: 'created_at.desc',
-        ),
-        // 查询用户已添加到书架的小说ID列表
-        ApiClient.get(
-          'user_novels',
-          filters: {'user_id': 'eq.$userId'},
-          columns: 'novel_id',
-        ),
-      ]);
+      final novelsFuture = ApiClient.get(
+        'novels',
+        filters: {'user_id': 'is.null'},
+        columns: 'id,title,author,cover_url,category,description,chapter_count,word_count,status',
+        order: 'created_at.desc',
+      );
+      final shelfFuture = ApiClient.get(
+        'user_novels',
+        filters: {'user_id': 'eq.$userId'},
+        columns: 'novel_id',
+      );
 
-      final novelsResult = results[0];
-      final shelfResult = results[1];
+      final novelsResult = await novelsFuture;
+      final shelfResult = await shelfFuture;
 
       if (novelsResult.isSuccess) {
         final novelsData = novelsResult.data!;

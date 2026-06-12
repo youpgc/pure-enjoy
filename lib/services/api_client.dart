@@ -70,10 +70,14 @@ bool _isSuccess(int statusCode) => statusCode >= 200 && statusCode < 300;
 class ApiClient {
   static final String _baseUrl = '${SupabaseConfig.url}/rest/v1';
 
+  /// Supabase 基础 URL（不含 /rest/v1）
+  static String get baseUrl => SupabaseConfig.url;
+
   /// GET 请求
   static Future<ApiResponse<List<Map<String, dynamic>>>> get(
     String table, {
     String? select,
+    String? columns,
     Map<String, String>? filters,
     String? order,
     int? limit,
@@ -138,11 +142,13 @@ class ApiClient {
     String table, {
     required Map<String, dynamic> body,
     bool returnRepresentation = true,
+    Map<String, String>? extraHeaders,
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl/$table');
       final headers = Map<String, String>.from(SupabaseConfig.headers);
       headers['Prefer'] = returnRepresentation ? 'return=representation' : 'return=minimal';
+      if (extraHeaders != null) headers.addAll(extraHeaders);
 
       final response = await http.post(uri, headers: headers, body: jsonEncode(body));
 
@@ -238,6 +244,9 @@ class ApiClient {
     }
     if (select != null) {
       params['select'] = select;
+    }
+    if (columns != null) {
+      params['select'] = columns;
     }
     if (order != null) {
       params['order'] = order;
