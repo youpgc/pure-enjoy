@@ -301,11 +301,11 @@ jobs:
 
           # 收集上次构建到本次构建之间的所有 commit messages
           if [ -n "$LAST_BUILD_SHA" ] && [ "$LAST_BUILD_SHA" != "$CURRENT_SHA" ]; then
-            # 获取两个 SHA 之间的所有提交
-            COMMIT_LIST=$(git log --pretty=format:"- %s" "${LAST_BUILD_SHA}..${CURRENT_SHA}" 2>/dev/null || echo "")
+            # 获取两个 SHA 之间的所有提交，并去掉提交类型前缀(feat:/fix:等)
+            COMMIT_LIST=$(git log --pretty=format:"%s" "${LAST_BUILD_SHA}..${CURRENT_SHA}" 2>/dev/null | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
           else
             # 首次构建或无法获取上次 SHA，只取最近 5 条
-            COMMIT_LIST=$(git log --pretty=format:"- %s" -n 5 2>/dev/null || echo "")
+            COMMIT_LIST=$(git log --pretty=format:"%s" -n 5 2>/dev/null | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
           fi
 
           # 格式化 release notes
