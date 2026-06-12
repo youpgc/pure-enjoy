@@ -1,8 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import '../../../services/supabase_service.dart';
-import '../../../config.dart';
+import '../../../services/api_client.dart';
 import '../../novel/screens/novel_detail_screen.dart';
 import '../../novel/models/novel_model.dart';
 
@@ -35,18 +34,15 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         return;
       }
 
-      final resp = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id,last_chapter,last_read_at,novels:novel_id(title,cover_url,author,description,category,status,word_count,chapter_count)&order=last_read_at.desc&limit=50',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final result = await ApiClient.get(
+        'user_novels',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'last_read_at.desc',
+        limit: 50,
       );
 
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List;
+      if (result.isSuccess) {
+        final data = result.data!;
         setState(() {
           _history = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -84,21 +80,17 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         final userId = _userId;
         if (userId == null) return;
 
-        final resp = await http.patch(
-          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId'),
-          headers: {
-            'apikey': AppConfig.supabaseAnonKey,
-            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-            'Content-Type': 'application/json',
-          },
-          body: jsonEncode({
+        final result = await ApiClient.patch(
+          'user_novels',
+          filters: {'user_id': 'eq.$userId'},
+          body: {
             'last_chapter': 0,
             'last_read_at': null,
             'progress': 0,
-          }),
+          },
         );
 
-        if (resp.statusCode == 200 || resp.statusCode == 204) {
+        if (result.isSuccess) {
           setState(() => _history = []);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(

@@ -1,8 +1,7 @@
 import 'dart:convert';
 
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import '../../../config.dart';
+import '../../../services/api_client.dart';
 
 /// 富文本展示页面
 /// 通过 configKey 从 Supabase app_configs 表查询对应配置内容并渲染
@@ -29,18 +28,14 @@ class _RichTextPageState extends State<RichTextPage> {
 
   Future<void> _loadContent() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/app_configs?config_key=eq.${widget.configKey}&select=title,content',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final result = await ApiClient.get(
+        'app_configs',
+        filters: {'config_key': 'eq.${widget.configKey}'},
+        columns: 'title,content',
       );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         if (data.isNotEmpty) {
           setState(() {
             _content = data[0]['content'] ?? '';

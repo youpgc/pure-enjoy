@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -61,15 +61,15 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=date.desc&limit=365',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'weight_records',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'date.desc',
+        limit: 365,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
 
         setState(() {
@@ -83,7 +83,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
           records.map((r) => r.toJson()).toList(),
         );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -97,13 +97,12 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
   Future<void> _createWeightRecord(WeightRecordModel record) async {
     try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(record.toJson()),
+      final result = await ApiClient.post(
+        'weight_records',
+        body: record.toJson(),
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      if (result.isSuccess) {
         await _loadRecords();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +110,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {
@@ -127,12 +126,12 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
     if (confirm == true) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'weight_records',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           await _loadRecords();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -140,7 +139,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
             );
           }
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         if (mounted) {
@@ -154,19 +153,19 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
   Future<void> _updateWeightRecord(WeightRecordModel record) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/weight_records?id=eq.${record.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
+      final result = await ApiClient.patch(
+        'weight_records',
+        filters: {'id': 'eq.${record.id}'},
+        body: {
           'weight': record.weight,
           'bmi': record.bmi,
           'body_fat': record.bodyFat,
           'note': record.note,
           'date': record.date.toIso8601String().split('T').first,
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadRecords();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -174,7 +173,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {

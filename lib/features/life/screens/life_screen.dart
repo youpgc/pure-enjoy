@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../services/api_client.dart';
 import 'expense_list_screen.dart';
 import 'mood_diary_screen.dart';
 import 'note_list_screen.dart';
@@ -44,32 +43,27 @@ class _LifeScreenState extends State<LifeScreen> {
       return;
     }
 
-    final headers = {
-      'apikey': AppConfig.supabaseAnonKey,
-      'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-    };
-
     try {
       // 并行请求两个模块的最新记录
       final results = await Future.wait([
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*&order=created_at.desc&limit=1',
-          ),
-          headers: headers,
+        ApiClient.get(
+          'expenses',
+          filters: {'user_id': 'eq.$userId'},
+          order: 'created_at.desc',
+          limit: 1,
         ),
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId&select=*&order=created_at.desc&limit=1',
-          ),
-          headers: headers,
+        ApiClient.get(
+          'weight_records',
+          filters: {'user_id': 'eq.$userId'},
+          order: 'created_at.desc',
+          limit: 1,
         ),
       ]);
 
       if (!mounted) return;
 
-      final expenseList = jsonDecode(results[0].body) as List;
-      final weightList = jsonDecode(results[1].body) as List;
+      final expenseList = results[0].isSuccess ? results[0].data! : [];
+      final weightList = results[1].isSuccess ? results[1].data! : [];
 
       setState(() {
         _latestExpense =

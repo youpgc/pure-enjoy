@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
@@ -57,18 +57,18 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     // 2. 静默从网络刷新
     try {
-      final habitsResponse = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_habits?user_id=eq.$userId&select=*&order=is_active.desc&limit=200',
-        ),
-        headers: SupabaseConfig.headers,
+      final habitsResult = await ApiClient.get(
+        'user_habits',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'is_active.desc',
+        limit: 200,
       );
 
-      if (habitsResponse.statusCode != 200) {
-        throw Exception('HTTP ${habitsResponse.statusCode}');
+      if (!habitsResult.isSuccess) {
+        throw Exception('HTTP ${habitsResult.statusCode}');
       }
 
-      final List habitsData = jsonDecode(habitsResponse.body);
+      final habitsData = habitsResult.data!;
       final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
       // 保存习惯缓存
       await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
@@ -76,16 +76,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 加载所有打卡记录
       final history = <String, List<HabitCheckinModel>>{};
       for (final habit in items) {
-        final checkinsResponse = await http.get(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/habit_checkins?habit_id=eq.${habit.id}&select=*&order=checkin_at.desc',
-          ),
-          headers: SupabaseConfig.headers,
+        final checkinsResult = await ApiClient.get(
+          'habit_checkins',
+          filters: {'habit_id': 'eq.${habit.id}'},
+          order: 'checkin_at.desc',
         );
 
-        if (checkinsResponse.statusCode == 200) {
-          final List checkinsData = jsonDecode(checkinsResponse.body);
-          history[habit.id] = checkinsData.map((e) => HabitCheckinModel.fromJson(e)).toList();
+        if (checkinsResult.isSuccess) {
+          history[habit.id] = checkinsResult.data!.map((e) => HabitCheckinModel.fromJson(e)).toList();
         } else {
           history[habit.id] = [];
         }
@@ -133,18 +131,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       // 添加打卡记录
       final checkinId = const Uuid().v4();
-      final checkinResponse = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
+      final checkinResult = await ApiClient.post(
+        'habit_checkins',
+        body: {
           'id': checkinId,
           'habit_id': habit.id,
           'checkin_at': today.toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (checkinResponse.statusCode != 201 && checkinResponse.statusCode != 200) {
-        throw Exception('添加打卡记录失败: HTTP ${checkinResponse.statusCode}');
+      if (!checkinResult.isSuccess) {
+        throw Exception('添加打卡记录失败: HTTP ${checkinResult.statusCode}');
       }
 
       _loadHabits();
@@ -167,21 +164,21 @@ class _HabitsScreenState extends State<HabitsScreen> {
     if (confirmed == true) {
       try {
         // 先删除打卡记录
-        await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/habit_checkins?habit_id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        await ApiClient.delete(
+          'habit_checkins',
+          filters: {'habit_id': 'eq.$id'},
         );
 
         // 再删除习惯
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'user_habits',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           _loadHabits();
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         _showError('删除失败: $e');
@@ -292,20 +289,20 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
                 try {
                   if (isEditing) {
-                    final response = await http.patch(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits?id=eq.${habit.id}'),
-                      headers: SupabaseConfig.writeHeaders,
-                      body: jsonEncode({
+                    final result = await ApiClient.patch(
+                      'user_habits',
+                      filters: {'id': 'eq.${habit.id}'},
+                      body: {
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
                         'reminder_enabled': enableReminder,
                         'reminder_hour': enableReminder ? reminderHour : null,
                         'reminder_minute': enableReminder ? reminderMinute : null,
-                      }),
+                      },
                     );
-                    if (response.statusCode != 200 && response.statusCode != 204) {
-                      throw Exception('HTTP ${response.statusCode}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}');
                     }
                     // 设置/取消通知
                     if (enableReminder) {
@@ -320,10 +317,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     }
                   } else {
                     final habitId = const Uuid().v4();
-                    final response = await http.post(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_habits'),
-                      headers: SupabaseConfig.writeHeaders,
-                      body: jsonEncode({
+                    final result = await ApiClient.post(
+                      'user_habits',
+                      body: {
                         'id': habitId,
                         'user_id': userId,
                         'name': nameController.text.trim(),
@@ -336,10 +332,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         'reminder_enabled': enableReminder,
                         'reminder_hour': enableReminder ? reminderHour : null,
                         'reminder_minute': enableReminder ? reminderMinute : null,
-                      }),
+                      },
                     );
-                    if (response.statusCode != 201 && response.statusCode != 200) {
-                      throw Exception('HTTP ${response.statusCode}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}');
                     }
                     // 设置通知
                     if (enableReminder) {

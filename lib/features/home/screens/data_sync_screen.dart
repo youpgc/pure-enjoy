@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// 单个表的同步结果
@@ -66,12 +65,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
 
   String? get _userId => AuthService.instance.currentUserId;
 
-  /// Supabase 请求头
-  Map<String, String> get _supabaseHeaders => {
-        'apikey': AppConfig.supabaseAnonKey,
-        'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        'Content-Type': 'application/json',
-      };
+  // ApiClient handles headers internally
 
   @override
   void initState() {
@@ -112,15 +106,14 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     String userId,
   ) async {
     try {
-      final url = Uri.parse(
-        '${AppConfig.supabaseUrl}/rest/v1/${current.tableName}'
-        '?user_id=eq.$userId&select=*&order=created_at.desc',
+      final result = await ApiClient.get(
+        current.tableName,
+        filters: {'user_id': 'eq.$userId'},
+        order: 'created_at.desc',
       );
 
-      final response = await http.get(url, headers: _supabaseHeaders);
-
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
 
         // 将数据缓存到 SharedPreferences
         final prefs = await SharedPreferences.getInstance();
@@ -133,7 +126,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
           status: TableSyncStatus.success,
           recordCount: data.length,
         );
-      } else if (response.statusCode == 404) {
+      } else if (result.statusCode == 404) {
         // 表不存在，跳过
         debugPrint('同步跳过: ${current.tableName} (表不存在, HTTP 404)');
         return current.copyWith(
@@ -143,7 +136,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         );
       } else {
         final errorMsg =
-            'HTTP ${response.statusCode}: ${response.body.length > 100 ? response.body.substring(0, 100) : response.body}';
+            'HTTP ${result.statusCode}: ${result.errorMessage}';
         debugPrint('同步失败: ${current.tableName} - $errorMsg');
         return current.copyWith(
           status: TableSyncStatus.failed,

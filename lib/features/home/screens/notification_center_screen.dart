@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
-import '../../../config.dart';
+import '../../../services/api_client.dart';
 
 /// 通知中心页面 - 接入 Supabase notifications 表
 class NotificationCenterScreen extends StatefulWidget {
@@ -34,25 +33,21 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     try {
       final userId = _userId;
       // 查询所有用户的通知（系统通知 user_id 为 null）+ 当前用户的通知
-      final resp = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/notifications?select=*&order=created_at.desc&limit=100',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final result = await ApiClient.get(
+        'notifications',
+        order: 'created_at.desc',
+        limit: 100,
       );
 
-      if (resp.statusCode == 200) {
-        final data = jsonDecode(resp.body) as List;
+      if (result.isSuccess) {
+        final data = result.data!;
         setState(() {
           _notifications = data.cast<Map<String, dynamic>>();
           _isLoading = false;
         });
       } else {
         setState(() {
-          _error = '加载通知失败 (${resp.statusCode})';
+          _error = '加载通知失败 (${result.statusCode})';
           _isLoading = false;
         });
       }
@@ -66,14 +61,10 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _markAsRead(String id) async {
     try {
-      await http.patch(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/notifications?id=eq.$id'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()}),
+      await ApiClient.patch(
+        'notifications',
+        filters: {'id': 'eq.$id'},
+        body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
       setState(() {
         final idx = _notifications.indexWhere((n) => n['id'] == id);
@@ -96,14 +87,10 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       
       if (unreadIds.isEmpty) return;
 
-      await http.patch(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/notifications?is_read=eq.false'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()}),
+      await ApiClient.patch(
+        'notifications',
+        filters: {'is_read': 'eq.false'},
+        body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
       setState(() {
         for (var n in _notifications) {

@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
-import '../../../config.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/novel_model.dart';
@@ -69,19 +68,16 @@ class _NovelListScreenState extends State<NovelListScreen> {
   Future<void> _loadNovels() async {
     try {
       // 从 Supabase 加载已发布的小说
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/novels?user_id=is.null&select=*&order=created_at.desc&limit=100',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final result = await ApiClient.get(
+        'novels',
+        filters: {'user_id': 'is.null'},
+        order: 'created_at.desc',
+        limit: 100,
       );
 
       List<NovelModel> novels = [];
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         novels = data.map((json) => NovelModel.fromJson(json)).toList();
       }
 
@@ -90,17 +86,13 @@ class _NovelListScreenState extends State<NovelListScreen> {
       final userId = _userId;
       if (userId != null) {
         try {
-          final shelfResponse = await http.get(
-            Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,is_collected,last_chapter,last_read_at,progress',
-            ),
-            headers: {
-              'apikey': AppConfig.supabaseAnonKey,
-              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-            },
+          final shelfResult = await ApiClient.get(
+            'user_novels',
+            filters: {'user_id': 'eq.$userId'},
+            columns: 'id,novel_id,is_collected,last_chapter,last_read_at,progress',
           );
-          if (shelfResponse.statusCode == 200) {
-            userNovels = jsonDecode(shelfResponse.body).cast<Map<String, dynamic>>();
+          if (shelfResult.isSuccess) {
+            userNovels = shelfResult.data!.cast<Map<String, dynamic>>();
           }
         } catch (e) {
           debugPrint('加载用户书架数据失败: $e');
@@ -182,15 +174,9 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
 
     try {
-      final response = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=representation',
-        },
-        body: jsonEncode({
+      final result = await ApiClient.post(
+        'user_novels',
+        body: {
           'user_id': userId,
           'novel_id': novel.id,
           'progress': 0,
@@ -199,10 +185,10 @@ class _NovelListScreenState extends State<NovelListScreen> {
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (result.isSuccess) {
         await _loadNovels();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(

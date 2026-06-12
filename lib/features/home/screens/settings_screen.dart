@@ -1,10 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:provider/provider.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
-import '../../../config.dart';
+import '../../../services/api_client.dart';
 import 'data_sync_screen.dart';
 import 'rich_text_page.dart';
 import '../../../services/data_export_service.dart';
@@ -512,9 +511,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
       for (final table in tables) {
         try {
-          await http.delete(
-            Uri.parse('${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId'),
-            headers: SupabaseConfig.writeHeaders,
+          await ApiClient.delete(
+            table,
+            filters: {'user_id': 'eq.$userId'},
           );
         } catch (e) {
           debugPrint('删除表 $table 失败: $e');

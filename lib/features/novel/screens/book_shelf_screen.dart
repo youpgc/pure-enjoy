@@ -1,9 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../../../config.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
@@ -28,21 +27,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   String _filterStatus = 'all'; // all, reading, completed
 
   String? get _userId => AuthService.instance.currentUserId;
-
-  /// 获取当前用户的 JWT access token
-  /// 构建认证请求头
-  /// 注意：本App使用自定义认证（非Supabase Auth），使用anon key + user_id过滤
-  Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
-    final headers = <String, String>{
-      'apikey': AppConfig.supabaseAnonKey,
-      'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-    };
-    if (jsonContent) {
-      headers['Content-Type'] = 'application/json';
-      headers['Prefer'] = 'return=representation';
-    }
-    return headers;
-  }
 
   /// 检查用户是否已登录，未登录则提示
   bool _checkAuth() {
@@ -97,23 +81,24 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
     try {
       // 第一步：查询 user_novels 获取用户的书架记录
-      final userNovelsResponse = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=id,novel_id,progress,last_chapter,last_read_at,is_collected&order=last_read_at.desc.nullslast&limit=200',
-        ),
-        headers: _buildAuthHeaders(),
+      final userNovelsResult = await ApiClient.get(
+        'user_novels',
+        filters: {'user_id': 'eq.$userId'},
+        columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected',
+        order: 'last_read_at.desc.nullslast',
+        limit: 200,
       );
 
-      if (userNovelsResponse.statusCode != 200) {
+      if (!userNovelsResult.isSuccess) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载书架失败: ${userNovelsResponse.statusCode}')),
+            SnackBar(content: Text('加载书架失败: ${userNovelsResult.statusCode}')),
           );
         }
         return;
       }
 
-      final List<dynamic> userNovelsData = jsonDecode(userNovelsResponse.body);
+      final userNovelsData = userNovelsResult.data!;
       if (userNovelsData.isEmpty) {
         setState(() {
           _bookshelfItems = [];
@@ -130,23 +115,22 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           .toList();
 
       // 第二步：查询 novels 表获取小说详情
-      final novelsResponse = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/novels?id=in.(${novelIds.join(',')})&select=id,title,author,cover_url,category,status,chapter_count,word_count,description',
-        ),
-        headers: _buildAuthHeaders(),
+      final novelsResult = await ApiClient.get(
+        'novels',
+        filters: {'id': 'in.(${novelIds.join(',')})'},
+        columns: 'id,title,author,cover_url,category,status,chapter_count,word_count,description',
       );
 
-      if (novelsResponse.statusCode != 200) {
+      if (!novelsResult.isSuccess) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载小说详情失败: ${novelsResponse.statusCode}')),
+            SnackBar(content: Text('加载小说详情失败: ${novelsResult.statusCode}')),
           );
         }
         return;
       }
 
-      final List<dynamic> novelsData = jsonDecode(novelsResponse.body);
+      final novelsData = novelsResult.data!;
       
       // 创建小说详情映射表 (novel_id -> novel_data)
       final novelsMap = <String, Map<String, dynamic>>{};
@@ -192,14 +176,12 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (!_checkAuth()) return;
 
     try {
-      final response = await http.delete(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
-        ),
-        headers: _buildAuthHeaders(),
+      final result = await ApiClient.delete(
+        'user_novels',
+        filters: {'id': 'eq.$userNovelId'},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadBookshelf();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -209,7 +191,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('移除失败: ${response.statusCode}')),
+            SnackBar(content: Text('移除失败: ${result.statusCode}')),
           );
         }
       }
@@ -227,18 +209,16 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (!_checkAuth()) return;
 
     try {
-      final response = await http.patch(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
-        ),
-        headers: _buildAuthHeaders(jsonContent: true),
-        body: jsonEncode({
+      final result = await ApiClient.patch(
+        'user_novels',
+        filters: {'id': 'eq.$userNovelId'},
+        body: {
           'progress': newProgress,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadBookshelf();
       }
     } catch (e) {
@@ -255,18 +235,16 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (!_checkAuth()) return;
 
     try {
-      final response = await http.patch(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$userNovelId',
-        ),
-        headers: _buildAuthHeaders(jsonContent: true),
-        body: jsonEncode({
+      final result = await ApiClient.patch(
+        'user_novels',
+        filters: {'id': 'eq.$userNovelId'},
+        body: {
           'reading_status': status,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadBookshelf();
       }
     } catch (e) {
@@ -734,20 +712,6 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
 
   String? get _userId => AuthService.instance.currentUserId;
 
-  /// 构建认证请求头
-  /// 注意：本App使用自定义认证（非Supabase Auth），使用anon key + user_id过滤
-  Map<String, String> _buildAuthHeaders({bool jsonContent = false}) {
-    final headers = <String, String>{
-      'apikey': AppConfig.supabaseAnonKey,
-      'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-    };
-    if (jsonContent) {
-      headers['Content-Type'] = 'application/json';
-      headers['Prefer'] = 'return=representation';
-    }
-    return headers;
-  }
-
   /// 检查用户认证
   bool _checkAuth() {
     if (!AuthService.instance.isAuthenticated) {
@@ -781,33 +745,32 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
       // 并行请求：公共小说列表 + 用户已添加的书架
       final results = await Future.wait([
         // 查询公共小说列表（user_id IS NULL 表示公共小说）
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/novels?user_id=is.null&select=id,title,author,cover_url,category,description,chapter_count,word_count,status&order=created_at.desc',
-          ),
-          headers: _buildAuthHeaders(),
+        ApiClient.get(
+          'novels',
+          filters: {'user_id': 'is.null'},
+          columns: 'id,title,author,cover_url,category,description,chapter_count,word_count,status',
+          order: 'created_at.desc',
         ),
         // 查询用户已添加到书架的小说ID列表
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&select=novel_id',
-          ),
-          headers: _buildAuthHeaders(),
+        ApiClient.get(
+          'user_novels',
+          filters: {'user_id': 'eq.$userId'},
+          columns: 'novel_id',
         ),
       ]);
 
-      final novelsResponse = results[0];
-      final shelfResponse = results[1];
+      final novelsResult = results[0];
+      final shelfResult = results[1];
 
-      if (novelsResponse.statusCode == 200) {
-        final List<dynamic> novelsData = jsonDecode(novelsResponse.body);
+      if (novelsResult.isSuccess) {
+        final novelsData = novelsResult.data!;
         setState(() {
           _novels = novelsData.cast<Map<String, dynamic>>();
         });
       }
 
-      if (shelfResponse.statusCode == 200) {
-        final List<dynamic> shelfData = jsonDecode(shelfResponse.body);
+      if (shelfResult.isSuccess) {
+        final shelfData = shelfResult.data!;
         setState(() {
           _addedNovelIds = shelfData
               .map((item) => item['novel_id'] as String)
@@ -834,10 +797,9 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
     setState(() => _addingNovelIds.add(novelId));
 
     try {
-      final response = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
-        headers: _buildAuthHeaders(jsonContent: true),
-        body: jsonEncode({
+      final result = await ApiClient.post(
+        'user_novels',
+        body: {
           'user_id': userId,
           'novel_id': novelId,
           'progress': 0,
@@ -846,10 +808,10 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (result.isSuccess) {
         setState(() => _addedNovelIds.add(novelId));
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -859,7 +821,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
       } else {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('添加失败: ${response.statusCode}')),
+            SnackBar(content: Text('添加失败: ${result.statusCode}')),
           );
         }
       }

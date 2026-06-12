@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/widgets/widgets.dart';
@@ -41,13 +41,9 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     setState(() => _isSubmitting = true);
 
     try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/user_feedback'),
-        headers: {
-          ...SupabaseConfig.writeHeaders,
-          'x-user-id': userId,
-        },
-        body: jsonEncode({
+      final result = await ApiClient.post(
+        'user_feedback',
+        body: {
           'user_id': userId,
           'user_nickname': userNickname,
           'title': _titleController.text.trim(),
@@ -55,16 +51,16 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
               ? null
               : _descController.text.trim(),
           'category': _category,
-        }),
+        },
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      if (result.isSuccess) {
         if (mounted) {
           showSnackBar(context, '反馈提交成功');
           Navigator.pop(context);
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception(result.errorMessage ?? '提交失败');
       }
     } catch (e) {
       if (mounted) {

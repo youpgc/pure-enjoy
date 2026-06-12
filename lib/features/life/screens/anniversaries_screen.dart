@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
@@ -59,18 +59,21 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
     // 2. 静默从网络刷新
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_anniversaries?user_id=eq.$userId&type=eq.${widget.filterType}&select=*&order=date.asc&limit=500',
-        ),
-        headers: AuthService.instance.authHeaders,
+      final result = await ApiClient.get(
+        'user_anniversaries',
+        filters: {
+          'user_id': 'eq.$userId',
+          'type': 'eq.${widget.filterType}',
+        },
+        order: 'date.asc',
+        limit: 500,
       );
 
-      if (response.statusCode != 200) {
-        throw Exception('HTTP ${response.statusCode}');
+      if (!result.isSuccess) {
+        throw Exception('HTTP ${result.statusCode}');
       }
 
-      final List data = jsonDecode(response.body);
+      final data = result.data!;
       final items = data.map((e) => AnniversaryModel.fromJson(e)).toList();
 
       // 保存缓存（只保存当前用户、当前类型的数据）
@@ -147,20 +150,15 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
     if (confirmed == true) {
       try {
-        final response = await http.delete(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/user_anniversaries?id=eq.$id',
-          ),
-          headers: {
-            ...SupabaseConfig.writeHeaders,
-            'x-user-id': userId,
-          },
+        final result = await ApiClient.delete(
+          'user_anniversaries',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           _loadAnniversaries();
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         _showError('删除失败: $e');
@@ -311,15 +309,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
                 try {
                   if (isEditing) {
-                    final response = await http.patch(
-                      Uri.parse(
-                        '${SupabaseConfig.url}/rest/v1/user_anniversaries?id=eq.${anniversary.id}',
-                      ),
-                      headers: {
-                        ...SupabaseConfig.writeHeaders,
-                        'x-user-id': userId,
-                      },
-                      body: jsonEncode({
+                    final result = await ApiClient.patch(
+                      'user_anniversaries',
+                      filters: {'id': 'eq.${anniversary.id}'},
+                      body: {
                         'user_nickname': nickname,
                         'title': nameController.text.trim(),
                         'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
@@ -332,23 +325,16 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                         'remind_enabled': remindEnabled,
                         'remind_days_before':
                             remindEnabled ? remindDaysBefore : null,
-                      }),
+                      },
                     );
-                    if (response.statusCode != 200 &&
-                        response.statusCode != 204) {
-                      throw Exception('HTTP ${response.statusCode}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}');
                     }
                   } else {
                     final anniversaryId = const Uuid().v4();
-                    final response = await http.post(
-                      Uri.parse(
-                        '${SupabaseConfig.url}/rest/v1/user_anniversaries',
-                      ),
-                      headers: {
-                        ...SupabaseConfig.writeHeaders,
-                        'x-user-id': userId,
-                      },
-                      body: jsonEncode({
+                    final result = await ApiClient.post(
+                      'user_anniversaries',
+                      body: {
                         'id': anniversaryId,
                         'user_id': userId,
                         'user_nickname': nickname,
@@ -363,11 +349,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                         'remind_enabled': remindEnabled,
                         'remind_days_before':
                             remindEnabled ? remindDaysBefore : null,
-                      }),
+                      },
                     );
-                    if (response.statusCode != 201 &&
-                        response.statusCode != 200) {
-                      throw Exception('HTTP ${response.statusCode}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}');
                     }
                   }
                   Navigator.pop(context);

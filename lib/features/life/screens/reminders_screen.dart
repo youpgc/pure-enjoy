@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -53,15 +53,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     // 2. 静默从网络刷新
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_reminders?user_id=eq.$userId&select=*&order=remind_at.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'user_reminders',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'remind_at.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
         // 保存缓存
         await CacheHelper.instance.saveList(CacheHelper.keyReminders, data);
@@ -72,7 +72,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           });
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -105,16 +105,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        final response = await http.post(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders'),
-          headers: SupabaseConfig.writeHeaders,
-          body: jsonEncode(result.toJson()),
+        final apiResult = await ApiClient.post(
+          'user_reminders',
+          body: result.toJson(),
         );
 
-        if (response.statusCode == 201 || response.statusCode == 200) {
+        if (apiResult.isSuccess) {
           _loadReminders();
         } else {
-          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+          throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -135,16 +134,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        final response = await http.patch(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
-          headers: SupabaseConfig.writeHeaders,
-          body: jsonEncode(result.toJsonForUpdate()),
+        final apiResult = await ApiClient.patch(
+          'user_reminders',
+          filters: {'id': 'eq.${reminder.id}'},
+          body: result.toJsonForUpdate(),
         );
 
-        if (response.statusCode == 200 || response.statusCode == 204) {
+        if (apiResult.isSuccess) {
           _loadReminders();
         } else {
-          throw Exception('HTTP ${response.statusCode}: ${response.body}');
+          throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
         }
       } catch (e) {
         setState(() => _isLoading = false);
@@ -161,15 +160,15 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个提醒吗？');
     if (confirmed == true) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'user_reminders',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           _loadReminders();
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         if (mounted) {
@@ -183,16 +182,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _toggleComplete(ReminderModel reminder) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/user_reminders?id=eq.${reminder.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({'is_completed': !reminder.isCompleted}),
+      final result = await ApiClient.patch(
+        'user_reminders',
+        filters: {'id': 'eq.${reminder.id}'},
+        body: {'is_completed': !reminder.isCompleted},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         _loadReminders();
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       if (mounted) {

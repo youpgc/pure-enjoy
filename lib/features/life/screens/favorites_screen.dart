@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:url_launcher/url_launcher.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -55,15 +55,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     // 2. 静默从网络刷新
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/user_favorites?user_id=eq.$userId&select=*&order=created_at.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'user_favorites',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'created_at.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
         // 保存缓存
         await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
@@ -74,7 +74,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           });
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -117,15 +117,15 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (confirmed == true) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'user_favorites',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           _loadFavorites();
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         _showError('删除失败: $e');
@@ -239,53 +239,39 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 );
 
                 try {
-                  // 构建请求头
-                  final headers = {
-                    'apikey': SupabaseConfig.anonKey,
-                    'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-                    'Content-Type': 'application/json',
-                    'Accept': 'application/json',
-                  };
-
                   if (isEditing) {
-                    final response = await http.patch(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites?id=eq.${favorite.id}'),
-                      headers: headers,
-                      body: jsonEncode({
+                    final result = await ApiClient.patch(
+                      'user_favorites',
+                      filters: {'id': 'eq.${favorite.id}'},
+                      body: {
                         'title': newFavorite.title,
                         'url': newFavorite.url,
                         'description': newFavorite.description,
                         'category': newFavorite.category,
                         'tags': newFavorite.tags,
                         'updated_at': DateTime.now().toUtc().toIso8601String(),
-                      }),
+                      },
                     );
-                    if (response.statusCode != 200 && response.statusCode != 204) {
-                      throw Exception('HTTP ${response.statusCode}: ${response.body}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
                     }
                   } else {
-                    // 新增：手动构建 JSON，确保字段正确
-                    final body = jsonEncode({
-                      'id': newFavorite.id,
-                      'user_id': newFavorite.userId,
-                      'title': newFavorite.title,
-                      'url': newFavorite.url,
-                      'description': newFavorite.description,
-                      'category': newFavorite.category,
-                      'tags': newFavorite.tags,
-                      'is_pinned': newFavorite.isPinned,
-                      'created_at': DateTime.now().toUtc().toIso8601String(),
-                    });
-                    debugPrint('📤 新增收藏请求体: $body');
-                    
-                    final response = await http.post(
-                      Uri.parse('${SupabaseConfig.url}/rest/v1/user_favorites'),
-                      headers: headers,
-                      body: body,
+                    final result = await ApiClient.post(
+                      'user_favorites',
+                      body: {
+                        'id': newFavorite.id,
+                        'user_id': newFavorite.userId,
+                        'title': newFavorite.title,
+                        'url': newFavorite.url,
+                        'description': newFavorite.description,
+                        'category': newFavorite.category,
+                        'tags': newFavorite.tags,
+                        'is_pinned': newFavorite.isPinned,
+                        'created_at': DateTime.now().toUtc().toIso8601String(),
+                      },
                     );
-                    debugPrint('📥 新增收藏响应: ${response.statusCode} - ${response.body}');
-                    if (response.statusCode != 201 && response.statusCode != 200) {
-                      throw Exception('HTTP ${response.statusCode}: ${response.body}');
+                    if (!result.isSuccess) {
+                      throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
                     }
                   }
                   Navigator.pop(context);

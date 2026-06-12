@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -83,15 +83,15 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId&select=*&order=date.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'expenses',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'date.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
@@ -105,7 +105,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           allExpenses.map((e) => e.toJson()).toList(),
         );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -119,13 +119,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   Future<void> _addExpense(ExpenseModel expense) async {
     try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(expense.toJson()),
+      final result = await ApiClient.post(
+        'expenses',
+        body: expense.toJson(),
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      if (result.isSuccess) {
         await _loadExpenses();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -133,7 +132,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {
@@ -149,12 +148,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
     if (confirm == true) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'expenses',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           await _loadExpenses();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -162,7 +161,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
             );
           }
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         if (mounted) {
@@ -176,18 +175,18 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   Future<void> _updateExpense(ExpenseModel expense) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/expenses?id=eq.${expense.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
+      final result = await ApiClient.patch(
+        'expenses',
+        filters: {'id': 'eq.${expense.id}'},
+        body: {
           'amount': expense.amount,
           'category': expense.category,
           'note': expense.note,
           'date': expense.date.toIso8601String().split('T').first,
-        }),
+        },
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadExpenses();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -195,7 +194,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {

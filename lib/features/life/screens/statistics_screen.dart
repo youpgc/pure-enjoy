@@ -1,10 +1,10 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
+import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 
 /// 统计图表页面
@@ -92,21 +92,19 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
       final startOfMonth = DateTime(now.year, now.month, 1);
       final endOfMonth = DateTime(now.year, now.month + 1, 0);
 
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/expenses?user_id=eq.$userId'
-          '&date=gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)}'
-          '&date=lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)}'
-          '&select=*&order=date.desc&limit=500',
-        ),
-        headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+      final result = await ApiClient.get(
+        'expenses',
+        filters: {
+          'user_id': 'eq.$userId',
+          'date': 'gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)}',
+          'date': 'lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)}',
         },
+        order: 'date.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = _parseJson(response.body);
+      if (result.isSuccess) {
+        final List<dynamic> data = result.data!;
         setState(() {
           _expenses = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -289,19 +287,15 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
 
     try {
       // 获取最近30条记录
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/weight_records?user_id=eq.$userId'
-          '&select=*&order=date.desc&limit=30',
-        ),
-        headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-        },
+      final result = await ApiClient.get(
+        'weight_records',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'date.desc',
+        limit: 30,
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = _parseJson(response.body);
+      if (result.isSuccess) {
+        final List<dynamic> data = result.data!;
         setState(() {
           _records = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -549,19 +543,15 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
 
     try {
       // 获取最近30天记录
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId'
-          '&select=*&order=date.desc&limit=30',
-        ),
-        headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-        },
+      final result = await ApiClient.get(
+        'mood_diaries',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'date.desc',
+        limit: 30,
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = _parseJson(response.body);
+      if (result.isSuccess) {
+        final List<dynamic> data = result.data!;
         setState(() {
           _diaries = data.cast<Map<String, dynamic>>();
           _isLoading = false;

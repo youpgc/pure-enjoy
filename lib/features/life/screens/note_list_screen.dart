@@ -1,8 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -61,15 +61,15 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/notes?user_id=eq.$userId&select=*&order=is_pinned.desc,updated_at.desc&limit=500',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'notes',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'is_pinned.desc,updated_at.desc',
+        limit: 500,
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         final notes = data.map((e) => NoteModel.fromJson(e)).toList();
 
         setState(() {
@@ -83,7 +83,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           notes.map((n) => n.toJson()).toList(),
         );
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -97,13 +97,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Future<void> _createNote(NoteModel note) async {
     try {
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(note.toJson()),
+      final result = await ApiClient.post(
+        'notes',
+        body: note.toJson(),
       );
 
-      if (response.statusCode == 201 || response.statusCode == 200) {
+      if (result.isSuccess) {
         await _loadNotes();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -111,7 +110,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {
@@ -124,13 +123,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Future<void> _updateNote(NoteModel note) async {
     try {
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(note.toJsonForUpdate()),
+      final result = await ApiClient.patch(
+        'notes',
+        filters: {'id': 'eq.${note.id}'},
+        body: note.toJsonForUpdate(),
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadNotes();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -138,7 +137,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
       }
     } catch (e) {
       if (mounted) {
@@ -154,12 +153,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
     if (confirm == true) {
       try {
-        final response = await http.delete(
-          Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.$id'),
-          headers: SupabaseConfig.writeHeaders,
+        final result = await ApiClient.delete(
+          'notes',
+          filters: {'id': 'eq.$id'},
         );
 
-        if (response.statusCode == 204 || response.statusCode == 200) {
+        if (result.isSuccess) {
           await _loadNotes();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
@@ -167,7 +166,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             );
           }
         } else {
-          throw Exception('HTTP ${response.statusCode}');
+          throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
         if (mounted) {
@@ -182,13 +181,13 @@ class _NoteListScreenState extends State<NoteListScreen> {
   Future<void> _togglePin(NoteModel note) async {
     try {
       final updated = note.copyWith(isPinned: !note.isPinned);
-      final response = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/notes?id=eq.${note.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({'is_pinned': updated.isPinned}),
+      final result = await ApiClient.patch(
+        'notes',
+        filters: {'id': 'eq.${note.id}'},
+        body: {'is_pinned': updated.isPinned},
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         await _loadNotes();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -196,7 +195,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           );
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       if (mounted) {

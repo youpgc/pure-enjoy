@@ -1,10 +1,9 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'dart:convert';
 import 'package:image_picker/image_picker.dart';
 import '../../../services/supabase_service.dart';
-import '../../../config.dart';
+import '../../../services/api_client.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
@@ -71,19 +70,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       }
       _userId = userId;
 
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$userId&select=*',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-        },
+      final result = await ApiClient.get(
+        'users',
+        filters: {'id': 'eq.$userId'},
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final data = result.data!;
         if (data.isNotEmpty) {
           setState(() {
             _userData = data.first as Map<String, dynamic>;
@@ -91,7 +84,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           });
         }
       } else {
-        _showError('加载用户数据失败: ${response.statusCode}');
+        _showError('加载用户数据失败: ${result.statusCode}');
       }
     } catch (e) {
       _showError('加载用户数据出错: $e');
@@ -141,33 +134,30 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final bytes = await file.readAsBytes();
 
       // 上传到 Supabase Storage
-      final uploadResponse = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/storage/v1/object/avatars/$fileName'),
-        headers: {
-          ...AuthService.instance.authHeaders,
-          'Content-Type': 'image/$fileExt',
-        },
+      final uploadResponse = await ApiClient.post(
+        'storage/v1/object/avatars/$fileName',
         body: bytes,
+        headers: {'Content-Type': 'image/$fileExt'},
       );
 
-      if (uploadResponse.statusCode != 200 && uploadResponse.statusCode != 201) {
+      if (!uploadResponse.isSuccess) {
         throw Exception('上传失败: ${uploadResponse.statusCode}');
       }
 
       // 获取公开URL
-      final publicUrl = '${AppConfig.supabaseUrl}/storage/v1/object/public/avatars/$fileName';
+      final publicUrl = '${ApiClient.baseUrl}/storage/v1/object/public/avatars/$fileName';
 
       // 更新用户头像URL
-      final updateResponse = await http.patch(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$_userId'),
-        headers: AuthService.instance.authHeaders,
-        body: jsonEncode({
+      final updateResult = await ApiClient.patch(
+        'users',
+        filters: {'id': 'eq.$_userId'},
+        body: {
           'avatar_url': publicUrl,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (updateResponse.statusCode == 200 || updateResponse.statusCode == 204) {
+      if (updateResult.isSuccess) {
         setState(() => _avatarUrl = publicUrl);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -175,7 +165,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           );
         }
       } else {
-        throw Exception('更新头像URL失败: ${updateResponse.statusCode}');
+        throw Exception('更新头像URL失败: ${updateResult.statusCode}');
       }
     } catch (e) {
       if (mounted) {
@@ -265,13 +255,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      final response = await http.patch(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/users?id=eq.$_userId'),
-        headers: AuthService.instance.authHeaders,
-        body: jsonEncode(updateData),
+      final result = await ApiClient.patch(
+        'users',
+        filters: {'id': 'eq.$_userId'},
+        body: updateData,
       );
 
-      if (response.statusCode == 200 || response.statusCode == 204) {
+      if (result.isSuccess) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('保存成功')),
@@ -279,7 +269,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Navigator.pop(context, true);
         }
       } else {
-        _showError('保存失败: ${response.statusCode}');
+        _showError('保存失败: ${result.statusCode}');
       }
     } catch (e) {
       _showError('保存出错: $e');

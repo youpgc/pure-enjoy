@@ -1,9 +1,9 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../models/point_record_model.dart';
 
 /// 积分服务
@@ -60,21 +60,19 @@ class PointService {
       final yesterday = _beijingYesterday();
 
       // 1. 查询用户今天是否已打卡
-      final todayCheckUrl = Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/point_records'
-        '?user_id=eq.$userId&type=eq.checkin'
-        '&created_at=gte.${today.toUtc().toIso8601String()}'
-        '&created_at=lt.${tomorrow.toUtc().toIso8601String()}'
-        '&select=id',
+      final todayResult = await ApiClient.get(
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'type': 'eq.checkin',
+          'created_at': 'gte.${today.toUtc().toIso8601String()}',
+          'created_at': 'lt.${tomorrow.toUtc().toIso8601String()}',
+        },
+        columns: 'id',
       );
 
-      final todayResponse = await http.get(
-        todayCheckUrl,
-        headers: AuthService.instance.authHeaders,
-      );
-
-      if (todayResponse.statusCode == 200) {
-        final records = jsonDecode(todayResponse.body) as List;
+      if (todayResult.isSuccess) {
+        final records = todayResult.data!;
         if (records.isNotEmpty) {
           return {'success': false, 'message': '今天已打卡'};
         }
@@ -82,21 +80,19 @@ class PointService {
 
       // 2. 查询最近一次打卡记录，计算连续打卡天数
       int streak = 1;
-      final lastCheckUrl = Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/point_records'
-        '?user_id=eq.$userId&type=eq.checkin'
-        '&select=created_at'
-        '&order=created_at.desc'
-        '&limit=1',
+      final lastResult = await ApiClient.get(
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'type': 'eq.checkin',
+        },
+        columns: 'created_at',
+        order: 'created_at.desc',
+        limit: 1,
       );
 
-      final lastResponse = await http.get(
-        lastCheckUrl,
-        headers: AuthService.instance.authHeaders,
-      );
-
-      if (lastResponse.statusCode == 200) {
-        final lastRecords = jsonDecode(lastResponse.body) as List;
+      if (lastResult.isSuccess) {
+        final lastRecords = lastResult.data!;
         if (lastRecords.isNotEmpty) {
           final lastCreatedAt = DateTime.parse(lastRecords[0]['created_at']);
 
@@ -112,20 +108,18 @@ class PointService {
               lastDate.day == yesterday.day) {
             // 最近一次是昨天，今天打卡后连续天数 = 已有连续天数 + 1
             // 查询所有打卡记录，计算已有连续天数
-            final streakUrl = Uri.parse(
-              '${SupabaseConfig.url}/rest/v1/point_records'
-              '?user_id=eq.$userId&type=eq.checkin'
-              '&select=created_at'
-              '&order=created_at.desc',
+            final streakResult = await ApiClient.get(
+              'point_records',
+              filters: {
+                'user_id': 'eq.$userId',
+                'type': 'eq.checkin',
+              },
+              columns: 'created_at',
+              order: 'created_at.desc',
             );
 
-            final streakResponse = await http.get(
-              streakUrl,
-              headers: AuthService.instance.authHeaders,
-            );
-
-            if (streakResponse.statusCode == 200) {
-              final allCheckins = jsonDecode(streakResponse.body) as List;
+            if (streakResult.isSuccess) {
+              final allCheckins = streakResult.data!;
               // 从昨天的记录开始，向前统计连续天数
               int consecutiveDays = 1; // 昨天是第1天
               for (int i = 1; i < allCheckins.length; i++) {
@@ -164,10 +158,9 @@ class PointService {
       final now = DateTime.now();
       final nowIso = now.toUtc().toIso8601String();
       final expiresAt = now.add(const Duration(days: 180)).toUtc().toIso8601String();
-      final insertResponse = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/point_records'),
-        headers: AuthService.instance.authHeaders,
-        body: jsonEncode({
+      final insertResult = await ApiClient.post(
+        'point_records',
+        body: {
           'user_id': userId,
           'type': 'checkin',
           'amount': points,
@@ -175,28 +168,26 @@ class PointService {
           'created_at': nowIso,
           'expires_at': expiresAt,
           'status': 'active',
-        }),
+        },
       );
 
-      if (insertResponse.statusCode != 201 &&
-          insertResponse.statusCode != 200) {
-        debugPrint('插入积分记录失败: ${insertResponse.statusCode} ${insertResponse.body}');
+      if (!insertResult.isSuccess) {
+        debugPrint('插入积分记录失败: ${insertResult.statusCode} ${insertResult.errorMessage}');
         return {'success': false, 'message': '打卡失败，请重试'};
       }
 
       // 5. 更新 users 表 points += 积分
       final currentPoints = AuthService.instance.currentPoints ?? 0;
-      final updateResponse = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/users?id=eq.$userId'),
-        headers: AuthService.instance.authHeaders,
-        body: jsonEncode({
+      final updateResult = await ApiClient.patch(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        body: {
           'points': currentPoints + points,
-        }),
+        },
       );
 
-      if (updateResponse.statusCode != 200 &&
-          updateResponse.statusCode != 204) {
-        debugPrint('更新用户积分失败: ${updateResponse.statusCode} ${updateResponse.body}');
+      if (!updateResult.isSuccess) {
+        debugPrint('更新用户积分失败: ${updateResult.statusCode} ${updateResult.errorMessage}');
       }
 
       // 6. 更新 AuthService 中的用户缓存
@@ -221,22 +212,16 @@ class PointService {
       if (userId == null) return [];
 
       final offset = (page - 1) * pageSize;
-      final url = Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/point_records'
-        '?user_id=eq.$userId'
-        '&select=*'
-        '&order=created_at.desc'
-        '&limit=$pageSize'
-        '&offset=$offset',
+      final result = await ApiClient.get(
+        'point_records',
+        filters: {'user_id': 'eq.$userId'},
+        order: 'created_at.desc',
+        limit: pageSize,
+        offset: offset,
       );
 
-      final response = await http.get(
-        url,
-        headers: AuthService.instance.authHeaders,
-      );
-
-      if (response.statusCode == 200) {
-        final records = jsonDecode(response.body) as List;
+      if (result.isSuccess) {
+        final records = result.data!;
         return records
             .map((json) => PointRecord.fromJson(json as Map<String, dynamic>))
             .toList();
@@ -260,17 +245,13 @@ class PointService {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return 0;
 
-      final url = Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/v_points_expiring_soon?user_id=eq.$userId&select=*',
+      final result = await ApiClient.get(
+        'v_points_expiring_soon',
+        filters: {'user_id': 'eq.$userId'},
       );
 
-      final response = await http.get(
-        url,
-        headers: AuthService.instance.authHeaders,
-      );
-
-      if (response.statusCode == 200) {
-        final records = jsonDecode(response.body) as List;
+      if (result.isSuccess) {
+        final records = result.data!;
         int total = 0;
         for (final record in records) {
           total += (record['amount'] as num?)?.toInt() ?? 0;
@@ -291,17 +272,17 @@ class PointService {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return 0;
 
-      final url = Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/point_records?user_id=eq.$userId&status=eq.active&select=amount',
+      final result = await ApiClient.get(
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'status': 'eq.active',
+        },
+        columns: 'amount',
       );
 
-      final response = await http.get(
-        url,
-        headers: AuthService.instance.authHeaders,
-      );
-
-      if (response.statusCode == 200) {
-        final records = jsonDecode(response.body) as List;
+      if (result.isSuccess) {
+        final records = result.data!;
         int total = 0;
         for (final record in records) {
           total += (record['amount'] as num?)?.toInt() ?? 0;

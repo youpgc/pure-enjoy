@@ -1,6 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
+import '../../../services/api_client.dart';
 import '../models/feedback_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
@@ -29,17 +29,15 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
 
   Future<void> _loadFlowRecords() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/feedback_flow_records?feedback_id=eq.${widget.feedback.id}&select=*&order=created_at.desc',
-        ),
-        headers: AuthService.instance.authHeaders,
+      final result = await ApiClient.get(
+        'feedback_flow_records',
+        filters: {'feedback_id': 'eq.${widget.feedback.id}'},
+        order: 'created_at.desc',
       );
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
         setState(() {
-          _flowRecords = data.cast<Map<String, dynamic>>();
+          _flowRecords = result.data!;
           _loadingFlow = false;
         });
       } else {
