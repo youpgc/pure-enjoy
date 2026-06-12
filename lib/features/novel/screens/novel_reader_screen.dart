@@ -1281,7 +1281,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                               Row(
                                 children: [
                                   Icon(
-                                    Icons.battery_outline,
+                                    Icons.battery_0_bar,
                                     size: 14,
                                     color: _background.textColor.withOpacity(0.5),
                                   ),
