@@ -27,16 +27,26 @@ void main() async {
     ));
   }
 
-  // 初始化认证服务（从本地存储恢复会话）
+  // 只同步初始化认证服务（从本地存储恢复会话，无网络请求）
   await AuthService.instance.initialize();
 
-  // 初始化字典服务（预加载字典数据）
-  await DictService.instance.initialize();
-
-  // 初始化通知服务
-  await NotificationService.instance.initialize();
+  // 字典服务和通知服务改为后台懒加载，不阻塞启动
+  _lazyInitializeServices();
 
   runApp(const PureEnjoyApp());
+}
+
+/// 后台懒加载服务，不阻塞首屏渲染
+void _lazyInitializeServices() {
+  // 字典服务：进入首页后再加载，首屏不阻塞
+  DictService.instance.initialize().catchError((e) {
+    debugPrint('字典服务后台初始化失败: $e');
+  });
+
+  // 通知服务：后台初始化
+  NotificationService.instance.initialize().catchError((e) {
+    debugPrint('通知服务后台初始化失败: $e');
+  });
 }
 
 class PureEnjoyApp extends StatelessWidget {
