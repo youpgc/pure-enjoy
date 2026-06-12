@@ -101,8 +101,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       final response = await http.post(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
         headers: {
-          ...SupabaseConfig.writeHeaders,
-          'x-user-id': diary.userId,
+          ...SupabaseConfig.headers,
+          'Prefer': 'return=representation',
         },
         body: jsonEncode(diary.toJson()),
       );
@@ -160,14 +160,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final response = await http.patch(
         Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.${diary.id}'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
-          'mood': diary.mood,
-          'mood_label': diary.moodScore.toString(),
-          'content': diary.content,
-          'tags': diary.tags,
-          'date': diary.entryDate.toIso8601String().split('T').first,
-        }),
+        headers: {
+          ...SupabaseConfig.headers,
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode(diary.toUpdateJson()),
       );
 
       if (response.statusCode == 200 || response.statusCode == 204) {

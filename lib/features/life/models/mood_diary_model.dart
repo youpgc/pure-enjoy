@@ -40,13 +40,22 @@ class MoodDiaryModel {
       'mood': mood,
       'mood_label': moodScore.toString(),
       'content': content,
-      'tags': tags,
       'date': entryDate.toIso8601String().split('T').first,
     };
     if (id.isNotEmpty) {
       json['id'] = id;
     }
     return json;
+  }
+
+  /// 转换为更新用的 JSON（不包含 user_id）
+  Map<String, dynamic> toUpdateJson() {
+    return <String, dynamic>{
+      'mood': mood,
+      'mood_label': moodScore.toString(),
+      'content': content,
+      'date': entryDate.toIso8601String().split('T').first,
+    };
   }
 
   MoodDiaryModel copyWith({
