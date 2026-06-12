@@ -1,8 +1,16 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:intl/intl.dart';
-import '../../../services/api_client.dart';
+import 'package:http/http.dart' as http;
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
+import '../../../utils/date_time_utils.dart';
+import '../../../utils/cache_helper.dart';
+import '../../../core/widgets/widgets.dart';
+import '../../../widgets/common_widgets.dart';
+import '../models/mood_diary_model.dart';
 
+/// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
   const MoodDiaryScreen({super.key});
 
@@ -11,108 +19,200 @@ class MoodDiaryScreen extends StatefulWidget {
 }
 
 class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
-  List<Map<String, dynamic>> _records = [];
+  List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
-  String? _userId;
+
+  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
     super.initState();
-    _userId = AuthService.instance.currentUserId;
-    _loadRecords();
+    _initLoad();
   }
 
-  Future<void> _loadRecords() async {
-    if (_userId == null) return;
+  /// 初始化加载：先读缓存，再静默刷新
+  Future<void> _initLoad() async {
+    await _loadCache();
+    await _loadDiaries();
+  }
 
-    setState(() => _isLoading = true);
+  /// 从 SharedPreferences 加载缓存数据
+  Future<void> _loadCache() async {
+    final userId = _userId;
+    if (userId == null) return;
+    final cached = await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
+    if (cached.isNotEmpty && mounted) {
+      setState(() {
+        _diaries = cached.map((e) => MoodDiaryModel.fromJson(e)).toList();
+        _isLoading = false;
+      });
+    }
+  }
+
+  Future<void> _loadDiaries() async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _isLoading = false);
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('请先登录')),
+        );
+      }
+      return;
+    }
 
     try {
-      final result = await ApiClient.get(
-        'mood_records',
-        filters: {'user_id': 'eq.$_userId'},
-        order: 'date.desc',
-        limit: 500,
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/mood_diaries?user_id=eq.$userId&select=*&order=date.desc&limit=500',
+        ),
+        headers: SupabaseConfig.headers,
       );
 
-      if (result.isSuccess) {
+      if (response.statusCode == 200) {
+        final List data = jsonDecode(response.body);
+        final diaries = data.map((e) => MoodDiaryModel.fromJson(e)).toList();
+
         setState(() {
-          _records = result.data!;
+          _diaries = diaries;
           _isLoading = false;
         });
+
+        // 写入缓存
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyDiaries,
+          diaries.map((d) => d.toJson()).toList(),
+        );
       } else {
-        setState(() => _isLoading = false);
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载失败: ${result.errorMessage}')),
-          );
-        }
+        throw Exception('HTTP ${response.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
-    }
-  }
-
-  Future<void> _addRecord() async {
-    if (_userId == null) return;
-
-    final result = await showDialog<Map<String, dynamic>>(
-      context: context,
-      builder: (context) => const _MoodDialog(),
-    );
-
-    if (result != null) {
-      try {
-        final insertResult = await ApiClient.post(
-          'mood_records',
-          body: {
-            ...result,
-            'user_id': _userId,
-          },
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('加载失败: $e')),
         );
-
-        if (insertResult.isSuccess) {
-          _loadRecords();
-        } else {
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              SnackBar(content: Text('添加失败: ${insertResult.errorMessage}')),
-            );
-          }
-        }
-      } catch (e) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('添加失败: $e')),
-          );
-        }
       }
     }
   }
 
-  Future<void> _deleteRecord(String id) async {
+  Future<void> _createMoodDiary(MoodDiaryModel diary) async {
     try {
-      final result = await ApiClient.delete(
-        'mood_records',
-        filters: {'id': 'eq.$id'},
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries'),
+        headers: {
+          ...SupabaseConfig.headers,
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode(diary.toJson()),
       );
 
-      if (result.isSuccess) {
-        _loadRecords();
-      } else {
+      if (response.statusCode == 201 || response.statusCode == 200) {
+        await _loadDiaries();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: ${result.errorMessage}')),
+            const SnackBar(content: Text('添加成功')),
           );
         }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
       }
     } catch (e) {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
+          SnackBar(content: Text('添加失败: $e')),
         );
       }
     }
+  }
+
+  Future<void> _deleteMoodDiary(String id) async {
+    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条日记吗？');
+
+    if (confirm == true) {
+      try {
+        final response = await http.delete(
+          Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.$id'),
+          headers: SupabaseConfig.writeHeaders,
+        );
+
+        if (response.statusCode == 204 || response.statusCode == 200) {
+          await _loadDiaries();
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('删除成功')),
+            );
+          }
+        } else {
+          throw Exception('HTTP ${response.statusCode}');
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('删除失败: $e')),
+          );
+        }
+      }
+    }
+  }
+
+  Future<void> _updateMoodDiary(MoodDiaryModel diary) async {
+    try {
+      final response = await http.patch(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/mood_diaries?id=eq.${diary.id}'),
+        headers: {
+          ...SupabaseConfig.headers,
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode(diary.toUpdateJson()),
+      );
+
+      if (response.statusCode == 200 || response.statusCode == 204) {
+        await _loadDiaries();
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('更新成功')),
+          );
+        }
+      } else {
+        throw Exception('HTTP ${response.statusCode}: ${response.body}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('更新失败: $e')),
+        );
+      }
+    }
+  }
+
+  void _showEditDiaryForm(MoodDiaryModel diary) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _DiaryForm(
+        userId: _userId ?? 'local_user',
+        diary: diary,
+        onSave: (updatedDiary) {
+          Navigator.pop(context);
+          _updateMoodDiary(updatedDiary);
+        },
+      ),
+    );
+  }
+
+  void _showDiaryForm() {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => _DiaryForm(
+        userId: _userId ?? 'local_user',
+        onSave: (newDiary) {
+          Navigator.pop(context);
+          _createMoodDiary(newDiary);
+        },
+      ),
+    );
   }
 
   @override
@@ -120,147 +220,279 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('心情日记'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.add),
-            onPressed: _addRecord,
-          ),
-        ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : _records.isEmpty
-              ? const Center(child: Text('暂无记录'))
-              : ListView.builder(
-                  itemCount: _records.length,
-                  itemBuilder: (context, index) {
-                    final record = _records[index];
-                    final date = DateTime.parse(record['date']);
-                    return Dismissible(
-                      key: Key(record['id']),
-                      direction: DismissDirection.endToStart,
-                      background: Container(
-                        color: Colors.red,
-                        alignment: Alignment.centerRight,
-                        padding: const EdgeInsets.only(right: 20),
-                        child: const Icon(Icons.delete, color: Colors.white),
-                      ),
-                      onDismissed: (_) => _deleteRecord(record['id']),
-                      child: ListTile(
-                        leading: _buildMoodIcon(record['mood_level']),
-                        title: Text(record['note'] ?? '无备注'),
-                        subtitle: Text(
-                          DateFormat('yyyy-MM-dd').format(date),
+          ? const LoadingWidget()
+          : _diaries.isEmpty
+              ? const EmptyWidget(icon: Icons.mood_outlined, message: '暂无日记，点击右下角按钮添加')
+              : RefreshIndicator(
+                  onRefresh: _loadDiaries,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _diaries.length,
+                    itemBuilder: (context, index) {
+                      final diary = _diaries[index];
+                      final moodLabel = DictService.instance.getLabel(
+                        DictService.moodType,
+                        diary.mood,
+                        defaultValue: diary.mood,
+                      );
+                      final moodEmoji = DictService.instance.getEmoji(
+                        DictService.moodType,
+                        diary.mood,
+                      );
+
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: InkWell(
+                          onTap: () => _showEditDiaryForm(diary),
+                          borderRadius: BorderRadius.circular(16),
+                          child: Padding(
+                            padding: const EdgeInsets.all(16),
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Row(
+                                  children: [
+                                    Container(
+                                      padding: const EdgeInsets.symmetric(
+                                        horizontal: 12,
+                                        vertical: 6,
+                                      ),
+                                      decoration: BoxDecoration(
+                                        color: Theme.of(context).colorScheme.primaryContainer,
+                                        borderRadius: BorderRadius.circular(20),
+                                      ),
+                                      child: Row(
+                                        mainAxisSize: MainAxisSize.min,
+                                        children: [
+                                          Text(
+                                            moodEmoji.isNotEmpty ? moodEmoji : '😊',
+                                            style: const TextStyle(fontSize: 16),
+                                          ),
+                                          const SizedBox(width: 4),
+                                          Text(moodLabel),
+                                        ],
+                                      ),
+                                    ),
+                                    const Spacer(),
+                                    Text(
+                                      DateTimeUtils.formatStandard(diary.createdAt ?? diary.entryDate),
+                                      style: Theme.of(context).textTheme.bodySmall,
+                                    ),
+                                    EditDeletePopupMenu(
+                                      onEdit: () => _showEditDiaryForm(diary),
+                                      onDelete: () => _deleteMoodDiary(diary.id),
+                                    ),
+                                  ],
+                                ),
+                                if (diary.content != null && diary.content!.isNotEmpty) ...[
+                                  const SizedBox(height: 12),
+                                  Text(
+                                    diary.content!,
+                                    maxLines: 3,
+                                    overflow: TextOverflow.ellipsis,
+                                  ),
+                                ],
+                                if (diary.tags != null && diary.tags!.isNotEmpty) ...[
+                                  const SizedBox(height: 8),
+                                  Wrap(
+                                    spacing: 6,
+                                    children: diary.tags!.map((tag) => Chip(
+                                      label: Text(tag, style: const TextStyle(fontSize: 12)),
+                                      padding: EdgeInsets.zero,
+                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                    )).toList(),
+                                  ),
+                                ],
+                              ],
+                            ),
+                          ),
                         ),
-                      ),
-                    );
-                  },
+                      );
+                    },
+                  ),
                 ),
+      floatingActionButton: FloatingActionButton(
+        onPressed: () => _showDiaryForm(),
+        child: const Icon(Icons.add),
+      ),
     );
   }
-
-  Widget _buildMoodIcon(int? level) {
-    final icon = switch (level) {
-      1 => Icons.sentiment_very_dissatisfied,
-      2 => Icons.sentiment_dissatisfied,
-      3 => Icons.sentiment_neutral,
-      4 => Icons.sentiment_satisfied,
-      5 => Icons.sentiment_very_satisfied,
-      _ => Icons.sentiment_neutral,
-    };
-
-    final color = switch (level) {
-      1 => Colors.red,
-      2 => Colors.orange,
-      3 => Colors.yellow,
-      4 => Colors.lightGreen,
-      5 => Colors.green,
-      _ => Colors.grey,
-    };
-
-    return Icon(icon, color: color, size: 32);
-  }
 }
 
-class _MoodDialog extends StatefulWidget {
-  const _MoodDialog();
+class _DiaryForm extends StatefulWidget {
+  final String userId;
+  final MoodDiaryModel? diary;
+  final Function(MoodDiaryModel) onSave;
+
+  const _DiaryForm({required this.userId, this.diary, required this.onSave});
 
   @override
-  State<_MoodDialog> createState() => _MoodDialogState();
+  State<_DiaryForm> createState() => _DiaryFormState();
 }
 
-class _MoodDialogState extends State<_MoodDialog> {
-  int _moodLevel = 3;
-  final _noteController = TextEditingController();
-  DateTime _date = DateTime.now();
+class _DiaryFormState extends State<_DiaryForm> {
+  late final TextEditingController _contentController;
+  late final TextEditingController _tagsController;
+  late String _selectedMoodCode;
+  late DateTime _selectedDate;
+
+  bool get _isEditing => widget.diary != null;
+
+  /// 获取心情选项列表（从字典服务）
+  List<String> get _moodCodes {
+    return DictService.instance.getItemsSync(DictService.moodType).map((e) => e.code).toList();
+  }
+
+  @override
+  void initState() {
+    super.initState();
+    final diary = widget.diary;
+    _contentController = TextEditingController(text: diary?.content ?? '');
+    _tagsController = TextEditingController(
+      text: diary?.tags?.join(', ') ?? '',
+    );
+    _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);
+    if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+      _selectedMoodCode = _moodCodes.first;
+    }
+    _selectedDate = diary?.entryDate ?? DateTime.now();
+    // 监听字典刷新
+    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+  }
+
+  void _onDictRefresh() {
+    if (mounted) {
+      setState(() {
+        if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+          _selectedMoodCode = _moodCodes.first;
+        }
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
+    _contentController.dispose();
+    _tagsController.dispose();
+    super.dispose();
+  }
+
+  void _save() {
+    final tags = _tagsController.text
+        .split(',')
+        .map((t) => t.trim())
+        .where((t) => t.isNotEmpty)
+        .toList();
+
+    final newDiary = MoodDiaryModel(
+      id: _isEditing ? widget.diary!.id : const Uuid().v4(),
+      userId: _isEditing ? widget.diary!.userId : widget.userId,
+      mood: _selectedMoodCode,
+      moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
+      content: _contentController.text.isEmpty ? null : _contentController.text,
+      tags: tags.isEmpty ? null : tags,
+      entryDate: _selectedDate,
+    );
+
+    widget.onSave(newDiary);
+  }
 
   @override
   Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('记录心情'),
-      content: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                for (int i = 1; i <= 5; i++)
-                  IconButton(
-                    icon: Icon(
-                      i <= _moodLevel
-                          ? Icons.sentiment_very_satisfied
-                          : Icons.sentiment_very_satisfied_outlined,
-                      color: i <= _moodLevel ? Colors.amber : Colors.grey,
-                    ),
-                    onPressed: () => setState(() => _moodLevel = i),
-                  ),
-              ],
-            ),
-            TextField(
-              controller: _noteController,
-              maxLines: 3,
-              decoration: const InputDecoration(
-                labelText: '备注',
-                hintText: '今天发生了什么...',
-              ),
-            ),
-            const SizedBox(height: 16),
-            ListTile(
-              title: const Text('日期'),
-              subtitle: Text(DateFormat('yyyy-MM-dd').format(_date)),
-              trailing: const Icon(Icons.calendar_today),
-              onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
-                  initialDate: _date,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
-                );
-                if (picked != null) {
-                  setState(() => _date = picked);
-                }
-              },
-            ),
-          ],
-        ),
+    return Padding(
+      padding: EdgeInsets.fromLTRB(
+        16,
+        16,
+        16,
+        MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context),
-          child: const Text('取消'),
-        ),
-        FilledButton(
-          onPressed: () {
-            Navigator.pop(context, {
-              'mood_level': _moodLevel,
-              'note': _noteController.text,
-              'date': DateFormat('yyyy-MM-dd').format(_date),
-            });
-          },
-          child: const Text('保存'),
-        ),
-      ],
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          Text(
+            '写日记',
+            style: Theme.of(context).textTheme.titleLarge,
+          ),
+          const SizedBox(height: 16),
+
+          // 心情选择
+          Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
+          const SizedBox(height: 12),
+          Wrap(
+            spacing: 8,
+            runSpacing: 8,
+            children: _moodCodes.map((code) {
+              final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
+              final emoji = DictService.instance.getEmoji(DictService.moodType, code);
+              return ChoiceChip(
+                label: Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(emoji.isNotEmpty ? emoji : '😊'),
+                    const SizedBox(width: 4),
+                    Text(label),
+                  ],
+                ),
+                selected: _selectedMoodCode == code,
+                selectedColor: Theme.of(context).colorScheme.primaryContainer,
+                onSelected: (selected) {
+                  if (selected) setState(() => _selectedMoodCode = code);
+                },
+              );
+            }).toList(),
+          ),
+          const SizedBox(height: 16),
+
+          // 内容输入
+          TextField(
+            controller: _contentController,
+            maxLines: 5,
+            decoration: const InputDecoration(
+              labelText: '写点什么...',
+              alignLabelWithHint: true,
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 标签输入
+          TextField(
+            controller: _tagsController,
+            decoration: const InputDecoration(
+              labelText: '标签（可选，逗号分隔）',
+              hintText: '工作, 运动, 阅读',
+            ),
+          ),
+          const SizedBox(height: 16),
+
+          // 日期选择
+          ListTile(
+            contentPadding: EdgeInsets.zero,
+            title: const Text('日期'),
+            trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
+            onTap: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedDate,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() => _selectedDate = picked);
+              }
+            },
+          ),
+          const SizedBox(height: 16),
+
+          FilledButton(
+            onPressed: _save,
+            child: const Text('保存'),
+          ),
+        ],
+      ),
     );
   }
 }

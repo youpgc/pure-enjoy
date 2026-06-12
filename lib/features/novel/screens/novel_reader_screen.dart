@@ -1,9 +1,10 @@
+import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:battery_plus/battery_plus.dart';
 import '../../../config.dart';
-import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../models/novel_model.dart';
@@ -245,30 +246,34 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
     try {
       // 并行加载章节列表和阅读进度
-      final chaptersFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {'novel_id': 'eq.${widget.novel.id}'},
-        select: 'id,title,chapter_num',
-        order: 'chapter_num.asc',
+      final chaptersFuture = http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?novel_id=eq.${widget.novel.id}&select=id,title,chapter_num&order=chapter_num.asc',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
       );
 
       final userId = _userId;
-      Future<ApiResponse<List<Map<String, dynamic>>>>? progressFuture;
+      Future<http.Response>? progressFuture;
       if (userId != null) {
-        progressFuture = ApiClient.get(
-          'user_novels',
-          filters: {
-            'user_id': 'eq.$userId',
-            'novel_id': 'eq.${widget.novel.id}',
+        progressFuture = http.get(
+          Uri.parse(
+            '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=last_chapter',
+          ),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
           },
-          select: 'last_chapter',
         );
       }
 
-      final chaptersResult = await chaptersFuture;
+      final response = await chaptersFuture;
 
-      if (chaptersResult.isSuccess) {
-        final data = chaptersResult.data!;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
         final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
         chapters.removeWhere((c) => c.chapterOrder <= 0);
 
@@ -283,9 +288,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         // 并行获取阅读进度
         if (progressFuture != null) {
           try {
-            final progressResult = await progressFuture;
-            if (progressResult.isSuccess) {
-              final progressData = progressResult.data!;
+            final progressResponse = await progressFuture;
+            if (progressResponse.statusCode == 200) {
+              final progressData = jsonDecode(progressResponse.body);
               if (progressData.isNotEmpty) {
                 final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
                 for (int i = 0; i < chapters.length; i++) {
@@ -333,10 +338,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     try {
       // 先检查缓存，同时发起网络请求（并行加载）
       final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
-      final networkFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {'id': 'eq.${chapter.id}'},
-        select: '*',
+      final networkFuture = http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/novel_chapters?id=eq.${chapter.id}&select=*',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+        },
       );
 
       // 等待缓存结果
@@ -363,10 +372,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       }
 
       // 等待网络请求
-      final networkResult = await networkFuture;
+      final response = await networkFuture;
 
-      if (networkResult.isSuccess) {
-        final data = networkResult.data!;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
           final chapterData = data.first;
           final parsedChapter = NovelChapterModel.fromJson(chapterData);
@@ -471,17 +480,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (userId == null) return;
 
     try {
-      final result = await ApiClient.get(
-        'user_novels',
-        filters: {
-          'user_id': 'eq.$userId',
-          'novel_id': 'eq.${widget.novel.id}',
+      final response = await http.get(
+        Uri.parse(
+          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&novel_id=eq.${widget.novel.id}&select=id,is_collected',
+        ),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
         },
-        select: 'id,is_collected',
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
+      if (response.statusCode == 200) {
+        final List<dynamic> data = jsonDecode(response.body);
         if (data.isNotEmpty) {
           setState(() {
             _isInBookshelf = true;
@@ -506,19 +516,29 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
       if (_isInBookshelf && _bookshelfId != null) {
-        await ApiClient.patch(
-          'user_novels',
-          filters: {'id': 'eq.$_bookshelfId'},
-          body: {
+        await http.patch(
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId'),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            'Content-Type': 'application/json',
+          },
+          body: jsonEncode({
             'last_chapter': chapterNum,
             'progress': progress,
             'last_read_at': DateTime.now().toUtc().toIso8601String(),
-          },
+          }),
         );
       } else {
-        final result = await ApiClient.post(
-          'user_novels',
-          body: {
+        final response = await http.post(
+          Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
+          headers: {
+            'apikey': AppConfig.supabaseAnonKey,
+            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+            'Content-Type': 'application/json',
+            'Prefer': 'return=representation',
+          },
+          body: jsonEncode({
             'user_id': userId,
             'novel_id': widget.novel.id,
             'progress': progress,
@@ -527,15 +547,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             'last_read_at': DateTime.now().toUtc().toIso8601String(),
             'created_at': DateTime.now().toUtc().toIso8601String(),
             'updated_at': DateTime.now().toUtc().toIso8601String(),
-          },
+          }),
         );
 
-        if (result.isSuccess) {
-          final data = result.data;
+        if (response.statusCode == 200 || response.statusCode == 201) {
+          final List<dynamic> data = jsonDecode(response.body);
           if (mounted) {
             setState(() {
               _isInBookshelf = true;
-              _bookshelfId = data?['id'] as String?;
+              _bookshelfId = data.first['id'] as String;
             });
           }
         }
@@ -557,9 +577,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
 
     try {
-      final result = await ApiClient.post(
-        'user_novels',
-        body: {
+      final response = await http.post(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+          'Prefer': 'return=representation',
+        },
+        body: jsonEncode({
           'user_id': userId,
           'novel_id': widget.novel.id,
           'progress': 0,
@@ -567,14 +593,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           'is_collected': true,
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
+        }),
       );
 
-      if (result.isSuccess) {
-        final data = result.data;
+      if (response.statusCode == 200 || response.statusCode == 201) {
+        final List<dynamic> data = jsonDecode(response.body);
         setState(() {
           _isInBookshelf = true;
-          _bookshelfId = data?['id'] as String?;
+          _bookshelfId = data.first['id'] as String;
         });
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
@@ -598,13 +624,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
 
     try {
-      final result = await ApiClient.patch(
-        'user_novels',
-        filters: {'id': 'eq.$_bookshelfId'},
-        body: {'is_collected': !_isCollected},
+      final response = await http.patch(
+        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_novels?id=eq.$_bookshelfId'),
+        headers: {
+          'apikey': AppConfig.supabaseAnonKey,
+          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
+          'Content-Type': 'application/json',
+        },
+        body: jsonEncode({'is_collected': !_isCollected}),
       );
 
-      if (result.isSuccess) {
+      if (response.statusCode == 200 || response.statusCode == 204) {
         if (mounted) {
           setState(() => _isCollected = !_isCollected);
         }
