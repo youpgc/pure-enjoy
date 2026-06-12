@@ -950,8 +950,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 spacing: 12,
                 runSpacing: 12,
                 children: _pendingHabits.map((habit) {
-                  final colorValue = habitColors[habit.color] ?? colorScheme.primary.value;
-                  final habitColor = Color(colorValue);
+                  final habitColor = colorScheme.primary;
                   final isChecking = _checkingHabitId == habit.id;
 
                   return SizedBox(
@@ -1468,7 +1467,6 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
       mood: _selectedMoodCode,
       moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
-      tags: tags.isEmpty ? null : tags,
       entryDate: _selectedDate,
     );
 
@@ -1613,7 +1611,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
       userId: AuthService.instance.currentUserId ?? 'local_user',
       amount: double.parse(_amountController.text),
       category: _selectedCategoryCode,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
+      description: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
 
@@ -2049,9 +2047,6 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
       name: _nameController.text.trim(),
       description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
       targetDays: targetDays,
-      frequency: DictService.instance.getDefaultCode(DictService.habitFrequency).isNotEmpty
-          ? DictService.instance.getDefaultCode(DictService.habitFrequency)
-          : 'daily',
       isActive: true,
     );
 

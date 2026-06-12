@@ -148,12 +148,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  Future<void> _showDeleteConfirm(BuildContext context, String noteId, String noteTitle) {
-    showConfirmDialog(context, title: '确认删除', content: '确定要删除笔记「$noteTitle」吗？').then((confirm) {
-      if (confirm == true) {
-        _deleteNote(noteId);
-      }
-    });
+  Future<void> _showDeleteConfirm(BuildContext context, String noteId, String noteTitle) async {
+    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除笔记「$noteTitle」吗？');
+    if (confirm == true) {
+      _deleteNote(noteId);
+    }
   }
 
   Future<void> _deleteNote(String id) async {
