@@ -766,9 +766,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void _showSettings() {
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => Padding(
-          padding: const EdgeInsets.all(24),
+        builder: (context, setModalState) => SingleChildScrollView(
+          padding: EdgeInsets.only(
+            left: 24,
+            right: 24,
+            top: 24,
+            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
+          ),
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -935,6 +941,45 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               const SizedBox(height: 24),
             ],
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 构建底部常驻状态栏（始终显示）
+  Widget _buildBottomStatusBar() {
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Row(
+              children: [
+                Icon(
+                  Icons.battery_0_bar,
+                  size: 14,
+                  color: _background.textColor.withOpacity(0.5),
+                ),
+                const SizedBox(width: 4),
+                Text(
+                  _currentTime,
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _background.textColor.withOpacity(0.5),
+                  ),
+                ),
+              ],
+            ),
+            Text(
+              '${(_readingProgress * 100).toStringAsFixed(2)}%',
+              style: TextStyle(
+                fontSize: 12,
+                color: _background.textColor.withOpacity(0.5),
+              ),
+            ),
+          ],
         ),
       ),
     );
@@ -1271,41 +1316,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       left: 0,
                       right: 0,
                       bottom: 0,
-                      child: SafeArea(
-                        top: false,
-                        child: Padding(
-                          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 8),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                            children: [
-                              Row(
-                                children: [
-                                  Icon(
-                                    Icons.battery_0_bar,
-                                    size: 14,
-                                    color: _background.textColor.withOpacity(0.5),
-                                  ),
-                                  const SizedBox(width: 4),
-                                  Text(
-                                    _currentTime,
-                                    style: TextStyle(
-                                      fontSize: 12,
-                                      color: _background.textColor.withOpacity(0.5),
-                                    ),
-                                  ),
-                                ],
-                              ),
-                              Text(
-                                '${(_readingProgress * 100).toStringAsFixed(2)}%',
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: _background.textColor.withOpacity(0.5),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
+                      child: _buildBottomStatusBar(),
                     ),
                   ],
                 ),
@@ -1320,10 +1331,25 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 48),
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
+              // 菜单隐藏时显示章节标题
+              if (!_showMenu)
+                Padding(
+                  padding: const EdgeInsets.only(bottom: 16),
+                  child: Text(
+                    _currentChapter!.title,
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w500,
+                      color: _background.textColor.withOpacity(0.6),
+                      height: 1.4,
+                      fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+                    ),
+                  ),
+                ),
               Center(
                 child: Padding(
                   padding: const EdgeInsets.only(bottom: 24),
