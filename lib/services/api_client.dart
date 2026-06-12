@@ -81,9 +81,10 @@ class ApiClient {
     Map<String, String>? filters,
     String? order,
     int? limit,
+    int? offset,
   }) async {
     try {
-      final uri = _buildUri(table, select: select, filters: filters, order: order, limit: limit);
+      final uri = _buildUri(table, select: select, columns: columns, filters: filters, order: order, limit: limit, offset: offset);
       final response = await http.get(uri, headers: SupabaseConfig.headers);
 
       if (_isSuccess(response.statusCode)) {
@@ -233,9 +234,11 @@ class ApiClient {
   static Uri _buildUri(
     String table, {
     String? select,
+    String? columns,
     Map<String, String>? filters,
     String? order,
     int? limit,
+    int? offset,
   }) {
     final params = <String, String>{};
 
@@ -253,6 +256,9 @@ class ApiClient {
     }
     if (limit != null) {
       params['limit'] = limit.toString();
+    }
+    if (offset != null) {
+      params['offset'] = offset.toString();
     }
 
     return Uri.parse('$_baseUrl/$table').replace(queryParameters: params);
