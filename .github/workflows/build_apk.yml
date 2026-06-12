@@ -318,12 +318,14 @@ jobs:
           fi
 
       # 16. 上传构建产物（作为备份）
-      - name: Upload build artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: pure-enjoy-apk-${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
-          path: build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}
-          retention-days: 30
+      # 注：GitHub Artifact 存储配额有限，APK 已上传到 Supabase Storage
+      # 如需启用 artifact 上传，请确保清理旧 artifact 释放配额
+      # - name: Upload build artifact
+      #   uses: actions/upload-artifact@v4
+      #   with:
+      #     name: pure-enjoy-apk-${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
+      #     path: build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}
+      #     retention-days: 30
 
       # 17. 创建 GitHub Release（仅标签触发时）
       - name: Create GitHub Release
