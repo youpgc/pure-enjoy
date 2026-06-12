@@ -111,10 +111,10 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
                     labelText: '分类',
                     prefixIcon: Icon(Icons.category),
                   ),
-                  items: categoryOptions.entries
-                      .map((e) => DropdownMenuItem(
-                            value: e.key,
-                            child: Text(e.value),
+                  items: categoryOptions
+                      .map((item) => DropdownMenuItem(
+                            value: item.code,
+                            child: Text(item.label),
                           ))
                       .toList(),
                   onChanged: (value) {
