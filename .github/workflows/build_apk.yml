@@ -289,23 +289,23 @@ jobs:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          # 获取上次构建的 commit SHA（从 app_versions 表的最新记录中获取）
-          LAST_BUILD_SHA=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=release_notes&order=created_at.desc&limit=1" \
+          # 获取上次构建时间（从 app_versions 表的最新记录中获取）
+          LAST_BUILD_TIME=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=created_at&order=created_at.desc&limit=1" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
-            python3 -c 'import sys, json, re; data=json.load(sys.stdin); notes=data[0].get("release_notes","") if data else ""; m=re.search(r"SHA:\s*([a-f0-9]+)",notes); print(m.group(1) if m else "")' 2>/dev/null || echo '')
+            python3 -c 'import sys, json; data=json.load(sys.stdin); print(data[0].get("created_at","") if data else "")' 2>/dev/null || echo '')
 
           CURRENT_SHA="${{ github.sha }}"
-          echo "Last build SHA: ${LAST_BUILD_SHA:-none}"
+          echo "Last build time: ${LAST_BUILD_TIME:-none}"
           echo "Current SHA: $CURRENT_SHA"
 
           # 收集上次构建到本次构建之间的所有 commit messages
-          if [ -n "$LAST_BUILD_SHA" ] && [ "$LAST_BUILD_SHA" != "$CURRENT_SHA" ]; then
-            # 获取两个 SHA 之间的所有提交，并去掉提交类型前缀(feat:/fix:等)
-            COMMIT_LIST=$(git log --pretty=format:"%s" "${LAST_BUILD_SHA}..${CURRENT_SHA}" 2>/dev/null | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
+          if [ -n "$LAST_BUILD_TIME" ]; then
+            # 使用 --since 基于时间获取 commits，并去掉提交类型前缀(feat:/fix:等)
+            COMMIT_LIST=$(git log --pretty=format:"%s" --since="$LAST_BUILD_TIME" 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
           else
-            # 首次构建或无法获取上次 SHA，只取最近 5 条
-            COMMIT_LIST=$(git log --pretty=format:"%s" -n 5 2>/dev/null | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
+            # 首次构建，取最近 10 条
+            COMMIT_LIST=$(git log --pretty=format:"%s" -n 10 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' | awk '{print "- " $0}' || echo "")
           fi
 
           # 格式化 release notes
