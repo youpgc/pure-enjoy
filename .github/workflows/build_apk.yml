@@ -233,17 +233,35 @@ jobs:
           for FILE in $FILES; do
             if [ -z "$FILE" ]; then continue; fi
             TOTAL=$((TOTAL + 1))
+            
+            # 1. 先从 Storage 删除 APK 文件
             HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "$SUPABASE_URL/storage/v1/object/apk-releases/$FILE" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+            
             if [ "$HTTP_CODE" = "200" ] || [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "404" ]; then
               DELETED=$((DELETED + 1))
+              echo "🗑️ 已删除: $FILE"
+              
+              # 2. 将对应版本记录标记为失效（inactive）
+              # 从文件名提取版本号：pure-enjoy-v{version}-build{build_number}.apk
+              VERSION=$(echo "$FILE" | sed -n 's/pure-enjoy-v\(.*\)-build.*/\1/p')
+              BUILD_NUM=$(echo "$FILE" | sed -n 's/.*-build\([0-9]*\)\.apk/\1/p')
+              
+              if [ -n "$VERSION" ] && [ -n "$BUILD_NUM" ]; then
+                curl -s -o /dev/null -X PATCH "$SUPABASE_URL/rest/v1/app_versions?version=eq.$VERSION&build_number=eq.$BUILD_NUM" \
+                  -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                  -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                  -H "Content-Type: application/json" \
+                  -d '{"status":"inactive","revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
+                echo "   📋 版本记录已标记为失效: v$VERSION+$BUILD_NUM"
+              fi
             else
               echo "⚠️ 删除失败: $FILE (HTTP $HTTP_CODE)"
             fi
           done
           
-          echo "✅ 清理完成：删除 $DELETED / $TOTAL 个旧 APK"
+          echo "✅ 清理完成：删除 $DELETED / $TOTAL 个旧 APK，对应版本记录已标记为失效"
 
       # 14.5 确保app_configs表存在（检查并提示）
       - name: Check app_configs table
