@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/feedback_model.dart';
@@ -75,34 +76,40 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
 
   /// 获取分类标签信息
   _CategoryInfo _getCategoryInfo(String category) {
+    final label = DictService.instance.getLabel(DictService.feedbackCategory, category, defaultValue: category);
+    final Color color;
     switch (category) {
       case 'bug':
-        return _CategoryInfo(label: 'Bug', color: Theme.of(context).colorScheme.error);
+        color = Theme.of(context).colorScheme.error;
       case 'feature':
-        return _CategoryInfo(label: '功能建议', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'improvement':
-        return _CategoryInfo(label: '体验优化', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'other':
-        return _CategoryInfo(label: '其他', color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
       default:
-        return _CategoryInfo(label: category, color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
     }
+    return _CategoryInfo(label: label, color: color);
   }
 
   /// 获取状态标签信息
   _StatusInfo _getStatusInfo(String status) {
+    final label = DictService.instance.getLabel(DictService.feedbackStatus, status, defaultValue: status);
+    final Color color;
     switch (status) {
       case 'pending':
-        return _StatusInfo(label: '待确认', color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
       case 'confirmed':
-        return _StatusInfo(label: '已确认', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'in_progress':
-        return _StatusInfo(label: '进行中', color: Theme.of(context).colorScheme.secondary);
+        color = Theme.of(context).colorScheme.secondary;
       case 'resolved':
-        return _StatusInfo(label: '已完结', color: AppTheme.success);
+        color = AppTheme.success;
       default:
-        return _StatusInfo(label: status, color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
     }
+    return _StatusInfo(label: label, color: color);
   }
 
   /// 格式化时间

@@ -256,7 +256,13 @@ class _LifeScreenState extends State<LifeScreen> {
               title: '记账',
               backgroundColor: colorScheme.primaryContainer,
               summary: _latestExpense != null
-                  ? '${_latestExpense!['category'] ?? ''} ${_latestExpense!['amount'] ?? ''}'
+                  ? () {
+                      final categoryCode = _latestExpense!['category'] as String? ?? '';
+                      final categoryLabel = categoryCode.isNotEmpty
+                          ? DictService.instance.getLabel(DictService.expenseCategory, categoryCode, defaultValue: categoryCode)
+                          : '';
+                      return '$categoryLabel ${_latestExpense!['amount'] ?? ''}';
+                    }()
                   : null,
               description: _latestExpense?['note'] as String?,
               date: _formatDate(_latestExpense?['created_at'] as String?),

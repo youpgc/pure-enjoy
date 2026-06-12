@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 提交问题反馈页面
@@ -18,14 +19,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
   final _descController = TextEditingController();
   String _category = 'bug'; // 默认分类
   bool _isSubmitting = false;
-
-  /// 分类选项
-  static const Map<String, String> _categoryOptions = {
-    'bug': 'Bug',
-    'feature': '功能建议',
-    'improvement': '体验优化',
-    'other': '其他',
-  };
 
   @override
   void dispose() {
@@ -110,24 +103,27 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
               const SizedBox(height: 16),
 
               // 分类选择
-              DropdownButtonFormField<String>(
-                value: _category,
-                decoration: const InputDecoration(
-                  labelText: '分类',
-                  prefixIcon: Icon(Icons.category),
-                ),
-                items: _categoryOptions.entries
-                    .map((e) => DropdownMenuItem(
-                          value: e.key,
-                          child: Text(e.value),
-                        ))
-                    .toList(),
-                onChanged: (value) {
-                  if (value != null) {
-                    setState(() => _category = value);
-                  }
-                },
-              ),
+              Builder(builder: (context) {
+                final categoryOptions = DictService.instance.getItemsSync(DictService.feedbackCategory);
+                return DropdownButtonFormField<String>(
+                  value: _category,
+                  decoration: const InputDecoration(
+                    labelText: '分类',
+                    prefixIcon: Icon(Icons.category),
+                  ),
+                  items: categoryOptions.entries
+                      .map((e) => DropdownMenuItem(
+                            value: e.key,
+                            child: Text(e.value),
+                          ))
+                      .toList(),
+                  onChanged: (value) {
+                    if (value != null) {
+                      setState(() => _category = value);
+                    }
+                  },
+                );
+              }),
               const SizedBox(height: 16),
 
               // 描述输入

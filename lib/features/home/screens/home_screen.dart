@@ -2471,13 +2471,13 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 获取角色标签
   String _getRoleLabel(String? role) {
     if (role == null || role.isEmpty) return '普通用户';
-    return DictService.instance.getLabel('user_role', role, defaultValue: '普通用户');
+    return DictService.instance.getLabel(DictService.userRole, role, defaultValue: '普通用户');
   }
 
   /// 获取会员等级标签
   String _getMemberLevelLabel(String? level) {
     if (level == null || level.isEmpty) return '普通会员';
-    return DictService.instance.getLabel('member_level', level, defaultValue: '普通会员');
+    return DictService.instance.getLabel(DictService.memberLevel, level, defaultValue: '普通会员');
   }
 
   /// 构建用户头像

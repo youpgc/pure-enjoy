@@ -238,12 +238,13 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
           ...categories.asMap().entries.map((entry) {
             final index = entry.key;
             final category = entry.value;
+            final categoryLabel = DictService.instance.getLabel(DictService.expenseCategory, category.key, defaultValue: category.key);
             return ListTile(
               leading: CircleAvatar(
                 backgroundColor: colors[index % colors.length],
                 radius: 12,
               ),
-              title: Text(category.key),
+              title: Text(categoryLabel),
               trailing: Text(
                 '¥${category.value.toStringAsFixed(2)}',
                 style: const TextStyle(fontWeight: FontWeight.bold),

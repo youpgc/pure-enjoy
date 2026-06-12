@@ -565,7 +565,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '状态',
-                    value: novel.status == 'completed' ? '已完结' : '连载中',
+                    value: DictService.instance.getLabel(DictService.novelStatus, novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(

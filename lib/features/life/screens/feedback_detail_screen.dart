@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import '../models/feedback_model.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/dict_service.dart';
 import '../../../utils/date_time_utils.dart';
 
 /// 问题反馈详情页面（含流转记录）
@@ -52,58 +53,75 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
 
   /// 获取分类标签信息
   _CategoryInfo _getCategoryInfo(String category, BuildContext context) {
+    final label = DictService.instance.getLabel(DictService.feedbackCategory, category, defaultValue: category);
+    final Color color;
     switch (category) {
       case 'bug':
-        return _CategoryInfo(label: 'Bug', color: Theme.of(context).colorScheme.error);
+        color = Theme.of(context).colorScheme.error;
       case 'feature':
-        return _CategoryInfo(label: '功能建议', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'improvement':
-        return _CategoryInfo(label: '体验优化', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'other':
-        return _CategoryInfo(label: '其他', color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
       default:
-        return _CategoryInfo(label: category, color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
     }
+    return _CategoryInfo(label: label, color: color);
   }
 
   /// 获取状态标签信息
   _StatusInfo _getStatusInfo(String status, BuildContext context) {
+    final label = DictService.instance.getLabel(DictService.feedbackStatus, status, defaultValue: status);
+    final Color color;
     switch (status) {
       case 'pending':
-        return _StatusInfo(label: '待确认', color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
       case 'confirmed':
-        return _StatusInfo(label: '已确认', color: Theme.of(context).colorScheme.primary);
+        color = Theme.of(context).colorScheme.primary;
       case 'in_progress':
-        return _StatusInfo(label: '处理中', color: Theme.of(context).colorScheme.secondary);
+        color = Theme.of(context).colorScheme.secondary;
       case 'resolved':
-        return _StatusInfo(label: '已完结', color: AppTheme.success);
+        color = AppTheme.success;
       case 'rejected':
-        return _StatusInfo(label: '已拒绝', color: Theme.of(context).colorScheme.error);
+        color = Theme.of(context).colorScheme.error;
       case 'delayed':
-        return _StatusInfo(label: '已滞后', color: Colors.orange);
+        color = Colors.orange;
       default:
-        return _StatusInfo(label: status, color: Theme.of(context).colorScheme.onSurfaceVariant);
+        color = Theme.of(context).colorScheme.onSurfaceVariant;
     }
+    return _StatusInfo(label: label, color: color);
   }
 
   /// 获取操作标签信息
   _ActionInfo _getActionInfo(String action, BuildContext context) {
+    final label = DictService.instance.getLabel(DictService.feedbackStatus, action, defaultValue: action);
+    final IconData icon;
+    final Color color;
     switch (action) {
       case 'confirmed':
-        return _ActionInfo(label: '确认', icon: Icons.check_circle, color: Colors.blue);
+        icon = Icons.check_circle;
+        color = Colors.blue;
       case 'in_progress':
-        return _ActionInfo(label: '处理中', icon: Icons.sync, color: Colors.orange);
+        icon = Icons.sync;
+        color = Colors.orange;
       case 'resolved':
-        return _ActionInfo(label: '完成', icon: Icons.check_circle_outline, color: AppTheme.success);
+        icon = Icons.check_circle_outline;
+        color = AppTheme.success;
       case 'rejected':
-        return _ActionInfo(label: '拒绝', icon: Icons.cancel, color: Theme.of(context).colorScheme.error);
+        icon = Icons.cancel;
+        color = Theme.of(context).colorScheme.error;
       case 'delayed':
-        return _ActionInfo(label: '滞后', icon: Icons.schedule, color: Colors.orange);
+        icon = Icons.schedule;
+        color = Colors.orange;
       case 'deleted':
-        return _ActionInfo(label: '删除', icon: Icons.delete_outline, color: Colors.grey);
+        icon = Icons.delete_outline;
+        color = Colors.grey;
       default:
-        return _ActionInfo(label: action, icon: Icons.circle, color: Colors.grey);
+        icon = Icons.circle;
+        color = Colors.grey;
     }
+    return _ActionInfo(label: label, icon: icon, color: color);
   }
 
   /// 格式化时间
