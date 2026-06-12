@@ -1,5 +1,5 @@
-/// 提醒事项模型 - 对应 Supabase user_reminders 表
-/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), description(TEXT), remind_at(TIMESTAMPTZ), is_completed(BOOLEAN), priority(VARCHAR), created_at, updated_at
+/// 提醒事项模型 - 对应 Supabase reminders 表
+/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), description(TEXT), remind_at(TIMESTAMPTZ), is_completed(BOOLEAN), is_repeated(BOOLEAN), repeat_type(VARCHAR), created_at, updated_at
 class ReminderModel {
   final String id;
   final String userId;
@@ -7,7 +7,8 @@ class ReminderModel {
   final String? description;
   final DateTime remindAt;
   final bool isCompleted;
-  final String? priority;
+  final bool? isRepeated;
+  final String? repeatType;
   final DateTime? createdAt;
 
   ReminderModel({
@@ -17,7 +18,8 @@ class ReminderModel {
     this.description,
     required this.remindAt,
     this.isCompleted = false,
-    this.priority,
+    this.isRepeated,
+    this.repeatType,
     this.createdAt,
   });
 
@@ -29,7 +31,8 @@ class ReminderModel {
       description: json['description'] as String?,
       remindAt: DateTime.parse(json['remind_at'] as String).toLocal(),
       isCompleted: json['is_completed'] as bool? ?? false,
-      priority: json['priority'] as String?,
+      isRepeated: json['is_repeated'] as bool?,
+      repeatType: json['repeat_type'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : null,
     );
   }
@@ -41,7 +44,8 @@ class ReminderModel {
       'description': description,
       'remind_at': remindAt.toUtc().toIso8601String(),
       'is_completed': isCompleted,
-      'priority': priority,
+      'is_repeated': isRepeated,
+      'repeat_type': repeatType,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
@@ -56,7 +60,8 @@ class ReminderModel {
       'description': description,
       'remind_at': remindAt.toUtc().toIso8601String(),
       'is_completed': isCompleted,
-      'priority': priority,
+      'is_repeated': isRepeated,
+      'repeat_type': repeatType,
     };
   }
 
@@ -67,7 +72,8 @@ class ReminderModel {
     String? description,
     DateTime? remindAt,
     bool? isCompleted,
-    String? priority,
+    bool? isRepeated,
+    String? repeatType,
     DateTime? createdAt,
   }) {
     return ReminderModel(
@@ -77,7 +83,8 @@ class ReminderModel {
       description: description ?? this.description,
       remindAt: remindAt ?? this.remindAt,
       isCompleted: isCompleted ?? this.isCompleted,
-      priority: priority ?? this.priority,
+      isRepeated: isRepeated ?? this.isRepeated,
+      repeatType: repeatType ?? this.repeatType,
       createdAt: createdAt ?? this.createdAt,
     );
   }

@@ -287,17 +287,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                                     overflow: TextOverflow.ellipsis,
                                   ),
                                 ],
-                                if (diary.tags != null && diary.tags!.isNotEmpty) ...[
-                                  const SizedBox(height: 8),
-                                  Wrap(
-                                    spacing: 6,
-                                    children: diary.tags!.map((tag) => Chip(
-                                      label: Text(tag, style: const TextStyle(fontSize: 12)),
-                                      padding: EdgeInsets.zero,
-                                      materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                                    )).toList(),
-                                  ),
-                                ],
                               ],
                             ),
                           ),
@@ -327,7 +316,6 @@ class _DiaryForm extends StatefulWidget {
 
 class _DiaryFormState extends State<_DiaryForm> {
   late final TextEditingController _contentController;
-  late final TextEditingController _tagsController;
   late String _selectedMoodCode;
   late DateTime _selectedDate;
 
@@ -343,9 +331,6 @@ class _DiaryFormState extends State<_DiaryForm> {
     super.initState();
     final diary = widget.diary;
     _contentController = TextEditingController(text: diary?.content ?? '');
-    _tagsController = TextEditingController(
-      text: diary?.tags?.join(', ') ?? '',
-    );
     _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);
     if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
       _selectedMoodCode = _moodCodes.first;
@@ -369,24 +354,16 @@ class _DiaryFormState extends State<_DiaryForm> {
   void dispose() {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _contentController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
   void _save() {
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
     final newDiary = MoodDiaryModel(
       id: _isEditing ? widget.diary!.id : const Uuid().v4(),
       userId: _isEditing ? widget.diary!.userId : widget.userId,
       mood: _selectedMoodCode,
       moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
-      tags: tags.isEmpty ? null : tags,
       entryDate: _selectedDate,
     );
 
@@ -447,16 +424,6 @@ class _DiaryFormState extends State<_DiaryForm> {
             decoration: const InputDecoration(
               labelText: '写点什么...',
               alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 16),
-
-          // 标签输入
-          TextField(
-            controller: _tagsController,
-            decoration: const InputDecoration(
-              labelText: '标签（可选，逗号分隔）',
-              hintText: '工作, 运动, 阅读',
             ),
           ),
           const SizedBox(height: 16),

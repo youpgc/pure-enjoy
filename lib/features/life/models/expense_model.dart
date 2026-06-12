@@ -1,22 +1,26 @@
 /// 支出记录模型 - 对应 Supabase expenses 表
-/// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), note(TEXT), date(DATE), created_at, updated_at
+/// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), description(TEXT), date(DATE), created_at, updated_at
 class ExpenseModel {
   final String id;
   final String userId;
   final double amount;
   final String category;
-  final String? note;
+  final String? description;
   final DateTime date;
+  final String? userNickname;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   ExpenseModel({
     required this.id,
     required this.userId,
     required this.amount,
     required this.category,
-    this.note,
+    this.description,
     required this.date,
+    this.userNickname,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory ExpenseModel.fromJson(Map<String, dynamic> json) {
@@ -25,9 +29,11 @@ class ExpenseModel {
       userId: json['user_id'] as String,
       amount: (json['amount'] as num).toDouble(),
       category: json['category'] as String,
-      note: json['note'] as String?,
+      description: json['description'] as String?,
       date: DateTime.parse(json['date'] as String),
+      userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
     );
   }
 
@@ -36,7 +42,7 @@ class ExpenseModel {
       'user_id': userId,
       'amount': amount,
       'category': category,
-      'note': note,
+      'description': description,
       'date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
@@ -51,7 +57,7 @@ class ExpenseModel {
     return {
       'amount': amount,
       'category': category,
-      'note': note,
+      'description': description,
       'date': date.toIso8601String().split('T').first,
     };
   }
@@ -61,20 +67,22 @@ class ExpenseModel {
     String? userId,
     double? amount,
     String? category,
-    String? note,
+    String? description,
     DateTime? date,
+    String? userNickname,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return ExpenseModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
       amount: amount ?? this.amount,
       category: category ?? this.category,
-      note: note ?? this.note,
+      description: description ?? this.description,
       date: date ?? this.date,
+      userNickname: userNickname ?? this.userNickname,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-
-

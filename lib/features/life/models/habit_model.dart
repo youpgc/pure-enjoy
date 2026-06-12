@@ -1,38 +1,26 @@
-/// 习惯模型 - 对应 Supabase user_habits 表
-/// 字段: id(UUID), user_id(VARCHAR), name(VARCHAR), description(TEXT), frequency(VARCHAR), target_days(INTEGER), current_streak(INTEGER), max_streak(INTEGER), total_checkins(INTEGER), color(VARCHAR), is_active(BOOLEAN), created_at, updated_at
+/// 习惯模型 - 对应 Supabase habits 表
+/// 字段: id(UUID), user_id(VARCHAR), name(VARCHAR), description(TEXT), target_days(INTEGER), current_streak(INTEGER), longest_streak(INTEGER), is_active(BOOLEAN), created_at, updated_at
 class HabitModel {
   final String id;
   final String userId;
   final String name;
   final String? description;
-  final String frequency;
   final int targetDays;
   final int currentStreak;
-  final int maxStreak;
-  final int totalCheckins;
-  final String? color;
+  final int longestStreak;
   final bool isActive;
   final DateTime? createdAt;
-  final bool reminderEnabled;
-  final int? reminderHour;
-  final int? reminderMinute;
 
   HabitModel({
     required this.id,
     required this.userId,
     required this.name,
     this.description,
-    this.frequency = 'daily',
     this.targetDays = 21,
     this.currentStreak = 0,
-    this.maxStreak = 0,
-    this.totalCheckins = 0,
-    this.color,
+    this.longestStreak = 0,
     this.isActive = true,
     this.createdAt,
-    this.reminderEnabled = false,
-    this.reminderHour,
-    this.reminderMinute,
   });
 
   factory HabitModel.fromJson(Map<String, dynamic> json) {
@@ -41,17 +29,11 @@ class HabitModel {
       userId: json['user_id'] as String,
       name: json['name'] as String,
       description: json['description'] as String?,
-      frequency: json['frequency'] as String? ?? 'daily',
       targetDays: json['target_days'] as int? ?? 21,
       currentStreak: json['current_streak'] as int? ?? 0,
-      maxStreak: json['max_streak'] as int? ?? 0,
-      totalCheckins: json['total_checkins'] as int? ?? 0,
-      color: json['color'] as String?,
+      longestStreak: json['longest_streak'] as int? ?? 0,
       isActive: json['is_active'] as bool? ?? true,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
-      reminderEnabled: json['reminder_enabled'] as bool? ?? false,
-      reminderHour: json['reminder_hour'] as int?,
-      reminderMinute: json['reminder_minute'] as int?,
     );
   }
 
@@ -60,12 +42,9 @@ class HabitModel {
       'user_id': userId,
       'name': name,
       'description': description,
-      'frequency': frequency,
       'target_days': targetDays,
       'current_streak': currentStreak,
-      'max_streak': maxStreak,
-      'total_checkins': totalCheckins,
-      'color': color,
+      'longest_streak': longestStreak,
       'is_active': isActive,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
@@ -79,12 +58,9 @@ class HabitModel {
     return {
       'name': name,
       'description': description,
-      'frequency': frequency,
       'target_days': targetDays,
       'current_streak': currentStreak,
-      'max_streak': maxStreak,
-      'total_checkins': totalCheckins,
-      'color': color,
+      'longest_streak': longestStreak,
       'is_active': isActive,
     };
   }
@@ -94,34 +70,22 @@ class HabitModel {
     String? userId,
     String? name,
     String? description,
-    String? frequency,
     int? targetDays,
     int? currentStreak,
-    int? maxStreak,
-    int? totalCheckins,
-    String? color,
+    int? longestStreak,
     bool? isActive,
     DateTime? createdAt,
-    bool? reminderEnabled,
-    int? reminderHour,
-    int? reminderMinute,
   }) {
     return HabitModel(
       id: id ?? this.id,
       userId: userId ?? this.userId,
       name: name ?? this.name,
       description: description ?? this.description,
-      frequency: frequency ?? this.frequency,
       targetDays: targetDays ?? this.targetDays,
       currentStreak: currentStreak ?? this.currentStreak,
-      maxStreak: maxStreak ?? this.maxStreak,
-      totalCheckins: totalCheckins ?? this.totalCheckins,
-      color: color ?? this.color,
+      longestStreak: longestStreak ?? this.longestStreak,
       isActive: isActive ?? this.isActive,
       createdAt: createdAt ?? this.createdAt,
-      reminderEnabled: reminderEnabled ?? this.reminderEnabled,
-      reminderHour: reminderHour ?? this.reminderHour,
-      reminderMinute: reminderMinute ?? this.reminderMinute,
     );
   }
 }

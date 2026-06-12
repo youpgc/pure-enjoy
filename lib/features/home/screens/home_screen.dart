@@ -179,7 +179,7 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_habits?user_id=eq.$userId&is_active=eq.true&select=*&order=created_at.desc',
+          '${AppConfig.supabaseUrl}/rest/v1/habits?user_id=eq.$userId&is_active=eq.true&select=*&order=created_at.desc',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -422,7 +422,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final response = await http.get(
         Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_reminders?user_id=eq.$userId&is_completed=eq.false&select=*&order=remind_at.asc&limit=3',
+          '${AppConfig.supabaseUrl}/rest/v1/reminders?user_id=eq.$userId&is_completed=eq.false&select=*&order=remind_at.asc&limit=3',
         ),
         headers: {
           'apikey': AppConfig.supabaseAnonKey,
@@ -675,7 +675,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onSave: (reminder) async {
           try {
             final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_reminders'),
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/reminders'),
               headers: {
                 'apikey': AppConfig.supabaseAnonKey,
                 'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
@@ -716,7 +716,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onSave: (habit) async {
           try {
             final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/user_habits'),
+              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/habits'),
               headers: {
                 'apikey': AppConfig.supabaseAnonKey,
                 'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',

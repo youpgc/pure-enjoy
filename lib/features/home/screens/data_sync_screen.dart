@@ -59,8 +59,8 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     TableSyncResult(tableName: 'weight_records', displayName: '体重记录'),
     TableSyncResult(tableName: 'notes', displayName: '笔记'),
     TableSyncResult(tableName: 'user_favorites', displayName: '收藏'),
-    TableSyncResult(tableName: 'user_reminders', displayName: '提醒事项'),
-    TableSyncResult(tableName: 'user_habits', displayName: '习惯打卡'),
+    TableSyncResult(tableName: 'reminders', displayName: '提醒事项'),
+    TableSyncResult(tableName: 'habits', displayName: '习惯打卡'),
   ];
 
   String? get _userId => AuthService.instance.currentUserId;
@@ -355,8 +355,8 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     'weight_records': '追踪体重变化趋势',
     'notes': '同步您的所有笔记',
     'user_favorites': '同步您的收藏内容',
-    'user_reminders': '同步您的提醒事项',
-    'user_habits': '同步您的习惯打卡记录',
+    'reminders': '同步您的提醒事项',
+    'habits': '同步您的习惯打卡记录',
   };
 
   /// 同步项图标映射
@@ -366,8 +366,8 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     'weight_records': Icons.monitor_weight,
     'notes': Icons.note,
     'user_favorites': Icons.bookmark,
-    'user_reminders': Icons.notifications,
-    'user_habits': Icons.checklist,
+    'reminders': Icons.notifications,
+    'habits': Icons.checklist,
   };
 
   Widget _buildSyncItem(TableSyncResult result) {

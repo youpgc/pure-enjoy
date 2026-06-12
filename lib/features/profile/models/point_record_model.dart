@@ -5,6 +5,7 @@ class PointRecord {
   final int amount;
   final String? remark;
   final String? operatorName;
+  final String? operatorId;
   final DateTime? createdAt;
   final DateTime? expiresAt;
   final String status; // active, expired
@@ -16,6 +17,7 @@ class PointRecord {
     required this.amount,
     this.remark,
     this.operatorName,
+    this.operatorId,
     this.createdAt,
     this.expiresAt,
     this.status = 'active',
@@ -29,6 +31,7 @@ class PointRecord {
       amount: json['amount'] ?? 0,
       remark: json['remark'],
       operatorName: json['operator_name'],
+      operatorId: json['operator_id'],
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'])
           : null,
@@ -37,5 +40,20 @@ class PointRecord {
           : null,
       status: json['status'] ?? 'active',
     );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'id': id,
+      'user_id': userId,
+      'type': type,
+      'amount': amount,
+      'remark': remark,
+      'operator_name': operatorName,
+      'operator_id': operatorId,
+      'created_at': createdAt?.toUtc().toIso8601String(),
+      'expires_at': expiresAt?.toUtc().toIso8601String(),
+      'status': status,
+    };
   }
 }

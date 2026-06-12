@@ -32,9 +32,17 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     });
     try {
       final userId = _userId;
-      // 查询所有用户的通知（系统通知 user_id 为 null）+ 当前用户的通知
+      if (userId == null) {
+        setState(() {
+          _notifications = [];
+          _isLoading = false;
+        });
+        return;
+      }
+      // 查询当前用户的通知 + 系统通知（user_id 为 null）
       final result = await ApiClient.get(
         'notifications',
+        filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
         limit: 100,
       );
@@ -80,6 +88,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _markAllRead() async {
     try {
+      final userId = _userId;
+      if (userId == null) return;
+
       final unreadIds = _notifications
           .where((n) => !n['is_read'])
           .map((n) => n['id'])
@@ -89,7 +100,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
       await ApiClient.patch(
         'notifications',
-        filters: {'is_read': 'eq.false'},
+        filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
       setState(() {

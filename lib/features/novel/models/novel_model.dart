@@ -110,6 +110,7 @@ class NovelChapterModel {
   final String title;
   final String content;
   final int chapterOrder;
+  final int? chapterNumber;
   final int? wordCount;
   final bool? isFree;
   final double? price;
@@ -121,6 +122,7 @@ class NovelChapterModel {
     required this.title,
     required this.content,
     required this.chapterOrder,
+    this.chapterNumber,
     this.wordCount,
     this.isFree,
     this.price,
@@ -134,6 +136,7 @@ class NovelChapterModel {
       title: json['title'] as String? ?? '无标题',
       content: json['content'] as String? ?? '',
       chapterOrder: json['chapter_num'] as int? ?? 0,
+      chapterNumber: json['chapter_number'] as int?,
       wordCount: json['word_count'] as int?,
       isFree: json['is_free'] as bool?,
       price: json['price'] != null ? (json['price'] as num).toDouble() : null,
@@ -149,6 +152,7 @@ class NovelChapterModel {
       'title': title,
       'content': content,
       'chapter_num': chapterOrder,
+      'chapter_number': chapterNumber,
       'word_count': wordCount,
       'is_free': isFree,
       'price': price,

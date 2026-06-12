@@ -6,9 +6,11 @@ class MoodDiaryModel {
   final String mood;
   final int moodScore;
   final String? content;
-  final List<String>? tags;
   final DateTime entryDate;
+  final String? userNickname;
+  final bool? synced;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   MoodDiaryModel({
     required this.id,
@@ -16,9 +18,11 @@ class MoodDiaryModel {
     required this.mood,
     required this.moodScore,
     this.content,
-    this.tags,
     required this.entryDate,
+    this.userNickname,
+    this.synced,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory MoodDiaryModel.fromJson(Map<String, dynamic> json) {
@@ -28,9 +32,11 @@ class MoodDiaryModel {
       mood: json['mood'] as String,
       moodScore: int.tryParse(json['mood_label']?.toString() ?? '5') ?? 5,
       content: json['content'] as String?,
-      tags: (json['tags'] as List<dynamic>?)?.cast<String>(),
       entryDate: DateTime.parse(json['date'] as String),
+      userNickname: json['user_nickname'] as String?,
+      synced: json['synced'] as bool?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
     );
   }
 
@@ -64,9 +70,11 @@ class MoodDiaryModel {
     String? mood,
     int? moodScore,
     String? content,
-    List<String>? tags,
     DateTime? entryDate,
+    String? userNickname,
+    bool? synced,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return MoodDiaryModel(
       id: id ?? this.id,
@@ -74,11 +82,11 @@ class MoodDiaryModel {
       mood: mood ?? this.mood,
       moodScore: moodScore ?? this.moodScore,
       content: content ?? this.content,
-      tags: tags ?? this.tags,
       entryDate: entryDate ?? this.entryDate,
+      userNickname: userNickname ?? this.userNickname,
+      synced: synced ?? this.synced,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-
-

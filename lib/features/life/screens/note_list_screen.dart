@@ -148,32 +148,36 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
+  Future<void> _showDeleteConfirm(BuildContext context, String noteId, String noteTitle) {
+    showConfirmDialog(context, title: '确认删除', content: '确定要删除笔记「$noteTitle」吗？').then((confirm) {
+      if (confirm == true) {
+        _deleteNote(noteId);
+      }
+    });
+  }
+
   Future<void> _deleteNote(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条笔记吗？');
+    try {
+      final result = await ApiClient.delete(
+        'notes',
+        filters: {'id': 'eq.$id'},
+      );
 
-    if (confirm == true) {
-      try {
-        final result = await ApiClient.delete(
-          'notes',
-          filters: {'id': 'eq.$id'},
-        );
-
-        if (result.isSuccess) {
-          await _loadNotes();
-          if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
-            );
-          }
-        } else {
-          throw Exception('HTTP ${result.statusCode}');
-        }
-      } catch (e) {
+      if (result.isSuccess) {
+        await _loadNotes();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
+            const SnackBar(content: Text('删除成功')),
           );
         }
+      } else {
+        throw Exception('HTTP ${result.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('删除失败: $e')),
+        );
       }
     }
   }
@@ -287,7 +291,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                               clipBehavior: Clip.antiAlias,
                               child: InkWell(
                                 onTap: () => _showNoteForm(note),
-                                onLongPress: () => _deleteNote(note.id),
+                                onLongPress: () => _showDeleteConfirm(context, note.id, note.title),
                                 child: Stack(
                                   children: [
                                     Padding(

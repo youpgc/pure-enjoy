@@ -230,16 +230,29 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     }
   }
 
-  /// 更新阅读状态（不覆盖 progress，仅通过 PATCH 更新状态标记字段）
+  /// 更新阅读状态（通过更新 progress 来标记状态，数据库无 reading_status 列）
   Future<void> _updateReadingStatus(String userNovelId, String status) async {
     if (!_checkAuth()) return;
 
     try {
+      // 根据状态计算对应的 progress 值
+      double progressValue;
+      switch (status) {
+        case 'reading':
+          progressValue = 0.01; // 标记为已开始阅读
+          break;
+        case 'completed':
+          progressValue = 1.0; // 标记为已读完
+          break;
+        default:
+          progressValue = 0.0;
+      }
+
       final result = await ApiClient.patch(
         'user_novels',
         filters: {'id': 'eq.$userNovelId'},
         body: {
-          'reading_status': status,
+          'progress': progressValue,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
         },
       );
@@ -755,8 +768,9 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         columns: 'novel_id',
       );
 
-      final novelsResult = await novelsFuture;
-      final shelfResult = await shelfFuture;
+      final results = await Future.wait([novelsFuture, shelfFuture]);
+      final novelsResult = results[0];
+      final shelfResult = results[1];
 
       if (novelsResult.isSuccess) {
         final novelsData = novelsResult.data!;

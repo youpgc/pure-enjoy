@@ -54,7 +54,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     // 2. 静默从网络刷新
     try {
       final result = await ApiClient.get(
-        'user_reminders',
+        'reminders',
         filters: {'user_id': 'eq.$userId'},
         order: 'remind_at.desc',
         limit: 500,
@@ -106,7 +106,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       setState(() => _isLoading = true);
       try {
         final apiResult = await ApiClient.post(
-          'user_reminders',
+          'reminders',
           body: result.toJson(),
         );
 
@@ -135,7 +135,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       setState(() => _isLoading = true);
       try {
         final apiResult = await ApiClient.patch(
-          'user_reminders',
+          'reminders',
           filters: {'id': 'eq.${reminder.id}'},
           body: result.toJsonForUpdate(),
         );
@@ -161,7 +161,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (confirmed == true) {
       try {
         final result = await ApiClient.delete(
-          'user_reminders',
+          'reminders',
           filters: {'id': 'eq.$id'},
         );
 
@@ -183,7 +183,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
   Future<void> _toggleComplete(ReminderModel reminder) async {
     try {
       final result = await ApiClient.patch(
-        'user_reminders',
+        'reminders',
         filters: {'id': 'eq.${reminder.id}'},
         body: {'is_completed': !reminder.isCompleted},
       );

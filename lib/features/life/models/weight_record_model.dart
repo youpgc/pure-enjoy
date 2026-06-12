@@ -8,7 +8,9 @@ class WeightRecordModel {
   final double? bodyFat;
   final String? note;
   final DateTime date;
+  final String? userNickname;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   WeightRecordModel({
     required this.id,
@@ -18,7 +20,9 @@ class WeightRecordModel {
     this.bodyFat,
     this.note,
     required this.date,
+    this.userNickname,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory WeightRecordModel.fromJson(Map<String, dynamic> json) {
@@ -30,7 +34,9 @@ class WeightRecordModel {
       bodyFat: json['body_fat'] != null ? (json['body_fat'] as num).toDouble() : null,
       note: json['note'] as String?,
       date: DateTime.parse(json['date'] as String),
+      userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
     );
   }
 
@@ -59,7 +65,9 @@ class WeightRecordModel {
     double? bodyFat,
     String? note,
     DateTime? date,
+    String? userNickname,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return WeightRecordModel(
       id: id ?? this.id,
@@ -69,7 +77,9 @@ class WeightRecordModel {
       bodyFat: bodyFat ?? this.bodyFat,
       note: note ?? this.note,
       date: date ?? this.date,
+      userNickname: userNickname ?? this.userNickname,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }

@@ -8,6 +8,7 @@ class FeedbackModel {
   final String category; // bug / feature / improvement / other
   final String status; // pending / confirmed / in_progress / resolved
   final String? adminReply;
+  final String? userNickname;
   final DateTime? createdAt;
 
   FeedbackModel({
@@ -18,6 +19,7 @@ class FeedbackModel {
     required this.category,
     required this.status,
     this.adminReply,
+    this.userNickname,
     this.createdAt,
   });
 
@@ -30,6 +32,7 @@ class FeedbackModel {
       category: json['category'] as String,
       status: json['status'] as String,
       adminReply: json['admin_reply'] as String?,
+      userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String).toLocal()
           : null,
@@ -70,6 +73,7 @@ class FeedbackModel {
     String? category,
     String? status,
     String? adminReply,
+    String? userNickname,
     DateTime? createdAt,
   }) {
     return FeedbackModel(
@@ -80,6 +84,7 @@ class FeedbackModel {
       category: category ?? this.category,
       status: status ?? this.status,
       adminReply: adminReply ?? this.adminReply,
+      userNickname: userNickname ?? this.userNickname,
       createdAt: createdAt ?? this.createdAt,
     );
   }

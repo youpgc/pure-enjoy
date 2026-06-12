@@ -2,9 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
-import '../../../services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
@@ -58,7 +56,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     // 2. 静默从网络刷新
     try {
       final habitsResult = await ApiClient.get(
-        'user_habits',
+        'habits',
         filters: {'user_id': 'eq.$userId'},
         order: 'is_active.desc',
         limit: 200,
@@ -73,19 +71,26 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 保存习惯缓存
       await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
 
-      // 加载所有打卡记录
+      // 加载所有打卡记录（批量查询，避免 N+1）
       final history = <String, List<HabitCheckinModel>>{};
-      for (final habit in items) {
+      if (items.isNotEmpty) {
+        final habitIds = items.map((h) => h.id).join(',');
         final checkinsResult = await ApiClient.get(
           'habit_checkins',
-          filters: {'habit_id': 'eq.${habit.id}'},
+          filters: {'habit_id': 'in.($habitIds)'},
           order: 'checkin_at.desc',
         );
 
         if (checkinsResult.isSuccess) {
-          history[habit.id] = checkinsResult.data!.map((e) => HabitCheckinModel.fromJson(e)).toList();
-        } else {
-          history[habit.id] = [];
+          // 按 habit_id 分组
+          for (final checkin in checkinsResult.data!) {
+            final model = HabitCheckinModel.fromJson(checkin);
+            history.putIfAbsent(model.habitId, () => []).add(model);
+          }
+        }
+        // 确保每个 habit 都有条目
+        for (final habit in items) {
+          history.putIfAbsent(habit.id, () => []);
         }
       }
 
@@ -171,7 +176,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
         // 再删除习惯
         final result = await ApiClient.delete(
-          'user_habits',
+          'habits',
           filters: {'id': 'eq.$id'},
         );
 
@@ -193,9 +198,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final targetDaysController = TextEditingController(
       text: (habit?.targetDays ?? 21).toString(),
     );
-    bool enableReminder = habit?.reminderEnabled ?? false;
-    int reminderHour = habit?.reminderHour ?? 9;
-    int reminderMinute = habit?.reminderMinute ?? 0;
 
     await showDialog(
       context: context,
@@ -230,45 +232,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   ),
                   keyboardType: TextInputType.number,
                 ),
-                const SizedBox(height: 16),
-                // 提醒设置
-                SwitchListTile(
-                  title: const Text('每日打卡提醒'),
-                  subtitle: Text(enableReminder
-                      ? '${reminderHour.toString().padLeft(2, '0')}:${reminderMinute.toString().padLeft(2, '0')} 提醒'
-                      : '关闭'),
-                  contentPadding: EdgeInsets.zero,
-                  value: enableReminder,
-                  onChanged: (value) {
-                    setDialogState(() => enableReminder = value);
-                  },
-                ),
-                if (enableReminder)
-                  Row(
-                    children: [
-                      const Text('提醒时间: '),
-                      const SizedBox(width: 8),
-                      DropdownButton<int>(
-                        value: reminderHour,
-                        items: List.generate(24, (h) => DropdownMenuItem(
-                          value: h,
-                          child: Text('$h 时', style: const TextStyle(fontSize: 14)),
-                        )),
-                        onChanged: (v) => setDialogState(() => reminderHour = v ?? 9),
-                        underline: const SizedBox(),
-                      ),
-                      const SizedBox(width: 8),
-                      DropdownButton<int>(
-                        value: reminderMinute,
-                        items: [0, 15, 30, 45].map((m) => DropdownMenuItem(
-                          value: m,
-                          child: Text('$m 分', style: const TextStyle(fontSize: 14)),
-                        )).toList(),
-                        onChanged: (v) => setDialogState(() => reminderMinute = v ?? 0),
-                        underline: const SizedBox(),
-                      ),
-                    ],
-                  ),
               ],
             ),
           ),
@@ -290,61 +253,32 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 try {
                   if (isEditing) {
                     final result = await ApiClient.patch(
-                      'user_habits',
+                      'habits',
                       filters: {'id': 'eq.${habit.id}'},
                       body: {
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
-                        'reminder_enabled': enableReminder,
-                        'reminder_hour': enableReminder ? reminderHour : null,
-                        'reminder_minute': enableReminder ? reminderMinute : null,
                       },
                     );
                     if (!result.isSuccess) {
                       throw Exception('HTTP ${result.statusCode}');
                     }
-                    // 设置/取消通知
-                    if (enableReminder) {
-                      await NotificationService.instance.setHabitReminder(
-                        habitId: habit.id,
-                        habitName: nameController.text.trim(),
-                        hour: reminderHour,
-                        minute: reminderMinute,
-                      );
-                    } else {
-                      await NotificationService.instance.cancelHabitReminder(habit.id);
-                    }
                   } else {
                     final habitId = const Uuid().v4();
                     final result = await ApiClient.post(
-                      'user_habits',
+                      'habits',
                       body: {
                         'id': habitId,
                         'user_id': userId,
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
                         'target_days': targetDays,
-                        'frequency': DictService.instance.getDefaultCode(DictService.habitFrequency).isNotEmpty
-                            ? DictService.instance.getDefaultCode(DictService.habitFrequency)
-                            : 'daily',
                         'is_active': true,
-                        'reminder_enabled': enableReminder,
-                        'reminder_hour': enableReminder ? reminderHour : null,
-                        'reminder_minute': enableReminder ? reminderMinute : null,
                       },
                     );
                     if (!result.isSuccess) {
                       throw Exception('HTTP ${result.statusCode}');
-                    }
-                    // 设置通知
-                    if (enableReminder) {
-                      await NotificationService.instance.setHabitReminder(
-                        habitId: habitId,
-                        habitName: nameController.text.trim(),
-                        hour: reminderHour,
-                        minute: reminderMinute,
-                      );
                     }
                   }
                   Navigator.pop(context);
@@ -606,13 +540,9 @@ class _HabitCard extends StatelessWidget {
                   color: AppTheme.success,
                 ),
                 _StatItem(
-                  label: '频率',
-                  value: DictService.instance.getLabel(
-                    DictService.habitFrequency,
-                    habit.frequency,
-                    defaultValue: habit.frequency,
-                  ),
-                  icon: Icons.calendar_today,
+                  label: '最长连续',
+                  value: '${habit.longestStreak}',
+                  icon: Icons.local_fire_department,
                   color: Theme.of(context).colorScheme.primary,
                 ),
               ],

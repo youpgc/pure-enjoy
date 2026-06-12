@@ -10,6 +10,7 @@ class FavoriteModel {
   final List<String>? tags;
   final bool isPinned;
   final DateTime? createdAt;
+  final DateTime? updatedAt;
 
   FavoriteModel({
     required this.id,
@@ -21,6 +22,7 @@ class FavoriteModel {
     this.tags,
     this.isPinned = false,
     this.createdAt,
+    this.updatedAt,
   });
 
   factory FavoriteModel.fromJson(Map<String, dynamic> json) {
@@ -34,6 +36,7 @@ class FavoriteModel {
       tags: (json['tags'] as List<dynamic>?)?.cast<String>(),
       isPinned: json['is_pinned'] as bool? ?? false,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
+      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
     );
   }
 
@@ -64,6 +67,7 @@ class FavoriteModel {
     List<String>? tags,
     bool? isPinned,
     DateTime? createdAt,
+    DateTime? updatedAt,
   }) {
     return FavoriteModel(
       id: id ?? this.id,
@@ -75,8 +79,7 @@ class FavoriteModel {
       tags: tags ?? this.tags,
       isPinned: isPinned ?? this.isPinned,
       createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
     );
   }
 }
-
-

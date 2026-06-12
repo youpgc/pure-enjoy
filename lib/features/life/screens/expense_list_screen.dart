@@ -181,7 +181,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         body: {
           'amount': expense.amount,
           'category': expense.category,
-          'note': expense.note,
+          'description': expense.description,
           'date': expense.date.toIso8601String().split('T').first,
         },
       );
@@ -345,7 +345,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                                 leading: const Icon(Icons.receipt),
                                 title: Text(categoryLabel),
                                 subtitle: Text(
-                                  '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.note != null ? ' - ${expense.note}' : ''}',
+                                  '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.description != null ? ' - ${expense.description}' : ''}',
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,
@@ -412,7 +412,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       text: expense != null ? expense.amount.toString() : '',
     );
     _noteController = TextEditingController(
-      text: expense?.note ?? '',
+      text: expense?.description ?? '',
     );
     _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(DictService.expenseCategory);
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
@@ -450,7 +450,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
       userId: _isEditing ? widget.expense!.userId : widget.userId,
       amount: double.parse(_amountController.text),
       category: _selectedCategoryCode,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
+      description: _noteController.text.isEmpty ? null : _noteController.text,
       date: _selectedDate,
     );
 
