@@ -8,6 +8,7 @@ import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../../services/dict_service.dart';
 import '../models/favorite_model.dart';
 
 /// 收藏夹页面 - Supabase 数据同步
@@ -180,10 +181,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 DropdownButtonFormField<String>(
                   value: category,
                   decoration: const InputDecoration(labelText: '分类'),
-                  items: FavoriteCategory.values.map((c) {
+                  items: DictService.instance.getItemsSync('favorite_category').map((item) {
                     return DropdownMenuItem(
-                      value: c.name,
-                      child: Text(c.label),
+                      value: item.code,
+                      child: Text(item.label),
                     );
                   }).toList(),
                   onChanged: (value) {
@@ -325,9 +326,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 value: null,
                 child: Text('全部'),
               ),
-              ...FavoriteCategory.values.map((c) => PopupMenuItem(
-                value: c.name,
-                child: Text(c.label),
+              ...DictService.instance.getItemsSync('favorite_category').map((item) => PopupMenuItem(
+                value: item.code,
+                child: Text(item.label),
               )),
             ],
           ),
@@ -342,10 +343,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   itemCount: _filteredFavorites.length,
                   itemBuilder: (context, index) {
                     final favorite = _filteredFavorites[index];
-                    final category = FavoriteCategory.values.firstWhere(
-                      (c) => c.name == favorite.category,
-                      orElse: () => FavoriteCategory.other,
-                    );
+                    final categoryLabel = DictService.instance.getLabel('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),
@@ -392,7 +390,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                             borderRadius: BorderRadius.circular(4),
                                           ),
                                           child: Text(
-                                            category.label,
+                                            categoryLabel,
                                             style: TextStyle(
                                               fontSize: 12,
                                               color: colorScheme.onSecondaryContainer,

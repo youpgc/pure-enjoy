@@ -97,6 +97,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
   }
 
   /// 获取类型对应的图标和颜色
+  /// 注意：point_type 字典类型目前未在后台配置，暂使用硬编码映射
   _PointTypeInfo _getTypeInfo(String type) {
     switch (type) {
       case 'checkin':

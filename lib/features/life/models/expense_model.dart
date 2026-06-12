@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// 支出记录模型 - 对应 Supabase expenses 表
 /// 字段: id(UUID), user_id(VARCHAR), amount(DECIMAL), category(VARCHAR), note(TEXT), date(DATE), created_at, updated_at
 class ExpenseModel {
@@ -79,18 +77,4 @@ class ExpenseModel {
   }
 }
 
-/// 支出分类
-enum ExpenseCategory {
-  food('餐饮', Icons.restaurant),
-  transport('交通', Icons.directions_car),
-  shopping('购物', Icons.shopping_bag),
-  entertainment('娱乐', Icons.movie),
-  health('医疗', Icons.local_hospital),
-  education('教育', Icons.school),
-  other('其他', Icons.more_horiz);
 
-  final String label;
-  final IconData icon;
-
-  const ExpenseCategory(this.label, this.icon);
-}

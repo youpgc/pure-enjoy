@@ -79,15 +79,4 @@ class FavoriteModel {
   }
 }
 
-/// 收藏分类
-enum FavoriteCategory {
-  article('文章'),
-  video('视频'),
-  tool('工具'),
-  website('网站'),
-  other('其他');
 
-  final String label;
-
-  const FavoriteCategory(this.label);
-}

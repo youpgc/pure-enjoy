@@ -204,8 +204,8 @@ class DictService {
   }
 
   /// 根据 code 获取 label
-  String getLabel(String typeCode, String itemCode, {String defaultValue = ''}) {
-    return findByCode(typeCode, itemCode)?.label ?? defaultValue;
+  String getLabel(String typeCode, String itemCode, {String? defaultValue}) {
+    return findByCode(typeCode, itemCode)?.label ?? (defaultValue ?? itemCode);
   }
 
   /// 根据 code 获取 emoji

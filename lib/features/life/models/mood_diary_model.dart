@@ -1,5 +1,3 @@
-import 'package:flutter/material.dart';
-
 /// 心情日记模型 - 对应 Supabase mood_diaries 表
 /// 字段: id(UUID), user_id(VARCHAR), mood(VARCHAR), mood_label(VARCHAR), content(TEXT), date(DATE), created_at, updated_at
 class MoodDiaryModel {
@@ -74,19 +72,4 @@ class MoodDiaryModel {
   }
 }
 
-/// 心情类型
-enum MoodType {
-  happy('开心', '😊', Color(0xFFFFD93D), 9),
-  calm('平静', '😌', Color(0xFF6BCB77), 7),
-  sad('难过', '😢', Color(0xFF4D96FF), 3),
-  angry('生气', '😤', Color(0xFFFF6B6B), 2),
-  anxious('焦虑', '😰', Color(0xFFC9B1FF), 4),
-  tired('疲惫', '😴', Color(0xFFA0A0A0), 3);
 
-  final String label;
-  final String emoji;
-  final Color color;
-  final int score;
-
-  const MoodType(this.label, this.emoji, this.color, this.score);
-}
