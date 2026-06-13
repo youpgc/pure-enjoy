@@ -1423,7 +1423,7 @@ class _AddMoodSheet extends StatefulWidget {
 
 class _AddMoodSheetState extends State<_AddMoodSheet> {
   final _contentController = TextEditingController();
-  final _tagsController = TextEditingController();
+  final _categoryController = TextEditingController();
   String _selectedMoodCode = '';
   DateTime _selectedDate = DateTime.now();
 
@@ -1457,17 +1457,11 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
   void dispose() {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _contentController.dispose();
-    _tagsController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
   void _save() {
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
     final diary = MoodDiaryModel(
       id: const Uuid().v4(),
       userId: AuthService.instance.currentUserId ?? 'local_user',
@@ -1527,13 +1521,6 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
             decoration: const InputDecoration(
               labelText: '写点什么...',
               alignLabelWithHint: true,
-            ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _tagsController,
-            decoration: const InputDecoration(
-              labelText: '标签（可选，逗号分隔）',
             ),
           ),
           const SizedBox(height: 12),
@@ -1831,13 +1818,13 @@ class _AddNoteSheet extends StatefulWidget {
 class _AddNoteSheetState extends State<_AddNoteSheet> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final _tagsController = TextEditingController();
+  final _categoryController = TextEditingController();
 
   @override
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
-    _tagsController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
@@ -1849,18 +1836,12 @@ class _AddNoteSheetState extends State<_AddNoteSheet> {
       return;
     }
 
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
     final note = NoteModel(
       id: const Uuid().v4(),
       userId: AuthService.instance.currentUserId ?? 'local_user',
       title: _titleController.text,
       content: _contentController.text.isEmpty ? null : _contentController.text,
-      tags: tags.isEmpty ? null : tags,
+      category: _categoryController.text.isEmpty ? null : _categoryController.text,
     );
 
     widget.onSave(note);
@@ -1900,9 +1881,9 @@ class _AddNoteSheetState extends State<_AddNoteSheet> {
           ),
           const SizedBox(height: 12),
           TextField(
-            controller: _tagsController,
+            controller: _categoryController,
             decoration: const InputDecoration(
-              labelText: '标签（可选，逗号分隔）',
+              labelText: '分类（可选）',
             ),
           ),
           const SizedBox(height: 16),
