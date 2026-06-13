@@ -1,0 +1,30 @@
+name: Add Lunar Column to Anniversaries
+
+on:
+  workflow_dispatch:
+
+jobs:
+  add-column:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Add is_lunar column to user_anniversaries
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          SUPABASE_URL="https://mhdrbjpqmzswswoazwjg.supabase.co"
+
+          RESULT=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/pg/query" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{"query": "ALTER TABLE user_anniversaries ADD COLUMN IF NOT EXISTS is_lunar BOOLEAN DEFAULT FALSE;"}')
+
+          HTTP_CODE=$(echo "$RESULT" | tail -1)
+          echo "Add column result: HTTP $HTTP_CODE"
+          echo "$RESULT"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ Column is_lunar added successfully"
+          else
+            echo "❌ Failed to add column (HTTP $HTTP_CODE)"
+          fi

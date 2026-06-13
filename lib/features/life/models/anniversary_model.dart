@@ -1,7 +1,10 @@
+import 'package:lunar/lunar.dart';
+
 /// 纪念日模型 - 对应 Supabase user_anniversaries 表
 /// 字段: id(TEXT), user_id(TEXT), user_nickname(TEXT?), title(TEXT), date(DateTime),
 ///       type(String: birthday/anniversary), description(String?), repeat_yearly(bool),
-///       remind_enabled(bool), remind_days_before(int?), created_at(DateTime?)
+///       remind_enabled(bool), remind_days_before(int?), is_lunar(bool),
+///       created_at(DateTime?)
 class AnniversaryModel {
   final String id;
   final String userId;
@@ -13,6 +16,7 @@ class AnniversaryModel {
   final bool repeatYearly;
   final bool remindEnabled;
   final int? remindDaysBefore;
+  final bool isLunar;
   final DateTime? createdAt;
 
   AnniversaryModel({
@@ -26,6 +30,7 @@ class AnniversaryModel {
     this.repeatYearly = true,
     this.remindEnabled = false,
     this.remindDaysBefore,
+    this.isLunar = false,
     this.createdAt,
   });
 
@@ -41,6 +46,7 @@ class AnniversaryModel {
       repeatYearly: json['repeat_yearly'] as bool? ?? true,
       remindEnabled: json['remind_enabled'] as bool? ?? false,
       remindDaysBefore: json['remind_days_before'] as int?,
+      isLunar: json['is_lunar'] as bool? ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
           : null,
@@ -59,6 +65,7 @@ class AnniversaryModel {
       'repeat_yearly': repeatYearly,
       'remind_enabled': remindEnabled,
       'remind_days_before': remindDaysBefore,
+      'is_lunar': isLunar,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
   }
@@ -73,6 +80,7 @@ class AnniversaryModel {
       'repeat_yearly': repeatYearly,
       'remind_enabled': remindEnabled,
       'remind_days_before': remindDaysBefore,
+      'is_lunar': isLunar,
     };
   }
 
@@ -87,6 +95,7 @@ class AnniversaryModel {
     bool? repeatYearly,
     bool? remindEnabled,
     int? remindDaysBefore,
+    bool? isLunar,
     DateTime? createdAt,
   }) {
     return AnniversaryModel(
@@ -100,31 +109,95 @@ class AnniversaryModel {
       repeatYearly: repeatYearly ?? this.repeatYearly,
       remindEnabled: remindEnabled ?? this.remindEnabled,
       remindDaysBefore: remindDaysBefore ?? this.remindDaysBefore,
+      isLunar: isLunar ?? this.isLunar,
       createdAt: createdAt ?? this.createdAt,
     );
   }
 
-  /// 下一个纪念日的 DateTime
+  /// 获取农历信息（仅 isLunar 为 true 时有效）
+  String get lunarDateStr {
+    if (!isLunar) return '';
+    try {
+      final solar = Solar.fromDate(date);
+      final lunar = solar.getLunar();
+      final monthStr = lunar.getMonthInChinese();
+      final dayStr = lunar.getDayInChinese();
+      return '$monthStr月$dayStr';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 获取农历年份信息（如"甲辰年"）
+  String get lunarYearStr {
+    if (!isLunar) return '';
+    try {
+      final solar = Solar.fromDate(date);
+      final lunar = solar.getLunar();
+      return '${lunar.getYearInGanZhi()}年';
+    } catch (_) {
+      return '';
+    }
+  }
+
+  /// 下一个纪念日的 DateTime（支持农历）
   DateTime get nextDate {
+    if (isLunar) {
+      return _nextLunarDate();
+    }
+    return _nextSolarDate();
+  }
+
+  /// 公历下一个纪念日
+  DateTime _nextSolarDate() {
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
 
     if (type == 'birthday' || repeatYearly) {
-      // 计算今年的纪念日/生日
       var next = DateTime(now.year, date.month, date.day);
       if (next.isBefore(today) || next.isAtSameMomentAs(today)) {
-        // 如果今天已经过了，算明年的
         next = DateTime(now.year + 1, date.month, date.day);
       }
       return next;
     } else {
-      // 非重复纪念日，如果已过则返回原日期
       final original = DateTime(date.year, date.month, date.day);
       if (original.isBefore(today) || original.isAtSameMomentAs(today)) {
         return original;
       }
       return original;
     }
+  }
+
+  /// 农历下一个纪念日
+  DateTime _nextLunarDate() {
+    final now = DateTime.now();
+    final today = DateTime(now.year, now.month, now.day);
+
+    if (!repeatYearly) {
+      // 非重复农历纪念日，返回原日期
+      return DateTime(date.year, date.month, date.day);
+    }
+
+    // 从存储的公历日期反推农历月日
+    final solar = Solar.fromDate(date);
+    final lunar = solar.getLunar();
+    final lunarMonth = lunar.getMonth();
+    final lunarDay = lunar.getDay();
+
+    // 计算今年的农历对应公历日期
+    var thisYearLunar = Lunar.fromYmd(now.year, lunarMonth, lunarDay);
+    var thisYearSolar = thisYearLunar.getSolar();
+
+    // 如果今年还没到，就用今年的
+    var nextSolar = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
+    if (nextSolar.isBefore(today) || nextSolar.isAtSameMomentAs(today)) {
+      // 今年的已过，算明年的
+      var nextYearLunar = Lunar.fromYmd(now.year + 1, lunarMonth, lunarDay);
+      var nextYearSolar = nextYearLunar.getSolar();
+      nextSolar = DateTime(nextYearSolar.getYear(), nextYearSolar.getMonth(), nextYearSolar.getDay());
+    }
+
+    return nextSolar;
   }
 
   /// 距离下一个纪念日的天数
@@ -142,10 +215,24 @@ class AnniversaryModel {
 
     final now = DateTime.now();
     final today = DateTime(now.year, now.month, now.day);
-    final birthDate = DateTime(date.year, date.month, date.day);
 
-    // 如果今年的生日还没到，年龄 = 当前年份 - 出生年份 - 1
-    // 如果今年的生日已过，年龄 = 当前年份 - 出生年份
+    if (isLunar) {
+      // 农历生日：根据农历计算年龄
+      var age = now.year - date.year;
+      // 检查今年的农历生日是否已过
+      final solar = Solar.fromDate(date);
+      final lunar = solar.getLunar();
+      var thisYearLunar = Lunar.fromYmd(now.year, lunar.getMonth(), lunar.getDay());
+      var thisYearSolar = thisYearLunar.getSolar();
+      var thisYearBirthday = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
+
+      if (thisYearBirthday.isAfter(today)) {
+        age--;
+      }
+      return age >= 0 ? age : 0;
+    }
+
+    // 公历生日
     var age = now.year - date.year;
     final thisYearBirthday = DateTime(now.year, date.month, date.day);
 

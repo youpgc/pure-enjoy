@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:lunar/lunar.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/widgets/widgets.dart';
@@ -177,6 +178,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     bool repeatYearly = anniversary?.repeatYearly ?? true;
     bool remindEnabled = anniversary?.remindEnabled ?? false;
     int? remindDaysBefore = anniversary?.remindDaysBefore ?? 0;
+    bool isLunar = anniversary?.isLunar ?? false;
 
     final isBirthday = widget.filterType == 'birthday';
     final typeLabel = isBirthday ? '生日' : '纪念日';
@@ -206,19 +208,43 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                   contentPadding: EdgeInsets.zero,
                   title: const Text('日期 *'),
                   subtitle: Text(
-                    DateTimeUtils.formatDate(selectedDate),
+                    isLunar
+                        ? '农历 ${_getLunarDateStr(selectedDate)}'
+                        : DateTimeUtils.formatDate(selectedDate),
                   ),
                   trailing: const Icon(Icons.calendar_today),
                   onTap: () async {
-                    final picked = await showDatePicker(
-                      context: context,
-                      initialDate: selectedDate,
-                      firstDate: DateTime(1900),
-                      lastDate: DateTime(2100),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => selectedDate = picked);
+                    if (isLunar) {
+                      // 农历日期选择器
+                      final picked = await _showLunarDatePicker(
+                        context,
+                        initialDate: selectedDate,
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
+                    } else {
+                      final picked = await showDatePicker(
+                        context: context,
+                        initialDate: selectedDate,
+                        firstDate: DateTime(1900),
+                        lastDate: DateTime(2100),
+                      );
+                      if (picked != null) {
+                        setDialogState(() => selectedDate = picked);
+                      }
                     }
+                  },
+                ),
+                const SizedBox(height: 4),
+                // 农历/公历切换
+                SwitchListTile(
+                  title: const Text('农历'),
+                  subtitle: Text(isLunar ? '当前为农历日期' : '当前为公历日期'),
+                  contentPadding: EdgeInsets.zero,
+                  value: isLunar,
+                  onChanged: (value) {
+                    setDialogState(() => isLunar = value);
                   },
                 ),
                 const Divider(),
@@ -325,6 +351,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                         'remind_enabled': remindEnabled,
                         'remind_days_before':
                             remindEnabled ? remindDaysBefore : null,
+                        'is_lunar': isLunar,
                       },
                     );
                     if (!result.isSuccess) {
@@ -349,6 +376,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                         'remind_enabled': remindEnabled,
                         'remind_days_before':
                             remindEnabled ? remindDaysBefore : null,
+                        'is_lunar': isLunar,
                       },
                     );
                     if (!result.isSuccess) {
@@ -369,9 +397,148 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
     );
   }
 
-  /// 格式化日期显示
-  String _formatDate(DateTime date) {
-    return DateTimeUtils.formatStandard(date);
+  /// 格式化农历日期显示
+  String _getLunarDateStr(DateTime date) {
+    try {
+      final solar = Solar.fromDate(date);
+      final lunar = solar.getLunar();
+      final monthStr = lunar.getMonthInChinese();
+      final dayStr = lunar.getDayInChinese();
+      return '$monthStr月$dayStr';
+    } catch (_) {
+      return DateTimeUtils.formatDate(date);
+    }
+  }
+
+  /// 农历日期选择器
+  Future<DateTime?> _showLunarDatePicker(
+    BuildContext context, {
+    required DateTime initialDate,
+  }) async {
+    try {
+      final solar = Solar.fromDate(initialDate);
+      final lunar = solar.getLunar();
+      int selectedYear = lunar.getYear();
+      int selectedMonth = lunar.getMonth();
+      int selectedDay = lunar.getDay();
+
+      return await showDialog<DateTime>(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setDialogState) {
+            String getDisplayStr() {
+              try {
+                final l = Lunar.fromYmd(selectedYear, selectedMonth, selectedDay);
+                final s = l.getSolar();
+                return '农历 ${l.getMonthInChinese()}月${l.getDayInChinese()} '
+                    '(${s.getYear()}-${s.getMonth().toString().padLeft(2, '0')}-${s.getDay().toString().padLeft(2, '0')})';
+              } catch (_) {
+                return '无效日期';
+              }
+            }
+
+            return AlertDialog(
+              title: const Text('选择农历日期'),
+              content: SingleChildScrollView(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      getDisplayStr(),
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                    ),
+                    const SizedBox(height: 16),
+                    // 年份选择
+                    Row(
+                      children: [
+                        IconButton(
+                          icon: const Icon(Icons.chevron_left),
+                          onPressed: () => setDialogState(() => selectedYear--),
+                        ),
+                        Expanded(
+                          child: Text(
+                            '$selectedYear年',
+                            textAlign: TextAlign.center,
+                            style: Theme.of(context).textTheme.titleLarge,
+                          ),
+                        ),
+                        IconButton(
+                          icon: const Icon(Icons.chevron_right),
+                          onPressed: () => setDialogState(() => selectedYear++),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 8),
+                    // 月份选择（1-12）
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(12, (index) {
+                        final month = index + 1;
+                        final isSelected = month == selectedMonth;
+                        return ChoiceChip(
+                          label: Text('$month月'),
+                          selected: isSelected,
+                          onSelected: (_) => setDialogState(() => selectedMonth = month),
+                        );
+                      }),
+                    ),
+                    const SizedBox(height: 12),
+                    // 日期选择（1-30）
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
+                      children: List.generate(30, (index) {
+                        final day = index + 1;
+                        final isSelected = day == selectedDay;
+                        return ChoiceChip(
+                          label: Text('$day'),
+                          selected: isSelected,
+                          onSelected: (_) => setDialogState(() => selectedDay = day),
+                        );
+                      }),
+                    ),
+                  ],
+                ),
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(context),
+                  child: const Text('取消'),
+                ),
+                FilledButton(
+                  onPressed: () {
+                    try {
+                      final l = Lunar.fromYmd(selectedYear, selectedMonth, selectedDay);
+                      final s = l.getSolar();
+                      final result = DateTime(s.getYear(), s.getMonth(), s.getDay());
+                      Navigator.pop(context, result);
+                    } catch (_) {
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('无效的农历日期')),
+                      );
+                    }
+                  },
+                  child: const Text('确定'),
+                ),
+              ],
+            );
+          },
+        ),
+      );
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 格式化日期显示（支持农历）
+  String _formatDate(AnniversaryModel item) {
+    if (item.isLunar && item.lunarDateStr.isNotEmpty) {
+      return '农历${item.lunarDateStr} (${DateTimeUtils.formatStandard(item.date)})';
+    }
+    return DateTimeUtils.formatStandard(item.date);
   }
 
   /// 获取距离天数的描述文本
@@ -415,7 +582,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                       return _AnniversaryCard(
                         item: item,
                         daysText: _getDaysText(item),
-                        formatDate: _formatDate(item.date),
+                        formatDate: _formatDate(item),
                         onEdit: () => _showEditDialog(anniversary: item),
                         onDelete: () => _deleteAnniversary(item.id),
                       );
@@ -525,6 +692,27 @@ class _AnniversaryCard extends StatelessWidget {
                               ),
                             ),
                           ),
+                          // 农历标签
+                          if (item.isLunar) ...[
+                            const SizedBox(width: 4),
+                            Container(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 8,
+                                vertical: 2,
+                              ),
+                              decoration: BoxDecoration(
+                                color: Colors.orange.withOpacity(0.15),
+                                borderRadius: BorderRadius.circular(12),
+                              ),
+                              child: const Text(
+                                '农历',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Colors.orange,
+                                ),
+                              ),
+                            ),
+                          ],
                           const SizedBox(width: 4),
                           // 提醒图标
                           if (item.remindEnabled)
