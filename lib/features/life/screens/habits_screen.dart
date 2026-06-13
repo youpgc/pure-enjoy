@@ -148,6 +148,18 @@ class _HabitsScreenState extends State<HabitsScreen> {
         throw Exception('添加打卡记录失败: HTTP ${checkinResult.statusCode}');
       }
 
+      // 立即本地更新打卡记录，UI马上变为已打卡状态
+      if (mounted) {
+        setState(() {
+          _checkinHistory.putIfAbsent(habit.id, () => []);
+          _checkinHistory[habit.id]!.add(HabitCheckinModel(
+            id: checkinId,
+            habitId: habit.id,
+            checkinAt: today,
+          ));
+        });
+      }
+
       await _loadHabits();
 
       // 显示成功提示
