@@ -170,34 +170,39 @@ class AnniversaryModel {
 
   /// 农历下一个纪念日
   DateTime _nextLunarDate() {
-    final now = DateTime.now();
-    final today = DateTime(now.year, now.month, now.day);
+    try {
+      final now = DateTime.now();
+      final today = DateTime(now.year, now.month, now.day);
 
-    if (!repeatYearly) {
-      // 非重复农历纪念日，返回原日期
-      return DateTime(date.year, date.month, date.day);
+      if (!repeatYearly) {
+        // 非重复农历纪念日，返回原日期
+        return DateTime(date.year, date.month, date.day);
+      }
+
+      // 从存储的公历日期反推农历月日
+      final solar = Solar.fromDate(date);
+      final lunar = solar.getLunar();
+      final lunarMonth = lunar.getMonth();
+      final lunarDay = lunar.getDay();
+
+      // 计算今年的农历对应公历日期
+      var thisYearLunar = Lunar.fromYmd(now.year, lunarMonth, lunarDay);
+      var thisYearSolar = thisYearLunar.getSolar();
+
+      // 如果今年还没到，就用今年的
+      var nextSolar = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
+      if (nextSolar.isBefore(today) || nextSolar.isAtSameMomentAs(today)) {
+        // 今年的已过，算明年的
+        var nextYearLunar = Lunar.fromYmd(now.year + 1, lunarMonth, lunarDay);
+        var nextYearSolar = nextYearLunar.getSolar();
+        nextSolar = DateTime(nextYearSolar.getYear(), nextYearSolar.getMonth(), nextYearSolar.getDay());
+      }
+
+      return nextSolar;
+    } catch (_) {
+      // 农历计算异常时回退到公历计算
+      return _nextSolarDate();
     }
-
-    // 从存储的公历日期反推农历月日
-    final solar = Solar.fromDate(date);
-    final lunar = solar.getLunar();
-    final lunarMonth = lunar.getMonth();
-    final lunarDay = lunar.getDay();
-
-    // 计算今年的农历对应公历日期
-    var thisYearLunar = Lunar.fromYmd(now.year, lunarMonth, lunarDay);
-    var thisYearSolar = thisYearLunar.getSolar();
-
-    // 如果今年还没到，就用今年的
-    var nextSolar = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
-    if (nextSolar.isBefore(today) || nextSolar.isAtSameMomentAs(today)) {
-      // 今年的已过，算明年的
-      var nextYearLunar = Lunar.fromYmd(now.year + 1, lunarMonth, lunarDay);
-      var nextYearSolar = nextYearLunar.getSolar();
-      nextSolar = DateTime(nextYearSolar.getYear(), nextYearSolar.getMonth(), nextYearSolar.getDay());
-    }
-
-    return nextSolar;
   }
 
   /// 距离下一个纪念日的天数

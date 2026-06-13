@@ -215,6 +215,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
+    if (!mounted) return;
     setState(() {
       final savedFontSize = prefs.getDouble('reader_font_size') ?? 18;
       _fontSizeIndex = _fontSizes.indexOf(savedFontSize);
@@ -301,20 +302,22 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           }
         }
 
-        setState(() {
-          _chapters = chapters;
-          _currentChapterIndex = startIndex;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _chapters = chapters;
+            _currentChapterIndex = startIndex;
+            _isLoading = false;
+          });
+        }
 
         if (_chapters.isNotEmpty) {
           _loadChapterContent(_chapters[startIndex]);
         }
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) setState(() => _isLoading = false);
       }
     } catch (e) {
-      setState(() => _isLoading = false);
+      if (mounted) setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载章节失败: $e')),
@@ -343,17 +346,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       if (cachedContent != null) {
         // 有缓存，先显示缓存内容
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-        setState(() {
-          _currentChapter = NovelChapterModel(
-            id: chapter.id,
-            novelId: chapter.novelId,
-            title: chapter.title,
-            chapterOrder: chapter.chapterOrder,
-            content: normalizedContent,
-            createdAt: chapter.createdAt,
-          );
-          _isLoadingChapter = false;
-        });
+        if (mounted) {
+          setState(() {
+            _currentChapter = NovelChapterModel(
+              id: chapter.id,
+              novelId: chapter.novelId,
+              title: chapter.title,
+              chapterOrder: chapter.chapterOrder,
+              content: normalizedContent,
+              createdAt: chapter.createdAt,
+            );
+            _isLoadingChapter = false;
+          });
+        }
         // 根据方向决定滚动位置：上一章到末尾，下一章到顶部
         _scrollToPosition();
         _saveProgress();
@@ -374,17 +379,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
           // 只有当网络内容比缓存新或不同才更新UI
           if (_currentChapter == null || _currentChapter!.content != normalizedContent) {
-            setState(() {
-              _currentChapter = NovelChapterModel(
-                id: parsedChapter.id,
-                novelId: parsedChapter.novelId,
-                title: parsedChapter.title,
-                chapterOrder: parsedChapter.chapterOrder,
-                content: normalizedContent,
-                createdAt: parsedChapter.createdAt,
-              );
-              _isLoadingChapter = false;
-            });
+            if (mounted) {
+              setState(() {
+                _currentChapter = NovelChapterModel(
+                  id: parsedChapter.id,
+                  novelId: parsedChapter.novelId,
+                  title: parsedChapter.title,
+                  chapterOrder: parsedChapter.chapterOrder,
+                  content: normalizedContent,
+                  createdAt: parsedChapter.createdAt,
+                );
+                _isLoadingChapter = false;
+              });
+            }
             // 根据方向决定滚动位置
             _scrollToPosition();
             _saveProgress();
@@ -401,25 +408,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             );
           }
         } else if (_currentChapter == null) {
+          if (mounted) {
+            setState(() {
+              _currentChapter = chapter;
+              _isLoadingChapter = false;
+            });
+          }
+          _scrollToPosition();
+        }
+      } else if (_currentChapter == null) {
+        if (mounted) {
           setState(() {
             _currentChapter = chapter;
             _isLoadingChapter = false;
           });
-          _scrollToPosition();
         }
-      } else if (_currentChapter == null) {
-        setState(() {
-          _currentChapter = chapter;
-          _isLoadingChapter = false;
-        });
         _scrollToPosition();
       }
     } catch (e) {
       if (_currentChapter == null) {
-        setState(() {
-          _currentChapter = chapter;
-          _isLoadingChapter = false;
-        });
+        if (mounted) {
+          setState(() {
+            _currentChapter = chapter;
+            _isLoadingChapter = false;
+          });
+        }
         _scrollToPosition();
       }
     }
@@ -481,7 +494,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       if (result.isSuccess) {
         final data = result.data!;
-        if (data.isNotEmpty) {
+        if (data.isNotEmpty && mounted) {
           setState(() {
             _isInBookshelf = true;
             _bookshelfId = data.first['id'] as String;
@@ -571,10 +584,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       if (result.isSuccess) {
         final data = result.data!;
-        setState(() {
-          _isInBookshelf = true;
-          _bookshelfId = data['id'] as String;
-        });
+        if (mounted) {
+          setState(() {
+            _isInBookshelf = true;
+            _bookshelfId = data['id'] as String;
+          });
+        }
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('已加入书架')),

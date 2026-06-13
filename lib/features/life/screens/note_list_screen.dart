@@ -182,31 +182,25 @@ class _NoteListScreenState extends State<NoteListScreen> {
   }
 
   Future<void> _togglePin(NoteModel note) async {
-    try {
-      final updated = note.copyWith(isPinned: !note.isPinned);
-      final result = await ApiClient.patch(
-        'notes',
-        filters: {'id': 'eq.${note.id}'},
-        body: {'is_pinned': updated.isPinned},
+    // isPinned 字段已从数据库移除，此功能不再可用
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('置顶功能暂不可用')),
       );
-
-      if (result.isSuccess) {
-        await _loadNotes();
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(note.isPinned ? '已取消置顶' : '已置顶')),
-          );
-        }
-      } else {
-        throw Exception('HTTP ${result.statusCode}');
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
-      }
     }
+  }
+
+  Color? _parseColor(String? colorStr) {
+    if (colorStr == null || colorStr.isEmpty) return null;
+    try {
+      final hex = colorStr.replaceFirst('#', '');
+      if (hex.length == 6) {
+        return Color(int.parse('FF$hex', radix: 16));
+      } else if (hex.length == 8) {
+        return Color(int.parse(hex, radix: 16));
+      }
+    } catch (_) {}
+    return null;
   }
 
   void _showNoteForm([NoteModel? note]) {
@@ -223,7 +217,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
               _createNote(newNote);
             }
           },
-          onTogglePin: note != null ? () => _togglePin(note) : null,
         ),
       ),
     );
@@ -314,16 +307,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                               overflow: TextOverflow.fade,
                                             ),
                                           ),
-                                          if (note.tags != null && note.tags!.isNotEmpty)
-                                            Wrap(
-                                              spacing: 4,
-                                              children: note.tags!.take(2).map((tag) => Text(
-                                                '#$tag',
-                                                style: TextStyle(
-                                                  fontSize: 11,
-                                                  color: colorScheme.primary,
-                                                ),
-                                              )).toList(),
+                                          if (note.color != null)
+                                            Container(
+                                              width: 4,
+                                              height: double.infinity,
+                                              decoration: BoxDecoration(
+                                                color: _parseColor(note.color),
+                                                borderRadius: BorderRadius.circular(2),
+                                              ),
                                             ),
                                           const SizedBox(height: 4),
                                           Text(
@@ -336,7 +327,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                         ],
                                       ),
                                     ),
-                                    if (note.isPinned)
+                                    if (note.color != null)
                                       Positioned(
                                         top: 8,
                                         right: 8,
@@ -368,13 +359,11 @@ class _NoteEditScreen extends StatefulWidget {
   final NoteModel? note;
   final String userId;
   final Function(NoteModel) onSave;
-  final VoidCallback? onTogglePin;
 
   const _NoteEditScreen({
     this.note,
     required this.userId,
     required this.onSave,
-    this.onTogglePin,
   });
 
   @override
@@ -384,8 +373,6 @@ class _NoteEditScreen extends StatefulWidget {
 class _NoteEditScreenState extends State<_NoteEditScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
-  final _tagsController = TextEditingController();
-  bool _isPinned = false;
   bool _isSaving = false;
 
   @override
@@ -394,8 +381,6 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
     if (widget.note != null) {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content ?? '';
-      _tagsController.text = widget.note!.tags?.join(', ') ?? '';
-      _isPinned = widget.note!.isPinned;
     }
   }
 
@@ -403,7 +388,6 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
-    _tagsController.dispose();
     super.dispose();
   }
 
@@ -417,19 +401,11 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
 
     setState(() => _isSaving = true);
 
-    final tags = _tagsController.text
-        .split(',')
-        .map((t) => t.trim())
-        .where((t) => t.isNotEmpty)
-        .toList();
-
     final newNote = NoteModel(
       id: widget.note?.id ?? const Uuid().v4(),
       userId: widget.userId,
       title: _titleController.text,
       content: _contentController.text.isEmpty ? null : _contentController.text,
-      tags: tags.isEmpty ? null : tags,
-      isPinned: _isPinned,
     );
 
     widget.onSave(newNote);
@@ -442,14 +418,6 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       appBar: AppBar(
         title: Text(widget.note != null ? '编辑笔记' : '新建笔记'),
         actions: [
-          if (widget.onTogglePin != null)
-            IconButton(
-              icon: Icon(_isPinned ? Icons.push_pin : Icons.push_pin_outlined),
-              onPressed: () {
-                setState(() => _isPinned = !_isPinned);
-                widget.onTogglePin!();
-              },
-            ),
           IconButton(
             icon: _isSaving
                 ? const SizedBox(
@@ -486,15 +454,6 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                   hintText: '写点什么...',
                   border: InputBorder.none,
                 ),
-              ),
-            ),
-            const SizedBox(height: 8),
-            TextField(
-              controller: _tagsController,
-              decoration: const InputDecoration(
-                hintText: '标签（可选，逗号分隔）',
-                prefixIcon: Icon(Icons.tag),
-                border: InputBorder.none,
               ),
             ),
           ],

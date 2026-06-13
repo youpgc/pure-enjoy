@@ -113,7 +113,6 @@ class NovelChapterModel {
   final int? chapterNumber;
   final int? wordCount;
   final bool? isFree;
-  final double? price;
   final DateTime createdAt;
 
   NovelChapterModel({
@@ -125,7 +124,6 @@ class NovelChapterModel {
     this.chapterNumber,
     this.wordCount,
     this.isFree,
-    this.price,
     required this.createdAt,
   });
 
@@ -136,10 +134,9 @@ class NovelChapterModel {
       title: json['title'] as String? ?? '无标题',
       content: json['content'] as String? ?? '',
       chapterOrder: json['chapter_num'] as int? ?? 0,
-      chapterNumber: json['chapter_number'] as int?,
+      chapterNumber: json['chapter_num'] as int?,
       wordCount: json['word_count'] as int?,
       isFree: json['is_free'] as bool?,
-      price: json['price'] != null ? (json['price'] as num).toDouble() : null,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'] as String) ?? DateTime.now()
           : DateTime.now(),
@@ -151,11 +148,9 @@ class NovelChapterModel {
       'novel_id': novelId,
       'title': title,
       'content': content,
-      'chapter_num': chapterOrder,
-      'chapter_number': chapterNumber,
+      'chapter_num': chapterNumber ?? chapterOrder,
       'word_count': wordCount,
       'is_free': isFree,
-      'price': price,
       'created_at': createdAt.toUtc().toIso8601String(),
     };
     // 只在ID非空时添加，让数据库自动生成新记录的ID

@@ -51,6 +51,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
               ? null
               : _descController.text.trim(),
           'category': _category,
+          'status': 'pending',
         },
       );
 
