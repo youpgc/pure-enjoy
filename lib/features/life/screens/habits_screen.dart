@@ -47,6 +47,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     if (cachedHabits.isNotEmpty && mounted) {
       setState(() {
         _habits = cachedHabits.map((e) => HabitModel.fromJson(e)).toList();
+        _checkinHistory = {}; // 缓存加载时重置打卡记录，避免显示旧状态
         _isLoading = false;
       });
     } else if (mounted) {
@@ -104,9 +105,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        if (_habits.isEmpty) {
-          _showError('加载习惯失败: $e');
-        }
+        _showError('加载习惯失败: $e');
       }
     }
   }
@@ -149,7 +148,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         throw Exception('添加打卡记录失败: HTTP ${checkinResult.statusCode}');
       }
 
-      _loadHabits();
+      await _loadHabits();
 
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
