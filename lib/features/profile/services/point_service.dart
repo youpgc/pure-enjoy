@@ -65,8 +65,7 @@ class PointService {
         filters: {
           'user_id': 'eq.$userId',
           'type': 'eq.checkin',
-          'created_at': 'gte.${today.toUtc().toIso8601String()}',
-          'created_at': 'lt.${tomorrow.toUtc().toIso8601String()}',
+          'and': '(created_at.gte.${today.toUtc().toIso8601String()},created_at.lt.${tomorrow.toUtc().toIso8601String()})',
         },
         columns: 'id',
       );
