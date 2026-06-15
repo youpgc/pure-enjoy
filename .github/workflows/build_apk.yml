@@ -283,7 +283,8 @@ jobs:
               \"status\": \"released\",
               \"is_active\": true,
               \"is_force_update\": false,
-              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
+              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              "created_by": "GitHub Actions"
             }")
           
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
@@ -297,7 +298,9 @@ jobs:
             echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
             echo "✅ Database record created successfully"
           else
-            echo "⚠️ Database operation returned HTTP $DB_HTTP_CODE, continuing anyway..."
+            echo "❌ Database operation failed with HTTP $DB_HTTP_CODE"
+            echo "Response: $DB_RESPONSE_BODY"
+            exit 1
           fi
 
       # 16. 清理旧 APK（只保留最新 5 个）
