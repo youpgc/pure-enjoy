@@ -131,7 +131,7 @@ jobs:
           fi
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
-          echo "apk_name=pure-enjoy-v${VERSION}+${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
+          echo "apk_name=pure-enjoy-v${VERSION}-build${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
           echo "Version: $VERSION, Build: $BUILD_NUMBER"
 
       # 10. 构建 APK
