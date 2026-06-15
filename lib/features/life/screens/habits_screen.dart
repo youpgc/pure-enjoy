@@ -9,6 +9,8 @@ import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/habit_model.dart';
+import '../models/reminder_schedule_model.dart';
+import '../widgets/reminder_schedule_picker.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
@@ -21,6 +23,7 @@ class HabitsScreen extends StatefulWidget {
 class _HabitsScreenState extends State<HabitsScreen> {
   List<HabitModel> _habits = [];
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
+  Map<String, ReminderScheduleModel> _reminderSchedules = {};
   bool _isLoading = true;
 
   String? get _userId => AuthService.instance.currentUserId;
@@ -95,10 +98,27 @@ class _HabitsScreenState extends State<HabitsScreen> {
         }
       }
 
+      // 加载提醒计划（批量查询）
+      final schedules = <String, ReminderScheduleModel>{};
+      if (items.isNotEmpty) {
+        final habitIds = items.map((h) => h.id).join(',');
+        final scheduleResult = await ApiClient.get(
+          'reminder_schedules',
+          filters: {'habit_id': 'in.($habitIds)'},
+        );
+        if (scheduleResult.isSuccess) {
+          for (final s in scheduleResult.data!) {
+            final model = ReminderScheduleModel.fromJson(s);
+            schedules[model.habitId] = model;
+          }
+        }
+      }
+
       if (mounted) {
         setState(() {
           _habits = items;
           _checkinHistory = history;
+          _reminderSchedules = schedules;
           _isLoading = false;
         });
       }
@@ -210,6 +230,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
       text: (habit?.targetDays ?? 21).toString(),
     );
 
+    // 提醒计划状态
+    ReminderScheduleModel? reminderSchedule = isEditing
+        ? _reminderSchedules[habit!.id]
+        : null;
+
     await showDialog(
       context: context,
       builder: (context) => StatefulBuilder(
@@ -218,6 +243,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           content: SingleChildScrollView(
             child: Column(
               mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 TextField(
                   controller: nameController,
@@ -243,6 +269,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   ),
                   keyboardType: TextInputType.number,
                 ),
+                const SizedBox(height: 16),
+                const Divider(),
+                const SizedBox(height: 8),
+                ReminderSchedulePicker(
+                  initialSchedule: reminderSchedule,
+                  onChanged: (schedule) {
+                    setDialogState(() {
+                      reminderSchedule = schedule;
+                    });
+                  },
+                ),
               ],
             ),
           ),
@@ -260,12 +297,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
                 final targetDays = int.tryParse(targetDaysController.text) ?? 21;
                 final userId = _userId ?? 'local_user';
+                String? habitId;
 
                 try {
                   if (isEditing) {
+                    habitId = habit!.id;
                     final result = await ApiClient.patch(
                       'habits',
-                      filters: {'id': 'eq.${habit.id}'},
+                      filters: {'id': 'eq.$habitId'},
                       body: {
                         'name': nameController.text.trim(),
                         'description': descController.text.trim().isEmpty ? null : descController.text.trim(),
@@ -276,7 +315,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       throw Exception('HTTP ${result.statusCode}');
                     }
                   } else {
-                    final habitId = const Uuid().v4();
+                    habitId = const Uuid().v4();
                     final result = await ApiClient.post(
                       'habits',
                       body: {
@@ -292,6 +331,31 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       throw Exception('HTTP ${result.statusCode}');
                     }
                   }
+
+                  // 保存提醒计划
+                  if (habitId != null && reminderSchedule != null) {
+                    final schedule = reminderSchedule!.copyWith(
+                      habitId: habitId,
+                      userId: userId,
+                    );
+
+                    if (schedule.id.isNotEmpty) {
+                      // 更新已有提醒计划
+                      await ApiClient.patch(
+                        'reminder_schedules',
+                        filters: {'id': 'eq.${schedule.id}'},
+                        body: schedule.toJsonForUpdate(),
+                      );
+                    } else {
+                      // 新建提醒计划
+                      final newId = const Uuid().v4();
+                      await ApiClient.post(
+                        'reminder_schedules',
+                        body: schedule.copyWith(id: newId).toJson(),
+                      );
+                    }
+                  }
+
                   Navigator.pop(context);
                   _loadHabits();
                 } catch (e) {
@@ -373,10 +437,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     final habit = _habits[index];
                     final isCheckedIn = _isCheckedInToday(habit.id);
                     final totalCheckins = _getTotalCheckins(habit.id);
+                    final schedule = _reminderSchedules[habit.id];
+                    final shouldRemindToday = schedule?.shouldRemindToday(DateTime.now()) ?? false;
                     return _HabitCard(
                       habit: habit,
                       isCheckedIn: isCheckedIn,
                       totalCheckins: totalCheckins,
+                      reminderSchedule: schedule,
+                      shouldRemindToday: shouldRemindToday,
                       onCheckIn: () => _checkIn(habit),
                       onEdit: () => _showEditDialog(habit: habit),
                       onDelete: () => _deleteHabit(habit.id),
@@ -396,6 +464,8 @@ class _HabitCard extends StatelessWidget {
   final HabitModel habit;
   final bool isCheckedIn;
   final int totalCheckins;
+  final ReminderScheduleModel? reminderSchedule;
+  final bool shouldRemindToday;
   final VoidCallback onCheckIn;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -405,6 +475,8 @@ class _HabitCard extends StatelessWidget {
     required this.habit,
     required this.isCheckedIn,
     required this.totalCheckins,
+    this.reminderSchedule,
+    required this.shouldRemindToday,
     required this.onCheckIn,
     required this.onEdit,
     required this.onDelete,
@@ -480,6 +552,31 @@ class _HabitCard extends StatelessWidget {
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
+                        ),
+                      ],
+                      // 提醒状态
+                      if (reminderSchedule != null && reminderSchedule!.isEnabled) ...[
+                        const SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(
+                              shouldRemindToday ? Icons.notifications_active : Icons.notifications_none,
+                              size: 14,
+                              color: shouldRemindToday
+                                  ? Theme.of(context).colorScheme.primary
+                                  : colorScheme.outline,
+                            ),
+                            const SizedBox(width: 4),
+                            Text(
+                              reminderSchedule!.getScheduleDescription(),
+                              style: TextStyle(
+                                fontSize: 11,
+                                color: shouldRemindToday
+                                    ? Theme.of(context).colorScheme.primary
+                                    : colorScheme.outline,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ],

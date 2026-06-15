@@ -1,0 +1,68 @@
+name: Create Reminder Schedules Table
+
+on:
+  workflow_dispatch:
+
+jobs:
+  create-table:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Create reminder_schedules table
+        env:
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          SUPABASE_URL="https://mhdrbjpqmzswswoazwjg.supabase.co"
+
+          RESULT=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/pg/query" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "query": "
+                CREATE TABLE IF NOT EXISTS reminder_schedules (
+                  id UUID PRIMARY KEY DEFAULT gen_random_uuid(),
+                  habit_id UUID NOT NULL,
+                  user_id VARCHAR(50) NOT NULL,
+                  schedule_type VARCHAR(20) NOT NULL DEFAULT '\''weekly'\'',
+                  week_days JSONB,
+                  month_days JSONB,
+                  months JSONB,
+                  years JSONB,
+                  dates JSONB,
+                  time TIME NOT NULL DEFAULT '\''08:00'\'',
+                  is_enabled BOOLEAN NOT NULL DEFAULT TRUE,
+                  created_at TIMESTAMPTZ DEFAULT NOW(),
+                  updated_at TIMESTAMPTZ DEFAULT NOW()
+                );
+
+                CREATE INDEX IF NOT EXISTS idx_reminder_schedules_habit_id ON reminder_schedules(habit_id);
+                CREATE INDEX IF NOT EXISTS idx_reminder_schedules_user_id ON reminder_schedules(user_id);
+                CREATE INDEX IF NOT EXISTS idx_reminder_schedules_is_enabled ON reminder_schedules(is_enabled);
+
+                ALTER TABLE reminder_schedules ENABLE ROW LEVEL SECURITY;
+
+                CREATE POLICY IF NOT EXISTS reminder_schedules_select_user ON reminder_schedules
+                  FOR SELECT USING (user_id = auth.uid()::TEXT);
+                CREATE POLICY IF NOT EXISTS reminder_schedules_insert_user ON reminder_schedules
+                  FOR INSERT WITH CHECK (user_id = auth.uid()::TEXT);
+                CREATE POLICY IF NOT EXISTS reminder_schedules_update_user ON reminder_schedules
+                  FOR UPDATE USING (user_id = auth.uid()::TEXT);
+                CREATE POLICY IF NOT EXISTS reminder_schedules_delete_user ON reminder_schedules
+                  FOR DELETE USING (user_id = auth.uid()::TEXT);
+
+                CREATE POLICY IF NOT EXISTS reminder_schedules_select_admin ON reminder_schedules
+                  FOR SELECT USING (auth.jwt() ->> '\''role'\'' = '\''admin'\'');
+                CREATE POLICY IF NOT EXISTS reminder_schedules_all_admin ON reminder_schedules
+                  FOR ALL USING (auth.jwt() ->> '\''role'\'' = '\''admin'\'');
+              "
+            }')
+
+          HTTP_CODE=$(echo "$RESULT" | tail -1)
+          echo "Result: HTTP $HTTP_CODE"
+          echo "$RESULT"
+
+          if [ "$HTTP_CODE" = "200" ]; then
+            echo "✅ reminder_schedules table created successfully"
+          else
+            echo "❌ Failed to create table (HTTP $HTTP_CODE)"
+          fi
