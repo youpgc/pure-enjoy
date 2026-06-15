@@ -73,6 +73,16 @@ class ApiClient {
   /// Supabase 基础 URL（不含 /rest/v1）
   static String get baseUrl => SupabaseConfig.url;
 
+  /// 获取带用户标识的请求头（写入操作需要 x-user-id 供 RLS 使用）
+  static Map<String, String> get _writeHeaders {
+    final headers = Map<String, String>.from(SupabaseConfig.headers);
+    final userId = AuthService.instance.currentUserId;
+    if (userId != null) {
+      headers['x-user-id'] = userId;
+    }
+    return headers;
+  }
+
   /// GET 请求
   static Future<ApiResponse<List<Map<String, dynamic>>>> get(
     String table, {
@@ -147,7 +157,7 @@ class ApiClient {
   }) async {
     try {
       final uri = Uri.parse('$_baseUrl/$table');
-      final headers = Map<String, String>.from(SupabaseConfig.headers);
+      final headers = Map<String, String>.from(_writeHeaders);
       headers['Prefer'] = returnRepresentation ? 'return=representation' : 'return=minimal';
       if (extraHeaders != null) headers.addAll(extraHeaders);
 
@@ -188,7 +198,7 @@ class ApiClient {
   }) async {
     try {
       final uri = _buildUri(table, filters: filters);
-      final headers = Map<String, String>.from(SupabaseConfig.headers);
+      final headers = Map<String, String>.from(_writeHeaders);
       headers['Prefer'] = 'return=minimal';
 
       final response = await http.patch(uri, headers: headers, body: jsonEncode(body));
@@ -214,7 +224,7 @@ class ApiClient {
   }) async {
     try {
       final uri = _buildUri(table, filters: filters);
-      final response = await http.delete(uri, headers: SupabaseConfig.headers);
+      final response = await http.delete(uri, headers: _writeHeaders);
 
       if (_isSuccess(response.statusCode) || response.statusCode == 404) {
         return ApiResponse.success(true, statusCode: response.statusCode);

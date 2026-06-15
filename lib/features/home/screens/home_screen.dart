@@ -263,6 +263,8 @@ class _DashboardPageState extends State<DashboardPage> {
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
           'Content-Type': 'application/json',
           'Prefer': 'return=minimal',
+          if (AuthService.instance.currentUserId != null)
+            'x-user-id': AuthService.instance.currentUserId!,
         },
         body: jsonEncode({
           'id': const Uuid().v4(),
