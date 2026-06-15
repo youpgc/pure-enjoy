@@ -344,11 +344,6 @@ jobs:
             -H "Content-Type: application/json" \
             -d '{"status":"revoked","revoked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > /dev/null 2>&1 || true
 
-          # 先尝试删除已存在的同版本记录（避免 409 冲突）
-          curl -s -X DELETE "$SUPABASE_URL/rest/v1/app_versions?version=eq.${{ steps.version.outputs.version }}&build_number=eq.${{ steps.version.outputs.build_number }}" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" > /dev/null 2>&1 || true
-          
           # 计算可读文件大小
           FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
           
@@ -386,26 +381,6 @@ jobs:
           if [ "$DB_HTTP_CODE" = "201" ] || [ "$DB_HTTP_CODE" = "200" ]; then
             echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
             echo "✅ Database record created successfully"
-          elif [ "$DB_HTTP_CODE" = "409" ]; then
-            # 版本已存在，更新现有记录
-            echo "⚠️ Version exists, updating..."
-            UPDATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?version=eq.${{ steps.version.outputs.version }}&build_number=eq.${{ steps.version.outputs.build_number }}" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Content-Type: application/json" \
-              -d "{
-                \"status\": \"released\",
-                \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
-                \"apk_size\": ${{ steps.filesize.outputs.bytes }},
-                \"release_notes\": \"$RELEASE_NOTES\",
-                \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-              }")
-            UPDATE_HTTP_CODE=$(echo "$UPDATE_RESPONSE" | tail -n1)
-            if [ "$UPDATE_HTTP_CODE" = "204" ]; then
-              echo "✅ Database record updated successfully"
-            else
-              echo "⚠️ Update returned HTTP $UPDATE_HTTP_CODE, continuing anyway..."
-            fi
           else
             echo "⚠️ Database operation returned HTTP $DB_HTTP_CODE, continuing anyway..."
           fi
