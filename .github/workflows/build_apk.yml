@@ -220,7 +220,88 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
-      # 14.1 清理旧 APK（只保留最新 5 个）
+      # 15. 创建版本记录到数据库
+      - name: Create version record in database
+        id: db_record
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          # 获取上次构建时间（从 app_versions 表的最新记录中获取）
+          LAST_BUILD_TIME=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=created_at&order=created_at.desc&limit=1" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
+            python3 -c 'import sys, json; data=json.load(sys.stdin); print(data[0].get("created_at","") if data else "")' 2>/dev/null || echo '')
+
+          CURRENT_SHA="${{ github.sha }}"
+          echo "Last build time: ${LAST_BUILD_TIME:-none}"
+          echo "Current SHA: $CURRENT_SHA"
+
+          # 收集上次构建到本次构建之间的所有 commit messages
+          if [ -n "$LAST_BUILD_TIME" ]; then
+            # 使用 --since 基于时间获取 commits，并去掉提交类型前缀(feat:/fix:等)
+            COMMIT_LIST=$(git log --pretty=format:"%s" --since="$LAST_BUILD_TIME" 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
+          else
+            # 首次构建，取最近 10 条
+            COMMIT_LIST=$(git log --pretty=format:"%s" -n 10 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
+          fi
+
+          # 格式化 release notes
+          if [ -n "$COMMIT_LIST" ]; then
+            RELEASE_NOTES="$COMMIT_LIST"
+          else
+            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          fi
+
+          echo "Release notes:"
+          echo -e "$RELEASE_NOTES"
+          echo ""
+          
+          echo "Creating database record..."
+          
+          # 根据是否强制更新决定 release_type
+          RELEASE_TYPE="feature"
+          
+          # 计算可读文件大小
+          FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
+          
+          DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -H "Prefer: return=representation" \
+            -d "{
+              \"version\": \"${{ steps.version.outputs.version }}\",
+              \"build_number\": ${{ steps.version.outputs.build_number }},
+              \"platform\": \"android\",
+              \"release_type\": \"$RELEASE_TYPE\",
+              \"release_notes\": \"$RELEASE_NOTES\",
+              \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
+              \"apk_size\": ${{ steps.filesize.outputs.bytes }},
+              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
+              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
+              \"status\": \"released\",
+              \"is_active\": true,
+              \"is_force_update\": false,
+              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
+              \"created_by\": \"GitHub Actions\"
+            }")
+          
+          DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
+          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
+          
+          echo "Database HTTP Code: $DB_HTTP_CODE"
+          echo "Database response: $DB_RESPONSE_BODY"
+          
+          # 处理插入结果
+          if [ "$DB_HTTP_CODE" = "201" ] || [ "$DB_HTTP_CODE" = "200" ]; then
+            echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
+            echo "✅ Database record created successfully"
+          else
+            echo "⚠️ Database operation returned HTTP $DB_HTTP_CODE, continuing anyway..."
+          fi
+
+      # 16. 清理旧 APK（只保留最新 5 个）
       - name: Clean old APKs from Storage
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
@@ -274,130 +355,6 @@ jobs:
           done
           
           echo "✅ 清理完成：删除 $DELETED / $TOTAL 个旧 APK，对应版本记录已标记为失效"
-
-      # 14.5 确保app_configs表存在（检查并提示）
-      - name: Check app_configs table
-        env:
-          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          echo "Checking if app_configs table exists..."
-          TABLE_CHECK=$(curl -s -o /dev/null -w "%{http_code}" \
-            "$SUPABASE_URL/rest/v1/app_configs?select=id&limit=1" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
-          
-          if [ "$TABLE_CHECK" = "200" ]; then
-            echo "✅ app_configs table exists"
-          else
-            echo "⚠️ app_configs table does not exist"
-            echo "⚠️ Please run database/create_app_configs.sql in Supabase Dashboard SQL Editor"
-          fi
-
-      # 15. 创建版本记录到数据库
-      - name: Create version record in database
-        id: db_record
-        env:
-          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
-        run: |
-          # 获取上次构建时间（从 app_versions 表的最新记录中获取）
-          LAST_BUILD_TIME=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=created_at&order=created_at.desc&limit=1" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
-            python3 -c 'import sys, json; data=json.load(sys.stdin); print(data[0].get("created_at","") if data else "")' 2>/dev/null || echo '')
-
-          CURRENT_SHA="${{ github.sha }}"
-          echo "Last build time: ${LAST_BUILD_TIME:-none}"
-          echo "Current SHA: $CURRENT_SHA"
-
-          # 收集上次构建到本次构建之间的所有 commit messages
-          if [ -n "$LAST_BUILD_TIME" ]; then
-            # 使用 --since 基于时间获取 commits，并去掉提交类型前缀(feat:/fix:等)
-            COMMIT_LIST=$(git log --pretty=format:"%s" --since="$LAST_BUILD_TIME" 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
-          else
-            # 首次构建，取最近 10 条
-            COMMIT_LIST=$(git log --pretty=format:"%s" -n 10 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
-          fi
-
-          # 格式化 release notes
-          if [ -n "$COMMIT_LIST" ]; then
-            RELEASE_NOTES="$COMMIT_LIST"
-          else
-            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
-          fi
-
-          echo "Release notes:"
-          echo -e "$RELEASE_NOTES"
-          echo ""
-          
-          echo "Creating database record..."
-          
-          # 根据是否强制更新决定 release_type
-          RELEASE_TYPE="feature"
-          
-          # 先将其他所有已发布版本改为已下架
-          echo "Revoking other released versions..."
-          curl -s -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "status":"revoked",
-              "is_active":false,
-              "revoked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
-            }' > /dev/null 2>&1 || true
-
-          # 计算可读文件大小
-          FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
-          
-          DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
-            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -H "Prefer: return=representation" \
-            -d "{
-              \"version\": \"${{ steps.version.outputs.version }}\",
-              \"build_number\": ${{ steps.version.outputs.build_number }},
-              \"platform\": \"android\",
-              \"release_type\": \"$RELEASE_TYPE\",
-              \"release_notes\": \"$RELEASE_NOTES\",
-              \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
-              \"apk_size\": ${{ steps.filesize.outputs.bytes }},
-              \"download_url\": \"${{ steps.upload.outputs.download_url }}\",
-              \"file_size\": ${{ steps.filesize.outputs.bytes }},
-              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
-              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
-              \"status\": \"released\",
-              \"is_active\": true,
-              \"is_force_update\": false,
-              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-              \"created_by\": \"GitHub Actions\"
-            }")
-          
-          DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
-          DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
-          
-          echo "Database HTTP Code: $DB_HTTP_CODE"
-          echo "Database response: $DB_RESPONSE_BODY"
-          
-          # 处理插入结果
-          if [ "$DB_HTTP_CODE" = "201" ] || [ "$DB_HTTP_CODE" = "200" ]; then
-            echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
-            echo "✅ Database record created successfully"
-          else
-            echo "⚠️ Database operation returned HTTP $DB_HTTP_CODE, continuing anyway..."
-          fi
-
-      # 16. 上传构建产物（作为备份）
-      # 注：GitHub Artifact 存储配额有限，APK 已上传到 Supabase Storage
-      # 如需启用 artifact 上传，请确保清理旧 artifact 释放配额
-      # - name: Upload build artifact
-      #   uses: actions/upload-artifact@v4
-      #   with:
-      #     name: pure-enjoy-apk-${{ steps.version.outputs.version }}-${{ steps.version.outputs.build_number }}
-      #     path: build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}
-      #     retention-days: 30
 
       # 17. 创建 GitHub Release（仅标签触发时）
       - name: Create GitHub Release

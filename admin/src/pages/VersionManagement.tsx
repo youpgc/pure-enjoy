@@ -50,8 +50,8 @@ interface AppVersion {
   id: string;
   version: string;
   build_number: number;
-  download_url: string;
-  file_size: number;
+  apk_url: string;
+  apk_size: number;
   checksum: string;
   release_notes: string;
   is_force_update: boolean;
@@ -263,8 +263,8 @@ const VersionManagement: React.FC = () => {
         {
           version: version,
           build_number: buildNumber,
-          download_url: urlData.publicUrl,
-          file_size: file.size,
+          apk_url: urlData.publicUrl,
+          apk_size: file.size,
           checksum: '', // 可以添加 SHA256 计算
           release_notes: values.release_notes || '',
           is_force_update: values.is_force_update || false,
@@ -410,7 +410,7 @@ const VersionManagement: React.FC = () => {
       key: 'file_info',
       render: (_: any, record: AppVersion) => (
         <Space direction="vertical" size={0}>
-          <Text type="secondary">{formatFileSize(record.file_size)}</Text>
+          <Text type="secondary">{formatFileSize(record.apk_size)}</Text>
           <Text type="secondary" copyable={{ text: record.checksum }}>
             {record.checksum?.slice(0, 8)}...
           </Text>
@@ -466,7 +466,7 @@ const VersionManagement: React.FC = () => {
             <Button
               icon={<CopyOutlined />}
               size="small"
-              onClick={() => handleCopyLink(record.download_url)}
+              onClick={() => handleCopyLink(record.apk_url)}
             />
           </Tooltip>
           <Tooltip title="编辑">
@@ -681,7 +681,7 @@ const VersionManagement: React.FC = () => {
           </Form.Item>
 
           <Form.Item
-            name="download_url"
+            name="apk_url"
             label="下载链接"
             rules={[{ required: true, message: '请输入下载链接' }]}
           >
@@ -783,7 +783,7 @@ const VersionManagement: React.FC = () => {
             type="primary"
             icon={<CopyOutlined />}
             onClick={() =>
-              selectedVersion && handleCopyLink(selectedVersion.download_url)
+              selectedVersion && handleCopyLink(selectedVersion.apk_url)
             }
           >
             复制链接
@@ -794,7 +794,7 @@ const VersionManagement: React.FC = () => {
         {selectedVersion && (
           <div style={{ textAlign: 'center', padding: 24 }}>
             <QRCode
-              value={selectedVersion.download_url}
+              value={selectedVersion.apk_url}
               size={200}
               style={{ marginBottom: 16 }}
             />
@@ -804,7 +804,7 @@ const VersionManagement: React.FC = () => {
               </Text>
             </Paragraph>
             <Paragraph type="secondary" copyable>
-              {selectedVersion.download_url}
+              {selectedVersion.apk_url}
             </Paragraph>
           </div>
         )}
@@ -852,13 +852,13 @@ const VersionManagement: React.FC = () => {
               )}
             </Descriptions.Item>
             <Descriptions.Item label="文件大小">
-              {formatFileSize(selectedVersion.file_size)}
+              {formatFileSize(selectedVersion.apk_size)}
             </Descriptions.Item>
             <Descriptions.Item label="文件名" span={2}>
               {selectedVersion.file_name}
             </Descriptions.Item>
             <Descriptions.Item label="下载链接" span={2}>
-              <Text copyable>{selectedVersion.download_url}</Text>
+              <Text copyable>{selectedVersion.apk_url}</Text>
             </Descriptions.Item>
             <Descriptions.Item label="SHA256 校验" span={2}>
               <Text copyable>{selectedVersion.checksum}</Text>
