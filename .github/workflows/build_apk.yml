@@ -261,7 +261,11 @@ jobs:
                   -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
                   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                   -H "Content-Type: application/json" \
-                  -d '{"status":"inactive","revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"}'
+                  -d '{
+                    "status":"inactive",
+                    "is_active":false,
+                    "revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+                  }'
                 echo "   📋 版本记录已标记为失效: v$VERSION+$BUILD_NUM"
               fi
             else
@@ -345,6 +349,9 @@ jobs:
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" > /dev/null 2>&1 || true
           
+          # 计算可读文件大小
+          FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
+          
           DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -353,13 +360,20 @@ jobs:
             -d "{
               \"version\": \"${{ steps.version.outputs.version }}\",
               \"build_number\": ${{ steps.version.outputs.build_number }},
+              \"platform\": \"android\",
               \"release_type\": \"$RELEASE_TYPE\",
               \"release_notes\": \"$RELEASE_NOTES\",
               \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
               \"apk_size\": ${{ steps.filesize.outputs.bytes }},
+              \"download_url\": \"${{ steps.upload.outputs.download_url }}\",
+              \"file_size\": ${{ steps.filesize.outputs.bytes }},
+              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
+              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
               \"status\": \"released\",
+              \"is_active\": true,
+              \"is_force_update\": false,
               \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-              \"created_by\": null
+              \"created_by\": \"GitHub Actions\"
             }")
           
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
