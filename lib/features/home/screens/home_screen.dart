@@ -15,6 +15,7 @@ import '../../life/screens/reminders_screen.dart';
 import '../../life/screens/habits_screen.dart';
 import '../../novel/screens/book_shelf_screen.dart';
 import '../../novel/screens/novel_reader_screen.dart';
+import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/data_export_service.dart';
@@ -256,25 +257,18 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final today = DateTime.now();
 
-      final checkinResponse = await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/habit_checkins'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-          if (AuthService.instance.currentUserId != null)
-            'x-user-id': AuthService.instance.currentUserId!,
-        },
-        body: jsonEncode({
+      final checkinResult = await ApiClient.post(
+        'habit_checkins',
+        body: {
           'id': const Uuid().v4(),
           'habit_id': habit.id,
           'checkin_at': today.toUtc().toIso8601String(),
-        }),
+        },
+        returnRepresentation: false,
       );
 
-      if (checkinResponse.statusCode != 201 && checkinResponse.statusCode != 200) {
-        throw Exception('打卡失败: HTTP ${checkinResponse.statusCode}');
+      if (!checkinResult.isSuccess) {
+        throw Exception('打卡失败: HTTP ${checkinResult.statusCode}');
       }
 
       // 刷新习惯数据
@@ -520,17 +514,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddMoodSheet(
         onSave: (diary) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/mood_diaries'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(diary.toJson()),
+            final result = await ApiClient.post(
+              'mood_diaries',
+              body: diary.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -561,17 +550,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddExpenseSheet(
         onSave: (expense) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/expenses'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(expense.toJson()),
+            final result = await ApiClient.post(
+              'expenses',
+              body: expense.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -602,17 +586,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddWeightSheet(
         onSave: (record) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/weight_records'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(record.toJson()),
+            final result = await ApiClient.post(
+              'weight_records',
+              body: record.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -643,17 +622,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddNoteSheet(
         onSave: (note) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/notes'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(note.toJson()),
+            final result = await ApiClient.post(
+              'notes',
+              body: note.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -683,17 +657,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddReminderSheet(
         onSave: (reminder) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/reminders'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(reminder.toJson()),
+            final result = await ApiClient.post(
+              'reminders',
+              body: reminder.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -724,17 +693,12 @@ class _DashboardPageState extends State<DashboardPage> {
       builder: (context) => _AddHabitSheet(
         onSave: (habit) async {
           try {
-            final response = await http.post(
-              Uri.parse('${AppConfig.supabaseUrl}/rest/v1/habits'),
-              headers: {
-                'apikey': AppConfig.supabaseAnonKey,
-                'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-                'Content-Type': 'application/json',
-                'Prefer': 'return=minimal',
-              },
-              body: jsonEncode(habit.toJson()),
+            final result = await ApiClient.post(
+              'habits',
+              body: habit.toJson(),
+              returnRepresentation: false,
             );
-            if (response.statusCode == 201 || response.statusCode == 200) {
+            if (result.isSuccess) {
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
