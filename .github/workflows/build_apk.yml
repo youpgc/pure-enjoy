@@ -342,7 +342,11 @@ jobs:
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
-            -d '{"status":"revoked","revoked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"}' > /dev/null 2>&1 || true
+            -d '{
+              "status":"revoked",
+              "is_active":false,
+              "revoked_at":"'$(date -u +%Y-%m-%dT%H:%M:%SZ)'"
+            }' > /dev/null 2>&1 || true
 
           # 计算可读文件大小
           FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
