@@ -283,8 +283,7 @@ jobs:
               \"status\": \"released\",
               \"is_active\": true,
               \"is_force_update\": false,
-              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\",
-              "created_by": "GitHub Actions"
+              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
             }")
           
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
