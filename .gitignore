@@ -13,6 +13,5 @@ supabase/
 # Flutter/Dart 生成文件
 .dart_tool/
 .flutter-plugins*
-android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
 android/local.properties
 pubspec.lock
