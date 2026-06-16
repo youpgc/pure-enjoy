@@ -181,7 +181,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final result = await ApiClient.get('habits',
           filters: {'user_id': userId, 'is_active': true},
           select: '*',
-          orderBy: 'created_at.desc');
+          order: 'created_at.desc');
 
       if (result.isSuccess) {
         final List data = result.data as List;
@@ -194,7 +194,7 @@ class _DashboardPageState extends State<DashboardPage> {
           final checkinsResult = await ApiClient.get('habit_checkins',
               filters: {'habit_id': habitIds},
               select: '*',
-              orderBy: 'checkin_at.desc');
+              order: 'checkin_at.desc');
 
           if (checkinsResult.isSuccess) {
             final List checkinsData = checkinsResult.data as List;
@@ -316,17 +316,17 @@ class _DashboardPageState extends State<DashboardPage> {
         ApiClient.get('expenses',
             filters: {'user_id': userId},
             select: '*,created_at',
-            orderBy: 'created_at.desc',
+            order: 'created_at.desc',
             limit: 1),
         ApiClient.get('mood_diaries',
             filters: {'user_id': userId},
             select: '*,created_at',
-            orderBy: 'created_at.desc',
+            order: 'created_at.desc',
             limit: 1),
         ApiClient.get('weight_records',
             filters: {'user_id': userId},
             select: '*,created_at',
-            orderBy: 'created_at.desc',
+            order: 'created_at.desc',
             limit: 1),
       ];
 
@@ -408,7 +408,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final result = await ApiClient.get('reminders',
           filters: {'user_id': userId, 'is_completed': false},
           select: '*',
-          orderBy: 'remind_at.asc',
+          order: 'remind_at.asc',
           limit: 3);
 
       if (result.isSuccess) {
@@ -441,7 +441,7 @@ class _DashboardPageState extends State<DashboardPage> {
       final result = await ApiClient.get('user_novels',
           filters: {'user_id': userId, 'is_collected': true},
           select: '*,novels:novel_id(*)',
-          orderBy: 'last_read_at.desc.nullslast',
+          order: 'last_read_at.desc.nullslast',
           limit: 5);
 
       if (result.isSuccess) {

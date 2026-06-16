@@ -281,7 +281,7 @@ class ApiClient {
     // select: Supabase PostgREST 语法，支持嵌套选择、外键关联等（如 "id,name,orders(*)"）
     // columns: 简单列名列表，逗号分隔（如 "id,name,created_at"）
     // 如果 columns 不为空，优先使用 columns，忽略 select
-    final selectValue = columns.isNotEmpty ? columns : select;
+    final selectValue = (columns != null && columns.isNotEmpty) ? columns : select;
     if (selectValue != null) {
       params['select'] = selectValue;
     }
