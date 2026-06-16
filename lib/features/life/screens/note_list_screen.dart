@@ -321,7 +321,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                                             DateTimeUtils.formatStandard(note.createdAt),
                                             style: TextStyle(
                                               fontSize: 10,
-                                              color: colorScheme.outline.withOpacity(0.7),
+                                              color: colorScheme.outline.withValues(alpha: 0.7),
                                             ),
                                           ),
                                         ],

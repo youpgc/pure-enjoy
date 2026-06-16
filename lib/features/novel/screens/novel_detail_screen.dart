@@ -419,7 +419,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                         end: Alignment.bottomCenter,
                         colors: [
                           Colors.transparent,
-                          Theme.of(context).colorScheme.onSurface.withOpacity(0.3),
+                          Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
                           colorScheme.surface,
                         ],
                         stops: const [0.0, 0.5, 1.0],
@@ -485,7 +485,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                 novel.author ?? '佚名',
                                 style: TextStyle(
                                   fontSize: 14,
-                                  color: Colors.white.withOpacity(0.9),
+                                  color: Colors.white.withValues(alpha: 0.9),
                                 ),
                               ),
                               const SizedBox(height: 4),

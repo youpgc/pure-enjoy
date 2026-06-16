@@ -185,7 +185,7 @@ class _LifeScreenState extends State<LifeScreen> {
   Widget _buildShimmerCard(Color baseColor) {
     return Expanded(
       child: Card(
-        color: baseColor.withOpacity(0.3),
+        color: baseColor.withValues(alpha: 0.3),
         elevation: 2,
         child: Padding(
           padding: const EdgeInsets.all(12),
@@ -198,7 +198,7 @@ class _LifeScreenState extends State<LifeScreen> {
                     width: 28,
                     height: 28,
                     decoration: BoxDecoration(
-                      color: baseColor.withOpacity(0.5),
+                      color: baseColor.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(6),
                     ),
                   ),
@@ -207,7 +207,7 @@ class _LifeScreenState extends State<LifeScreen> {
                     width: 40,
                     height: 14,
                     decoration: BoxDecoration(
-                      color: baseColor.withOpacity(0.5),
+                      color: baseColor.withValues(alpha: 0.5),
                       borderRadius: BorderRadius.circular(4),
                     ),
                   ),
@@ -218,7 +218,7 @@ class _LifeScreenState extends State<LifeScreen> {
                 width: double.infinity,
                 height: 12,
                 decoration: BoxDecoration(
-                  color: baseColor.withOpacity(0.4),
+                  color: baseColor.withValues(alpha: 0.4),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -227,7 +227,7 @@ class _LifeScreenState extends State<LifeScreen> {
                 width: 60,
                 height: 10,
                 decoration: BoxDecoration(
-                  color: baseColor.withOpacity(0.3),
+                  color: baseColor.withValues(alpha: 0.3),
                   borderRadius: BorderRadius.circular(4),
                 ),
               ),
@@ -346,7 +346,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.track_changes,
           title: '习惯打卡',
           subtitle: '培养好习惯',
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.7),
+          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
@@ -359,7 +359,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.cake,
           title: '生日',
           subtitle: '记录亲友生日',
-          color: Theme.of(context).colorScheme.tertiaryContainer.withOpacity(0.7),
+          color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
@@ -371,7 +371,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.celebration,
           title: '纪念日',
           subtitle: '记录重要日子',
-          color: Theme.of(context).colorScheme.secondaryContainer.withOpacity(0.7),
+          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
@@ -383,7 +383,7 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.bar_chart,
           title: '数据统计',
           subtitle: '消费/体重/心情图表',
-          color: Theme.of(context).colorScheme.primaryContainer.withOpacity(0.5),
+          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.5),
           onTap: (context) {
             Navigator.push(
               context,

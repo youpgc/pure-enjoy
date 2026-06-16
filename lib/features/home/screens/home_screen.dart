@@ -1169,7 +1169,7 @@ class _ToolCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 24),
@@ -2523,7 +2523,7 @@ class _ThemeSettingsScreen extends StatelessWidget {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: scheme.seedColor.withOpacity(0.4),
+                                      color: scheme.seedColor.withValues(alpha: 0.4),
                                       blurRadius: 8,
                                     ),
                                   ]
@@ -2629,7 +2629,7 @@ class _ThemeSettingsScreen extends StatelessWidget {
                             border: Border.all(
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                                  : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                               width: isSelected ? 3 : 1,
                             ),
                           ),
@@ -2841,7 +2841,7 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: (_typeColors[type] ?? Theme.of(context).colorScheme.onSurfaceVariant).withOpacity(0.1),
+                              color: (_typeColors[type] ?? Theme.of(context).colorScheme.onSurfaceVariant).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(

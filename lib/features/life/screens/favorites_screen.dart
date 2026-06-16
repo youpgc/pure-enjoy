@@ -434,7 +434,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                       DateTimeUtils.formatStandard(favorite.createdAt),
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: colorScheme.outline.withOpacity(0.7),
+                                        color: colorScheme.outline.withValues(alpha: 0.7),
                                       ),
                                     ),
                                   ],

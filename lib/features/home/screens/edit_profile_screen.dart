@@ -341,7 +341,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                               Positioned.fill(
                                 child: CircleAvatar(
                                   radius: 50,
-                                  backgroundColor: Theme.of(context).colorScheme.onSurface.withOpacity(0.5),
+                                  backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
                                   child: const SizedBox(
                                     width: 24,
                                     height: 24,
