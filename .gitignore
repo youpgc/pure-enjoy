@@ -9,3 +9,10 @@ sql/
 # 数据库迁移文件和Supabase配置（敏感/本地开发用，不上传仓库）
 database/
 supabase/
+
+# Flutter/Dart 生成文件
+.dart_tool/
+.flutter-plugins*
+android/app/src/main/java/io/flutter/plugins/GeneratedPluginRegistrant.java
+android/local.properties
+pubspec.lock
