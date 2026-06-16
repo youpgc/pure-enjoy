@@ -953,14 +953,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               '$_currentTime  $_batteryLevel%',
               style: TextStyle(
                 fontSize: 12,
-                color: _background.textColor.withValues(alpha: 0.5),
+                color: _background.textColor.withOpacity(0.5),
               ),
             ),
             Text(
               '${(_readingProgress * 100).toStringAsFixed(1)}%',
               style: TextStyle(
                 fontSize: 12,
-                color: _background.textColor.withValues(alpha: 0.5),
+                color: _background.textColor.withOpacity(0.5),
               ),
             ),
           ],
@@ -1054,7 +1054,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               icon: Icon(
                 Icons.arrow_back_ios_new,
                 size: 18,
-                color: _background.textColor.withValues(alpha: 0.7),
+                color: _background.textColor.withOpacity(0.7),
               ),
               onPressed: () => Navigator.pop(context),
               padding: EdgeInsets.zero,
@@ -1066,7 +1066,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                 _currentChapter?.title ?? widget.novel.title,
                 style: TextStyle(
                   fontSize: 13,
-                  color: _background.textColor.withValues(alpha: 0.6),
+                  color: _background.textColor.withOpacity(0.6),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1085,7 +1085,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       child: SlideTransition(
         position: _topToolbarSlideAnimation,
         child: Container(
-          color: Colors.black.withValues(alpha: 0.5),
+          color: Colors.black.withOpacity(0.5),
           child: SafeArea(
             bottom: false,
             child: Padding(
@@ -1160,7 +1160,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       child: SlideTransition(
         position: _bottomToolbarSlideAnimation,
         child: Container(
-          color: Colors.black.withValues(alpha: 0.5),
+          color: Colors.black.withOpacity(0.5),
           child: SafeArea(
             top: false,
             child: Column(
@@ -1177,7 +1177,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _background.textColor,
-                              side: BorderSide(color: _background.textColor.withValues(alpha: 0.3)),
+                              side: BorderSide(color: _background.textColor.withOpacity(0.3)),
                             ),
                             child: const Text('上一章'),
                           ),
@@ -1252,7 +1252,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       backgroundColor: _background.bgColor,
       appBar: null, // 始终不显示 AppBar
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _background.textColor.withValues(alpha: 0.5)))
+          ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
           : _currentChapter == null
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
               : Stack(
@@ -1260,7 +1260,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                     // 第1层：内容区域
                     Positioned.fill(
                       child: _isLoadingChapter
-                          ? Center(child: CircularProgressIndicator(color: _background.textColor.withValues(alpha: 0.5)))
+                          ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
                           : _buildContent(),
                     ),
 
@@ -1298,7 +1298,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           padding: const EdgeInsets.only(top: 44),
                           child: LinearProgressIndicator(
                             value: _readingProgress,
-                            backgroundColor: _background.textColor.withValues(alpha: 0.1),
+                            backgroundColor: _background.textColor.withOpacity(0.1),
                             valueColor: AlwaysStoppedAnimation<Color>(
                               _background == ReaderBackground.dark
                                   ? Theme.of(context).colorScheme.primary
@@ -1355,7 +1355,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               Center(
                 child: Text(
                   '${_currentChapter!.title} - 完',
-                  style: TextStyle(fontSize: 14, color: _background.textColor.withValues(alpha: 0.5)),
+                  style: TextStyle(fontSize: 14, color: _background.textColor.withOpacity(0.5)),
                 ),
               ),
               const SizedBox(height: 24),

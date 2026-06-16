@@ -501,7 +501,7 @@ class _HabitCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: habitColor.withValues(alpha: 0.2),
+                    color: habitColor.withOpacity(0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -529,7 +529,7 @@ class _HabitCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
+                                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(

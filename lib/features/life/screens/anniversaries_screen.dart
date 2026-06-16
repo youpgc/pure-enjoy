@@ -669,8 +669,8 @@ class _AnniversaryCard extends StatelessWidget {
 
     // 根据类型选择颜色
     final cardColor = isBirthday
-        ? colorScheme.primaryContainer.withValues(alpha: 0.5)
-        : colorScheme.tertiaryContainer.withValues(alpha: 0.5);
+        ? colorScheme.primaryContainer.withOpacity(0.5)
+        : colorScheme.tertiaryContainer.withOpacity(0.5);
 
     final iconColor = isBirthday
         ? colorScheme.primary
@@ -749,7 +749,7 @@ class _AnniversaryCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withValues(alpha: 0.15),
+                                color: Colors.orange.withOpacity(0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Text(
