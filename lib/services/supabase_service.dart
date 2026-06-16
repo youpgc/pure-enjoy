@@ -4,6 +4,7 @@ import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import 'api_client.dart';
 
 /// 缓存条目
 class _CacheEntry {
@@ -130,19 +131,15 @@ class AuthService {
       final userId = currentUserId;
       if (userId == null) return;
 
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
-        ),
-        headers: authHeaders,
+      final result = await ApiClient.get(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
       );
 
-      if (response.statusCode == 200) {
-        final users = jsonDecode(response.body) as List;
-        if (users.isNotEmpty) {
-          await _saveUser(users[0] as Map<String, dynamic>);
-          debugPrint('✅ 用户信息已静默刷新');
-        }
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        await _saveUser(result.data!.first);
+        debugPrint('✅ 用户信息已静默刷新');
       }
     } catch (e) {
       debugPrint('⚠️ 静默刷新用户信息失败: $e');
@@ -166,23 +163,25 @@ class AuthService {
 
       debugPrint('🔐 登录请求: email=$email, hash=${passwordHash.substring(0, 8)}...');
 
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?email=eq.$email&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'users',
+        filters: {
+          'email': 'eq.$email',
+          'password_hash': 'eq.$passwordHash',
+        },
+        select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
       );
 
-      debugPrint('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+      debugPrint('🔐 登录响应: isSuccess=${result.isSuccess}, data=${result.data}');
 
-      if (response.statusCode == 200) {
-        final users = jsonDecode(response.body) as List;
-        if (users.isEmpty) {
+      if (result.isSuccess) {
+        final users = result.data;
+        if (users == null || users.isEmpty) {
           debugPrint('❌ 邮箱或密码错误');
           return false;
         }
 
-        final user = users[0] as Map<String, dynamic>;
+        final user = users.first;
 
         // 检查用户状态
         if (user['status'] != 'active') {
@@ -193,21 +192,19 @@ class AuthService {
         await _saveUser(user);
 
         // 更新最后登录信息
-        await http.patch(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
-          ),
-          headers: SupabaseConfig.writeHeaders,
-          body: jsonEncode({
+        await ApiClient.patch(
+          'users',
+          filters: {'id': 'eq.${user['id']}'},
+          body: {
             'last_login_at': DateTime.now().toUtc().toIso8601String(),
             'login_count': (user['login_count'] ?? 0) + 1,
-          }),
+          },
         );
 
         debugPrint('✅ 登录成功: ${user['nickname']}');
         return true;
       } else {
-        debugPrint('❌ 登录失败: HTTP ${response.statusCode}');
+        debugPrint('❌ 登录失败: ${result.errorMessage}');
         return false;
       }
     } catch (e) {
@@ -248,14 +245,16 @@ class AuthService {
       }
 
       // 邮箱或手机号直接查询
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?$queryField=eq.${Uri.encodeComponent(account)}&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'users',
+        filters: {
+          queryField: 'eq.${Uri.encodeComponent(account)}',
+          'password_hash': 'eq.$passwordHash',
+        },
+        select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url',
       );
 
-      return await _processLoginResponse(response);
+      return await _processLoginResult(result);
     } catch (e) {
       debugPrint('❌ signInWithAccount error: $e');
       return false;
@@ -283,14 +282,16 @@ class AuthService {
   }) async {
     try {
       // 使用 or 查询：username=account or nickname=account
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?or=(username.eq.${Uri.encodeComponent(account)},nickname.eq.${Uri.encodeComponent(account)})&password_hash=eq.$passwordHash&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'users',
+        filters: {
+          'or': '(username.eq.${Uri.encodeComponent(account)},nickname.eq.${Uri.encodeComponent(account)})',
+          'password_hash': 'eq.$passwordHash',
+        },
+        select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url',
       );
 
-      return await _processLoginResponse(response);
+      return await _processLoginResult(result);
     } catch (e) {
       debugPrint('❌ _signInWithUsernameOrNickname error: $e');
       return false;
@@ -298,17 +299,17 @@ class AuthService {
   }
 
   /// 处理登录响应
-  Future<bool> _processLoginResponse(http.Response response) async {
-    debugPrint('🔐 登录响应: statusCode=${response.statusCode}, body=${response.body.length > 200 ? response.body.substring(0, 200) : response.body}');
+  Future<bool> _processLoginResult(ApiResponse<List<Map<String, dynamic>>> result) async {
+    debugPrint('🔐 登录响应: isSuccess=${result.isSuccess}, data=${result.data}');
 
-    if (response.statusCode == 200) {
-      final users = jsonDecode(response.body) as List;
-      if (users.isEmpty) {
+    if (result.isSuccess) {
+      final users = result.data;
+      if (users == null || users.isEmpty) {
         debugPrint('❌ 账号或密码错误');
         return false;
       }
 
-      final user = users[0] as Map<String, dynamic>;
+      final user = users.first;
 
       if (user['status'] != 'active') {
         debugPrint('❌ 用户已被禁用: ${user['status']}');
@@ -317,21 +318,19 @@ class AuthService {
 
       await _saveUser(user);
 
-      await http.patch(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?id=eq.${user['id']}',
-        ),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode({
+      await ApiClient.patch(
+        'users',
+        filters: {'id': 'eq.${user['id']}'},
+        body: {
           'last_login_at': DateTime.now().toUtc().toIso8601String(),
           'login_count': (user['login_count'] ?? 0) + 1,
-        }),
+        },
       );
 
       debugPrint('✅ 登录成功: ${user['nickname']}');
       return true;
     } else {
-      debugPrint('❌ 登录失败: HTTP ${response.statusCode}');
+      debugPrint('❌ 登录失败: ${result.errorMessage}');
       return false;
     }
   }
@@ -493,20 +492,20 @@ class AuthService {
         'updated_at': now,
       };
 
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/users'),
-        headers: SupabaseConfig.writeHeaders,
-        body: jsonEncode(userData),
+      final response = await ApiClient.post(
+        'users',
+        body: userData,
+        returnRepresentation: true,
       );
 
-      debugPrint('📝 注册响应: statusCode=${response.statusCode}, body=${response.body.length > 300 ? response.body.substring(0, 300) : response.body}');
+      debugPrint('📝 注册响应: isSuccess=${response.isSuccess}, data=${response.data}');
 
-      if (response.statusCode == 200 || response.statusCode == 201) {
+      if (response.isSuccess) {
         await _saveUser(userData);
         debugPrint('✅ 注册成功: $username');
         return true;
       } else {
-        debugPrint('❌ 注册失败: ${response.statusCode} ${response.body}');
+        debugPrint('❌ 注册失败: ${response.errorMessage}');
         return false;
       }
     } catch (e) {
@@ -547,19 +546,15 @@ class AuthService {
       final userId = currentUserId;
       if (userId == null) return false;
 
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&select=id,email,nickname,phone,role,member_level,points,status,avatar_url',
-        ),
-        headers: SupabaseConfig.headers,
+      final result = await ApiClient.get(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url',
       );
 
-      if (response.statusCode == 200) {
-        final users = jsonDecode(response.body) as List;
-        if (users.isNotEmpty) {
-          await _saveUser(users[0] as Map<String, dynamic>);
-          return true;
-        }
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        await _saveUser(result.data!.first);
+        return true;
       }
       return false;
     } catch (e) {
@@ -582,41 +577,40 @@ class AuthService {
 
       // 1. 验证旧密码
       final oldPasswordHash = _hashPassword(oldPassword);
-      final verifyResponse = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?id=eq.$userId&password_hash=eq.$oldPasswordHash&select=id',
-        ),
-        headers: SupabaseConfig.headers,
+      final verifyResult = await ApiClient.get(
+        'users',
+        filters: {
+          'id': 'eq.$userId',
+          'password_hash': 'eq.$oldPasswordHash',
+        },
+        select: 'id',
       );
 
-      if (verifyResponse.statusCode != 200) {
+      if (!verifyResult.isSuccess) {
         return {'success': false, 'message': '验证旧密码失败，请重试'};
       }
 
-      final users = jsonDecode(verifyResponse.body) as List;
-      if (users.isEmpty) {
+      final users = verifyResult.data;
+      if (users == null || users.isEmpty) {
         return {'success': false, 'message': '旧密码不正确'};
       }
 
       // 2. 更新为新密码
       final newPasswordHash = _hashPassword(newPassword);
-      final updateResponse = await http.patch(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/users?id=eq.$userId'),
-        headers: {
-          ...SupabaseConfig.writeHeaders,
-          'x-user-id': userId,
-        },
-        body: jsonEncode({
+      final updateResult = await ApiClient.patch(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        body: {
           'password_hash': newPasswordHash,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
       );
 
-      if (updateResponse.statusCode == 200 || updateResponse.statusCode == 204) {
+      if (updateResult.isSuccess) {
         debugPrint('✅ 密码修改成功: $userId');
         return {'success': true, 'message': '密码修改成功'};
       } else {
-        debugPrint('❌ 密码修改失败: ${updateResponse.statusCode} ${updateResponse.body}');
+        debugPrint('❌ 密码修改失败: ${updateResult.errorMessage}');
         return {'success': false, 'message': '密码修改失败，请重试'};
       }
     } catch (e) {

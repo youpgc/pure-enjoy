@@ -178,38 +178,28 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/habits?user_id=eq.$userId&is_active=eq.true&select=*&order=created_at.desc',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
+      final result = await ApiClient.get('habits',
+          filters: {'user_id': userId, 'is_active': true},
+          select: '*',
+          orderBy: 'created_at.desc');
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final habits = data.map((e) => HabitModel.fromJson(e)).toList();
+      if (result.isSuccess) {
+        final List data = result.data as List;
+        final habits = data.map((e) => HabitModel.fromJson(e as Map<String, dynamic>)).toList();
 
         // 批量加载所有习惯的打卡记录
         final history = <String, List<HabitCheckinModel>>{};
         if (habits.isNotEmpty) {
-          final habitIds = habits.map((h) => h.id).join(',');
-          final checkinsResponse = await http.get(
-            Uri.parse(
-              '${AppConfig.supabaseUrl}/rest/v1/habit_checkins?habit_id=in.($habitIds)&select=*&order=checkin_at.desc',
-            ),
-            headers: {
-              'apikey': AppConfig.supabaseAnonKey,
-              'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-            },
-          );
+          final habitIds = habits.map((h) => h.id).toList();
+          final checkinsResult = await ApiClient.get('habit_checkins',
+              filters: {'habit_id': habitIds},
+              select: '*',
+              orderBy: 'checkin_at.desc');
 
-          if (checkinsResponse.statusCode == 200) {
-            final List checkinsData = jsonDecode(checkinsResponse.body);
+          if (checkinsResult.isSuccess) {
+            final List checkinsData = checkinsResult.data as List;
             for (final checkin in checkinsData) {
-              final model = HabitCheckinModel.fromJson(checkin);
+              final model = HabitCheckinModel.fromJson(checkin as Map<String, dynamic>);
               final habitId = model.habitId;
               history.putIfAbsent(habitId, () => []).add(model);
             }
@@ -321,41 +311,33 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      final headers = {
-        'apikey': AppConfig.supabaseAnonKey,
-        'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-      };
-
       // 并行查询 expenses、mood_diaries、weight_records 各最新一条
       final futures = [
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/expenses?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
-          ),
-          headers: headers,
-        ),
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/mood_diaries?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
-          ),
-          headers: headers,
-        ),
-        http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/weight_records?user_id=eq.$userId&select=*,created_at&order=created_at.desc&limit=1',
-          ),
-          headers: headers,
-        ),
+        ApiClient.get('expenses',
+            filters: {'user_id': userId},
+            select: '*,created_at',
+            orderBy: 'created_at.desc',
+            limit: 1),
+        ApiClient.get('mood_diaries',
+            filters: {'user_id': userId},
+            select: '*,created_at',
+            orderBy: 'created_at.desc',
+            limit: 1),
+        ApiClient.get('weight_records',
+            filters: {'user_id': userId},
+            select: '*,created_at',
+            orderBy: 'created_at.desc',
+            limit: 1),
       ];
 
-      final responses = await Future.wait(futures);
+      final results = await Future.wait(futures);
 
       final activities = <Map<String, dynamic>>[];
 
       // 解析心情日记
-      final diaryResponse = responses[1];
-      if (diaryResponse.statusCode == 200) {
-        final list = jsonDecode(diaryResponse.body) as List;
+      final diaryResult = results[1];
+      if (diaryResult.isSuccess) {
+        final list = diaryResult.data as List;
         if (list.isNotEmpty) {
           final item = list[0] as Map<String, dynamic>;
           activities.add({
@@ -369,9 +351,9 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       // 解析支出记录
-      final expenseResponse = responses[0];
-      if (expenseResponse.statusCode == 200) {
-        final list = jsonDecode(expenseResponse.body) as List;
+      final expenseResult = results[0];
+      if (expenseResult.isSuccess) {
+        final list = expenseResult.data as List;
         if (list.isNotEmpty) {
           final item = list[0] as Map<String, dynamic>;
           activities.add({
@@ -385,9 +367,9 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       // 解析体重记录
-      final weightResponse = responses[2];
-      if (weightResponse.statusCode == 200) {
-        final list = jsonDecode(weightResponse.body) as List;
+      final weightResult = results[2];
+      if (weightResult.isSuccess) {
+        final list = weightResult.data as List;
         if (list.isNotEmpty) {
           final item = list[0] as Map<String, dynamic>;
           activities.add({
@@ -423,19 +405,15 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/reminders?user_id=eq.$userId&is_completed=eq.false&select=*&order=remind_at.asc&limit=3',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
+      final result = await ApiClient.get('reminders',
+          filters: {'user_id': userId, 'is_completed': false},
+          select: '*',
+          orderBy: 'remind_at.asc',
+          limit: 3);
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
-        final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
+      if (result.isSuccess) {
+        final List data = result.data as List;
+        final reminders = data.map((e) => ReminderModel.fromJson(e as Map<String, dynamic>)).toList();
         if (mounted) {
           setState(() {
             _pendingReminders = reminders;
@@ -443,7 +421,7 @@ class _DashboardPageState extends State<DashboardPage> {
           });
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception(result.errorMessage);
       }
     } catch (e) {
       debugPrint('加载提醒失败: $e');
@@ -460,26 +438,23 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/user_novels?user_id=eq.$userId&is_collected=eq.true&select=*,novels:novel_id(*)&order=last_read_at.desc.nullslast&limit=5',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
-      );
+      final result = await ApiClient.get('user_novels',
+          filters: {'user_id': userId, 'is_collected': true},
+          select: '*,novels:novel_id(*)',
+          orderBy: 'last_read_at.desc.nullslast',
+          limit: 5);
 
-      if (response.statusCode == 200) {
-        final List data = jsonDecode(response.body);
+      if (result.isSuccess) {
+        final List data = result.data as List;
         final novels = <Map<String, dynamic>>[];
         for (final item in data) {
-          final novelData = item['novels'] as Map<String, dynamic>?;
+          final itemMap = item as Map<String, dynamic>;
+          final novelData = itemMap['novels'] as Map<String, dynamic>?;
           if (novelData != null) {
             novels.add({
               'novel': NovelModel.fromJson(novelData),
-              'lastChapter': item['last_chapter'] as int? ?? 1,
-              'progress': item['progress'] as num? ?? 0.0,
+              'lastChapter': itemMap['last_chapter'] as int? ?? 1,
+              'progress': itemMap['progress'] as num? ?? 0.0,
             });
           }
         }
@@ -490,7 +465,7 @@ class _DashboardPageState extends State<DashboardPage> {
           });
         }
       } else {
-        throw Exception('HTTP ${response.statusCode}');
+        throw Exception(result.errorMessage);
       }
     } catch (e) {
       debugPrint('加载最近阅读失败: $e');
@@ -528,7 +503,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _loadRecentActivities();
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
@@ -564,7 +539,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _loadRecentActivities();
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
@@ -600,7 +575,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _loadRecentActivities();
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
@@ -635,7 +610,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
@@ -671,7 +646,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 _loadPendingReminders();
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
@@ -706,7 +681,7 @@ class _DashboardPageState extends State<DashboardPage> {
                 );
               }
             } else {
-              throw Exception('HTTP ${response.statusCode}');
+              throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {

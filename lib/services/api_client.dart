@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
@@ -95,7 +96,9 @@ class ApiClient {
   }) async {
     try {
       final uri = _buildUri(table, select: select, columns: columns, filters: filters, order: order, limit: limit, offset: offset);
-      final response = await http.get(uri, headers: _authHeaders);
+      final response = await http.get(uri, headers: _authHeaders).timeout(
+        const Duration(seconds: 30),
+      );
 
       if (_isSuccess(response.statusCode)) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -110,6 +113,8 @@ class ApiClient {
       );
     } on SocketException {
       return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
+    } on TimeoutException {
+      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
     } on FormatException {
       return ApiResponse.error('数据解析失败', statusCode: 0);
     } catch (e) {
@@ -125,7 +130,9 @@ class ApiClient {
   }) async {
     try {
       final uri = _buildUri(table, select: select, filters: filters);
-      final response = await http.get(uri, headers: _authHeaders);
+      final response = await http.get(uri, headers: _authHeaders).timeout(
+        const Duration(seconds: 30),
+      );
 
       if (_isSuccess(response.statusCode)) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -143,6 +150,10 @@ class ApiClient {
       );
     } on SocketException {
       return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
+    } on TimeoutException {
+      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
+    } on FormatException {
+      return ApiResponse.error('数据解析失败', statusCode: 0);
     } catch (e) {
       return ApiResponse.error('请求异常: $e', statusCode: 0);
     }
@@ -161,7 +172,9 @@ class ApiClient {
       headers['Prefer'] = returnRepresentation ? 'return=representation' : 'return=minimal';
       if (extraHeaders != null) headers.addAll(extraHeaders);
 
-      final response = await http.post(uri, headers: headers, body: jsonEncode(body));
+      final response = await http.post(uri, headers: headers, body: jsonEncode(body)).timeout(
+        const Duration(seconds: 30),
+      );
 
       if (_isSuccess(response.statusCode)) {
         if (response.body.isEmpty) {
@@ -185,6 +198,8 @@ class ApiClient {
       );
     } on SocketException {
       return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
+    } on TimeoutException {
+      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
     } catch (e) {
       return ApiResponse.error('请求异常: $e', statusCode: 0);
     }
@@ -201,7 +216,9 @@ class ApiClient {
       final headers = Map<String, String>.from(_authHeaders);
       headers['Prefer'] = 'return=minimal';
 
-      final response = await http.patch(uri, headers: headers, body: jsonEncode(body));
+      final response = await http.patch(uri, headers: headers, body: jsonEncode(body)).timeout(
+        const Duration(seconds: 30),
+      );
 
       if (_isSuccess(response.statusCode)) {
         return ApiResponse.success(true, statusCode: response.statusCode);
@@ -212,6 +229,8 @@ class ApiClient {
       );
     } on SocketException {
       return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
+    } on TimeoutException {
+      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
     } catch (e) {
       return ApiResponse.error('请求异常: $e', statusCode: 0);
     }
@@ -224,7 +243,9 @@ class ApiClient {
   }) async {
     try {
       final uri = _buildUri(table, filters: filters);
-      final response = await http.delete(uri, headers: _authHeaders);
+      final response = await http.delete(uri, headers: _authHeaders).timeout(
+        const Duration(seconds: 30),
+      );
 
       if (_isSuccess(response.statusCode) || response.statusCode == 404) {
         return ApiResponse.success(true, statusCode: response.statusCode);
@@ -235,6 +256,8 @@ class ApiClient {
       );
     } on SocketException {
       return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
+    } on TimeoutException {
+      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
     } catch (e) {
       return ApiResponse.error('请求异常: $e', statusCode: 0);
     }
@@ -255,11 +278,12 @@ class ApiClient {
     if (filters != null && filters.isNotEmpty) {
       params.addAll(filters);
     }
-    if (select != null) {
-      params['select'] = select;
-    }
-    if (columns != null) {
-      params['select'] = columns;
+    // select: Supabase PostgREST 语法，支持嵌套选择、外键关联等（如 "id,name,orders(*)"）
+    // columns: 简单列名列表，逗号分隔（如 "id,name,created_at"）
+    // 如果 columns 不为空，优先使用 columns，忽略 select
+    final selectValue = columns.isNotEmpty ? columns : select;
+    if (selectValue != null) {
+      params['select'] = selectValue;
     }
     if (order != null) {
       params['order'] = order;
