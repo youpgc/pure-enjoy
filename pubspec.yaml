@@ -21,7 +21,7 @@ dependencies:
   # 状态管理
   provider: ^6.1.1
   # 工具
-  intl: ^0.20.2
+  intl: ^0.19.0
   uuid: ^4.3.1
   # 密码加密
   crypto: ^3.0.3
