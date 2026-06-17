@@ -2,6 +2,8 @@
 
 # 非功能性文档和脚本（本地开发参考，不上传仓库）
 sql/
+!sql/fix_logs_rls.sql
+!sql/create_rpc_functions.sql
 
 # 组件规范文档（需要提交到仓库）
 !docs/COMPONENT_GUIDELINES.md
