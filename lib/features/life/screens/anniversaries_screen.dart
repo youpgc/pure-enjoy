@@ -584,9 +584,9 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   /// 格式化日期显示（支持农历）
   String _formatDate(AnniversaryModel item) {
     if (item.isLunar && item.lunarDateStr.isNotEmpty) {
-      return '农历${item.lunarDateStr} (${DateTimeUtils.formatStandard(item.date)})';
+      return '农历${item.lunarDateStr} (${DateTimeUtils.formatDate(item.date)})';
     }
-    return DateTimeUtils.formatStandard(item.date);
+    return DateTimeUtils.formatDate(item.date);
   }
 
   /// 获取距离天数的描述文本

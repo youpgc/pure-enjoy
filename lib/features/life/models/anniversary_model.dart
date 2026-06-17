@@ -1,4 +1,5 @@
 import 'package:lunar/lunar.dart';
+import '../../utils/date_time_utils.dart';
 
 /// 纪念日模型 - 对应 Supabase user_anniversaries 表
 /// 字段: id(TEXT), user_id(TEXT), user_nickname(TEXT?), title(TEXT), date(DateTime),
@@ -59,7 +60,7 @@ class AnniversaryModel {
       'user_id': userId,
       'user_nickname': userNickname,
       'title': title,
-      'date': DateTime(date.year, date.month, date.day, 12).toIso8601String(),
+      'date': DateTimeUtils.toDateString(date),
       'type': type,
       'description': description,
       'repeat_yearly': repeatYearly,
@@ -74,7 +75,7 @@ class AnniversaryModel {
     return {
       'user_nickname': userNickname,
       'title': title,
-      'date': DateTime(date.year, date.month, date.day, 12).toIso8601String(),
+      'date': DateTimeUtils.toDateString(date),
       'type': type,
       'description': description,
       'repeat_yearly': repeatYearly,
