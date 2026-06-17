@@ -276,7 +276,43 @@ class ApiClient {
     final params = <String, String>{};
 
     if (filters != null && filters.isNotEmpty) {
-      params.addAll(filters);
+      for (final entry in filters.entries) {
+        final key = entry.key;
+        final value = entry.value;
+        // 自动补全 eq. 前缀：如果 value 不包含操作符前缀（如 eq. in. gte. 等），则自动添加 eq.
+        // 例外：and/or 语法和已带操作符前缀的值保持原样
+        if (key == 'and' || key == 'or') {
+          params[key] = value;
+        } else if (value.contains('.') &&
+            !value.startsWith('eq.') &&
+            !value.startsWith('neq.') &&
+            !value.startsWith('gt.') &&
+            !value.startsWith('gte.') &&
+            !value.startsWith('lt.') &&
+            !value.startsWith('lte.') &&
+            !value.startsWith('like.') &&
+            !value.startsWith('ilike.') &&
+            !value.startsWith('in.') &&
+            !value.startsWith('is.') &&
+            !value.startsWith('cs.') &&
+            !value.startsWith('cd.') &&
+            !value.startsWith('ov.') &&
+            !value.startsWith('sl.') &&
+            !value.startsWith('sr.') &&
+            !value.startsWith('nxl.') &&
+            !value.startsWith('nxr.') &&
+            !value.startsWith('adj.') &&
+            !value.startsWith('match.')) {
+          // value 包含点但不是已知操作符，可能是用户输入的特殊值，保持原样
+          params[key] = value;
+        } else if (!value.contains('.')) {
+          // 没有操作符前缀，自动补全 eq.
+          params[key] = 'eq.$value';
+        } else {
+          // 已有操作符前缀，保持原样
+          params[key] = value;
+        }
+      }
     }
     // select: Supabase PostgREST 语法，支持嵌套选择、外键关联等（如 "id,name,orders(*)"）
     // columns: 简单列名列表，逗号分隔（如 "id,name,created_at"）

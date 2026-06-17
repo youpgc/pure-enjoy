@@ -96,8 +96,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
         'expenses',
         filters: {
           'user_id': 'eq.$userId',
-          'date': 'gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)}',
-          'date': 'lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)}',
+          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)},date.lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)})',
         },
         order: 'date.desc',
         limit: 500,

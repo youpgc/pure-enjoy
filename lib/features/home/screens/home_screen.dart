@@ -179,7 +179,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final result = await ApiClient.get('habits',
-          filters: {'user_id': userId, 'is_active': 'true'},
+          filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
           select: '*',
           order: 'created_at.desc');
 
@@ -314,17 +314,17 @@ class _DashboardPageState extends State<DashboardPage> {
       // 并行查询 expenses、mood_diaries、weight_records 各最新一条
       final futures = [
         ApiClient.get('expenses',
-            filters: {'user_id': userId},
+            filters: {'user_id': 'eq.$userId'},
             select: '*,created_at',
             order: 'created_at.desc',
             limit: 1),
         ApiClient.get('mood_diaries',
-            filters: {'user_id': userId},
+            filters: {'user_id': 'eq.$userId'},
             select: '*,created_at',
             order: 'created_at.desc',
             limit: 1),
         ApiClient.get('weight_records',
-            filters: {'user_id': userId},
+            filters: {'user_id': 'eq.$userId'},
             select: '*,created_at',
             order: 'created_at.desc',
             limit: 1),
@@ -406,7 +406,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       final result = await ApiClient.get('reminders',
-          filters: {'user_id': userId, 'is_completed': 'false'},
+          filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
           select: '*',
           order: 'remind_at.asc',
           limit: 3);
@@ -439,7 +439,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       final result = await ApiClient.get('user_novels',
-          filters: {'user_id': userId, 'is_collected': 'true'},
+          filters: {'user_id': 'eq.$userId', 'is_collected': 'eq.true'},
           select: '*,novels:novel_id(*)',
           order: 'last_read_at.desc.nullslast',
           limit: 5);
