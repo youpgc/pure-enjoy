@@ -1,8 +1,6 @@
 import 'dart:async';
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import '../config.dart';
+import 'api_client.dart';
 import '../core/models/dict_model.dart';
 
 /// 数据字典服务
@@ -113,22 +111,18 @@ class DictService {
         }
 
         // Step 1: 先查 dict_types 获取 type_id
-        final typeResponse = await http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/dict_types?code=eq.$typeCode&select=id',
-          ),
-          headers: {
-            'apikey': AppConfig.supabaseAnonKey,
-            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          },
+        final typeResult = await ApiClient.get(
+          'dict_types',
+          filters: {'code': 'eq.$typeCode'},
+          select: 'id',
         );
 
-        if (typeResponse.statusCode != 200) {
-          debugPrint('❌ 查询 dict_types 失败: ${typeResponse.statusCode}');
+        if (!typeResult.isSuccess) {
+          debugPrint('❌ 查询 dict_types 失败: ${typeResult.errorMessage}');
           continue;
         }
 
-        final typeData = jsonDecode(typeResponse.body) as List;
+        final typeData = typeResult.data!;
         if (typeData.isEmpty) {
           debugPrint('❌ 字典类型不存在: $typeCode');
           break;
@@ -137,20 +131,17 @@ class DictService {
         final typeId = typeData[0]['id'] as String;
 
         // Step 2: 通过 type_id 查 dict_items
-        final response = await http.get(
-          Uri.parse(
-            '${AppConfig.supabaseUrl}/rest/v1/dict_items?type_id=eq.$typeId&select=id,type_id,code,label,value,extra,sort_order,is_default,status&order=sort_order.asc',
-          ),
-          headers: {
-            'apikey': AppConfig.supabaseAnonKey,
-            'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          },
+        final result = await ApiClient.get(
+          'dict_items',
+          filters: {'type_id': 'eq.$typeId'},
+          select: 'id,type_id,code,label,value,extra,sort_order,is_default,status',
+          order: 'sort_order.asc',
         );
 
-        if (response.statusCode == 200) {
-          final List<dynamic> data = jsonDecode(response.body);
+        if (result.isSuccess) {
+          final data = result.data!;
           final items = data
-              .map((json) => DictItem.fromJson(json as Map<String, dynamic>))
+              .map((json) => DictItem.fromJson(json))
               .where((item) => item.status == 'active')
               .toList();
 
@@ -159,7 +150,7 @@ class DictService {
           debugPrint('✅ 字典加载成功 [$typeCode]: ${items.length} 项');
           return items;
         } else {
-          debugPrint('❌ 查询 dict_items 失败: ${response.statusCode}');
+          debugPrint('❌ 查询 dict_items 失败: ${result.errorMessage}');
         }
       } catch (e) {
         debugPrint('❌ 加载字典失败 [$typeCode]: $e (attempt $attempt/$retryCount)');
