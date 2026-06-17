@@ -226,22 +226,77 @@ jobs:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "将旧版本标记为已取代(superseded)..."
+          echo "=== 步骤15：将旧版本标记为已取代 ==="
 
-          PATCH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
+          HEADERS="-H \"apikey: $SUPABASE_SERVICE_ROLE_KEY\" -H \"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\""
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # 15a. 先查询当前 status=released 的记录
+          echo "--- 查询当前已发布版本 ---"
+          RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status&status=eq.released" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-            -H "Content-Type: application/json" \
-            -d '{
-              "status":"superseded",
-              "is_active":false,
-              "revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
-            }')
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          echo "当前 released 版本: $RELEASED"
+          RELEASED_COUNT=$(echo "$RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d))' 2>/dev/null || echo "0")
+          echo "released 记录数: $RELEASED_COUNT"
 
-          if [ "$PATCH_RESPONSE" = "200" ] || [ "$PATCH_RESPONSE" = "204" ]; then
-            echo "✅ 旧版本已标记为 superseded"
+          if [ "$RELEASED_COUNT" = "0" ]; then
+            echo "✅ 没有需要标记的旧版本"
           else
-            echo "⚠️ 标记旧版本失败 (HTTP $PATCH_RESPONSE)，继续创建新版本..."
+            # 15b. 批量 PATCH：将所有 released 改为 superseded
+            echo "--- 执行批量 PATCH ---"
+            PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+
+            PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
+            PATCH_BODY=$(echo "$PATCH_RESPONSE" | sed '$d')
+            echo "PATCH HTTP: $PATCH_CODE"
+            echo "PATCH 响应: $PATCH_BODY"
+
+            # 15c. 验证：检查是否还有 released 记录
+            echo "--- 验证 PATCH 结果 ---"
+            AFTER_RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id&status=eq.released" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+            AFTER_COUNT=$(echo "$AFTER_RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d))' 2>/dev/null || echo "0")
+            echo "PATCH 后 released 记录数: $AFTER_COUNT"
+
+            if [ "$AFTER_COUNT" = "0" ]; then
+              echo "✅ 所有旧版本已成功标记为 superseded"
+            else
+              # 15d. 兜底：逐条更新（防止批量 PATCH 因 RLS 等原因失效）
+              echo "⚠️ 批量 PATCH 未完全生效，尝试逐条更新..."
+              IDS=$(echo "$RELEASED" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)]' 2>/dev/null || echo "")
+              for ID in $IDS; do
+                if [ -n "$ID" ]; then
+                  SINGLE_PATCH=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$ID" \
+                    -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                    -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                    -H "Content-Type: application/json" \
+                    -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+                  if [ "$SINGLE_PATCH" = "200" ] || [ "$SINGLE_PATCH" = "204" ]; then
+                    echo "  ✅ 已更新 id=$ID → superseded"
+                  else
+                    echo "  ❌ 更新失败 id=$ID (HTTP $SINGLE_PATCH)"
+                  fi
+                fi
+              done
+
+              # 15e. 最终验证
+              FINAL_COUNT=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id&status=eq.released" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
+                python3 -c 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo "0")
+              echo "最终 released 记录数: $FINAL_COUNT"
+              if [ "$FINAL_COUNT" = "0" ]; then
+                echo "✅ 逐条更新成功，所有旧版本已标记为 superseded"
+              else
+                echo "❌ 警告：仍有 $FINAL_COUNT 条 released 记录未被更新"
+              fi
+            fi
           fi
 
       # 16. 创建版本记录到数据库
