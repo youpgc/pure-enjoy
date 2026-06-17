@@ -134,12 +134,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 读取文件字节
       final bytes = await file.readAsBytes();
 
-      // 上传到 Supabase Storage（使用原始 http，因为文件上传需要发送原始字节）
+      // 上传到 Supabase Storage
+      final userId = AuthService.instance.currentUserId;
       final uploadResponse = await http.post(
         Uri.parse('${SupabaseConfig.url}/storage/v1/object/avatars/$fileName'),
         headers: {
           ...SupabaseConfig.headers,
           'Content-Type': 'image/$fileExt',
+          if (userId != null) 'x-user-id': userId,
         },
         body: bytes,
       );

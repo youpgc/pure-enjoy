@@ -62,10 +62,15 @@ class StorageService {
 
   Map<String, String> get _headers {
     final authService = AuthService.instance;
-    return {
+    final headers = {
       'apikey': _anonKey,
       'Authorization': 'Bearer ${authService.isAuthenticated ? authService.authHeaders['Authorization']?.replaceFirst('Bearer ', '') : _anonKey}',
     };
+    final userId = authService.currentUserId;
+    if (userId != null) {
+      headers['x-user-id'] = userId;
+    }
+    return headers;
   }
 
   /// 上传文件

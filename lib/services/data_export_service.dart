@@ -1,11 +1,11 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:path_provider/path_provider.dart';
 import 'package:share_plus/share_plus.dart';
 import 'package:intl/intl.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'api_client.dart';
 import 'supabase_service.dart';
 
 /// 数据导出服务
@@ -84,20 +84,15 @@ class DataExportService {
         ? 'date'
         : 'created_at';
 
-    final response = await http.get(
-      Uri.parse(
-        '${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId'
-        '&select=*&order=$orderField.desc',
-      ),
-      headers: {
-        'apikey': SupabaseConfig.anonKey,
-        'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-      },
+    final result = await ApiClient.get(
+      table,
+      filters: {'user_id': userId},
+      select: '*',
+      order: '$orderField.desc',
     );
 
-    if (response.statusCode == 200) {
-      final List<dynamic> data = jsonDecode(response.body) as List<dynamic>;
-      return data.cast<Map<String, dynamic>>();
+    if (result.isSuccess && result.data != null) {
+      return result.data!;
     }
 
     return [];
@@ -113,20 +108,14 @@ class DataExportService {
     for (final table in [typeExpenses, typeWeight, typeMood]) {
       try {
         // 使用 count 模式获取条数
-        final response = await http.get(
-          Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/$table?user_id=eq.$userId&select=id',
-          ),
-          headers: {
-            'apikey': SupabaseConfig.anonKey,
-            'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
-            'Prefer': 'count=exact',
-          },
+        final result = await ApiClient.get(
+          table,
+          filters: {'user_id': userId},
+          select: 'id',
         );
 
-        if (response.statusCode == 200) {
-          final data = jsonDecode(response.body) as List;
-          counts[table] = data.length;
+        if (result.isSuccess && result.data != null) {
+          counts[table] = result.data!.length;
         } else {
           counts[table] = 0;
         }

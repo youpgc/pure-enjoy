@@ -1,8 +1,6 @@
-import 'dart:convert';
 import 'dart:math';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
-import '../config.dart';
+import 'api_client.dart';
 
 /// 敏感词模型
 class SensitiveWordModel {
@@ -126,19 +124,13 @@ class SensitiveWordService {
   /// 加载分类开关状态
   Future<void> _loadSwitches() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/sensitive_word_configs?select=config_key,config_value',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final response = await ApiClient.get(
+        'sensitive_word_configs',
+        columns: 'config_key,config_value',
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> configs = jsonDecode(response.body);
-        for (final config in configs) {
+      if (response.isSuccess && response.data != null) {
+        for (final config in response.data!) {
           if (config['config_key'] == 'novel_enabled') {
             _novelEnabled = config['config_value'] == 'true';
           } else if (config['config_key'] == 'system_enabled') {
@@ -154,22 +146,17 @@ class SensitiveWordService {
   /// 加载敏感词列表
   Future<void> _loadWords() async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/sensitive_words?is_active=eq.true&select=id,word,category,level,replace_word,match_mode,is_active,hit_count',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-        },
+      final response = await ApiClient.get(
+        'sensitive_words',
+        columns: 'id,word,category,level,replace_word,match_mode,is_active,hit_count',
+        filters: {'is_active': 'true'},
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
+      if (response.isSuccess && response.data != null) {
         _wordCache.clear();
 
-        for (final item in data) {
-          final word = SensitiveWordModel.fromJson(item as Map<String, dynamic>);
+        for (final item in response.data!) {
+          final word = SensitiveWordModel.fromJson(item);
           _wordCache.putIfAbsent(word.category, () => []).add(word);
         }
 
@@ -382,15 +369,9 @@ class SensitiveWordService {
         snippet = contentSnippet;
       }
 
-      await http.post(
-        Uri.parse('${AppConfig.supabaseUrl}/rest/v1/sensitive_word_logs'),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          'Prefer': 'return=minimal',
-        },
-        body: jsonEncode({
+      await ApiClient.post(
+        'sensitive_word_logs',
+        body: {
           'word_id': word.id,
           'word': word.word,
           'category': word.category,
@@ -400,7 +381,8 @@ class SensitiveWordService {
           'content_snippet': snippet,
           'action_taken': actionTaken,
           'created_at': DateTime.now().toUtc().toIso8601String(),
-        }),
+        },
+        returnRepresentation: false,
       );
 
       // 更新命中次数（异步，不等待）
@@ -414,21 +396,14 @@ class SensitiveWordService {
   Future<void> _incrementHitCount(String wordId) async {
     try {
       // 使用 RPC 函数原子更新命中次数，避免 N+1 查询问题
-      final response = await http.post(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/rpc/increment_sensitive_word_hit_count',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({
+      final response = await ApiClient.post(
+        'rpc/increment_sensitive_word_hit_count',
+        body: {
           'word_id': wordId,
-        }),
+        },
       );
 
-      if (response.statusCode != 200) {
+      if (response.isError) {
         debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
