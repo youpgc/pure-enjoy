@@ -8,7 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
 import '../config.dart';
 import '../core/theme/app_theme.dart';
-import 'supabase_service.dart';
+import 'api_client.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -31,41 +31,35 @@ class VersionCheckService {
 
       debugPrint('📱 当前版本: $currentVersion+$currentBuildNumber');
 
-      final userId = AuthService.instance.currentUserId;
-      final response = await http.get(
-        Uri.parse(
-          '${AppConfig.supabaseUrl}/rest/v1/app_versions?status=eq.released&order=created_at.desc&limit=1',
-        ),
-        headers: {
-          'apikey': AppConfig.supabaseAnonKey,
-          'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
-          'Content-Type': 'application/json',
-          if (userId != null) 'x-user-id': userId,
-        },
+      final result = await ApiClient.get(
+        'app_versions',
+        filters: {'status': 'eq.released'},
+        order: 'created_at.desc',
+        limit: 1,
       );
 
-      if (response.statusCode == 200) {
-        final List<dynamic> data = jsonDecode(response.body);
-        if (data.isEmpty) return null;
+      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
+        debugPrint('📱 未获取到最新版本或请求失败');
+        return null;
+      }
 
-        final latestVersion = data.first as Map<String, dynamic>;
-        // 统一版本号格式：去掉 v 前缀
-        final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
-        final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
-        final isForceUpdate = latestVersion['release_type'] == 'force';
+      final latestVersion = result.data!.first;
+      // 统一版本号格式：去掉 v 前缀
+      final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
+      final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
+      final isForceUpdate = latestVersion['release_type'] == 'force';
 
-        debugPrint('📱 最新版本: $latestVersionStr+$latestBuildNumber');
+      debugPrint('📱 最新版本: $latestVersionStr+$latestBuildNumber');
 
-        if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
-          return {
-            'version': latestVersionStr,
-            'build_number': latestBuildNumber,
-            'apk_url': latestVersion['apk_url'],
-            'release_notes': latestVersion['release_notes'],
-            'is_force_update': isForceUpdate,
-            'release_type': latestVersion['release_type'],
-          };
-        }
+      if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
+        return {
+          'version': latestVersionStr,
+          'build_number': latestBuildNumber,
+          'apk_url': latestVersion['apk_url'],
+          'release_notes': latestVersion['release_notes'],
+          'is_force_update': isForceUpdate,
+          'release_type': latestVersion['release_type'],
+        };
       }
       return null;
     } catch (e) {
