@@ -31,8 +31,19 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   /// 初始化加载：先读缓存，再静默刷新
   Future<void> _initLoad() async {
-    await _loadCache();
-    await _loadNotes();
+    try {
+      await _loadCache();
+      await _loadNotes();
+    } catch (e, stackTrace) {
+      debugPrint('❌ NoteListScreen _initLoad 异常: $e');
+      debugPrint(stackTrace.toString());
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('初始化失败: $e')),
+        );
+      }
+    }
   }
 
   /// 从 SharedPreferences 加载缓存数据

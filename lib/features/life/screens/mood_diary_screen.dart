@@ -32,21 +32,44 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
-    await DictService.instance.ensureInitialized();
-    await _loadCache();
-    await _loadDiaries();
+    try {
+      await DictService.instance.ensureInitialized();
+      await _loadCache();
+      await _loadDiaries();
+    } catch (e, stackTrace) {
+      debugPrint('❌ MoodDiaryScreen _initLoad 异常: $e');
+      debugPrint(stackTrace.toString());
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('初始化失败: $e')),
+        );
+      }
+    }
   }
 
   /// 从 SharedPreferences 加载缓存数据
   Future<void> _loadCache() async {
     final userId = _userId;
     if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
-    if (cached.isNotEmpty && mounted) {
-      setState(() {
-        _diaries = cached.map((e) => MoodDiaryModel.fromJson(e)).toList();
-        _isLoading = false;
-      });
+    try {
+      final cached = await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
+      if (cached.isNotEmpty && mounted) {
+        final diaries = <MoodDiaryModel>[];
+        for (final item in cached) {
+          try {
+            diaries.add(MoodDiaryModel.fromJson(item));
+          } catch (e) {
+            debugPrint('⚠️ 跳过无效缓存日记数据: $e');
+          }
+        }
+        setState(() {
+          _diaries = diaries;
+          _isLoading = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('⚠️ 加载缓存失败: $e');
     }
   }
 
@@ -72,12 +95,21 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
       if (result.isSuccess) {
         final data = result.data!;
-        final diaries = data.map((e) => MoodDiaryModel.fromJson(e)).toList();
+        final diaries = <MoodDiaryModel>[];
+        for (final item in data) {
+          try {
+            diaries.add(MoodDiaryModel.fromJson(item));
+          } catch (e) {
+            debugPrint('⚠️ 跳过无效日记数据: $e, 数据: $item');
+          }
+        }
 
-        setState(() {
-          _diaries = diaries;
-          _isLoading = false;
-        });
+        if (mounted) {
+          setState(() {
+            _diaries = diaries;
+            _isLoading = false;
+          });
+        }
 
         // 写入缓存
         await CacheHelper.instance.saveList(
@@ -87,9 +119,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
-    } catch (e) {
-      setState(() => _isLoading = false);
+    } catch (e, stackTrace) {
+      debugPrint('❌ MoodDiaryScreen _loadDiaries 异常: $e');
+      debugPrint(stackTrace.toString());
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载失败: $e')),
         );

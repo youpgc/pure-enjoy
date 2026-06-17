@@ -26,14 +26,25 @@ class MoodDiaryModel {
   });
 
   factory MoodDiaryModel.fromJson(Map<String, dynamic> json) {
+    DateTime parseDate(dynamic value, String fieldName) {
+      if (value == null) {
+        throw FormatException('字段 $fieldName 不能为 null');
+      }
+      try {
+        return DateTime.parse(value as String);
+      } catch (e) {
+        throw FormatException('字段 $fieldName 日期格式错误: $value');
+      }
+    }
+
     return MoodDiaryModel(
-      id: json['id'] as String,
-      userId: json['user_id'] as String,
-      mood: json['mood'] as String,
+      id: json['id']?.toString() ?? '',
+      userId: json['user_id']?.toString() ?? '',
+      mood: json['mood']?.toString() ?? '',
       moodScore: int.tryParse(json['mood_label']?.toString() ?? '5') ?? 5,
-      content: json['content'] as String?,
-      entryDate: DateTime.parse(json['date'] as String),
-      userNickname: json['user_nickname'] as String?,
+      content: json['content']?.toString(),
+      entryDate: parseDate(json['date'], 'date'),
+      userNickname: json['user_nickname']?.toString(),
       synced: json['synced'] as bool?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,

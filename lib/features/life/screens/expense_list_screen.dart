@@ -34,9 +34,20 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
-    await DictService.instance.ensureInitialized();
-    await _loadCache();
-    await _loadExpenses();
+    try {
+      await DictService.instance.ensureInitialized();
+      await _loadCache();
+      await _loadExpenses();
+    } catch (e, stackTrace) {
+      debugPrint('❌ ExpenseListScreen _initLoad 异常: $e');
+      debugPrint(stackTrace.toString());
+      if (mounted) {
+        setState(() => _isLoading = false);
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('初始化失败: $e')),
+        );
+      }
+    }
   }
 
   /// 从 SharedPreferences 加载缓存数据
