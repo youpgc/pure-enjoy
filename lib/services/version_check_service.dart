@@ -8,6 +8,7 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
 import '../config.dart';
 import '../core/theme/app_theme.dart';
+import 'supabase_service.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -30,6 +31,7 @@ class VersionCheckService {
 
       debugPrint('📱 当前版本: $currentVersion+$currentBuildNumber');
 
+      final userId = AuthService.instance.currentUserId;
       final response = await http.get(
         Uri.parse(
           '${AppConfig.supabaseUrl}/rest/v1/app_versions?status=eq.released&order=created_at.desc&limit=1',
@@ -38,6 +40,7 @@ class VersionCheckService {
           'apikey': AppConfig.supabaseAnonKey,
           'Authorization': 'Bearer ${AppConfig.supabaseAnonKey}',
           'Content-Type': 'application/json',
+          if (userId != null) 'x-user-id': userId,
         },
       );
 
