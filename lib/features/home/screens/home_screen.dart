@@ -179,7 +179,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
     try {
       final result = await ApiClient.get('habits',
-          filters: {'user_id': userId, 'is_active': true},
+          filters: {'user_id': userId, 'is_active': 'true'},
           select: '*',
           order: 'created_at.desc');
 
@@ -192,7 +192,7 @@ class _DashboardPageState extends State<DashboardPage> {
         if (habits.isNotEmpty) {
           final habitIds = habits.map((h) => h.id).toList();
           final checkinsResult = await ApiClient.get('habit_checkins',
-              filters: {'habit_id': habitIds},
+              filters: {'habit_id': 'in.(${habitIds.join(",")})'},
               select: '*',
               order: 'checkin_at.desc');
 
@@ -406,7 +406,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       final result = await ApiClient.get('reminders',
-          filters: {'user_id': userId, 'is_completed': false},
+          filters: {'user_id': userId, 'is_completed': 'false'},
           select: '*',
           order: 'remind_at.asc',
           limit: 3);
@@ -439,7 +439,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       final result = await ApiClient.get('user_novels',
-          filters: {'user_id': userId, 'is_collected': true},
+          filters: {'user_id': userId, 'is_collected': 'true'},
           select: '*,novels:novel_id(*)',
           order: 'last_read_at.desc.nullslast',
           limit: 5);
