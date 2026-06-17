@@ -49,7 +49,11 @@ class WeightRecordModel {
       'note': note,
       'date': date.toIso8601String().split('T').first,
       'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
+      'updated_at': (updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
+    if (userNickname != null) {
+      json['user_nickname'] = userNickname;
+    }
     // 只在ID非空时添加，让数据库自动生成新记录的ID
     if (id.isNotEmpty) {
       json['id'] = id;
