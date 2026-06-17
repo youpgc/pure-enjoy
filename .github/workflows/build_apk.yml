@@ -220,7 +220,31 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
-      # 15. 创建版本记录到数据库
+      # 15. 将旧版本标记为已取代（确保只有最新版本是 released 状态）
+      - name: Mark old versions as superseded
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "将旧版本标记为已取代(superseded)..."
+
+          PATCH_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Content-Type: application/json" \
+            -d '{
+              "status":"superseded",
+              "is_active":false,
+              "revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
+            }')
+
+          if [ "$PATCH_RESPONSE" = "200" ] || [ "$PATCH_RESPONSE" = "204" ]; then
+            echo "✅ 旧版本已标记为 superseded"
+          else
+            echo "⚠️ 标记旧版本失败 (HTTP $PATCH_RESPONSE)，继续创建新版本..."
+          fi
+
+      # 16. 创建版本记录到数据库
       - name: Create version record in database
         id: db_record
         env:
@@ -256,15 +280,15 @@ jobs:
           echo "Release notes:"
           echo -e "$RELEASE_NOTES"
           echo ""
-          
+
           echo "Creating database record..."
-          
+
           # 根据是否强制更新决定 release_type
           RELEASE_TYPE="feature"
-          
+
           # 计算可读文件大小
           FILE_SIZE_HUMAN=$(numfmt --to=iec-i ${{ steps.filesize.outputs.bytes }})
-          
+
           DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
@@ -285,13 +309,13 @@ jobs:
               \"is_force_update\": false,
               \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
             }")
-          
+
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
           DB_RESPONSE_BODY=$(echo "$DB_RESPONSE" | sed '$d')
-          
+
           echo "Database HTTP Code: $DB_HTTP_CODE"
           echo "Database response: $DB_RESPONSE_BODY"
-          
+
           # 处理插入结果
           if [ "$DB_HTTP_CODE" = "201" ] || [ "$DB_HTTP_CODE" = "200" ]; then
             echo "version_id=$(echo $DB_RESPONSE_BODY | grep -o '"id":"[^"]*"' | head -1 | cut -d'"' -f4)" >> $GITHUB_OUTPUT
@@ -302,7 +326,7 @@ jobs:
             exit 1
           fi
 
-      # 16. 清理旧 APK（只保留最新 5 个）
+      # 17. 清理旧 APK（只保留最新 5 个）
       - name: Clean old APKs from Storage
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
@@ -357,7 +381,7 @@ jobs:
           
           echo "✅ 清理完成：删除 $DELETED / $TOTAL 个旧 APK，对应版本记录已标记为失效"
 
-      # 17. 创建 GitHub Release（仅标签触发时）
+      # 18. 创建 GitHub Release（仅标签触发时）
       - name: Create GitHub Release
         if: startsWith(github.ref, 'refs/tags/v')
         uses: softprops/action-gh-release@v1
@@ -367,7 +391,7 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
 
-      # 18. 输出总结
+      # 19. 输出总结
       - name: Build summary
         run: |
           echo "✅ Build completed!"
