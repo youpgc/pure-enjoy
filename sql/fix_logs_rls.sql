@@ -67,7 +67,18 @@ CREATE OR REPLACE FUNCTION create_admin_rls_policies(p_table_name TEXT)
 RETURNS TEXT AS $$
 DECLARE
   r RECORD;
+  table_exists BOOLEAN;
 BEGIN
+  -- 检查表是否存在
+  SELECT EXISTS (
+    SELECT 1 FROM information_schema.tables 
+    WHERE table_schema = 'public' AND table_name = p_table_name
+  ) INTO table_exists;
+
+  IF NOT table_exists THEN
+    RETURN '表 ' || p_table_name || ' 不存在，跳过';
+  END IF;
+
   -- 启用 RLS
   EXECUTE format('ALTER TABLE %I ENABLE ROW LEVEL SECURITY', p_table_name);
 
