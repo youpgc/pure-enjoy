@@ -32,8 +32,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     _initLoad();
   }
 
-  /// 初始化加载：先读缓存，再静默刷新
+  /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
+    await DictService.instance.ensureInitialized();
     await _loadCache();
     await _loadExpenses();
   }

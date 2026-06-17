@@ -30,8 +30,9 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     _initLoad();
   }
 
-  /// 初始化加载：先读缓存，再静默刷新
+  /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
+    await DictService.instance.ensureInitialized();
     await _loadCache();
     await _loadDiaries();
   }
@@ -318,6 +319,7 @@ class _DiaryFormState extends State<_DiaryForm> {
   late final TextEditingController _contentController;
   late String _selectedMoodCode;
   late DateTime _selectedDate;
+  bool _isDictLoading = true;
 
   bool get _isEditing => widget.diary != null;
 
@@ -329,6 +331,11 @@ class _DiaryFormState extends State<_DiaryForm> {
   @override
   void initState() {
     super.initState();
+    _initDict();
+  }
+
+  Future<void> _initDict() async {
+    await DictService.instance.ensureInitialized();
     final diary = widget.diary;
     _contentController = TextEditingController(text: diary?.content ?? '');
     _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);
@@ -336,6 +343,9 @@ class _DiaryFormState extends State<_DiaryForm> {
       _selectedMoodCode = _moodCodes.first;
     }
     _selectedDate = diary?.entryDate ?? DateTime.now();
+    if (mounted) {
+      setState(() => _isDictLoading = false);
+    }
     // 监听字典刷新
     DictService.instance.refreshNotifier.addListener(_onDictRefresh);
   }
@@ -392,10 +402,13 @@ class _DiaryFormState extends State<_DiaryForm> {
           // 心情选择
           Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _moodCodes.map((code) {
+          if (_isDictLoading)
+            const Center(child: CircularProgressIndicator())
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _moodCodes.map((code) {
               final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
               final emoji = DictService.instance.getEmoji(DictService.moodType, code);
               return ChoiceChip(

@@ -1367,6 +1367,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
   final _categoryController = TextEditingController();
   String _selectedMoodCode = '';
   DateTime _selectedDate = DateTime.now();
+  bool _isDictLoading = true;
 
   /// 获取心情选项列表（从字典服务）
   List<String> get _moodCodes {
@@ -1376,12 +1377,20 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
   @override
   void initState() {
     super.initState();
+    _initDict();
+    // 监听字典刷新
+    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+  }
+
+  Future<void> _initDict() async {
+    await DictService.instance.ensureInitialized();
     _selectedMoodCode = DictService.instance.getDefaultCode(DictService.moodType);
     if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
       _selectedMoodCode = _moodCodes.first;
     }
-    // 监听字典刷新
-    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+    if (mounted) {
+      setState(() => _isDictLoading = false);
+    }
   }
 
   void _onDictRefresh() {
@@ -1432,10 +1441,13 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
           const SizedBox(height: 16),
           Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: _moodCodes.map((code) {
+          if (_isDictLoading)
+            const Center(child: CircularProgressIndicator())
+          else
+            Wrap(
+              spacing: 8,
+              runSpacing: 8,
+              children: _moodCodes.map((code) {
               final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
               final emoji = DictService.instance.getEmoji(DictService.moodType, code);
               return ChoiceChip(
@@ -1503,6 +1515,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   final _noteController = TextEditingController();
   String _selectedCategoryCode = '';
   DateTime _selectedDate = DateTime.now();
+  bool _isDictLoading = true;
 
   /// 获取支出分类选项列表（从字典服务）
   List<String> get _categoryCodes {
@@ -1512,12 +1525,20 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   @override
   void initState() {
     super.initState();
+    _initDict();
+    // 监听字典刷新
+    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+  }
+
+  Future<void> _initDict() async {
+    await DictService.instance.ensureInitialized();
     _selectedCategoryCode = DictService.instance.getDefaultCode(DictService.expenseCategory);
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
       _selectedCategoryCode = _categoryCodes.first;
     }
-    // 监听字典刷新
-    DictService.instance.refreshNotifier.addListener(_onDictRefresh);
+    if (mounted) {
+      setState(() => _isDictLoading = false);
+    }
   }
 
   void _onDictRefresh() {
@@ -1586,19 +1607,22 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
             const SizedBox(height: 12),
             Text('分类', style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 8),
-            Wrap(
-              spacing: 8,
-              children: _categoryCodes.map((code) {
-                final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
-                return ChoiceChip(
-                  label: Text(label),
-                  selected: _selectedCategoryCode == code,
-                  onSelected: (selected) {
-                    if (selected) setState(() => _selectedCategoryCode = code);
-                  },
-                );
-              }).toList(),
-            ),
+            if (_isDictLoading)
+              const Center(child: CircularProgressIndicator())
+            else
+              Wrap(
+                spacing: 8,
+                children: _categoryCodes.map((code) {
+                  final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
+                  return ChoiceChip(
+                    label: Text(label),
+                    selected: _selectedCategoryCode == code,
+                    onSelected: (selected) {
+                      if (selected) setState(() => _selectedCategoryCode = code);
+                    },
+                  );
+                }).toList(),
+              ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _noteController,

@@ -19,6 +19,20 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
   final _descController = TextEditingController();
   String _category = 'bug'; // 默认分类
   bool _isSubmitting = false;
+  bool _isDictLoading = true;
+
+  @override
+  void initState() {
+    super.initState();
+    _initDict();
+  }
+
+  Future<void> _initDict() async {
+    await DictService.instance.ensureInitialized();
+    if (mounted) {
+      setState(() => _isDictLoading = false);
+    }
+  }
 
   @override
   void dispose() {
@@ -80,47 +94,49 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       appBar: AppBar(
         title: const Text('提交反馈'),
       ),
-      body: SingleChildScrollView(
-        padding: const EdgeInsets.all(16),
-        child: Form(
-          key: _formKey,
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 标题输入
-              TextFormField(
-                controller: _titleController,
-                decoration: const InputDecoration(
-                  labelText: '问题标题',
-                  hintText: '请简要描述问题',
-                  prefixIcon: Icon(Icons.title),
-                ),
-                validator: (v) => v?.trim().isEmpty == true ? '请输入标题' : null,
-              ),
-              const SizedBox(height: 16),
+      body: _isDictLoading
+          ? const Center(child: CircularProgressIndicator())
+          : SingleChildScrollView(
+              padding: const EdgeInsets.all(16),
+              child: Form(
+                key: _formKey,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // 标题输入
+                    TextFormField(
+                      controller: _titleController,
+                      decoration: const InputDecoration(
+                        labelText: '问题标题',
+                        hintText: '请简要描述问题',
+                        prefixIcon: Icon(Icons.title),
+                      ),
+                      validator: (v) => v?.trim().isEmpty == true ? '请输入标题' : null,
+                    ),
+                    const SizedBox(height: 16),
 
-              // 分类选择
-              Builder(builder: (context) {
-                final categoryOptions = DictService.instance.getItemsSync(DictService.feedbackCategory);
-                return DropdownButtonFormField<String>(
-                  value: _category,
-                  decoration: const InputDecoration(
-                    labelText: '分类',
-                    prefixIcon: Icon(Icons.category),
-                  ),
-                  items: categoryOptions
-                      .map((item) => DropdownMenuItem(
-                            value: item.code,
-                            child: Text(item.label),
-                          ))
-                      .toList(),
-                  onChanged: (value) {
-                    if (value != null) {
-                      setState(() => _category = value);
-                    }
-                  },
-                );
-              }),
+                    // 分类选择
+                    Builder(builder: (context) {
+                      final categoryOptions = DictService.instance.getItemsSync(DictService.feedbackCategory);
+                      return DropdownButtonFormField<String>(
+                        value: _category,
+                        decoration: const InputDecoration(
+                          labelText: '分类',
+                          prefixIcon: Icon(Icons.category),
+                        ),
+                        items: categoryOptions
+                            .map((item) => DropdownMenuItem(
+                                  value: item.code,
+                                  child: Text(item.label),
+                                ))
+                            .toList(),
+                        onChanged: (value) {
+                          if (value != null) {
+                            setState(() => _category = value);
+                          }
+                        },
+                      );
+                    }),
               const SizedBox(height: 16),
 
               // 描述输入

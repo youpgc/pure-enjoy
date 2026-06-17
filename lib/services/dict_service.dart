@@ -88,6 +88,12 @@ class DictService {
     debugPrint('✅ 字典服务初始化完成，缓存 ${_cache.length} 个类型');
   }
 
+  /// 确保字典服务已初始化（如果未初始化则等待完成）
+  Future<void> ensureInitialized() async {
+    if (_initialized) return;
+    await initialize();
+  }
+
   /// 获取某类型的所有字典项（带重试）
   Future<List<DictItem>> getItems(String typeCode, {int retryCount = 2}) async {
     // 检查缓存（缓存存在且非空且在有效期内）
