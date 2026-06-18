@@ -249,7 +249,7 @@ jobs:
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
-              -d "{\"status\":\"revoked\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+              -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
 
             PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
             PATCH_BODY=$(echo "$PATCH_RESPONSE" | sed '$d')
@@ -277,7 +277,7 @@ jobs:
                     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                     -H "Content-Type: application/json" \
                     -H "Prefer: return=representation" \
-                    -d "{\"status\":\"revoked\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+                    -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
                   SINGLE_CODE=$(echo "$SINGLE_PATCH" | tail -n1)
                   SINGLE_BODY=$(echo "$SINGLE_PATCH" | sed '$d')
                   if [ "$SINGLE_CODE" = "200" ] || [ "$SINGLE_CODE" = "204" ]; then
@@ -426,8 +426,7 @@ jobs:
                   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                   -H "Content-Type: application/json" \
                   -d '{
-                    "status":"revoked",
-                    "is_active":false,
+                    "status":"superseded",
                     "revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
                   }'
                 echo "   📋 版本记录已标记为失效: v$VERSION+$BUILD_NUM"
