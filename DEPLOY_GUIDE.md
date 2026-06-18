@@ -1,8 +1,8 @@
 # 纯享项目部署指南
 
-> 版本: v1.5
+> 版本: v1.6
 > 日期: 2026-06-18
-> 更新内容: 优化构建日志获取方式（API 直接获取，无需登录网页）
+> 更新内容: 添加 Flutter 本地环境配置，强制 flutter analyze 流程
 
 ---
 
@@ -38,6 +38,20 @@ export GH_TOKEN="$GITHUB_TOKEN"
 **Token 权限要求：** `repo`、`workflow`、`read:org`
 
 > 注意：当前 Token 已内嵌在两个仓库的 git remote URL 中，无需额外配置即可 push。
+
+### Flutter SDK（本地分析）
+
+```bash
+# Flutter 已安装在 /tmp/flutter
+export PATH="/tmp/flutter/bin:$PATH"
+export PUB_HOSTED_URL="https://pub.flutter-io.cn"
+export FLUTTER_STORAGE_BASE_URL="https://storage.flutter-io.cn"
+
+# 验证安装
+flutter --version
+```
+
+**用途：** 本地运行 `flutter analyze` 提前发现编译错误，避免提交后 CI 构建失败。
 
 ### Gitee Token
 
@@ -98,7 +112,12 @@ git push gitee main
 ```bash
 cd /workspace/pure-enjoy
 
-# 提交并推送到 GitHub（自动触发 APK 构建）
+# 步骤1：本地静态分析（强制，不允许跳过）
+flutter pub get
+flutter analyze
+# 如果有 error 或 warning，必须先修复再提交
+
+# 步骤2：提交并推送到 GitHub（自动触发 APK 构建）
 git add -A
 git commit -m "feat: xxx功能"
 git push origin master
@@ -380,7 +399,7 @@ export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 - [ ] 代码已提交到本地仓库
 - [ ] TypeScript 编译无错误（管理后台）
-- [ ] `flutter analyze` 无 error（App 端）
+- [ ] `flutter analyze` 无 error 和 warning（App 端）——**不允许跳过**
 - [ ] 提交信息清晰明确（遵循 Conventional Commits）
 
 **部署后确认：**
