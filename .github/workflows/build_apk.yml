@@ -149,7 +149,11 @@ jobs:
         run: |
           flutter build apk --release \
             --build-name=${{ steps.version.outputs.version }} \
-            --build-number=${{ steps.version.outputs.build_number }}
+            --build-number=${{ steps.version.outputs.build_number }} \
+            --split-debug-info=build/symbols \
+            --obfuscate \
+            --tree-shake-icons \
+            --dart-define=FLUTTER_BUILD_MODE=release
 
       # 11. 查找并重命名 APK 文件
       - name: Find and rename APK
