@@ -220,13 +220,13 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
-      # 15. 将旧版本标记为已取代（确保只有最新版本是 released 状态）
-      - name: Mark old versions as superseded
+      # 15. 将旧版本标记为已下架（revoked），确保新 APK 入表前旧版本已失效
+      - name: Mark old versions as revoked
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "=== 步骤15：将旧版本标记为已取代 ==="
+          echo "=== 步骤15：将旧版本标记为已下架(revoked) ==="
 
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
@@ -242,14 +242,14 @@ jobs:
           if [ "$RELEASED_COUNT" = "0" ]; then
             echo "✅ 没有需要标记的旧版本"
           else
-            # 15b. 批量 PATCH：将所有 released 改为 superseded
+            # 15b. 批量 PATCH：将所有 released 改为 revoked
             echo "--- 执行批量 PATCH ---"
             PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
               -H "Prefer: return=representation" \
-              -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+              -d "{\"status\":\"revoked\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
 
             PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
             PATCH_BODY=$(echo "$PATCH_RESPONSE" | sed '$d')
@@ -265,7 +265,7 @@ jobs:
             echo "PATCH 后 released 记录数: $AFTER_COUNT"
 
             if [ "$AFTER_COUNT" = "0" ]; then
-              echo "✅ 所有旧版本已成功标记为 superseded"
+              echo "✅ 所有旧版本已成功标记为 revoked"
             else
               # 15d. 兜底：逐条更新（防止批量 PATCH 因 RLS 等原因失效）
               echo "⚠️ 批量 PATCH 未完全生效，尝试逐条更新..."
@@ -277,11 +277,11 @@ jobs:
                     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                     -H "Content-Type: application/json" \
                     -H "Prefer: return=representation" \
-                    -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
+                    -d "{\"status\":\"revoked\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
                   SINGLE_CODE=$(echo "$SINGLE_PATCH" | tail -n1)
                   SINGLE_BODY=$(echo "$SINGLE_PATCH" | sed '$d')
                   if [ "$SINGLE_CODE" = "200" ] || [ "$SINGLE_CODE" = "204" ]; then
-                    echo "  ✅ 已更新 id=$ID → superseded (HTTP $SINGLE_CODE)"
+                    echo "  ✅ 已更新 id=$ID → revoked (HTTP $SINGLE_CODE)"
                   else
                     echo "  ❌ 更新失败 id=$ID (HTTP $SINGLE_CODE, body: $SINGLE_BODY)"
                   fi
@@ -295,7 +295,7 @@ jobs:
                 python3 -c 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo "0")
               echo "最终 released 记录数: $FINAL_COUNT"
               if [ "$FINAL_COUNT" = "0" ]; then
-                echo "✅ 逐条更新成功，所有旧版本已标记为 superseded"
+                echo "✅ 逐条更新成功，所有旧版本已标记为 revoked"
               else
                 echo "❌ 警告：仍有 $FINAL_COUNT 条 released 记录未被更新"
               fi
@@ -426,7 +426,7 @@ jobs:
                   -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                   -H "Content-Type: application/json" \
                   -d '{
-                    "status":"inactive",
+                    "status":"revoked",
                     "is_active":false,
                     "revoked_at":"'"$(date -u +%Y-%m-%dT%H:%M:%SZ)"'"
                   }'
