@@ -7,7 +7,6 @@ import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
 import '../core/theme/app_theme.dart';
 import 'api_client.dart';
-import 'http_client.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -128,6 +127,10 @@ class VersionCheckService {
 
   /// 下载APK文件
   Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
+    // 使用独立的 http.Client 下载，不经过共享 HttpClient
+    // 避免注入 Supabase headers（apikey 等）导致 GitHub CDN 拒绝请求
+    // 避免共享 Client 被关闭或超时影响其他 API 请求
+    final client = http.Client();
     try {
       downloadProgress.value = 0;
       downloadStatus.value = '准备下载...';
@@ -155,12 +158,16 @@ class VersionCheckService {
         }
       } catch (_) {}
 
-      downloadStatus.value = '正在下载...';
+      downloadStatus.value = '正在连接...';
 
-      // 开始下载
-      debugPrint('📱 开始下载APK...');
-      final request = http.Request('GET', Uri.parse(apkUrl));
-      final response = await HttpClient.instance.send(request);
+      // 使用独立 Client 发送请求，不注入任何额外 headers
+      debugPrint('📱 开始下载APK: $apkUrl');
+      final request = http.Request('GET', uri);
+      // 只设置必要的下载 headers
+      request.headers['Accept'] = '*/*';
+      request.headers['User-Agent'] = 'PureEnjoy/1.0';
+
+      final response = await client.send(request).timeout(const Duration(minutes: 10));
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
@@ -169,13 +176,14 @@ class VersionCheckService {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {
           debugPrint('📱 跟随重定向: $redirectUrl');
+          // 关闭当前 response stream 后跟随重定向
+          response.stream.listen((_) {}).cancel();
           return await downloadApk(redirectUrl, onProgress: onProgress);
         }
       }
 
       if (response.statusCode != 200) {
         downloadStatus.value = '下载失败: HTTP ${response.statusCode}';
-        // 不要关闭共享 HttpClient，否则后续所有请求都会失败
         return null;
       }
 
@@ -184,6 +192,8 @@ class VersionCheckService {
       int downloadedBytes = 0;
 
       final sink = file.openWrite();
+
+      downloadStatus.value = '正在下载...';
 
       await response.stream.listen(
         (chunk) {
@@ -194,6 +204,9 @@ class VersionCheckService {
             downloadProgress.value = progress;
             onProgress?.call(progress);
             downloadStatus.value = '下载中 ${(progress * 100).toStringAsFixed(1)}%';
+          } else {
+            // 未知大小时显示已下载大小
+            downloadStatus.value = '下载中 ${(downloadedBytes / 1024 / 1024).toStringAsFixed(1)} MB';
           }
         },
         onDone: () async {
@@ -218,8 +231,12 @@ class VersionCheckService {
         return null;
       }
     } catch (e) {
+      debugPrint('📱 下载异常: $e');
       downloadStatus.value = '下载出错: $e';
       return null;
+    } finally {
+      // 确保关闭独立 Client，不影响共享 HttpClient
+      client.close();
     }
   }
 
