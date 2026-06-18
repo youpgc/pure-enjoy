@@ -81,8 +81,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
       final filters = <String, String>{
         'user_id': 'eq.$userId',
-        'date.gte': startOfMonth.toIso8601String().split('T').first,
-        'date.lt': endOfMonth.toIso8601String().split('T').first,
+        'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
       };
 
       if (_selectedCategory != 'all') {

@@ -93,8 +93,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
         'mood_diaries',
         filters: {
           'user_id': 'eq.$userId',
-          'date.gte': startOfMonth.toIso8601String().split('T').first,
-          'date.lt': endOfMonth.toIso8601String().split('T').first,
+          'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
         },
         order: 'date.desc',
       );
