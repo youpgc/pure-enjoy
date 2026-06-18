@@ -1375,7 +1375,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
 
   /// 获取心情选项列表（从字典服务）
   List<String> get _moodCodes {
-    return DictService.instance.getItemsSync(DictService.moodType).map((e) => e.code).toList();
+    return DictService.instance.getItemsSync('mood_type').map((e) => e.code).toList();
   }
 
   @override
@@ -1388,7 +1388,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
 
   Future<void> _initDict() async {
     await DictService.instance.initialize();
-    _selectedMoodCode = DictService.instance.getDefaultCode(DictService.moodType);
+    _selectedMoodCode = DictService.instance.getDefaultCode('mood_type');
     if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
       _selectedMoodCode = _moodCodes.first;
     }
@@ -1420,7 +1420,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
       id: const Uuid().v4(),
       userId: AuthService.instance.currentUserId ?? 'local_user',
       mood: _selectedMoodCode,
-      moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
+      moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       entryDate: _selectedDate,
     );
@@ -1452,8 +1452,8 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
               spacing: 8,
               runSpacing: 8,
               children: _moodCodes.map((code) {
-              final label = DictService.instance.getLabelOrDefault(DictService.moodType, code, defaultValue: code);
-              final emoji = DictService.instance.getEmoji(DictService.moodType, code);
+              final label = DictService.instance.getLabelOrDefault('mood_type', code, defaultValue: code);
+              final emoji = DictService.instance.getEmoji('mood_type', code);
               return ChoiceChip(
                 label: Row(
                   mainAxisSize: MainAxisSize.min,
@@ -1523,7 +1523,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
 
   /// 获取支出分类选项列表（从字典服务）
   List<String> get _categoryCodes {
-    return DictService.instance.getItemsSync(DictService.expenseCategory).map((e) => e.code).toList();
+    return DictService.instance.getItemsSync('expense_category').map((e) => e.code).toList();
   }
 
   @override
@@ -1536,7 +1536,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
 
   Future<void> _initDict() async {
     await DictService.instance.initialize();
-    _selectedCategoryCode = DictService.instance.getDefaultCode(DictService.expenseCategory);
+    _selectedCategoryCode = DictService.instance.getDefaultCode('expense_category');
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
       _selectedCategoryCode = _categoryCodes.first;
     }
@@ -1617,7 +1617,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
               Wrap(
                 spacing: 8,
                 children: _categoryCodes.map((code) {
-                  final label = DictService.instance.getLabelOrDefault(DictService.expenseCategory, code, defaultValue: code);
+                  final label = DictService.instance.getLabelOrDefault('expense_category', code, defaultValue: code);
                   return ChoiceChip(
                     label: Text(label),
                     selected: _selectedCategoryCode == code,
@@ -2423,13 +2423,13 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 获取角色标签
   String _getRoleLabel(String? role) {
     if (role == null || role.isEmpty) return '普通用户';
-    return DictService.instance.getLabelOrDefault(DictService.userRole, role, defaultValue: '普通用户');
+    return DictService.instance.getLabelOrDefault('user_role', role, defaultValue: '普通用户');
   }
 
   /// 获取会员等级标签
   String _getMemberLevelLabel(String? level) {
     if (level == null || level.isEmpty) return '普通会员';
-    return DictService.instance.getLabelOrDefault(DictService.memberLevel, level, defaultValue: '普通会员');
+    return DictService.instance.getLabelOrDefault('member_level', level, defaultValue: '普通会员');
   }
 
   /// 构建用户头像

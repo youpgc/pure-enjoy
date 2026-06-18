@@ -28,7 +28,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
   /// 分类列表（从字典服务获取）
   List<String> get _categories {
-    final items = DictService.instance.getItemsSync(DictService.novelCategory);
+    final items = DictService.instance.getItemsSync('novel_category');
     return ['all', ...items.map((item) => item.code)];
   }
 
@@ -357,7 +357,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                         final label = category == 'all'
                             ? '全部'
                             : DictService.instance.getLabelOrDefault(
-                                DictService.novelCategory,
+                                'novel_category',
                                 category,
                                 defaultValue: category,
                               );
@@ -397,7 +397,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                   // 小说列表
                   Text(
                     _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabelOrDefault(
-                        DictService.novelCategory,
+                        'novel_category',
                         _selectedCategory,
                         defaultValue: _selectedCategory,
                       ),
@@ -572,7 +572,7 @@ class _NovelCard extends StatelessWidget {
                     if (novel.category != null)
                       Text(
                         DictService.instance.getLabelOrDefault(
-                          DictService.novelCategory,
+                          'novel_category',
                           novel.category!,
                           defaultValue: novel.category!,
                         ),

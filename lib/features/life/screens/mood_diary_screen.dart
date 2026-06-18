@@ -285,12 +285,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                     itemBuilder: (context, index) {
                       final diary = _diaries[index];
                       final moodLabel = DictService.instance.getLabelOrDefault(
-                        DictService.moodType,
+                        'mood_type',
                         diary.mood,
                         defaultValue: diary.mood,
                       );
                       final moodEmoji = DictService.instance.getEmoji(
-                        DictService.moodType,
+                        'mood_type',
                         diary.mood,
                       );
 
@@ -383,7 +383,7 @@ class _DiaryFormState extends State<_DiaryForm> {
 
   /// 获取心情选项列表（从字典服务）
   List<String> get _moodCodes {
-    return DictService.instance.getItemsSync(DictService.moodType).map((e) => e.code).toList();
+    return DictService.instance.getItemsSync('mood_type').map((e) => e.code).toList();
   }
 
   @override
@@ -396,7 +396,7 @@ class _DiaryFormState extends State<_DiaryForm> {
     await DictService.instance.initialize();
     final diary = widget.diary;
     _contentController = TextEditingController(text: diary?.content ?? '');
-    _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);
+    _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode('mood_type');
     if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
       _selectedMoodCode = _moodCodes.first;
     }
@@ -430,7 +430,7 @@ class _DiaryFormState extends State<_DiaryForm> {
       id: _isEditing ? widget.diary!.id : const Uuid().v4(),
       userId: _isEditing ? widget.diary!.userId : widget.userId,
       mood: _selectedMoodCode,
-      moodScore: int.tryParse(DictService.instance.findByCode(DictService.moodType, _selectedMoodCode)?.value ?? '5') ?? 5,
+      moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
       content: _contentController.text.isEmpty ? null : _contentController.text,
       entryDate: _selectedDate,
     );
@@ -467,8 +467,8 @@ class _DiaryFormState extends State<_DiaryForm> {
               spacing: 8,
               runSpacing: 8,
               children: _moodCodes.map((code) {
-              final label = DictService.instance.getLabelOrDefault(DictService.moodType, code, defaultValue: code);
-              final emoji = DictService.instance.getEmoji(DictService.moodType, code);
+              final label = DictService.instance.getLabelOrDefault('mood_type', code, defaultValue: code);
+              final emoji = DictService.instance.getEmoji('mood_type', code);
               return ChoiceChip(
                 label: Row(
                   mainAxisSize: MainAxisSize.min,

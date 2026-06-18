@@ -20,7 +20,7 @@ class AppConstants {
   static const int defaultPageSize = 20;
   
   // 支出分类 - 已迁移到字典表（dict_items.type_code = 'expense_category'）
-  // 请使用 DictService.instance.getItemsSync(DictService.expenseCategory) 获取
+  // 请使用 DictService.instance.getItemsSync('expense_category') 获取
   @Deprecated('请使用 DictService 获取')
   static const List<String> expenseCategories = [
     '餐饮',
@@ -33,7 +33,7 @@ class AppConstants {
   ];
 
   // 心情类型 - 已迁移到字典表（dict_items.type_code = 'mood_type'）
-  // 请使用 DictService.instance.getItemsSync(DictService.moodType) 获取
+  // 请使用 DictService.instance.getItemsSync('mood_type') 获取
   @Deprecated('请使用 DictService 获取')
   static const List<String> moodTypes = [
     'happy',
@@ -45,7 +45,7 @@ class AppConstants {
   ];
 
   // 小说分类 - 已迁移到字典表（dict_items.type_code = 'novel_category'）
-  // 请使用 DictService.instance.getItemsSync(DictService.novelCategory) 获取
+  // 请使用 DictService.instance.getItemsSync('novel_category') 获取
   @Deprecated('请使用 DictService 获取')
   static const List<String> novelCategories = [
     '玄幻',

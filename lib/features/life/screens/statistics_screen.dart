@@ -235,7 +235,7 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
           ...categories.asMap().entries.map((entry) {
             final index = entry.key;
             final category = entry.value;
-            final categoryLabel = DictService.instance.getLabelOrDefault(DictService.expenseCategory, category.key, defaultValue: category.key);
+            final categoryLabel = DictService.instance.getLabelOrDefault('expense_category', category.key, defaultValue: category.key);
             return ListTile(
               leading: CircleAvatar(
                 backgroundColor: colors[index % colors.length],
@@ -514,13 +514,13 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
 
   /// 获取心情表情（从字典服务）
   String _getMoodEmoji(String mood) {
-    final emoji = DictService.instance.getEmoji(DictService.moodType, mood);
+    final emoji = DictService.instance.getEmoji('mood_type', mood);
     return emoji.isNotEmpty ? emoji : '😐';
   }
 
   /// 获取心情标签（从字典服务）
   String _getMoodLabel(String mood) {
-    return DictService.instance.getLabelOrDefault(DictService.moodType, mood, defaultValue: mood);
+    return DictService.instance.getLabelOrDefault('mood_type', mood, defaultValue: mood);
   }
 
   @override

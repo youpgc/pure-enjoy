@@ -513,7 +513,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                   ),
                                   child: Text(
                                     DictService.instance.getLabelOrDefault(
-                                      DictService.novelCategory,
+                                      'novel_category',
                                       novel.category!,
                                       defaultValue: novel.category!,
                                     ),
@@ -552,7 +552,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '状态',
-                    value: DictService.instance.getLabelOrDefault(DictService.novelStatus, novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
+                    value: DictService.instance.getLabelOrDefault('novel_status', novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(

@@ -70,7 +70,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
 
   /// 获取分类标签信息
   _CategoryInfo _getCategoryInfo(String category) {
-    final label = DictService.instance.getLabelOrDefault(DictService.feedbackCategory, category, defaultValue: category);
+    final label = DictService.instance.getLabelOrDefault('feedback_category', category, defaultValue: category);
     final Color color;
     switch (category) {
       case 'bug':
@@ -89,7 +89,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
 
   /// 获取状态标签信息
   _StatusInfo _getStatusInfo(String status) {
-    final label = DictService.instance.getLabelOrDefault(DictService.feedbackStatus, status, defaultValue: status);
+    final label = DictService.instance.getLabelOrDefault('feedback_status', status, defaultValue: status);
     final Color color;
     switch (status) {
       case 'pending':

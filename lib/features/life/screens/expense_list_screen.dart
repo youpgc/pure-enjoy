@@ -314,7 +314,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                     _loadExpenses();
                   },
                 ),
-                ...DictService.instance.getItemsSync(DictService.expenseCategory).map((cat) => CategoryChip(
+                ...DictService.instance.getItemsSync('expense_category').map((cat) => CategoryChip(
                   label: cat.label,
                   isSelected: _selectedCategory == cat.code,
                   onTap: () {
@@ -341,7 +341,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           itemBuilder: (context, index) {
                             final expense = _expenses[index];
                             final categoryLabel = DictService.instance.getLabelOrDefault(
-                              DictService.expenseCategory,
+                              'expense_category',
                               expense.category,
                               defaultValue: expense.category,
                             );
@@ -409,7 +409,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
 
   /// 获取支出分类选项列表（从字典服务）
   List<String> get _categoryCodes {
-    return DictService.instance.getItemsSync(DictService.expenseCategory).map((e) => e.code).toList();
+    return DictService.instance.getItemsSync('expense_category').map((e) => e.code).toList();
   }
 
   @override
@@ -425,7 +425,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     _noteController = TextEditingController(
       text: expense?.note ?? '',
     );
-    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(DictService.expenseCategory);
+    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode('expense_category');
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
       _selectedCategoryCode = _categoryCodes.first;
     }
@@ -513,7 +513,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             Wrap(
               spacing: 8,
               children: _categoryCodes.map((code) {
-                final label = DictService.instance.getLabelOrDefault(DictService.expenseCategory, code, defaultValue: code);
+                final label = DictService.instance.getLabelOrDefault('expense_category', code, defaultValue: code);
                 return ChoiceChip(
                   label: Text(label),
                   selected: _selectedCategoryCode == code,
