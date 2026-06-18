@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
@@ -22,15 +21,19 @@ class _NovelListScreenState extends State<NovelListScreen> {
   List<NovelModel> _allNovels = [];
   List<Map<String, dynamic>> _userNovels = [];
   bool _isLoading = true;
-  String _selectedCategory = '全部';
+  String _selectedCategory = 'all';
+  String _selectedStatus = 'all';
   String _searchQuery = '';
   final TextEditingController _searchController = TextEditingController();
 
   /// 分类列表（从字典服务获取）
   List<String> get _categories {
     final items = DictService.instance.getItemsSync(DictService.novelCategory);
-    return ['全部', ...items.map((item) => item.label)];
+    return ['all', ...items.map((item) => item.code)];
   }
+
+  /// 状态列表
+  List<String> get _statuses => ['all', 'ongoing', 'completed'];
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -71,7 +74,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
       final novels = cached.map((json) => NovelModel.fromJson(json)).toList();
       setState(() {
         _allNovels = novels;
-        _novels = _applyFilters(novels);
+        _novels = novels;
         _isLoading = false;
       });
     }
@@ -81,10 +84,21 @@ class _NovelListScreenState extends State<NovelListScreen> {
     try {
       final userId = _userId;
 
+      // 构建服务端过滤条件
+      final filters = <String, String>{
+        'user_id': 'is.null',
+      };
+      if (_selectedCategory != 'all') {
+        filters['category'] = 'eq.$_selectedCategory';
+      }
+      if (_selectedStatus != 'all') {
+        filters['status'] = 'eq.$_selectedStatus';
+      }
+
       // 并行加载 novels 和 user_novels
       final novelsFuture = ApiClient.get(
         'novels',
-        filters: {'user_id': 'is.null'},
+        filters: filters,
         order: 'created_at.desc',
         limit: 100,
       );
@@ -115,7 +129,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
       setState(() {
         _allNovels = novels;
-        _novels = _applyFilters(novels);
+        _novels = novels;
         _userNovels = userNovels;
         _isLoading = false;
       });
@@ -135,44 +149,33 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
   }
 
-  /// 应用分类和搜索筛选
-  List<NovelModel> _applyFilters(List<NovelModel> novels) {
-    var filtered = novels;
-
-    // 分类筛选（根据 label 找到对应的 code 再筛选）
-    if (_selectedCategory != '全部') {
-      final categoryItem = DictService.instance.getItemsSync(DictService.novelCategory)
-          .firstWhere((item) => item.label == _selectedCategory, orElse: () => null as dynamic);
-      final categoryCode = categoryItem?.code ?? _selectedCategory;
-      filtered = filtered.where((n) => n.category == categoryCode).toList();
-    }
-
-    // 搜索筛选
-    if (_searchQuery.isNotEmpty) {
-      final query = _searchQuery.toLowerCase();
-      filtered = filtered.where((n) {
-        return n.title.toLowerCase().contains(query) ||
-            (n.author?.toLowerCase().contains(query) ?? false);
-      }).toList();
-    }
-
-    return filtered;
-  }
-
   /// 切换分类
   void _onCategoryChanged(String category) {
-    setState(() {
-      _selectedCategory = category;
-      _novels = _applyFilters(_allNovels);
-    });
+    setState(() => _selectedCategory = category);
+    _loadNovels();
+  }
+
+  /// 切换状态
+  void _onStatusChanged(String status) {
+    setState(() => _selectedStatus = status);
+    _loadNovels();
   }
 
   /// 搜索
   void _onSearchChanged(String query) {
-    setState(() {
-      _searchQuery = query;
-      _novels = _applyFilters(_allNovels);
-    });
+    setState(() => _searchQuery = query);
+    // 搜索保持本地筛选，因为服务端 ilike 搜索需要额外支持
+    if (_searchQuery.isEmpty) {
+      _loadNovels();
+    } else {
+      setState(() {
+        _novels = _allNovels.where((n) {
+          final q = _searchQuery.toLowerCase();
+          return n.title.toLowerCase().contains(q) ||
+              (n.author?.toLowerCase().contains(q) ?? false);
+        }).toList();
+      });
+    }
   }
 
   /// 添加到书架
@@ -351,10 +354,40 @@ class _NovelListScreenState extends State<NovelListScreen> {
                       itemCount: _categories.length,
                       itemBuilder: (context, index) {
                         final category = _categories[index];
+                        final label = category == 'all'
+                            ? '全部'
+                            : DictService.instance.getLabel(
+                                DictService.novelCategory,
+                                category,
+                                defaultValue: category,
+                              );
                         return CategoryChip(
-                          label: category,
+                          label: label,
                           isSelected: _selectedCategory == category,
                           onTap: () => _onCategoryChanged(category),
+                        );
+                      },
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+
+                  // 状态筛选
+                  SizedBox(
+                    height: 40,
+                    child: ListView.builder(
+                      scrollDirection: Axis.horizontal,
+                      itemCount: _statuses.length,
+                      itemBuilder: (context, index) {
+                        final status = _statuses[index];
+                        final label = status == 'all'
+                            ? '全部'
+                            : status == 'ongoing'
+                                ? '连载中'
+                                : '已完结';
+                        return CategoryChip(
+                          label: label,
+                          isSelected: _selectedStatus == status,
+                          onTap: () => _onStatusChanged(status),
                         );
                       },
                     ),
@@ -363,7 +396,11 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
                   // 小说列表
                   Text(
-                    _selectedCategory == '全部' ? '全部小说' : _selectedCategory,
+                    _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabel(
+                        DictService.novelCategory,
+                        _selectedCategory,
+                        defaultValue: _selectedCategory,
+                      ),
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 12),

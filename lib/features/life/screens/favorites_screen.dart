@@ -55,9 +55,17 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     // 2. 静默从网络刷新
     try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+
+      if (_selectedCategory != null) {
+        filters['category'] = 'eq.$_selectedCategory';
+      }
+
       final result = await ApiClient.get(
         'user_favorites',
-        filters: {'user_id': 'eq.$userId'},
+        filters: filters,
         order: 'created_at.desc',
       );
 
@@ -287,11 +295,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     );
   }
 
-  List<FavoriteModel> get _filteredFavorites {
-    if (_selectedCategory == null) return _favorites;
-    return _favorites.where((f) => f.category == _selectedCategory).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -305,6 +308,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             tooltip: '筛选',
             onSelected: (value) {
               setState(() => _selectedCategory = value);
+              _loadFavorites();
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -321,13 +325,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       ),
       body: _isLoading
           ? const LoadingWidget()
-          : _filteredFavorites.isEmpty
+          : _favorites.isEmpty
               ? const EmptyWidget(icon: Icons.bookmark_border, message: '暂无收藏')
               : ListView.builder(
                   padding: const EdgeInsets.all(16),
-                  itemCount: _filteredFavorites.length,
+                  itemCount: _favorites.length,
                   itemBuilder: (context, index) {
-                    final favorite = _filteredFavorites[index];
+                    final favorite = _favorites[index];
                     final categoryLabel = DictService.instance.getLabel('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
 
                     return Card(

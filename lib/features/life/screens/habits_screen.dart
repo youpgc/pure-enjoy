@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
@@ -25,6 +24,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
   Map<String, ReminderScheduleModel> _reminderSchedules = {};
   bool _isLoading = true;
+  bool? _filterStatus;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -59,9 +59,16 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     // 2. 静默从网络刷新
     try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+      if (_filterStatus != null) {
+        filters['is_active'] = 'eq.$_filterStatus';
+      }
+
       final habitsResult = await ApiClient.get(
         'habits',
-        filters: {'user_id': 'eq.$userId'},
+        filters: filters,
         order: 'is_active.desc',
       );
 
@@ -424,6 +431,32 @@ class _HabitsScreenState extends State<HabitsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('习惯打卡'),
+        actions: [
+          PopupMenuButton<bool?>(
+            icon: const Icon(Icons.filter_list),
+            tooltip: '筛选',
+            onSelected: (value) {
+              setState(() {
+                _filterStatus = value;
+              });
+              _loadHabits();
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: null,
+                child: Text('全部'),
+              ),
+              const PopupMenuItem(
+                value: true,
+                child: Text('进行中'),
+              ),
+              const PopupMenuItem(
+                value: false,
+                child: Text('已暂停'),
+              ),
+            ],
+          ),
+        ],
       ),
       body: _isLoading
           ? const LoadingWidget()

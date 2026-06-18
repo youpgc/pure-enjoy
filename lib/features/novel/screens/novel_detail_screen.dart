@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
@@ -84,7 +83,10 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     try {
       final result = await ApiClient.get(
         'novel_chapters',
-        filters: {'novel_id': 'eq.${widget.novel.id}'},
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'chapter_num.gte': '1',
+        },
         columns: 'id,title,chapter_num,word_count',
         order: 'chapter_num.asc',
         limit: 200,
@@ -93,8 +95,6 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       if (result.isSuccess) {
         final data = result.data!;
         final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
-        // 过滤掉章节号为0的无效章节
-        chapters.removeWhere((c) => c.chapterOrder <= 0);
         setState(() {
           _chapters = chapters;
           _isLoadingChapters = false;

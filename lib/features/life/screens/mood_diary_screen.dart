@@ -21,6 +21,7 @@ class MoodDiaryScreen extends StatefulWidget {
 class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
+  DateTime _selectedMonth = DateTime.now();
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -86,9 +87,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     }
 
     try {
-      final now = DateTime.now();
-      final startOfMonth = DateTime(now.year, now.month, 1);
-      final endOfMonth = DateTime(now.year, now.month + 1, 1);
+      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
 
       final result = await ApiClient.get(
         'mood_diaries',
@@ -255,6 +255,23 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('心情日记'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            onPressed: () async {
+              final picked = await showDatePicker(
+                context: context,
+                initialDate: _selectedMonth,
+                firstDate: DateTime(2020),
+                lastDate: DateTime.now(),
+              );
+              if (picked != null) {
+                setState(() => _selectedMonth = picked);
+                _loadDiaries();
+              }
+            },
+          ),
+        ],
       ),
       body: _isLoading
           ? const LoadingWidget()

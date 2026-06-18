@@ -72,9 +72,18 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
 
     try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+
+      if (_searchQuery.isNotEmpty) {
+        filters['search'] = _searchQuery;
+        filters['searchFields'] = 'title,content';
+      }
+
       final result = await ApiClient.get(
         'notes',
-        filters: {'user_id': 'eq.$userId'},
+        filters: filters,
         order: 'is_pinned.desc,updated_at.desc',
       );
 
@@ -232,15 +241,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
     );
   }
 
-  List<NoteModel> get _filteredNotes {
-    if (_searchQuery.isEmpty) return _notes;
-    return _notes.where((note) {
-      final titleMatch = note.title.toLowerCase().contains(_searchQuery.toLowerCase());
-      final contentMatch = note.content?.toLowerCase().contains(_searchQuery.toLowerCase()) ?? false;
-      return titleMatch || contentMatch;
-    }).toList();
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -255,14 +255,20 @@ class _NoteListScreenState extends State<NoteListScreen> {
           Padding(
             padding: const EdgeInsets.all(16),
             child: TextField(
-              onChanged: (value) => setState(() => _searchQuery = value),
+              onChanged: (value) {
+                _searchQuery = value;
+                _loadNotes();
+              },
               decoration: InputDecoration(
                 hintText: '搜索笔记...',
                 prefixIcon: const Icon(Icons.search),
                 suffixIcon: _searchQuery.isNotEmpty
                     ? IconButton(
                         icon: const Icon(Icons.clear),
-                        onPressed: () => setState(() => _searchQuery = ''),
+                        onPressed: () {
+                          _searchQuery = '';
+                          _loadNotes();
+                        },
                       )
                     : null,
               ),
@@ -273,7 +279,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
           Expanded(
             child: _isLoading
                 ? const LoadingWidget()
-                : _filteredNotes.isEmpty
+                : _notes.isEmpty
                     ? const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记')
                     : RefreshIndicator(
                         onRefresh: _loadNotes,
@@ -285,9 +291,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             crossAxisSpacing: 12,
                             childAspectRatio: 1,
                           ),
-                          itemCount: _filteredNotes.length,
+                          itemCount: _notes.length,
                           itemBuilder: (context, index) {
-                            final note = _filteredNotes[index];
+                            final note = _notes[index];
 
                             return Card(
                               clipBehavior: Clip.antiAlias,

@@ -53,12 +53,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     // 2. 静默从网络刷新
     try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+
+      switch (_filter) {
+        case 'pending':
+          filters['is_completed'] = 'eq.false';
+        case 'completed':
+          filters['is_completed'] = 'eq.true';
+      }
+
       final result = await ApiClient.get(
         'reminders',
-        filters: {
-          'user_id': 'eq.$userId',
-          'is_completed': 'eq.false',
-        },
+        filters: filters,
         order: 'remind_at.desc',
       );
 
@@ -85,17 +93,6 @@ class _RemindersScreenState extends State<RemindersScreen> {
           );
         }
       }
-    }
-  }
-
-  List<ReminderModel> get _filteredReminders {
-    switch (_filter) {
-      case 'pending':
-        return _reminders.where((r) => !r.isCompleted).toList();
-      case 'completed':
-        return _reminders.where((r) => r.isCompleted).toList();
-      default:
-        return _reminders;
     }
   }
 
@@ -219,6 +216,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
             selected: {_filter},
             onSelectionChanged: (set) {
               setState(() => _filter = set.first);
+              _loadReminders();
             },
           ),
           const SizedBox(width: 8),
@@ -226,12 +224,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
       ),
       body: _isLoading
           ? const LoadingWidget()
-          : _filteredReminders.isEmpty
+          : _reminders.isEmpty
               ? const EmptyWidget(icon: Icons.notifications_outlined, message: '暂无提醒事项')
               : ListView.builder(
-                  itemCount: _filteredReminders.length,
+                  itemCount: _reminders.length,
                   itemBuilder: (context, index) {
-                    final reminder = _filteredReminders[index];
+                    final reminder = _reminders[index];
                     return ReminderCard(
                       reminder: reminder,
                       onToggle: () => _toggleComplete(reminder),

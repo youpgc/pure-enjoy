@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
@@ -20,6 +19,7 @@ class WeightRecordScreen extends StatefulWidget {
 class _WeightRecordScreenState extends State<WeightRecordScreen> {
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
+  DateTimeRange? _selectedRange;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -72,11 +72,19 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
 
     try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+      if (_selectedRange != null) {
+        filters['date.gte'] = _selectedRange!.start.toIso8601String().split('T').first;
+        filters['date.lt'] = _selectedRange!.end.add(const Duration(days: 1)).toIso8601String().split('T').first;
+      }
+
       final result = await ApiClient.get(
         'weight_records',
-        filters: {'user_id': 'eq.$userId'},
+        filters: filters,
         order: 'date.desc',
-        limit: 30,
+        limit: _selectedRange != null ? null : 30,
       );
 
       if (result.isSuccess) {
@@ -238,6 +246,37 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('体重记录'),
+        actions: [
+          IconButton(
+            icon: Icon(_selectedRange != null ? Icons.date_range : Icons.calendar_today_outlined),
+            tooltip: '选择日期范围',
+            onPressed: () async {
+              final now = DateTime.now();
+              final picked = await showDateRangePicker(
+                context: context,
+                firstDate: DateTime(2020),
+                lastDate: now,
+                initialDateRange: _selectedRange ?? DateTimeRange(
+                  start: now.subtract(const Duration(days: 30)),
+                  end: now,
+                ),
+              );
+              if (picked != null) {
+                setState(() => _selectedRange = picked);
+                _loadRecords();
+              }
+            },
+          ),
+          if (_selectedRange != null)
+            IconButton(
+              icon: const Icon(Icons.clear),
+              tooltip: '清除筛选',
+              onPressed: () {
+                setState(() => _selectedRange = null);
+                _loadRecords();
+              },
+            ),
+        ],
       ),
       body: _isLoading
           ? const LoadingWidget()

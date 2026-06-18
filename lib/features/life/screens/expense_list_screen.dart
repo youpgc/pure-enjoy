@@ -58,18 +58,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     if (cached.isNotEmpty && mounted) {
       final allExpenses = cached.map((e) => ExpenseModel.fromJson(e)).toList();
       setState(() {
-        _expenses = _applyFilters(allExpenses);
+        _expenses = allExpenses;
         _isLoading = false;
       });
     }
-  }
-
-  List<ExpenseModel> _applyFilters(List<ExpenseModel> expenses) {
-    // 按分类筛选（月份筛选已移至服务端）
-    if (_selectedCategory != 'all') {
-      return expenses.where((e) => e.category == _selectedCategory).toList();
-    }
-    return expenses;
   }
 
   Future<void> _loadExpenses() async {
@@ -88,13 +80,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
 
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+        'date.gte': startOfMonth.toIso8601String().split('T').first,
+        'date.lt': endOfMonth.toIso8601String().split('T').first,
+      };
+
+      if (_selectedCategory != 'all') {
+        filters['category'] = 'eq.$_selectedCategory';
+      }
+
       final result = await ApiClient.get(
         'expenses',
-        filters: {
-          'user_id': 'eq.$userId',
-          'date.gte': startOfMonth.toIso8601String().split('T').first,
-          'date.lt': endOfMonth.toIso8601String().split('T').first,
-        },
+        filters: filters,
         order: 'date.desc',
       );
 
@@ -103,7 +101,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
-          _expenses = _applyFilters(allExpenses);
+          _expenses = allExpenses;
           _isLoading = false;
         });
 
