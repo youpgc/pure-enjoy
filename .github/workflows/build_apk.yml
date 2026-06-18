@@ -228,7 +228,6 @@ jobs:
         run: |
           echo "=== 步骤15：将旧版本标记为已取代 ==="
 
-          HEADERS="-H \"apikey: $SUPABASE_SERVICE_ROLE_KEY\" -H \"Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY\" -H \"Content-Type: application/json\""
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
           # 15a. 先查询当前 status=released 的记录
@@ -249,6 +248,7 @@ jobs:
               -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
               -H "Content-Type: application/json" \
+              -H "Prefer: return=representation" \
               -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
 
             PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
@@ -272,15 +272,18 @@ jobs:
               IDS=$(echo "$RELEASED" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)]' 2>/dev/null || echo "")
               for ID in $IDS; do
                 if [ -n "$ID" ]; then
-                  SINGLE_PATCH=$(curl -s -o /dev/null -w "%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$ID" \
+                  SINGLE_PATCH=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$ID" \
                     -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
                     -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
                     -H "Content-Type: application/json" \
+                    -H "Prefer: return=representation" \
                     -d "{\"status\":\"superseded\",\"is_active\":false,\"revoked_at\":\"$NOW\"}")
-                  if [ "$SINGLE_PATCH" = "200" ] || [ "$SINGLE_PATCH" = "204" ]; then
-                    echo "  ✅ 已更新 id=$ID → superseded"
+                  SINGLE_CODE=$(echo "$SINGLE_PATCH" | tail -n1)
+                  SINGLE_BODY=$(echo "$SINGLE_PATCH" | sed '$d')
+                  if [ "$SINGLE_CODE" = "200" ] || [ "$SINGLE_CODE" = "204" ]; then
+                    echo "  ✅ 已更新 id=$ID → superseded (HTTP $SINGLE_CODE)"
                   else
-                    echo "  ❌ 更新失败 id=$ID (HTTP $SINGLE_PATCH)"
+                    echo "  ❌ 更新失败 id=$ID (HTTP $SINGLE_CODE, body: $SINGLE_BODY)"
                   fi
                 fi
               done
