@@ -1,8 +1,8 @@
 # 纯享项目部署指南
 
-> 版本: v1.6
-> 日期: 2026-06-18
-> 更新内容: 添加 Flutter 本地环境配置，强制 flutter analyze 流程
+> 版本: v2.0
+> 日期: 2026-06-19
+> 更新内容: 迁移 APK 存储从 Supabase Storage 到 GitHub Releases，升级 Flutter 3.44.2 + Android 构建配置
 
 ---
 
@@ -12,7 +12,7 @@
 
 1. **提交代码** → GitHub & Gitee
 2. **构建部署** → 管理后台自动部署到 GitHub Pages
-3. **构建 APK** → App 端自动打包并上传到 Supabase Storage
+3. **构建 APK** → App 端自动打包并上传到 GitHub Releases
 4. **汇报结果** → 按标准格式输出构建状态
 
 ---
@@ -128,8 +128,8 @@ git push gitee master
 
 **自动构建流程：**
 - 触发条件：`master`/`main`/`develop` 分支 push、`v*` 标签、手动触发
-- 构建环境：Flutter 3.24.0 + Java 17 (Temurin)
-- 构建步骤：获取依赖 → 代码生成 → 测试 → 版本号自动迭代 → 构建 APK → 上传 Supabase Storage → 写入数据库版本记录 → 清理旧 APK（保留最新5个）
+- 构建环境：Flutter 3.44.2 + Java 17 (Temurin) + Gradle 8.11.1 + AGP 8.9.1
+- 构建步骤：获取依赖 → 代码生成 → 测试 → 版本号自动迭代 → 构建 APK → 上传 GitHub Releases → 写入数据库版本记录 → 清理旧 GitHub Releases（保留最新 10 个）
 - 版本号自动管理：每次 push 自动递增 patch 版本号和构建号（`chore:` 开头的提交或上次构建失败时跳过递增）
 - APK 命名：`pure-enjoy-v{version}-build{build_number}.apk`
 
@@ -184,13 +184,13 @@ curl -s -H "Authorization: token $GITHUB_TOKEN" \
 ```bash
 export GITHUB_TOKEN="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"
 
-# 自动轮询构建状态（每45秒检查一次，共12次，约9分钟）
+# 自动轮询构建状态（每50秒检查一次，共12次，约10分钟）
 for i in 1 2 3 4 5 6 7 8 9 10 11 12; do
   echo "=== 检查 #$i ==="
   curl -s -H "Authorization: token $GITHUB_TOKEN" \
     "https://api.github.com/repos/youpgc/pure-enjoy/actions/runs?per_page=1" | \
     python3 -c "import sys,json; data=json.load(sys.stdin); r=data.get('workflow_runs',[{}])[0]; print(f'Run {r.get(\"run_number\",\"?\")}: {r.get(\"conclusion\") or r.get(\"status\",\"unknown\")}')"
-  sleep 45
+  sleep 50
 done
 ```
 
@@ -214,7 +214,7 @@ for i in 1 2 3 4 5 6 7 8; do
   curl -s -H "Authorization: token $GITHUB_TOKEN" \
     "https://api.github.com/repos/youpgc/pure-enjoy/actions/runs?per_page=1" | \
     python3 -c "import sys,json; data=json.load(sys.stdin); r=data.get('workflow_runs',[{}])[0]; print(f'Run {r.get(\"run_number\",\"?\")}: {r.get(\"conclusion\") or r.get(\"status\",\"unknown\")}')"
-  sleep 45
+  sleep 50
 done
 ```
 
@@ -241,22 +241,37 @@ done
 
 | 配置项 | 值 |
 |-------|---|
+| 工作流名称 | `Build APK and Upload to GitHub Releases` |
 | 触发条件 | `master`/`main`/`develop` 分支 push、`v*` 标签、手动触发 |
 | 运行环境 | `ubuntu-latest` |
-| Flutter 版本 | 3.24.0 (stable channel) |
+| Flutter 版本 | 3.44.2 (stable channel) |
 | Java 版本 | 17 (Temurin) |
+| Gradle 版本 | 8.11.1 |
+| Android Gradle Plugin | 8.9.1 |
+| Kotlin 版本 | 2.0.20 |
+| compileSdk / targetSdk | 36 |
+| minSdk | 21 |
 | 构建产物 | Release APK |
-| APK 上传 | Supabase Storage (`apk-releases` 桶) |
-| 版本记录 | Supabase `app_versions` 表 |
-| 旧版清理 | 自动删除超过 5 个的旧 APK 并标记数据库记录为 `superseded` |
+| APK 存储 | **GitHub Releases**（无大小限制） |
+| 版本记录 | Supabase `app_versions` 表（仅存储元数据，apk_url 指向 GitHub Releases） |
+| 旧版清理 | 自动删除超过 10 个的旧 GitHub Releases |
 | 并发控制 | 同一分支只允许一个构建 |
 | 构建号保护 | 上次构建失败时，重新推送不递增构建号 |
+| 代码压缩 | `minifyEnabled true` + `shrinkResources true` + R8 |
+| ABI 过滤 | `arm64-v8a`, `armeabi-v7a`（移除 x86/x86_64） |
+| Dart 优化 | `--obfuscate` + `--tree-shake-icons` + `--split-debug-info` |
 
 **所需 Secrets：**
-- `SUPABASE_ACCESS_TOKEN`
-- `SUPABASE_PROJECT_ID`
-- `SUPABASE_SERVICE_ROLE_KEY`
-- `GITHUB_TOKEN`（仅标签触发创建 Release 时使用）
+- `GITHUB_TOKEN`（用于创建 GitHub Release 和上传 APK）
+- `SUPABASE_PROJECT_ID`（用于写入版本记录数据库）
+- `SUPABASE_SERVICE_ROLE_KEY`（用于写入版本记录数据库）
+
+**数据流向：**
+```
+构建 APK → GitHub Releases（APK 文件存储）
+         → Supabase app_versions（版本元数据记录：版本号、下载 URL、大小、SHA256 等）
+         → Supabase 旧版本标记 revoked
+```
 
 ---
 
@@ -270,7 +285,7 @@ done
 | 项目 | 状态 | 版本 | 部署地址 |
 |------|------|------|----------|
 | 管理后台 | 构建成功/失败 | - | `https://youpgc.github.io/pure-enjoy-admin/` |
-| App端 | 构建成功/失败 | v1.9.184+230 | APK已上传至Supabase Storage |
+| App端 | 构建成功/失败 | v1.9.222+268 | APK 已上传至 GitHub Releases |
 
 ---
 
@@ -292,7 +307,7 @@ done
 **文件：** `/workspace/pure-enjoy/pubspec.yaml`
 
 ```yaml
-version: 1.9.184+230
+version: 1.9.222+268
 # 格式: 主版本.次版本.修订号+构建号
 ```
 
@@ -322,7 +337,7 @@ version: 1.9.184+230
 |------|------|
 | GitHub | `https://github.com/youpgc/pure-enjoy` |
 | Gitee | `https://gitee.com/YouPgC/pure-enjoy` |
-| APK 下载 | Supabase Storage `apk-releases` 桶 |
+| APK 下载 | GitHub Releases（`https://github.com/youpgc/pure-enjoy/releases`） |
 
 ---
 
@@ -341,7 +356,9 @@ version: 1.9.184+230
 export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oZHJianBxbXpzd3N3b2F6d2pnIiwicm9sZSI6InNlcnZpY2Vfcm9sZSIsImlhdCI6MTc3ODYyMDIxMywiZXhwIjoyMDk0MTk2MjEzfQ.N9av5Q_bmFu2X4_8kM9TCrSjh0x0u856PLkwqWkKK5w"
 ```
 
-**用途：** 用于 AI 助手直接操作 Supabase 数据库（执行 SQL、管理 Storage、查询数据等），具有超级管理员权限，绕过 RLS 策略。
+**用途：** 用于 AI 助手直接操作 Supabase 数据库（执行 SQL、查询数据等），具有超级管理员权限，绕过 RLS 策略。
+
+**注意：** Supabase Storage 不再用于存储 APK 文件（50MB 大小限制）。仅保留 `app_versions` 表用于版本元数据管理。
 
 ---
 
@@ -363,10 +380,11 @@ export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 4. 监听新构建状态
 
 常见原因：
-- Flutter 版本是否为 3.24.0
+- Flutter 版本是否为 3.44.2
 - `pubspec.lock` 是否存在（CI 缓存依赖）
 - `GeneratedPluginRegistrant.java` 是否在 git 跟踪中
-- Android 构建配置：AGP 8.1.0 / Kotlin 1.9.0 / Gradle 8.4 / compileSdk 34
+- Android 构建配置：AGP 8.9.1 / Kotlin 2.0.20 / Gradle 8.11.1 / compileSdk 36
+- ProGuard 规则是否完整（R8 压缩失败）
 
 ### Q3: Gitee 推送失败
 
@@ -391,6 +409,15 @@ export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 - Token 是否过期（GitHub Settings > Developer settings > Personal access tokens）
 - 环境变量是否正确设置：`echo $GITHUB_TOKEN`
 
+### Q7: APK 体积超过 50MB（Supabase 限制）
+
+**已解决：** 自 v2.0 起，APK 已迁移到 GitHub Releases 存储，不再受 Supabase 50MB 限制。
+
+如果 APK 体积异常增大（>60MB），检查：
+- 是否意外引入了大型依赖
+- `assets/images/` 中是否有未使用的大文件
+- `pubspec.yaml` 的 `assets` 是否精确引用（避免整目录打包）
+
 ---
 
 ## 十二、部署检查清单
@@ -411,4 +438,51 @@ export SUPABASE_SERVICE_ROLE_KEY="eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiO
 
 ---
 
-*本文档由开发助手自动生成，最后更新：2026-06-18*
+*本文档由开发助手自动生成，最后更新：2026-06-19*
+
+---
+
+# 附录：历史版本（已作废）
+
+## v1.6（已作废）
+
+> 日期: 2026-06-18
+> 作废原因: Flutter 3.44.2 升级后 APK 体积超过 Supabase Storage 50MB 限制，已迁移到 GitHub Releases
+
+### v1.6 与 v2.0 的主要差异
+
+| 项目 | v1.6（作废） | v2.0（当前） |
+|------|-------------|-------------|
+| Flutter 版本 | 3.24.0 | 3.44.2 |
+| Gradle 版本 | 8.4 | 8.11.1 |
+| AGP 版本 | 8.1.0 | 8.9.1 |
+| Kotlin 版本 | 1.9.0 | 2.0.20 |
+| compileSdk | 34 | 36 |
+| APK 存储 | Supabase Storage | GitHub Releases |
+| 旧版清理 | Supabase Storage（保留 5 个） | GitHub Releases（保留 10 个） |
+| 所需 Secrets | SUPABASE_ACCESS_TOKEN, SUPABASE_PROJECT_ID, SUPABASE_SERVICE_ROLE_KEY, GITHUB_TOKEN | GITHUB_TOKEN, SUPABASE_PROJECT_ID, SUPABASE_SERVICE_ROLE_KEY |
+
+### v1.6 的 App 端构建流程（已作废，仅存档）
+
+```
+获取依赖 → 代码生成 → 测试 → 版本号自动迭代 → 构建 APK → 上传 Supabase Storage → 写入数据库版本记录 → 清理旧 APK（保留最新5个）
+```
+
+### v1.6 的 build_apk.yml 配置（已作废，仅存档）
+
+| 配置项 | v1.6 值 |
+|-------|---------|
+| Flutter 版本 | 3.24.0 (stable channel) |
+| Java 版本 | 17 (Temurin) |
+| 构建产物 | Release APK |
+| APK 上传 | Supabase Storage (`apk-releases` 桶) |
+| 版本记录 | Supabase `app_versions` 表 |
+| 旧版清理 | 自动删除超过 5 个的旧 APK 并标记数据库记录为 `superseded` |
+| 并发控制 | 同一分支只允许一个构建 |
+| 构建号保护 | 上次构建失败时，重新推送不递增构建号 |
+
+### v1.6 常见问题（已作废，仅存档）
+
+**Q: APK 上传失败 Payload too large (413)**
+原因：Supabase Storage 单文件大小限制约 50MB，Flutter 3.44.2 引擎体积增大后 APK 超过限制。
+解决：升级到 v2.0，迁移到 GitHub Releases。
