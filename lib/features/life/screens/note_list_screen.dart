@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
@@ -197,15 +196,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
           SnackBar(content: Text('删除失败: $e')),
         );
       }
-    }
-  }
-
-  Future<void> _togglePin(NoteModel note) async {
-    // isPinned 字段已从数据库移除，此功能不再可用
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('置顶功能暂不可用')),
-      );
     }
   }
 

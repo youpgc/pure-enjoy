@@ -196,7 +196,6 @@ class _SimulationPageViewState extends State<SimulationPageView>
   bool _isDragging = false;
   int _currentPage = 0;
 
-  int get _currentPageGetter => _currentPage;
   int get pageCount => widget.pages.length;
 
   @override

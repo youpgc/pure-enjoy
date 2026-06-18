@@ -1,6 +1,5 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
 import '../../../services/supabase_service.dart';
@@ -80,7 +79,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final data = result.data!;
         if (data.isNotEmpty) {
           setState(() {
-            _userData = data.first as Map<String, dynamic>;
+            _userData = data.first;
             _initializeControllers();
           });
         }

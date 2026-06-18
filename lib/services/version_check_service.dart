@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
@@ -6,7 +5,6 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
-import '../config.dart';
 import '../core/theme/app_theme.dart';
 import 'api_client.dart';
 import 'http_client.dart';
@@ -177,7 +175,6 @@ class VersionCheckService {
       int downloadedBytes = 0;
 
       final sink = file.openWrite();
-      bool downloadSuccess = false;
 
       await response.stream.listen(
         (chunk) {
@@ -192,7 +189,6 @@ class VersionCheckService {
         },
         onDone: () async {
           debugPrint('📱 下载流完成');
-          downloadSuccess = true;
           await sink.close();
         },
         onError: (error) async {

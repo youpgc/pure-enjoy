@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';

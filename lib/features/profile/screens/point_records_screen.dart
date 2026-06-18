@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';

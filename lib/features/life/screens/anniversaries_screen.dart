@@ -604,7 +604,6 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final isBirthday = widget.filterType == 'birthday';
     final title = isBirthday ? '生日' : '纪念日';
 

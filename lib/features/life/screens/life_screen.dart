@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
@@ -90,19 +89,6 @@ class _LifeScreenState extends State<LifeScreen> {
       debugPrint('格式化日期失败: $e');
       return '';
     }
-  }
-
-  /// 心情 emoji 映射（从字典服务获取）
-  String _moodEmoji(String? mood) {
-    if (mood == null || mood.isEmpty) return '\u{1F60A}';
-    final emoji = DictService.instance.getEmoji('mood_type', mood);
-    return emoji.isNotEmpty ? emoji : '\u{1F60A}';
-  }
-
-  /// 心情文字映射（从字典服务获取）
-  String _moodText(String? mood) {
-    if (mood == null || mood.isEmpty) return '开心';
-    return DictService.instance.getLabelOrDefault('mood_type', mood, defaultValue: '开心');
   }
 
   @override

@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -436,12 +435,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         }
         _scrollToPosition();
       }
-    }
-  }
-
-  void _scrollToTop() {
-    if (_scrollController.hasClients) {
-      _scrollController.jumpTo(0);
     }
   }
 

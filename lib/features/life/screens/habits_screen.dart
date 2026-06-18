@@ -6,7 +6,6 @@ import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../../widgets/common_widgets.dart';
 import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
 import '../widgets/reminder_schedule_picker.dart';
@@ -238,7 +237,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     // 提醒计划状态
     ReminderScheduleModel? reminderSchedule = isEditing
-        ? _reminderSchedules[habit!.id]
+        ? _reminderSchedules[habit.id]
         : null;
 
     await showDialog(
@@ -307,7 +306,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
                 try {
                   if (isEditing) {
-                    habitId = habit!.id;
+                    habitId = habit.id;
                     final result = await ApiClient.patchByFilter(
                       'habits',
                       filters: {'id': 'eq.$habitId'},
@@ -339,12 +338,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   }
 
                   // 保存提醒计划
-                  if (habitId != null && reminderSchedule != null) {
-                    final schedule = reminderSchedule!.copyWith(
-                      habitId: habitId,
-                      userId: userId,
-                    );
-
+                  final schedule = reminderSchedule?.copyWith(
+                    habitId: habitId,
+                    userId: userId,
+                  );
+                  if (schedule != null) {
                     if (schedule.id.isNotEmpty) {
                       // 更新已有提醒计划
                       await ApiClient.patchByFilter(
@@ -426,8 +424,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('习惯打卡'),

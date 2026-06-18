@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
@@ -120,11 +119,6 @@ class _ExpenseStatisticsState extends State<_ExpenseStatistics> {
         _isLoading = false;
       });
     }
-  }
-
-  List<dynamic> _parseJson(String body) {
-    if (body.isEmpty) return [];
-    return jsonDecode(body) as List<dynamic>;
   }
 
   @override
@@ -311,11 +305,6 @@ class _WeightStatisticsState extends State<_WeightStatistics> {
         _isLoading = false;
       });
     }
-  }
-
-  List<dynamic> _parseJson(String body) {
-    if (body.isEmpty) return [];
-    return jsonDecode(body) as List<dynamic>;
   }
 
   @override
@@ -567,11 +556,6 @@ class _MoodStatisticsState extends State<_MoodStatistics> {
         _isLoading = false;
       });
     }
-  }
-
-  List<dynamic> _parseJson(String body) {
-    if (body.isEmpty) return [];
-    return jsonDecode(body) as List<dynamic>;
   }
 
   @override

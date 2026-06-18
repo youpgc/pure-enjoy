@@ -5,7 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/theme_provider.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../config.dart';
 import '../../life/screens/life_screen.dart';
 import '../../life/screens/reminders_screen.dart';
 
@@ -142,7 +141,6 @@ class _DashboardPageState extends State<DashboardPage> {
   bool _isLoadingActivities = true;
   List<Map<String, dynamic>> _recentActivities = [];
 
-  bool _isLoadingReminders = true;
   List<ReminderModel> _pendingReminders = [];
 
   bool _isLoadingNovels = true;
@@ -151,7 +149,6 @@ class _DashboardPageState extends State<DashboardPage> {
   List<String> _visibleToolIds = [];
 
   // 习惯打卡数据
-  bool _isLoadingHabits = true;
   List<HabitModel> _habits = [];
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
   String? _checkingHabitId; // 正在打卡的习惯ID，用于loading阻断
@@ -177,7 +174,6 @@ class _DashboardPageState extends State<DashboardPage> {
   Future<void> _loadHabitsForCheckin() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) {
-      if (mounted) setState(() => _isLoadingHabits = false);
       return;
     }
 
@@ -218,15 +214,11 @@ class _DashboardPageState extends State<DashboardPage> {
           setState(() {
             _habits = habits;
             _checkinHistory = history;
-            _isLoadingHabits = false;
           });
         }
-      } else {
-        if (mounted) setState(() => _isLoadingHabits = false);
       }
     } catch (e) {
       debugPrint('加载习惯数据失败: $e');
-      if (mounted) setState(() => _isLoadingHabits = false);
     }
   }
 
@@ -405,7 +397,6 @@ class _DashboardPageState extends State<DashboardPage> {
     try {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) {
-        if (mounted) setState(() => _isLoadingReminders = false);
         return;
       }
 
@@ -421,7 +412,6 @@ class _DashboardPageState extends State<DashboardPage> {
         if (mounted) {
           setState(() {
             _pendingReminders = reminders;
-            _isLoadingReminders = false;
           });
         }
       } else {
@@ -429,7 +419,6 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       debugPrint('加载提醒失败: $e');
-      if (mounted) setState(() => _isLoadingReminders = false);
     }
   }
 
@@ -1184,41 +1173,6 @@ class _ToolCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
           ],
-        ),
-      ),
-    );
-  }
-}
-
-class _QuickActionCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color color;
-  final VoidCallback onTap;
-
-  const _QuickActionCard({
-    required this.icon,
-    required this.label,
-    required this.color,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      color: color,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(16),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            children: [
-              Icon(icon, size: 32),
-              const SizedBox(height: 8),
-              Text(label),
-            ],
-          ),
         ),
       ),
     );
@@ -2357,30 +2311,6 @@ class _ProfilePageState extends State<ProfilePage> {
     );
   }
 
-  void _showExportDialog(BuildContext context) {
-    if (!AuthService.instance.isAuthenticated) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请先登录后再导出数据')),
-      );
-      return;
-    }
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-      ),
-      builder: (context) => const _ExportBottomSheet(),
-    );
-  }
-
-  void _showThemeDialog(BuildContext context) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const _ThemeSettingsScreen()),
-    ).then((_) => _loadUserData());
-  }
-
   /// 构建统计项
   Widget _buildStatItem(IconData icon, String label, String value, {required VoidCallback onTap}) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -2480,8 +2410,8 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 /// 个性化设置页面
-class _ThemeSettingsScreen extends StatelessWidget {
-  const _ThemeSettingsScreen();
+class ThemeSettingsScreen extends StatelessWidget {
+  const ThemeSettingsScreen({super.key});
 
   @override
   Widget build(BuildContext context) {

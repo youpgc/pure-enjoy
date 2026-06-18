@@ -6,7 +6,6 @@ import '../../../utils/cache_helper.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
-import 'book_shelf_screen.dart';
 
 /// 小说列表页面
 class NovelListScreen extends StatefulWidget {

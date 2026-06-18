@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
@@ -222,7 +221,7 @@ class PointService {
       if (result.isSuccess) {
         final records = result.data!;
         return records
-            .map((json) => PointRecord.fromJson(json as Map<String, dynamic>))
+            .map((json) => PointRecord.fromJson(json))
             .toList();
       }
 

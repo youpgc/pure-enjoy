@@ -1,6 +1,4 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
@@ -150,7 +148,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 创建小说详情映射表 (novel_id -> novel_data)
       final novelsMap = <String, Map<String, dynamic>>{};
       for (final novel in novelsData) {
-        novelsMap[novel['id'].toString()] = novel as Map<String, dynamic>;
+        novelsMap[novel['id'].toString()] = novel;
       }
 
       // 合并数据：只展示已加入书架的小说（is_collected=true）
@@ -213,32 +211,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('移除出错: $e')),
-        );
-      }
-    }
-  }
-
-  /// 更新阅读进度
-  Future<void> _updateProgress(String userNovelId, double newProgress) async {
-    if (!_checkAuth()) return;
-
-    try {
-      final result = await ApiClient.patchByFilter(
-        'user_novels',
-        filters: {'id': 'eq.$userNovelId'},
-        body: {
-          'progress': newProgress,
-          'last_read_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      );
-
-      if (result.isSuccess) {
-        await _loadBookshelf();
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新进度失败: $e')),
         );
       }
     }
