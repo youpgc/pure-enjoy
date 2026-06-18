@@ -62,7 +62,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         if (data.isNotEmpty) {
           setState(() {
             _isInBookshelf = true;
-            _bookshelfId = data.first['id'] as String;
+            _bookshelfId = data.first['id'].toString();
             _currentChapter = data.first['last_chapter'] as int? ?? 1;
             _isCollected = data.first['is_collected'] as bool? ?? false;
             _isLoadingShelf = false;

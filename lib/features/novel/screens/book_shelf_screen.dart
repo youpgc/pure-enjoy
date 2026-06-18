@@ -150,7 +150,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 创建小说详情映射表 (novel_id -> novel_data)
       final novelsMap = <String, Map<String, dynamic>>{};
       for (final novel in novelsData) {
-        novelsMap[novel['id'] as String] = novel as Map<String, dynamic>;
+        novelsMap[novel['id'].toString()] = novel as Map<String, dynamic>;
       }
 
       // 合并数据：只展示已加入书架的小说（is_collected=true）
@@ -382,7 +382,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
   /// 显示操作底部弹窗
   void _showActionBottomSheet(BuildContext context, Map<String, dynamic> item) {
-    final userNovelId = item['id'] as String;
+    final userNovelId = item['id'].toString();
     final progress = (item['progress'] as num?)?.toDouble() ?? 0.0;
     final currentStatus = _getReadingStatus(progress);
     final lastChapter = item['last_chapter'] as int? ?? 1;
@@ -802,7 +802,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         final shelfData = shelfResult.data!;
         setState(() {
           _addedNovelIds = shelfData
-              .map((item) => item['novel_id'] as String)
+              .map((item) => item['novel_id'].toString())
               .toSet();
         });
       }
@@ -928,7 +928,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
                   separatorBuilder: (_, __) => const Divider(height: 1),
                   itemBuilder: (context, index) {
                     final novel = _filteredNovels[index];
-                    final novelId = novel['id'] as String;
+                    final novelId = novel['id'].toString();
                     final isAdded = _addedNovelIds.contains(novelId);
                     final isAdding = _addingNovelIds.contains(novelId);
 
@@ -1188,7 +1188,7 @@ class _NovelSearchDelegate extends SearchDelegate<String> {
       separatorBuilder: (_, __) => const Divider(height: 1),
       itemBuilder: (context, index) {
         final novel = results[index];
-        final novelId = novel['id'] as String;
+        final novelId = novel['id'].toString();
         final isAdded = addedNovelIds.contains(novelId);
         final isAdding = addingNovelIds.contains(novelId);
 

@@ -498,7 +498,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         if (data.isNotEmpty && mounted) {
           setState(() {
             _isInBookshelf = true;
-            _bookshelfId = data.first['id'] as String;
+            _bookshelfId = data.first['id'].toString();
             _isCollected = data.first['is_collected'] as bool? ?? false;
           });
         }

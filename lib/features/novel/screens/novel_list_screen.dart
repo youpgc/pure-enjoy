@@ -237,7 +237,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
     final readingNovelIds = _userNovels.where((un) {
       final progress = (un['progress'] as num?)?.toDouble() ?? 0.0;
       return progress > 0 && progress < 1;
-    }).map((un) => un['novel_id'] as String).toSet();
+    }).map((un) => un['novel_id'].toString()).toSet();
     return _allNovels
         .where((n) => readingNovelIds.contains(n.id) && n.chapterCount > 0)
         .toList();
@@ -436,7 +436,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                           itemCount: _novels.length,
                           itemBuilder: (context, index) {
                             final novel = _novels[index];
-                            final bookshelfIds = _userNovels.map((un) => un['novel_id'] as String).toSet();
+                            final bookshelfIds = _userNovels.map((un) => un['novel_id'].toString()).toSet();
                             final isInBookshelf = bookshelfIds.contains(novel.id);
                             return _NovelCard(
                               novel: novel,
