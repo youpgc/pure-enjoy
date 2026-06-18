@@ -47,7 +47,6 @@ class FeedbackModel {
       'category': category,
       'status': status,
       'admin_reply': adminReply,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

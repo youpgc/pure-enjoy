@@ -59,7 +59,6 @@ class MoodDiaryModel {
       'mood_label': moodScore.toString(),
       'content': content,
       'date': entryDate.toIso8601String().split('T').first,
-      'synced': true,
     };
     if (id.isNotEmpty) {
       json['id'] = id;

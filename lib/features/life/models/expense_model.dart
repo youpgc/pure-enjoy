@@ -48,8 +48,6 @@ class ExpenseModel {
       'description': description,
       'note': note,
       'date': date.toIso8601String().split('T').first,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
-      'updated_at': (updatedAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (userNickname != null) {
       json['user_nickname'] = userNickname;

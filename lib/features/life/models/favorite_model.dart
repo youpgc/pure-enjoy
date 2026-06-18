@@ -49,7 +49,6 @@ class FavoriteModel {
       'category': category,
       'tags': tags,
       'is_pinned': isPinned,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

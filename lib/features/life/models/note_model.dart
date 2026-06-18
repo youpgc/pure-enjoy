@@ -47,8 +47,6 @@ class NoteModel {
       'category': category,
       'color': color,
       'user_nickname': userNickname,
-      'created_at': createdAt.toUtc().toIso8601String(),
-      'updated_at': updatedAt.toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

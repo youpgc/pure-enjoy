@@ -46,7 +46,6 @@ class ReminderModel {
       'is_completed': isCompleted,
       'is_repeated': isRepeated,
       'repeat_type': repeatType,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;

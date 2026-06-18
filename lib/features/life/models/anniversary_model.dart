@@ -55,8 +55,7 @@ class AnniversaryModel {
   }
 
   Map<String, dynamic> toJson() {
-    return {
-      'id': id,
+    final json = <String, dynamic>{
       'user_id': userId,
       'user_nickname': userNickname,
       'title': title,
@@ -67,8 +66,11 @@ class AnniversaryModel {
       'remind_enabled': remindEnabled,
       'remind_days_before': remindDaysBefore,
       'is_lunar': isLunar,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
     };
+    if (id.isNotEmpty) {
+      json['id'] = id;
+    }
+    return json;
   }
 
   Map<String, dynamic> toJsonForUpdate() {

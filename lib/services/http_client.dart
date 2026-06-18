@@ -109,7 +109,10 @@ class HttpClient {
     Duration? timeout,
   }) async {
     final response = await _client
-        .delete(Uri.parse(url), headers: _buildHeaders(extra: headers))
+        .delete(
+          Uri.parse(url),
+          headers: _buildHeaders(extra: headers),
+        )
         .timeout(timeout ?? RequestTimeout.simple);
     return response;
   }

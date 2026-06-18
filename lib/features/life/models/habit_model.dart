@@ -46,8 +46,6 @@ class HabitModel {
       'current_streak': currentStreak,
       'longest_streak': longestStreak,
       'is_active': isActive,
-      'created_at': (createdAt ?? DateTime.now()).toUtc().toIso8601String(),
-      'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
     if (id.isNotEmpty) {
       json['id'] = id;
