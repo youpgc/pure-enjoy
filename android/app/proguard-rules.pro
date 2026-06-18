@@ -51,3 +51,11 @@
 -keepclassmembers class * {
     @com.google.gson.annotations.SerializedName <fields>;
 }
+
+# 忽略 Play Core 缺失类（R8）
+-dontwarn com.google.android.play.core.splitcompat.SplitCompatApplication
+-dontwarn com.google.android.play.core.tasks.OnFailureListener
+-dontwarn com.google.android.play.core.tasks.OnSuccessListener
+-dontwarn com.google.android.play.core.tasks.Task
+-dontwarn com.google.android.play.core.splitinstall.**
+-dontwarn com.google.android.play.core.**
