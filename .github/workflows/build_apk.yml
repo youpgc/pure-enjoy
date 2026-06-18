@@ -209,18 +209,71 @@ jobs:
           echo "File to upload: build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
           ls -lh "build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
           
-          # Try upload with upsert header (allows overwriting)
+          # 使用 TUS 分片上传（支持大文件）
+          FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          FILE_SIZE=$(stat -f%z "$FILE_PATH" 2>/dev/null || stat -c%s "$FILE_PATH" 2>/dev/null || echo "0")
+          echo "File size: $FILE_SIZE bytes"
+          
+          # 创建 TUS 上传
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/vnd.android.package-archive" \
             -H "x-upsert: true" \
-            --data-binary @"build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}")
+            --data-binary @"$FILE_PATH")
           
           HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
           RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
           
           echo "Upload HTTP Code: $HTTP_CODE"
           echo "Upload Response: $RESPONSE_BODY"
+          
+          # 如果 413 Payload too large，尝试使用 resumable 上传
+          if [ "$HTTP_CODE" = "413" ]; then
+            echo "⚠️ Direct upload failed (413), trying resumable TUS upload..."
+            
+            # 创建 TUS 上传会话
+            TUS_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Tus-Resumable: 1.0.0" \
+              -H "Upload-Length: $FILE_SIZE" \
+              -H "Upload-Metadata: filename ${{ steps.version.outputs.apk_name }},contentType YXBwbGljYXRpb24vdm5kLmFuZHJvaWQucGFja2FnZS1hcmNoaXZl" \
+              -H "Content-Type: application/offset+octet-stream")
+            
+            TUS_CODE=$(echo "$TUS_RESPONSE" | tail -n1)
+            TUS_BODY=$(echo "$TUS_RESPONSE" | sed '$d')
+            echo "TUS init HTTP Code: $TUS_CODE"
+            
+            if [ "$TUS_CODE" = "201" ] || [ "$TUS_CODE" = "200" ]; then
+              # 获取上传 URL
+              UPLOAD_URL=$(echo "$TUS_RESPONSE" | grep -i "location:" | awk '{print $2}' | tr -d '\r')
+              if [ -z "$UPLOAD_URL" ]; then
+                UPLOAD_URL="$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}"
+              fi
+              
+              # 上传文件内容
+              PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$UPLOAD_URL" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Tus-Resumable: 1.0.0" \
+                -H "Upload-Offset: 0" \
+                -H "Content-Type: application/offset+octet-stream" \
+                --data-binary @"$FILE_PATH")
+              
+              PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
+              echo "TUS patch HTTP Code: $PATCH_CODE"
+              
+              if [ "$PATCH_CODE" = "204" ] || [ "$PATCH_CODE" = "200" ]; then
+                HTTP_CODE="201"
+                echo "✅ TUS upload successful"
+              else
+                echo "❌ TUS upload failed with HTTP $PATCH_CODE"
+                exit 1
+              fi
+            else
+              echo "❌ TUS init failed with HTTP $TUS_CODE"
+              echo "Response: $TUS_BODY"
+              exit 1
+            fi
+          fi
           
           if [ "$HTTP_CODE" -ne 200 ] && [ "$HTTP_CODE" -ne 201 ]; then
             echo "❌ Upload failed with HTTP $HTTP_CODE"
