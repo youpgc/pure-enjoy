@@ -431,34 +431,65 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      final result = await ApiClient.get('user_novels',
+      // 分两步查询：先查 user_novels，再查 novels（避免嵌套查询因缺少外键返回400）
+      final userNovelsResult = await ApiClient.get('user_novels',
           filters: {'user_id': 'eq.$userId', 'is_collected': 'eq.true'},
-          select: '*,novels:novel_id(*)',
+          select: 'novel_id,last_chapter,progress,last_read_at',
           order: 'last_read_at.desc.nullslast',
           limit: 5);
 
-      if (result.isSuccess) {
-        final List data = result.data as List;
-        final novels = <Map<String, dynamic>>[];
-        for (final item in data) {
-          final itemMap = item as Map<String, dynamic>;
-          final novelData = itemMap['novels'] as Map<String, dynamic>?;
-          if (novelData != null) {
-            novels.add({
-              'novel': NovelModel.fromJson(novelData),
-              'lastChapter': itemMap['last_chapter'] as int? ?? 1,
-              'progress': itemMap['progress'] as num? ?? 0.0,
-            });
-          }
-        }
-        if (mounted) {
-          setState(() {
-            _recentNovels = novels;
-            _isLoadingNovels = false;
+      if (!userNovelsResult.isSuccess || userNovelsResult.data == null || userNovelsResult.data!.isEmpty) {
+        if (mounted) setState(() => _isLoadingNovels = false);
+        return;
+      }
+
+      // 提取 novel_id 列表
+      final novelIds = userNovelsResult.data!
+          .map((e) => e['novel_id'] as String?)
+          .where((id) => id != null)
+          .toList();
+
+      if (novelIds.isEmpty) {
+        if (mounted) setState(() => _isLoadingNovels = false);
+        return;
+      }
+
+      // 查询 novels 详情
+      final novelsResult = await ApiClient.get('novels',
+          filters: {'id': 'in.(${novelIds.join(',')})'},
+          select: 'id,title,author,cover_url,category',
+          limit: 5);
+
+      if (!novelsResult.isSuccess) {
+        if (mounted) setState(() => _isLoadingNovels = false);
+        return;
+      }
+
+      // 创建 novel 详情映射
+      final novelsMap = <String, Map<String, dynamic>>{};
+      for (final novel in novelsResult.data!) {
+        novelsMap[novel['id'].toString()] = novel;
+      }
+
+      // 合并数据
+      final novels = <Map<String, dynamic>>[];
+      for (final userNovel in userNovelsResult.data!) {
+        final novelId = userNovel['novel_id'] as String?;
+        final novelData = novelsMap[novelId];
+        if (novelData != null) {
+          novels.add({
+            'novel': NovelModel.fromJson(novelData),
+            'lastChapter': userNovel['last_chapter'] as int? ?? 1,
+            'progress': userNovel['progress'] as num? ?? 0.0,
           });
         }
-      } else {
-        throw Exception(result.errorMessage);
+      }
+
+      if (mounted) {
+        setState(() {
+          _recentNovels = novels;
+          _isLoadingNovels = false;
+        });
       }
     } catch (e) {
       debugPrint('加载最近阅读失败: $e');
