@@ -163,7 +163,6 @@ class VersionCheckService {
       // 使用独立 Client 发送请求，不注入任何额外 headers
       debugPrint('📱 开始下载APK: $apkUrl');
       final request = http.Request('GET', uri);
-      // 只设置必要的下载 headers
       request.headers['Accept'] = '*/*';
       request.headers['User-Agent'] = 'PureEnjoy/1.0';
 
@@ -171,7 +170,7 @@ class VersionCheckService {
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
-      // 处理重定向（GitHub Releases 返回 302）
+      // 处理重定向（GitHub Releases 返回 302 到 CDN）
       if (response.statusCode == 302 || response.statusCode == 301) {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {

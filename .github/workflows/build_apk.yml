@@ -253,7 +253,7 @@ jobs:
             exit 1
           fi
           
-          # 获取下载 URL
+          # 获取下载 URL（公开仓库可直接使用 browser_download_url）
           DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
