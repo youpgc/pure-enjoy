@@ -164,10 +164,12 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
         if (result.isSuccess) {
           final data = result.data!;
-          setState(() {
-            _isInBookshelf = true;
-            _bookshelfId = data['id'].toString();
-          });
+          if (data.isNotEmpty) {
+            setState(() {
+              _isInBookshelf = true;
+              _bookshelfId = data.first['id'].toString();
+            });
+          }
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('已加入书架')),

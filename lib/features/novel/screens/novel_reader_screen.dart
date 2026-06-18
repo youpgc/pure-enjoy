@@ -545,10 +545,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
         if (result.isSuccess) {
           final data = result.data!;
-          if (mounted) {
+          if (data.isNotEmpty && mounted) {
             setState(() {
               _isInBookshelf = true;
-              _bookshelfId = data['id'].toString();
+              _bookshelfId = data.first['id'].toString();
             });
           }
         }
@@ -585,10 +585,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       if (result.isSuccess) {
         final data = result.data!;
-        if (mounted) {
+        if (data.isNotEmpty && mounted) {
           setState(() {
             _isInBookshelf = true;
-            _bookshelfId = data['id'].toString();
+            _bookshelfId = data.first['id'].toString();
           });
         }
         if (mounted) {
