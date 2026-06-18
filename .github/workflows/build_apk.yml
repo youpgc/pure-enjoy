@@ -191,64 +191,66 @@ jobs:
           echo "file_size=$FILESIZE" >> $GITHUB_OUTPUT
           echo "Size: $FILESIZE bytes"
 
-      # 14. 上传 APK 到 Supabase Storage（使用 Supabase CLI）
-      - name: Upload APK to Supabase Storage
+      # 14. 上传 APK 到 GitHub Releases
+      - name: Upload APK to GitHub Releases
         id: upload
         env:
-          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
-          SUPABASE_PROJECT_ID: ${{ secrets.SUPABASE_PROJECT_ID }}
-          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          SUPABASE_URL="https://$SUPABASE_PROJECT_ID.supabase.co"
-          DOWNLOAD_URL="$SUPABASE_URL/storage/v1/object/public/apk-releases/${{ steps.version.outputs.apk_name }}"
           FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           
-          echo "Uploading to: $DOWNLOAD_URL"
           echo "File: $FILE_PATH"
           ls -lh "$FILE_PATH"
           
-          # 安装 Supabase CLI
-          echo "Installing Supabase CLI..."
-          npm install -g supabase@latest 2>/dev/null || npm install -g supabase 2>/dev/null || true
+          # 创建 GitHub Release
+          echo "Creating GitHub Release $TAG_NAME..."
+          RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/json" \
+            -d "{
+              \"tag_name\": \"$TAG_NAME\",
+              \"name\": \"Pure Enjoy $TAG_NAME\",
+              \"body\": \"自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}\",
+              \"draft\": false,
+              \"prerelease\": false
+            }")
           
-          # 检查是否安装成功
-          if command -v supabase &> /dev/null; then
-            echo "✅ Supabase CLI installed"
-            
-            # 使用 CLI 上传（支持大文件）
-            supabase storage upload --project-ref "$SUPABASE_PROJECT_ID" \
-              --bucket apk-releases \
-              --path "${{ steps.version.outputs.apk_name }}" \
-              --file "$FILE_PATH" \
-              --token "$SUPABASE_SERVICE_ROLE_KEY" 2>/dev/null || {
-              echo "⚠️ CLI upload failed, falling back to curl..."
-              CLI_FAILED=1
-            }
+          RELEASE_HTTP=$(echo "$RELEASE_RESPONSE" | tail -n1)
+          RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
+          echo "Release HTTP Code: $RELEASE_HTTP"
+          
+          # 如果 release 已存在，获取已有 release 的上传 URL
+          if [ "$RELEASE_HTTP" = "422" ]; then
+            echo "Release already exists, fetching existing release..."
+            RELEASE_RESPONSE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" \
+              -H "Authorization: token $GITHUB_TOKEN")
+            UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
           else
-            echo "⚠️ Supabase CLI not available, using curl..."
-            CLI_FAILED=1
+            UPLOAD_URL=$(echo "$RELEASE_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
           fi
           
-          # 如果 CLI 失败，使用 curl 上传
-          if [ -n "$CLI_FAILED" ]; then
-            UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/storage/v1/object/apk-releases/${{ steps.version.outputs.apk_name }}" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Content-Type: application/vnd.android.package-archive" \
-              -H "x-upsert: true" \
-              --data-binary @"$FILE_PATH")
-            
-            HTTP_CODE=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-            RESPONSE_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
-            
-            echo "Upload HTTP Code: $HTTP_CODE"
-            echo "Upload Response: $RESPONSE_BODY"
-            
-            if [ "$HTTP_CODE" -ne 200 ] && [ "$HTTP_CODE" -ne 201 ]; then
-              echo "❌ Upload failed with HTTP $HTTP_CODE"
-              exit 1
-            fi
+          echo "Upload URL: $UPLOAD_URL"
+          
+          # 上传 APK 到 release
+          echo "Uploading APK to GitHub Release..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL?name=${{ steps.version.outputs.apk_name }}" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$FILE_PATH")
+          
+          UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          echo "Upload HTTP Code: $UPLOAD_HTTP"
+          
+          if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
+            echo "❌ Upload failed with HTTP $UPLOAD_HTTP"
+            echo "Response: $UPLOAD_BODY"
+            exit 1
           fi
           
+          # 获取下载 URL
+          DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
