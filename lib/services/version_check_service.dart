@@ -164,9 +164,18 @@ class VersionCheckService {
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
+      // 处理重定向（GitHub Releases 返回 302）
+      if (response.statusCode == 302 || response.statusCode == 301) {
+        final redirectUrl = response.headers['location'];
+        if (redirectUrl != null) {
+          debugPrint('📱 跟随重定向: $redirectUrl');
+          return await downloadApk(redirectUrl, onProgress: onProgress);
+        }
+      }
+
       if (response.statusCode != 200) {
         downloadStatus.value = '下载失败: HTTP ${response.statusCode}';
-        HttpClient.instance.close();
+        // 不要关闭共享 HttpClient，否则后续所有请求都会失败
         return null;
       }
 
