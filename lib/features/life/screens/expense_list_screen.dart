@@ -127,7 +127,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     try {
       final result = await ApiClient.post(
         'expenses',
-        body: expense.toJson(),
+        expense.toJson(),
       );
 
       if (result.isSuccess) {
@@ -340,7 +340,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                           itemCount: _expenses.length,
                           itemBuilder: (context, index) {
                             final expense = _expenses[index];
-                            final categoryLabel = DictService.instance.getLabel(
+                            final categoryLabel = DictService.instance.getLabelOrDefault(
                               DictService.expenseCategory,
                               expense.category,
                               defaultValue: expense.category,
@@ -513,7 +513,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             Wrap(
               spacing: 8,
               children: _categoryCodes.map((code) {
-                final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
+                final label = DictService.instance.getLabelOrDefault(DictService.expenseCategory, code, defaultValue: code);
                 return ChoiceChip(
                   label: Text(label),
                   selected: _selectedCategoryCode == code,

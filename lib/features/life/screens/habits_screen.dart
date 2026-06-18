@@ -163,7 +163,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       final checkinId = const Uuid().v4();
       final checkinResult = await ApiClient.post(
         'habit_checkins',
-        body: {
+        {
           'id': checkinId,
           'habit_id': habit.id,
           'checkin_at': today.toUtc().toIso8601String(),
@@ -324,7 +324,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     habitId = const Uuid().v4();
                     final result = await ApiClient.post(
                       'habits',
-                      body: {
+                      {
                         'id': habitId,
                         'user_id': userId,
                         'name': nameController.text.trim(),
@@ -357,7 +357,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       final newId = const Uuid().v4();
                       await ApiClient.post(
                         'reminder_schedules',
-                        body: schedule.copyWith(id: newId).toJson(),
+                        schedule.copyWith(id: newId).toJson(),
                       );
                     }
                   }

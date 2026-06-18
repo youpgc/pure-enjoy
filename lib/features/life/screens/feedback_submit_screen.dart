@@ -57,7 +57,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     try {
       final result = await ApiClient.post(
         'user_feedback',
-        body: {
+        {
           'user_id': userId,
           'user_nickname': userNickname,
           'title': _titleController.text.trim(),

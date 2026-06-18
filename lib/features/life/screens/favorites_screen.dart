@@ -265,7 +265,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   } else {
                     final result = await ApiClient.post(
                       'user_favorites',
-                      body: {
+                      {
                         'id': newFavorite.id,
                         'user_id': newFavorite.userId,
                         'title': newFavorite.title,
@@ -332,7 +332,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   itemCount: _favorites.length,
                   itemBuilder: (context, index) {
                     final favorite = _favorites[index];
-                    final categoryLabel = DictService.instance.getLabel('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
+                    final categoryLabel = DictService.instance.getLabelOrDefault('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
 
                     return Card(
                       margin: const EdgeInsets.only(bottom: 12),

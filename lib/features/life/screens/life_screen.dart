@@ -102,7 +102,7 @@ class _LifeScreenState extends State<LifeScreen> {
   /// 心情文字映射（从字典服务获取）
   String _moodText(String? mood) {
     if (mood == null || mood.isEmpty) return '开心';
-    return DictService.instance.getLabel(DictService.moodType, mood, defaultValue: '开心');
+    return DictService.instance.getLabelOrDefault(DictService.moodType, mood, defaultValue: '开心');
   }
 
   @override
@@ -253,7 +253,7 @@ class _LifeScreenState extends State<LifeScreen> {
                   ? () {
                       final categoryCode = _latestExpense!['category'] as String? ?? '';
                       final categoryLabel = categoryCode.isNotEmpty
-                          ? DictService.instance.getLabel(DictService.expenseCategory, categoryCode, defaultValue: categoryCode)
+                          ? DictService.instance.getLabelOrDefault(DictService.expenseCategory, categoryCode, defaultValue: categoryCode)
                           : '';
                       return '$categoryLabel ${_latestExpense!['amount'] ?? ''}';
                     }()

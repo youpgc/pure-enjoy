@@ -531,7 +531,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       } else {
         final result = await ApiClient.post(
           'user_novels',
-          body: {
+          {
             'user_id': userId,
             'novel_id': widget.novel.id,
             'progress': progress,
@@ -572,7 +572,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     try {
       final result = await ApiClient.post(
         'user_novels',
-        body: {
+        {
           'user_id': userId,
           'novel_id': widget.novel.id,
           'progress': 0,

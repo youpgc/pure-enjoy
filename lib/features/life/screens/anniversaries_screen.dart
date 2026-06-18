@@ -360,7 +360,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                     final anniversaryId = const Uuid().v4();
                     final result = await ApiClient.post(
                       'user_anniversaries',
-                      body: {
+                      {
                         'id': anniversaryId,
                         'user_id': userId,
                         'user_nickname': nickname,

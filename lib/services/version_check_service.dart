@@ -168,7 +168,7 @@ class VersionCheckService {
 
       if (response.statusCode != 200) {
         downloadStatus.value = '下载失败: HTTP ${response.statusCode}';
-        client.close();
+        HttpClient.instance.close();
         return null;
       }
 

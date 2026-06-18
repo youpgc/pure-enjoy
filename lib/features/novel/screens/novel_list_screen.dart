@@ -193,7 +193,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
     try {
       final result = await ApiClient.post(
         'user_novels',
-        body: {
+        {
           'user_id': userId,
           'novel_id': novel.id,
           'progress': 0,
@@ -356,7 +356,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                         final category = _categories[index];
                         final label = category == 'all'
                             ? '全部'
-                            : DictService.instance.getLabel(
+                            : DictService.instance.getLabelOrDefault(
                                 DictService.novelCategory,
                                 category,
                                 defaultValue: category,
@@ -396,7 +396,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
                   // 小说列表
                   Text(
-                    _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabel(
+                    _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabelOrDefault(
                         DictService.novelCategory,
                         _selectedCategory,
                         defaultValue: _selectedCategory,
@@ -571,7 +571,7 @@ class _NovelCard extends StatelessWidget {
                     const Spacer(),
                     if (novel.category != null)
                       Text(
-                        DictService.instance.getLabel(
+                        DictService.instance.getLabelOrDefault(
                           DictService.novelCategory,
                           novel.category!,
                           defaultValue: novel.category!,

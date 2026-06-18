@@ -159,7 +159,7 @@ class PointService {
       final expiresAt = now.add(const Duration(days: 180)).toUtc().toIso8601String();
       final insertResult = await ApiClient.post(
         'point_records',
-        body: {
+        {
           'user_id': userId,
           'type': 'checkin',
           'amount': points,

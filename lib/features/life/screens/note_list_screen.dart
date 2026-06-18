@@ -118,7 +118,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     try {
       final result = await ApiClient.post(
         'notes',
-        body: note.toJson(),
+        note.toJson(),
       );
 
       if (result.isSuccess) {

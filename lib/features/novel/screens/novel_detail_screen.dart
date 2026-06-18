@@ -150,7 +150,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       try {
         final result = await ApiClient.post(
           'user_novels',
-          body: {
+          {
             'user_id': userId,
             'novel_id': widget.novel.id,
             'progress': 0,
@@ -512,7 +512,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                     borderRadius: BorderRadius.circular(4),
                                   ),
                                   child: Text(
-                                    DictService.instance.getLabel(
+                                    DictService.instance.getLabelOrDefault(
                                       DictService.novelCategory,
                                       novel.category!,
                                       defaultValue: novel.category!,
@@ -552,7 +552,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '状态',
-                    value: DictService.instance.getLabel(DictService.novelStatus, novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
+                    value: DictService.instance.getLabelOrDefault(DictService.novelStatus, novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(

@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
+import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import 'http_client.dart';
@@ -310,7 +311,7 @@ class AuthService {
   }
 
   /// 处理登录响应
-  Future<bool> _processLoginResult(ApiResponse<List<Map<String, dynamic>>> result) async {
+  Future<bool> _processLoginResult(ApiResponse result) async {
     debugPrint('🔐 登录响应: isSuccess=${result.isSuccess}, data=${result.data}');
 
     if (result.isSuccess) {
@@ -505,7 +506,7 @@ class AuthService {
 
       final response = await ApiClient.post(
         'users',
-        body: userData,
+        userData,
         returnRepresentation: true,
       );
 

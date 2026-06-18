@@ -353,4 +353,58 @@ class DictService {
       'cachedTypes': _cache.keys.toList(),
     };
   }
+
+  // ==================== 兼容旧代码方法 ====================
+
+  /// 兼容旧代码：获取 emoji（从 extra 字段）
+  String? getEmoji(String typeCode, String value) {
+    final extra = getExtra(typeCode, value);
+    return extra;
+  }
+
+  /// 兼容旧代码：获取默认 code
+  String? getDefaultCode(String typeCode) {
+    final items = _cache[typeCode] ?? [];
+    try {
+      return items.firstWhere((item) => item.isDefault).code;
+    } catch (e) {
+      return items.isNotEmpty ? items.first.code : null;
+    }
+  }
+
+  /// 兼容旧代码：根据 code 查找 item
+  DictItem? findByCode(String typeCode, String code) {
+    final items = _cache[typeCode] ?? [];
+    try {
+      return items.firstWhere((item) => item.code == code);
+    } catch (e) {
+      return null;
+    }
+  }
+
+  /// 兼容旧代码：refreshNotifier（空实现，旧代码用它触发刷新）
+  ValueNotifier<int> get refreshNotifier => ValueNotifier<int>(0);
+
+  /// 兼容旧代码：通过属性访问 moodType
+  static List<DictItem> get moodType => _instance._cache['mood_type'] ?? [];
+  static List<DictItem> get expenseCategory => _instance._cache['expense_category'] ?? [];
+  static List<DictItem> get userRole => _instance._cache['user_role'] ?? [];
+  static List<DictItem> get memberLevel => _instance._cache['member_level'] ?? [];
+  static List<DictItem> get habitFrequency => _instance._cache['habit_frequency'] ?? [];
+  static List<DictItem> get habitColor => _instance._cache['habit_color'] ?? [];
+  static List<DictItem> get novelCategory => _instance._cache['novel_category'] ?? [];
+  static List<DictItem> get novelStatus => _instance._cache['novel_status'] ?? [];
+  static List<DictItem> get feedbackCategory => _instance._cache['feedback_category'] ?? [];
+  static List<DictItem> get feedbackStatus => _instance._cache['feedback_status'] ?? [];
+  static List<DictItem> get notificationType => _instance._cache['notification_type'] ?? [];
+  static List<DictItem> get announcementType => _instance._cache['announcement_type'] ?? [];
+  static List<DictItem> get priorityLevel => _instance._cache['priority_level'] ?? [];
+  static List<DictItem> get favoriteCategory => _instance._cache['favorite_category'] ?? [];
+  static List<DictItem> get noteCategory => _instance._cache['note_category'] ?? [];
+
+  /// 兼容旧代码：getLabel 带 defaultValue 参数
+  String getLabelOrDefault(String typeCode, String value, {String? defaultValue}) {
+    final label = this.getLabel(typeCode, value);
+    return label ?? defaultValue ?? value;
+  }
 }

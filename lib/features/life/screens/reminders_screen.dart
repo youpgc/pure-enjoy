@@ -106,7 +106,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       try {
         final apiResult = await ApiClient.post(
           'reminders',
-          body: result.toJson(),
+          result.toJson(),
         );
 
         if (apiResult.isSuccess) {

@@ -828,7 +828,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
     try {
       final result = await ApiClient.post(
         'user_novels',
-        body: {
+        {
           'user_id': userId,
           'novel_id': novelId,
           'progress': 0,

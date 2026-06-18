@@ -118,7 +118,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     try {
       final result = await ApiClient.post(
         'weight_records',
-        body: record.toJson(),
+        record.toJson(),
       );
 
       if (result.isSuccess) {

@@ -253,7 +253,7 @@ class _DashboardPageState extends State<DashboardPage> {
 
       final checkinResult = await ApiClient.post(
         'habit_checkins',
-        body: {
+        {
           'id': const Uuid().v4(),
           'habit_id': habit.id,
           'checkin_at': today.toUtc().toIso8601String(),
@@ -495,7 +495,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'mood_diaries',
-              body: diary.toJson(),
+              diary.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -531,7 +531,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'expenses',
-              body: expense.toJson(),
+              expense.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -567,7 +567,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'weight_records',
-              body: record.toJson(),
+              record.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -603,7 +603,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'notes',
-              body: note.toJson(),
+              note.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -638,7 +638,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'reminders',
-              body: reminder.toJson(),
+              reminder.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -674,7 +674,7 @@ class _DashboardPageState extends State<DashboardPage> {
           try {
             final result = await ApiClient.post(
               'habits',
-              body: habit.toJson(),
+              habit.toJson(),
               returnRepresentation: false,
             );
             if (result.isSuccess) {
@@ -1452,7 +1452,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
               spacing: 8,
               runSpacing: 8,
               children: _moodCodes.map((code) {
-              final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
+              final label = DictService.instance.getLabelOrDefault(DictService.moodType, code, defaultValue: code);
               final emoji = DictService.instance.getEmoji(DictService.moodType, code);
               return ChoiceChip(
                 label: Row(
@@ -1617,7 +1617,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
               Wrap(
                 spacing: 8,
                 children: _categoryCodes.map((code) {
-                  final label = DictService.instance.getLabel(DictService.expenseCategory, code, defaultValue: code);
+                  final label = DictService.instance.getLabelOrDefault(DictService.expenseCategory, code, defaultValue: code);
                   return ChoiceChip(
                     label: Text(label),
                     selected: _selectedCategoryCode == code,
@@ -2423,13 +2423,13 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 获取角色标签
   String _getRoleLabel(String? role) {
     if (role == null || role.isEmpty) return '普通用户';
-    return DictService.instance.getLabel(DictService.userRole, role, defaultValue: '普通用户');
+    return DictService.instance.getLabelOrDefault(DictService.userRole, role, defaultValue: '普通用户');
   }
 
   /// 获取会员等级标签
   String _getMemberLevelLabel(String? level) {
     if (level == null || level.isEmpty) return '普通会员';
-    return DictService.instance.getLabel(DictService.memberLevel, level, defaultValue: '普通会员');
+    return DictService.instance.getLabelOrDefault(DictService.memberLevel, level, defaultValue: '普通会员');
   }
 
   /// 构建用户头像

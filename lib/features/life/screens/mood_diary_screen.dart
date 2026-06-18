@@ -142,7 +142,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     try {
       final result = await ApiClient.post(
         'mood_diaries',
-        body: diary.toJson(),
+        diary.toJson(),
       );
 
       if (result.isSuccess) {
@@ -284,7 +284,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
                     itemCount: _diaries.length,
                     itemBuilder: (context, index) {
                       final diary = _diaries[index];
-                      final moodLabel = DictService.instance.getLabel(
+                      final moodLabel = DictService.instance.getLabelOrDefault(
                         DictService.moodType,
                         diary.mood,
                         defaultValue: diary.mood,
@@ -467,7 +467,7 @@ class _DiaryFormState extends State<_DiaryForm> {
               spacing: 8,
               runSpacing: 8,
               children: _moodCodes.map((code) {
-              final label = DictService.instance.getLabel(DictService.moodType, code, defaultValue: code);
+              final label = DictService.instance.getLabelOrDefault(DictService.moodType, code, defaultValue: code);
               final emoji = DictService.instance.getEmoji(DictService.moodType, code);
               return ChoiceChip(
                 label: Row(
