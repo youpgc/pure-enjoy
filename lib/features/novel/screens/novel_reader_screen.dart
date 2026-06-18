@@ -548,7 +548,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           if (mounted) {
             setState(() {
               _isInBookshelf = true;
-              _bookshelfId = data['id'] as String;
+              _bookshelfId = data['id'].toString();
             });
           }
         }
@@ -588,7 +588,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         if (mounted) {
           setState(() {
             _isInBookshelf = true;
-            _bookshelfId = data['id'] as String;
+            _bookshelfId = data['id'].toString();
           });
         }
         if (mounted) {

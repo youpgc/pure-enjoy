@@ -357,18 +357,18 @@ class DictService {
   // ==================== 兼容旧代码方法 ====================
 
   /// 兼容旧代码：获取 emoji（从 extra 字段）
-  String? getEmoji(String typeCode, String value) {
+  String getEmoji(String typeCode, String value) {
     final extra = getExtra(typeCode, value);
-    return extra;
+    return extra ?? '';
   }
 
   /// 兼容旧代码：获取默认 code
-  String? getDefaultCode(String typeCode) {
+  String getDefaultCode(String typeCode) {
     final items = _cache[typeCode] ?? [];
     try {
       return items.firstWhere((item) => item.isDefault).code;
     } catch (e) {
-      return items.isNotEmpty ? items.first.code : null;
+      return items.isNotEmpty ? items.first.code : '';
     }
   }
 
