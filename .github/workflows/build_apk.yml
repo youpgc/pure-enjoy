@@ -84,6 +84,16 @@ jobs:
               echo "⚠️ 最新提交为 chore（自动版本号），跳过版本递增，直接使用当前版本构建"
               VERSION="$CURRENT_VERSION"
               BUILD_NUMBER="$CURRENT_BUILD"
+            # 检查上次构建是否失败（通过查询 GitHub API），失败时不递增构建号
+            elif curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
+              "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=2&branch=${{ github.ref_name }}" | \
+              python3 -c "import sys,json; runs=json.load(sys.stdin).get('workflow_runs',[]); 
+              # 排除当前正在运行的构建，检查上一次完成的构建
+              completed=[r for r in runs if r.get('status')=='completed' and r.get('run_number')!=${{ github.run_number }}];
+              print('failure' if completed and completed[0].get('conclusion')=='failure' else 'success')" 2>/dev/null | grep -q "failure"; then
+              echo "⚠️ 上次构建失败，本次为修复推送，跳过版本递增，直接使用当前版本构建"
+              VERSION="$CURRENT_VERSION"
+              BUILD_NUMBER="$CURRENT_BUILD"
             else
               # 解析版本号：major.minor.patch
               MAJOR=$(echo $CURRENT_VERSION | cut -d'.' -f1)
