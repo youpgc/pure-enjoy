@@ -28,13 +28,22 @@ class DictItem {
   });
 
   factory DictItem.fromJson(Map<String, dynamic> json) {
+    // extra 可能是 JSON 对象或字符串，统一转为字符串存储
+    String? extraStr;
+    final extra = json['extra'];
+    if (extra is String) {
+      extraStr = extra;
+    } else if (extra is Map) {
+      extraStr = jsonEncode(extra);
+    }
+
     return DictItem(
       id: json['id']?.toString() ?? '',
       typeId: json['type_id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
       label: json['label']?.toString() ?? '',
       value: json['value']?.toString() ?? '',
-      extra: json['extra']?.toString(),
+      extra: extraStr,
       sortOrder: json['sort_order'] as int? ?? 0,
       isDefault: json['is_default'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
@@ -296,22 +305,33 @@ class DictService {
   }
 
   /// 获取字典项的标签
+  /// 优先按 value 匹配，找不到时按 code 匹配（兼容业务表存储 code 的情况）
   String? getLabel(String typeCode, String value) {
     final items = _cache[typeCode] ?? [];
     try {
       return items.firstWhere((item) => item.value == value).label;
     } catch (e) {
-      return null;
+      // value 未匹配到，尝试按 code 匹配
+      try {
+        return items.firstWhere((item) => item.code == value).label;
+      } catch (e) {
+        return null;
+      }
     }
   }
 
   /// 获取字典项的额外信息
+  /// 优先按 value 匹配，找不到时按 code 匹配
   String? getExtra(String typeCode, String value) {
     final items = _cache[typeCode] ?? [];
     try {
       return items.firstWhere((item) => item.value == value).extra;
     } catch (e) {
-      return null;
+      try {
+        return items.firstWhere((item) => item.code == value).extra;
+      } catch (e) {
+        return null;
+      }
     }
   }
 
