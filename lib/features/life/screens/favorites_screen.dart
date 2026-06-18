@@ -59,7 +59,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         'user_favorites',
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
-        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -117,7 +116,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     if (confirmed == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'user_favorites',
           filters: {'id': 'eq.$id'},
         );
@@ -240,7 +239,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
                 try {
                   if (isEditing) {
-                    final result = await ApiClient.patch(
+                    final result = await ApiClient.patchByFilter(
                       'user_favorites',
                       filters: {'id': 'eq.${favorite.id}'},
                       body: {

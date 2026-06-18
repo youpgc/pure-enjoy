@@ -76,7 +76,6 @@ class _NoteListScreenState extends State<NoteListScreen> {
         'notes',
         filters: {'user_id': 'eq.$userId'},
         order: 'is_pinned.desc,updated_at.desc',
-        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -134,7 +133,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Future<void> _updateNote(NoteModel note) async {
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'notes',
         filters: {'id': 'eq.${note.id}'},
         body: note.toJsonForUpdate(),
@@ -168,7 +167,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
 
   Future<void> _deleteNote(String id) async {
     try {
-      final result = await ApiClient.delete(
+      final result = await ApiClient.batchDeleteByFilter(
         'notes',
         filters: {'id': 'eq.$id'},
       );

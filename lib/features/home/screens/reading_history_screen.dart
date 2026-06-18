@@ -80,7 +80,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         final userId = _userId;
         if (userId == null) return;
 
-        final result = await ApiClient.patch(
+        final result = await ApiClient.patchByFilter(
           'user_novels',
           filters: {'user_id': 'eq.$userId'},
           body: {

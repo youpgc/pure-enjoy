@@ -159,11 +159,18 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    _loadRecentActivities();
-    _loadPendingReminders();
-    _loadRecentNovels();
-    _loadToolConfig();
-    _loadHabitsForCheckin();
+    DictService.instance.loadFromNetwork();
+    _initLoadData();
+  }
+
+  Future<void> _initLoadData() async {
+    await Future.wait([
+      _loadRecentActivities(),
+      _loadPendingReminders(),
+      _loadRecentNovels(),
+      _loadToolConfig(),
+      _loadHabitsForCheckin(),
+    ]);
   }
 
   /// 加载习惯数据（用于首页快捷打卡）
@@ -1380,7 +1387,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
   }
 
   Future<void> _initDict() async {
-    await DictService.instance.ensureInitialized();
+    await DictService.instance.initialize();
     _selectedMoodCode = DictService.instance.getDefaultCode(DictService.moodType);
     if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
       _selectedMoodCode = _moodCodes.first;
@@ -1528,7 +1535,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   }
 
   Future<void> _initDict() async {
-    await DictService.instance.ensureInitialized();
+    await DictService.instance.initialize();
     _selectedCategoryCode = DictService.instance.getDefaultCode(DictService.expenseCategory);
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
       _selectedCategoryCode = _categoryCodes.first;

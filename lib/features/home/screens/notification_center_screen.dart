@@ -44,7 +44,6 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         'notifications',
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
-        limit: 100,
       );
 
       if (result.isSuccess) {
@@ -69,7 +68,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _markAsRead(String id) async {
     try {
-      await ApiClient.patch(
+      await ApiClient.patchByFilter(
         'notifications',
         filters: {'id': 'eq.$id'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
@@ -98,7 +97,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       
       if (unreadIds.isEmpty) return;
 
-      await ApiClient.patch(
+      await ApiClient.patchByFilter(
         'notifications',
         filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},

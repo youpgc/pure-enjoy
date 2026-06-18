@@ -110,6 +110,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         current.tableName,
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
+        limit: 200,
       );
 
       if (result.isSuccess) {
@@ -186,28 +187,39 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     int failCount = 0;
     final totalTables = _syncResults.length;
 
+    // 并行同步所有表
+    final syncFutures = <Future<void>>[];
     for (int i = 0; i < totalTables; i++) {
       final table = _syncResults[i];
 
       setState(() {
         _syncResults[i] = table.copyWith(status: TableSyncStatus.syncing);
-        _syncStatus = '正在同步${table.displayName}...';
-        _syncProgress = i / totalTables;
       });
 
-      final result = await _syncTable(table, userId);
+      syncFutures.add(() async {
+        final result = await _syncTable(table, userId);
 
-      if (result.status == TableSyncStatus.success) {
+        if (mounted) {
+          setState(() {
+            _syncResults[i] = result;
+          });
+        }
+      }());
+    }
+
+    await Future.wait(syncFutures);
+
+    for (int i = 0; i < totalTables; i++) {
+      if (_syncResults[i].status == TableSyncStatus.success) {
         successCount++;
       } else {
         failCount++;
       }
-
-      setState(() {
-        _syncResults[i] = result;
-        _syncProgress = (i + 1) / totalTables;
-      });
     }
+
+    setState(() {
+      _syncProgress = 1.0;
+    });
 
     // 保存同步时间
     await _saveLastSyncTime();

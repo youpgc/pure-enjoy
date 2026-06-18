@@ -38,9 +38,9 @@ void main() async {
 
 /// 后台懒加载服务，不阻塞首屏渲染
 void _lazyInitializeServices() {
-  // 字典服务：进入首页后再加载，首屏不阻塞
+  // 字典服务：改为在首页加载，此处只初始化本地缓存
   DictService.instance.initialize().catchError((e) {
-    debugPrint('字典服务后台初始化失败: $e');
+    debugPrint('字典服务本地缓存初始化失败: $e');
   });
 
   // 通知服务：后台初始化

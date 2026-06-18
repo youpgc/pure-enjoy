@@ -107,18 +107,11 @@ class DataExportService {
 
     for (final table in [typeExpenses, typeWeight, typeMood]) {
       try {
-        // 使用 count 模式获取条数
-        final result = await ApiClient.get(
+        // 使用 count=exact 获取条数
+        counts[table] = await ApiClient.count(
           table,
-          filters: {'user_id': userId},
-          select: 'id',
+          filters: {'user_id': 'eq.$userId'},
         );
-
-        if (result.isSuccess && result.data != null) {
-          counts[table] = result.data!.length;
-        } else {
-          counts[table] = 0;
-        }
       } catch (e) {
         counts[table] = 0;
       }

@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
-import 'supabase_service.dart';
+import 'http_client.dart';
 
 /// 存储文件对象
 class FileObject {
@@ -61,16 +61,10 @@ class StorageService {
   String get _anonKey => AppConfig.supabaseAnonKey;
 
   Map<String, String> get _headers {
-    final authService = AuthService.instance;
-    final headers = {
+    return {
       'apikey': _anonKey,
-      'Authorization': 'Bearer ${authService.isAuthenticated ? authService.authHeaders['Authorization']?.replaceFirst('Bearer ', '') : _anonKey}',
+      'Authorization': 'Bearer $_anonKey',
     };
-    final userId = authService.currentUserId;
-    if (userId != null) {
-      headers['x-user-id'] = userId;
-    }
-    return headers;
   }
 
   /// 上传文件
@@ -106,7 +100,8 @@ class StorageService {
         ),
       );
 
-      final response = await request.send();
+      // 使用 HttpClient 发送，统一注入 headers 和超时保护
+      final response = await HttpClient.instance.sendMultipart(request);
       final responseBody = await response.stream.bytesToString();
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -140,13 +135,11 @@ class StorageService {
   Future<String> getSignedUrl(String bucket, String path, {int expiresIn = 3600}) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/sign/$bucket/$path');
-      final response = await http.post(
-        uri,
-        headers: {
-          ..._headers,
-          'Content-Type': 'application/json',
-        },
+      final response = await HttpClient.instance.post(
+        uri.toString(),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({'expiresIn': expiresIn}),
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -176,7 +169,10 @@ class StorageService {
   Future<void> deleteFile(String bucket, String path) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket/$path');
-      final response = await http.delete(uri, headers: _headers);
+      final response = await HttpClient.instance.delete(
+        uri.toString(),
+        timeout: RequestTimeout.simple,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return;
@@ -200,13 +196,10 @@ class StorageService {
   Future<void> deleteFiles(String bucket, List<String> paths) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket');
-      final response = await http.delete(
-        uri,
-        headers: {
-          ..._headers,
-          'Content-Type': 'application/json',
-        },
-        body: jsonEncode({'prefixes': paths}),
+      final response = await HttpClient.instance.delete(
+        uri.toString(),
+        headers: {'Content-Type': 'application/json'},
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -237,7 +230,10 @@ class StorageService {
 
       final uri = Uri.parse('$_baseUrl/storage/v1/object/list/$bucket')
           .replace(queryParameters: queryParams);
-      final response = await http.get(uri, headers: _headers);
+      final response = await HttpClient.instance.get(
+        uri.toString(),
+        timeout: RequestTimeout.simple,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         final List<dynamic> data = jsonDecode(response.body);
@@ -262,7 +258,10 @@ class StorageService {
   Future<Uint8List> downloadFile(String bucket, String path) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket/$path');
-      final response = await http.get(uri, headers: _headers);
+      final response = await HttpClient.instance.get(
+        uri.toString(),
+        timeout: RequestTimeout.file,
+      );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
         return response.bodyBytes;
@@ -287,17 +286,15 @@ class StorageService {
   Future<void> moveFile(String bucket, String sourcePath, String destinationPath) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/move');
-      final response = await http.post(
-        uri,
-        headers: {
-          ..._headers,
-          'Content-Type': 'application/json',
-        },
+      final response = await HttpClient.instance.post(
+        uri.toString(),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'bucketId': bucket,
           'sourceKey': sourcePath,
           'destinationKey': destinationPath,
         }),
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -323,17 +320,15 @@ class StorageService {
   Future<void> copyFile(String bucket, String sourcePath, String destinationPath) async {
     try {
       final uri = Uri.parse('$_baseUrl/storage/v1/object/copy');
-      final response = await http.post(
-        uri,
-        headers: {
-          ..._headers,
-          'Content-Type': 'application/json',
-        },
+      final response = await HttpClient.instance.post(
+        uri.toString(),
+        headers: {'Content-Type': 'application/json'},
         body: jsonEncode({
           'bucketId': bucket,
           'sourceKey': sourcePath,
           'destinationKey': destinationPath,
         }),
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {

@@ -87,6 +87,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         filters: {'novel_id': 'eq.${widget.novel.id}'},
         columns: 'id,title,chapter_num,word_count',
         order: 'chapter_num.asc',
+        limit: 200,
       );
 
       if (result.isSuccess) {
@@ -121,7 +122,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     if (_isInBookshelf && _bookshelfId != null) {
       // 移出书架
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'user_novels',
           filters: {'id': 'eq.$_bookshelfId'},
         );
@@ -192,7 +193,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     }
 
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'user_novels',
         filters: {'id': 'eq.$_bookshelfId'},
         body: {'is_collected': !_isCollected},
@@ -225,25 +226,33 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     setState(() => _isDownloading = true);
 
     int downloaded = 0;
-    for (final chapter in _chapters) {
-      // 跳过已缓存的章节
-      if (ChapterCacheService.instance.isCached(chapter.id)) {
-        downloaded++;
-        setState(() => _cachedChapterCount = downloaded);
-        continue;
-      }
+    final uncachedChapters = _chapters.where((c) => !ChapterCacheService.instance.isCached(c.id)).toList();
 
+    // 批量查询所有未缓存章节内容
+    if (uncachedChapters.isNotEmpty) {
       try {
+        final chapterIds = uncachedChapters.map((c) => c.id).toList();
         final result = await ApiClient.get(
           'novel_chapters',
-          filters: {'id': 'eq.${chapter.id}'},
+          filters: {'id': 'in.(${chapterIds.join(",")})'},
+          columns: 'id,content',
+          limit: 200,
         );
 
         if (result.isSuccess) {
           final data = result.data!;
-          if (data.isNotEmpty) {
-            final content = data.first['content'] as String?;
-            if (content != null && content.isNotEmpty) {
+          final contentMap = <String, String>{};
+          for (final item in data) {
+            final id = item['id'] as String?;
+            final content = item['content'] as String?;
+            if (id != null && content != null && content.isNotEmpty) {
+              contentMap[id] = content;
+            }
+          }
+
+          for (final chapter in uncachedChapters) {
+            final content = contentMap[chapter.id];
+            if (content != null) {
               await ChapterCacheService.instance.cacheChapter(
                 chapterId: chapter.id,
                 novelId: widget.novel.id,
@@ -252,15 +261,18 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                 content: content,
               );
               downloaded++;
-              setState(() => _cachedChapterCount = downloaded);
+              setState(() => _cachedChapterCount = _cachedChapterCount + 1);
             }
           }
         }
       } catch (e) {
-        debugPrint('缓存章节失败: $e');
+        debugPrint('批量缓存章节失败: $e');
       }
     }
 
+    // 已缓存的章节直接计数
+    downloaded += _chapters.length - uncachedChapters.length;
+    setState(() => _cachedChapterCount = downloaded);
     setState(() => _isDownloading = false);
   }
 

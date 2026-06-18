@@ -98,6 +98,9 @@ class SensitiveWordService {
   /// 是否已初始化
   bool _initialized = false;
 
+  /// 是否正在刷新中（防止并发刷新）
+  bool _isRefreshing = false;
+
   /// ==================== 初始化 ====================
 
   /// 初始化服务：加载敏感词和开关状态
@@ -112,11 +115,17 @@ class SensitiveWordService {
         '小说开关:${_novelEnabled}, 系统开关:${_systemEnabled})');
   }
 
-  /// 强制刷新敏感词缓存
+  /// 强制刷新敏感词缓存（带锁，防止并发）
   Future<void> refresh() async {
-    await _loadSwitches();
-    await _loadWords();
-    debugPrint('🔄 敏感词缓存已刷新');
+    if (_isRefreshing) return;
+    _isRefreshing = true;
+    try {
+      await _loadSwitches();
+      await _loadWords();
+      debugPrint('🔄 敏感词缓存已刷新');
+    } finally {
+      _isRefreshing = false;
+    }
   }
 
   /// ==================== 数据加载 ====================
@@ -126,7 +135,8 @@ class SensitiveWordService {
     try {
       final response = await ApiClient.get(
         'sensitive_word_configs',
-        columns: 'config_key,config_value',
+        select: 'config_key,config_value',
+        limit: null,
       );
 
       if (response.isSuccess && response.data != null) {
@@ -148,8 +158,9 @@ class SensitiveWordService {
     try {
       final response = await ApiClient.get(
         'sensitive_words',
-        columns: 'id,word,category,level,replace_word,match_mode,is_active,hit_count',
-        filters: {'is_active': 'true'},
+        select: 'id,word,category,level,replace_word,match_mode,is_active,hit_count',
+        filters: {'is_active': 'eq.true'},
+        limit: null,
       );
 
       if (response.isSuccess && response.data != null) {
@@ -229,7 +240,7 @@ class SensitiveWordService {
       return SensitiveWordCheckResult.safe(text);
     }
 
-    // 检查缓存是否过期，自动刷新
+    // 检查缓存是否过期，自动刷新（带锁）
     if (_lastFetch != null &&
         DateTime.now().difference(_lastFetch!).inHours >= _cacheHours) {
       await refresh();
@@ -371,7 +382,7 @@ class SensitiveWordService {
 
       await ApiClient.post(
         'sensitive_word_logs',
-        body: {
+        {
           'word_id': word.id,
           'word': word.word,
           'category': word.category,
@@ -382,7 +393,6 @@ class SensitiveWordService {
           'action_taken': actionTaken,
           'created_at': DateTime.now().toUtc().toIso8601String(),
         },
-        returnRepresentation: false,
       );
 
       // 更新命中次数（异步，不等待）
@@ -398,12 +408,12 @@ class SensitiveWordService {
       // 使用 RPC 函数原子更新命中次数，避免 N+1 查询问题
       final response = await ApiClient.post(
         'rpc/increment_sensitive_word_hit_count',
-        body: {
+        {
           'word_id': wordId,
         },
       );
 
-      if (response.isError) {
+      if (!response.isSuccess) {
         debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
       }
     } catch (e) {

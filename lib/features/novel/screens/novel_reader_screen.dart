@@ -251,10 +251,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         filters: {'novel_id': 'eq.${widget.novel.id}'},
         columns: 'id,title,chapter_num',
         order: 'chapter_num.asc',
+        limit: 200,
       );
 
       final userId = _userId;
-      Future<ApiResponse<List<Map<String, dynamic>>>>? progressFuture;
+      Future<ApiResponse>? progressFuture;
       if (userId != null) {
         progressFuture = ApiClient.get(
           'user_novels',
@@ -518,7 +519,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
       if (_isInBookshelf && _bookshelfId != null) {
-        await ApiClient.patch(
+        await ApiClient.patchByFilter(
           'user_novels',
           filters: {'id': 'eq.$_bookshelfId'},
           body: {
@@ -612,7 +613,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
 
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'user_novels',
         filters: {'id': 'eq.$_bookshelfId'},
         body: {'is_collected': !_isCollected},

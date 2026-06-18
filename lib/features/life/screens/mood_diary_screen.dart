@@ -33,7 +33,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
     try {
-      await DictService.instance.ensureInitialized();
+      await DictService.instance.initialize();
       await _loadCache();
       await _loadDiaries();
     } catch (e, stackTrace) {
@@ -86,11 +86,18 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     }
 
     try {
+      final now = DateTime.now();
+      final startOfMonth = DateTime(now.year, now.month, 1);
+      final endOfMonth = DateTime(now.year, now.month + 1, 1);
+
       final result = await ApiClient.get(
         'mood_diaries',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'date.gte': startOfMonth.toIso8601String().split('T').first,
+          'date.lt': endOfMonth.toIso8601String().split('T').first,
+        },
         order: 'date.desc',
-        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -162,7 +169,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
     if (confirm == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'mood_diaries',
           filters: {'id': 'eq.$id'},
         );
@@ -189,7 +196,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
   Future<void> _updateMoodDiary(MoodDiaryModel diary) async {
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'mood_diaries',
         filters: {'id': 'eq.${diary.id}'},
         body: diary.toUpdateJson(),
@@ -369,7 +376,7 @@ class _DiaryFormState extends State<_DiaryForm> {
   }
 
   Future<void> _initDict() async {
-    await DictService.instance.ensureInitialized();
+    await DictService.instance.initialize();
     final diary = widget.diary;
     _contentController = TextEditingController(text: diary?.content ?? '');
     _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode(DictService.moodType);

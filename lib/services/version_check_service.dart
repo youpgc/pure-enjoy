@@ -9,6 +9,7 @@ import 'package:open_filex/open_filex.dart';
 import '../config.dart';
 import '../core/theme/app_theme.dart';
 import 'api_client.dart';
+import 'http_client.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -160,9 +161,8 @@ class VersionCheckService {
 
       // 开始下载
       debugPrint('📱 开始下载APK...');
-      final client = http.Client();
       final request = http.Request('GET', Uri.parse(apkUrl));
-      final response = await client.send(request);
+      final response = await HttpClient.instance.send(request);
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
@@ -194,12 +194,10 @@ class VersionCheckService {
           debugPrint('📱 下载流完成');
           downloadSuccess = true;
           await sink.close();
-          client.close();
         },
         onError: (error) async {
           debugPrint('📱 下载流出错: $error');
           await sink.close();
-          client.close();
           downloadStatus.value = '下载失败: $error';
         },
         cancelOnError: true,

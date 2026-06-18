@@ -2,13 +2,13 @@ import 'dart:convert';
 import 'dart:math';
 import 'package:crypto/crypto.dart';
 import 'package:flutter/foundation.dart';
-import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import 'http_client.dart';
 
 /// 缓存条目
 class _CacheEntry {
-  final http.Response response;
+  final dynamic response;
   final DateTime cachedAt;
 
   _CacheEntry(this.response, this.cachedAt);
@@ -120,6 +120,11 @@ class AuthService {
     final userJson = prefs.getString('user');
     if (userJson != null) {
       _user = jsonDecode(userJson);
+      // 恢复 HttpClient 的 userId
+      final userId = _user?['id']?.toString();
+      if (userId != null && userId.isNotEmpty) {
+        HttpClient.instance.setUserId(userId);
+      }
       // 静默刷新用户信息（不阻塞启动）
       _silentRefreshUser();
     }
@@ -150,6 +155,12 @@ class AuthService {
   /// 保存用户信息到本地
   Future<void> _saveUser(Map<String, dynamic> userData) async {
     _user = userData;
+
+    // 同步设置 HttpClient 的 userId，确保所有请求自动注入 headers
+    final userId = userData['id']?.toString();
+    if (userId != null && userId.isNotEmpty) {
+      HttpClient.instance.setUserId(userId);
+    }
 
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString('user', jsonEncode(_user));
@@ -192,7 +203,7 @@ class AuthService {
         await _saveUser(user);
 
         // 更新最后登录信息
-        await ApiClient.patch(
+        await ApiClient.patchByFilter(
           'users',
           filters: {'id': 'eq.${user['id']}'},
           body: {
@@ -318,7 +329,7 @@ class AuthService {
 
       await _saveUser(user);
 
-      await ApiClient.patch(
+      await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.${user['id']}'},
         body: {
@@ -533,6 +544,9 @@ class AuthService {
     } finally {
       _user = null;
 
+      // 清除 HttpClient 的 userId
+      HttpClient.instance.setUserId(null);
+
       // 清除本地存储
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('user');
@@ -597,7 +611,7 @@ class AuthService {
 
       // 2. 更新为新密码
       final newPasswordHash = _hashPassword(newPassword);
-      final updateResult = await ApiClient.patch(
+      final updateResult = await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.$userId'},
         body: {

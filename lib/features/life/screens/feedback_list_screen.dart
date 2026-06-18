@@ -45,7 +45,6 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
         'user_feedback',
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
-        limit: 200,
       );
 
       if (result.isSuccess) {

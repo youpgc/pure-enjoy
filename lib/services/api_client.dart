@@ -1,336 +1,358 @@
-import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:http/http.dart' as http;
-import 'supabase_service.dart';
+import 'package:flutter/foundation.dart';
+import '../config.dart';
+import 'http_client.dart';
 
-/// 统一 API 响应封装
-class ApiResponse<T> {
-  final bool success;
-  final T? data;
-  final String? errorMessage;
+/// API 响应结果
+class ApiResponse {
+  final bool isSuccess;
+  final List<Map<String, dynamic>>? data;
   final int? statusCode;
+  final String? error;
 
-  ApiResponse._({required this.success, this.data, this.errorMessage, this.statusCode});
+  ApiResponse({
+    required this.isSuccess,
+    this.data,
+    this.statusCode,
+    this.error,
+  });
 
-  factory ApiResponse.success(T data, {int? statusCode}) =>
-      ApiResponse._(success: true, data: data, statusCode: statusCode);
-
-  factory ApiResponse.error(String message, {int? statusCode}) =>
-      ApiResponse._(success: false, errorMessage: message, statusCode: statusCode);
-
-  bool get isSuccess => success;
-  bool get isError => !success;
-}
-
-/// 统一 API 异常
-class ApiException implements Exception {
-  final String message;
-  final int? statusCode;
-  final String? body;
-
-  ApiException(this.message, {this.statusCode, this.body});
-
-  @override
-  String toString() => 'ApiException: $message (status: $statusCode)';
-}
-
-/// 统一 HTTP 状态码处理
-String _handleHttpError(int statusCode, String? body) {
-  switch (statusCode) {
-    case 400:
-      return '请求参数错误 (400)';
-    case 401:
-      return '认证失败，请重新登录 (401)';
-    case 403:
-      return '没有权限执行此操作 (403)';
-    case 404:
-      return '请求的资源不存在 (404)';
-    case 409:
-      return '数据冲突，可能已存在 (409)';
-    case 422:
-      return '数据格式错误 (422)';
-    case 429:
-      return '请求过于频繁，请稍后重试 (429)';
-    case 500:
-      return '服务器内部错误 (500)';
-    case 502:
-      return '网关错误 (502)';
-    case 503:
-      return '服务暂不可用 (503)';
-    default:
-      return '请求失败 (HTTP $statusCode)';
+  factory ApiResponse.success(List<Map<String, dynamic>> data, {int? statusCode}) {
+    return ApiResponse(
+      isSuccess: true,
+      data: data,
+      statusCode: statusCode,
+    );
   }
+
+  factory ApiResponse.error(String error, {int? statusCode}) {
+    return ApiResponse(
+      isSuccess: false,
+      error: error,
+      statusCode: statusCode,
+    );
+  }
+
+  /// 兼容旧代码：isError = !isSuccess
+  bool get isError => !isSuccess;
+
+  /// 兼容旧代码：errorMessage
+  String? get errorMessage => error;
 }
 
-/// 检查 HTTP 响应是否成功
-bool _isSuccess(int statusCode) => statusCode >= 200 && statusCode < 300;
-
-/// 统一 API 客户端
-/// 封装所有 HTTP 请求，统一处理 headers、异常、状态码
+/// API 客户端
+/// 统一封装 Supabase REST API 调用，默认 limit=10
 class ApiClient {
-  static final String _baseUrl = '${SupabaseConfig.url}/rest/v1';
+  static String get _baseUrl => AppConfig.supabaseUrl;
 
-  /// Supabase 基础 URL（不含 /rest/v1）
-  static String get baseUrl => SupabaseConfig.url;
+  /// 构建请求 URL
+  static String _buildUrl(
+    String table, {
+    Map<String, String>? filters,
+    String? select,
+    String? order,
+    int? limit = 10,
+    int? offset,
+    String? search,
+    String? searchFields,
+  }) {
+    final queryParts = <String>[];
 
-  /// 获取带用户标识的请求头（所有请求都需要 x-user-id 供 RLS 使用）
-  static Map<String, String> get _authHeaders {
-    final headers = Map<String, String>.from(SupabaseConfig.headers);
-    final userId = AuthService.instance.currentUserId;
-    if (userId != null) {
-      headers['x-user-id'] = userId;
+    // 选择字段
+    if (select != null && select.isNotEmpty) {
+      queryParts.add('select=${Uri.encodeComponent(select)}');
     }
-    return headers;
+
+    // 过滤条件
+    if (filters != null) {
+      filters.forEach((key, value) {
+        queryParts.add('$key=${Uri.encodeComponent(value)}');
+      });
+    }
+
+    // 搜索
+    if (search != null && search.isNotEmpty) {
+      if (searchFields != null && searchFields.isNotEmpty) {
+        final fields = searchFields.split(',');
+        final orConditions = fields.map((field) {
+          return '$field.ilike.*${Uri.encodeComponent(search)}*';
+        }).join(',');
+        queryParts.add('or=($orConditions)');
+      }
+    }
+
+    // 排序
+    if (order != null && order.isNotEmpty) {
+      queryParts.add('order=${Uri.encodeComponent(order)}');
+    }
+
+    // 分页 - 默认 limit=10，传 null 取消限制
+    if (limit != null) {
+      queryParts.add('limit=$limit');
+    }
+    if (offset != null) {
+      queryParts.add('offset=$offset');
+    }
+
+    final queryString = queryParts.isNotEmpty ? '?${queryParts.join('&')}' : '';
+    return '$_baseUrl/rest/v1/$table$queryString';
   }
 
   /// GET 请求
-  static Future<ApiResponse<List<Map<String, dynamic>>>> get(
+  /// [columns] 兼容旧代码，等同于 select
+  static Future<ApiResponse> get(
     String table, {
-    String? select,
-    String? columns,
     Map<String, String>? filters,
-    String? order,
-    int? limit,
-    int? offset,
-  }) async {
-    try {
-      final uri = _buildUri(table, select: select, columns: columns, filters: filters, order: order, limit: limit, offset: offset);
-      final response = await http.get(uri, headers: _authHeaders).timeout(
-        const Duration(seconds: 30),
-      );
-
-      if (_isSuccess(response.statusCode)) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return ApiResponse.success(
-          data.cast<Map<String, dynamic>>(),
-          statusCode: response.statusCode,
-        );
-      }
-      return ApiResponse.error(
-        _handleHttpError(response.statusCode, response.body),
-        statusCode: response.statusCode,
-      );
-    } on SocketException {
-      return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
-    } on TimeoutException {
-      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
-    } on FormatException {
-      return ApiResponse.error('数据解析失败', statusCode: 0);
-    } catch (e) {
-      return ApiResponse.error('请求异常: $e', statusCode: 0);
-    }
-  }
-
-  /// GET 单条
-  static Future<ApiResponse<Map<String, dynamic>>> getOne(
-    String table, {
-    required Map<String, String> filters,
     String? select,
+    String? columns, // 兼容旧代码
+    String? order,
+    int? limit = 10,
+    int? offset,
+    String? search,
+    String? searchFields,
+    Duration? timeout,
   }) async {
     try {
-      final uri = _buildUri(table, select: select, filters: filters);
-      final response = await http.get(uri, headers: _authHeaders).timeout(
-        const Duration(seconds: 30),
+      final url = _buildUrl(
+        table,
+        filters: filters,
+        select: select ?? columns, // columns 兼容旧代码
+        order: order,
+        limit: limit,
+        offset: offset,
+        search: search,
+        searchFields: searchFields,
       );
 
-      if (_isSuccess(response.statusCode)) {
-        final List<dynamic> data = jsonDecode(response.body);
-        if (data.isEmpty) {
-          return ApiResponse.error('数据不存在', statusCode: 404);
-        }
-        return ApiResponse.success(
-          data.first as Map<String, dynamic>,
-          statusCode: response.statusCode,
-        );
-      }
-      return ApiResponse.error(
-        _handleHttpError(response.statusCode, response.body),
-        statusCode: response.statusCode,
+      final response = await HttpClient.instance.get(
+        url,
+        timeout: timeout ?? RequestTimeout.list,
       );
-    } on SocketException {
-      return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
-    } on TimeoutException {
-      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
-    } on FormatException {
-      return ApiResponse.error('数据解析失败', statusCode: 0);
+
+      return _handleResponse(response);
     } catch (e) {
-      return ApiResponse.error('请求异常: $e', statusCode: 0);
+      debugPrint('❌ GET 请求失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
     }
   }
 
   /// POST 请求
-  static Future<ApiResponse<Map<String, dynamic>>> post(
-    String table, {
-    required Map<String, dynamic> body,
-    bool returnRepresentation = true,
-    Map<String, String>? extraHeaders,
+  /// [body] 兼容旧代码命名参数
+  static Future<ApiResponse> post(
+    String table,
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? body, // 兼容旧代码
+    bool returnRepresentation = true, // 兼容旧代码
+    Duration? timeout,
   }) async {
     try {
-      final uri = Uri.parse('$_baseUrl/$table');
-      final headers = Map<String, String>.from(_authHeaders);
-      headers['Prefer'] = returnRepresentation ? 'return=representation' : 'return=minimal';
-      if (extraHeaders != null) headers.addAll(extraHeaders);
-
-      final response = await http.post(uri, headers: headers, body: jsonEncode(body)).timeout(
-        const Duration(seconds: 30),
-      );
-
-      if (_isSuccess(response.statusCode)) {
-        if (response.body.isEmpty) {
-          return ApiResponse.success({}, statusCode: response.statusCode);
-        }
-        final data = jsonDecode(response.body);
-        if (data is List && data.isNotEmpty) {
-          return ApiResponse.success(
-            data.first as Map<String, dynamic>,
-            statusCode: response.statusCode,
-          );
-        }
-        return ApiResponse.success(
-          data is Map<String, dynamic> ? data : {},
-          statusCode: response.statusCode,
-        );
+      final url = '$_baseUrl/rest/v1/$table';
+      final headers = <String, String>{};
+      if (!returnRepresentation) {
+        headers['Prefer'] = 'return=minimal';
       }
-      return ApiResponse.error(
-        _handleHttpError(response.statusCode, response.body),
-        statusCode: response.statusCode,
+      final payload = body ?? data;
+      final response = await HttpClient.instance.post(
+        url,
+        headers: headers.isNotEmpty ? headers : null,
+        body: payload,
+        timeout: timeout ?? RequestTimeout.simple,
       );
-    } on SocketException {
-      return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
-    } on TimeoutException {
-      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
+
+      return _handleResponse(response);
     } catch (e) {
-      return ApiResponse.error('请求异常: $e', statusCode: 0);
+      debugPrint('❌ POST 请求失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
     }
   }
 
-  /// PATCH 请求
-  static Future<ApiResponse<bool>> patch(
+  /// PATCH 请求（新API：通过 id 参数指定记录）
+  /// [body] 兼容旧代码命名参数
+  static Future<ApiResponse> patch(
+    String table,
+    Map<String, dynamic> data, {
+    Map<String, dynamic>? body, // 兼容旧代码
+    required String id,
+    Duration? timeout,
+  }) async {
+    try {
+      final url = '$_baseUrl/rest/v1/$table?id=eq.$id';
+      final payload = body ?? data;
+      final response = await HttpClient.instance.patch(
+        url,
+        body: payload,
+        timeout: timeout ?? RequestTimeout.simple,
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('❌ PATCH 请求失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
+    }
+  }
+
+  /// PATCH 请求（兼容旧代码：通过 filters 参数过滤）
+  static Future<ApiResponse> patchByFilter(
     String table, {
     required Map<String, String> filters,
     required Map<String, dynamic> body,
+    Duration? timeout,
   }) async {
     try {
-      final uri = _buildUri(table, filters: filters);
-      final headers = Map<String, String>.from(_authHeaders);
-      headers['Prefer'] = 'return=minimal';
-
-      final response = await http.patch(uri, headers: headers, body: jsonEncode(body)).timeout(
-        const Duration(seconds: 30),
+      final url = _buildUrl(
+        table,
+        filters: filters,
+        limit: null,
+      );
+      final response = await HttpClient.instance.patch(
+        url,
+        body: body,
+        timeout: timeout ?? RequestTimeout.simple,
       );
 
-      if (_isSuccess(response.statusCode)) {
-        return ApiResponse.success(true, statusCode: response.statusCode);
-      }
-      return ApiResponse.error(
-        _handleHttpError(response.statusCode, response.body),
-        statusCode: response.statusCode,
-      );
-    } on SocketException {
-      return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
-    } on TimeoutException {
-      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
+      return _handleResponse(response);
     } catch (e) {
-      return ApiResponse.error('请求异常: $e', statusCode: 0);
+      debugPrint('❌ PATCH 请求失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
     }
   }
 
   /// DELETE 请求
-  static Future<ApiResponse<bool>> delete(
+  static Future<ApiResponse> delete(
     String table, {
-    required Map<String, String> filters,
+    required String id,
+    Duration? timeout,
   }) async {
     try {
-      final uri = _buildUri(table, filters: filters);
-      final response = await http.delete(uri, headers: _authHeaders).timeout(
-        const Duration(seconds: 30),
+      final url = '$_baseUrl/rest/v1/$table?id=eq.$id';
+      final response = await HttpClient.instance.delete(
+        url,
+        timeout: timeout ?? RequestTimeout.simple,
       );
 
-      if (_isSuccess(response.statusCode) || response.statusCode == 404) {
-        return ApiResponse.success(true, statusCode: response.statusCode);
-      }
-      return ApiResponse.error(
-        _handleHttpError(response.statusCode, response.body),
-        statusCode: response.statusCode,
-      );
-    } on SocketException {
-      return ApiResponse.error('网络连接失败，请检查网络', statusCode: 0);
-    } on TimeoutException {
-      return ApiResponse.error('请求超时，请检查网络后重试', statusCode: 0);
+      return _handleResponse(response);
     } catch (e) {
-      return ApiResponse.error('请求异常: $e', statusCode: 0);
+      debugPrint('❌ DELETE 请求失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
     }
   }
 
-  /// 构建 URI
-  static Uri _buildUri(
+  /// 批量删除
+  static Future<ApiResponse> batchDelete(
     String table, {
-    String? select,
-    String? columns,
-    Map<String, String>? filters,
-    String? order,
-    int? limit,
-    int? offset,
-  }) {
-    final params = <String, String>{};
+    required List<String> ids,
+    Duration? timeout,
+  }) async {
+    try {
+      final idList = ids.map((id) => '"$id"').join(',');
+      final url = '$_baseUrl/rest/v1/$table?id=in.($idList)';
+      final response = await HttpClient.instance.delete(
+        url,
+        timeout: timeout ?? RequestTimeout.simple,
+      );
 
-    if (filters != null && filters.isNotEmpty) {
-      for (final entry in filters.entries) {
-        final key = entry.key;
-        final value = entry.value;
-        // 自动补全 eq. 前缀：如果 value 不包含操作符前缀（如 eq. in. gte. 等），则自动添加 eq.
-        // 例外：and/or 语法和已带操作符前缀的值保持原样
-        if (key == 'and' || key == 'or') {
-          params[key] = value;
-        } else if (value.contains('.') &&
-            !value.startsWith('eq.') &&
-            !value.startsWith('neq.') &&
-            !value.startsWith('gt.') &&
-            !value.startsWith('gte.') &&
-            !value.startsWith('lt.') &&
-            !value.startsWith('lte.') &&
-            !value.startsWith('like.') &&
-            !value.startsWith('ilike.') &&
-            !value.startsWith('in.') &&
-            !value.startsWith('is.') &&
-            !value.startsWith('cs.') &&
-            !value.startsWith('cd.') &&
-            !value.startsWith('ov.') &&
-            !value.startsWith('sl.') &&
-            !value.startsWith('sr.') &&
-            !value.startsWith('nxl.') &&
-            !value.startsWith('nxr.') &&
-            !value.startsWith('adj.') &&
-            !value.startsWith('match.')) {
-          // value 包含点但不是已知操作符，可能是用户输入的特殊值，保持原样
-          params[key] = value;
-        } else if (!value.contains('.')) {
-          // 没有操作符前缀，自动补全 eq.
-          params[key] = 'eq.$value';
-        } else {
-          // 已有操作符前缀，保持原样
-          params[key] = value;
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('❌ 批量删除失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
+    }
+  }
+
+  /// 按条件批量删除
+  static Future<ApiResponse> batchDeleteByFilter(
+    String table, {
+    required Map<String, String> filters,
+    Duration? timeout,
+  }) async {
+    try {
+      final url = _buildUrl(
+        table,
+        filters: filters,
+        limit: null,
+      );
+      final response = await HttpClient.instance.delete(
+        url,
+        timeout: timeout ?? RequestTimeout.simple,
+      );
+
+      return _handleResponse(response);
+    } catch (e) {
+      debugPrint('❌ 批量删除失败 [$table]: $e');
+      return ApiResponse.error('请求失败: $e');
+    }
+  }
+
+  /// 使用 Prefer: count=exact 获取总数（HEAD 请求）
+  static Future<int> count(
+    String table, {
+    Map<String, String>? filters,
+    Duration? timeout,
+  }) async {
+    try {
+      final queryParts = <String>[];
+      if (filters != null) {
+        filters.forEach((key, value) {
+          queryParts.add('$key=${Uri.encodeComponent(value)}');
+        });
+      }
+      final queryString = queryParts.isNotEmpty ? '?${queryParts.join('&')}' : '';
+      final url = '$_baseUrl/rest/v1/$table$queryString';
+
+      final response = await HttpClient.instance.get(
+        url,
+        headers: {
+          'Prefer': 'count=exact',
+          'Range': '0-0',
+        },
+        timeout: timeout ?? RequestTimeout.simple,
+      );
+
+      final contentRange = response.headers['content-range'];
+      if (contentRange != null) {
+        final match = RegExp(r'/(\d+)').firstMatch(contentRange);
+        if (match != null) {
+          return int.parse(match.group(1)!);
         }
       }
+      return 0;
+    } catch (e) {
+      debugPrint('❌ COUNT 请求失败 [$table]: $e');
+      return 0;
     }
-    // select: Supabase PostgREST 语法，支持嵌套选择、外键关联等（如 "id,name,orders(*)"）
-    // columns: 简单列名列表，逗号分隔（如 "id,name,created_at"）
-    // 如果 columns 不为空，优先使用 columns，忽略 select
-    final selectValue = (columns != null && columns.isNotEmpty) ? columns : select;
-    if (selectValue != null) {
-      params['select'] = selectValue;
-    }
-    if (order != null) {
-      params['order'] = order;
-    }
-    if (limit != null) {
-      params['limit'] = limit.toString();
-    }
-    if (offset != null) {
-      params['offset'] = offset.toString();
-    }
+  }
 
-    return Uri.parse('$_baseUrl/$table').replace(queryParameters: params);
+  /// 处理响应
+  static ApiResponse _handleResponse(dynamic response) {
+    final statusCode = response.statusCode;
+
+    if (statusCode >= 200 && statusCode < 300) {
+      try {
+        final body = response.body;
+        if (body.isEmpty) {
+          return ApiResponse.success([], statusCode: statusCode);
+        }
+        final data = jsonDecode(body) as List<dynamic>;
+        return ApiResponse.success(
+          data.cast<Map<String, dynamic>>(),
+          statusCode: statusCode,
+        );
+      } catch (e) {
+        return ApiResponse.error('解析响应失败: $e', statusCode: statusCode);
+      }
+    } else if (statusCode == 401) {
+      return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
+    } else if (statusCode == 404) {
+      return ApiResponse.error('资源不存在', statusCode: statusCode);
+    } else if (statusCode == 409) {
+      return ApiResponse.error('数据冲突', statusCode: statusCode);
+    } else if (statusCode == 429) {
+      return ApiResponse.error('请求过于频繁，请稍后再试', statusCode: statusCode);
+    } else {
+      return ApiResponse.error(
+        '请求失败 (HTTP $statusCode): ${response.body}',
+        statusCode: statusCode,
+      );
+    }
   }
 }

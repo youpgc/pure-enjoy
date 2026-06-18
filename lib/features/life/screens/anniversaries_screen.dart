@@ -67,7 +67,6 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
           'type': 'eq.${widget.filterType}',
         },
         order: 'date.asc',
-        limit: 500,
       );
 
       if (!result.isSuccess) {
@@ -151,7 +150,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
     if (confirmed == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'user_anniversaries',
           filters: {'id': 'eq.$id'},
         );
@@ -335,7 +334,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
 
                 try {
                   if (isEditing) {
-                    final result = await ApiClient.patch(
+                    final result = await ApiClient.patchByFilter(
                       'user_anniversaries',
                       filters: {'id': 'eq.${anniversary.id}'},
                       body: {

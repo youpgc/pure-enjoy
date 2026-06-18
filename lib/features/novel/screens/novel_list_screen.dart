@@ -49,7 +49,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
     try {
-      await DictService.instance.ensureInitialized();
+      await DictService.instance.initialize();
       await _loadCache();
       await _loadNovels();
     } catch (e, stackTrace) {
@@ -79,36 +79,38 @@ class _NovelListScreenState extends State<NovelListScreen> {
 
   Future<void> _loadNovels() async {
     try {
-      // 从 Supabase 加载已发布的小说
-      final result = await ApiClient.get(
+      final userId = _userId;
+
+      // 并行加载 novels 和 user_novels
+      final novelsFuture = ApiClient.get(
         'novels',
         filters: {'user_id': 'is.null'},
         order: 'created_at.desc',
         limit: 100,
       );
 
+      final shelfFuture = userId != null
+          ? ApiClient.get(
+              'user_novels',
+              filters: {'user_id': 'eq.$userId'},
+              columns: 'id,novel_id,is_collected,last_chapter,last_read_at,progress',
+              limit: 200,
+            )
+          : Future.value(ApiResponse.success([]));
+
+      final results = await Future.wait([novelsFuture, shelfFuture]);
+      final novelsResult = results[0];
+      final shelfResult = results[1];
+
       List<NovelModel> novels = [];
-      if (result.isSuccess) {
-        final data = result.data!;
+      if (novelsResult.isSuccess) {
+        final data = novelsResult.data!;
         novels = data.map((json) => NovelModel.fromJson(json)).toList();
       }
 
-      // 加载用户书架
       List<Map<String, dynamic>> userNovels = [];
-      final userId = _userId;
-      if (userId != null) {
-        try {
-          final shelfResult = await ApiClient.get(
-            'user_novels',
-            filters: {'user_id': 'eq.$userId'},
-            columns: 'id,novel_id,is_collected,last_chapter,last_read_at,progress',
-          );
-          if (shelfResult.isSuccess) {
-            userNovels = shelfResult.data!.cast<Map<String, dynamic>>();
-          }
-        } catch (e) {
-          debugPrint('加载用户书架数据失败: $e');
-        }
+      if (shelfResult.isSuccess) {
+        userNovels = shelfResult.data!.cast<Map<String, dynamic>>();
       }
 
       setState(() {
@@ -397,7 +399,8 @@ class _NovelListScreenState extends State<NovelListScreen> {
                           itemCount: _novels.length,
                           itemBuilder: (context, index) {
                             final novel = _novels[index];
-                            final isInBookshelf = _userNovels.any((un) => un['novel_id'] == novel.id);
+                            final bookshelfIds = _userNovels.map((un) => un['novel_id'] as String).toSet();
+                            final isInBookshelf = bookshelfIds.contains(novel.id);
                             return _NovelCard(
                               novel: novel,
                               onTap: () => _openNovelDetail(novel),

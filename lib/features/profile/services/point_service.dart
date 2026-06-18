@@ -177,7 +177,7 @@ class PointService {
 
       // 5. 更新 users 表 points += 积分
       final currentPoints = AuthService.instance.currentPoints ?? 0;
-      final updateResult = await ApiClient.patch(
+      final updateResult = await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.$userId'},
         body: {

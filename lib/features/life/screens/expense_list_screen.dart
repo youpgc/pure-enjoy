@@ -35,7 +35,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
   Future<void> _initLoad() async {
     try {
-      await DictService.instance.ensureInitialized();
+      await DictService.instance.initialize();
       await _loadCache();
       await _loadExpenses();
     } catch (e, stackTrace) {
@@ -65,21 +65,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   }
 
   List<ExpenseModel> _applyFilters(List<ExpenseModel> expenses) {
-    // 按月份筛选
-    final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-    final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
-
-    var filtered = expenses.where((e) {
-      return e.date.isAfter(startOfMonth.subtract(const Duration(days: 1))) &&
-             e.date.isBefore(endOfMonth.add(const Duration(days: 1)));
-    }).toList();
-
-    // 按分类筛选
+    // 按分类筛选（月份筛选已移至服务端）
     if (_selectedCategory != 'all') {
-      filtered = filtered.where((e) => e.category == _selectedCategory).toList();
+      return expenses.where((e) => e.category == _selectedCategory).toList();
     }
-
-    return filtered;
+    return expenses;
   }
 
   Future<void> _loadExpenses() async {
@@ -95,11 +85,17 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
 
     try {
+      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+
       final result = await ApiClient.get(
         'expenses',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'date.gte': startOfMonth.toIso8601String().split('T').first,
+          'date.lt': endOfMonth.toIso8601String().split('T').first,
+        },
         order: 'date.desc',
-        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -160,7 +156,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
     if (confirm == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'expenses',
           filters: {'id': 'eq.$id'},
         );
@@ -187,7 +183,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
 
   Future<void> _updateExpense(ExpenseModel expense) async {
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'expenses',
         filters: {'id': 'eq.${expense.id}'},
         body: {

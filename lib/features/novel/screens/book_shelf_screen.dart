@@ -94,7 +94,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       // 第一步：查询 user_novels 获取用户的书架记录
       final userNovelsResult = await ApiClient.get(
         'user_novels',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'is_collected': 'eq.true',
+        },
         columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected',
         order: 'last_read_at.desc.nullslast',
         limit: 200,
@@ -130,6 +133,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         'novels',
         filters: {'id': 'in.(${novelIds.join(',')})'},
         columns: 'id,title,author,cover_url,category,status,chapter_count,word_count,description',
+        limit: 200,
       );
 
       if (!novelsResult.isSuccess) {
@@ -151,7 +155,6 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
 
       // 合并数据：只展示已加入书架的小说（is_collected=true）
       final bookshelfItems = userNovelsData
-          .where((userNovel) => userNovel['is_collected'] == true)
           .map((userNovel) {
         final novelId = userNovel['novel_id'] as String?;
         return {
@@ -187,7 +190,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (!_checkAuth()) return;
 
     try {
-      final result = await ApiClient.delete(
+      final result = await ApiClient.batchDeleteByFilter(
         'user_novels',
         filters: {'id': 'eq.$userNovelId'},
       );
@@ -220,7 +223,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
     if (!_checkAuth()) return;
 
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'user_novels',
         filters: {'id': 'eq.$userNovelId'},
         body: {
@@ -259,7 +262,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
           progressValue = 0.0;
       }
 
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'user_novels',
         filters: {'id': 'eq.$userNovelId'},
         body: {
@@ -772,11 +775,16 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         filters: {'user_id': 'is.null'},
         columns: 'id,title,author,cover_url,category,description,chapter_count,word_count,status',
         order: 'created_at.desc',
+        limit: 200,
       );
       final shelfFuture = ApiClient.get(
         'user_novels',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'is_collected': 'eq.true',
+        },
         columns: 'novel_id',
+        limit: 200,
       );
 
       final results = await Future.wait([novelsFuture, shelfFuture]);

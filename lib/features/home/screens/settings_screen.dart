@@ -438,9 +438,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         !key.startsWith('setting_') &&
         key != 'user'
       ).toList();
-      for (final key in keysToRemove) {
-        await prefs.remove(key);
-      }
+      await Future.wait(keysToRemove.map((key) => prefs.remove(key)));
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('缓存已清除（${keysToRemove.length}项）')),
@@ -510,16 +508,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'point_records',
       ];
 
-      for (final table in tables) {
+      await Future.wait(tables.map((table) async {
         try {
-          await ApiClient.delete(
+          await ApiClient.batchDeleteByFilter(
             table,
             filters: {'user_id': 'eq.$userId'},
           );
         } catch (e) {
           debugPrint('删除表 $table 失败: $e');
         }
-      }
+      }));
 
       // 登出
       await auth.signOut();

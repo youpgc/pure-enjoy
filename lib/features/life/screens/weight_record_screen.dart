@@ -76,7 +76,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         'weight_records',
         filters: {'user_id': 'eq.$userId'},
         order: 'date.desc',
-        limit: 365,
+        limit: 30,
       );
 
       if (result.isSuccess) {
@@ -84,7 +84,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
 
         setState(() {
-          _records = records.length > 30 ? records.sublist(0, 30) : records;
+          _records = records;
           _isLoading = false;
         });
 
@@ -137,7 +137,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
     if (confirm == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'weight_records',
           filters: {'id': 'eq.$id'},
         );
@@ -164,7 +164,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
 
   Future<void> _updateWeightRecord(WeightRecordModel record) async {
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'weight_records',
         filters: {'id': 'eq.${record.id}'},
         body: {

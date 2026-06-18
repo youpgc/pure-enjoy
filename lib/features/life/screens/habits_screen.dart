@@ -63,7 +63,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
         'habits',
         filters: {'user_id': 'eq.$userId'},
         order: 'is_active.desc',
-        limit: 200,
       );
 
       if (!habitsResult.isSuccess) {
@@ -75,18 +74,27 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 保存习惯缓存
       await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
 
-      // 加载所有打卡记录（批量查询，避免 N+1）
+      // 并行加载打卡记录和提醒计划
       final history = <String, List<HabitCheckinModel>>{};
+      final schedules = <String, ReminderScheduleModel>{};
       if (items.isNotEmpty) {
         final habitIds = items.map((h) => h.id).join(',');
-        final checkinsResult = await ApiClient.get(
-          'habit_checkins',
-          filters: {'habit_id': 'in.($habitIds)'},
-          order: 'checkin_at.desc',
-        );
+        final results = await Future.wait([
+          ApiClient.get(
+            'habit_checkins',
+            filters: {'habit_id': 'in.($habitIds)'},
+            order: 'checkin_at.desc',
+          ),
+          ApiClient.get(
+            'reminder_schedules',
+            filters: {'habit_id': 'in.($habitIds)'},
+          ),
+        ]);
+
+        final checkinsResult = results[0];
+        final scheduleResult = results[1];
 
         if (checkinsResult.isSuccess) {
-          // 按 habit_id 分组
           for (final checkin in checkinsResult.data!) {
             final model = HabitCheckinModel.fromJson(checkin);
             history.putIfAbsent(model.habitId, () => []).add(model);
@@ -96,16 +104,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         for (final habit in items) {
           history.putIfAbsent(habit.id, () => []);
         }
-      }
 
-      // 加载提醒计划（批量查询）
-      final schedules = <String, ReminderScheduleModel>{};
-      if (items.isNotEmpty) {
-        final habitIds = items.map((h) => h.id).join(',');
-        final scheduleResult = await ApiClient.get(
-          'reminder_schedules',
-          filters: {'habit_id': 'in.($habitIds)'},
-        );
         if (scheduleResult.isSuccess) {
           for (final s in scheduleResult.data!) {
             final model = ReminderScheduleModel.fromJson(s);
@@ -200,13 +199,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
     if (confirmed == true) {
       try {
         // 先删除打卡记录
-        await ApiClient.delete(
+        await ApiClient.batchDeleteByFilter(
           'habit_checkins',
           filters: {'habit_id': 'eq.$id'},
         );
 
         // 再删除习惯
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'habits',
           filters: {'id': 'eq.$id'},
         );
@@ -302,7 +301,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                 try {
                   if (isEditing) {
                     habitId = habit!.id;
-                    final result = await ApiClient.patch(
+                    final result = await ApiClient.patchByFilter(
                       'habits',
                       filters: {'id': 'eq.$habitId'},
                       body: {
@@ -341,7 +340,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
                     if (schedule.id.isNotEmpty) {
                       // 更新已有提醒计划
-                      await ApiClient.patch(
+                      await ApiClient.patchByFilter(
                         'reminder_schedules',
                         filters: {'id': 'eq.${schedule.id}'},
                         body: schedule.toJsonForUpdate(),

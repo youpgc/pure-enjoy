@@ -28,7 +28,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
   }
 
   Future<void> _initDict() async {
-    await DictService.instance.ensureInitialized();
+    await DictService.instance.initialize();
     if (mounted) {
       setState(() => _isDictLoading = false);
     }

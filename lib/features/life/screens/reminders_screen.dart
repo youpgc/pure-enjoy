@@ -20,7 +20,7 @@ class RemindersScreen extends StatefulWidget {
 class _RemindersScreenState extends State<RemindersScreen> {
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
-  String _filter = 'all'; // all, pending, completed
+  String _filter = 'pending'; // all, pending, completed
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -55,9 +55,11 @@ class _RemindersScreenState extends State<RemindersScreen> {
     try {
       final result = await ApiClient.get(
         'reminders',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'is_completed': 'eq.false',
+        },
         order: 'remind_at.desc',
-        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -134,7 +136,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     if (result != null) {
       setState(() => _isLoading = true);
       try {
-        final apiResult = await ApiClient.patch(
+        final apiResult = await ApiClient.patchByFilter(
           'reminders',
           filters: {'id': 'eq.${reminder.id}'},
           body: result.toJsonForUpdate(),
@@ -160,7 +162,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
     final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个提醒吗？');
     if (confirmed == true) {
       try {
-        final result = await ApiClient.delete(
+        final result = await ApiClient.batchDeleteByFilter(
           'reminders',
           filters: {'id': 'eq.$id'},
         );
@@ -182,7 +184,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
   Future<void> _toggleComplete(ReminderModel reminder) async {
     try {
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'reminders',
         filters: {'id': 'eq.${reminder.id}'},
         body: {'is_completed': !reminder.isCompleted},

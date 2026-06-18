@@ -154,7 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final publicUrl = '${SupabaseConfig.url}/storage/v1/object/public/avatars/$fileName';
 
       // 更新用户头像URL
-      final updateResult = await ApiClient.patch(
+      final updateResult = await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.$_userId'},
         body: {
@@ -261,7 +261,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      final result = await ApiClient.patch(
+      final result = await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.$_userId'},
         body: updateData,
