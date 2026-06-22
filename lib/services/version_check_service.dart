@@ -125,16 +125,62 @@ class VersionCheckService {
     return false;
   }
 
+  /// GitHub 国内镜像加速地址列表（按优先级排序）
+  /// 当 GitHub 直接访问失败时，依次尝试这些镜像
+  static const List<String> _githubMirrors = [
+    '', // 空字符串表示直接访问 GitHub（原始地址）
+    'https://ghproxy.com/',
+    'https://mirror.ghproxy.com/',
+    'https://ghps.cc/',
+  ];
+
+  /// 将 GitHub URL 转换为镜像 URL
+  String _getMirrorUrl(String originalUrl, int mirrorIndex) {
+    if (mirrorIndex == 0 || mirrorIndex >= _githubMirrors.length) {
+      return originalUrl;
+    }
+    final mirror = _githubMirrors[mirrorIndex];
+    // 镜像服务通常需要完整的 https:// 前缀
+    if (originalUrl.startsWith('https://')) {
+      return '$mirror$originalUrl';
+    }
+    return originalUrl;
+  }
+
   /// 下载APK文件
-  /// 支持 Gitee Releases 和 GitHub Releases 两种下载源
+  /// 支持 GitHub Releases 下载，自动使用国内镜像加速
+  /// 当某个镜像失败时，自动切换到下一个镜像重试
   Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
+    // 尝试所有镜像地址（包括原始地址）
+    for (int mirrorIndex = 0; mirrorIndex < _githubMirrors.length; mirrorIndex++) {
+      final tryUrl = _getMirrorUrl(apkUrl, mirrorIndex);
+      final mirrorName = mirrorIndex == 0 ? 'GitHub直连' : _githubMirrors[mirrorIndex];
+
+      debugPrint('📱 尝试下载 [$mirrorName]: $tryUrl');
+      downloadStatus.value = '正在连接${mirrorIndex > 0 ? " (镜像${mirrorIndex})" : ""}...';
+
+      final result = await _downloadFromUrl(tryUrl, onProgress: onProgress);
+      if (result != null) {
+        debugPrint('📱 ✅ 下载成功 via $mirrorName');
+        return result;
+      }
+
+      debugPrint('📱 ❌ $mirrorName 下载失败，尝试下一个...');
+    }
+
+    // 所有镜像都失败了
+    downloadStatus.value = '下载失败：所有镜像均不可用，请检查网络连接';
+    return null;
+  }
+
+  /// 从指定 URL 下载 APK（内部方法）
+  Future<String?> _downloadFromUrl(String apkUrl, {ValueChanged<double>? onProgress}) async {
     // 使用独立的 http.Client 下载，不经过共享 HttpClient
     // 避免注入 Supabase headers（apikey 等）导致 CDN 拒绝请求
     // 避免共享 Client 被关闭或超时影响其他 API 请求
     final client = http.Client();
     try {
       downloadProgress.value = 0;
-      downloadStatus.value = '准备下载...';
 
       // Android 10+ 使用应用私有目录，不需要存储权限
       // 直接使用 getTemporaryDirectory() 保存到缓存目录
@@ -159,31 +205,28 @@ class VersionCheckService {
         }
       } catch (_) {}
 
-      downloadStatus.value = '正在连接...';
-
       // 使用独立 Client 发送请求，不注入任何额外 headers
-      debugPrint('📱 开始下载APK: $apkUrl');
       final request = http.Request('GET', uri);
       request.headers['Accept'] = '*/*';
       request.headers['User-Agent'] = 'PureEnjoy/1.0';
 
-      final response = await client.send(request).timeout(const Duration(minutes: 10));
+      final response = await client.send(request).timeout(const Duration(minutes: 5));
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
-      // 处理重定向（GitHub/Gitee Releases 返回 302 到 CDN）
+      // 处理重定向（GitHub Releases 返回 302 到 CDN）
       if (response.statusCode == 302 || response.statusCode == 301) {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {
           debugPrint('📱 跟随重定向: $redirectUrl');
           // 关闭当前 response stream 后跟随重定向
           response.stream.listen((_) {}).cancel();
-          return await downloadApk(redirectUrl, onProgress: onProgress);
+          return await _downloadFromUrl(redirectUrl, onProgress: onProgress);
         }
       }
 
       if (response.statusCode != 200) {
-        downloadStatus.value = '下载失败: HTTP ${response.statusCode}';
+        debugPrint('📱 HTTP 错误: ${response.statusCode}');
         return null;
       }
 
@@ -216,7 +259,6 @@ class VersionCheckService {
         onError: (error) async {
           debugPrint('📱 下载流出错: $error');
           await sink.close();
-          downloadStatus.value = '下载失败: $error';
         },
         cancelOnError: true,
       ).asFuture();
@@ -227,12 +269,11 @@ class VersionCheckService {
         downloadStatus.value = '下载完成';
         return savePath;
       } else {
-        downloadStatus.value = '下载失败：文件无效';
+        debugPrint('📱 文件验证失败');
         return null;
       }
     } catch (e) {
       debugPrint('📱 下载异常: $e');
-      downloadStatus.value = '下载出错: $e';
       return null;
     } finally {
       // 确保关闭独立 Client，不影响共享 HttpClient

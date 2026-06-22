@@ -196,25 +196,24 @@ jobs:
           echo "Size: $FILESIZE bytes"
 
       # ===================================================================
-      # APK 分发策略：Gitee Releases（国内访问稳定）
+      # APK 分发策略：GitHub Releases + 国内镜像加速
       # ===================================================================
       # 问题背景：
       #   1. GitHub 国内访问不稳定，APK 下载经常超时/失败
       #   2. Supabase 免费存储上限 50M，APK 已超过限制
       #   3. 不引入其他第三方平台（阿里云/AWS/腾讯云等）
+      #   4. Gitee 需要实名认证，无法满足
       # 解决方案：
-      #   - 使用 Gitee Releases 存储 APK（国内速度快，无需额外平台）
-      #   - 同时保留 GitHub Releases 作为备份（国外用户可用）
-      #   - 数据库 apk_url 字段存储 Gitee 下载地址（国内优先）
+      #   - 使用 GitHub Releases 存储 APK（主渠道）
+      #   - App 端通过国内镜像加速下载（ghproxy/mirror.ghproxy/ghps.cc）
+      #   - 镜像服务自动将 github.com 请求转发到国内 CDN 节点
       # ===================================================================
 
-      # 13. 上传 APK 到 Gitee Releases（国内主分发渠道）
-      - name: Upload APK to Gitee Releases
-        id: upload_gitee
+      # 13. 上传 APK 到 GitHub Releases
+      - name: Upload APK to GitHub Releases
+        id: upload
         env:
-          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
-          GITEE_OWNER: YouPgC
-          GITEE_REPO: pure-enjoy
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
           FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
           TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
@@ -222,72 +221,8 @@ jobs:
           echo "File: $FILE_PATH"
           ls -lh "$FILE_PATH"
           
-          # 创建 Gitee Release
-          echo "Creating Gitee Release $TAG_NAME..."
-          RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases" \
-            -H "Content-Type: application/json" \
-            -d "{
-              \"access_token\": \"$GITEE_TOKEN\",
-              \"tag_name\": \"$TAG_NAME\",
-              \"name\": \"Pure Enjoy $TAG_NAME\",
-              \"body\": \"自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}\",
-              \"prerelease\": false
-            }")
-          
-          RELEASE_HTTP=$(echo "$RELEASE_RESPONSE" | tail -n1)
-          RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
-          echo "Gitee Release HTTP Code: $RELEASE_HTTP"
-          
-          # 如果 release 已存在(409)，获取已有 release
-          if [ "$RELEASE_HTTP" = "409" ] || [ "$RELEASE_HTTP" = "422" ]; then
-            echo "Release already exists, fetching existing release..."
-            RELEASE_RESPONSE=$(curl -s "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/tags/$TAG_NAME?access_token=$GITEE_TOKEN")
-            RELEASE_ID=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id",""))')
-          else
-            RELEASE_ID=$(echo "$RELEASE_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("id",""))')
-          fi
-          
-          echo "Gitee Release ID: $RELEASE_ID"
-          
-          if [ -z "$RELEASE_ID" ]; then
-            echo "❌ Failed to create or get Gitee release"
-            echo "Response: $RELEASE_BODY"
-            exit 1
-          fi
-          
-          # 上传 APK 到 Gitee Release
-          echo "Uploading APK to Gitee Release..."
-          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://gitee.com/api/v5/repos/$GITEE_OWNER/$GITEE_REPO/releases/$RELEASE_ID/attach_files" \
-            -H "Content-Type: multipart/form-data" \
-            -F "access_token=$GITEE_TOKEN" \
-            -F "file=@$FILE_PATH")
-          
-          UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-          UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
-          echo "Gitee Upload HTTP Code: $UPLOAD_HTTP"
-          
-          if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
-            echo "❌ Gitee upload failed with HTTP $UPLOAD_HTTP"
-            echo "Response: $UPLOAD_BODY"
-            exit 1
-          fi
-          
-          # 获取 Gitee 下载 URL
-          GITEE_DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
-          echo "gitee_download_url=$GITEE_DOWNLOAD_URL" >> $GITHUB_OUTPUT
-          echo "✅ Uploaded to Gitee: $GITEE_DOWNLOAD_URL"
-
-      # 13b. 同时上传到 GitHub Releases（国外备份渠道）
-      - name: Upload APK to GitHub Releases (backup)
-        id: upload_github
-        env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-        run: |
-          FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
-          TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
-          
           # 创建 GitHub Release
-          echo "Creating GitHub Release $TAG_NAME (backup)..."
+          echo "Creating GitHub Release $TAG_NAME..."
           RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
@@ -301,8 +236,11 @@ jobs:
           
           RELEASE_HTTP=$(echo "$RELEASE_RESPONSE" | tail -n1)
           RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
+          echo "Release HTTP Code: $RELEASE_HTTP"
           
+          # 如果 release 已存在，获取已有 release 的上传 URL
           if [ "$RELEASE_HTTP" = "422" ]; then
+            echo "Release already exists, fetching existing release..."
             RELEASE_RESPONSE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" \
               -H "Authorization: token $GITHUB_TOKEN")
             UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
@@ -310,21 +248,29 @@ jobs:
             UPLOAD_URL=$(echo "$RELEASE_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
           fi
           
-          if [ -n "$UPLOAD_URL" ]; then
-            UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL?name=${{ steps.version.outputs.apk_name }}" \
-              -H "Authorization: token $GITHUB_TOKEN" \
-              -H "Content-Type: application/vnd.android.package-archive" \
-              --data-binary @"$FILE_PATH")
-            
-            UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
-            UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
-            
-            if [ "$UPLOAD_HTTP" -eq 201 ] || [ "$UPLOAD_HTTP" -eq 200 ]; then
-              GITHUB_DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
-              echo "github_download_url=$GITHUB_DOWNLOAD_URL" >> $GITHUB_OUTPUT
-              echo "✅ Uploaded to GitHub: $GITHUB_DOWNLOAD_URL"
-            fi
+          echo "Upload URL: $UPLOAD_URL"
+          
+          # 上传 APK 到 release
+          echo "Uploading APK to GitHub Release..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL?name=${{ steps.version.outputs.apk_name }}" \
+            -H "Authorization: token $GITHUB_TOKEN" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary @"$FILE_PATH")
+          
+          UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
+          echo "Upload HTTP Code: $UPLOAD_HTTP"
+          
+          if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
+            echo "❌ Upload failed with HTTP $UPLOAD_HTTP"
+            echo "Response: $UPLOAD_BODY"
+            exit 1
           fi
+          
+          # 获取下载 URL（公开仓库可直接使用 browser_download_url）
+          DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
+          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "✅ Uploaded to: $DOWNLOAD_URL"
 
       # ===================================================================
       # 版本状态管理逻辑（三级状态流转）
