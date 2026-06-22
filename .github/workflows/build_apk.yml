@@ -363,7 +363,7 @@ jobs:
               \"platform\": \"android\",
               \"release_type\": \"feature\",
               \"release_notes\": \"$RELEASE_NOTES\",
-              \"apk_url\": \"${{ steps.upload_gitee.outputs.gitee_download_url }}\",
+              \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
               \"apk_size\": ${{ steps.filesize.outputs.bytes }},
               \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
               \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
@@ -453,6 +453,6 @@ jobs:
           echo "✅ Build completed!"
           echo "📱 Version: ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           echo "📦 File: ${{ steps.version.outputs.apk_name }}"
-          echo "🔗 Download: ${{ steps.upload_gitee.outputs.gitee_download_url }}"
+          echo "🔗 Download: ${{ steps.upload.outputs.download_url }}"
           echo "💾 Size: ${{ steps.filesize.outputs.bytes }} bytes"
           echo "🔐 SHA256: ${{ steps.checksum.outputs.sha256 }}"
