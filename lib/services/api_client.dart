@@ -3,6 +3,17 @@ import 'package:flutter/foundation.dart';
 import '../config.dart';
 import 'http_client.dart';
 
+/// 安全日志工具：仅在开发模式下输出日志，生产环境静默处理
+class _SecureLogger {
+  static void log(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
+
+  static void error(String message) {
+    if (kDebugMode) debugPrint(message);
+  }
+}
+
 /// API 响应结果
 class ApiResponse {
   final bool isSuccess;
@@ -131,7 +142,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ GET 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ GET 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -161,7 +172,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ POST 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ POST 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -186,7 +197,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ PATCH 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ PATCH 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -212,7 +223,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ PATCH 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ PATCH 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -232,7 +243,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ DELETE 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ DELETE 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -253,7 +264,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ 批量删除失败 [$table]: $e');
+      _SecureLogger.error('❌ 批量删除失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -277,7 +288,7 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      debugPrint('❌ 批量删除失败 [$table]: $e');
+      _SecureLogger.error('❌ 批量删除失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -324,7 +335,7 @@ class ApiClient {
       }
       return null;
     } catch (e) {
-      debugPrint('❌ SUM 请求失败 [$table.$column]: $e');
+      _SecureLogger.error('❌ SUM 请求失败 [$table.$column]');
       return null;
     }
   }
@@ -363,7 +374,7 @@ class ApiClient {
       }
       return 0;
     } catch (e) {
-      debugPrint('❌ COUNT 请求失败 [$table]: $e');
+      _SecureLogger.error('❌ COUNT 请求失败 [$table]');
       return 0;
     }
   }

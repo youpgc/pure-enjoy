@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
@@ -49,8 +50,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
       await _loadCache();
       await _loadRecords();
     } catch (e, stackTrace) {
-      debugPrint('❌ WeightRecordScreen _initLoad 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ WeightRecordScreen _initLoad 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

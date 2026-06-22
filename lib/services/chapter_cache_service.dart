@@ -59,13 +59,13 @@ class ChapterCacheService {
         final Map<String, dynamic> decoded = jsonDecode(indexJson);
         _index = decoded.map((k, v) => MapEntry(k, _CacheEntry.fromJson(v as Map<String, dynamic>)));
       } catch (e) {
-        debugPrint('❌ 加载缓存索引失败: $e');
+        if (kDebugMode) debugPrint('❌ 加载缓存索引失败');
         _index = {};
       }
     } else {
       _index = {};
     }
-    debugPrint('✅ 缓存服务初始化完成，已缓存 ${_index!.length} 个章节');
+    if (kDebugMode) debugPrint('✅ 缓存服务初始化完成');
   }
 
   /// 获取缓存目录
@@ -106,9 +106,9 @@ class ChapterCacheService {
       );
       await _saveIndex();
 
-      debugPrint('💾 缓存章节: $title (${content.length}字)');
+      if (kDebugMode) debugPrint('💾 缓存章节已保存');
     } catch (e) {
-      debugPrint('❌ 缓存章节失败: $e');
+      if (kDebugMode) debugPrint('❌ 缓存章节失败');
     }
   }
 
@@ -121,7 +121,7 @@ class ChapterCacheService {
         return await file.readAsString();
       }
     } catch (e) {
-      debugPrint('❌ 读取缓存失败: $e');
+      if (kDebugMode) debugPrint('❌ 读取缓存失败');
     }
     return null;
   }
@@ -176,11 +176,11 @@ class ChapterCacheService {
         }
         _index!.remove(chapter.chapterId);
       } catch (e) {
-        debugPrint('❌ 删除缓存失败: $e');
+        if (kDebugMode) debugPrint('❌ 删除缓存失败');
       }
     }
     await _saveIndex();
-    debugPrint('🗑️ 清除小说缓存: $count 个章节');
+    if (kDebugMode) debugPrint('🗑️ 清除小说缓存');
     return count;
   }
 
@@ -200,9 +200,9 @@ class ChapterCacheService {
       }
       _index?.clear();
       await _saveIndex();
-      debugPrint('🗑️ 清除所有缓存: $count 个文件');
+      if (kDebugMode) debugPrint('🗑️ 清除所有缓存');
     } catch (e) {
-      debugPrint('❌ 清除缓存失败: $e');
+      if (kDebugMode) debugPrint('❌ 清除缓存失败');
     }
     return count;
   }

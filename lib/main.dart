@@ -1,5 +1,6 @@
 import 'dart:io';
 
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
@@ -40,12 +41,16 @@ void main() async {
 void _lazyInitializeServices() {
   // 字典服务：改为在首页加载，此处只初始化本地缓存
   DictService.instance.initialize().catchError((e) {
-    debugPrint('字典服务本地缓存初始化失败: $e');
+    if (kDebugMode) {
+      debugPrint('字典服务本地缓存初始化失败');
+    }
   });
 
   // 通知服务：后台初始化
   NotificationService.instance.initialize().catchError((e) {
-    debugPrint('通知服务后台初始化失败: $e');
+    if (kDebugMode) {
+      debugPrint('通知服务后台初始化失败');
+    }
   });
 }
 

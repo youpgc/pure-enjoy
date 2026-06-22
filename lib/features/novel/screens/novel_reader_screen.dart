@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:battery_plus/battery_plus.dart';
@@ -298,7 +299,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               }
             }
           } catch (e) {
-            debugPrint('解析已读章节进度失败: $e');
+            if (kDebugMode) {
+              debugPrint('解析已读章节进度失败');
+            }
           }
         }
 
@@ -497,7 +500,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         }
       }
     } catch (e) {
-      debugPrint('检查书架状态失败: $e');
+      if (kDebugMode) {
+        debugPrint('检查书架状态失败');
+      }
     }
   }
 
@@ -547,7 +552,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         }
       }
     } catch (e) {
-      debugPrint('保存阅读进度失败: $e');
+      if (kDebugMode) {
+        debugPrint('保存阅读进度失败');
+      }
     }
   }
 

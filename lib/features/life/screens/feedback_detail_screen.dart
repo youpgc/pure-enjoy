@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../services/api_client.dart';
 import '../models/feedback_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -42,7 +43,9 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
         setState(() => _loadingFlow = false);
       }
     } catch (e) {
-      debugPrint('加载流转记录失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载流转记录失败');
+      }
       setState(() => _loadingFlow = false);
     }
   }

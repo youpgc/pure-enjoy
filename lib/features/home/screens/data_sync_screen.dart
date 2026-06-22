@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
@@ -129,7 +130,9 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         );
       } else if (result.statusCode == 404) {
         // 表不存在，跳过
-        debugPrint('同步跳过: ${current.tableName} (表不存在, HTTP 404)');
+        if (kDebugMode) {
+          debugPrint('同步跳过: ${current.tableName} (表不存在, HTTP 404)');
+        }
         return current.copyWith(
           status: TableSyncStatus.success,
           recordCount: 0,
@@ -138,14 +141,18 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
       } else {
         final errorMsg =
             'HTTP ${result.statusCode}: ${result.errorMessage}';
-        debugPrint('同步失败: ${current.tableName} - $errorMsg');
+        if (kDebugMode) {
+          debugPrint('同步失败: ${current.tableName}');
+        }
         return current.copyWith(
           status: TableSyncStatus.failed,
           errorMessage: errorMsg,
         );
       }
     } catch (e) {
-      debugPrint('同步异常: ${current.tableName} - $e');
+      if (kDebugMode) {
+        debugPrint('同步异常: ${current.tableName}');
+      }
       return current.copyWith(
         status: TableSyncStatus.failed,
         errorMessage: e.toString(),

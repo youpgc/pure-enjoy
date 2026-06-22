@@ -28,7 +28,9 @@ class HttpClient {
   /// 设置用户 ID（登录后调用）
   void setUserId(String? userId) {
     _userId = userId;
-    debugPrint('🔐 HttpClient userId set: $userId');
+    if (kDebugMode) {
+      debugPrint('🔐 HttpClient userId 已设置');
+    }
   }
 
   /// 获取当前用户 ID

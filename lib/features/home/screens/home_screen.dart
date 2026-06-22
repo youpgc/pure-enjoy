@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -219,7 +220,9 @@ class _DashboardPageState extends State<DashboardPage> {
         }
       }
     } catch (e) {
-      debugPrint('加载习惯数据失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载习惯数据失败');
+      }
     }
   }
 
@@ -386,7 +389,9 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     } catch (e) {
-      debugPrint('加载最近活动失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载最近活动失败');
+      }
       if (mounted) {
         setState(() => _isLoadingActivities = false);
       }
@@ -419,7 +424,9 @@ class _DashboardPageState extends State<DashboardPage> {
         throw Exception(result.errorMessage);
       }
     } catch (e) {
-      debugPrint('加载提醒失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载提醒失败');
+      }
     }
   }
 
@@ -493,7 +500,9 @@ class _DashboardPageState extends State<DashboardPage> {
         });
       }
     } catch (e) {
-      debugPrint('加载最近阅读失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载最近阅读失败');
+      }
       if (mounted) setState(() => _isLoadingNovels = false);
     }
   }
@@ -2086,7 +2095,9 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      debugPrint('获取版本信息失败: $e');
+      if (kDebugMode) {
+        debugPrint('获取版本信息失败');
+      }
     }
   }
 
@@ -2103,7 +2114,9 @@ class _ProfilePageState extends State<ProfilePage> {
         });
       }
     } catch (e) {
-      debugPrint('检查版本失败: $e');
+      if (kDebugMode) {
+        debugPrint('检查版本失败');
+      }
     }
   }
 

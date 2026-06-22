@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
@@ -55,8 +56,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       await _loadCache();
       await _loadExpenses();
     } catch (e, stackTrace) {
-      debugPrint('❌ ExpenseListScreen _initLoad 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ ExpenseListScreen _initLoad 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -113,7 +116,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
         });
       }
     } catch (e) {
-      debugPrint('❌ 加载总支出失败: $e');
+      if (kDebugMode) {
+        debugPrint('❌ 加载总支出失败');
+      }
       if (mounted) {
         setState(() => _isLoadingTotal = false);
       }

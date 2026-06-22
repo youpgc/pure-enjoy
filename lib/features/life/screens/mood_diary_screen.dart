@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
@@ -51,8 +52,10 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       await _loadCache();
       await _loadDiaries();
     } catch (e, stackTrace) {
-      debugPrint('❌ MoodDiaryScreen _initLoad 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ MoodDiaryScreen _initLoad 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
@@ -74,7 +77,9 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           try {
             diaries.add(MoodDiaryModel.fromJson(item));
           } catch (e) {
-            debugPrint('⚠️ 跳过无效缓存日记数据: $e');
+            if (kDebugMode) {
+              debugPrint('⚠️ 跳过无效缓存日记数据');
+            }
           }
         }
         setState(() {
@@ -83,7 +88,9 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         });
       }
     } catch (e) {
-      debugPrint('⚠️ 加载缓存失败: $e');
+      if (kDebugMode) {
+        debugPrint('⚠️ 加载缓存失败');
+      }
     }
   }
 
@@ -130,7 +137,9 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           try {
             diaries.add(MoodDiaryModel.fromJson(item));
           } catch (e) {
-            debugPrint('⚠️ 跳过无效日记数据: $e, 数据: $item');
+            if (kDebugMode) {
+              debugPrint('⚠️ 跳过无效日记数据');
+            }
           }
         }
 
@@ -157,8 +166,10 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e, stackTrace) {
-      debugPrint('❌ MoodDiaryScreen _loadDiaries 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ MoodDiaryScreen _loadDiaries 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

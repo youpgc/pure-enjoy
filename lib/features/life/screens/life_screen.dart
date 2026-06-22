@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
@@ -108,7 +109,9 @@ class _LifeScreenState extends State<LifeScreen> {
       final date = DateTime.parse(dateStr).toLocal();
       return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
     } catch (e) {
-      debugPrint('格式化日期失败: $e');
+      if (kDebugMode) {
+        debugPrint('格式化日期失败');
+      }
       return '';
     }
   }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
@@ -64,8 +65,10 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       await _loadCache();
       await _loadBookshelf(refresh: true);
     } catch (e, stackTrace) {
-      debugPrint('❌ BookShelfScreen _initLoad 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ BookShelfScreen _initLoad 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

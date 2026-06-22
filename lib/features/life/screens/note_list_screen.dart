@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
@@ -47,8 +48,10 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
       await _loadCache();
       await _loadNotes(refresh: true);
     } catch (e, stackTrace) {
-      debugPrint('❌ NoteListScreen _initLoad 异常: $e');
-      debugPrint(stackTrace.toString());
+      if (kDebugMode) {
+        debugPrint('❌ NoteListScreen _initLoad 异常');
+        debugPrint('堆栈信息');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(

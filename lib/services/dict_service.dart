@@ -153,10 +153,10 @@ class DictService {
                 .toList();
           }
         });
-        debugPrint('✅ 字典服务从本地缓存加载完成，共 ${_cache.length} 个类型');
+        if (kDebugMode) debugPrint('✅ 字典服务从本地缓存加载完成');
       }
     } catch (e) {
-      debugPrint('❌ 字典服务加载本地缓存失败: $e');
+      if (kDebugMode) debugPrint('❌ 字典服务加载本地缓存失败');
     }
 
     _initialized = true;
@@ -166,7 +166,7 @@ class DictService {
   /// 一次性获取所有 dict_types 和 dict_items，只需 2 次请求
   Future<void> loadFromNetwork() async {
     try {
-      debugPrint('🔄 字典服务开始从网络加载...');
+      if (kDebugMode) debugPrint('🔄 字典服务开始从网络加载...');
 
       // 第1次请求：获取所有 dict_types
       final typesResult = await ApiClient.get(
@@ -176,7 +176,7 @@ class DictService {
       );
 
       if (!typesResult.isSuccess || typesResult.data == null) {
-        debugPrint('❌ 字典类型加载失败: ${typesResult.error}');
+        if (kDebugMode) debugPrint('❌ 字典类型加载失败');
         return;
       }
 
@@ -196,7 +196,7 @@ class DictService {
       // 第2次请求：一次性获取所有需要的 dict_items
       final neededIds = _typeIdMap.values.toList();
       if (neededIds.isEmpty) {
-        debugPrint('⚠️ 没有需要加载的字典类型');
+        if (kDebugMode) debugPrint('⚠️ 没有需要加载的字典类型');
         return;
       }
 
@@ -210,7 +210,7 @@ class DictService {
       );
 
       if (!itemsResult.isSuccess || itemsResult.data == null) {
-        debugPrint('❌ 字典项加载失败: ${itemsResult.error}');
+        if (kDebugMode) debugPrint('❌ 字典项加载失败');
         return;
       }
 
@@ -234,9 +234,9 @@ class DictService {
       // 保存到本地缓存
       await _saveToLocalCache();
 
-      debugPrint('✅ 字典服务网络加载完成，共 ${_cache.length} 个类型');
+      if (kDebugMode) debugPrint('✅ 字典服务网络加载完成');
     } catch (e) {
-      debugPrint('❌ 字典服务网络加载失败: $e');
+      if (kDebugMode) debugPrint('❌ 字典服务网络加载失败');
     }
   }
 
@@ -249,10 +249,10 @@ class DictService {
     }
 
     try {
-      debugPrint('🔄 字典服务后台静默更新...');
+      if (kDebugMode) debugPrint('🔄 字典服务后台静默更新...');
       await loadFromNetwork();
     } catch (e) {
-      debugPrint('⚠️ 字典服务静默更新失败（使用缓存）: $e');
+      if (kDebugMode) debugPrint('⚠️ 字典服务静默更新失败（使用缓存）');
     }
   }
 
@@ -282,7 +282,7 @@ class DictService {
       await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
       await prefs.setInt(_cacheVersionKey, _cacheVersion);
     } catch (e) {
-      debugPrint('❌ 字典服务保存本地缓存失败: $e');
+      if (kDebugMode) debugPrint('❌ 字典服务保存本地缓存失败');
     }
   }
 
@@ -361,7 +361,7 @@ class DictService {
   void clearCache() {
     _cache.clear();
     _typeIdMap.clear();
-    debugPrint('🗑️ 字典缓存已清空');
+    if (kDebugMode) debugPrint('🗑️ 字典缓存已清空');
   }
 
   /// 获取缓存状态

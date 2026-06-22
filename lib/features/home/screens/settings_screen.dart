@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:provider/provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -515,7 +516,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
             filters: {'user_id': 'eq.$userId'},
           );
         } catch (e) {
-          debugPrint('删除表 $table 失败: $e');
+          if (kDebugMode) {
+            debugPrint('删除表 $table 失败');
+          }
         }
       }));
 

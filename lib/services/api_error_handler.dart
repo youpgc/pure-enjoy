@@ -37,7 +37,9 @@ class ApiErrorHandler {
         detail = body['message'] ?? body['error'] ?? body['detail'] ?? '';
       }
     } catch (e) {
-      debugPrint('解析错误响应体失败: $e');
+      if (kDebugMode) {
+        debugPrint('解析错误响应体失败');
+      }
       // 解析失败，使用默认消息
     }
 

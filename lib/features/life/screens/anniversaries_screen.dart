@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:lunar/lunar.dart';
@@ -141,7 +142,9 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
       if (decoded is List) return decoded;
       return [];
     } catch (e) {
-      debugPrint('错误: $e');
+      if (kDebugMode) {
+        debugPrint('错误');
+      }
       return [];
     }
   }
@@ -152,7 +155,9 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
       final prefs = await _getPrefs();
       await prefs.setString(_cacheKey, jsonEncode(data));
     } catch (e) {
-      debugPrint('错误: $e');
+      if (kDebugMode) {
+        debugPrint('错误');
+      }
     }
   }
 

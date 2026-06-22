@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
@@ -268,7 +269,9 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           }
         }
       } catch (e) {
-        debugPrint('批量缓存章节失败: $e');
+        if (kDebugMode) {
+          debugPrint('批量缓存章节失败');
+        }
       }
     }
 

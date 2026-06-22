@@ -7,6 +7,28 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
 import 'http_client.dart';
 
+/// 安全日志工具：仅在开发模式或调试模式下输出日志
+/// 生产环境中所有日志输出都会被静默处理，防止敏感信息泄露
+class SecureLogger {
+  static void log(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
+
+  static void error(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
+
+  static void warning(String message) {
+    if (kDebugMode) {
+      debugPrint(message);
+    }
+  }
+}
+
 /// 缓存条目
 class _CacheEntry {
   final dynamic response;
@@ -145,10 +167,10 @@ class AuthService {
 
       if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
         await _saveUser(result.data!.first);
-        debugPrint('✅ 用户信息已静默刷新');
+        SecureLogger.log('✅ 用户信息已静默刷新');
       }
     } catch (e) {
-      debugPrint('⚠️ 静默刷新用户信息失败: $e');
+      SecureLogger.warning('⚠️ 静默刷新用户信息失败');
       // 静默失败不影响使用，继续使用本地缓存
     }
   }
@@ -173,7 +195,7 @@ class AuthService {
     try {
       final passwordHash = _hashPassword(password);
 
-      debugPrint('🔐 登录请求: email=$email, hash=${passwordHash.substring(0, 8)}...');
+      SecureLogger.log('🔐 登录请求');
 
       final result = await ApiClient.get(
         'users',
@@ -184,12 +206,12 @@ class AuthService {
         select: 'id,email,nickname,phone,role,member_level,points,status,avatar_url,login_count',
       );
 
-      debugPrint('🔐 登录响应: isSuccess=${result.isSuccess}, data=${result.data}');
+      SecureLogger.log('🔐 登录响应: isSuccess=${result.isSuccess}');
 
       if (result.isSuccess) {
         final users = result.data;
         if (users == null || users.isEmpty) {
-          debugPrint('❌ 邮箱或密码错误');
+          SecureLogger.log('❌ 邮箱或密码错误');
           return false;
         }
 
@@ -197,7 +219,7 @@ class AuthService {
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          debugPrint('❌ 用户已被禁用: ${user['status']}');
+          SecureLogger.log('❌ 用户已被禁用');
           return false;
         }
 
@@ -213,14 +235,14 @@ class AuthService {
           },
         );
 
-        debugPrint('✅ 登录成功: ${user['nickname']}');
+        SecureLogger.log('✅ 登录成功');
         return true;
       } else {
-        debugPrint('❌ 登录失败: ${result.errorMessage}');
+        SecureLogger.log('❌ 登录失败');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Sign in error: $e');
+      SecureLogger.error('❌ Sign in error');
       return false;
     }
   }
@@ -234,7 +256,7 @@ class AuthService {
     try {
       final passwordHash = _hashPassword(password);
 
-      debugPrint('🔐 账号登录: account=$account, hash=${passwordHash.substring(0, 8)}...');
+      SecureLogger.log('🔐 账号登录');
 
       // 判断账号类型
       final accountType = _detectAccountType(account);
@@ -268,7 +290,7 @@ class AuthService {
 
       return await _processLoginResult(result);
     } catch (e) {
-      debugPrint('❌ signInWithAccount error: $e');
+      SecureLogger.error('❌ signInWithAccount error');
       return false;
     }
   }
@@ -305,26 +327,26 @@ class AuthService {
 
       return await _processLoginResult(result);
     } catch (e) {
-      debugPrint('❌ _signInWithUsernameOrNickname error: $e');
+      SecureLogger.error('❌ _signInWithUsernameOrNickname error');
       return false;
     }
   }
 
   /// 处理登录响应
   Future<bool> _processLoginResult(ApiResponse result) async {
-    debugPrint('🔐 登录响应: isSuccess=${result.isSuccess}, data=${result.data}');
+    SecureLogger.log('🔐 登录响应: isSuccess=${result.isSuccess}');
 
     if (result.isSuccess) {
       final users = result.data;
       if (users == null || users.isEmpty) {
-        debugPrint('❌ 账号或密码错误');
+        SecureLogger.log('❌ 账号或密码错误');
         return false;
       }
 
       final user = users.first;
 
       if (user['status'] != 'active') {
-        debugPrint('❌ 用户已被禁用: ${user['status']}');
+        SecureLogger.log('❌ 用户已被禁用');
         return false;
       }
 
@@ -339,10 +361,10 @@ class AuthService {
         },
       );
 
-      debugPrint('✅ 登录成功: ${user['nickname']}');
+      SecureLogger.log('✅ 登录成功');
       return true;
     } else {
-      debugPrint('❌ 登录失败: ${result.errorMessage}');
+      SecureLogger.log('❌ 登录失败');
       return false;
     }
   }
@@ -367,7 +389,7 @@ class AuthService {
       if (verifyResponse.statusCode == 200) {
         final users = jsonDecode(verifyResponse.body) as List;
         if (users.isEmpty) {
-          debugPrint('验证码错误或手机号未注册');
+          SecureLogger.log('验证码错误或手机号未注册');
           return false;
         }
 
@@ -378,14 +400,14 @@ class AuthService {
         if (expiresAt != null) {
           final expires = DateTime.parse(expiresAt);
           if (DateTime.now().toUtc().isAfter(expires)) {
-            debugPrint('验证码已过期');
+            SecureLogger.log('验证码已过期');
             return false;
           }
         }
 
         // 检查用户状态
         if (user['status'] != 'active') {
-          debugPrint('用户已被禁用');
+          SecureLogger.log('用户已被禁用');
           return false;
         }
 
@@ -408,7 +430,7 @@ class AuthService {
 
       return false;
     } catch (e) {
-      debugPrint('signInWithPhoneCode error: $e');
+      SecureLogger.error('signInWithPhoneCode error');
       return false;
     }
   }
@@ -450,19 +472,19 @@ class AuthService {
 
           if (updateResponse.statusCode == 200 ||
               updateResponse.statusCode == 204) {
-            debugPrint('验证码已发送到 $phone: $code');
+            SecureLogger.log('验证码已发送');
             return true;
           }
         } else {
           // 用户不存在，也可以发送验证码（注册场景）
-          debugPrint('手机号未注册，验证码: $code');
+          SecureLogger.log('手机号未注册');
           return true;
         }
       }
 
       return false;
     } catch (e) {
-      debugPrint('sendSmsCode error: $e');
+      SecureLogger.error('sendSmsCode error');
       return false;
     }
   }
@@ -483,7 +505,7 @@ class AuthService {
 
       final userEmail = email ?? '${username}_${DateTime.now().millisecondsSinceEpoch}@pureenjoy.local';
 
-      debugPrint('📝 注册请求: username=$username, email=$userEmail, hash=${passwordHash.substring(0, 8)}...');
+      SecureLogger.log('📝 注册请求');
 
       final userData = {
         'id': userId,
@@ -510,18 +532,18 @@ class AuthService {
         returnRepresentation: true,
       );
 
-      debugPrint('📝 注册响应: isSuccess=${response.isSuccess}, data=${response.data}');
+      SecureLogger.log('📝 注册响应: isSuccess=${response.isSuccess}');
 
       if (response.isSuccess) {
         await _saveUser(userData);
-        debugPrint('✅ 注册成功: $username');
+        SecureLogger.log('✅ 注册成功');
         return true;
       } else {
-        debugPrint('❌ 注册失败: ${response.errorMessage}');
+        SecureLogger.log('❌ 注册失败');
         return false;
       }
     } catch (e) {
-      debugPrint('❌ Sign up error: $e');
+      SecureLogger.error('❌ Sign up error');
       return false;
     }
   }
@@ -541,7 +563,7 @@ class AuthService {
       // 不再调用 Supabase Auth 的 logout 端点
       // 直接清除本地会话
     } catch (e) {
-      debugPrint('Sign out error: $e');
+      SecureLogger.error('Sign out error');
     } finally {
       _user = null;
 
@@ -573,7 +595,7 @@ class AuthService {
       }
       return false;
     } catch (e) {
-      debugPrint('reloadCurrentUser error: $e');
+      SecureLogger.error('reloadCurrentUser error');
       return false;
     }
   }
@@ -622,14 +644,14 @@ class AuthService {
       );
 
       if (updateResult.isSuccess) {
-        debugPrint('✅ 密码修改成功: $userId');
+        SecureLogger.log('✅ 密码修改成功');
         return {'success': true, 'message': '密码修改成功'};
       } else {
-        debugPrint('❌ 密码修改失败: ${updateResult.errorMessage}');
+        SecureLogger.log('❌ 密码修改失败');
         return {'success': false, 'message': '密码修改失败，请重试'};
       }
     } catch (e) {
-      debugPrint('❌ 修改密码出错: $e');
+      SecureLogger.error('❌ 修改密码出错');
       return {'success': false, 'message': '修改密码出错: $e'};
     }
   }
@@ -673,7 +695,7 @@ class AuthService {
     if (method.toUpperCase() == 'GET' && useCache) {
       final cached = _cache[cacheKey];
       if (cached != null && !cached.isExpired(_cacheTtl)) {
-        debugPrint('📦 缓存命中: $url');
+        SecureLogger.log('📦 缓存命中');
         return cached.response;
       }
     }
@@ -684,7 +706,7 @@ class AuthService {
 
     for (int attempt = 1; attempt <= _maxRetries; attempt++) {
       try {
-        debugPrint('🌐 HTTP $method $url (attempt $attempt)');
+        SecureLogger.log('🌐 HTTP $method (attempt $attempt)');
 
         final uri = Uri.parse(url);
         switch (method.toUpperCase()) {
@@ -709,7 +731,7 @@ class AuthService {
 
         // 3. 处理 401 未授权（用户未登录或会话过期）
         if (response.statusCode == 401) {
-          debugPrint('🔒 收到 401，用户未登录或会话过期');
+          SecureLogger.log('🔒 收到 401，用户未登录或会话过期');
           // 清除本地用户状态，触发重新登录
           _user = null;
           final prefs = await SharedPreferences.getInstance();
@@ -722,12 +744,12 @@ class AuthService {
         break;
       } catch (e) {
         lastError = e is Exception ? e : Exception(e.toString());
-        debugPrint('⚠️ 请求失败 (attempt $attempt): $e');
+        SecureLogger.warning('⚠️ 请求失败 (attempt $attempt)');
 
         if (attempt < _maxRetries) {
           // 指数退避：1s, 2s, 4s
           final delay = Duration(seconds: 1 << (attempt - 1));
-          debugPrint('⏳ ${_maxRetries - attempt} 秒后重试...');
+          SecureLogger.log('⏳ 重试中...');
           await Future.delayed(delay);
         }
       }
@@ -741,7 +763,7 @@ class AuthService {
     // 6. 缓存 GET 请求响应
     if (method.toUpperCase() == 'GET' && useCache && response.statusCode >= 200 && response.statusCode < 300) {
       _cache[cacheKey] = _CacheEntry(response, DateTime.now());
-      debugPrint('💾 缓存已更新: $url');
+      SecureLogger.log('💾 缓存已更新');
     }
 
     return response;
@@ -750,7 +772,7 @@ class AuthService {
   /// 清除请求缓存
   void clearCache() {
     _cache.clear();
-    debugPrint('🧹 请求缓存已清除');
+    SecureLogger.log('🧹 请求缓存已清除');
   }
 }
 

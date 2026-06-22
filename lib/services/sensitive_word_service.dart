@@ -108,7 +108,7 @@ class SensitiveWordService {
     await _loadSwitches();
     await _loadWords();
     _initialized = true;
-    debugPrint('✅ 敏感词服务初始化完成 '
+    if (kDebugMode) debugPrint('✅ 敏感词服务初始化完成');
         '(小说:${_wordCache['novel']?.length ?? 0}, '
         '系统:${_wordCache['system']?.length ?? 0}, '
         '小说开关:${_novelEnabled}, 系统开关:${_systemEnabled})');
@@ -121,7 +121,7 @@ class SensitiveWordService {
     try {
       await _loadSwitches();
       await _loadWords();
-      debugPrint('🔄 敏感词缓存已刷新');
+      if (kDebugMode) debugPrint('🔄 敏感词缓存已刷新');
     } finally {
       _isRefreshing = false;
     }
@@ -148,7 +148,7 @@ class SensitiveWordService {
         }
       }
     } catch (e) {
-      debugPrint('❌ 加载敏感词开关失败: $e');
+      if (kDebugMode) debugPrint('❌ 加载敏感词开关失败');
     }
   }
 
@@ -173,7 +173,7 @@ class SensitiveWordService {
         _lastFetch = DateTime.now();
       }
     } catch (e) {
-      debugPrint('❌ 加载敏感词列表失败: $e');
+      if (kDebugMode) debugPrint('❌ 加载敏感词列表失败');
     }
   }
 
@@ -302,7 +302,7 @@ class SensitiveWordService {
         try {
           return RegExp(sw.word, caseSensitive: false).hasMatch(text);
         } catch (e) {
-          debugPrint('正则匹配敏感词失败: $e');
+          if (kDebugMode) debugPrint('正则匹配敏感词失败');
           return false;
         }
       default:
@@ -397,7 +397,7 @@ class SensitiveWordService {
       // 更新命中次数（异步，不等待）
       _incrementHitCount(word.id);
     } catch (e) {
-      debugPrint('❌ 记录敏感词日志失败: $e');
+      if (kDebugMode) debugPrint('❌ 记录敏感词日志失败');
     }
   }
 
@@ -413,10 +413,10 @@ class SensitiveWordService {
       );
 
       if (!response.isSuccess) {
-        debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
+        if (kDebugMode) debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
       }
     } catch (e) {
-      debugPrint('❌ 更新命中次数失败: $e');
+      if (kDebugMode) debugPrint('❌ 更新命中次数失败');
     }
   }
 

@@ -9,22 +9,25 @@ import '../main.dart' show navigatorKey;
 /// 本地通知服务
 /// 支持即时通知、定时通知、每日重复通知
 class NotificationService {
-  NotificationService._();
-  static final NotificationService instance = NotificationService._();
+  static final NotificationService _instance = NotificationService._internal();
+  factory NotificationService() => _instance;
+  NotificationService._internal();
 
-  final FlutterLocalNotificationsPlugin _plugin = FlutterLocalNotificationsPlugin();
+  static NotificationService get instance => _instance;
+
+  final FlutterLocalNotificationsPlugin _plugin =
+      FlutterLocalNotificationsPlugin();
+
   bool _initialized = false;
 
-  /// 通知渠道
+  // 通知渠道配置
   static const String _channelId = 'pure_enjoy_channel';
   static const String _channelName = '纯享通知';
-  static const String _channelDescription = '习惯打卡、阅读提醒等通知';
+  static const String _channelDescription = '纯享应用的通知渠道';
 
-  /// 通知 ID 范围
-  static int _nextId = 1000;
-  int get _generateId => _nextId++;
-
-  // ========== 初始化 ==========
+  // 通知 ID 生成器
+  int _notificationId = 1000;
+  int get _generateId => _notificationId++;
 
   /// 初始化通知服务
   Future<void> initialize() async {
@@ -32,29 +35,34 @@ class NotificationService {
 
     // 初始化时区数据
     tz_data.initializeTimeZones();
-    tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
 
+    // Android 初始化设置
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+
+    // iOS 初始化设置
     const iosSettings = DarwinInitializationSettings(
       requestAlertPermission: true,
       requestBadgePermission: true,
       requestSoundPermission: true,
     );
-    const settings = InitializationSettings(
+
+    const initSettings = InitializationSettings(
       android: androidSettings,
       iOS: iosSettings,
     );
 
     await _plugin.initialize(
-      settings,
+      initSettings,
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
-    // Android 13+ 请求通知权限
+    // 请求通知权限
     await _requestPermission();
 
     _initialized = true;
-    debugPrint('✅ 通知服务初始化完成');
+    if (kDebugMode) {
+      debugPrint('✅ 通知服务初始化完成');
+    }
   }
 
   /// 请求通知权限
@@ -63,7 +71,9 @@ class NotificationService {
         AndroidFlutterLocalNotificationsPlugin>();
     if (androidPlugin != null) {
       final granted = await androidPlugin.requestNotificationsPermission();
-      debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      if (kDebugMode) {
+        debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      }
       return granted == true;
     }
 
@@ -75,7 +85,9 @@ class NotificationService {
         badge: true,
         sound: true,
       );
-      debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      if (kDebugMode) {
+        debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      }
       return granted == true;
     }
 
@@ -84,7 +96,9 @@ class NotificationService {
 
   /// 通知点击回调
   void _onNotificationTapped(NotificationResponse response) {
-    debugPrint('🔔 通知被点击: id=${response.id}, payload=${response.payload}');
+    if (kDebugMode) {
+      debugPrint('🔔 通知被点击');
+    }
     final payload = response.payload;
     if (payload == null || payload.isEmpty) return;
 
@@ -101,22 +115,30 @@ class NotificationService {
     switch (type) {
       case 'novel':
         // 跳转到小说详情
-        debugPrint('跳转到小说详情: $id');
+        if (kDebugMode) {
+          debugPrint('跳转到小说详情');
+        }
         break;
       case 'expense':
         // 跳转到消费记录
-        debugPrint('跳转到消费记录: $id');
+        if (kDebugMode) {
+          debugPrint('跳转到消费记录');
+        }
         break;
       case 'reminder':
         // 跳转到提醒事项
-        debugPrint('跳转到提醒事项: $id');
+        if (kDebugMode) {
+          debugPrint('跳转到提醒事项');
+        }
         break;
       case 'notification':
         // 跳转到通知中心
         Navigator.pushNamed(context, '/notifications');
         break;
       default:
-        debugPrint('未知通知类型: $type');
+        if (kDebugMode) {
+          debugPrint('未知通知类型: $type');
+        }
     }
   }
 
@@ -191,7 +213,9 @@ class NotificationService {
       androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
     );
 
-    debugPrint('⏰ 定时通知已设置: $title @ $scheduledTime');
+    if (kDebugMode) {
+      debugPrint('⏰ 定时通知已设置: $title @ $scheduledTime');
+    }
   }
 
   /// 发送每日重复通知
@@ -245,7 +269,9 @@ class NotificationService {
       matchDateTimeComponents: DateTimeComponents.time, // 每天重复
     );
 
-    debugPrint('🔄 每日通知已设置: $title @ ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+    if (kDebugMode) {
+      debugPrint('🔄 每日通知已设置: $title @ ${hour.toString().padLeft(2, '0')}:${minute.toString().padLeft(2, '0')}');
+    }
   }
 
   // ========== 取消通知 ==========
@@ -253,13 +279,17 @@ class NotificationService {
   /// 取消指定通知
   Future<void> cancelNotification(int id) async {
     await _plugin.cancel(id);
-    debugPrint('❌ 通知已取消: id=$id');
+    if (kDebugMode) {
+      debugPrint('❌ 通知已取消: id=$id');
+    }
   }
 
   /// 取消所有通知
   Future<void> cancelAllNotifications() async {
     await _plugin.cancelAll();
-    debugPrint('❌ 所有通知已取消');
+    if (kDebugMode) {
+      debugPrint('❌ 所有通知已取消');
+    }
   }
 
   // ========== 习惯打卡提醒 ==========
@@ -275,12 +305,11 @@ class NotificationService {
     required int hour,
     required int minute,
   }) async {
-    // 用 habitId hash 生成固定 ID
-    final id = _habitNotificationBaseId + habitId.hashCode.abs() % 1000;
+    final id = _habitNotificationBaseId + habitId.hashCode.abs();
 
     await scheduleDailyNotification(
       id: id,
-      title: '习惯打卡提醒 💪',
+      title: '习惯打卡提醒',
       body: '该完成「$habitName」了，坚持就是胜利！',
       hour: hour,
       minute: minute,
@@ -290,31 +319,38 @@ class NotificationService {
 
   /// 取消习惯打卡提醒
   Future<void> cancelHabitReminder(String habitId) async {
-    final id = _habitNotificationBaseId + habitId.hashCode.abs() % 1000;
+    final id = _habitNotificationBaseId + habitId.hashCode.abs();
     await cancelNotification(id);
   }
 
-  // ========== 阅读提醒 ==========
+  // ========== 纪念日提醒 ==========
 
-  static const int _readingReminderId = 3000;
+  /// 通知 ID 前缀
+  static const int _anniversaryNotificationBaseId = 3000;
 
-  /// 设置每日阅读提醒
-  Future<void> setReadingReminder({
-    required int hour,
-    required int minute,
+  /// 设置纪念日提醒（每年重复）
+  /// [anniversaryId] 纪念日ID，[title] 提醒标题，[date] 日期（月/日）
+  Future<void> setAnniversaryReminder({
+    required String anniversaryId,
+    required String title,
+    required DateTime date,
+    String? note,
   }) async {
+    final id = _anniversaryNotificationBaseId + anniversaryId.hashCode.abs();
+
     await scheduleDailyNotification(
-      id: _readingReminderId,
-      title: '阅读时间到 📖',
-      body: '今天看书了吗？每天进步一点点！',
-      hour: hour,
-      minute: minute,
-      payload: 'reading_reminder',
+      id: id,
+      title: '🎉 $title',
+      body: note ?? '今天是特别的日子，记得庆祝一下！',
+      hour: 9, // 早上9点提醒
+      minute: 0,
+      payload: 'anniversary:$anniversaryId',
     );
   }
 
-  /// 取消阅读提醒
-  Future<void> cancelReadingReminder() async {
-    await cancelNotification(_readingReminderId);
+  /// 取消纪念日提醒
+  Future<void> cancelAnniversaryReminder(String anniversaryId) async {
+    final id = _anniversaryNotificationBaseId + anniversaryId.hashCode.abs();
+    await cancelNotification(id);
   }
 }

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
@@ -80,7 +81,9 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         }
       });
     } catch (e) {
-      debugPrint('标记已读失败: $e');
+      if (kDebugMode) {
+        debugPrint('标记已读失败');
+      }
     }
   }
 

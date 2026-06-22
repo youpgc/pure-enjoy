@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
@@ -27,7 +28,7 @@ class VersionCheckService {
       final currentVersion = packageInfo.version;
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
-      debugPrint('📱 当前版本: $currentVersion+$currentBuildNumber');
+      if (kDebugMode) debugPrint('📱 当前版本检查');
 
       final result = await ApiClient.get(
         'app_versions',
@@ -37,7 +38,7 @@ class VersionCheckService {
       );
 
       if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
-        debugPrint('📱 未获取到最新版本或请求失败');
+        if (kDebugMode) debugPrint('📱 未获取到最新版本或请求失败');
         return null;
       }
 
@@ -47,7 +48,7 @@ class VersionCheckService {
       final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
       final isForceUpdate = latestVersion['release_type'] == 'force';
 
-      debugPrint('📱 最新版本: $latestVersionStr+$latestBuildNumber');
+      if (kDebugMode) debugPrint('📱 最新版本获取成功');
 
       if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
         return {
@@ -61,7 +62,7 @@ class VersionCheckService {
       }
       return null;
     } catch (e) {
-      debugPrint('📱 检查更新失败: $e');
+      if (kDebugMode) debugPrint('📱 检查更新失败');
       return null;
     }
   }
@@ -95,15 +96,17 @@ class VersionCheckService {
 
     // 3. 综合判断：版本号更大，或版本号相同但构建号更大
     if (versionCompare > 0) {
-      debugPrint('📱 需要更新: 版本号 $latestVersion > $currentVersion');
+      if (kDebugMode) debugPrint('📱 需要更新: 版本号');
       return true;
     }
     if (versionCompare == 0 && buildCompare > 0) {
-      debugPrint('📱 需要更新: 构建号 +$latestBuild > +$currentBuild');
+      if (kDebugMode) debugPrint('📱 需要更新: 构建号');
       return true;
     }
 
-    debugPrint('📱 无需更新: 当前 $currentVersion+$currentBuild, 最新 $latestVersion+$latestBuild');
+    if (kDebugMode) {
+      debugPrint('📱 无需更新');
+    }
     return false;
   }
 
@@ -184,16 +187,16 @@ class VersionCheckService {
       final tryUrl = _getMirrorUrl(apkUrl, mirrorIndex);
       final mirrorName = mirrorIndex == 0 ? 'GitHub直连' : _githubMirrors[mirrorIndex];
 
-      debugPrint('📱 尝试下载 [$mirrorName]: $tryUrl');
+      if (kDebugMode) debugPrint('📱 尝试下载 [$mirrorName]');
       downloadStatus.value = '正在连接${mirrorIndex > 0 ? " (镜像${mirrorIndex})" : ""}...';
 
       final result = await _downloadFromUrl(tryUrl, onProgress: onProgress);
       if (result != null) {
-        debugPrint('📱 ✅ 下载成功 via $mirrorName');
+        if (kDebugMode) debugPrint('📱 ✅ 下载成功');
         return result;
       }
 
-      debugPrint('📱 ❌ $mirrorName 下载失败，尝试下一个...');
+      if (kDebugMode) debugPrint('📱 ❌ 下载失败，尝试下一个...');
     }
 
     // 所有镜像都失败了
@@ -205,13 +208,13 @@ class VersionCheckService {
   /// [redirectDepth] 递归跟踪重定向时的深度，防止无限循环
   Future<String?> _downloadFromUrl(String apkUrl, {ValueChanged<double>? onProgress, int redirectDepth = 0}) async {
     if (redirectDepth > 5) {
-      debugPrint('📱 重定向次数过多，放弃下载');
+      if (kDebugMode) debugPrint('📱 重定向次数过多，放弃下载');
       return null;
     }
 
     // URL 为空或无效时直接返回
     if (apkUrl.isEmpty) {
-      debugPrint('📱 URL 为空，跳过');
+      if (kDebugMode) debugPrint('📱 URL 为空，跳过');
       return null;
     }
 
@@ -219,7 +222,7 @@ class VersionCheckService {
     if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
       // 可能是相对路径（镜像服务器的重定向地址没有完整 scheme/host）
       // 无法处理，直接返回失败
-      debugPrint('📱 URL 缺少 host: $apkUrl');
+      if (kDebugMode) debugPrint('📱 URL 缺少 host');
       return null;
     }
     // 使用独立的 http.Client 下载，不经过共享 HttpClient
@@ -258,13 +261,13 @@ class VersionCheckService {
 
       final response = await client.send(request).timeout(const Duration(minutes: 5));
 
-      debugPrint('📱 HTTP 状态码: ${response.statusCode}');
+      if (kDebugMode) debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
       // 处理重定向（GitHub Releases 返回 302 到 CDN）
       if (response.statusCode == 302 || response.statusCode == 301) {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null && redirectUrl.isNotEmpty) {
-          debugPrint('📱 跟随重定向: $redirectUrl');
+          if (kDebugMode) debugPrint('📱 跟随重定向');
           // 关闭当前 response stream 后跟随重定向
           response.stream.listen((_) {}).cancel();
           return await _downloadFromUrl(redirectUrl, onProgress: onProgress, redirectDepth: redirectDepth + 1);
@@ -272,12 +275,12 @@ class VersionCheckService {
       }
 
       if (response.statusCode != 200) {
-        debugPrint('📱 HTTP 错误: ${response.statusCode}');
+        if (kDebugMode) debugPrint('📱 HTTP 错误: ${response.statusCode}');
         return null;
       }
 
       final totalBytes = response.contentLength ?? 0;
-      debugPrint('📱 文件总大小: $totalBytes bytes');
+      if (kDebugMode) debugPrint('📱 文件总大小: $totalBytes bytes');
       int downloadedBytes = 0;
 
       final sink = file.openWrite();
@@ -299,11 +302,11 @@ class VersionCheckService {
           }
         },
         onDone: () async {
-          debugPrint('📱 下载流完成');
+          if (kDebugMode) debugPrint('📱 下载流完成');
           await sink.close();
         },
         onError: (error) async {
-          debugPrint('📱 下载流出错: $error');
+          if (kDebugMode) debugPrint('📱 下载流出错');
           await sink.close();
         },
         cancelOnError: true,
@@ -315,11 +318,11 @@ class VersionCheckService {
         downloadStatus.value = '下载完成';
         return savePath;
       } else {
-        debugPrint('📱 文件验证失败');
+        if (kDebugMode) debugPrint('📱 文件验证失败');
         return null;
       }
     } catch (e) {
-      debugPrint('📱 下载异常: $e');
+      if (kDebugMode) debugPrint('📱 下载异常');
       return null;
     } finally {
       // 确保关闭独立 Client，不影响共享 HttpClient
@@ -367,42 +370,42 @@ class VersionCheckService {
   /// 完整的下载并安装流程
   Future<void> downloadAndInstall(BuildContext context, String apkUrl) async {
     try {
-      debugPrint('📱 开始下载并安装流程');
-      debugPrint('📱 APK URL: $apkUrl');
+      if (kDebugMode) debugPrint('📱 开始下载并安装流程');
+      if (kDebugMode) debugPrint('📱 APK URL 已设置');
 
       // 1. 下载APK
       final filePath = await downloadApk(apkUrl);
       if (filePath == null) {
-        debugPrint('📱 下载失败，filePath 为 null');
+        if (kDebugMode) debugPrint('📱 下载失败，filePath 为 null');
         return;
       }
 
-      debugPrint('📱 APK 下载完成，路径: $filePath');
+      if (kDebugMode) debugPrint('📱 APK 下载完成');
 
       // 验证文件是否存在
       final file = File(filePath);
       if (!await file.exists()) {
-        debugPrint('📱 错误：下载的文件不存在');
+        if (kDebugMode) debugPrint('📱 错误：下载的文件不存在');
         downloadStatus.value = '下载文件不存在';
         return;
       }
 
       final fileSize = await file.length();
-      debugPrint('📱 文件大小: $fileSize bytes');
+      if (kDebugMode) debugPrint('📱 文件大小: $fileSize bytes');
 
       if (fileSize == 0) {
-        debugPrint('📱 错误：文件大小为0');
+        if (kDebugMode) debugPrint('📱 错误：文件大小为0');
         downloadStatus.value = '下载文件无效（大小为0）';
         return;
       }
 
       // 2. 安装APK
-      debugPrint('📱 开始安装APK...');
+      if (kDebugMode) debugPrint('📱 开始安装APK...');
       final result = await installApk(filePath);
-      debugPrint('📱 安装结果: $result');
+      if (kDebugMode) debugPrint('📱 安装结果: $result');
     } catch (e, stackTrace) {
-      debugPrint('📱 下载安装流程出错: $e');
-      debugPrint('📱 堆栈: $stackTrace');
+      if (kDebugMode) debugPrint('📱 下载安装流程出错');
+      if (kDebugMode) debugPrint('📱 堆栈信息');
       downloadStatus.value = '更新失败: $e';
     }
   }

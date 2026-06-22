@@ -170,7 +170,9 @@ class PointService {
       );
 
       if (!insertResult.isSuccess) {
-        debugPrint('插入积分记录失败: ${insertResult.statusCode} ${insertResult.errorMessage}');
+        if (kDebugMode) {
+          debugPrint('插入积分记录失败');
+        }
         return {'success': false, 'message': '打卡失败，请重试'};
       }
 
@@ -185,7 +187,9 @@ class PointService {
       );
 
       if (!updateResult.isSuccess) {
-        debugPrint('更新用户积分失败: ${updateResult.statusCode} ${updateResult.errorMessage}');
+        if (kDebugMode) {
+          debugPrint('更新用户积分失败');
+        }
       }
 
       // 6. 更新 AuthService 中的用户缓存
@@ -198,7 +202,9 @@ class PointService {
         'streak': streak,
       };
     } catch (e) {
-      debugPrint('打卡失败: $e');
+      if (kDebugMode) {
+        debugPrint('打卡失败');
+      }
       return {'success': false, 'message': '打卡失败: $e'};
     }
   }
@@ -227,7 +233,9 @@ class PointService {
 
       return [];
     } catch (e) {
-      debugPrint('获取积分记录失败: $e');
+      if (kDebugMode) {
+        debugPrint('获取积分记录失败');
+      }
       return [];
     }
   }
@@ -259,7 +267,9 @@ class PointService {
 
       return 0;
     } catch (e) {
-      debugPrint('获取即将过期积分失败: $e');
+      if (kDebugMode) {
+        debugPrint('获取即将过期积分失败');
+      }
       return 0;
     }
   }
@@ -290,7 +300,9 @@ class PointService {
 
       return 0;
     } catch (e) {
-      debugPrint('获取可用积分失败: $e');
+      if (kDebugMode) {
+        debugPrint('获取可用积分失败');
+      }
       return 0;
     }
   }
