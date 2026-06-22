@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
+import '../../../core/utils/event_bus.dart';
 import 'expense_list_screen.dart';
 import 'mood_diary_screen.dart';
 import 'note_list_screen.dart';
@@ -28,10 +30,31 @@ class _LifeScreenState extends State<LifeScreen> {
   Map<String, dynamic>? _latestExpense;
   Map<String, dynamic>? _latestWeight;
 
+  StreamSubscription<void>? _expenseSubscription;
+  StreamSubscription<void>? _weightSubscription;
+
   @override
   void initState() {
     super.initState();
     _loadLatestRecords();
+    _listenEvents();
+  }
+
+  /// 监听全局事件，数据变更时自动刷新
+  void _listenEvents() {
+    _expenseSubscription = EventBus.instance.on(EventType.expenseUpdated).listen((_) {
+      _loadLatestRecords();
+    });
+    _weightSubscription = EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
+      _loadLatestRecords();
+    });
+  }
+
+  @override
+  void dispose() {
+    _expenseSubscription?.cancel();
+    _weightSubscription?.cancel();
+    super.dispose();
   }
 
   /// 从 Supabase 加载各模块最新记录
@@ -99,56 +122,69 @@ class _LifeScreenState extends State<LifeScreen> {
       appBar: AppBar(
         title: const Text('生活'),
       ),
-      body: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // ====== 顶部最新记录卡片 ======
-          const SizedBox(height: 4),
-          Text(
-            '最新动态',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
+      body: NotificationListener<ScrollNotification>(
+        onNotification: (notification) {
+          // 监听滚动到顶部时刷新数据
+          if (notification is ScrollEndNotification &&
+              notification.metrics.pixels <= 0) {
+            _loadLatestRecords();
+          }
+          return false;
+        },
+        child: RefreshIndicator(
+          onRefresh: _loadLatestRecords,
+          child: ListView(
+            padding: const EdgeInsets.all(16),
+            children: [
+              // ====== 顶部最新记录卡片 ======
+              const SizedBox(height: 4),
+              Text(
+                '最新动态',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 12),
+
+              _isLoading
+                  ? _buildLoadingCards(colorScheme)
+                  : _buildLatestRecordCards(colorScheme),
+
+              const SizedBox(height: 24),
+
+              // ====== 下方功能模块网格 ======
+              Text(
+                '更多功能',
+                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                      fontWeight: FontWeight.bold,
+                    ),
+              ),
+              const SizedBox(height: 12),
+
+              GridView.builder(
+                shrinkWrap: true,
+                physics: const NeverScrollableScrollPhysics(),
+                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                  crossAxisCount: 2,
+                  crossAxisSpacing: 12,
+                  mainAxisSpacing: 12,
+                  childAspectRatio: 1.3,
                 ),
+                itemCount: _gridFeatures.length,
+                itemBuilder: (context, index) {
+                  final feature = _gridFeatures[index];
+                  return _LifeFeatureCard(
+                    icon: feature.icon,
+                    title: feature.title,
+                    subtitle: feature.subtitle,
+                    color: feature.color,
+                    onTap: () => feature.onTap(context),
+                  );
+                },
+              ),
+            ],
           ),
-          const SizedBox(height: 12),
-
-          _isLoading
-              ? _buildLoadingCards(colorScheme)
-              : _buildLatestRecordCards(colorScheme),
-
-          const SizedBox(height: 24),
-
-          // ====== 下方功能模块网格 ======
-          Text(
-            '更多功能',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                ),
-          ),
-          const SizedBox(height: 12),
-
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 2,
-              crossAxisSpacing: 12,
-              mainAxisSpacing: 12,
-              childAspectRatio: 1.3,
-            ),
-            itemCount: _gridFeatures.length,
-            itemBuilder: (context, index) {
-              final feature = _gridFeatures[index];
-              return _LifeFeatureCard(
-                icon: feature.icon,
-                title: feature.title,
-                subtitle: feature.subtitle,
-                color: feature.color,
-                onTap: () => feature.onTap(context),
-              );
-            },
-          ),
-        ],
+        ),
       ),
     );
   }

@@ -7,6 +7,7 @@ import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/expense_model.dart';
 
@@ -23,6 +24,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   bool _isLoading = true;
   String _selectedCategory = 'all';
   DateTime _selectedMonth = DateTime.now();
+  double _totalAmount = 0.0;
+  bool _isLoadingTotal = false;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -76,6 +79,46 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     }
   }
 
+  /// 加载月度总支出（服务端聚合查询，不受分页限制）
+  Future<void> _loadTotalAmount() async {
+    final userId = _userId;
+    if (userId == null) return;
+
+    setState(() => _isLoadingTotal = true);
+
+    try {
+      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
+      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+        'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
+      };
+
+      if (_selectedCategory != 'all') {
+        filters['category'] = 'eq.$_selectedCategory';
+      }
+
+      final total = await ApiClient.sum(
+        'expenses',
+        column: 'amount',
+        filters: filters,
+      );
+
+      if (mounted) {
+        setState(() {
+          _totalAmount = total ?? 0.0;
+          _isLoadingTotal = false;
+        });
+      }
+    } catch (e) {
+      debugPrint('❌ 加载总支出失败: $e');
+      if (mounted) {
+        setState(() => _isLoadingTotal = false);
+      }
+    }
+  }
+
   Future<void> _loadExpenses({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
@@ -108,7 +151,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       final (limit, offset) = paginationParams;
 
-      final result = await ApiClient.get(
+      // 并行加载列表数据和总计数据（首次/刷新时）
+      final listFuture = ApiClient.get(
         'expenses',
         filters: filters,
         order: 'date.desc',
@@ -116,8 +160,18 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
         offset: offset,
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
+      final totalFuture = refresh ? ApiClient.sum(
+        'expenses',
+        column: 'amount',
+        filters: filters,
+      ) : Future<double?>.value(null);
+
+      final results = await Future.wait([listFuture, totalFuture]);
+      final listResult = results[0] as ApiResponse;
+      final totalResult = results[1] as double?;
+
+      if (listResult.isSuccess) {
+        final data = listResult.data!;
         var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
@@ -125,6 +179,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
             _expenses = allExpenses;
           } else {
             _expenses.addAll(allExpenses);
+          }
+          if (totalResult != null) {
+            _totalAmount = totalResult;
           }
           _isLoading = false;
           onPaginationDataLoaded(allExpenses.length);
@@ -138,7 +195,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}');
+        throw Exception('HTTP ${listResult.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -159,6 +216,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       if (result.isSuccess) {
         await _loadExpenses(refresh: true);
+        // 通知其他页面刷新
+        EventBus.instance.fire(EventType.expenseUpdated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
@@ -188,6 +247,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
         if (result.isSuccess) {
           await _loadExpenses(refresh: true);
+          // 通知其他页面刷新
+          EventBus.instance.fire(EventType.expenseUpdated);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
@@ -222,6 +283,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       if (result.isSuccess) {
         await _loadExpenses(refresh: true);
+        // 通知其他页面刷新
+        EventBus.instance.fire(EventType.expenseUpdated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
@@ -268,10 +331,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     );
   }
 
-  double get _totalAmount {
-    return _expenses.fold(0.0, (sum, e) => sum + e.amount);
-  }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
@@ -299,7 +358,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       ),
       body: Column(
         children: [
-          // 统计卡片
+          // 统计卡片（服务端聚合查询，不受分页限制）
           Container(
             width: double.infinity,
             padding: const EdgeInsets.all(20),
@@ -316,11 +375,23 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
-                Text(
-                  '总支出: ¥${_totalAmount.toStringAsFixed(2)}',
-                  style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                  ),
+                Row(
+                  children: [
+                    Text(
+                      '总支出: ¥${_totalAmount.toStringAsFixed(2)}',
+                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    if (_isLoadingTotal) ...[
+                      const SizedBox(width: 8),
+                      const SizedBox(
+                        width: 16,
+                        height: 16,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      ),
+                    ],
+                  ],
                 ),
               ],
             ),

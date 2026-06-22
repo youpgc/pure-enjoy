@@ -16,6 +16,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/data_export_service.dart';
 import '../../../services/version_check_service.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../auth/screens/login_screen.dart';
 import 'edit_profile_screen.dart';
 import 'reading_history_screen.dart';
@@ -561,6 +562,8 @@ class _DashboardPageState extends State<DashboardPage> {
                   const SnackBar(content: Text('支出添加成功')),
                 );
                 _loadRecentActivities();
+                // 通知生活页刷新最新记账记录
+                EventBus.instance.fire(EventType.expenseUpdated);
               }
             } else {
               throw Exception(result.errorMessage ?? '请求失败');

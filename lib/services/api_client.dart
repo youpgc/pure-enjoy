@@ -282,6 +282,53 @@ class ApiClient {
     }
   }
 
+  /// 聚合查询：求和
+  /// 使用 Supabase 的 select=column.sum() 语法
+  /// 返回聚合结果，失败时返回 null
+  static Future<double?> sum(
+    String table, {
+    required String column,
+    Map<String, String>? filters,
+    Duration? timeout,
+  }) async {
+    try {
+      final queryParts = <String>[
+        'select=${Uri.encodeComponent('$column.sum()')}',
+      ];
+      if (filters != null) {
+        filters.forEach((key, value) {
+          queryParts.add('$key=${Uri.encodeComponent(value)}');
+        });
+      }
+      final queryString = '?${queryParts.join('&')}';
+      final url = '$_baseUrl/rest/v1/$table$queryString';
+
+      final response = await HttpClient.instance.get(
+        url,
+        timeout: timeout ?? RequestTimeout.simple,
+      );
+
+      if (response.statusCode >= 200 && response.statusCode < 300) {
+        final body = response.body;
+        if (body.isEmpty) return 0;
+        final data = jsonDecode(body) as List<dynamic>;
+        if (data.isNotEmpty) {
+          final result = data[0] as Map<String, dynamic>;
+          final sumKey = column.contains('.') ? column : '$column.sum';
+          final value = result[sumKey];
+          if (value == null) return 0;
+          if (value is num) return value.toDouble();
+          if (value is String) return double.tryParse(value);
+        }
+        return 0;
+      }
+      return null;
+    } catch (e) {
+      debugPrint('❌ SUM 请求失败 [$table.$column]: $e');
+      return null;
+    }
+  }
+
   /// 使用 Prefer: count=exact 获取总数（HEAD 请求）
   static Future<int> count(
     String table, {
