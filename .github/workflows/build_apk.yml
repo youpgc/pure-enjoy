@@ -258,50 +258,44 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
-      # 14. 将旧版本标记为已下架（revoked）
-      - name: Mark old versions as revoked
+      # 14. 将倒数第5个及更旧的版本标记为已下架（保留最新4个已有版本 + 即将新建的第5个）
+      - name: Mark old versions as revoked (keep latest 5)
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "=== 将旧版本标记为已下架(revoked) ==="
+          echo "=== 将最新5个版本以外的版本标记为已下架(revoked) ==="
 
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-          # 查询当前 status=released 的记录
-          RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status&status=eq.released" \
+          # 查询当前 status=released 的记录，按 build_number 降序排列
+          RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status&status=eq.released&order=build_number.desc" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
           echo "当前 released 版本: $RELEASED"
           RELEASED_COUNT=$(echo "$RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d))' 2>/dev/null || echo "0")
           echo "released 记录数: $RELEASED_COUNT"
 
-          if [ "$RELEASED_COUNT" = "0" ]; then
-            echo "✅ 没有需要标记的旧版本"
+          if [ "$RELEASED_COUNT" -le 4 ]; then
+            echo "✅ 版本数不超过4个，与即将创建的新版本合计不超过5个，不需要标记"
           else
-            # 批量 PATCH：将所有 released 改为 revoked
-            PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Content-Type: application/json" \
-              -H "Prefer: return=representation" \
-              -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
+            # 获取倒数第5个及以后的版本 ID（跳过前4个，新版本即将创建为第5个）
+            OLD_IDS=$(echo "$RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(r["id"]) for r in d[4:]]' 2>/dev/null)
+            OLD_COUNT=$(echo "$OLD_IDS" | wc -l)
+            echo "需要标记为 revoked 的数量: $OLD_COUNT"
 
-            PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
-            echo "PATCH HTTP: $PATCH_CODE"
+            for VERSION_ID in $OLD_IDS; do
+              echo "🔴 标记版本 ID=$VERSION_ID 为 revoked"
+              PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$VERSION_ID" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
+              PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
+              echo "  PATCH HTTP: $PATCH_CODE"
+            done
 
-            # 验证
-            AFTER_COUNT=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id&status=eq.released" \
-              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" | \
-              python3 -c 'import sys,json; print(len(json.load(sys.stdin)))' 2>/dev/null || echo "0")
-            echo "PATCH 后 released 记录数: $AFTER_COUNT"
-
-            if [ "$AFTER_COUNT" = "0" ]; then
-              echo "✅ 所有旧版本已成功标记为 revoked"
-            else
-              echo "⚠️ 仍有 $AFTER_COUNT 条 released 记录"
-            fi
+            echo "✅ 旧版本标记完成"
           fi
 
       # 15. 创建版本记录到数据库
@@ -366,19 +360,19 @@ jobs:
             exit 1
           fi
 
-      # 16. 清理旧 GitHub Releases（只保留最新 10 个）
+      # 16. 清理旧 GitHub Releases（只保留最新 5 个）
       - name: Clean old GitHub Releases
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "清理旧 GitHub Releases（保留最新 10 个）..."
+          echo "清理旧 GitHub Releases（保留最新 5 个）..."
           
-          # 获取所有 releases（按创建时间倒序）
+          # 获取所有 releases（按发布时间倒序）
           RELEASES=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=50" \
             -H "Authorization: token $GITHUB_TOKEN")
           
-          # 提取第 11 个及以后的 release ID
-          OLD_RELEASE_IDS=$(echo "$RELEASES" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)[10:]]' 2>/dev/null)
+          # 提取第 6 个及以后的 release ID
+          OLD_RELEASE_IDS=$(echo "$RELEASES" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)[5:]]' 2>/dev/null)
           
           if [ -z "$OLD_RELEASE_IDS" ]; then
             echo "✅ 没有需要清理的旧 releases"
