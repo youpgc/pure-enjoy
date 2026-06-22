@@ -66,17 +66,45 @@ class VersionCheckService {
     }
   }
 
+  /// 判断是否需要更新
+  /// 综合比较版本号(version)和构建号(build_number)：
+  ///   1. 优先比较版本号（如 1.9.231 vs 1.9.238）
+  ///   2. 版本号相同时，比较构建号（如 +283 vs +284）
+  ///   3. 两者中有任意一个更大即提示更新
   bool _shouldUpdate(String currentVersion, int currentBuild, String latestVersion, int latestBuild) {
-    if (latestBuild > currentBuild) return true;
+    // 1. 比较版本号（分段比较，如 1.9.231 vs 1.9.238）
     final currentParts = currentVersion.split('.').map(int.tryParse).toList();
     final latestParts = latestVersion.split('.').map(int.tryParse).toList();
-    for (int i = 0; i < currentParts.length && i < latestParts.length; i++) {
-      final current = currentParts[i] ?? 0;
-      final latest = latestParts[i] ?? 0;
-      if (latest > current) return true;
-      if (latest < current) return false;
+
+    int versionCompare = 0;
+    final maxLen = currentParts.length > latestParts.length ? currentParts.length : latestParts.length;
+    for (int i = 0; i < maxLen; i++) {
+      final current = (i < currentParts.length ? currentParts[i] : 0) ?? 0;
+      final latest = (i < latestParts.length ? latestParts[i] : 0) ?? 0;
+      if (latest > current) {
+        versionCompare = 1;
+        break;
+      } else if (latest < current) {
+        versionCompare = -1;
+        break;
+      }
     }
-    return latestParts.length > currentParts.length;
+
+    // 2. 比较构建号
+    final buildCompare = latestBuild.compareTo(currentBuild);
+
+    // 3. 综合判断：版本号更大，或版本号相同但构建号更大
+    if (versionCompare > 0) {
+      debugPrint('📱 需要更新: 版本号 $latestVersion > $currentVersion');
+      return true;
+    }
+    if (versionCompare == 0 && buildCompare > 0) {
+      debugPrint('📱 需要更新: 构建号 +$latestBuild > +$currentBuild');
+      return true;
+    }
+
+    debugPrint('📱 无需更新: 当前 $currentVersion+$currentBuild, 最新 $latestVersion+$latestBuild');
+    return false;
   }
 
   /// 显示更新对话框（带下载进度）
