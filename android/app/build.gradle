@@ -64,7 +64,10 @@ android {
             shrinkResources true
             proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'), 'proguard-rules.pro'
             ndk {
-                abiFilters 'arm64-v8a', 'armeabi-v7a'
+                // 只保留 arm64-v8a，显著减小APK体积（约减少30-40%）
+                // 现代Android设备（Android 5.0+）基本都支持arm64
+                // 如需支持32位设备，可改回 'arm64-v8a', 'armeabi-v7a'
+                abiFilters 'arm64-v8a'
             }
         }
     }

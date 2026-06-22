@@ -126,9 +126,10 @@ class VersionCheckService {
   }
 
   /// 下载APK文件
+  /// 支持 Gitee Releases 和 GitHub Releases 两种下载源
   Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
     // 使用独立的 http.Client 下载，不经过共享 HttpClient
-    // 避免注入 Supabase headers（apikey 等）导致 GitHub CDN 拒绝请求
+    // 避免注入 Supabase headers（apikey 等）导致 CDN 拒绝请求
     // 避免共享 Client 被关闭或超时影响其他 API 请求
     final client = http.Client();
     try {
@@ -170,7 +171,7 @@ class VersionCheckService {
 
       debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
-      // 处理重定向（GitHub Releases 返回 302 到 CDN）
+      // 处理重定向（GitHub/Gitee Releases 返回 302 到 CDN）
       if (response.statusCode == 302 || response.statusCode == 301) {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null) {
