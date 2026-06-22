@@ -6,6 +6,7 @@ import 'package:lunar/lunar.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
 
@@ -20,7 +21,7 @@ class AnniversariesScreen extends StatefulWidget {
   State<AnniversariesScreen> createState() => _AnniversariesScreenState();
 }
 
-class _AnniversariesScreenState extends State<AnniversariesScreen> {
+class _AnniversariesScreenState extends State<AnniversariesScreen> with PaginatedListMixin {
   List<AnniversaryModel> _anniversaries = [];
   bool _isLoading = true;
 
@@ -32,10 +33,22 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _loadAnniversaries();
   }
 
-  Future<void> _loadAnniversaries() async {
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadAnniversaries();
+  }
+
+  Future<void> _loadAnniversaries({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() {
@@ -45,21 +58,29 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
       return;
     }
 
-    // 1. 先加载本地缓存
-    final cachedData = await _loadCachedList();
-    if (cachedData.isNotEmpty && mounted) {
-      setState(() {
-        _anniversaries =
-            cachedData.map((e) => AnniversaryModel.fromJson(e)).toList();
-        _sortAnniversaries();
-        _isLoading = false;
-      });
-    } else if (mounted) {
-      setState(() => _isLoading = true);
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
+
+    // 1. 先加载本地缓存（仅 refresh 时）
+    if (refresh) {
+      final cachedData = await _loadCachedList();
+      if (cachedData.isNotEmpty && mounted) {
+        setState(() {
+          _anniversaries =
+              cachedData.map((e) => AnniversaryModel.fromJson(e)).toList();
+          _sortAnniversaries();
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoading = true);
+      }
     }
 
     // 2. 静默从网络刷新
     try {
+      final (limit, offset) = paginationParams;
       final result = await ApiClient.get(
         'user_anniversaries',
         filters: {
@@ -67,6 +88,8 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
           'type': 'eq.${widget.filterType}',
         },
         order: 'date.asc',
+        limit: limit,
+        offset: offset,
       );
 
       if (!result.isSuccess) {
@@ -76,14 +99,21 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
       final data = result.data!;
       final items = data.map((e) => AnniversaryModel.fromJson(e)).toList();
 
-      // 保存缓存（只保存当前用户、当前类型的数据）
-      await _saveCachedList(data);
+      // 保存缓存（只保存当前用户、当前类型的数据，仅 refresh 时）
+      if (refresh) {
+        await _saveCachedList(data);
+      }
 
       if (mounted) {
         setState(() {
-          _anniversaries = items;
+          if (refresh) {
+            _anniversaries = items;
+          } else {
+            _anniversaries.addAll(items);
+          }
           _sortAnniversaries();
           _isLoading = false;
+          onPaginationDataLoaded(items.length);
         });
       }
     } catch (e) {
@@ -156,7 +186,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
         );
 
         if (result.isSuccess) {
-          _loadAnniversaries();
+          _loadAnniversaries(refresh: true);
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }
@@ -383,7 +413,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                     }
                   }
                   Navigator.pop(context);
-                  _loadAnniversaries();
+                  _loadAnniversaries(refresh: true);
                 } catch (e) {
                   _showError('保存失败: $e');
                 }
@@ -619,11 +649,15 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> {
                   message: '还没有$title',
                 )
               : RefreshIndicator(
-                  onRefresh: _loadAnniversaries,
+                  onRefresh: () => _loadAnniversaries(refresh: true),
                   child: ListView.builder(
+                    controller: scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _anniversaries.length,
+                    itemCount: _anniversaries.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == _anniversaries.length) {
+                        return buildLoadMoreIndicator();
+                      }
                       final item = _anniversaries[index];
                       return _AnniversaryCard(
                         item: item,

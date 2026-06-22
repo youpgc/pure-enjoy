@@ -4,6 +4,7 @@ import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../widgets/common_widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 
@@ -15,7 +16,7 @@ class NovelListScreen extends StatefulWidget {
   State<NovelListScreen> createState() => _NovelListScreenState();
 }
 
-class _NovelListScreenState extends State<NovelListScreen> {
+class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMixin {
   List<NovelModel> _novels = [];
   List<NovelModel> _allNovels = [];
   List<Map<String, dynamic>> _userNovels = [];
@@ -39,12 +40,14 @@ class _NovelListScreenState extends State<NovelListScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
   }
 
   @override
   void dispose() {
     _searchController.dispose();
+    disposePagination();
     super.dispose();
   }
 
@@ -53,7 +56,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
     try {
       await DictService.instance.initialize();
       await _loadCache();
-      await _loadNovels();
+      await _loadNovels(refresh: true);
     } catch (e, stackTrace) {
       debugPrint('❌ NovelListScreen _initLoad 异常: $e');
       debugPrint(stackTrace.toString());
@@ -64,6 +67,11 @@ class _NovelListScreenState extends State<NovelListScreen> {
         );
       }
     }
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadNovels();
   }
 
   /// 从 SharedPreferences 加载缓存数据
@@ -79,8 +87,13 @@ class _NovelListScreenState extends State<NovelListScreen> {
     }
   }
 
-  Future<void> _loadNovels() async {
+  Future<void> _loadNovels({bool refresh = false}) async {
     try {
+      if (refresh) {
+        resetPagination();
+      }
+      if (!refresh && !beginLoadMore()) return;
+
       final userId = _userId;
 
       // 构建服务端过滤条件
@@ -94,12 +107,16 @@ class _NovelListScreenState extends State<NovelListScreen> {
         filters['status'] = 'eq.$_selectedStatus';
       }
 
+      // 获取分页参数
+      final (limit, offset) = paginationParams;
+
       // 并行加载 novels 和 user_novels
       final novelsFuture = ApiClient.get(
         'novels',
         filters: filters,
         order: 'created_at.desc',
-        limit: 100,
+        limit: limit,
+        offset: offset,
       );
 
       final shelfFuture = userId != null
@@ -127,17 +144,25 @@ class _NovelListScreenState extends State<NovelListScreen> {
       }
 
       setState(() {
-        _allNovels = novels;
-        _novels = novels;
+        if (refresh) {
+          _allNovels = novels;
+          _novels = novels;
+        } else {
+          _allNovels.addAll(novels);
+          _novels.addAll(novels);
+        }
         _userNovels = userNovels;
         _isLoading = false;
+        onPaginationDataLoaded(novels.length);
       });
 
-      // 写入缓存
-      await CacheHelper.instance.saveList(
-        CacheHelper.keyNovelList,
-        novels.map((n) => n.toJson()).toList(),
-      );
+      // 只在 refresh 时写入缓存
+      if (refresh) {
+        await CacheHelper.instance.saveList(
+          CacheHelper.keyNovelList,
+          novels.map((n) => n.toJson()).toList(),
+        );
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -151,13 +176,13 @@ class _NovelListScreenState extends State<NovelListScreen> {
   /// 切换分类
   void _onCategoryChanged(String category) {
     setState(() => _selectedCategory = category);
-    _loadNovels();
+    _loadNovels(refresh: true);
   }
 
   /// 切换状态
   void _onStatusChanged(String status) {
     setState(() => _selectedStatus = status);
-    _loadNovels();
+    _loadNovels(refresh: true);
   }
 
   /// 搜索
@@ -165,7 +190,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
     setState(() => _searchQuery = query);
     // 搜索保持本地筛选，因为服务端 ilike 搜索需要额外支持
     if (_searchQuery.isEmpty) {
-      _loadNovels();
+      _loadNovels(refresh: true);
     } else {
       setState(() {
         _novels = _allNovels.where((n) {
@@ -205,7 +230,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadNovels();
+        await _loadNovels(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('已添加到书架')),
@@ -293,8 +318,9 @@ class _NovelListScreenState extends State<NovelListScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : RefreshIndicator(
-              onRefresh: _loadNovels,
+              onRefresh: () => _loadNovels(refresh: true),
               child: ListView(
+                controller: scrollController,
                 padding: const EdgeInsets.all(16),
                 children: [
                   // 搜索提示
@@ -445,6 +471,7 @@ class _NovelListScreenState extends State<NovelListScreen> {
                             );
                           },
                         ),
+                  buildLoadMoreIndicator(),
                 ],
               ),
             ),

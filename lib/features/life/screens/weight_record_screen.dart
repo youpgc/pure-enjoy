@@ -5,6 +5,7 @@ import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/weight_record_model.dart';
 
@@ -16,7 +17,7 @@ class WeightRecordScreen extends StatefulWidget {
   State<WeightRecordScreen> createState() => _WeightRecordScreenState();
 }
 
-class _WeightRecordScreenState extends State<WeightRecordScreen> {
+class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedListMixin {
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
   DateTimeRange? _selectedRange;
@@ -26,7 +27,19 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadRecords();
   }
 
   /// 初始化加载：先读缓存，再静默刷新
@@ -59,7 +72,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
     }
   }
 
-  Future<void> _loadRecords() async {
+  Future<void> _loadRecords({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -71,6 +84,11 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       return;
     }
 
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
+
     try {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -80,11 +98,13 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         filters['date.lt'] = _selectedRange!.end.add(const Duration(days: 1)).toIso8601String().split('T').first;
       }
 
+      final (limit, offset) = paginationParams;
+
       final result = await ApiClient.get(
         'weight_records',
         filters: filters,
         order: 'date.desc',
-        limit: _selectedRange != null ? null : 30,
+        limit: limit, offset: offset,
       );
 
       if (result.isSuccess) {
@@ -92,15 +112,22 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
 
         setState(() {
-          _records = records;
+          if (refresh) {
+            _records = records;
+          } else {
+            _records.addAll(records);
+          }
           _isLoading = false;
         });
+        onPaginationDataLoaded(records.length);
 
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyWeightRecords,
-          records.map((r) => r.toJson()).toList(),
-        );
+        // 只在刷新时写入缓存
+        if (refresh) {
+          await CacheHelper.instance.saveList(
+            CacheHelper.keyWeightRecords,
+            records.map((r) => r.toJson()).toList(),
+          );
+        }
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
@@ -122,7 +149,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadRecords();
+        await _loadRecords(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
@@ -151,7 +178,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
         );
 
         if (result.isSuccess) {
-          await _loadRecords();
+          await _loadRecords(refresh: true);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
@@ -185,7 +212,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadRecords();
+        await _loadRecords(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
@@ -263,7 +290,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
               );
               if (picked != null) {
                 setState(() => _selectedRange = picked);
-                _loadRecords();
+                _loadRecords(refresh: true);
               }
             },
           ),
@@ -273,7 +300,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
               tooltip: '清除筛选',
               onPressed: () {
                 setState(() => _selectedRange = null);
-                _loadRecords();
+                _loadRecords(refresh: true);
               },
             ),
         ],
@@ -281,126 +308,117 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> {
       body: _isLoading
           ? const LoadingWidget()
           : RefreshIndicator(
-              onRefresh: _loadRecords,
-              child: SingleChildScrollView(
+              onRefresh: () => _loadRecords(refresh: true),
+              child: ListView(
+                controller: scrollController,
                 padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 当前体重卡片
-                    Card(
-                      child: Padding(
-                        padding: const EdgeInsets.all(20),
-                        child: Column(
-                          children: [
-                            Text(
-                              '当前体重',
-                              style: Theme.of(context).textTheme.bodyMedium,
+                children: [
+                  // 当前体重卡片
+                  Card(
+                    child: Padding(
+                      padding: const EdgeInsets.all(20),
+                      child: Column(
+                        children: [
+                          Text(
+                            '当前体重',
+                            style: Theme.of(context).textTheme.bodyMedium,
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            _latestWeight != null
+                                ? '${_latestWeight!.toStringAsFixed(2)} kg'
+                                : '-- kg',
+                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                              fontWeight: FontWeight.bold,
+                              color: colorScheme.primary,
                             ),
+                          ),
+                          if (_weightChange != null) ...[
                             const SizedBox(height: 8),
-                            Text(
-                              _latestWeight != null
-                                  ? '${_latestWeight!.toStringAsFixed(2)} kg'
-                                  : '-- kg',
-                              style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                                fontWeight: FontWeight.bold,
-                                color: colorScheme.primary,
-                              ),
-                            ),
-                            if (_weightChange != null) ...[
-                              const SizedBox(height: 8),
-                              Row(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: [
-                                  Icon(
-                                    _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                                    size: 16,
+                            Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                Icon(
+                                  _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                                  size: 16,
+                                  color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
+                                ),
+                                Text(
+                                  '${_weightChange!.abs().toStringAsFixed(2)} kg',
+                                  style: TextStyle(
                                     color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
                                   ),
-                                  Text(
-                                    '${_weightChange!.abs().toStringAsFixed(2)} kg',
-                                    style: TextStyle(
-                                      color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                    ),
-                                  ),
-                                ],
+                                ),
+                              ],
+                            ),
+                          ],
+                        ],
+                      ),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+
+                  // 记录列表
+                  Text(
+                    '历史记录',
+                    style: Theme.of(context).textTheme.titleMedium,
+                  ),
+                  const SizedBox(height: 12),
+                  if (_records.isEmpty)
+                    const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
+                  else
+                    ..._records.map((record) => Card(
+                      margin: const EdgeInsets.only(bottom: 8),
+                      child: ListTile(
+                        leading: const Icon(Icons.monitor_weight),
+                        title: Row(
+                          children: [
+                            Text(
+                              '${record.weight.toStringAsFixed(2)} kg',
+                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                            if (record.bodyFat != null) ...[
+                              const SizedBox(width: 12),
+                              Text(
+                                '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                            if (record.bmi != null) ...[
+                              const SizedBox(width: 12),
+                              Text(
+                                'BMI ${record.bmi!.toStringAsFixed(1)}',
+                                style: Theme.of(context).textTheme.bodySmall,
                               ),
                             ],
                           ],
                         ),
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-
-                    // 记录列表
-                    Text(
-                      '历史记录',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    _records.isEmpty
-                        ? const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
-                        : ListView.builder(
-                            shrinkWrap: true,
-                            physics: const NeverScrollableScrollPhysics(),
-                            itemCount: _records.length,
-                            itemBuilder: (context, index) {
-                              final record = _records[index];
-
-                              return Card(
-                                margin: const EdgeInsets.only(bottom: 8),
-                                child: ListTile(
-                                  leading: const Icon(Icons.monitor_weight),
-                                  title: Row(
-                                    children: [
-                                      Text(
-                                        '${record.weight.toStringAsFixed(2)} kg',
-                                        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      if (record.bodyFat != null) ...[
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                      if (record.bmi != null) ...[
-                                        const SizedBox(width: 12),
-                                        Text(
-                                          'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                          style: Theme.of(context).textTheme.bodySmall,
-                                        ),
-                                      ],
-                                    ],
-                                  ),
-                                  subtitle: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
-                                      if (record.note != null && record.note!.isNotEmpty)
-                                        Text(
-                                          record.note!,
-                                          style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                            color: Theme.of(context).colorScheme.outline,
-                                            fontStyle: FontStyle.italic,
-                                          ),
-                                          maxLines: 1,
-                                          overflow: TextOverflow.ellipsis,
-                                        ),
-                                    ],
-                                  ),
-                                  trailing: EditDeletePopupMenu(
-                                    onEdit: () => _showEditRecordForm(record),
-                                    onDelete: () => _deleteWeightRecord(record.id),
-                                  ),
+                        subtitle: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
+                            if (record.note != null && record.note!.isNotEmpty)
+                              Text(
+                                record.note!,
+                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                  color: Theme.of(context).colorScheme.outline,
+                                  fontStyle: FontStyle.italic,
                                 ),
-                              );
-                            },
-                          ),
-                  ],
-                ),
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                          ],
+                        ),
+                        trailing: EditDeletePopupMenu(
+                          onEdit: () => _showEditRecordForm(record),
+                          onDelete: () => _deleteWeightRecord(record.id),
+                        ),
+                      ),
+                    )),
+                  buildLoadMoreIndicator(),
+                ],
               ),
             ),
       floatingActionButton: FloatingActionButton(

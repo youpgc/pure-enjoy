@@ -5,6 +5,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../utils/format_utils.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
@@ -19,7 +20,7 @@ class BookShelfScreen extends StatefulWidget {
   State<BookShelfScreen> createState() => _BookShelfScreenState();
 }
 
-class _BookShelfScreenState extends State<BookShelfScreen> {
+class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMixin {
   List<Map<String, dynamic>> _bookshelfItems = [];
   bool _isLoading = true;
   String _filterStatus = 'all'; // all, reading, completed
@@ -42,14 +43,26 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadBookshelf();
   }
 
   /// 初始化加载：先读缓存，再静默刷新
   Future<void> _initLoad() async {
     try {
       await _loadCache();
-      await _loadBookshelf();
+      await _loadBookshelf(refresh: true);
     } catch (e, stackTrace) {
       debugPrint('❌ BookShelfScreen _initLoad 异常: $e');
       debugPrint(stackTrace.toString());
@@ -76,7 +89,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
   }
 
   /// 从 Supabase 加载书架数据（分两步查询：先查user_novels，再查novels）
-  Future<void> _loadBookshelf() async {
+  Future<void> _loadBookshelf({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -88,7 +101,14 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       return;
     }
 
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
+
     try {
+      final (limit, offset) = paginationParams;
+
       // 第一步：查询 user_novels 获取用户的书架记录
       final userNovelsResult = await ApiClient.get(
         'user_novels',
@@ -98,7 +118,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
         },
         columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected',
         order: 'last_read_at.desc.nullslast',
-        limit: 200,
+        limit: limit,
+        offset: offset,
       );
 
       if (!userNovelsResult.isSuccess) {
@@ -167,12 +188,19 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       }).toList();
 
       setState(() {
-        _bookshelfItems = bookshelfItems.cast<Map<String, dynamic>>();
+        if (refresh) {
+          _bookshelfItems = bookshelfItems.cast<Map<String, dynamic>>();
+        } else {
+          _bookshelfItems.addAll(bookshelfItems.cast<Map<String, dynamic>>());
+        }
         _isLoading = false;
       });
+      onPaginationDataLoaded(userNovelsData.length);
 
-      // 写入缓存
-      await CacheHelper.instance.saveList(CacheHelper.keyBookshelf, bookshelfItems);
+      // 写入缓存（仅在刷新时）
+      if (refresh) {
+        await CacheHelper.instance.saveList(CacheHelper.keyBookshelf, bookshelfItems);
+      }
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
@@ -194,7 +222,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadBookshelf();
+        await _loadBookshelf(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('已从书架移除')),
@@ -244,7 +272,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadBookshelf();
+        await _loadBookshelf(refresh: true);
       }
     } catch (e) {
       if (mounted) {
@@ -518,7 +546,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                   context,
                   MaterialPageRoute(builder: (_) => const _NovelListForAddScreen()),
                 ).then((_) {
-                  if (mounted) _loadBookshelf();
+                  if (mounted) _loadBookshelf(refresh: true);
                 });
               },
               tooltip: '添加小说',
@@ -598,7 +626,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                       ),
                     )
                   : RefreshIndicator(
-                      onRefresh: _loadBookshelf,
+                      onRefresh: () => _loadBookshelf(refresh: true),
                       child: Column(
                         children: [
                           // 状态筛选栏
@@ -667,10 +695,14 @@ class _BookShelfScreenState extends State<BookShelfScreen> {
                                     ],
                                   )
                                 : ListView.separated(
-                                    itemCount: _filteredItems.length,
+                                    controller: scrollController,
+                                    itemCount: _filteredItems.length + 1,
                                     separatorBuilder: (_, __) =>
                                         const Divider(height: 1),
                                     itemBuilder: (context, index) {
+                                      if (index == _filteredItems.length) {
+                                        return buildLoadMoreIndicator();
+                                      }
                                       final item = _filteredItems[index];
                                       return _BookshelfItem(
                                         item: item,

@@ -5,6 +5,7 @@ import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/note_model.dart';
 
 /// 笔记列表页面 - Supabase 数据同步
@@ -15,7 +16,7 @@ class NoteListScreen extends StatefulWidget {
   State<NoteListScreen> createState() => _NoteListScreenState();
 }
 
-class _NoteListScreenState extends State<NoteListScreen> {
+class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin {
   List<NoteModel> _notes = [];
   bool _isLoading = true;
   String _searchQuery = '';
@@ -25,14 +26,26 @@ class _NoteListScreenState extends State<NoteListScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadNotes();
   }
 
   /// 初始化加载：先读缓存，再静默刷新
   Future<void> _initLoad() async {
     try {
       await _loadCache();
-      await _loadNotes();
+      await _loadNotes(refresh: true);
     } catch (e, stackTrace) {
       debugPrint('❌ NoteListScreen _initLoad 异常: $e');
       debugPrint(stackTrace.toString());
@@ -58,7 +71,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
     }
   }
 
-  Future<void> _loadNotes() async {
+  Future<void> _loadNotes({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -70,6 +83,11 @@ class _NoteListScreenState extends State<NoteListScreen> {
       return;
     }
 
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
+
     try {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -80,10 +98,14 @@ class _NoteListScreenState extends State<NoteListScreen> {
         filters['searchFields'] = 'title,content';
       }
 
+      final (limit, offset) = paginationParams;
+
       final result = await ApiClient.get(
         'notes',
         filters: filters,
         order: 'is_pinned.desc,updated_at.desc',
+        limit: limit,
+        offset: offset,
       );
 
       if (result.isSuccess) {
@@ -91,15 +113,22 @@ class _NoteListScreenState extends State<NoteListScreen> {
         final notes = data.map((e) => NoteModel.fromJson(e)).toList();
 
         setState(() {
-          _notes = notes;
+          if (refresh) {
+            _notes = notes;
+          } else {
+            _notes.addAll(notes);
+          }
           _isLoading = false;
+          onPaginationDataLoaded(notes.length);
         });
 
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyNotes,
-          notes.map((n) => n.toJson()).toList(),
-        );
+        // 写入缓存（仅刷新时）
+        if (refresh) {
+          await CacheHelper.instance.saveList(
+            CacheHelper.keyNotes,
+            notes.map((n) => n.toJson()).toList(),
+          );
+        }
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
@@ -121,7 +150,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadNotes();
+        await _loadNotes(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('创建成功')),
@@ -148,7 +177,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadNotes();
+        await _loadNotes(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
@@ -181,7 +210,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadNotes();
+        await _loadNotes(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('删除成功')),
@@ -247,7 +276,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
             child: TextField(
               onChanged: (value) {
                 _searchQuery = value;
-                _loadNotes();
+                _loadNotes(refresh: true);
               },
               decoration: InputDecoration(
                 hintText: '搜索笔记...',
@@ -257,7 +286,7 @@ class _NoteListScreenState extends State<NoteListScreen> {
                         icon: const Icon(Icons.clear),
                         onPressed: () {
                           _searchQuery = '';
-                          _loadNotes();
+                          _loadNotes(refresh: true);
                         },
                       )
                     : null,
@@ -272,8 +301,9 @@ class _NoteListScreenState extends State<NoteListScreen> {
                 : _notes.isEmpty
                     ? const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记')
                     : RefreshIndicator(
-                        onRefresh: _loadNotes,
+                        onRefresh: () => _loadNotes(refresh: true),
                         child: GridView.builder(
+                          controller: scrollController,
                           padding: const EdgeInsets.all(16),
                           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                             maxCrossAxisExtent: 200,
@@ -281,8 +311,12 @@ class _NoteListScreenState extends State<NoteListScreen> {
                             crossAxisSpacing: 12,
                             childAspectRatio: 1,
                           ),
-                          itemCount: _notes.length,
+                          itemCount: _notes.length + 1,
                           itemBuilder: (context, index) {
+                            if (index == _notes.length) {
+                              return buildLoadMoreIndicator();
+                            }
+
                             final note = _notes[index];
 
                             return Card(

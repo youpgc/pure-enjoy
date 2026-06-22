@@ -6,6 +6,7 @@ import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/mood_diary_model.dart';
 
@@ -17,7 +18,7 @@ class MoodDiaryScreen extends StatefulWidget {
   State<MoodDiaryScreen> createState() => _MoodDiaryScreenState();
 }
 
-class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
+class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMixin {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
   DateTime _selectedMonth = DateTime.now();
@@ -27,7 +28,19 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadDiaries();
   }
 
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
@@ -73,7 +86,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
     }
   }
 
-  Future<void> _loadDiaries() async {
+  Future<void> _loadDiaries({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -85,9 +98,18 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
       return;
     }
 
+    if (refresh) {
+      resetPagination();
+    }
+
+    // 触底加载时使用 beginLoadMore
+    if (!refresh && !beginLoadMore()) return;
+
     try {
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
       final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+
+      final (limit, offset) = paginationParams;
 
       final result = await ApiClient.get(
         'mood_diaries',
@@ -96,6 +118,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
         },
         order: 'date.desc',
+        limit: limit,
+        offset: offset,
       );
 
       if (result.isSuccess) {
@@ -111,16 +135,23 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
 
         if (mounted) {
           setState(() {
-            _diaries = diaries;
+            if (refresh) {
+              _diaries = diaries;
+            } else {
+              _diaries.addAll(diaries);
+            }
+            onPaginationDataLoaded(diaries.length);
             _isLoading = false;
           });
         }
 
-        // 写入缓存
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyDiaries,
-          diaries.map((d) => d.toJson()).toList(),
-        );
+        // 写入缓存（仅首次加载时）
+        if (refresh) {
+          await CacheHelper.instance.saveList(
+            CacheHelper.keyDiaries,
+            diaries.map((d) => d.toJson()).toList(),
+          );
+        }
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
@@ -265,7 +296,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
               );
               if (picked != null) {
                 setState(() => _selectedMonth = picked);
-                _loadDiaries();
+                _loadDiaries(refresh: true);
               }
             },
           ),
@@ -276,11 +307,15 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> {
           : _diaries.isEmpty
               ? const EmptyWidget(icon: Icons.mood_outlined, message: '暂无日记，点击右下角按钮添加')
               : RefreshIndicator(
-                  onRefresh: _loadDiaries,
+                  onRefresh: () => _loadDiaries(refresh: true),
                   child: ListView.builder(
+                    controller: scrollController,
                     padding: const EdgeInsets.all(16),
-                    itemCount: _diaries.length,
+                    itemCount: _diaries.length + 1,
                     itemBuilder: (context, index) {
+                      if (index == _diaries.length) {
+                        return buildLoadMoreIndicator();
+                      }
                       final diary = _diaries[index];
                       final moodLabel = DictService.instance.getLabelOrDefault(
                         'mood_type',

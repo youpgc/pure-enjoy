@@ -6,6 +6,7 @@ import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/expense_model.dart';
 
@@ -17,7 +18,7 @@ class ExpenseListScreen extends StatefulWidget {
   State<ExpenseListScreen> createState() => _ExpenseListScreenState();
 }
 
-class _ExpenseListScreenState extends State<ExpenseListScreen> {
+class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedListMixin {
   List<ExpenseModel> _expenses = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
@@ -28,7 +29,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _initLoad();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadExpenses();
   }
 
   /// 初始化加载：先确保字典加载完成，再读缓存，最后静默刷新
@@ -63,7 +76,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
     }
   }
 
-  Future<void> _loadExpenses() async {
+  Future<void> _loadExpenses({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() => _isLoading = false);
@@ -74,6 +87,11 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       }
       return;
     }
+
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
 
     try {
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
@@ -88,10 +106,14 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         filters['category'] = 'eq.$_selectedCategory';
       }
 
+      final (limit, offset) = paginationParams;
+
       final result = await ApiClient.get(
         'expenses',
         filters: filters,
         order: 'date.desc',
+        limit: limit,
+        offset: offset,
       );
 
       if (result.isSuccess) {
@@ -99,15 +121,22 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
-          _expenses = allExpenses;
+          if (refresh) {
+            _expenses = allExpenses;
+          } else {
+            _expenses.addAll(allExpenses);
+          }
           _isLoading = false;
+          onPaginationDataLoaded(allExpenses.length);
         });
 
         // 写入缓存（保存全部数据，不按月筛选）
-        await CacheHelper.instance.saveList(
-          CacheHelper.keyExpenses,
-          allExpenses.map((e) => e.toJson()).toList(),
-        );
+        if (refresh) {
+          await CacheHelper.instance.saveList(
+            CacheHelper.keyExpenses,
+            allExpenses.map((e) => e.toJson()).toList(),
+          );
+        }
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
@@ -129,7 +158,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadExpenses();
+        await _loadExpenses(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
@@ -158,7 +187,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
         );
 
         if (result.isSuccess) {
-          await _loadExpenses();
+          await _loadExpenses(refresh: true);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
@@ -192,7 +221,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
       );
 
       if (result.isSuccess) {
-        await _loadExpenses();
+        await _loadExpenses(refresh: true);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
@@ -262,7 +291,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
               );
               if (picked != null) {
                 setState(() => _selectedMonth = picked);
-                _loadExpenses();
+                _loadExpenses(refresh: true);
               }
             },
           ),
@@ -309,7 +338,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                   isSelected: _selectedCategory == 'all',
                   onTap: () {
                     setState(() => _selectedCategory = 'all');
-                    _loadExpenses();
+                    _loadExpenses(refresh: true);
                   },
                 ),
                 ...DictService.instance.getItemsSync('expense_category').map((cat) => CategoryChip(
@@ -317,7 +346,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                   isSelected: _selectedCategory == cat.code,
                   onTap: () {
                     setState(() => _selectedCategory = cat.code);
-                    _loadExpenses();
+                    _loadExpenses(refresh: true);
                   },
                 )),
               ],
@@ -332,11 +361,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> {
                 : _expenses.isEmpty
                     ? const EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录')
                     : RefreshIndicator(
-                        onRefresh: _loadExpenses,
+                        onRefresh: () => _loadExpenses(refresh: true),
                         child: ListView.builder(
+                          controller: scrollController,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _expenses.length,
+                          itemCount: _expenses.length + 1,
                           itemBuilder: (context, index) {
+                            if (index == _expenses.length) {
+                              return buildLoadMoreIndicator();
+                            }
+
                             final expense = _expenses[index];
                             final categoryLabel = DictService.instance.getLabelOrDefault(
                               'expense_category',

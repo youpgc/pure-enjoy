@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
@@ -11,18 +12,31 @@ class PointRecordsScreen extends StatefulWidget {
   State<PointRecordsScreen> createState() => _PointRecordsScreenState();
 }
 
-class _PointRecordsScreenState extends State<PointRecordsScreen> {
+class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedListMixin {
   final List<PointRecord> _records = [];
-  int _currentPage = 1;
   bool _isLoading = false;
-  bool _hasMore = true;
   bool _isCheckingIn = false;
   int _availablePoints = 0;
 
   @override
+  int get pageSize => 20;
+
+  @override
   void initState() {
     super.initState();
+    initPagination();
     _loadAvailablePoints();
+    _loadRecords();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
     _loadRecords();
   }
 
@@ -39,15 +53,18 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
     if (_isLoading) return;
 
     if (refresh) {
-      _currentPage = 1;
-      _hasMore = true;
+      resetPagination();
     }
+
+    // 如果是触底加载，使用 beginLoadMore
+    if (!refresh && !beginLoadMore()) return;
 
     setState(() => _isLoading = true);
 
+    final (limit, offset) = paginationParams;
     final newRecords = await PointService.instance.getRecords(
-      page: _currentPage,
-      pageSize: 20,
+      page: offset ~/ limit + 1,
+      pageSize: limit,
     );
 
     if (mounted) {
@@ -56,7 +73,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
           _records.clear();
         }
         _records.addAll(newRecords);
-        _hasMore = newRecords.length >= 20;
+        onPaginationDataLoaded(newRecords.length);
         _isLoading = false;
       });
     }
@@ -204,6 +221,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
           await _loadRecords(refresh: true);
         },
         child: ListView(
+          controller: scrollController,
           children: [
             // 总积分卡片
             Padding(
@@ -358,25 +376,14 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> {
             }),
 
             // 加载更多指示器
-            if (_isLoading)
+            if (_isLoading && _records.isNotEmpty)
               const Padding(
                 padding: EdgeInsets.all(16),
                 child: Center(
                   child: CircularProgressIndicator(),
                 ),
               ),
-            if (!_hasMore && _records.isNotEmpty)
-              Padding(
-                padding: const EdgeInsets.all(16),
-                child: Center(
-                  child: Text(
-                    '没有更多了',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ),
-              ),
+            buildLoadMoreIndicator(),
           ],
         ),
       ),
