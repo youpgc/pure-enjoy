@@ -85,7 +85,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         'novel_chapters',
         filters: {
           'novel_id': 'eq.${widget.novel.id}',
-          'chapter_num.gte': '1',
+          'chapter_num': 'gte.1',
         },
         columns: 'id,title,chapter_num,word_count',
         order: 'chapter_num.asc',

@@ -94,8 +94,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
         'user_id': 'eq.$userId',
       };
       if (_selectedRange != null) {
-        filters['date.gte'] = _selectedRange!.start.toIso8601String().split('T').first;
-        filters['date.lt'] = _selectedRange!.end.add(const Duration(days: 1)).toIso8601String().split('T').first;
+        filters['and'] = '('
+            'date.gte.${_selectedRange!.start.toIso8601String().split('T').first},'
+            'date.lt.${_selectedRange!.end.add(const Duration(days: 1)).toIso8601String().split('T').first}'
+            ')';
       }
 
       final (limit, offset) = paginationParams;

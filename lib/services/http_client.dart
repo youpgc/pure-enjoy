@@ -40,6 +40,7 @@ class HttpClient {
       'Content-Type': 'application/json',
       'Accept': 'application/json',
       'apikey': 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6',
+      'Authorization': 'Bearer sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6',
       'Prefer': 'return=representation',
     };
     // 注入 x-user-id（登录后）
