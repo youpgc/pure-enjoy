@@ -174,7 +174,26 @@ class VersionCheckService {
   }
 
   /// 从指定 URL 下载 APK（内部方法）
-  Future<String?> _downloadFromUrl(String apkUrl, {ValueChanged<double>? onProgress}) async {
+  /// [redirectDepth] 递归跟踪重定向时的深度，防止无限循环
+  Future<String?> _downloadFromUrl(String apkUrl, {ValueChanged<double>? onProgress, int redirectDepth = 0}) async {
+    if (redirectDepth > 5) {
+      debugPrint('📱 重定向次数过多，放弃下载');
+      return null;
+    }
+
+    // URL 为空或无效时直接返回
+    if (apkUrl.isEmpty) {
+      debugPrint('📱 URL 为空，跳过');
+      return null;
+    }
+
+    final uri = Uri.tryParse(apkUrl);
+    if (uri == null || !uri.hasScheme || !uri.hasAuthority) {
+      // 可能是相对路径（镜像服务器的重定向地址没有完整 scheme/host）
+      // 无法处理，直接返回失败
+      debugPrint('📱 URL 缺少 host: $apkUrl');
+      return null;
+    }
     // 使用独立的 http.Client 下载，不经过共享 HttpClient
     // 避免注入 Supabase headers（apikey 等）导致 CDN 拒绝请求
     // 避免共享 Client 被关闭或超时影响其他 API 请求
@@ -187,7 +206,6 @@ class VersionCheckService {
       final dir = await getTemporaryDirectory();
 
       // 从URL中提取版本号作为文件名，避免缓存旧版本
-      final uri = Uri.parse(apkUrl);
       final urlFileName = uri.pathSegments.isNotEmpty ? uri.pathSegments.last : 'pure_enjoy_update.apk';
       final savePath = '${dir.path}/$urlFileName';
       final file = File(savePath);
@@ -217,11 +235,11 @@ class VersionCheckService {
       // 处理重定向（GitHub Releases 返回 302 到 CDN）
       if (response.statusCode == 302 || response.statusCode == 301) {
         final redirectUrl = response.headers['location'];
-        if (redirectUrl != null) {
+        if (redirectUrl != null && redirectUrl.isNotEmpty) {
           debugPrint('📱 跟随重定向: $redirectUrl');
           // 关闭当前 response stream 后跟随重定向
           response.stream.listen((_) {}).cancel();
-          return await _downloadFromUrl(redirectUrl, onProgress: onProgress);
+          return await _downloadFromUrl(redirectUrl, onProgress: onProgress, redirectDepth: redirectDepth + 1);
         }
       }
 
