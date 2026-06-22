@@ -258,48 +258,56 @@ jobs:
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
-      # 14. 将倒数第5个及更旧的版本标记为已下架（保留最新4个已有版本 + 即将新建的第5个）
-      - name: Mark old versions as revoked (keep latest 5)
+      # ===================================================================
+      # 版本状态管理逻辑（三级状态流转）
+      # ===================================================================
+      #
+      # 状态定义：
+      #   - released  (已发布)：当前最新可用版本，用户可下载更新
+      #   - revoked   (已下架)：已被新版本替代，不再推荐但可回滚
+      #   - superseded(已失效)：超过保留期限，彻底废弃不可回滚
+      #
+      # 执行流程：
+      #   Step 1: 将所有 released → revoked（原最新版本降级）
+      #   Step 2: 插入新版本，status = released（新王者登基）
+      #   Step 3: 清理 GitHub Releases，只保留最新 5 个 APK
+      #   Step 4: 将第 6 个及更旧的 revoked 版本 → superseded（彻底失效）
+      #
+      # 最终状态（按 created_at 降序）：
+      #   第1个: released   ← 最新版本，用户可更新
+      #   第2-5个: revoked  ← 近期版本，管理后台可回滚
+      #   第6个及以后: superseded ← 已失效，仅保留记录
+      # ===================================================================
+
+      # Step 1: 将所有 released 版本降级为 revoked
+      - name: Step 1 - Demote all released to revoked
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
           SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
-          echo "=== 将最新5个版本以外的版本标记为已下架(revoked) ==="
-
+          echo "=== Step 1: 将所有 released 版本降级为 revoked ==="
           NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
 
-          # 查询当前 status=released 的记录，按 build_number 降序排列
-          RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status&status=eq.released&order=build_number.desc" \
+          RELEASED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status&status=eq.released" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
-          echo "当前 released 版本: $RELEASED"
           RELEASED_COUNT=$(echo "$RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d))' 2>/dev/null || echo "0")
-          echo "released 记录数: $RELEASED_COUNT"
+          echo "当前 released 版本数: $RELEASED_COUNT"
 
-          if [ "$RELEASED_COUNT" -le 4 ]; then
-            echo "✅ 版本数不超过4个，与即将创建的新版本合计不超过5个，不需要标记"
+          if [ "$RELEASED_COUNT" = "0" ]; then
+            echo "✅ 没有 released 版本需要降级"
           else
-            # 获取倒数第5个及以后的版本 ID（跳过前4个，新版本即将创建为第5个）
-            OLD_IDS=$(echo "$RELEASED" | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(r["id"]) for r in d[4:]]' 2>/dev/null)
-            OLD_COUNT=$(echo "$OLD_IDS" | wc -l)
-            echo "需要标记为 revoked 的数量: $OLD_COUNT"
-
-            for VERSION_ID in $OLD_IDS; do
-              echo "🔴 标记版本 ID=$VERSION_ID 为 revoked"
-              PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$VERSION_ID" \
-                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
-                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
-                -H "Content-Type: application/json" \
-                -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
-              PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
-              echo "  PATCH HTTP: $PATCH_CODE"
-            done
-
-            echo "✅ 旧版本标记完成"
+            PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?status=eq.released" \
+              -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+              -H "Content-Type: application/json" \
+              -d "{\"status\":\"revoked\",\"revoked_at\":\"$NOW\"}")
+            PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
+            echo "✅ 降级完成，PATCH HTTP: $PATCH_CODE"
           fi
 
-      # 15. 创建版本记录到数据库
-      - name: Create version record in database
+      # Step 2: 创建新版本记录（status = released）
+      - name: Step 2 - Create new version record (released)
         id: db_record
         env:
           SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
@@ -360,12 +368,12 @@ jobs:
             exit 1
           fi
 
-      # 16. 清理旧 GitHub Releases（只保留最新 5 个）
-      - name: Clean old GitHub Releases
+      # Step 3: 清理旧 GitHub Releases（只保留最新 5 个 APK）
+      - name: Step 3 - Clean old GitHub Releases (keep 5)
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
         run: |
-          echo "清理旧 GitHub Releases（保留最新 5 个）..."
+          echo "=== Step 3: 清理旧 GitHub Releases（保留最新 5 个）==="
           
           # 获取所有 releases（按发布时间倒序）
           RELEASES=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=50" \
@@ -387,7 +395,45 @@ jobs:
             echo "✅ 旧 releases 清理完成"
           fi
 
-      # 17. 输出总结
+      # Step 4: 将第 6 个及更旧的 revoked 版本标记为 superseded（已失效）
+      - name: Step 4 - Mark old revoked versions as superseded
+        env:
+          SUPABASE_URL: https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
+          SUPABASE_SERVICE_ROLE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "=== Step 4: 将第 6 个及更旧的 revoked 版本标记为 superseded ==="
+          NOW=$(date -u +%Y-%m-%dT%H:%M:%SZ)
+
+          # 查询所有 revoked 版本，按 created_at 降序排列
+          REVOKED=$(curl -s "$SUPABASE_URL/rest/v1/app_versions?select=id,version,build_number,status,created_at&status=eq.revoked&order=created_at.desc" \
+            -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+            -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY")
+          REVOKED_COUNT=$(echo "$REVOKED" | python3 -c 'import sys,json; d=json.load(sys.stdin); print(len(d))' 2>/dev/null || echo "0")
+          echo "当前 revoked 版本数: $REVOKED_COUNT"
+
+          if [ "$REVOKED_COUNT" -le 4 ]; then
+            echo "✅ revoked 版本数不超过4个（加上最新的 released 正好5个），不需要标记为 superseded"
+          else
+            # 跳过前4个 revoked（保留第2-5个），将第5个及以后的 revoked → superseded
+            OLD_IDS=$(echo "$REVOKED" | python3 -c 'import sys,json; d=json.load(sys.stdin); [print(r["id"]) for r in d[4:]]' 2>/dev/null)
+            OLD_COUNT=$(echo "$OLD_IDS" | wc -l)
+            echo "需要标记为 superseded 的数量: $OLD_COUNT"
+
+            for VERSION_ID in $OLD_IDS; do
+              echo "⚫ 标记版本 ID=$VERSION_ID 为 superseded"
+              PATCH_RESPONSE=$(curl -s -w "\n%{http_code}" -X PATCH "$SUPABASE_URL/rest/v1/app_versions?id=eq.$VERSION_ID" \
+                -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
+                -H "Content-Type: application/json" \
+                -d "{\"status\":\"superseded\",\"revoked_at\":\"$NOW\"}")
+              PATCH_CODE=$(echo "$PATCH_RESPONSE" | tail -n1)
+              echo "  PATCH HTTP: $PATCH_CODE"
+            done
+
+            echo "✅ 旧版本 superseded 标记完成"
+          fi
+
+      # Step 5: 输出总结
       - name: Build summary
         run: |
           echo "✅ Build completed!"
