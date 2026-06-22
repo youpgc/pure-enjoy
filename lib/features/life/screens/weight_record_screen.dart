@@ -8,6 +8,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/weight_record_model.dart';
+import 'weight_statistics_screen.dart';
 
 /// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
@@ -276,6 +277,16 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
       appBar: AppBar(
         title: const Text('体重记录'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: '体重统计',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const WeightStatisticsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: Icon(_selectedRange != null ? Icons.date_range : Icons.calendar_today_outlined),
             tooltip: '选择日期范围',

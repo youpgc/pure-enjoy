@@ -9,6 +9,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/mood_diary_model.dart';
+import 'mood_statistics_screen.dart';
 
 /// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
@@ -285,6 +286,16 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       appBar: AppBar(
         title: const Text('心情日记'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: '心情统计',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const MoodStatisticsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {

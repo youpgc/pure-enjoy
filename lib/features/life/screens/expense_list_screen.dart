@@ -10,6 +10,7 @@ import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/expense_model.dart';
+import 'expense_statistics_screen.dart';
 
 /// 支出列表页面 - Supabase 数据同步
 class ExpenseListScreen extends StatefulWidget {
@@ -339,6 +340,16 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       appBar: AppBar(
         title: const Text('记账'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.bar_chart),
+            tooltip: '消费统计',
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ExpenseStatisticsScreen()),
+              );
+            },
+          ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {
