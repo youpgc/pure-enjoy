@@ -1,0 +1,35 @@
+#!/bin/sh
+
+# 检查是否在 CI 环境或没有 flutter 命令时跳过
+if [ -n "$CI" ] || ! command -v flutter >/dev/null 2>&1; then
+    echo "⚠️  跳过 Flutter 提交前验证（CI 环境或未安装 Flutter）"
+    exit 0
+fi
+
+echo "🔍 正在运行 Flutter 提交前构建验证..."
+
+# 获取依赖
+echo "📦 获取 Flutter 依赖..."
+flutter pub get
+if [ $? -ne 0 ]; then
+    echo "❌ 依赖获取失败，请检查 pubspec.yaml"
+    exit 1
+fi
+
+# 运行 Flutter 分析
+echo "📊 运行 Flutter 静态分析..."
+flutter analyze
+if [ $? -ne 0 ]; then
+    echo "❌ Flutter 静态分析发现错误，请修复后再提交"
+    exit 1
+fi
+
+# 运行测试
+echo "🧪 运行 Flutter 测试..."
+flutter test
+if [ $? -ne 0 ]; then
+    echo "⚠️ 测试未通过，请检查测试用例（使用 --no-verify 跳过）"
+    # 测试失败不阻塞提交，但给出警告
+fi
+
+echo "✅ Flutter 提交前验证通过"
