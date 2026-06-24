@@ -121,7 +121,30 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     }
 
     if (_isInBookshelf && _bookshelfId != null) {
-      // 移出书架
+      // 移出书架 - 二次确认
+      final confirm = await showDialog<bool>(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: const Text('确认移除'),
+          content: const Text('确定要将这本小说从书架移除吗？阅读进度将不会保留。'),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(context, false),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.pop(context, true),
+              style: FilledButton.styleFrom(
+                backgroundColor: Theme.of(context).colorScheme.error,
+              ),
+              child: const Text('移除'),
+            ),
+          ],
+        ),
+      );
+
+      if (confirm != true) return;
+
       try {
         final result = await ApiClient.batchDeleteByFilter(
           'user_novels',

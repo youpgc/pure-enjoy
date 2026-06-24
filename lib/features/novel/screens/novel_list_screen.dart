@@ -4,6 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../utils/cache_helper.dart';
+import '../../../utils/format_utils.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/novel_model.dart';
@@ -598,24 +599,44 @@ class _NovelCard extends StatelessWidget {
                       maxLines: 1,
                     ),
                     const Spacer(),
-                    if (novel.category != null)
-                      Text(
-                        DictService.instance.getLabelOrDefault(
-                          'novel_category',
-                          novel.category!,
-                          defaultValue: novel.category!,
-                        ),
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      )
-                    else
-                      Text(
-                        '${novel.chapterCount} 章',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: colorScheme.primary,
-                        ),
-                      ),
+                    Row(
+                      children: [
+                        if (novel.category != null)
+                          Text(
+                            DictService.instance.getLabelOrDefault(
+                              'novel_category',
+                              novel.category!,
+                              defaultValue: novel.category!,
+                            ),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          )
+                        else
+                          Text(
+                            '${novel.chapterCount} 章',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.primary,
+                            ),
+                          ),
+                        if (novel.wordCount != null && novel.wordCount! > 0) ...[
+                          const SizedBox(width: 4),
+                          Text(
+                            '·',
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          const SizedBox(width: 4),
+                          Text(
+                            FormatUtils.formatWordCount(novel.wordCount!),
+                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
                   ],
                 ),
               ),
