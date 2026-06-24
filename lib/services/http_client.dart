@@ -144,6 +144,28 @@ class HttpClient {
     );
   }
 
+  /// Multipart 请求（文件上传等）
+  Future<http.StreamedResponse> sendMultipart(
+    http.MultipartRequest request, {
+    Duration? timeout,
+  }) async {
+    // 注入认证头
+    final authHeaders = _authHeaders;
+    authHeaders.forEach((key, value) {
+      if (!request.headers.containsKey(key)) {
+        request.headers[key] = value;
+      }
+    });
+
+    final requestTimeout = timeout ?? HttpClientConfig.timeout;
+    try {
+      final response = await request.send().timeout(requestTimeout);
+      return response;
+    } catch (e) {
+      throw e is Exception ? e : Exception(e.toString());
+    }
+  }
+
   // ==================== 工具方法 ====================
 
   /// 构建完整 URI
