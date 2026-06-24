@@ -4,11 +4,13 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:provider/provider.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
+import 'features/auth/auth_provider.dart';
 import 'services/supabase_service.dart';
 import 'services/dict_service.dart';
 import 'services/notification_service.dart';
@@ -28,13 +30,13 @@ void main() async {
     ));
   }
 
-  // 只同步初始化认证服务（从本地存储恢复会话，无网络请求）
+  // 初始化认证服务（包含会话恢复）
   await AuthService.instance.initialize();
 
   // 字典服务和通知服务改为后台懒加载，不阻塞启动
   _lazyInitializeServices();
 
-  runApp(const PureEnjoyApp());
+  runApp(const ProviderScope(child: PureEnjoyApp()));
 }
 
 /// 后台懒加载服务，不阻塞首屏渲染
@@ -89,15 +91,20 @@ class PureEnjoyApp extends StatelessWidget {
 }
 
 /// 认证状态包装器
-class AuthWrapper extends StatelessWidget {
+/// 使用 Riverpod 监听认证状态变化
+class AuthWrapper extends ConsumerWidget {
   const AuthWrapper({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    // 检查是否已登录（AuthService.initialize() 已在 main() 中完成）
-    if (AuthService.instance.isAuthenticated) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final authState = ref.watch(authProvider);
+
+    // 已登录 -> 首页
+    if (authState.isAuthenticated) {
       return const HomeScreen();
     }
+
+    // 未登录 -> 登录页
     return const LoginScreen();
   }
 }

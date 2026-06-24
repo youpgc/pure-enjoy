@@ -1,29 +1,31 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
+import '../auth_provider.dart';
 
 /// 登录页面
-/// 统一登录方式：账号（用户名/昵称/邮箱/手机号）+ 密码
-class LoginScreen extends StatefulWidget {
+/// 仅支持 Supabase Auth（邮箱+密码）
+class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
 
   @override
-  State<LoginScreen> createState() => _LoginScreenState();
+  ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
 
-class _LoginScreenState extends State<LoginScreen> {
+class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
 
-  // 账号+密码
-  final _accountController = TextEditingController();
+  // 登录字段
+  final _emailController = TextEditingController();
   final _passwordController = TextEditingController();
 
   // 注册字段
-  final _regUsernameController = TextEditingController();
   final _regEmailController = TextEditingController();
-  final _regPhoneController = TextEditingController();
   final _regPasswordController = TextEditingController();
+  final _regUsernameController = TextEditingController();
+  final _regPhoneController = TextEditingController();
 
   bool _isLoading = false;
   bool _obscurePassword = true;
@@ -32,27 +34,27 @@ class _LoginScreenState extends State<LoginScreen> {
 
   @override
   void dispose() {
-    _accountController.dispose();
+    _emailController.dispose();
     _passwordController.dispose();
-    _regUsernameController.dispose();
     _regEmailController.dispose();
-    _regPhoneController.dispose();
     _regPasswordController.dispose();
+    _regUsernameController.dispose();
+    _regPhoneController.dispose();
     super.dispose();
   }
 
-  /// 登录提交
+  /// 登录提交（仅 Supabase Auth）
   Future<void> _submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isLoading = true);
 
     try {
-      final account = _accountController.text.trim();
+      final email = _emailController.text.trim();
       final password = _passwordController.text;
 
-      final success = await AuthService.instance.signInWithAccount(
-        account: account,
+      final success = await ref.read(authProvider.notifier).signInWithEmail(
+        email: email,
         password: password,
       );
 
@@ -61,7 +63,8 @@ class _LoginScreenState extends State<LoginScreen> {
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else if (mounted) {
-        _showSnackBar('登录失败，请检查账号和密码');
+        final error = ref.read(authProvider).error;
+        _showSnackBar(error ?? '登录失败，请检查邮箱和密码');
       }
     } catch (e) {
       if (mounted) {
@@ -81,13 +84,10 @@ class _LoginScreenState extends State<LoginScreen> {
     setState(() => _isLoading = true);
 
     try {
-      final supabaseService = SupabaseService.instance;
-      final success = await supabaseService.signUp(
-        username: _regUsernameController.text.trim(),
+      final success = await ref.read(authProvider.notifier).signUp(
+        email: _regEmailController.text.trim(),
         password: _regPasswordController.text,
-        email: _regEmailController.text.trim().isNotEmpty
-            ? _regEmailController.text.trim()
-            : null,
+        username: _regUsernameController.text.trim(),
         phone: _regPhoneController.text.trim().isNotEmpty
             ? _regPhoneController.text.trim()
             : null,
@@ -97,7 +97,8 @@ class _LoginScreenState extends State<LoginScreen> {
         _showSnackBar('注册成功！请登录', isSuccess: true);
         setState(() => _isRegister = false);
       } else if (mounted) {
-        _showSnackBar('注册失败，请检查网络或稍后重试');
+        final error = ref.read(authProvider).error;
+        _showSnackBar(error ?? '注册失败，请检查网络或稍后重试');
       }
     } catch (e) {
       if (mounted) {
@@ -226,21 +227,25 @@ class _LoginScreenState extends State<LoginScreen> {
     );
   }
 
-  /// 登录表单（统一账号+密码）
+  /// 登录表单（邮箱+密码）
   Widget _buildLoginForm(ColorScheme colorScheme) {
     return Column(
       children: [
         TextFormField(
-          controller: _accountController,
+          controller: _emailController,
+          keyboardType: TextInputType.emailAddress,
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
-            labelText: '账号',
-            hintText: '请输入用户名/昵称/邮箱/手机号',
-            prefixIcon: Icon(Icons.person_outline),
+            labelText: '邮箱',
+            hintText: '请输入邮箱地址',
+            prefixIcon: Icon(Icons.email_outlined),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return '请输入账号';
+              return '请输入邮箱';
+            }
+            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
+              return '请输入有效的邮箱地址';
             }
             return null;
           },
@@ -284,59 +289,20 @@ class _LoginScreenState extends State<LoginScreen> {
       child: Column(
         children: [
           TextFormField(
-            controller: _regUsernameController,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '用户名',
-              hintText: '请输入用户名',
-              prefixIcon: Icon(Icons.person_outline),
-            ),
-            validator: (value) {
-              if (value == null || value.isEmpty) {
-                return '请输入用户名';
-              }
-              if (value.length < 2) {
-                return '用户名至少需要2个字符';
-              }
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
             controller: _regEmailController,
             keyboardType: TextInputType.emailAddress,
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: '邮箱',
-              hintText: '请输入邮箱地址（选填）',
+              hintText: '请输入邮箱地址',
               prefixIcon: Icon(Icons.email_outlined),
             ),
             validator: (value) {
-              if (value != null && value.isNotEmpty) {
-                if (!RegExp(r'^[\w-\.]+@([\w-]+\.)+[\w-]{2,4}$').hasMatch(value)) {
-                  return '请输入有效的邮箱地址';
-                }
+              if (value == null || value.isEmpty) {
+                return '请输入邮箱';
               }
-              return null;
-            },
-          ),
-          const SizedBox(height: 12),
-          TextFormField(
-            controller: _regPhoneController,
-            keyboardType: TextInputType.phone,
-            maxLength: 11,
-            textInputAction: TextInputAction.next,
-            decoration: const InputDecoration(
-              labelText: '手机号',
-              hintText: '请输入手机号（选填）',
-              prefixIcon: Icon(Icons.phone_outlined),
-              counterText: '',
-            ),
-            validator: (value) {
-              if (value != null && value.isNotEmpty) {
-                if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
-                  return '请输入正确的11位手机号';
-                }
+              if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
+                return '请输入有效的邮箱地址';
               }
               return null;
             },
@@ -345,8 +311,7 @@ class _LoginScreenState extends State<LoginScreen> {
           TextFormField(
             controller: _regPasswordController,
             obscureText: _obscureRegPassword,
-            textInputAction: TextInputAction.done,
-            onFieldSubmitted: (_) => _submitRegister(),
+            textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: '密码',
               hintText: '请输入密码（至少6位）',
@@ -366,6 +331,38 @@ class _LoginScreenState extends State<LoginScreen> {
               }
               if (value.length < 6) {
                 return '密码至少需要6个字符';
+              }
+              return null;
+            },
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _regUsernameController,
+            textInputAction: TextInputAction.next,
+            decoration: const InputDecoration(
+              labelText: '用户名',
+              hintText: '请输入用户名（选填）',
+              prefixIcon: Icon(Icons.person_outline),
+            ),
+          ),
+          const SizedBox(height: 12),
+          TextFormField(
+            controller: _regPhoneController,
+            keyboardType: TextInputType.phone,
+            maxLength: 11,
+            textInputAction: TextInputAction.done,
+            onFieldSubmitted: (_) => _submitRegister(),
+            decoration: const InputDecoration(
+              labelText: '手机号',
+              hintText: '请输入手机号（选填）',
+              prefixIcon: Icon(Icons.phone_outlined),
+              counterText: '',
+            ),
+            validator: (value) {
+              if (value != null && value.isNotEmpty) {
+                if (!RegExp(r'^1[3-9]\d{9}$').hasMatch(value)) {
+                  return '请输入正确的11位手机号';
+                }
               }
               return null;
             },
