@@ -108,7 +108,7 @@ class SensitiveWordService {
     await _loadSwitches();
     await _loadWords();
     _initialized = true;
-    if (kDebugMode) debugPrint('✅ 敏感词服务初始化完成');
+    if (kDebugMode) debugPrint('✅ 敏感词服务初始化完成'
         '(小说:${_wordCache['novel']?.length ?? 0}, '
         '系统:${_wordCache['system']?.length ?? 0}, '
         '小说开关:${_novelEnabled}, 系统开关:${_systemEnabled})');
