@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart' hide ChangeNotifierProvider, Consumer;
 import 'package:provider/provider.dart';
@@ -20,6 +21,16 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 加载环境变量（优先从 --dart-define 读取，其次从 .env 文件加载）
+  try {
+    await dotenv.load(fileName: '.env');
+  } catch (e) {
+    // .env 文件不存在时忽略（生产环境使用 --dart-define 注入）
+    if (kDebugMode) {
+      debugPrint('⚠️ .env 文件未找到，将使用 --dart-define 注入的环境变量');
+    }
+  }
 
   // 设置状态栏样式
   if (Platform.isAndroid) {

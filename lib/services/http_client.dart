@@ -1,13 +1,19 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import '../env.dart';
 
-/// 全局 HttpClient 配置
+/// 全局 HttpClient 配置（从环境变量读取）
 class HttpClientConfig {
   static const int maxRetries = 3;
   static const Duration timeout = Duration(seconds: 30);
-  static const String baseUrl = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
-  static const String anonKey = 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
+
+  static String get baseUrl => Env.get(
+        'SUPABASE_URL',
+        fallback: 'https://mhdrbjpqmzswswoazwjg.supabase.co',
+      );
+
+  static String get anonKey => Env.get('SUPABASE_ANON_KEY');
 }
 
 /// 请求超时时间预设
