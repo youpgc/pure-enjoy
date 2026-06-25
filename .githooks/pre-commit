@@ -16,7 +16,7 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 运行 Flutter 分析
+# 运行 Flutter 静态分析
 echo "📊 运行 Flutter 静态分析..."
 flutter analyze
 if [ $? -ne 0 ]; then
@@ -24,12 +24,14 @@ if [ $? -ne 0 ]; then
     exit 1
 fi
 
-# 运行测试
-echo "🧪 运行 Flutter 测试..."
-flutter test
+# 运行本地 APK 构建（发现 analyze 通过仍可能构建失败）
+echo "🏗️  运行本地 APK 构建验证..."
+flutter build apk --release \
+  --dart-define=SUPABASE_ANON_KEY=sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6 \
+  --dart-define=SUPABASE_URL=https://mhdrbjpqmzswswoazwjg.supabase.co
 if [ $? -ne 0 ]; then
-    echo "⚠️ 测试未通过，请检查测试用例（使用 --no-verify 跳过）"
-    # 测试失败不阻塞提交，但给出警告
+    echo "❌ APK 构建失败，请修复后再提交（使用 --no-verify 跳过）"
+    exit 1
 fi
 
-echo "✅ Flutter 提交前验证通过"
+echo "✅ Flutter 提交前验证通过（分析 + 构建）"

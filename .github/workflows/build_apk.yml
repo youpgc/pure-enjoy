@@ -142,9 +142,30 @@ jobs:
               done
             fi
           fi
+          # 收集本次 dev 分支提交摘要（用于 Release 展示）
+          echo "📝 收集提交摘要..."
+          COMMIT_LIST=$(git log --pretty=format:"%s" -n 20 --no-merges 2>/dev/null | \
+            grep -v -i -E "^(chore|merge|ci|build|test|revert):" | \
+            grep -v -i -E "^Merge (branch|pull request)" | \
+            sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | \
+            sed 's/^[a-z]*([^)]*):[[:space:]]*//' | \
+            awk '{print "- " $0}' || echo "")
+          if [ -n "$COMMIT_LIST" ]; then
+            RELEASE_NOTES="$COMMIT_LIST"
+          else
+            RELEASE_NOTES="版本更新 v${VERSION}+${BUILD_NUMBER}"
+          fi
+          echo "$RELEASE_NOTES"
+
+          # 多行输出需特殊处理：使用 URL 编码或替换换行符
+          RELEASE_NOTES_ESCAPED=$(echo "$RELEASE_NOTES" | sed ':a;N;$!ba;s/\n/\\n/g')
+
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "build_number=$BUILD_NUMBER" >> $GITHUB_OUTPUT
           echo "apk_name=pure-enjoy-v${VERSION}-build${BUILD_NUMBER}.apk" >> $GITHUB_OUTPUT
+          echo "release_notes<<EOF" >> $GITHUB_OUTPUT
+          echo "$RELEASE_NOTES" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
           echo "Version: $VERSION, Build: $BUILD_NUMBER"
 
       # 9. 构建 APK
@@ -226,18 +247,30 @@ jobs:
           echo "File: $FILE_PATH"
           ls -lh "$FILE_PATH"
           
-          # 创建 GitHub Release
+          # 读取 Release Notes（从 Step 8 传递）
+          RELEASE_NOTES="${{ steps.version.outputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          fi
+
+          # 创建 GitHub Release（使用 Python 构建 JSON 避免转义问题）
           echo "Creating GitHub Release $TAG_NAME..."
+          RELEASE_PAYLOAD=$(python3 -c "
+import json, sys
+data = {
+  'tag_name': '$TAG_NAME',
+  'name': 'Pure Enjoy $TAG_NAME',
+  'body': sys.argv[1],
+  'draft': False,
+  'prerelease': False
+}
+print(json.dumps(data))
+" "$RELEASE_NOTES")
+
           RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/json" \
-            -d "{
-              \"tag_name\": \"$TAG_NAME\",
-              \"name\": \"Pure Enjoy $TAG_NAME\",
-              \"body\": \"自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}\",
-              \"draft\": false,
-              \"prerelease\": false
-            }")
+            -d "$RELEASE_PAYLOAD")
           
           RELEASE_HTTP=$(echo "$RELEASE_RESPONSE" | tail -n1)
           RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
@@ -340,21 +373,14 @@ jobs:
 
           echo "Last build time: ${LAST_BUILD_TIME:-none}"
 
-          # 收集 commit messages
-          if [ -n "$LAST_BUILD_TIME" ]; then
-            COMMIT_LIST=$(git log --pretty=format:"%s" --since="$LAST_BUILD_TIME" 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
-          else
-            COMMIT_LIST=$(git log --pretty=format:"%s" -n 10 2>/dev/null | grep -v "^chore:" | sed 's/^[a-z]*[[:space:]]*:[[:space:]]*//' | sed 's/^[a-z]*([^)]*):[[:space:]]*//' || echo "")
-          fi
-
-          if [ -n "$COMMIT_LIST" ]; then
-            RELEASE_NOTES="$COMMIT_LIST"
-          else
-            RELEASE_NOTES="自动构建版本 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          # 使用 Step 8 已收集的 Release Notes
+          RELEASE_NOTES="${{ steps.version.outputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
           echo "Release notes:"
-          echo -e "$RELEASE_NOTES"
+          echo "$RELEASE_NOTES"
 
           # 创建数据库记录
           DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
