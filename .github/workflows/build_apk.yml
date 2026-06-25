@@ -253,19 +253,10 @@ jobs:
             RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
-          # 创建 GitHub Release（使用 Python 构建 JSON 避免转义问题）
+          # 创建 GitHub Release（转义 body 后构建 JSON）
           echo "Creating GitHub Release $TAG_NAME..."
-          RELEASE_PAYLOAD=$(python3 -c "
-import json, sys
-data = {
-  'tag_name': '$TAG_NAME',
-  'name': 'Pure Enjoy $TAG_NAME',
-  'body': sys.argv[1],
-  'draft': False,
-  'prerelease': False
-}
-print(json.dumps(data))
-" "$RELEASE_NOTES")
+          BODY_ESCAPED=$(printf '%s' "$RELEASE_NOTES" | python3 -c 'import json,sys; print(json.dumps(sys.stdin.read()))')
+          RELEASE_PAYLOAD="{\"tag_name\":\"$TAG_NAME\",\"name\":\"Pure Enjoy $TAG_NAME\",\"body\":$BODY_ESCAPED,\"draft\":false,\"prerelease\":false}"
 
           RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
             -H "Authorization: token $GITHUB_TOKEN" \
