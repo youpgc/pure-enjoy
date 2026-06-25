@@ -30,6 +30,8 @@ dependencies:
   crypto: ^3.0.3
   # 版本信息
   package_info_plus: ^4.2.0
+  # 环境变量读取
+  flutter_dotenv: ^5.1.0
   # URL 启动器
   url_launcher: ^6.2.2
   # 文件路径

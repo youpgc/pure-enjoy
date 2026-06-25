@@ -156,7 +156,9 @@ jobs:
             --split-debug-info=build/symbols \
             --obfuscate \
             --tree-shake-icons \
-            --dart-define=FLUTTER_BUILD_MODE=release
+            --dart-define=FLUTTER_BUILD_MODE=release \
+            --dart-define=SUPABASE_ANON_KEY=${{ secrets.SUPABASE_ANON_KEY }} \
+            --dart-define=SUPABASE_URL=https://${{ secrets.SUPABASE_PROJECT_ID }}.supabase.co
 
       # 10. 查找并重命名 APK 文件
       - name: Find and rename APK

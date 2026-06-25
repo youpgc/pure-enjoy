@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
+import '../env.dart';
 import 'http_client.dart';
 
 /// 安全日志工具：仅在开发模式或调试模式下输出日志
@@ -36,10 +37,14 @@ class _CacheEntry {
   bool isExpired(Duration ttl) => DateTime.now().difference(cachedAt) > ttl;
 }
 
-/// Supabase 配置
+/// Supabase 配置（从环境变量读取）
 class SupabaseConfig {
-  static const String url = 'https://mhdrbjpqmzswswoazwjg.supabase.co';
-  static const String anonKey = 'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
+  static String get url => Env.get(
+        'SUPABASE_URL',
+        fallback: 'https://mhdrbjpqmzswswoazwjg.supabase.co',
+      );
+
+  static String get anonKey => Env.get('SUPABASE_ANON_KEY');
 
   /// 基础请求头（查询用）
   static Map<String, String> get headers => {
