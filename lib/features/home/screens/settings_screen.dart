@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -13,14 +13,14 @@ import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
 
 /// 系统设置页面
-class SettingsScreen extends StatefulWidget {
+class SettingsScreen extends ConsumerStatefulWidget {
   const SettingsScreen({super.key});
 
   @override
-  State<SettingsScreen> createState() => _SettingsScreenState();
+  ConsumerState<SettingsScreen> createState() => _SettingsScreenState();
 }
 
-class _SettingsScreenState extends State<SettingsScreen> {
+class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // 从 ThemeProvider 同步的状态
   bool _isDarkMode = false;
   double _fontScale = 1.0;
@@ -53,10 +53,10 @@ class _SettingsScreenState extends State<SettingsScreen> {
   }
 
   void _loadSettings() {
-    final themeProvider = context.read<ThemeProvider>();
-    _isDarkMode = themeProvider.isDarkMode;
-    _fontScale = themeProvider.fontScale;
-    _readerBg = themeProvider.readerBg;
+    final tp = ref.read(themeProvider);
+    _isDarkMode = tp.isDarkMode;
+    _fontScale = tp.fontScale;
+    _readerBg = tp.readerBg;
 
     // 加载持久化设置
     SharedPreferences.getInstance().then((prefs) {
@@ -134,8 +134,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             value: _isDarkMode,
             onChanged: (val) {
               setState(() => _isDarkMode = val);
-              final provider = context.read<ThemeProvider>();
-              provider.setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
+              ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
             },
           ),
           ListTile(
@@ -372,7 +371,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             groupValue: currentSize,
             onChanged: (val) {
               final scale = _fontSizeToScale(val!);
-              context.read<ThemeProvider>().setFontScale(scale);
+              ref.read(themeProvider).setFontScale(scale);
               setState(() => _fontScale = scale);
               Navigator.pop(context);
             },
@@ -394,7 +393,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
             groupValue: _readerBg,
             onChanged: (ReaderBackgroundTheme? val) {
               if (val == null) return;
-              context.read<ThemeProvider>().setReaderBackground(val);
+              ref.read(themeProvider).setReaderBackground(val);
               setState(() => _readerBg = val);
               Navigator.pop(context);
             },

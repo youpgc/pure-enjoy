@@ -7,6 +7,7 @@ import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../utils/format_utils.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
+import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
@@ -91,7 +92,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     }
   }
 
-  /// 从 Supabase 加载书架数据（分两步查询：先查user_novels，再查novels）
+  /// 从 Supabase 加载书架数据（嵌套查询：通过外键一次获取 user_novels + novels）
   Future<void> _loadBookshelf({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
@@ -112,30 +113,30 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     try {
       final (limit, offset) = paginationParams;
 
-      // 第一步：查询 user_novels 获取用户的书架记录
-      final userNovelsResult = await ApiClient.get(
+      // 嵌套查询：一次请求获取 user_novels + novels 详情（需要 FK: user_novels.novel_id → novels.id）
+      final result = await ApiClient.get(
         'user_novels',
         filters: {
           'user_id': 'eq.$userId',
           'is_collected': 'eq.true',
         },
-        columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected',
+        columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)',
         order: 'last_read_at.desc.nullslast',
         limit: limit,
         offset: offset,
       );
 
-      if (!userNovelsResult.isSuccess) {
+      if (!result.isSuccess) {
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载书架失败: ${userNovelsResult.statusCode}')),
+            SnackBar(content: Text('加载书架失败: ${result.statusCode}')),
           );
         }
         return;
       }
 
-      final userNovelsData = userNovelsResult.data!;
-      if (userNovelsData.isEmpty) {
+      final data = result.data!;
+      if (data.isEmpty) {
         setState(() {
           _bookshelfItems = [];
           _isLoading = false;
@@ -144,49 +145,16 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
         return;
       }
 
-      // 提取 novel_id 列表
-      final novelIds = userNovelsData
-          .map((item) => item['novel_id'] as String?)
-          .where((id) => id != null)
-          .toList();
-
-      // 第二步：查询 novels 表获取小说详情
-      final novelsResult = await ApiClient.get(
-        'novels',
-        filters: {'id': 'in.(${novelIds.join(',')})'},
-        columns: 'id,title,author,cover_url,category,status,chapter_count,word_count,description',
-        limit: 200,
-      );
-
-      if (!novelsResult.isSuccess) {
-        if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载小说详情失败: ${novelsResult.statusCode}')),
-          );
-        }
-        return;
-      }
-
-      final novelsData = novelsResult.data!;
-      
-      // 创建小说详情映射表 (novel_id -> novel_data)
-      final novelsMap = <String, Map<String, dynamic>>{};
-      for (final novel in novelsData) {
-        novelsMap[novel['id'].toString()] = novel;
-      }
-
-      // 合并数据：只展示已加入书架的小说（is_collected=true）
-      final bookshelfItems = userNovelsData
-          .map((userNovel) {
-        final novelId = userNovel['novel_id'] as String?;
+      // 嵌套查询返回的数据中 novels 字段已包含小说详情
+      final bookshelfItems = data.map((item) {
         return {
-          'id': userNovel['id'],
-          'novel_id': novelId,
-          'progress': userNovel['progress'],
-          'last_chapter': userNovel['last_chapter'],
-          'last_read_at': userNovel['last_read_at'],
-          'is_collected': userNovel['is_collected'],
-          'novels': novelsMap[novelId],
+          'id': item['id'],
+          'novel_id': item['novel_id'],
+          'progress': item['progress'],
+          'last_chapter': item['last_chapter'],
+          'last_read_at': item['last_read_at'],
+          'is_collected': item['is_collected'],
+          'novels': item['novels'],
         };
       }).toList();
 
@@ -198,7 +166,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
         }
         _isLoading = false;
       });
-      onPaginationDataLoaded(userNovelsData.length);
+      onPaginationDataLoaded(data.length);
 
       // 写入缓存（仅在刷新时）
       if (refresh) {
@@ -588,7 +556,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
               ),
             )
           : _isLoading
-              ? const Center(child: CircularProgressIndicator())
+              ? SkeletonLoading.list(itemCount: 6, showAvatar: false)
               : _bookshelfItems.isEmpty
                   ? Center(
                       child: Column(

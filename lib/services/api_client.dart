@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import '../config.dart';
 import 'http_client.dart';
+import 'cancel_token.dart';
 
 /// 安全日志工具：仅在开发模式下输出日志，生产环境静默处理
 class _SecureLogger {
@@ -122,6 +123,7 @@ class ApiClient {
     String? search,
     String? searchFields,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     try {
       final url = _buildUrl(
@@ -138,9 +140,12 @@ class ApiClient {
       final response = await HttpClient.instance.get(
         url,
         timeout: timeout ?? RequestTimeout.list,
+        cancelToken: cancelToken,
       );
 
       return _handleResponse(response);
+    } on RequestCancelledException {
+      return ApiResponse.error('请求已取消');
     } catch (e) {
       _SecureLogger.error('❌ GET 请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');

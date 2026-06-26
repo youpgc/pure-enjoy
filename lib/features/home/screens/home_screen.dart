@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
@@ -32,6 +32,7 @@ import '../../life/models/habit_model.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../profile/screens/point_records_screen.dart';
+import '../../../core/widgets/skeleton_loading.dart';
 
 /// 首页 - 主导航页面
 class HomeScreen extends StatefulWidget {
@@ -430,7 +431,7 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 加载最近阅读的小说
+  /// 加载最近阅读的小说（嵌套查询：通过外键一次获取 user_novels + novels）
   Future<void> _loadRecentNovels() async {
     try {
       final userId = AuthService.instance.currentUserId;
@@ -439,56 +440,27 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      // 分两步查询：先查 user_novels，再查 novels（避免嵌套查询因缺少外键返回400）
-      final userNovelsResult = await ApiClient.get('user_novels',
+      // 嵌套查询：一次请求获取 user_novels + novels 详情
+      final result = await ApiClient.get('user_novels',
           filters: {'user_id': 'eq.$userId', 'is_collected': 'eq.true'},
-          select: 'novel_id,last_chapter,progress,last_read_at',
+          select: 'novel_id,last_chapter,progress,last_read_at,novels(id,title,author,cover_url,category)',
           order: 'last_read_at.desc.nullslast',
           limit: 5);
 
-      if (!userNovelsResult.isSuccess || userNovelsResult.data == null || userNovelsResult.data!.isEmpty) {
+      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
         if (mounted) setState(() => _isLoadingNovels = false);
         return;
       }
 
-      // 提取 novel_id 列表
-      final novelIds = userNovelsResult.data!
-          .map((e) => e['novel_id'] as String?)
-          .where((id) => id != null)
-          .toList();
-
-      if (novelIds.isEmpty) {
-        if (mounted) setState(() => _isLoadingNovels = false);
-        return;
-      }
-
-      // 查询 novels 详情
-      final novelsResult = await ApiClient.get('novels',
-          filters: {'id': 'in.(${novelIds.join(',')})'},
-          select: 'id,title,author,cover_url,category',
-          limit: 5);
-
-      if (!novelsResult.isSuccess) {
-        if (mounted) setState(() => _isLoadingNovels = false);
-        return;
-      }
-
-      // 创建 novel 详情映射
-      final novelsMap = <String, Map<String, dynamic>>{};
-      for (final novel in novelsResult.data!) {
-        novelsMap[novel['id'].toString()] = novel;
-      }
-
-      // 合并数据
+      // 直接从嵌套数据中构建结果
       final novels = <Map<String, dynamic>>[];
-      for (final userNovel in userNovelsResult.data!) {
-        final novelId = userNovel['novel_id'] as String?;
-        final novelData = novelsMap[novelId];
+      for (final item in result.data!) {
+        final novelData = item['novels'] as Map<String, dynamic>?;
         if (novelData != null) {
           novels.add({
             'novel': NovelModel.fromJson(novelData),
-            'lastChapter': userNovel['last_chapter'] as int? ?? 1,
-            'progress': userNovel['progress'] as num? ?? 0.0,
+            'lastChapter': item['last_chapter'] as int? ?? 1,
+            'progress': item['progress'] as num? ?? 0.0,
           });
         }
       }
@@ -1045,9 +1017,13 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 12),
             Card(
               child: _isLoadingNovels
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
+                  ? SizedBox(
+                      height: 180,
+                      child: SkeletonLoading.grid(
+                        itemCount: 3,
+                        crossAxisCount: 3,
+                        aspectRatio: 0.75,
+                      ),
                     )
                   : _recentNovels.isEmpty
                       ? Padding(
@@ -1137,9 +1113,36 @@ class _DashboardPageState extends State<DashboardPage> {
             const SizedBox(height: 12),
             Card(
               child: _isLoadingActivities
-                  ? const Padding(
-                      padding: EdgeInsets.all(24),
-                      child: Center(child: CircularProgressIndicator()),
+                  ? Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        children: List.generate(3, (i) => Padding(
+                          padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
+                          child: Row(
+                            children: [
+                              Container(
+                                width: 40,
+                                height: 40,
+                                decoration: BoxDecoration(
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                              ),
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Container(height: 12, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(4))),
+                                    const SizedBox(height: 6),
+                                    Container(width: 120, height: 10, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3), borderRadius: BorderRadius.circular(4))),
+                                  ],
+                                ),
+                              ),
+                            ],
+                          ),
+                        )),
+                      ),
                     )
                   : _recentActivities.isEmpty
                       ? Padding(
@@ -2459,11 +2462,12 @@ class _ProfilePageState extends State<ProfilePage> {
 }
 
 /// 个性化设置页面
-class ThemeSettingsScreen extends StatelessWidget {
+class ThemeSettingsScreen extends ConsumerWidget {
   const ThemeSettingsScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final tp = ref.watch(themeProvider);
     return Scaffold(
       appBar: AppBar(title: const Text('个性化设置')),
       body: ListView(
@@ -2472,8 +2476,7 @@ class ThemeSettingsScreen extends StatelessWidget {
           // ====== 主题模式 ======
           _SectionTitle(title: '主题模式'),
           const SizedBox(height: 8),
-          Consumer<ThemeProvider>(
-            builder: (context, tp, _) => Card(
+          Card(
               child: Column(
                 children: [
                   _ThemeModeTile(
@@ -2499,14 +2502,12 @@ class ThemeSettingsScreen extends StatelessWidget {
                 ],
               ),
             ),
-          ),
           const SizedBox(height: 24),
 
           // ====== 配色方案 ======
           _SectionTitle(title: '配色方案'),
           const SizedBox(height: 8),
-          Consumer<ThemeProvider>(
-            builder: (context, tp, _) => Card(
+          Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Wrap(
@@ -2558,14 +2559,12 @@ class ThemeSettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 24),
 
           // ====== 字体大小 ======
           _SectionTitle(title: '字体大小'),
           const SizedBox(height: 8),
-          Consumer<ThemeProvider>(
-            builder: (context, tp, _) => Card(
+          Card(
               child: Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                 child: Column(
@@ -2608,14 +2607,12 @@ class ThemeSettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 24),
 
           // ====== 阅读背景 ======
           _SectionTitle(title: '阅读背景'),
           const SizedBox(height: 8),
-          Consumer<ThemeProvider>(
-            builder: (context, tp, _) => Card(
+          Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
                 child: Wrap(
@@ -2669,7 +2666,6 @@ class ThemeSettingsScreen extends StatelessWidget {
                 ),
               ),
             ),
-          ),
           const SizedBox(height: 32),
         ],
       ),

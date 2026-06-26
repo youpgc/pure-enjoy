@@ -19,7 +19,6 @@ dependencies:
   # 本地存储
   shared_preferences: ^2.2.2
   # 状态管理
-  provider: ^6.1.1
   flutter_riverpod: ^2.5.1
   # 工具
   # intl 版本由 flutter_localizations 自动管理
@@ -55,11 +54,15 @@ dependencies:
   battery_plus: ^5.0.2
   # 农历
   lunar: ^1.0.0
+  # 骨架屏 shimmer 效果
+  shimmer: ^3.0.0
 
 dev_dependencies:
   flutter_test:
     sdk: flutter
   flutter_lints: ^3.0.1
+  mockito: ^5.4.0
+  build_runner: ^2.4.0
 
 flutter:
   uses-material-design: true

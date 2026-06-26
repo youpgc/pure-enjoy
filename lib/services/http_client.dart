@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../env.dart';
+import 'cancel_token.dart';
 
 /// 全局 HttpClient 配置（从环境变量读取）
 class HttpClientConfig {
@@ -71,11 +72,13 @@ class HttpClient {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
       () => http.get(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
+      cancelToken: cancelToken,
     );
   }
 
@@ -86,6 +89,7 @@ class HttpClient {
     Object? body,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -95,6 +99,7 @@ class HttpClient {
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
+      cancelToken: cancelToken,
     );
   }
 
@@ -105,6 +110,7 @@ class HttpClient {
     Object? body,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -114,6 +120,7 @@ class HttpClient {
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
+      cancelToken: cancelToken,
     );
   }
 
@@ -124,6 +131,7 @@ class HttpClient {
     Object? body,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -133,6 +141,7 @@ class HttpClient {
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
+      cancelToken: cancelToken,
     );
   }
 
@@ -142,11 +151,13 @@ class HttpClient {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
       () => http.delete(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
+      cancelToken: cancelToken,
     );
   }
 
@@ -196,14 +207,25 @@ class HttpClient {
     Future<http.Response> Function() request, {
     int maxRetries = HttpClientConfig.maxRetries,
     Duration? timeout,
+    CancelToken? cancelToken,
   }) async {
     http.Response? response;
     Exception? lastError;
     final requestTimeout = timeout ?? HttpClientConfig.timeout;
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
+      // 请求前检查是否已取消
+      if (cancelToken?.isCancelled == true) {
+        throw RequestCancelledException();
+      }
+
       try {
         response = await request().timeout(requestTimeout);
+
+        // 响应后检查是否已取消（防止旧响应覆盖新数据）
+        if (cancelToken?.isCancelled == true) {
+          throw RequestCancelledException();
+        }
 
         // 处理 401：Token 失效
         if (response.statusCode == 401) {
@@ -212,6 +234,8 @@ class HttpClient {
         }
 
         return response;
+      } on RequestCancelledException {
+        rethrow; // 取消异常不重试，直接抛出
       } on SocketException catch (e) {
         lastError = e;
         if (attempt < maxRetries) {

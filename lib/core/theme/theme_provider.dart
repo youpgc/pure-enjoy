@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 主题配色方案 - 基于Logo的橙黄渐变色系
@@ -142,3 +143,6 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setInt(_readerBgKey, bg.index);
   }
 }
+
+/// 主题 Provider（Riverpod）
+final themeProvider = ChangeNotifierProvider<ThemeProvider>((ref) => ThemeProvider());

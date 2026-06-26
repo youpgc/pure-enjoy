@@ -8,6 +8,7 @@ import '../../../services/chapter_cache_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
 import 'novel_reader_screen.dart';
+import 'novel_comments_screen.dart';
 
 /// 小说详情页面
 class NovelDetailScreen extends StatefulWidget {
@@ -723,6 +724,68 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                     ),
                   ),
                 ],
+              ),
+            ),
+          ),
+
+          const SliverToBoxAdapter(child: SizedBox(height: 24)),
+
+          // 评论区入口
+          SliverToBoxAdapter(
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: InkWell(
+                onTap: () {
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (_) => NovelCommentsScreen(
+                        novelId: novel.id,
+                        novelTitle: novel.title,
+                      ),
+                    ),
+                  );
+                },
+                borderRadius: BorderRadius.circular(12),
+                child: Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainerHighest.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.comment_bank_outlined,
+                          color: colorScheme.primary),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              '评论区',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .titleMedium,
+                            ),
+                            const SizedBox(height: 2),
+                            Text(
+                              '查看读者评论，分享你的读后感',
+                              style: Theme.of(context)
+                                  .textTheme
+                                  .bodySmall
+                                  ?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                            ),
+                          ],
+                        ),
+                      ),
+                      Icon(Icons.chevron_right,
+                          color: colorScheme.onSurfaceVariant),
+                    ],
+                  ),
+                ),
               ),
             ),
           ),

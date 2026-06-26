@@ -5,8 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart' hide ChangeNotifierProvider, Consumer;
-import 'package:provider/provider.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'core/theme/app_theme.dart';
 import 'core/theme/theme_provider.dart';
 import 'features/home/screens/home_screen.dart';
@@ -15,6 +14,7 @@ import 'features/auth/auth_provider.dart';
 import 'services/supabase_service.dart';
 import 'services/dict_service.dart';
 import 'services/notification_service.dart';
+import 'services/offline_sync_service.dart';
 
 /// 全局 NavigatorKey，用于通知点击跳转
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -65,38 +65,39 @@ void _lazyInitializeServices() {
       debugPrint('通知服务后台初始化失败');
     }
   });
+
+  // 离线同步服务：启动时同步待处理队列
+  OfflineSyncService.instance.initialize().catchError((e) {
+    if (kDebugMode) {
+      debugPrint('离线同步服务初始化失败');
+    }
+  });
 }
 
-class PureEnjoyApp extends StatelessWidget {
+class PureEnjoyApp extends ConsumerWidget {
   const PureEnjoyApp({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    return ChangeNotifierProvider(
-      create: (_) => ThemeProvider(),
-      child: Consumer<ThemeProvider>(
-        builder: (context, themeProvider, child) {
-          return MaterialApp(
-            navigatorKey: navigatorKey,
-            title: '纯享',
-            debugShowCheckedModeBanner: false,
-            theme: AppTheme.lightTheme(themeProvider.colorScheme.seedColor),
-            darkTheme: AppTheme.darkTheme(themeProvider.colorScheme.seedColor),
-            themeMode: themeProvider.themeMode,
-            home: const AuthWrapper(),
-            // 中文本地化配置
-            localizationsDelegates: const [
-              GlobalMaterialLocalizations.delegate,
-              GlobalWidgetsLocalizations.delegate,
-              GlobalCupertinoLocalizations.delegate,
-            ],
-            supportedLocales: const [
-              Locale('zh', 'CN'), // 简体中文
-            ],
-            locale: const Locale('zh', 'CN'),
-          );
-        },
-      ),
+  Widget build(BuildContext context, WidgetRef ref) {
+    final theme = ref.watch(themeProvider);
+    return MaterialApp(
+      navigatorKey: navigatorKey,
+      title: '纯享',
+      debugShowCheckedModeBanner: false,
+      theme: AppTheme.lightTheme(theme.colorScheme.seedColor),
+      darkTheme: AppTheme.darkTheme(theme.colorScheme.seedColor),
+      themeMode: theme.themeMode,
+      home: const AuthWrapper(),
+      // 中文本地化配置
+      localizationsDelegates: const [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: const [
+        Locale('zh', 'CN'), // 简体中文
+      ],
+      locale: const Locale('zh', 'CN'),
     );
   }
 }

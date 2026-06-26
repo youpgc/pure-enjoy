@@ -7,6 +7,7 @@ import '../../../utils/cache_helper.dart';
 import '../../../utils/format_utils.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
+import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import 'novel_detail_screen.dart';
 
@@ -320,7 +321,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? SkeletonLoading.grid(itemCount: 6, crossAxisCount: 3)
           : RefreshIndicator(
               onRefresh: () => _loadNovels(refresh: true),
               child: ListView(

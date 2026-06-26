@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/offline_sync_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -188,18 +189,33 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
 
       if (result.isSuccess) {
         await _loadDiaries();
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.create,
+          table: 'mood_diaries',
+          data: diary.toJson(),
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.create,
+        table: 'mood_diaries',
+        data: diary.toJson(),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
@@ -217,18 +233,33 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
 
         if (result.isSuccess) {
           await _loadDiaries();
+          OfflineSyncService.instance.syncPending();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
             );
           }
         } else {
-          throw Exception('HTTP ${result.statusCode}');
+          await OfflineSyncService.instance.enqueue(
+            action: OfflineAction.delete,
+            table: 'mood_diaries',
+            filters: {'id': 'eq.$id'},
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+            );
+          }
         }
       } catch (e) {
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.delete,
+          table: 'mood_diaries',
+          filters: {'id': 'eq.$id'},
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
           );
         }
       }
@@ -245,18 +276,35 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
 
       if (result.isSuccess) {
         await _loadDiaries();
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.update,
+          table: 'mood_diaries',
+          data: diary.toUpdateJson(),
+          filters: {'id': 'eq.${diary.id}'},
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.update,
+        table: 'mood_diaries',
+        data: diary.toUpdateJson(),
+        filters: {'id': 'eq.${diary.id}'},
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
