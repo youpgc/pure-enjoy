@@ -225,17 +225,20 @@ class _RemindersScreenState extends State<RemindersScreen> {
           ? const LoadingWidget()
           : _reminders.isEmpty
               ? const EmptyWidget(icon: Icons.notifications_outlined, message: '暂无提醒事项')
-              : ListView.builder(
-                  itemCount: _reminders.length,
-                  itemBuilder: (context, index) {
-                    final reminder = _reminders[index];
-                    return ReminderCard(
-                      reminder: reminder,
-                      onToggle: () => _toggleComplete(reminder),
-                      onEdit: () => _editReminder(reminder),
-                      onDelete: () => _deleteReminder(reminder.id),
-                    );
-                  },
+              : RefreshIndicator(
+                  onRefresh: _loadReminders,
+                  child: ListView.builder(
+                    itemCount: _reminders.length,
+                    itemBuilder: (context, index) {
+                      final reminder = _reminders[index];
+                      return ReminderCard(
+                        reminder: reminder,
+                        onToggle: () => _toggleComplete(reminder),
+                        onEdit: () => _editReminder(reminder),
+                        onDelete: () => _deleteReminder(reminder.id),
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: _addReminder,
