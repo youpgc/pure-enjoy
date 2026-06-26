@@ -79,32 +79,48 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     }
   }
 
-  /// 加载章节列表
+  /// 加载章节列表（分批加载，无数量上限）
   Future<void> _loadChapters() async {
-    try {
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {
-          'novel_id': 'eq.${widget.novel.id}',
-          'chapter_num': 'gte.1',
-        },
-        columns: 'id,title,chapter_num,word_count',
-        order: 'chapter_num.asc',
-        limit: 200,
-      );
+    const batchSize = 50;
+    final allChapters = <NovelChapterModel>[];
+    int offset = 0;
+    bool hasMore = true;
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+    try {
+      while (hasMore) {
+        final result = await ApiClient.get(
+          'novel_chapters',
+          filters: {
+            'novel_id': 'eq.${widget.novel.id}',
+            'chapter_num': 'gte.1',
+          },
+          columns: 'id,title,chapter_num,word_count',
+          order: 'chapter_num.asc',
+          limit: batchSize,
+          offset: offset,
+        );
+
+        if (result.isSuccess) {
+          final data = result.data!;
+          final batch = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+          allChapters.addAll(batch);
+          hasMore = data.length >= batchSize;
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
+      }
+
+      if (mounted) {
         setState(() {
-          _chapters = chapters;
+          _chapters = allChapters;
           _isLoadingChapters = false;
         });
-      } else {
-        setState(() => _isLoadingChapters = false);
       }
     } catch (e) {
-      setState(() => _isLoadingChapters = false);
+      if (mounted) {
+        setState(() => _isLoadingChapters = false);
+      }
     }
   }
 
@@ -254,41 +270,45 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     int downloaded = 0;
     final uncachedChapters = _chapters.where((c) => !ChapterCacheService.instance.isCached(c.id)).toList();
 
-    // 批量查询所有未缓存章节内容
+    // 分批查询所有未缓存章节内容（每批100条）
     if (uncachedChapters.isNotEmpty) {
       try {
-        final chapterIds = uncachedChapters.map((c) => c.id).toList();
-        final result = await ApiClient.get(
-          'novel_chapters',
-          filters: {'id': 'in.(${chapterIds.join(",")})'},
-          columns: 'id,content',
-          limit: 200,
-        );
+        final contentMap = <String, String>{};
+        const downloadBatchSize = 100;
 
-        if (result.isSuccess) {
-          final data = result.data!;
-          final contentMap = <String, String>{};
-          for (final item in data) {
-            final id = item['id'] as String?;
-            final content = item['content'] as String?;
-            if (id != null && content != null && content.isNotEmpty) {
-              contentMap[id] = content;
+        for (int i = 0; i < uncachedChapters.length; i += downloadBatchSize) {
+          final batch = uncachedChapters.skip(i).take(downloadBatchSize).toList();
+          final chapterIds = batch.map((c) => c.id).toList();
+          final result = await ApiClient.get(
+            'novel_chapters',
+            filters: {'id': 'in.(${chapterIds.join(",")})'},
+            columns: 'id,content',
+            limit: downloadBatchSize,
+          );
+
+          if (result.isSuccess) {
+            for (final item in result.data!) {
+              final id = item['id'] as String?;
+              final content = item['content'] as String?;
+              if (id != null && content != null && content.isNotEmpty) {
+                contentMap[id] = content;
+              }
             }
           }
+        }
 
-          for (final chapter in uncachedChapters) {
-            final content = contentMap[chapter.id];
-            if (content != null) {
-              await ChapterCacheService.instance.cacheChapter(
-                chapterId: chapter.id,
-                novelId: widget.novel.id,
-                title: chapter.title,
-                chapterOrder: chapter.chapterOrder,
-                content: content,
-              );
-              downloaded++;
-              setState(() => _cachedChapterCount = _cachedChapterCount + 1);
-            }
+        for (final chapter in uncachedChapters) {
+          final content = contentMap[chapter.id];
+          if (content != null) {
+            await ChapterCacheService.instance.cacheChapter(
+              chapterId: chapter.id,
+              novelId: widget.novel.id,
+              title: chapter.title,
+              chapterOrder: chapter.chapterOrder,
+              content: content,
+            );
+            downloaded++;
+            setState(() => _cachedChapterCount = _cachedChapterCount + 1);
           }
         }
       } catch (e) {
