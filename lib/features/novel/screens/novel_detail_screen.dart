@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
+import '../../../constants/app_constants.dart';
 import 'novel_reader_screen.dart';
 import 'novel_comments_screen.dart';
 
@@ -562,7 +563,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                                   ),
                                   child: Text(
                                     DictService.instance.getLabelOrDefault(
-                                      'novel_category',
+                                      dictNovelCategory,
                                       novel.category!,
                                       defaultValue: novel.category!,
                                     ),
@@ -601,7 +602,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '状态',
-                    value: DictService.instance.getLabelOrDefault('novel_status', novel.status ?? '', defaultValue: novel.status == 'completed' ? '已完结' : '连载中'),
+                    value: DictService.instance.getLabelOrDefault(dictNovelStatus, novel.status ?? '', defaultValue: novel.status == novelStatusCompleted ? '已完结' : '连载中'),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(

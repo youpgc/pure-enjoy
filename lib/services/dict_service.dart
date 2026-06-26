@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'api_client.dart';
+import '../constants/app_constants.dart';
 
 /// 字典项
 class DictItem {
@@ -133,24 +134,7 @@ class DictService {
   static const int _cacheVersion = 1; // 缓存结构版本，变更时强制刷新
 
   /// 客户端需要的字典类型编码列表
-  static const List<String> _neededCodes = [
-    'user_role',
-    'member_level',
-    'user_status',
-    'expense_category',
-    'mood_type',
-    'habit_frequency',
-    'habit_color',
-    'novel_category',
-    'novel_status',
-    'feedback_category',
-    'feedback_status',
-    'notification_type',
-    'announcement_type',
-    'priority_level',
-    'favorite_category',
-    'note_category',
-  ];
+  static const List<String> _neededCodes = dictCodes;
 
   /// 初始化（从本地缓存读取）
   Future<void> initialize() async {

@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../env.dart';
 import 'http_client.dart';
+import '../constants/app_constants.dart';
 
 /// 安全日志工具：仅在开发模式或调试模式下输出日志
 /// 生产环境中所有日志输出都会被静默处理，防止敏感信息泄露
@@ -255,7 +256,7 @@ class AuthService {
           'data': {
             if (username != null) 'username': username,
             if (phone != null) 'phone': phone,
-            'role': 'user',
+            'role': roleUser,
           },
         }),
       );
