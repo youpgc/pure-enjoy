@@ -15,6 +15,7 @@ import 'services/supabase_service.dart';
 import 'services/dict_service.dart';
 import 'services/notification_service.dart';
 import 'services/offline_sync_service.dart';
+import 'services/chapter_cache_service.dart';
 
 /// 全局 NavigatorKey，用于通知点击跳转
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -70,6 +71,13 @@ void _lazyInitializeServices() {
   OfflineSyncService.instance.initialize().catchError((e) {
     if (kDebugMode) {
       debugPrint('离线同步服务初始化失败');
+    }
+  });
+
+  // 章节缓存服务：加载缓存索引（修复 Bug: initialize 从未被调用）
+  ChapterCacheService.instance.initialize().catchError((e) {
+    if (kDebugMode) {
+      debugPrint('章节缓存服务初始化失败');
     }
   });
 }

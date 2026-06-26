@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
@@ -105,6 +106,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 标记是否需要跳转到最后一页（上一章时）
   bool _shouldJumpToLastPage = false;
+
+  /// 当前正在加载的章节ID，用于防止快速切换时竞态条件（Bug 2 修复）
+  String? _loadingChapterId;
+
+  /// 书架状态检查完成信号，防止 _saveProgress 在检查完成前创建重复记录（Bug 3 修复）
+  final Completer<void> _bookshelfStatusCompleter = Completer<void>();
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -245,79 +252,85 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _isLoading = true);
 
     try {
-      // 并行加载章节列表和阅读进度
-      final chaptersFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {'novel_id': 'eq.${widget.novel.id}'},
-        columns: 'id,title,chapter_num',
-        order: 'chapter_num.asc',
-        limit: 200,
-      );
+      // 分批加载章节列表（无数量上限）
+      const batchSize = 50;
+      final allChapters = <NovelChapterModel>[];
+      int offset = 0;
+      bool hasMore = true;
 
-      final userId = _userId;
-      Future<ApiResponse>? progressFuture;
-      if (userId != null) {
-        progressFuture = ApiClient.get(
-          'user_novels',
-          filters: {
-            'user_id': 'eq.$userId',
-            'novel_id': 'eq.${widget.novel.id}',
-          },
-          columns: 'last_chapter',
+      while (hasMore) {
+        final result = await ApiClient.get(
+          'novel_chapters',
+          filters: {'novel_id': 'eq.${widget.novel.id}'},
+          columns: 'id,title,chapter_num',
+          order: 'chapter_num.asc',
+          limit: batchSize,
+          offset: offset,
         );
+
+        if (result.isSuccess) {
+          final data = result.data!;
+          final batch = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+          allChapters.addAll(batch);
+          hasMore = data.length >= batchSize;
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
       }
 
-      final result = await chaptersFuture;
+      allChapters.removeWhere((c) => c.chapterOrder <= 0);
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
-        chapters.removeWhere((c) => c.chapterOrder <= 0);
-
-        int startIndex = 0;
-        for (int i = 0; i < chapters.length; i++) {
-          if (chapters[i].chapterOrder >= widget.startChapter) {
-            startIndex = i;
-            break;
-          }
-        }
-
-        // 并行获取阅读进度
-        if (progressFuture != null) {
-          try {
-            final progressResult = await progressFuture;
-            if (progressResult.isSuccess) {
-              final progressData = progressResult.data!;
-              if (progressData.isNotEmpty) {
-                final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
-                for (int i = 0; i < chapters.length; i++) {
-                  if (chapters[i].chapterOrder >= savedChapter) {
-                    startIndex = i;
-                    break;
-                  }
+      // 获取阅读进度
+      final userId = _userId;
+      int startIndex = 0;
+      if (userId != null) {
+        try {
+          final progressResult = await ApiClient.get(
+            'user_novels',
+            filters: {
+              'user_id': 'eq.$userId',
+              'novel_id': 'eq.${widget.novel.id}',
+            },
+            columns: 'last_chapter',
+          );
+          if (progressResult.isSuccess) {
+            final progressData = progressResult.data!;
+            if (progressData.isNotEmpty) {
+              final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
+              for (int i = 0; i < allChapters.length; i++) {
+                if (allChapters[i].chapterOrder >= savedChapter) {
+                  startIndex = i;
+                  break;
                 }
               }
             }
-          } catch (e) {
-            if (kDebugMode) {
-              debugPrint('解析已读章节进度失败');
-            }
+          }
+        } catch (e) {
+          if (kDebugMode) {
+            debugPrint('解析已读章节进度失败');
           }
         }
+      }
 
-        if (mounted) {
-          setState(() {
-            _chapters = chapters;
-            _currentChapterIndex = startIndex;
-            _isLoading = false;
-          });
+      // 也考虑 widget.startChapter
+      for (int i = 0; i < allChapters.length; i++) {
+        if (allChapters[i].chapterOrder >= widget.startChapter) {
+          if (i > startIndex) startIndex = i;
+          break;
         }
+      }
 
-        if (_chapters.isNotEmpty) {
-          _loadChapterContent(_chapters[startIndex]);
-        }
-      } else {
-        if (mounted) setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() {
+          _chapters = allChapters;
+          _currentChapterIndex = startIndex;
+          _isLoading = false;
+        });
+      }
+
+      if (_chapters.isNotEmpty) {
+        _loadChapterContent(_chapters[startIndex]);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
@@ -330,6 +343,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   Future<void> _loadChapterContent(NovelChapterModel chapter) async {
+    // 记录当前加载的章节ID，用于防止竞态条件（Bug 2 修复）
+    _loadingChapterId = chapter.id;
     setState(() => _isLoadingChapter = true);
     _hasTriggeredNextChapter = false;
     // 重置页码信息
@@ -346,6 +361,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       // 等待缓存结果
       final cachedContent = await cacheFuture;
+
+      // 检查是否已切换到其他章节
+      if (_loadingChapterId != chapter.id) return;
+
       if (cachedContent != null) {
         // 有缓存，先显示缓存内容
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
@@ -371,6 +390,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       // 等待网络请求
       final result = await networkFuture;
+
+      // 再次检查是否已切换到其他章节（Bug 2 核心修复）
+      if (_loadingChapterId != chapter.id) return;
 
       if (result.isSuccess) {
         final data = result.data!;
@@ -429,6 +451,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _scrollToPosition();
       }
     } catch (e) {
+      // 异常时也检查是否已切换章节
+      if (_loadingChapterId != chapter.id) return;
       if (_currentChapter == null) {
         if (mounted) {
           setState(() {
@@ -477,7 +501,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   Future<void> _checkBookshelfStatus() async {
     final userId = _userId;
-    if (userId == null) return;
+    if (userId == null) {
+      if (!_bookshelfStatusCompleter.isCompleted) _bookshelfStatusCompleter.complete();
+      return;
+    }
 
     try {
       final result = await ApiClient.get(
@@ -503,6 +530,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       if (kDebugMode) {
         debugPrint('检查书架状态失败');
       }
+    } finally {
+      if (!_bookshelfStatusCompleter.isCompleted) _bookshelfStatusCompleter.complete();
     }
   }
 
@@ -527,27 +556,45 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           },
         );
       } else {
-        final result = await ApiClient.post(
-          'user_novels',
-          {
-            'user_id': userId,
-            'novel_id': widget.novel.id,
-            'progress': progress,
-            'last_chapter': chapterNum,
-            'is_collected': true,
-            'last_read_at': DateTime.now().toUtc().toIso8601String(),
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-            'updated_at': DateTime.now().toUtc().toIso8601String(),
-          },
-        );
+        // 等待书架状态检查完成，避免重复创建记录（Bug 3 修复）
+        if (!_bookshelfStatusCompleter.isCompleted) {
+          await _bookshelfStatusCompleter.future;
+        }
+        // 再次检查，可能在等待期间 _checkBookshelfStatus 已完成并设置了书架状态
+        if (_isInBookshelf && _bookshelfId != null) {
+          await ApiClient.patchByFilter(
+            'user_novels',
+            filters: {'id': 'eq.$_bookshelfId'},
+            body: {
+              'last_chapter': chapterNum,
+              'progress': progress,
+              'last_read_at': DateTime.now().toUtc().toIso8601String(),
+            },
+          );
+        } else {
+          final result = await ApiClient.post(
+            'user_novels',
+            {
+              'user_id': userId,
+              'novel_id': widget.novel.id,
+              'progress': progress,
+              'last_chapter': chapterNum,
+              'is_collected': true,
+              'last_read_at': DateTime.now().toUtc().toIso8601String(),
+              'created_at': DateTime.now().toUtc().toIso8601String(),
+              'updated_at': DateTime.now().toUtc().toIso8601String(),
+            },
+          );
 
-        if (result.isSuccess) {
-          final data = result.data!;
-          if (data.isNotEmpty && mounted) {
-            setState(() {
-              _isInBookshelf = true;
-              _bookshelfId = data.first['id'].toString();
-            });
+          if (result.isSuccess) {
+            final data = result.data!;
+            if (data.isNotEmpty && mounted) {
+              setState(() {
+                _isInBookshelf = true;
+                _bookshelfId = data.first['id'].toString();
+                _isCollected = true; // Bug 7 修复：同步收藏状态
+              });
+            }
           }
         }
       }
@@ -745,6 +792,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         : null,
                     onTap: () {
                       Navigator.pop(context);
+                      _shouldJumpToLastPage = false; // Bug 5 修复：章节目录跳转时重置标志
                       setState(() => _currentChapterIndex = index);
                       _loadChapterContent(chapter);
                     },
