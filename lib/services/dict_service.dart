@@ -14,6 +14,7 @@ class DictItem {
   final int sortOrder;
   final bool isDefault;
   final bool isActive;
+  final DateTime? updatedAt;
 
   DictItem({
     required this.id,
@@ -25,6 +26,7 @@ class DictItem {
     required this.sortOrder,
     required this.isDefault,
     required this.isActive,
+    this.updatedAt,
   });
 
   factory DictItem.fromJson(Map<String, dynamic> json) {
@@ -37,6 +39,11 @@ class DictItem {
       extraStr = jsonEncode(extra);
     }
 
+    DateTime? updatedAt;
+    if (json['updated_at'] != null) {
+      updatedAt = DateTime.tryParse(json['updated_at'].toString());
+    }
+
     return DictItem(
       id: json['id']?.toString() ?? '',
       typeId: json['type_id']?.toString() ?? '',
@@ -47,8 +54,22 @@ class DictItem {
       sortOrder: json['sort_order'] as int? ?? 0,
       isDefault: json['is_default'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
+      updatedAt: updatedAt,
     );
   }
+
+  Map<String, dynamic> toJson() => {
+    'id': id,
+    'type_id': typeId,
+    'code': code,
+    'label': label,
+    'value': value,
+    'extra': extra,
+    'sort_order': sortOrder,
+    'is_default': isDefault,
+    'is_active': isActive,
+    if (updatedAt != null) 'updated_at': updatedAt!.toIso8601String(),
+  };
 }
 
 /// 字典类型
@@ -60,6 +81,7 @@ class DictType {
   final int sortOrder;
   final bool isSystem;
   final bool isActive;
+  final DateTime? updatedAt;
 
   DictType({
     required this.id,
@@ -69,9 +91,15 @@ class DictType {
     required this.sortOrder,
     required this.isSystem,
     required this.isActive,
+    this.updatedAt,
   });
 
   factory DictType.fromJson(Map<String, dynamic> json) {
+    DateTime? updatedAt;
+    if (json['updated_at'] != null) {
+      updatedAt = DateTime.tryParse(json['updated_at'].toString());
+    }
+
     return DictType(
       id: json['id']?.toString() ?? '',
       code: json['code']?.toString() ?? '',
@@ -80,6 +108,7 @@ class DictType {
       sortOrder: json['sort_order'] as int? ?? 0,
       isSystem: json['is_system'] as bool? ?? false,
       isActive: json['is_active'] as bool? ?? true,
+      updatedAt: updatedAt,
     );
   }
 }
@@ -100,6 +129,7 @@ class DictService {
   static const String _cacheKey = 'dict_service_cache_v2';
   static const String _cacheTimestampKey = 'dict_service_cache_timestamp';
   static const String _cacheVersionKey = 'dict_service_cache_version';
+  static const String _lastSyncTimeKey = 'dict_service_last_sync_time';
   static const int _cacheVersion = 1; // 缓存结构版本，变更时强制刷新
 
   /// 客户端需要的字典类型编码列表
@@ -171,7 +201,7 @@ class DictService {
       // 第1次请求：获取所有 dict_types
       final typesResult = await ApiClient.get(
         'dict_types',
-        select: 'id,code,name,description,sort_order,is_system,is_active',
+        select: 'id,code,name,description,sort_order,is_system,is_active,updated_at',
         limit: null, // 取消限制，获取全部
       );
 
@@ -204,7 +234,7 @@ class DictService {
       final itemsResult = await ApiClient.get(
         'dict_items',
         filters: {'type_id': 'in.($idList)', 'is_active': 'eq.true'},
-        select: 'id,type_id,code,label,value,extra,sort_order,is_default,is_active',
+        select: 'id,type_id,code,label,value,extra,sort_order,is_default,is_active,updated_at',
         order: 'sort_order.asc',
         limit: null, // 取消限制，获取全部
       );
@@ -234,25 +264,136 @@ class DictService {
       // 保存到本地缓存
       await _saveToLocalCache();
 
+      // 记录同步时间（用于增量更新）
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.setInt(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
+
       if (kDebugMode) debugPrint('✅ 字典服务网络加载完成');
     } catch (e) {
       if (kDebugMode) debugPrint('❌ 字典服务网络加载失败');
     }
   }
 
-  /// 后台静默更新（已有缓存时调用）
+  /// 后台静默更新（已有缓存时尝试增量更新）
   Future<void> silentRefresh() async {
     if (_cache.isEmpty) {
-      // 没有缓存时直接网络加载
+      // 没有缓存时直接全量网络加载
       await loadFromNetwork();
       return;
     }
 
     try {
       if (kDebugMode) debugPrint('🔄 字典服务后台静默更新...');
-      await loadFromNetwork();
+
+      // 尝试增量更新
+      final success = await _incrementalRefresh();
+      if (!success) {
+        // 增量失败，回退到全量更新
+        if (kDebugMode) debugPrint('⚠️ 增量更新失败，回退到全量更新');
+        await loadFromNetwork();
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('⚠️ 字典服务静默更新失败（使用缓存）');
+    }
+  }
+
+  /// 增量更新：仅获取上次同步后变更的字典项
+  /// 返回 true 表示增量更新成功，false 表示需要全量更新
+  Future<bool> _incrementalRefresh() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final lastSyncMs = prefs.getInt(_lastSyncTimeKey);
+      if (lastSyncMs == null) {
+        // 没有同步时间记录，无法增量更新
+        return false;
+      }
+
+      final lastSync = DateTime.fromMillisecondsSinceEpoch(lastSyncMs);
+      final syncTimestamp = lastSync.toUtc().toIso8601String();
+
+      if (kDebugMode) debugPrint('🔄 增量更新，起始时间: $syncTimestamp');
+
+      // 第1次请求：检查 dict_types 是否有变更（新增/删除类型）
+      final typesResult = await ApiClient.get(
+        'dict_types',
+        select: 'id,code,name,description,sort_order,is_system,is_active,updated_at',
+        filters: {'updated_at': 'gt.$syncTimestamp'},
+        limit: null,
+      );
+
+      if (!typesResult.isSuccess) return false;
+
+      // 如果有类型变更，需要全量更新（类型增删影响整体结构）
+      if (typesResult.data != null && typesResult.data!.isNotEmpty) {
+        if (kDebugMode) debugPrint('🔄 检测到字典类型变更，需要全量更新');
+        return false;
+      }
+
+      // 第2次请求：获取变更的 dict_items
+      final neededIds = _typeIdMap.values.toList();
+      if (neededIds.isEmpty) return false;
+
+      final idList = neededIds.map((id) => '"$id"').join(',');
+      final itemsResult = await ApiClient.get(
+        'dict_items',
+        filters: {
+          'type_id': 'in.($idList)',
+          'updated_at': 'gt.$syncTimestamp',
+        },
+        select: 'id,type_id,code,label,value,extra,sort_order,is_default,is_active,updated_at',
+        order: 'sort_order.asc',
+        limit: null,
+      );
+
+      if (!itemsResult.isSuccess) return false;
+
+      final changedItems = itemsResult.data ?? [];
+
+      if (changedItems.isEmpty) {
+        // 没有变更，只更新同步时间
+        await prefs.setInt(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
+        if (kDebugMode) debugPrint('✅ 字典无变更');
+        return true;
+      }
+
+      if (kDebugMode) debugPrint('🔄 增量更新 ${changedItems.length} 条变更项');
+
+      // 合并变更项到现有缓存
+      for (final json in changedItems) {
+        final item = DictItem.fromJson(json);
+        final typeCode = _typeIdMap.entries
+            .firstWhere((entry) => entry.value == item.typeId,
+                orElse: () => const MapEntry('', ''))
+            .key;
+
+        if (typeCode.isNotEmpty) {
+          final typeItems = _cache[typeCode] ?? [];
+          final existingIndex = typeItems.indexWhere((i) => i.id == item.id);
+
+          if (!item.isActive) {
+            // 已停用的项从缓存中移除
+            if (existingIndex >= 0) {
+              typeItems.removeAt(existingIndex);
+            }
+          } else if (existingIndex >= 0) {
+            // 更新已有项
+            typeItems[existingIndex] = item;
+          } else {
+            // 新增项
+            typeItems.add(item);
+          }
+        }
+      }
+
+      // 更新同步时间并保存缓存
+      await _saveToLocalCache();
+      await prefs.setInt(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
+
+      if (kDebugMode) debugPrint('✅ 字典增量更新完成');
+      return true;
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 增量更新异常: $e');
+      return false;
     }
   }
 
@@ -263,17 +404,7 @@ class DictService {
       final cacheData = <String, dynamic>{};
 
       _cache.forEach((key, items) {
-        cacheData[key] = items.map((item) => {
-          'id': item.id,
-          'type_id': item.typeId,
-          'code': item.code,
-          'label': item.label,
-          'value': item.value,
-          'extra': item.extra,
-          'sort_order': item.sortOrder,
-          'is_default': item.isDefault,
-          'is_active': item.isActive,
-        }).toList();
+        cacheData[key] = items.map((item) => item.toJson()).toList();
       });
 
       cacheData['_typeIdMap'] = _typeIdMap;

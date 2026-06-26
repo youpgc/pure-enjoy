@@ -4,6 +4,7 @@ import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/offline_sync_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -222,20 +223,34 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       if (result.isSuccess) {
         await _loadExpenses(refresh: true);
-        // 通知其他页面刷新
         EventBus.instance.fire(EventType.expenseUpdated);
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.create,
+          table: 'expenses',
+          data: expense.toJson(),
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.create,
+        table: 'expenses',
+        data: expense.toJson(),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
@@ -253,20 +268,34 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
         if (result.isSuccess) {
           await _loadExpenses(refresh: true);
-          // 通知其他页面刷新
           EventBus.instance.fire(EventType.expenseUpdated);
+          OfflineSyncService.instance.syncPending();
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
             );
           }
         } else {
-          throw Exception('HTTP ${result.statusCode}');
+          await OfflineSyncService.instance.enqueue(
+            action: OfflineAction.delete,
+            table: 'expenses',
+            filters: {'id': 'eq.$id'},
+          );
+          if (mounted) {
+            ScaffoldMessenger.of(context).showSnackBar(
+              const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+            );
+          }
         }
       } catch (e) {
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.delete,
+          table: 'expenses',
+          filters: {'id': 'eq.$id'},
+        );
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
           );
         }
       }
@@ -275,34 +304,58 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
   Future<void> _updateExpense(ExpenseModel expense) async {
     try {
+      final body = {
+        'amount': expense.amount,
+        'category': expense.category,
+        'description': expense.description,
+        'note': expense.note,
+        'date': expense.date.toIso8601String().split('T').first,
+      };
       final result = await ApiClient.patchByFilter(
         'expenses',
         filters: {'id': 'eq.${expense.id}'},
-        body: {
-          'amount': expense.amount,
-          'category': expense.category,
-          'description': expense.description,
-          'note': expense.note,
-          'date': expense.date.toIso8601String().split('T').first,
-        },
+        body: body,
       );
 
       if (result.isSuccess) {
         await _loadExpenses(refresh: true);
-        // 通知其他页面刷新
         EventBus.instance.fire(EventType.expenseUpdated);
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.update,
+          table: 'expenses',
+          data: body,
+          filters: {'id': 'eq.${expense.id}'},
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      final body = {
+        'amount': expense.amount,
+        'category': expense.category,
+        'description': expense.description,
+        'note': expense.note,
+        'date': expense.date.toIso8601String().split('T').first,
+      };
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.update,
+        table: 'expenses',
+        data: body,
+        filters: {'id': 'eq.${expense.id}'},
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }

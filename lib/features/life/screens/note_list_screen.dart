@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/offline_sync_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -154,18 +155,33 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
       if (result.isSuccess) {
         await _loadNotes(refresh: true);
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('创建成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.create,
+          table: 'notes',
+          data: note.toJson(),
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.create,
+        table: 'notes',
+        data: note.toJson(),
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('创建失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
@@ -181,18 +197,35 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
       if (result.isSuccess) {
         await _loadNotes(refresh: true);
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.update,
+          table: 'notes',
+          data: note.toJsonForUpdate(),
+          filters: {'id': 'eq.${note.id}'},
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.update,
+        table: 'notes',
+        data: note.toJsonForUpdate(),
+        filters: {'id': 'eq.${note.id}'},
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
@@ -214,18 +247,33 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
       if (result.isSuccess) {
         await _loadNotes(refresh: true);
+        OfflineSyncService.instance.syncPending();
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('删除成功')),
           );
         }
       } else {
-        throw Exception('HTTP ${result.statusCode}');
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.delete,
+          table: 'notes',
+          filters: {'id': 'eq.$id'},
+        );
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
+          );
+        }
       }
     } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.delete,
+        table: 'notes',
+        filters: {'id': 'eq.$id'},
+      );
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('删除失败: $e')),
+          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
         );
       }
     }
