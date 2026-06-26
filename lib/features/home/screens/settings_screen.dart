@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/api_client.dart';
+import '../../../services/chapter_cache_service.dart';
 import 'data_sync_screen.dart';
 import 'rich_text_page.dart';
 import '../../../services/data_export_service.dart';
@@ -439,9 +440,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         key != 'user'
       ).toList();
       await Future.wait(keysToRemove.map((key) => prefs.remove(key)));
+
+      // 清除章节缓存文件（Bug 9 修复：之前只清除了索引，磁盘文件未被删除）
+      final chapterCacheCount = await ChapterCacheService.instance.clearAllCache();
+
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('缓存已清除（${keysToRemove.length}项）')),
+          SnackBar(content: Text('缓存已清除（${keysToRemove.length}项 + $chapterCacheCount个章节文件）')),
         );
       }
     } catch (e) {

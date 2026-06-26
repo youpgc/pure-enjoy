@@ -32,12 +32,12 @@ class _CacheEntry {
   };
 
   factory _CacheEntry.fromJson(Map<String, dynamic> json) => _CacheEntry(
-    chapterId: json['chapter_id'] as String,
-    novelId: json['novel_id'] as String,
-    title: json['title'] as String,
-    chapterOrder: json['chapter_order'] as int,
-    contentLength: json['content_length'] as int,
-    cachedAt: DateTime.parse(json['cached_at'] as String),
+    chapterId: json['chapter_id']?.toString() ?? '',
+    novelId: json['novel_id']?.toString() ?? '',
+    title: json['title']?.toString() ?? '',
+    chapterOrder: json['chapter_order'] is int ? json['chapter_order'] as int : int.tryParse(json['chapter_order']?.toString() ?? '0') ?? 0,
+    contentLength: json['content_length'] is int ? json['content_length'] as int : int.tryParse(json['content_length']?.toString() ?? '0') ?? 0,
+    cachedAt: DateTime.tryParse(json['cached_at']?.toString() ?? '') ?? DateTime.now(),
   );
 }
 
@@ -165,22 +165,27 @@ class ChapterCacheService {
   /// 删除某本小说的所有缓存
   Future<int> clearNovelCache(String novelId) async {
     final chapters = getCachedChapters(novelId);
+    if (chapters.isEmpty) return 0;
     int count = 0;
-    for (final chapter in chapters) {
-      try {
-        final dir = await _cacheDir;
-        final file = File('${dir.path}/${_cacheFileName(chapter.chapterId)}');
-        if (await file.exists()) {
-          await file.delete();
-          count++;
+    try {
+      final dir = await _cacheDir;
+      for (final chapter in chapters) {
+        try {
+          final file = File('${dir.path}/${_cacheFileName(chapter.chapterId)}');
+          if (await file.exists()) {
+            await file.delete();
+            count++;
+          }
+          _index?.remove(chapter.chapterId);
+        } catch (e) {
+          if (kDebugMode) debugPrint('❌ 删除缓存失败');
         }
-        _index!.remove(chapter.chapterId);
-      } catch (e) {
-        if (kDebugMode) debugPrint('❌ 删除缓存失败');
       }
+      await _saveIndex();
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 清除小说缓存失败');
     }
-    await _saveIndex();
-    if (kDebugMode) debugPrint('🗑️ 清除小说缓存');
+    if (kDebugMode) debugPrint('🗑️ 清除小说缓存 $count 章');
     return count;
   }
 

@@ -169,6 +169,9 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         );
       }
     } catch (e) {
+      if (!refresh) {
+        onPaginationDataLoaded(0); // Bug 12 修复：释放分页锁，防止加载更多失败后卡死
+      }
       setState(() => _isLoading = false);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -258,7 +261,10 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       MaterialPageRoute(
         builder: (_) => NovelDetailScreen(novel: novel),
       ),
-    );
+    ).then((_) {
+      // Bug 10 修复：从详情页返回后刷新数据，更新书架状态
+      if (mounted) _loadNovels(refresh: true);
+    });
   }
 
   /// 获取正在阅读的小说（只显示在读的：progress > 0 且 progress < 1，且章节数 > 0）
@@ -454,25 +460,30 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                             ),
                           ),
                         )
-                      : GridView.builder(
-                          shrinkWrap: true,
-                          physics: const NeverScrollableScrollPhysics(),
-                          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                            crossAxisCount: 2,
-                            childAspectRatio: 0.7,
-                            crossAxisSpacing: 12,
-                            mainAxisSpacing: 12,
-                          ),
-                          itemCount: _novels.length,
-                          itemBuilder: (context, index) {
-                            final novel = _novels[index];
+                      : Builder(
+                          builder: (context) {
+                            // Bug 11 修复：提升到 GridView 外部计算一次，避免每个 item 都重新计算 O(n*m)
                             final bookshelfIds = _userNovels.map((un) => un['novel_id'].toString()).toSet();
-                            final isInBookshelf = bookshelfIds.contains(novel.id);
-                            return _NovelCard(
-                              novel: novel,
-                              onTap: () => _openNovelDetail(novel),
-                              onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
-                              isInBookshelf: isInBookshelf,
+                            return GridView.builder(
+                              shrinkWrap: true,
+                              physics: const NeverScrollableScrollPhysics(),
+                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                                crossAxisCount: 2,
+                                childAspectRatio: 0.7,
+                                crossAxisSpacing: 12,
+                                mainAxisSpacing: 12,
+                              ),
+                              itemCount: _novels.length,
+                              itemBuilder: (context, index) {
+                                final novel = _novels[index];
+                                final isInBookshelf = bookshelfIds.contains(novel.id);
+                                return _NovelCard(
+                                  novel: novel,
+                                  onTap: () => _openNovelDetail(novel),
+                                  onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
+                                  isInBookshelf: isInBookshelf,
+                                );
+                              },
                             );
                           },
                         ),
