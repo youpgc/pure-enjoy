@@ -326,10 +326,12 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ? const LoadingWidget()
           : _favorites.isEmpty
               ? const EmptyWidget(icon: Icons.bookmark_border, message: '暂无收藏')
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _favorites.length,
-                  itemBuilder: (context, index) {
+              : RefreshIndicator(
+                  onRefresh: _loadFavorites,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _favorites.length,
+                    itemBuilder: (context, index) {
                     final favorite = _favorites[index];
                     final categoryLabel = DictService.instance.getLabelOrDefault('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
 
@@ -453,6 +455,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     );
                   },
                 ),
+              ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),
         child: const Icon(Icons.add),

@@ -458,27 +458,30 @@ class _HabitsScreenState extends State<HabitsScreen> {
           ? const LoadingWidget()
           : _habits.isEmpty
               ? const EmptyWidget(icon: Icons.track_changes_outlined, message: '还没有习惯')
-              : ListView.builder(
-                  padding: const EdgeInsets.all(16),
-                  itemCount: _habits.length,
-                  itemBuilder: (context, index) {
-                    final habit = _habits[index];
-                    final isCheckedIn = _isCheckedInToday(habit.id);
-                    final totalCheckins = _getTotalCheckins(habit.id);
-                    final schedule = _reminderSchedules[habit.id];
-                    final shouldRemindToday = schedule?.shouldRemindToday(DateTime.now()) ?? false;
-                    return _HabitCard(
-                      habit: habit,
-                      isCheckedIn: isCheckedIn,
-                      totalCheckins: totalCheckins,
-                      reminderSchedule: schedule,
-                      shouldRemindToday: shouldRemindToday,
-                      onCheckIn: () => _checkIn(habit),
-                      onEdit: () => _showEditDialog(habit: habit),
-                      onDelete: () => _deleteHabit(habit.id),
-                      onViewHistory: () => _showHistoryDialog(habit),
-                    );
-                  },
+              : RefreshIndicator(
+                  onRefresh: _loadHabits,
+                  child: ListView.builder(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: _habits.length,
+                    itemBuilder: (context, index) {
+                      final habit = _habits[index];
+                      final isCheckedIn = _isCheckedInToday(habit.id);
+                      final totalCheckins = _getTotalCheckins(habit.id);
+                      final schedule = _reminderSchedules[habit.id];
+                      final shouldRemindToday = schedule?.shouldRemindToday(DateTime.now()) ?? false;
+                      return _HabitCard(
+                        habit: habit,
+                        isCheckedIn: isCheckedIn,
+                        totalCheckins: totalCheckins,
+                        reminderSchedule: schedule,
+                        shouldRemindToday: shouldRemindToday,
+                        onCheckIn: () => _checkIn(habit),
+                        onEdit: () => _showEditDialog(habit: habit),
+                        onDelete: () => _deleteHabit(habit.id),
+                        onViewHistory: () => _showHistoryDialog(habit),
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showEditDialog(),

@@ -219,86 +219,89 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   }
 
   Widget _buildNotificationList() {
-    return ListView.separated(
-      itemCount: _notifications.length,
-      separatorBuilder: (_, __) => const Divider(height: 1),
-      itemBuilder: (context, index) {
-        final item = _notifications[index];
-        final isRead = item['is_read'] as bool? ?? false;
-        final icon = _getIcon(item['icon'] as String?);
-        final color = _getColor(item['color'] as String?);
-        final type = _getTypeLabel(item['type'] as String?);
-        final createdAt = item['created_at'] as String?;
+    return RefreshIndicator(
+      onRefresh: _loadNotifications,
+      child: ListView.separated(
+        itemCount: _notifications.length,
+        separatorBuilder: (_, __) => const Divider(height: 1),
+        itemBuilder: (context, index) {
+          final item = _notifications[index];
+          final isRead = item['is_read'] as bool? ?? false;
+          final icon = _getIcon(item['icon'] as String?);
+          final color = _getColor(item['color'] as String?);
+          final type = _getTypeLabel(item['type'] as String?);
+          final createdAt = item['created_at'] as String?;
 
-        return ListTile(
-          leading: Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              color: color.withOpacity(0.1),
-              borderRadius: BorderRadius.circular(20),
+          return ListTile(
+            leading: Container(
+              width: 40,
+              height: 40,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(20),
+              ),
+              child: Icon(icon, color: color, size: 20),
             ),
-            child: Icon(icon, color: color, size: 20),
-          ),
-          title: Row(
-            children: [
-              if (!isRead)
-                Container(
-                  width: 8,
-                  height: 8,
-                  margin: const EdgeInsets.only(right: 6),
-                  decoration: BoxDecoration(
-                    color: Theme.of(context).colorScheme.error,
-                    shape: BoxShape.circle,
-                  ),
-                ),
-              Expanded(
-                child: Text(
-                  item['title'] ?? '',
-                  style: TextStyle(
-                    fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
-                  ),
-                  overflow: TextOverflow.ellipsis,
-                ),
-              ),
-            ],
-          ),
-          subtitle: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              const SizedBox(height: 2),
-              Text(
-                item['body'] ?? '',
-                maxLines: 2,
-                overflow: TextOverflow.ellipsis,
-                style: TextStyle(
-                  fontSize: 13,
-                  color: isRead ? Theme.of(context).colorScheme.onSurfaceVariant : null,
-                ),
-              ),
-              const SizedBox(height: 2),
-              Row(
-                children: [
+            title: Row(
+              children: [
+                if (!isRead)
                   Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                    width: 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(right: 6),
                     decoration: BoxDecoration(
-                      border: Border.all(color: color.withOpacity(0.3)),
-                      borderRadius: BorderRadius.circular(3),
+                      color: Theme.of(context).colorScheme.error,
+                      shape: BoxShape.circle,
                     ),
-                    child: Text(type, style: TextStyle(fontSize: 10, color: color)),
                   ),
-                  const SizedBox(width: 8),
-                  Text(
-                    _formatTime(createdAt),
-                    style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                Expanded(
+                  child: Text(
+                    item['title'] ?? '',
+                    style: TextStyle(
+                      fontWeight: isRead ? FontWeight.normal : FontWeight.bold,
+                    ),
+                    overflow: TextOverflow.ellipsis,
                   ),
-                ],
-              ),
-            ],
-          ),
-          onTap: isRead ? null : () => _markAsRead(item['id']),
-        );
-      },
+                ),
+              ],
+            ),
+            subtitle: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const SizedBox(height: 2),
+                Text(
+                  item['body'] ?? '',
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: TextStyle(
+                    fontSize: 13,
+                    color: isRead ? Theme.of(context).colorScheme.onSurfaceVariant : null,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Row(
+                  children: [
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: color.withOpacity(0.3)),
+                        borderRadius: BorderRadius.circular(3),
+                      ),
+                      child: Text(type, style: TextStyle(fontSize: 10, color: color)),
+                    ),
+                    const SizedBox(width: 8),
+                    Text(
+                      _formatTime(createdAt),
+                      style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+            onTap: isRead ? null : () => _markAsRead(item['id']),
+          );
+        },
+      ),
     );
   }
 

@@ -811,9 +811,11 @@ class _DashboardPageState extends State<DashboardPage> {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
-          await _loadRecentActivities();
-          await _loadPendingReminders();
-          await _loadRecentNovels();
+          await Future.wait([
+            _loadRecentActivities(),
+            _loadPendingReminders(),
+            _loadRecentNovels(),
+          ]);
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
