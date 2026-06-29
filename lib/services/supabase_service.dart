@@ -26,6 +26,14 @@ class SecureLogger {
       debugPrint(message);
     }
   }
+
+  /// 从异常对象中提取可读错误信息（避免 release 模式下显示 Instance of 'Xxx'）
+  static String extractError(Object e) {
+    if (e is String) return e;
+    final s = e.toString();
+    if (s.startsWith('Instance of ')) return e.runtimeType.toString();
+    return s;
+  }
 }
 
 /// 缓存条目
@@ -233,7 +241,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      return SupabaseAuthResponse(error: '登录出错: $e');
+      return SupabaseAuthResponse(error: '登录出错：${SecureLogger.extractError(e)}');
     }
   }
 
@@ -283,26 +291,40 @@ class AuthService {
         filter = 'or=(username.eq.$account,nickname.eq.$account)';
       }
 
+      final baseUrl = SupabaseConfig.url;
+      final anonKey = SupabaseConfig.anonKey;
+      final fullUrl = '$baseUrl/rest/v1/users?$filter&select=email';
+
+      SecureLogger.log('🔍 解析账号 - URL: $fullUrl');
+      SecureLogger.log('🔍 解析账号 - anonKey长度: ${anonKey.length}');
+
       final response = await http.get(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/users?$filter&select=email'),
+        Uri.parse(fullUrl),
         headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+          'apikey': anonKey,
+          'Authorization': 'Bearer $anonKey',
         },
       );
+
+      SecureLogger.log('🔍 解析账号 - 状态码: ${response.statusCode}');
+      SecureLogger.log('🔍 解析账号 - 响应: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = jsonDecode(response.body) as List<dynamic>;
         if (data.isNotEmpty) {
-          return data[0]['email'] as String?;
+          final email = data[0]['email'] as String?;
+          SecureLogger.log('✅ 解析成功: $email');
+          return email;
         }
+        SecureLogger.warning('⚠️ 查询结果为空');
         return null;
       } else {
         SecureLogger.warning('⚠️ 查询用户信息失败: ${response.statusCode}');
+        SecureLogger.warning('⚠️ 响应体: ${response.body}');
         return null;
       }
     } catch (e) {
-      SecureLogger.warning('⚠️ 解析账号失败: $e');
+      SecureLogger.warning('⚠️ 解析账号异常: ${SecureLogger.extractError(e)}');
       return null;
     }
   }
@@ -358,7 +380,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      return SupabaseAuthResponse(error: '注册出错: $e');
+      return SupabaseAuthResponse(error: '注册出错：${SecureLogger.extractError(e)}');
     }
   }
 
