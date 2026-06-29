@@ -65,7 +65,7 @@ class AuthApi {
       return _parseError(response.body, '登录失败');
     } catch (e) {
       return SupabaseAuthResponse(
-          error: '登录出错：${SecureLogger.extractError(e)}');
+          error: '登录失败：${SecureLogger.extractError(e)}');
     }
   }
 
@@ -92,7 +92,7 @@ class AuthApi {
       return await signInWithEmail(email: email, password: password);
     } catch (e) {
       return SupabaseAuthResponse(
-          error: '登录出错：${SecureLogger.extractError(e)}');
+          error: '登录失败：${SecureLogger.extractError(e)}');
     }
   }
 
@@ -126,7 +126,7 @@ class AuthApi {
       return _parseError(response.body, '注册失败');
     } catch (e) {
       return SupabaseAuthResponse(
-          error: '注册出错：${SecureLogger.extractError(e)}');
+          error: '注册失败：${SecureLogger.extractError(e)}');
     }
   }
 
@@ -148,7 +148,7 @@ class AuthApi {
     } catch (e) {
       SecureLogger.warning(
           '⚠️ 刷新Token失败: ${SecureLogger.extractError(e)}');
-      return SupabaseAuthResponse(error: '刷新Token出错');
+      return SupabaseAuthResponse(error: '刷新Token失败');
     }
   }
 
@@ -205,7 +205,7 @@ class AuthApi {
     } catch (e) {
       return {
         'success': false,
-        'message': '修改密码出错：${SecureLogger.extractError(e)}',
+        'message': '修改密码失败：${SecureLogger.extractError(e)}',
       };
     }
   }
