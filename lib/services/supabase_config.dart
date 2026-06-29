@@ -16,12 +16,17 @@ class SecureLogger {
     if (kDebugMode) debugPrint(message);
   }
 
-  /// 从异常对象中提取可读错误信息（避免 release 模式下显示 Instance of 'Xxx'）
+  /// 从异常对象中提取可读错误信息
+  ///
+  /// release 模式下类名会被混淆，需要针对不同异常类型提取有意义的信息。
+  /// FormatException.toString() 只返回类名，必须用 .message。
   static String extractError(Object e) {
     if (e is String) return e;
-    final s = e.toString();
-    if (s.startsWith('Instance of ')) return e.runtimeType.toString();
-    return s;
+    if (e is FormatException) return e.message;
+    // Error 和 Exception 的 toString() 在 release 模式可能返回混淆名
+    final msg = e.toString();
+    if (msg.startsWith('Instance of ')) return e.runtimeType.toString();
+    return msg;
   }
 }
 

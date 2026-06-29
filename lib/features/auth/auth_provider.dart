@@ -93,7 +93,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(error: response.error ?? '登录失败');
       return false;
     } catch (e) {
-      state = state.copyWith(error: '登录出错：${e is String ? e : e.toString()}');
+      state = state.copyWith(error: '登录失败：${SecureLogger.extractError(e)}');
       return false;
     }
   }
@@ -124,7 +124,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(error: response.error ?? '登录失败');
       return false;
     } catch (e) {
-      state = state.copyWith(error: '登录出错：$e');
+      state = state.copyWith(error: '登录失败：${SecureLogger.extractError(e)}');
       return false;
     }
   }
@@ -159,7 +159,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       state = state.copyWith(error: response.error ?? '注册失败');
       return false;
     } catch (e) {
-      state = state.copyWith(error: '注册出错：${e is String ? e : e.toString()}');
+      state = state.copyWith(error: '注册失败：${SecureLogger.extractError(e)}');
       return false;
     }
   }
