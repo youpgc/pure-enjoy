@@ -3,6 +3,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../novel/screens/novel_detail_screen.dart';
 import '../../novel/models/novel_model.dart';
+import '../../../constants/app_constants.dart';
 
 /// 阅读历史页面
 class ReadingHistoryScreen extends StatefulWidget {
@@ -206,7 +207,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
               cover: coverUrl ?? '',
               description: novelData['description'] ?? '',
               category: novelData['category'] ?? '',
-              status: novelData['status'] ?? 'ongoing',
+              status: novelData['status'] ?? novelStatusOngoing,
               wordCount: novelData['word_count'] ?? 0,
               chapterCount: novelData['chapter_count'] ?? 0,
               createdAt: DateTime.now(),

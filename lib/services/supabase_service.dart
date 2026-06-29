@@ -4,6 +4,7 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import '../env.dart';
 import 'http_client.dart';
+import '../constants/app_constants.dart';
 
 /// 安全日志工具：仅在开发模式或调试模式下输出日志
 /// 生产环境中所有日志输出都会被静默处理，防止敏感信息泄露
@@ -233,6 +234,76 @@ class AuthService {
     }
   }
 
+
+  /// 统一账号登录（邮箱/手机号/用户名/昵称 + 密码）
+  /// 检测账号类型，解析为 email 后调用 Supabase Auth
+  Future<SupabaseAuthResponse> signInWithAccount({
+    required String account,
+    required String password,
+  }) async {
+    try {
+      final accountType = _detectAccountType(account);
+      SecureLogger.log('🔐 统一账号登录，类型: $accountType');
+
+      String email;
+      if (accountType == 'email') {
+        email = account;
+      } else {
+        final resolved = await _resolveAccountToEmail(account, accountType);
+        if (resolved == null) {
+          return SupabaseAuthResponse(error: '未找到该账号对应的用户');
+        }
+        email = resolved;
+      }
+
+      return await signInWithEmail(email: email, password: password);
+    } catch (e) {
+      return SupabaseAuthResponse(error: '登录出错: $e');
+    }
+  }
+
+  /// 检测账号类型：email / phone / username
+  String _detectAccountType(String account) {
+    if (RegExp(r'^[\w.-]+@([\w-]+\.)+[\w-]{2,}$').hasMatch(account)) return 'email';
+    if (RegExp(r'^1[3-9]\d{9}$').hasMatch(account)) return 'phone';
+    return 'username';
+  }
+
+  /// 查询 users 表，将手机号/用户名/昵称解析为 email
+  Future<String?> _resolveAccountToEmail(String account, String type) async {
+    try {
+      String filter;
+      if (type == 'phone') {
+        filter = 'phone=eq.$account';
+      } else {
+        // 用户名和昵称都可能匹配
+        filter = 'or=(username.eq.$account,nickname.eq.$account)';
+      }
+
+      final response = await http.get(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/users?$filter&select=email'),
+        headers: {
+          'apikey': SupabaseConfig.anonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        if (data.isNotEmpty) {
+          return data[0]['email'] as String?;
+        }
+        return null;
+      } else {
+        SecureLogger.warning('⚠️ 查询用户信息失败: ${response.statusCode}');
+        return null;
+      }
+    } catch (e) {
+      SecureLogger.warning('⚠️ 解析账号失败: $e');
+      return null;
+    }
+  }
+
   /// 注册（Supabase Auth）
   Future<SupabaseAuthResponse> signUpWithEmail({
     required String email,
@@ -255,7 +326,7 @@ class AuthService {
           'data': {
             if (username != null) 'username': username,
             if (phone != null) 'phone': phone,
-            'role': 'user',
+            'role': roleUser,
           },
         }),
       );

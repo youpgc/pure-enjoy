@@ -1,5 +1,6 @@
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/supabase_service.dart';
+import '../../constants/app_constants.dart';
 
 /// 认证状态
 class AuthState {
@@ -56,7 +57,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final user = service.currentUser;
       final role = user?['user_metadata']?['role'] as String? ??
           user?['app_metadata']?['role'] as String? ??
-          'user';
+          roleUser;
       state = AuthState(
         isAuthenticated: true,
         userId: service.currentUserId,
@@ -80,7 +81,38 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
-        final role = user?['user_metadata']?['role'] as String? ?? 'user';
+        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
+        state = AuthState(
+          isAuthenticated: true,
+          userId: response.userId,
+          email: response.email,
+          role: role,
+        );
+        return true;
+      }
+      state = state.copyWith(error: response.error ?? '登录失败');
+      return false;
+    } catch (e) {
+      state = state.copyWith(error: '登录出错：$e');
+      return false;
+    }
+  }
+
+/// 统一账号登录（邮箱/手机号/用户名/昵称 + 密码）
+  Future<bool> signInWithAccount({
+    required String account,
+    required String password,
+  }) async {
+    try {
+      state = state.clearError();
+      final response = await SupabaseService.instance.signInWithAccount(
+        account: account,
+        password: password,
+      );
+
+      if (response.success) {
+        final user = SupabaseService.instance.currentUser;
+        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -115,7 +147,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
-        final role = user?['user_metadata']?['role'] as String? ?? 'user';
+        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -142,7 +174,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> refreshUser() async {
     final user = await SupabaseService.instance.refreshUser();
     if (user != null) {
-      final role = user['user_metadata']?['role'] as String? ?? 'user';
+      final role = user['user_metadata']?['role'] as String? ?? roleUser;
       state = AuthState(
         isAuthenticated: true,
         userId: user['id'] as String?,

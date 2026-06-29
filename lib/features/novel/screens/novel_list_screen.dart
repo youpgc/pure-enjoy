@@ -9,6 +9,7 @@ import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
+import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
 
 /// 小说列表页面
@@ -31,12 +32,12 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
 
   /// 分类列表（从字典服务获取）
   List<String> get _categories {
-    final items = DictService.instance.getItemsSync('novel_category');
+    final items = DictService.instance.getItemsSync(dictNovelCategory);
     return ['all', ...items.map((item) => item.code)];
   }
 
   /// 状态列表
-  List<String> get _statuses => ['all', 'ongoing', 'completed'];
+  List<String> get _statuses => ['all', novelStatusOngoing, novelStatusCompleted];
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -393,7 +394,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         final label = category == 'all'
                             ? '全部'
                             : DictService.instance.getLabelOrDefault(
-                                'novel_category',
+                                dictNovelCategory,
                                 category,
                                 defaultValue: category,
                               );
@@ -417,9 +418,11 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         final status = _statuses[index];
                         final label = status == 'all'
                             ? '全部'
-                            : status == 'ongoing'
-                                ? '连载中'
-                                : '已完结';
+                            : DictService.instance.getLabelOrDefault(
+                                dictNovelStatus,
+                                status,
+                                defaultValue: status,
+                              );
                         return CategoryChip(
                           label: label,
                           isSelected: _selectedStatus == status,
@@ -433,7 +436,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                   // 小说列表
                   Text(
                     _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabelOrDefault(
-                        'novel_category',
+                        dictNovelCategory,
                         _selectedCategory,
                         defaultValue: _selectedCategory,
                       ),
@@ -616,7 +619,7 @@ class _NovelCard extends StatelessWidget {
                         if (novel.category != null)
                           Text(
                             DictService.instance.getLabelOrDefault(
-                              'novel_category',
+                              dictNovelCategory,
                               novel.category!,
                               defaultValue: novel.category!,
                             ),

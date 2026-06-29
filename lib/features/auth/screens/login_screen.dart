@@ -4,37 +4,30 @@ import '../../../services/supabase_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
 import '../auth_provider.dart';
-
 /// 登录页面
-/// 仅支持 Supabase Auth（邮箱+密码）
+/// 统一账号（用户名/昵称/邮箱/手机号）+ 密码
 class LoginScreen extends ConsumerStatefulWidget {
   const LoginScreen({super.key});
-
   @override
   ConsumerState<LoginScreen> createState() => _LoginScreenState();
 }
-
 class _LoginScreenState extends ConsumerState<LoginScreen> {
   final _formKey = GlobalKey<FormState>();
-
   // 登录字段
-  final _emailController = TextEditingController();
+  final _accountController = TextEditingController();
   final _passwordController = TextEditingController();
-
   // 注册字段
   final _regEmailController = TextEditingController();
   final _regPasswordController = TextEditingController();
   final _regUsernameController = TextEditingController();
   final _regPhoneController = TextEditingController();
-
   bool _isLoading = false;
   bool _obscurePassword = true;
   bool _obscureRegPassword = true;
   bool _isRegister = false;
-
   @override
   void dispose() {
-    _emailController.dispose();
+    _accountController.dispose();
     _passwordController.dispose();
     _regEmailController.dispose();
     _regPasswordController.dispose();
@@ -42,29 +35,24 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
     _regPhoneController.dispose();
     super.dispose();
   }
-
-  /// 登录提交（仅 Supabase Auth）
+  /// 登录提交（统一账号）
   Future<void> _submitLogin() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     try {
-      final email = _emailController.text.trim();
+      final account = _accountController.text.trim();
       final password = _passwordController.text;
-
-      final success = await ref.read(authProvider.notifier).signInWithEmail(
-        email: email,
+      final success = await ref.read(authProvider.notifier).signInWithAccount(
+        account: account,
         password: password,
       );
-
       if (success && mounted) {
         Navigator.of(context).pushReplacement(
           MaterialPageRoute(builder: (_) => const HomeScreen()),
         );
       } else if (mounted) {
         final error = ref.read(authProvider).error;
-        _showSnackBar(error ?? '登录失败，请检查邮箱和密码');
+        _showSnackBar(error ?? '登录失败，请检查账号和密码');
       }
     } catch (e) {
       if (mounted) {
@@ -76,13 +64,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     }
   }
-
   /// 注册提交
   Future<void> _submitRegister() async {
     if (!_formKey.currentState!.validate()) return;
-
     setState(() => _isLoading = true);
-
     try {
       final success = await ref.read(authProvider.notifier).signUp(
         email: _regEmailController.text.trim(),
@@ -92,7 +77,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             ? _regPhoneController.text.trim()
             : null,
       );
-
       if (success && mounted) {
         _showSnackBar('注册成功！请登录', isSuccess: true);
         setState(() => _isRegister = false);
@@ -110,7 +94,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     }
   }
-
   void _showSnackBar(String message, {bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -119,11 +102,9 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       body: SafeArea(
         child: Center(
@@ -161,12 +142,10 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       textAlign: TextAlign.center,
                     ),
                     const SizedBox(height: 32),
-
                     if (!_isRegister) ...[
                       // 登录表单
                       _buildLoginForm(colorScheme),
                       const SizedBox(height: 24),
-
                       // 登录按钮
                       FilledButton(
                         onPressed: _isLoading ? null : _submitLogin,
@@ -182,7 +161,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       // 注册表单
                       _buildRegisterForm(colorScheme),
                       const SizedBox(height: 24),
-
                       // 注册按钮
                       FilledButton(
                         onPressed: _isLoading ? null : _submitRegister,
@@ -195,9 +173,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                             : const Text('注册'),
                       ),
                     ],
-
                     const SizedBox(height: 16),
-
                     // 切换登录/注册
                     Row(
                       mainAxisAlignment: MainAxisAlignment.center,
@@ -226,26 +202,21 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-
-  /// 登录表单（邮箱+密码）
+  /// 登录表单（统一账号+密码）
   Widget _buildLoginForm(ColorScheme colorScheme) {
     return Column(
       children: [
         TextFormField(
-          controller: _emailController,
-          keyboardType: TextInputType.emailAddress,
+          controller: _accountController,
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
-            labelText: '邮箱',
-            hintText: '请输入邮箱地址',
-            prefixIcon: Icon(Icons.email_outlined),
+            labelText: '账号',
+            hintText: '用户名/昵称/邮箱/手机号',
+            prefixIcon: Icon(Icons.person_outline),
           ),
           validator: (value) {
             if (value == null || value.isEmpty) {
-              return '请输入邮箱';
-            }
-            if (!RegExp(r'^[^\s@]+@[^\s@]+\.[^\s@]+$').hasMatch(value)) {
-              return '请输入有效的邮箱地址';
+              return '请输入账号';
             }
             return null;
           },
@@ -282,7 +253,6 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ],
     );
   }
-
   /// 注册表单
   Widget _buildRegisterForm(ColorScheme colorScheme) {
     return SingleChildScrollView(
@@ -371,4 +341,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-}
+}
