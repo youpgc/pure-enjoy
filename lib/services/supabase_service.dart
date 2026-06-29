@@ -26,6 +26,14 @@ class SecureLogger {
       debugPrint(message);
     }
   }
+
+  /// 从异常对象中提取可读错误信息（避免 release 模式下显示 Instance of 'Xxx'）
+  static String extractError(Object e) {
+    if (e is String) return e;
+    final s = e.toString();
+    if (s.startsWith('Instance of ')) return e.runtimeType.toString();
+    return s;
+  }
 }
 
 /// 缓存条目
@@ -233,7 +241,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      return SupabaseAuthResponse(error: '登录出错: $e');
+      return SupabaseAuthResponse(error: '登录出错：${SecureLogger.extractError(e)}');
     }
   }
 
@@ -316,7 +324,7 @@ class AuthService {
         return null;
       }
     } catch (e) {
-      SecureLogger.warning('⚠️ 解析账号异常: $e');
+      SecureLogger.warning('⚠️ 解析账号异常: ${SecureLogger.extractError(e)}');
       return null;
     }
   }
@@ -372,7 +380,7 @@ class AuthService {
         );
       }
     } catch (e) {
-      return SupabaseAuthResponse(error: '注册出错: $e');
+      return SupabaseAuthResponse(error: '注册出错：${SecureLogger.extractError(e)}');
     }
   }
 
