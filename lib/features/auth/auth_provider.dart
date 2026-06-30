@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../services/supabase_service.dart';
 import '../../constants/app_constants.dart';
@@ -74,10 +75,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     try {
       state = state.clearError();
+      if (kDebugMode) debugPrint('🔐 [Provider] 开始邮箱登录: $email');
       final response = await SupabaseService.instance.signInWithEmail(
         email: email,
         password: password,
       );
+      if (kDebugMode) debugPrint('🔐 [Provider] 结果: success=${response.success}, error=${response.error}');
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
@@ -105,10 +108,12 @@ class AuthNotifier extends StateNotifier<AuthState> {
   }) async {
     try {
       state = state.clearError();
+      if (kDebugMode) debugPrint('🔐 [Provider] 开始登录: $account');
       final response = await SupabaseService.instance.signInWithAccount(
         account: account,
         password: password,
       );
+      if (kDebugMode) debugPrint('🔐 [Provider] 结果: success=${response.success}, error=${response.error}');
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;

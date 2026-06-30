@@ -43,7 +43,12 @@ void main() async {
   }
 
   // 初始化认证服务（包含会话恢复）
+  if (kDebugMode) {
+    debugPrint('🔧 Supabase URL: ${SupabaseConfig.url}');
+    debugPrint('🔧 Anon Key: ${SupabaseConfig.anonKey.substring(0, 20)}...');
+  }
   await AuthService.instance.initialize();
+  if (kDebugMode) debugPrint('🔧 初始化完成, isLoggedIn: ${AuthService.instance.isLoggedIn}');
 
   // 字典服务和通知服务改为后台懒加载，不阻塞启动
   _lazyInitializeServices();

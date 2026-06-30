@@ -33,7 +33,10 @@ class SessionManager {
   String? get refreshToken => _refreshToken;
   Map<String, dynamic>? get authUser => _authUser;
 
-  String? get currentUserId => _authUser?['id'] as String?;
+  /// 返回 public.users 的自定义 ID（如 U17789397932M453781），而非 auth UUID
+  String? get currentUserId =>
+      _authUser?['user_metadata']?['app_user_id'] as String? ??
+      _authUser?['id'] as String?;
   String? get currentUserEmail => _authUser?['email'] as String?;
 
   String? get currentUserName {

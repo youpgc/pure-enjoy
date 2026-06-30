@@ -251,9 +251,16 @@ class PointService {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return 0;
 
+      final now = DateTime.now().toUtc();
+      final thirtyDaysLater = now.add(const Duration(days: 30));
       final result = await ApiClient.get(
-        'v_points_expiring_soon',
-        filters: {'user_id': 'eq.$userId'},
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'status': 'eq.active',
+          'and': '(expires_at.gte.${now.toIso8601String()},expires_at.lte.${thirtyDaysLater.toIso8601String()})',
+        },
+        columns: 'amount',
       );
 
       if (result.isSuccess) {

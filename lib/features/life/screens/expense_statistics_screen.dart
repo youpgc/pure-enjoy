@@ -39,13 +39,13 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
 
     try {
       final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 0);
+      final firstOfNextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
 
       final result = await ApiClient.get(
         'expenses',
         filters: {
           'user_id': 'eq.$userId',
-          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)},date.lte.${DateFormat('yyyy-MM-dd').format(endOfMonth)})',
+          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
         },
         order: 'date.desc',
         limit: 500,

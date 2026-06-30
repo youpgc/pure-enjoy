@@ -165,6 +165,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         {
           'id': checkinId,
           'habit_id': habit.id,
+          'user_id': _userId,
           'checkin_at': today.toUtc().toIso8601String(),
         },
       );

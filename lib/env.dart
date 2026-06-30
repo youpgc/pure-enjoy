@@ -15,9 +15,13 @@ class Env {
     final fromDefine = String.fromEnvironment(key);
     if (fromDefine.isNotEmpty) return fromDefine;
 
-    // 2. 其次从 flutter_dotenv 读取
-    final fromDotenv = dotenv.env[key];
-    if (fromDotenv != null && fromDotenv.isNotEmpty) return fromDotenv;
+    // 2. 其次从 flutter_dotenv 读取（load 失败时 dotenv.env 会抛 NotInitializedError）
+    try {
+      final fromDotenv = dotenv.env[key];
+      if (fromDotenv != null && fromDotenv.isNotEmpty) return fromDotenv;
+    } catch (_) {
+      // dotenv 未初始化（.env 文件不存在），跳过
+    }
 
     // 3. 使用 fallback 默认值
     if (fallback != null) return fallback;
