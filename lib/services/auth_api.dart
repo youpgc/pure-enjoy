@@ -52,6 +52,8 @@ class AuthApi {
   }) async {
     try {
       SecureLogger.log('🔐 Supabase Auth 登录请求');
+      SecureLogger.log('🔐 URL: $_authUrl/token?grant_type=password');
+      SecureLogger.log('🔐 Email: $email');
 
       final response = await http.post(
         Uri.parse('$_authUrl/token?grant_type=password'),
@@ -59,11 +61,16 @@ class AuthApi {
         body: jsonEncode({'email': email, 'password': password}),
       );
 
+      SecureLogger.log('🔐 响应码: ${response.statusCode}');
       if (response.statusCode == 200) {
-        return _parseAuthResponse(jsonDecode(response.body));
+        final result = _parseAuthResponse(jsonDecode(response.body));
+        SecureLogger.log('✅ 登录成功, userId: ${result.userId}');
+        return result;
       }
+      SecureLogger.log('❌ 登录失败, body: ${response.body.substring(0, response.body.length > 200 ? 200 : response.body.length)}');
       return _parseError(response.body, '登录失败');
     } catch (e) {
+      SecureLogger.error('❌ 登录异常: ${e.runtimeType} - ${SecureLogger.extractError(e)}');
       return SupabaseAuthResponse(
           error: '登录失败：${SecureLogger.extractError(e)}');
     }
@@ -82,10 +89,13 @@ class AuthApi {
       if (accountType == 'email') {
         email = account;
       } else {
-        final resolved = await _resolveAccountToEmail(account, accountType);
+        SecureLogger.log('🔐 开始解析账号: $account (类型: $accountType)');
+      final resolved = await _resolveAccountToEmail(account, accountType);
         if (resolved == null) {
+          SecureLogger.log('❌ 未找到账号对应用户');
           return SupabaseAuthResponse(error: '未找到该账号对应的用户');
         }
+        SecureLogger.log('✅ 解析成功: $account -> $resolved');
         email = resolved;
       }
 
@@ -223,6 +233,7 @@ class AuthApi {
   Future<String?> _resolveAccountToEmail(
       String account, String type) async {
     try {
+      SecureLogger.log('🔐 解析类型: $type, 账号: $account');
       final filter = type == 'phone'
           ? 'phone=eq.$account'
           : 'or=(username.eq.$account,nickname.eq.$account)';
