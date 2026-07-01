@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
@@ -445,7 +446,16 @@ class _LatestRecordCard extends StatelessWidget {
               // 顶部：图标 + 模块名
               Row(
                 children: [
-                  Icon(icon, size: 20, color: textColor),
+                  Container(
+                    padding: const EdgeInsets.all(5),
+                    decoration: BoxDecoration(
+                      gradient: const LinearGradient(
+                        colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
+                      ),
+                      borderRadius: BorderRadius.circular(6),
+                    ),
+                    child: Icon(icon, size: 16, color: Colors.white),
+                  ),
                   const SizedBox(width: 6),
                   Text(
                     title,
@@ -544,36 +554,61 @@ class _LifeFeatureCard extends StatelessWidget {
     return Card(
       color: color,
       elevation: 2,
+      clipBehavior: Clip.antiAlias,
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            crossAxisAlignment: CrossAxisAlignment.center,
-            children: [
-              Icon(icon, size: 36),
-              const SizedBox(height: 12),
-              Text(
-                title,
-                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                textAlign: TextAlign.center,
+        child: Column(
+          children: [
+            // 顶部渐变装饰线
+            Container(
+              height: 3,
+              decoration: const BoxDecoration(
+                gradient: LinearGradient(
+                  colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
+                ),
               ),
-              const SizedBox(height: 4),
-              Text(
-                subtitle,
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+            ),
+            Expanded(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  crossAxisAlignment: CrossAxisAlignment.center,
+                  children: [
+                    Container(
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
+                        ),
+                        borderRadius: BorderRadius.circular(12),
+                      ),
+                      padding: const EdgeInsets.all(8),
+                      child: Icon(icon, size: 28, color: Colors.white),
                     ),
-                textAlign: TextAlign.center,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                    const SizedBox(height: 12),
+                    Text(
+                      title,
+                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                            fontWeight: FontWeight.bold,
+                          ),
+                      textAlign: TextAlign.center,
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      subtitle,
+                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                          ),
+                      textAlign: TextAlign.center,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ],
+                ),
               ),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
