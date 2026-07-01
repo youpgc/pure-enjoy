@@ -35,7 +35,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   void initState() {
     super.initState();
     initPagination();
-    _loadAnniversaries();
+    _loadAnniversaries(refresh: true);
   }
 
   @override

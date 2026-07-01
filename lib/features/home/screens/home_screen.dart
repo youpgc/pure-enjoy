@@ -253,6 +253,7 @@ class _DashboardPageState extends State<DashboardPage> {
         {
           'id': const Uuid().v4(),
           'habit_id': habit.id,
+          'user_id': AuthService.instance.currentUserId,
           'checkin_at': today.toUtc().toIso8601String(),
         },
         returnRepresentation: false,

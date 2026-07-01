@@ -26,7 +26,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     super.initState();
     initPagination();
     _loadAvailablePoints();
-    _loadRecords();
+    _loadRecords(refresh: true);
   }
 
   @override
