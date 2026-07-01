@@ -358,10 +358,15 @@ class _DashboardPageState extends State<DashboardPage> {
         final list = expenseResult.data as List;
         if (list.isNotEmpty) {
           final item = list[0] as Map<String, dynamic>;
+          final categoryLabel = DictService.instance.getLabelOrDefault(
+            'expense_category',
+            item['category'] as String? ?? '',
+            defaultValue: item['category'] as String? ?? '其他',
+          );
           activities.add({
             'icon': Icons.attach_money,
             'title': '支出记录',
-            'subtitle': '${item['category'] ?? '其他'} ¥${item['amount'] ?? 0}',
+            'subtitle': '$categoryLabel ¥${item['amount'] ?? 0}',
             'time': _formatDisplayDate(item['created_at'], item['date']),
             'created_at_raw': item['created_at'] as String? ?? '',
           });
