@@ -159,6 +159,30 @@ class NovelChapterModel {
     }
     return json;
   }
+
+  NovelChapterModel copyWith({
+    String? id,
+    String? novelId,
+    String? title,
+    String? content,
+    int? chapterOrder,
+    int? chapterNumber,
+    int? wordCount,
+    bool? isFree,
+    DateTime? createdAt,
+  }) {
+    return NovelChapterModel(
+      id: id ?? this.id,
+      novelId: novelId ?? this.novelId,
+      title: title ?? this.title,
+      content: content ?? this.content,
+      chapterOrder: chapterOrder ?? this.chapterOrder,
+      chapterNumber: chapterNumber ?? this.chapterNumber,
+      wordCount: wordCount ?? this.wordCount,
+      isFree: isFree ?? this.isFree,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 /// 阅读进度模型 - 对应 Supabase user_novels 表

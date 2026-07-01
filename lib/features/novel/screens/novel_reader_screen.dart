@@ -10,6 +10,7 @@ import '../../../services/api_client.dart';
 import '../models/novel_model.dart';
 import '../widgets/reader_page_turn.dart';
 import 'novel_detail_screen.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 背景主题枚举
 enum ReaderBackground {
@@ -331,13 +332,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       if (_chapters.isNotEmpty) {
         _loadChapterContent(_chapters[startIndex]);
+        _preloadAdjacentChapters(startIndex);
       }
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载章节失败: $e')),
-        );
+        showSnackBar(context, '加载章节失败: $e');
       }
     }
   }
@@ -351,8 +351,23 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _currentPageIndex = 0;
     _totalPages = 1;
 
+    // 1. 优先从 _chapters 列表中加载已缓存的内容（无感切换）
+    final index = _chapters.indexWhere((c) => c.id == chapter.id);
+    if (index != -1 && _chapters[index].content.isNotEmpty) {
+      if (mounted) {
+        setState(() {
+          _currentChapter = _chapters[index];
+          _isLoadingChapter = false;
+        });
+      }
+      _scrollToPosition();
+      _saveProgress();
+      _startReadingTimer();
+      return;
+    }
+
     try {
-      // 先检查缓存，同时发起网络请求（并行加载）
+      // 2. 检查本地持久化缓存，同时发起网络请求（并行加载）
       final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
       final networkFuture = ApiClient.get(
         'novel_chapters',
@@ -368,16 +383,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       if (cachedContent != null) {
         // 有缓存，先显示缓存内容
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+        final cachedChapter = chapter.copyWith(content: normalizedContent);
+        final chapterIndex = _chapters.indexWhere((c) => c.id == chapter.id);
+        if (chapterIndex != -1) {
+          _chapters[chapterIndex] = cachedChapter;
+        }
         if (mounted) {
           setState(() {
-            _currentChapter = NovelChapterModel(
-              id: chapter.id,
-              novelId: chapter.novelId,
-              title: chapter.title,
-              chapterOrder: chapter.chapterOrder,
-              content: normalizedContent,
-              createdAt: chapter.createdAt,
-            );
+            _currentChapter = cachedChapter;
             _isLoadingChapter = false;
           });
         }
@@ -402,18 +415,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           // 归一化换行符，避免 \r\n 导致渲染异常
           final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
 
+          // 更新 _chapters 列表中的章节内容
+          final loadedChapter = parsedChapter.copyWith(content: normalizedContent);
+          final loadedIndex = _chapters.indexWhere((c) => c.id == parsedChapter.id);
+          if (loadedIndex != -1) {
+            _chapters[loadedIndex] = loadedChapter;
+          }
+
           // 只有当网络内容比缓存新或不同才更新UI
           if (_currentChapter == null || _currentChapter!.content != normalizedContent) {
             if (mounted) {
               setState(() {
-                _currentChapter = NovelChapterModel(
-                  id: parsedChapter.id,
-                  novelId: parsedChapter.novelId,
-                  title: parsedChapter.title,
-                  chapterOrder: parsedChapter.chapterOrder,
-                  content: normalizedContent,
-                  createdAt: parsedChapter.createdAt,
-                );
+                _currentChapter = loadedChapter;
                 _isLoadingChapter = false;
               });
             }
@@ -462,6 +475,63 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         }
         _scrollToPosition();
       }
+    }
+  }
+
+  /// 静默预加载单个章节内容（不显示 loading，不影响当前章节）
+  Future<void> _fetchChapterContent(NovelChapterModel chapter) async {
+    // 已加载则跳过
+    final idx = _chapters.indexWhere((c) => c.id == chapter.id);
+    if (idx != -1 && _chapters[idx].content.isNotEmpty) return;
+
+    try {
+      final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
+      final networkFuture = ApiClient.get(
+        'novel_chapters',
+        filters: {'id': 'eq.${chapter.id}'},
+      );
+
+      final cachedContent = await cacheFuture;
+      if (cachedContent != null) {
+        final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+        if (idx != -1) {
+          _chapters[idx] = chapter.copyWith(content: normalizedContent);
+        }
+      }
+
+      final result = await networkFuture;
+      if (result.isSuccess && result.data!.isNotEmpty) {
+        final chapterData = result.data!.first;
+        final parsedChapter = NovelChapterModel.fromJson(chapterData);
+        final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+        final parsedIdx = _chapters.indexWhere((c) => c.id == parsedChapter.id);
+        if (parsedIdx != -1) {
+          _chapters[parsedIdx] = _chapters[parsedIdx].copyWith(content: normalizedContent);
+        }
+        if (normalizedContent.isNotEmpty) {
+          ChapterCacheService.instance.cacheChapter(
+            chapterId: parsedChapter.id,
+            novelId: widget.novel.id,
+            title: parsedChapter.title,
+            chapterOrder: parsedChapter.chapterOrder,
+            content: normalizedContent,
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('预加载章节失败: ${chapter.title}');
+      }
+    }
+  }
+
+  /// 预加载当前章节前后各一章（共3章）
+  void _preloadAdjacentChapters(int index) {
+    for (int i = index - 1; i <= index + 1; i++) {
+      if (i < 0 || i >= _chapters.length) continue;
+      final chapter = _chapters[i];
+      if (chapter.content.isNotEmpty) continue;
+      _fetchChapterContent(chapter);
     }
   }
 
@@ -609,9 +679,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     final userId = _userId;
     if (userId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return;
     }
@@ -639,16 +707,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           });
         }
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已加入书架')),
-          );
+          showSnackBar(context, '已加入书架');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        showSnackBar(context, '操作失败: $e');
       }
     }
   }
@@ -673,9 +737,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        showSnackBar(context, '操作失败: $e');
       }
     }
   }
@@ -684,15 +746,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_currentChapterIndex > 0) {
       // 标记需要跳转到最后一页（上一章）
       _shouldJumpToLastPage = true;
+      final prevIndex = _currentChapterIndex - 1;
       setState(() {
-        _currentChapterIndex--;
+        _currentChapterIndex = prevIndex;
       });
-      _loadChapterContent(_chapters[_currentChapterIndex]);
+      _loadChapterContent(_chapters[prevIndex]);
+      // 预加载新的相邻章节
+      _preloadAdjacentChapters(prevIndex);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已经是第一章了')),
-        );
+        showSnackBar(context, '已经是第一章了');
       }
     }
   }
@@ -706,11 +769,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _currentChapterIndex = nextIndex;
       });
       _loadChapterContent(_chapters[nextIndex]);
+      // 预加载新的相邻章节
+      _preloadAdjacentChapters(nextIndex);
     } else {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已经是最后一章了')),
-        );
+        showSnackBar(context, '已经是最后一章了');
       }
     }
   }
@@ -730,18 +793,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       if (_currentChapterIndex < _chapters.length - 1) {
         _nextChapter();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已经是最后一章了')),
-        );
+        showSnackBar(context, '已经是最后一章了');
       }
     } else {
       // 到达第一页，跳转上一章
       if (_currentChapterIndex > 0) {
         _previousChapter();
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已经是第一章了')),
-        );
+        showSnackBar(context, '已经是第一章了');
       }
     }
   }
@@ -750,58 +809,91 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        minChildSize: 0.3,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Text('目录', style: Theme.of(context).textTheme.titleLarge),
-                  const Spacer(),
-                  Text(
-                    '${widget.novel.title} - 共 ${_chapters.length} 章',
-                    style: Theme.of(context).textTheme.bodySmall,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          const pageSize = 10;
+          var displayedCount = _chapters.length.clamp(0, pageSize);
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.3,
+            expand: false,
+            builder: (context, scrollController) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Text('目录', style: Theme.of(context).textTheme.titleLarge),
+                      const Spacer(),
+                      Text(
+                        '${widget.novel.title} - 共 ${_chapters.length} 章',
+                        style: Theme.of(context).textTheme.bodySmall,
+                      ),
+                    ],
                   ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: ListView.builder(
-                controller: scrollController,
-                itemCount: _chapters.length,
-                itemBuilder: (context, index) {
-                  final chapter = _chapters[index];
-                  final isCurrent = index == _currentChapterIndex;
-                  return ListTile(
-                    dense: true,
-                    title: Text(
-                      chapter.title,
-                      style: TextStyle(
-                        color: isCurrent ? Theme.of(context).colorScheme.primary : null,
-                        fontWeight: isCurrent ? FontWeight.bold : null,
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: NotificationListener<ScrollNotification>(
+                    onNotification: (notification) {
+                      if (notification is ScrollEndNotification) {
+                        if (notification.metrics.pixels >=
+                            notification.metrics.maxScrollExtent - 50) {
+                          if (displayedCount < _chapters.length) {
+                            setModalState(() {
+                              displayedCount = (displayedCount + pageSize)
+                                  .clamp(0, _chapters.length);
+                            });
+                          }
+                        }
+                      }
+                      return false;
+                    },
+                    child: RefreshIndicator(
+                      onRefresh: () async {
+                        setModalState(() {
+                          displayedCount = _chapters.length.clamp(0, pageSize);
+                        });
+                      },
+                      child: ListView.builder(
+                        controller: scrollController,
+                        itemCount: displayedCount,
+                        itemBuilder: (context, index) {
+                          final chapter = _chapters[index];
+                          final isCurrent = index == _currentChapterIndex;
+                          return ListTile(
+                            dense: true,
+                            title: Text(
+                              chapter.title,
+                              style: TextStyle(
+                                color: isCurrent
+                                    ? Theme.of(context).colorScheme.primary
+                                    : null,
+                                fontWeight: isCurrent ? FontWeight.bold : null,
+                              ),
+                            ),
+                            trailing: isCurrent
+                                ? Icon(Icons.play_arrow,
+                                    color: Theme.of(context).colorScheme.primary)
+                                : null,
+                            onTap: () {
+                              Navigator.pop(context);
+                              _shouldJumpToLastPage = false;
+                              setState(() => _currentChapterIndex = index);
+                              _loadChapterContent(chapter);
+                            },
+                          );
+                        },
                       ),
                     ),
-                    trailing: isCurrent
-                        ? Icon(Icons.play_arrow, color: Theme.of(context).colorScheme.primary)
-                        : null,
-                    onTap: () {
-                      Navigator.pop(context);
-                      _shouldJumpToLastPage = false; // Bug 5 修复：章节目录跳转时重置标志
-                      setState(() => _currentChapterIndex = index);
-                      _loadChapterContent(chapter);
-                    },
-                  );
-                },
-              ),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -1301,7 +1393,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       backgroundColor: _background.bgColor,
       appBar: null, // 始终不显示 AppBar
       body: _isLoading
-          ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
+          ? Center(child: LoadingWidget())
           : _currentChapter == null
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
               : Stack(
@@ -1309,7 +1401,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                     // 第1层：内容区域
                     Positioned.fill(
                       child: _isLoadingChapter
-                          ? Center(child: CircularProgressIndicator(color: _background.textColor.withOpacity(0.5)))
+                          ? Center(child: LoadingWidget())
                           : _buildContent(),
                     ),
 
@@ -1600,7 +1692,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   @override
   Widget build(BuildContext context) {
     if (_isCalculating || _pages.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: LoadingWidget());
     }
 
     // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
@@ -1851,7 +1943,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   @override
   Widget build(BuildContext context) {
     if (_isCalculating || _pages.isEmpty) {
-      return const Center(child: CircularProgressIndicator());
+      return Center(child: LoadingWidget());
     }
 
     // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势

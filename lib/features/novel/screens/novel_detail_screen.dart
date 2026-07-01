@@ -10,6 +10,7 @@ import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_reader_screen.dart';
 import 'novel_comments_screen.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 小说详情页面
 class NovelDetailScreen extends StatefulWidget {
@@ -131,9 +132,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     final userId = _userId;
     if (userId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return;
     }
@@ -175,16 +174,12 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             _bookshelfId = null;
           });
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('已从书架移除')),
-            );
+            showSnackBar(context, '已从书架移除');
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('操作失败: $e')),
-          );
+          showSnackBar(context, '操作失败: $e');
         }
       }
     } else {
@@ -213,16 +208,12 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             });
           }
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('已加入书架')),
-            );
+            showSnackBar(context, '已加入书架');
           }
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('操作失败: $e')),
-          );
+          showSnackBar(context, '操作失败: $e');
         }
       }
     }
@@ -250,9 +241,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        showSnackBar(context, '操作失败: $e');
       }
     }
   }
@@ -391,7 +380,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             const Divider(height: 1),
             Expanded(
               child: _isLoadingChapters
-                  ? const Center(child: CircularProgressIndicator())
+                  ? Center(child: LoadingWidget())
                   : _chapters.isEmpty
                       ? const Center(child: Text('暂无章节'))
                       : ListView.builder(
@@ -641,7 +630,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                     width: 48,
                     height: 48,
                     child: _isLoadingShelf
-                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                        ? Center(child: LoadingWidget(size: 24))
                         : OutlinedButton(
                             onPressed: _toggleBookshelf,
                             style: OutlinedButton.styleFrom(
@@ -662,7 +651,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                     width: 48,
                     height: 48,
                     child: _isDownloading
-                        ? const Center(child: SizedBox(width: 24, height: 24, child: CircularProgressIndicator(strokeWidth: 2)))
+                        ? Center(child: LoadingWidget(size: 24))
                         : OutlinedButton(
                             onPressed: _cachedChapterCount > 0 && _cachedChapterCount >= _chapters.length
                                 ? _clearCache
@@ -836,7 +825,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                 if (_isLoadingChapters) {
                   return const ListTile(
                     dense: true,
-                    title: Center(child: CircularProgressIndicator()),
+                    title: Center(child: LoadingWidget()),
                   );
                 }
 
