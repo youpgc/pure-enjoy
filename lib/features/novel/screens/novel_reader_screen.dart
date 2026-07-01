@@ -1134,7 +1134,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       child: SlideTransition(
         position: _topToolbarSlideAnimation,
         child: Container(
-          color: Colors.black.withOpacity(0.5),
+          color: _background.bgColor,
           child: SafeArea(
             bottom: false,
             child: Padding(
@@ -1148,10 +1148,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       children: [
                         Text(
                           _currentChapter?.title ?? widget.novel.title,
-                          style: const TextStyle(
+                          style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: Colors.white70,
+                            color: _background.textColor.withOpacity(0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1159,9 +1159,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         if (_chapters.isNotEmpty)
                           Text(
                             '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
-                            style: const TextStyle(
+                            style: TextStyle(
                               fontSize: 11,
-                              color: Colors.white60,
+                              color: _background.textColor.withOpacity(0.6),
                             ),
                           ),
                       ],
@@ -1170,7 +1170,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   IconButton(
                     icon: Icon(
                       _isInBookshelf ? Icons.library_books : Icons.library_add_outlined,
-                      color: Colors.white,
+                      color: _background.textColor,
                     ),
                     onPressed: _isInBookshelf ? null : _addToBookshelf,
                     tooltip: _isInBookshelf ? '已在书架' : '加入书架',
@@ -1178,13 +1178,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   IconButton(
                     icon: Icon(
                       _isCollected ? Icons.favorite : Icons.favorite_border,
-                      color: _isCollected ? Theme.of(context).colorScheme.error : Colors.white,
+                      color: _isCollected ? Theme.of(context).colorScheme.error : _background.textColor,
                     ),
                     onPressed: () => _toggleCollection(),
                     tooltip: '收藏',
                   ),
                   IconButton(
-                    icon: const Icon(Icons.info_outline, color: Colors.white),
+                    icon: Icon(Icons.info_outline, color: _background.textColor),
                     onPressed: () {
                       Navigator.push(
                         context,
@@ -1209,7 +1209,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       child: SlideTransition(
         position: _bottomToolbarSlideAnimation,
         child: Container(
-          color: Colors.black.withOpacity(0.5),
+          color: _background.bgColor,
           child: SafeArea(
             top: false,
             child: Column(
@@ -1366,11 +1366,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_pageTurnMode == PageTurnMode.scroll) {
       // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
       // onTap 和 onVerticalDrag 在手势竞技场中可以共存
+      final mediaQuery = MediaQuery.of(context);
+      final topPadding = mediaQuery.padding.top + 12.0;
+      final bottomPadding = mediaQuery.padding.bottom + 36.0;
       return GestureDetector(
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
+          padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1539,9 +1542,9 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 减去顶部状态栏(44) + 底部状态栏(~36) + 间距
-    final topStatusBarHeight = 56.0; // 状态栏44 + 间距12
-    final bottomStatusBarHeight = 48.0; // 状态栏~36 + 间距12
+    // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
+    final topStatusBarHeight = mediaQuery.padding.top + 12.0;
+    final bottomStatusBarHeight = mediaQuery.padding.bottom + 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1614,9 +1617,12 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
         },
         itemBuilder: (context, index) {
           final page = _pages[index];
+          final mediaQuery = MediaQuery.of(context);
+          final topPadding = mediaQuery.padding.top + 12.0;
+          final bottomPadding = mediaQuery.padding.bottom + 36.0;
           return Container(
             color: widget.background.bgColor,
-            padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
+            padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1738,9 +1744,9 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 减去顶部状态栏(44) + 底部状态栏(~36) + 间距
-    final topStatusBarHeight = 56.0; // 状态栏44 + 间距12
-    final bottomStatusBarHeight = 48.0; // 状态栏~36 + 间距12
+    // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
+    final topStatusBarHeight = mediaQuery.padding.top + 12.0;
+    final bottomStatusBarHeight = mediaQuery.padding.bottom + 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1799,9 +1805,12 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
+    final mediaQuery = MediaQuery.of(context);
+    final topPadding = mediaQuery.padding.top + 12.0;
+    final bottomPadding = mediaQuery.padding.bottom + 36.0;
     return Container(
       color: widget.background.bgColor,
-      padding: const EdgeInsets.fromLTRB(20, 56, 20, 48),
+      padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
