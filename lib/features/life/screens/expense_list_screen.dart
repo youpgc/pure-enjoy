@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
@@ -26,21 +27,28 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   List<ExpenseModel> _expenses = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
-  DateTime _selectedMonth = DateTime.now();
+  DateTime _displayedMonth = DateTime.now();
   double _totalAmount = 0.0;
   bool _isLoadingTotal = false;
+  Timer? _monthUpdateDebounce;
 
   String? get _userId => AuthService.instance.currentUserId;
+
+  @override
+  int get pageSize => 10;
 
   @override
   void initState() {
     super.initState();
     initPagination();
+    scrollController.addListener(_onScrollForMonth);
     _initLoad();
   }
 
   @override
   void dispose() {
+    _monthUpdateDebounce?.cancel();
+    scrollController.removeListener(_onScrollForMonth);
     disposePagination();
     super.dispose();
   }
@@ -84,16 +92,34 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     }
   }
 
-  /// 加载月度总支出（服务端聚合查询，不受分页限制）
-  Future<void> _loadTotalAmount() async {
+  /// 根据滚动位置检测当前视窗月份并更新统计
+  void _onScrollForMonth() {
+    if (!scrollController.hasClients || _expenses.isEmpty) return;
+    _monthUpdateDebounce?.cancel();
+    _monthUpdateDebounce = Timer(const Duration(milliseconds: 150), () {
+      if (!mounted) return;
+      final pixels = scrollController.position.pixels;
+      const itemHeight = 72.0;
+      final index = (pixels / itemHeight).floor().clamp(0, _expenses.length - 1);
+      final expense = _expenses[index];
+      final month = DateTime(expense.date.year, expense.date.month);
+      if (month != _displayedMonth) {
+        setState(() => _displayedMonth = month);
+        _loadTotalAmountForMonth(month);
+      }
+    });
+  }
+
+  /// 加载指定月份总支出（服务端聚合查询）
+  Future<void> _loadTotalAmountForMonth(DateTime month) async {
     final userId = _userId;
     if (userId == null) return;
 
     setState(() => _isLoadingTotal = true);
 
     try {
-      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+      final startOfMonth = DateTime(month.year, month.month, 1);
+      final endOfMonth = DateTime(month.year, month.month + 1, 1);
 
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -144,12 +170,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     if (!refresh && !beginLoadMore()) return;
 
     try {
-      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
-
       final filters = <String, String>{
         'user_id': 'eq.$userId',
-        'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
       };
 
       if (_selectedCategory != 'all') {
@@ -158,8 +180,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       final (limit, offset) = paginationParams;
 
-      // 并行加载列表数据和总计数据（首次/刷新时）
-      final listFuture = ApiClient.get(
+      final result = await ApiClient.get(
         'expenses',
         filters: filters,
         order: 'date.desc',
@@ -167,18 +188,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
         offset: offset,
       );
 
-      final totalFuture = refresh ? ApiClient.sum(
-        'expenses',
-        column: 'amount',
-        filters: filters,
-      ) : Future<double?>.value(null);
-
-      final results = await Future.wait([listFuture, totalFuture]);
-      final listResult = results[0] as ApiResponse;
-      final totalResult = results[1] as double?;
-
-      if (listResult.isSuccess) {
-        final data = listResult.data!;
+      if (result.isSuccess) {
+        final data = result.data!;
         var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         setState(() {
@@ -187,12 +198,18 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
           } else {
             _expenses.addAll(allExpenses);
           }
-          if (totalResult != null) {
-            _totalAmount = totalResult;
-          }
           _isLoading = false;
           onPaginationDataLoaded(allExpenses.length);
         });
+
+        // 刷新后更新顶部月份统计为当前视窗月份
+        if (refresh && _expenses.isNotEmpty) {
+          final firstMonth = DateTime(_expenses.first.date.year, _expenses.first.date.month);
+          if (firstMonth != _displayedMonth) {
+            setState(() => _displayedMonth = firstMonth);
+          }
+          _loadTotalAmountForMonth(firstMonth);
+        }
 
         // 写入缓存（保存全部数据，不按月筛选）
         if (refresh) {
@@ -202,7 +219,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
           );
         }
       } else {
-        throw Exception('HTTP ${listResult.statusCode}');
+        throw Exception('HTTP ${result.statusCode}');
       }
     } catch (e) {
       setState(() => _isLoading = false);
@@ -408,21 +425,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
               );
             },
           ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedMonth,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() => _selectedMonth = picked);
-                _loadExpenses(refresh: true);
-              }
-            },
-          ),
         ],
       ),
       body: Column(
@@ -440,7 +442,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${_selectedMonth.year}年${_selectedMonth.month.toString().padLeft(2, '0')}月',
+                  '${_displayedMonth.year}年${_displayedMonth.month.toString().padLeft(2, '0')}月',
                   style: Theme.of(context).textTheme.titleMedium,
                 ),
                 const SizedBox(height: 8),
