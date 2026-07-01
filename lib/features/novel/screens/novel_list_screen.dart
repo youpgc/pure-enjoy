@@ -11,6 +11,7 @@ import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 小说列表页面
 class NovelListScreen extends StatefulWidget {
@@ -68,9 +69,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('初始化失败: $e')),
-        );
+        showSnackBar(context, '初始化失败: $e');
       }
     }
   }
@@ -97,6 +96,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
     try {
       if (refresh) {
         resetPagination();
+        setState(() => _isLoading = true);
       }
       if (!refresh && !beginLoadMore()) return;
 
@@ -175,9 +175,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       }
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+        showSnackBar(context, '加载失败: $e');
       }
     }
   }
@@ -216,9 +214,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
     final userId = _userId;
     if (userId == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return;
     }
@@ -241,16 +237,12 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       if (result.isSuccess) {
         await _loadNovels(refresh: true);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已添加到书架')),
-          );
+          showSnackBar(context, '已添加到书架');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
+        showSnackBar(context, '添加失败: $e');
       }
     }
   }

@@ -13,6 +13,7 @@ import 'novel_reader_screen.dart';
 import 'novel_detail_screen.dart';
 import 'novel_list_screen.dart';
 import '../../auth/screens/login_screen.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
@@ -33,9 +34,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   bool _checkAuth() {
     if (!AuthService.instance.isAuthenticated) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return false;
     }
@@ -72,9 +71,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('初始化失败: $e')),
-        );
+        showSnackBar(context, '初始化失败: $e');
       }
     }
   }
@@ -128,9 +125,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
 
       if (!result.isSuccess) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载书架失败: ${result.statusCode}')),
-          );
+          showSnackBar(context, '加载书架失败: ${result.statusCode}');
         }
         return;
       }
@@ -175,9 +170,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载书架出错: $e')),
-        );
+        showSnackBar(context, '加载书架出错: $e');
       }
     }
   }
@@ -195,22 +188,16 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       if (result.isSuccess) {
         await _loadBookshelf(refresh: true);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已从书架移除')),
-          );
+          showSnackBar(context, '已从书架移除');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('移除失败: ${result.statusCode}')),
-          );
+          showSnackBar(context, '移除失败: ${result.statusCode}');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('移除出错: $e')),
-        );
+        showSnackBar(context, '移除出错: $e');
       }
     }
   }
@@ -247,9 +234,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('更新状态失败: $e')),
-        );
+        showSnackBar(context, '更新状态失败: $e');
       }
     }
   }
@@ -718,9 +703,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
   bool _checkAuth() {
     if (!AuthService.instance.isAuthenticated) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return false;
     }
@@ -786,9 +769,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载小说列表出错: $e')),
-        );
+        showSnackBar(context, '加载小说列表出错: $e');
       }
     }
   }
@@ -818,22 +799,16 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
       if (result.isSuccess) {
         setState(() => _addedNovelIds.add(novelId));
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('已添加到书架')),
-          );
+          showSnackBar(context, '已添加到书架');
         }
       } else {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('添加失败: ${result.statusCode}')),
-          );
+          showSnackBar(context, '添加失败: ${result.statusCode}');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加出错: $e')),
-        );
+        showSnackBar(context, '添加出错: $e');
       }
     } finally {
       setState(() => _addingNovelIds.remove(novelId));
@@ -876,7 +851,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? Center(child: LoadingWidget())
           : _filteredNovels.isEmpty
               ? Center(
                   child: Column(
@@ -1066,11 +1041,7 @@ class _NovelListItem extends StatelessWidget {
                           width: 24,
                           height: 24,
                           child: Center(
-                            child: SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            ),
+                            child: LoadingWidget(size: 18),
                           ),
                         )
                       : FilledButton(
