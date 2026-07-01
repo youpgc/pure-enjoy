@@ -240,6 +240,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   /// 保存用户资料
   Future<void> _saveProfile() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
 
     setState(() => _isSaving = true);

@@ -481,6 +481,7 @@ class _DiaryFormState extends State<_DiaryForm> {
   late String _selectedMoodCode;
   late DateTime _selectedDate;
   bool _isDictLoading = true;
+  bool _isSaving = false;
 
   bool get _isEditing => widget.diary != null;
 
@@ -528,17 +529,25 @@ class _DiaryFormState extends State<_DiaryForm> {
     super.dispose();
   }
 
-  void _save() {
-    final newDiary = MoodDiaryModel(
-      id: _isEditing ? widget.diary!.id : const Uuid().v4(),
-      userId: _isEditing ? widget.diary!.userId : widget.userId,
-      mood: _selectedMoodCode,
-      moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
-      content: _contentController.text.isEmpty ? null : _contentController.text,
-      entryDate: _selectedDate,
-    );
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final newDiary = MoodDiaryModel(
+        id: _isEditing ? widget.diary!.id : const Uuid().v4(),
+        userId: _isEditing ? widget.diary!.userId : widget.userId,
+        mood: _selectedMoodCode,
+        moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
+        content: _contentController.text.isEmpty ? null : _contentController.text,
+        entryDate: _selectedDate,
+      );
 
-    widget.onSave(newDiary);
+      widget.onSave(newDiary);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -622,7 +631,7 @@ class _DiaryFormState extends State<_DiaryForm> {
           const SizedBox(height: 16),
 
           FilledButton(
-            onPressed: _save,
+            onPressed: _isSaving ? null : _save,
             child: const Text('保存'),
           ),
         ],

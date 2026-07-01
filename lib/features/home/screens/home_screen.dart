@@ -1375,6 +1375,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
   String _selectedMoodCode = '';
   DateTime _selectedDate = DateTime.now();
   bool _isDictLoading = true;
+  bool _isSaving = false;
 
   /// 获取心情选项列表（从字典服务）
   List<String> get _moodCodes {
@@ -1418,17 +1419,25 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
     super.dispose();
   }
 
-  void _save() {
-    final diary = MoodDiaryModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      mood: _selectedMoodCode,
-      moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
-      content: _contentController.text.isEmpty ? null : _contentController.text,
-      entryDate: _selectedDate,
-    );
+  Future<void> _save() async {
+    if (_isSaving) return;
+    setState(() => _isSaving = true);
+    try {
+      final diary = MoodDiaryModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        mood: _selectedMoodCode,
+        moodScore: int.tryParse(DictService.instance.findByCode('mood_type', _selectedMoodCode)?.value ?? '5') ?? 5,
+        content: _contentController.text.isEmpty ? null : _contentController.text,
+        entryDate: _selectedDate,
+      );
 
-    widget.onSave(diary);
+      widget.onSave(diary);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -1499,7 +1508,7 @@ class _AddMoodSheetState extends State<_AddMoodSheet> {
             },
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('保存')),
+          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
         ],
       ),
     );
@@ -1523,6 +1532,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   String _selectedCategoryCode = '';
   DateTime _selectedDate = DateTime.now();
   bool _isDictLoading = true;
+  bool _isSaving = false;
 
   /// 获取支出分类选项列表（从字典服务）
   List<String> get _categoryCodes {
@@ -1566,19 +1576,26 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    try {
+      final expense = ExpenseModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        amount: double.parse(_amountController.text),
+        category: _selectedCategoryCode,
+        description: _noteController.text.isEmpty ? null : _noteController.text,
+        date: _selectedDate,
+      );
 
-    final expense = ExpenseModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      amount: double.parse(_amountController.text),
-      category: _selectedCategoryCode,
-      description: _noteController.text.isEmpty ? null : _noteController.text,
-      date: _selectedDate,
-    );
-
-    widget.onSave(expense);
+      widget.onSave(expense);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -1651,7 +1668,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
               },
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _save, child: const Text('保存')),
+            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
           ],
         ),
       ),
@@ -1676,6 +1693,7 @@ class _AddWeightSheetState extends State<_AddWeightSheet> {
   final _bmiController = TextEditingController();
   final _noteController = TextEditingController();
   DateTime _selectedDate = DateTime.now();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -1686,20 +1704,27 @@ class _AddWeightSheetState extends State<_AddWeightSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    try {
+      final record = WeightRecordModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        weight: double.parse(_weightController.text),
+        bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
+        bodyFat: _bodyFatController.text.isNotEmpty ? double.tryParse(_bodyFatController.text) : null,
+        note: _noteController.text.isEmpty ? null : _noteController.text,
+        date: _selectedDate,
+      );
 
-    final record = WeightRecordModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      weight: double.parse(_weightController.text),
-      bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
-      bodyFat: _bodyFatController.text.isNotEmpty ? double.tryParse(_bodyFatController.text) : null,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
-      date: _selectedDate,
-    );
-
-    widget.onSave(record);
+      widget.onSave(record);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -1769,7 +1794,7 @@ class _AddWeightSheetState extends State<_AddWeightSheet> {
               },
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _save, child: const Text('保存')),
+            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
           ],
         ),
       ),
@@ -1791,6 +1816,7 @@ class _AddNoteSheetState extends State<_AddNoteSheet> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _categoryController = TextEditingController();
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -1800,23 +1826,30 @@ class _AddNoteSheetState extends State<_AddNoteSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入标题')),
       );
       return;
     }
+    setState(() => _isSaving = true);
+    try {
+      final note = NoteModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        title: _titleController.text,
+        content: _contentController.text.isEmpty ? null : _contentController.text,
+        category: _categoryController.text.isEmpty ? null : _categoryController.text,
+      );
 
-    final note = NoteModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      title: _titleController.text,
-      content: _contentController.text.isEmpty ? null : _contentController.text,
-      category: _categoryController.text.isEmpty ? null : _categoryController.text,
-    );
-
-    widget.onSave(note);
+      widget.onSave(note);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -1859,7 +1892,7 @@ class _AddNoteSheetState extends State<_AddNoteSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('保存')),
+          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
         ],
       ),
     );
@@ -1881,6 +1914,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -1889,18 +1923,25 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    try {
+      final reminder = ReminderModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        title: _titleController.text,
+        description: _descController.text.isEmpty ? null : _descController.text,
+        remindAt: _remindAt,
+      );
 
-    final reminder = ReminderModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      title: _titleController.text,
-      description: _descController.text.isEmpty ? null : _descController.text,
-      remindAt: _remindAt,
-    );
-
-    widget.onSave(reminder);
+      widget.onSave(reminder);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -1960,7 +2001,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
               },
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _save, child: const Text('保存')),
+            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
           ],
         ),
       ),
@@ -1982,6 +2023,7 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
   final _targetDaysController = TextEditingController(text: '21');
+  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -1991,26 +2033,33 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (_nameController.text.trim().isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入习惯名称')),
       );
       return;
     }
+    setState(() => _isSaving = true);
+    try {
+      final targetDays = int.tryParse(_targetDaysController.text) ?? 21;
 
-    final targetDays = int.tryParse(_targetDaysController.text) ?? 21;
+      final habit = HabitModel(
+        id: const Uuid().v4(),
+        userId: AuthService.instance.currentUserId ?? 'local_user',
+        name: _nameController.text.trim(),
+        description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
+        targetDays: targetDays,
+        isActive: true,
+      );
 
-    final habit = HabitModel(
-      id: const Uuid().v4(),
-      userId: AuthService.instance.currentUserId ?? 'local_user',
-      name: _nameController.text.trim(),
-      description: _descController.text.trim().isEmpty ? null : _descController.text.trim(),
-      targetDays: targetDays,
-      isActive: true,
-    );
-
-    widget.onSave(habit);
+      widget.onSave(habit);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -2051,7 +2100,7 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
             keyboardType: TextInputType.number,
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _save, child: const Text('保存')),
+          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
         ],
       ),
     );

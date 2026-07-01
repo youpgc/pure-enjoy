@@ -42,6 +42,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
 
   /// 提交反馈
   Future<void> _submitFeedback() async {
+    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     final userId = AuthService.instance.currentUserId;

@@ -519,6 +519,7 @@ class _RecordFormState extends State<_RecordForm> {
   late final TextEditingController _bmiController;
   late final TextEditingController _noteController;
   late DateTime _selectedDate;
+  bool _isSaving = false;
 
   bool get _isEditing => widget.record != null;
 
@@ -550,22 +551,29 @@ class _RecordFormState extends State<_RecordForm> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    try {
+      final newRecord = WeightRecordModel(
+        id: _isEditing ? widget.record!.id : const Uuid().v4(),
+        userId: _isEditing ? widget.record!.userId : widget.userId,
+        weight: double.parse(_weightController.text),
+        bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
+        bodyFat: _bodyFatController.text.isNotEmpty
+            ? double.tryParse(_bodyFatController.text)
+            : null,
+        note: _noteController.text.isNotEmpty ? _noteController.text : null,
+        date: _selectedDate,
+      );
 
-    final newRecord = WeightRecordModel(
-      id: _isEditing ? widget.record!.id : const Uuid().v4(),
-      userId: _isEditing ? widget.record!.userId : widget.userId,
-      weight: double.parse(_weightController.text),
-      bmi: _bmiController.text.isNotEmpty ? double.tryParse(_bmiController.text) : null,
-      bodyFat: _bodyFatController.text.isNotEmpty
-          ? double.tryParse(_bodyFatController.text)
-          : null,
-      note: _noteController.text.isNotEmpty ? _noteController.text : null,
-      date: _selectedDate,
-    );
-
-    widget.onSave(newRecord);
+      widget.onSave(newRecord);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -652,7 +660,7 @@ class _RecordFormState extends State<_RecordForm> {
             const SizedBox(height: 16),
 
             FilledButton(
-              onPressed: _save,
+              onPressed: _isSaving ? null : _save,
               child: const Text('保存'),
             ),
           ],

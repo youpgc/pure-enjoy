@@ -106,6 +106,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
   }
 
   Future<void> _submitComment() async {
+    if (_isSubmitting) return;
     final content = _inputController.text.trim();
     if (content.isEmpty) return;
     setState(() => _isSubmitting = true);

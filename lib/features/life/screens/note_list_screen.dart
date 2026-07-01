@@ -483,6 +483,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   }
 
   Future<void> _save() async {
+    if (_isSaving) return;
     if (_titleController.text.isEmpty) {
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(content: Text('请输入标题')),
@@ -491,16 +492,21 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
     }
 
     setState(() => _isSaving = true);
+    try {
+      final newNote = NoteModel(
+        id: widget.note?.id ?? const Uuid().v4(),
+        userId: widget.userId,
+        title: _titleController.text,
+        content: _contentController.text.isEmpty ? null : _contentController.text,
+      );
 
-    final newNote = NoteModel(
-      id: widget.note?.id ?? const Uuid().v4(),
-      userId: widget.userId,
-      title: _titleController.text,
-      content: _contentController.text.isEmpty ? null : _contentController.text,
-    );
-
-    widget.onSave(newNote);
-    if (mounted) Navigator.pop(context);
+      widget.onSave(newNote);
+      if (mounted) Navigator.pop(context);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override

@@ -37,6 +37,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
   /// 登录提交（统一账号）
   Future<void> _submitLogin() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {
@@ -66,6 +67,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
   }
   /// 注册提交
   Future<void> _submitRegister() async {
+    if (_isLoading) return;
     if (!_formKey.currentState!.validate()) return;
     setState(() => _isLoading = true);
     try {

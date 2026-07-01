@@ -576,6 +576,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
   late final TextEditingController _noteController;
   String _selectedCategoryCode = '';
   late DateTime _selectedDate;
+  bool _isSaving = false;
 
   bool get _isEditing => widget.expense != null;
 
@@ -626,20 +627,27 @@ class _ExpenseFormState extends State<_ExpenseForm> {
     super.dispose();
   }
 
-  void _save() {
+  Future<void> _save() async {
+    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
+    setState(() => _isSaving = true);
+    try {
+      final newExpense = ExpenseModel(
+        id: _isEditing ? widget.expense!.id : const Uuid().v4(),
+        userId: _isEditing ? widget.expense!.userId : widget.userId,
+        amount: double.parse(_amountController.text),
+        category: _selectedCategoryCode,
+        description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+        note: _noteController.text.isEmpty ? null : _noteController.text,
+        date: _selectedDate,
+      );
 
-    final newExpense = ExpenseModel(
-      id: _isEditing ? widget.expense!.id : const Uuid().v4(),
-      userId: _isEditing ? widget.expense!.userId : widget.userId,
-      amount: double.parse(_amountController.text),
-      category: _selectedCategoryCode,
-      description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
-      note: _noteController.text.isEmpty ? null : _noteController.text,
-      date: _selectedDate,
-    );
-
-    widget.onSave(newExpense);
+      widget.onSave(newExpense);
+    } finally {
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
+    }
   }
 
   @override
@@ -734,7 +742,7 @@ class _ExpenseFormState extends State<_ExpenseForm> {
             const SizedBox(height: 16),
 
             FilledButton(
-              onPressed: _save,
+              onPressed: _isSaving ? null : _save,
               child: const Text('保存'),
             ),
           ],
