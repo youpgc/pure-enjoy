@@ -47,7 +47,14 @@ class SessionManager {
   String? get currentUserAvatar =>
       _authUser?['user_metadata']?['avatar_url'] as String?;
 
-  int? get currentPoints => _authUser?['user_metadata']?['points'] as int?;
+  int? get currentPoints {
+    final value = _authUser?['user_metadata']?['points'];
+    if (value == null) return null;
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    if (value is String) return int.tryParse(value);
+    return null;
+  }
   String? get currentRole => _authUser?['user_metadata']?['role'] as String?;
 
   String? get currentMemberLevel =>

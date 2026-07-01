@@ -248,7 +248,36 @@ class PointService {
     }
   }
 
-  /// 从 AuthService 获取用户总积分
+  /// 从数据库查询用户总积分
+  Future<int> fetchTotalPoints() async {
+    try {
+      final userId = AuthService.instance.currentUserId;
+      if (userId == null) return 0;
+
+      final result = await ApiClient.get(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        columns: 'points',
+        limit: 1,
+      );
+
+      if (result.isSuccess && result.data!.isNotEmpty) {
+        final points = result.data![0]['points'];
+        if (points is int) return points;
+        if (points is num) return points.toInt();
+        if (points is String) return int.tryParse(points) ?? 0;
+      }
+
+      return 0;
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('获取用户总积分失败');
+      }
+      return 0;
+    }
+  }
+
+  /// 从 AuthService 获取用户总积分（兼容旧代码）
   int getTotalPoints() {
     return AuthService.instance.currentPoints ?? 0;
   }

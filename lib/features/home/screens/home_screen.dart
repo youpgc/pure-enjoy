@@ -32,6 +32,7 @@ import '../../life/models/habit_model.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../profile/screens/point_records_screen.dart';
+import '../../profile/services/point_service.dart';
 import '../../../core/widgets/skeleton_loading.dart';
 
 /// 首页 - 主导航页面
@@ -2140,6 +2141,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isForceUpdate = false;
   String? _apkUrl;
   bool _isLoading = true;
+  int _totalPoints = 0;
 
   @override
   void initState() {
@@ -2153,8 +2155,12 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadUserData() async {
     setState(() => _isLoading = true);
     await SupabaseService.instance.reloadCurrentUser();
+    final points = await PointService.instance.fetchTotalPoints();
     if (mounted) {
-      setState(() => _isLoading = false);
+      setState(() {
+        _totalPoints = points;
+        _isLoading = false;
+      });
     }
   }
 
@@ -2323,7 +2329,7 @@ class _ProfilePageState extends State<ProfilePage> {
               children: [
                 _buildStatItem(Icons.stars_outlined, '角色', _getRoleLabel(supabaseService.currentRole), onTap: () {}),
                 _buildStatItem(Icons.workspace_premium_outlined, '会员', _getMemberLevelLabel(supabaseService.currentMemberLevel), onTap: () {}),
-                _buildStatItem(Icons.monetization_on_outlined, '积分', '${supabaseService.currentPoints ?? 0}', onTap: () {
+                _buildStatItem(Icons.monetization_on_outlined, '积分', '$_totalPoints', onTap: () {
                   Navigator.push(context, MaterialPageRoute(builder: (_) => const PointRecordsScreen())).then((_) => _loadUserData());
                 }),
               ],
