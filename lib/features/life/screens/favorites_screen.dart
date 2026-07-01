@@ -148,6 +148,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       text: favorite?.tags?.join(', ') ?? '',
     );
     String category = favorite?.category ?? 'other';
+    bool isSaving = false;
 
     await showDialog(
       context: context,
@@ -216,7 +217,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
               child: const Text('取消'),
             ),
             FilledButton(
-              onPressed: () async {
+              onPressed: isSaving ? null : () async {
                 if (titleController.text.trim().isEmpty) {
                   _showError('请输入标题');
                   return;
@@ -244,6 +245,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   tags: tags,
                 );
 
+                setDialogState(() => isSaving = true);
                 try {
                   if (isEditing) {
                     final result = await ApiClient.patchByFilter(
@@ -284,9 +286,13 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   _loadFavorites();
                 } catch (e) {
                   _showError('保存失败: $e');
+                } finally {
+                  if (mounted) setDialogState(() => isSaving = false);
                 }
               },
-              child: Text(isEditing ? '保存' : '添加'),
+              child: isSaving
+                  ? const SizedBox(width: 20, height: 20, child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text(isEditing ? '保存' : '添加'),
             ),
           ],
         ),

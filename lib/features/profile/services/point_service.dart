@@ -176,8 +176,16 @@ class PointService {
         return {'success': false, 'message': '打卡失败，请重试'};
       }
 
-      // 5. 更新 users 表 points += 积分
-      final currentPoints = AuthService.instance.currentPoints ?? 0;
+      // 5. 从数据库查询实际积分，避免缓存不一致导致数据覆盖
+      final userResult = await ApiClient.get(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        columns: 'points',
+        limit: 1,
+      );
+      final currentPoints = (userResult.isSuccess && userResult.data!.isNotEmpty)
+          ? (userResult.data![0]['points'] as num?)?.toInt() ?? 0
+          : 0;
       final updateResult = await ApiClient.patchByFilter(
         'users',
         filters: {'id': 'eq.$userId'},

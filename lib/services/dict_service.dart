@@ -491,10 +491,16 @@ class DictService {
 
   // ==================== 兼容旧代码方法 ====================
 
-  /// 兼容旧代码：获取 emoji（从 extra 字段）
+  /// 兼容旧代码：获取 emoji（从 extra 字段解析 JSON）
   String getEmoji(String typeCode, String value) {
     final extra = getExtra(typeCode, value);
-    return extra ?? '';
+    if (extra == null || extra.isEmpty) return '';
+    try {
+      final Map<String, dynamic> parsed = jsonDecode(extra);
+      return parsed['emoji'] as String? ?? extra;
+    } catch (_) {
+      return extra;
+    }
   }
 
   /// 兼容旧代码：获取默认 code
