@@ -396,6 +396,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
                         'mood_type',
                         diary.mood,
                       );
+                      final displayDate = diary.createdAt != null &&
+                              diary.createdAt!.year == diary.entryDate.year &&
+                              diary.createdAt!.month == diary.entryDate.month &&
+                              diary.createdAt!.day == diary.entryDate.day
+                          ? diary.createdAt!
+                          : diary.entryDate;
 
                       return Card(
                         margin: const EdgeInsets.only(bottom: 12),
@@ -432,7 +438,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
                                     ),
                                     const Spacer(),
                                     Text(
-                                      DateTimeUtils.formatStandard(diary.createdAt ?? diary.entryDate),
+                                      DateTimeUtils.formatStandard(displayDate),
                                       style: Theme.of(context).textTheme.bodySmall,
                                     ),
                                     EditDeletePopupMenu(

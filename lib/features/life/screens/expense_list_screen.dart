@@ -519,6 +519,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                               expense.category,
                               defaultValue: expense.category,
                             );
+                            final displayDate = expense.createdAt != null &&
+                                    expense.createdAt!.year == expense.date.year &&
+                                    expense.createdAt!.month == expense.date.month &&
+                                    expense.createdAt!.day == expense.date.day
+                                ? expense.createdAt!
+                                : expense.date;
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
@@ -526,7 +532,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                                 leading: const Icon(Icons.receipt),
                                 title: Text(categoryLabel),
                                 subtitle: Text(
-                                  '${DateTimeUtils.formatStandard(expense.createdAt ?? expense.date)}${expense.description != null ? ' - ${expense.description}' : ''}',
+                                  '${DateTimeUtils.formatStandard(displayDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
                                 ),
                                 trailing: Row(
                                   mainAxisSize: MainAxisSize.min,

@@ -439,56 +439,64 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
                   if (_records.isEmpty)
                     const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
                   else
-                    ..._records.map((record) => Card(
-                      margin: const EdgeInsets.only(bottom: 8),
-                      child: ListTile(
-                        leading: const Icon(Icons.monitor_weight),
-                        title: Row(
-                          children: [
-                            Text(
-                              '${record.weight.toStringAsFixed(2)} kg',
-                              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            if (record.bodyFat != null) ...[
-                              const SizedBox(width: 12),
+                    ..._records.map((record) {
+                      final displayDate = record.createdAt != null &&
+                              record.createdAt!.year == record.date.year &&
+                              record.createdAt!.month == record.date.month &&
+                              record.createdAt!.day == record.date.day
+                          ? record.createdAt!
+                          : record.date;
+                      return Card(
+                        margin: const EdgeInsets.only(bottom: 8),
+                        child: ListTile(
+                          leading: const Icon(Icons.monitor_weight),
+                          title: Row(
+                            children: [
                               Text(
-                                '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                            if (record.bmi != null) ...[
-                              const SizedBox(width: 12),
-                              Text(
-                                'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                style: Theme.of(context).textTheme.bodySmall,
-                              ),
-                            ],
-                          ],
-                        ),
-                        subtitle: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(DateTimeUtils.formatStandard(record.createdAt ?? record.date)),
-                            if (record.note != null && record.note!.isNotEmpty)
-                              Text(
-                                record.note!,
-                                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                  color: Theme.of(context).colorScheme.outline,
-                                  fontStyle: FontStyle.italic,
+                                '${record.weight.toStringAsFixed(2)} kg',
+                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                  fontWeight: FontWeight.bold,
                                 ),
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
                               ),
-                          ],
+                              if (record.bodyFat != null) ...[
+                                const SizedBox(width: 12),
+                                Text(
+                                  '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                              if (record.bmi != null) ...[
+                                const SizedBox(width: 12),
+                                Text(
+                                  'BMI ${record.bmi!.toStringAsFixed(1)}',
+                                  style: Theme.of(context).textTheme.bodySmall,
+                                ),
+                              ],
+                            ],
+                          ),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(DateTimeUtils.formatStandard(displayDate)),
+                              if (record.note != null && record.note!.isNotEmpty)
+                                Text(
+                                  record.note!,
+                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                    color: Theme.of(context).colorScheme.outline,
+                                    fontStyle: FontStyle.italic,
+                                  ),
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                ),
+                            ],
+                          ),
+                          trailing: EditDeletePopupMenu(
+                            onEdit: () => _showEditRecordForm(record),
+                            onDelete: () => _deleteWeightRecord(record.id),
+                          ),
                         ),
-                        trailing: EditDeletePopupMenu(
-                          onEdit: () => _showEditRecordForm(record),
-                          onDelete: () => _deleteWeightRecord(record.id),
-                        ),
-                      ),
-                    )),
+                      );
+                    }),
                   buildLoadMoreIndicator(),
                 ],
               ),

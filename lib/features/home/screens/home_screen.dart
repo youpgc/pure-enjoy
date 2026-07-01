@@ -346,7 +346,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'icon': Icons.edit_note,
             'title': '心情日记',
             'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
-            'time': _formatTime(item['created_at']),
+            'time': _formatDisplayDate(item['created_at'], item['entry_date']),
             'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
@@ -362,7 +362,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'icon': Icons.attach_money,
             'title': '支出记录',
             'subtitle': '${item['category'] ?? '其他'} ¥${item['amount'] ?? 0}',
-            'time': _formatTime(item['created_at']),
+            'time': _formatDisplayDate(item['created_at'], item['date']),
             'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
@@ -378,7 +378,7 @@ class _DashboardPageState extends State<DashboardPage> {
             'icon': Icons.monitor_weight,
             'title': '体重记录',
             'subtitle': '${item['weight'] ?? 0} kg',
-            'time': _formatTime(item['created_at']),
+            'time': _formatDisplayDate(item['created_at'], item['date']),
             'created_at_raw': item['created_at'] as String? ?? '',
           });
         }
@@ -480,12 +480,25 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 格式化时间显示
-  String _formatTime(String? createdAt) {
-    if (createdAt == null) return '';
-    final dateTime = DateTime.tryParse(createdAt)?.toLocal();
-    if (dateTime == null) return '';
-    return DateTimeUtils.formatStandard(dateTime);
+  /// 格式化时间显示（优先创建时间，非同一天则展示选择日期）
+  String _formatDisplayDate(String? createdAt, String? selectedDate) {
+    if (createdAt == null && selectedDate == null) return '';
+    final created = createdAt != null ? DateTime.tryParse(createdAt)?.toLocal() : null;
+    if (created == null) {
+      final dt = selectedDate != null ? DateTime.tryParse(selectedDate) : null;
+      if (dt == null) return '';
+      return DateTimeUtils.formatStandard(dt);
+    }
+    if (selectedDate != null) {
+      final selected = DateTime.tryParse(selectedDate)?.toLocal();
+      if (selected != null &&
+          (created.year != selected.year ||
+              created.month != selected.month ||
+              created.day != selected.day)) {
+        return DateTimeUtils.formatStandard(selected);
+      }
+    }
+    return DateTimeUtils.formatStandard(created);
   }
 
   /// 显示添加心情日记弹窗
