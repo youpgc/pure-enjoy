@@ -67,8 +67,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       await _loadBookshelf(refresh: true);
     } catch (e, stackTrace) {
       if (kDebugMode) {
-        debugPrint('❌ BookShelfScreen _initLoad 异常');
-        debugPrint('堆栈信息');
+        debugPrint('❌ BookShelfScreen _initLoad 异常: ');
+        debugPrint('堆栈信息: ');
       }
       if (mounted) {
         setState(() => _isLoading = false);
