@@ -277,18 +277,31 @@ jobs:
           fi
           
           echo "Upload URL: $UPLOAD_URL"
-          
+
+          # 如果 release 已存在，检查并删除同名 asset（避免 422 already_exists）
+          if [ "$RELEASE_HTTP" = "422" ]; then
+            echo "Checking for existing asset with same name..."
+            EXISTING_ASSET_ID=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; data=json.load(sys.stdin); assets=data.get("assets",[]); print(next((a["id"] for a in assets if a["name"]=="'"${{ steps.version.outputs.apk_name }}"'"), ""))')
+            if [ -n "$EXISTING_ASSET_ID" ]; then
+              echo "Deleting existing asset ID: $EXISTING_ASSET_ID"
+              DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "https://api.github.com/repos/${{ github.repository }}/releases/assets/$EXISTING_ASSET_ID" \
+                -H "Authorization: token $GITHUB_TOKEN" \
+                -H "Accept: application/vnd.github.v3+json")
+              echo "Delete asset HTTP: $DELETE_RESPONSE"
+            fi
+          fi
+
           # 上传 APK 到 release
           echo "Uploading APK to GitHub Release..."
           UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL?name=${{ steps.version.outputs.apk_name }}" \
             -H "Authorization: token $GITHUB_TOKEN" \
             -H "Content-Type: application/vnd.android.package-archive" \
             --data-binary @"$FILE_PATH")
-          
+
           UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
           UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
           echo "Upload HTTP Code: $UPLOAD_HTTP"
-          
+
           if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
             echo "❌ Upload failed with HTTP $UPLOAD_HTTP"
             echo "Response: $UPLOAD_BODY"
