@@ -373,12 +373,9 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         itemCount: _readingNovels.length,
                         itemBuilder: (context, index) {
                           final novel = _readingNovels[index];
-                          // 查找书架中的 lastChapter
-                          final userNovel = _userNovels.where((un) => un['novel_id'].toString() == novel.id).firstOrNull;
                           return _NovelCard(
                             novel: novel,
                             onTap: () => _openNovelDetail(novel),
-                            lastChapter: userNovel?['last_chapter'] as int?,
                           );
                         },
                       ),
@@ -470,7 +467,6 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                           builder: (context) {
                             // Bug 11 修复：提升到 GridView 外部计算一次，避免每个 item 都重新计算 O(n*m)
                             final bookshelfIds = _userNovels.map((un) => un['novel_id'].toString()).toSet();
-                            final bookshelfLastChapters = {for (var un in _userNovels) un['novel_id'].toString(): un['last_chapter'] as int?};
                             return GridView.builder(
                               shrinkWrap: true,
                               physics: const NeverScrollableScrollPhysics(),
@@ -489,7 +485,6 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                                   onTap: () => _openNovelDetail(novel),
                                   onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
                                   isInBookshelf: isInBookshelf,
-                                  lastChapter: bookshelfLastChapters[novel.id],
                                 );
                               },
                             );
@@ -508,14 +503,12 @@ class _NovelCard extends StatelessWidget {
   final VoidCallback onTap;
   final VoidCallback? onAddToBookshelf;
   final bool isInBookshelf;
-  final int? lastChapter;
 
   const _NovelCard({
     required this.novel,
     required this.onTap,
     this.onAddToBookshelf,
     this.isInBookshelf = false,
-    this.lastChapter,
   });
 
   @override
@@ -536,16 +529,7 @@ class _NovelCard extends StatelessWidget {
                 children: [
                   Container(
                     width: double.infinity,
-                    decoration: BoxDecoration(
-                      color: colorScheme.surfaceContainerHighest,
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.orange.withOpacity(0.15),
-                          blurRadius: 8,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
+                    color: colorScheme.surfaceContainerHighest,
                     child: novel.cover != null
                         ? Image.network(
                             novel.cover!,
@@ -600,27 +584,6 @@ class _NovelCard extends StatelessWidget {
                           style: TextStyle(
                             fontSize: 10,
                             color: colorScheme.onPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                  // 阅读进度圆形标签
-                  if (lastChapter != null && lastChapter! > 0 && novel.chapterCount > 0)
-                    Positioned(
-                      bottom: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.all(4),
-                        decoration: BoxDecoration(
-                          color: Colors.orange,
-                          shape: BoxShape.circle,
-                        ),
-                        child: Text(
-                          '${((lastChapter! / novel.chapterCount) * 100).clamp(0, 100).round()}%',
-                          style: const TextStyle(
-                            fontSize: 10,
-                            color: Colors.white,
-                            fontWeight: FontWeight.bold,
                           ),
                         ),
                       ),

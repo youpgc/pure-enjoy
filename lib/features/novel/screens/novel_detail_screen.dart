@@ -593,25 +593,21 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   _StatItem(
                     label: '字数',
                     value: _formatWordCount(novel.wordCount),
-                    icon: Icons.text_fields,
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '章节',
                     value: '${novel.chapterCount} 章',
-                    icon: Icons.menu_book,
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '状态',
                     value: DictService.instance.getLabelOrDefault(dictNovelStatus, novel.status ?? '', defaultValue: novel.status == novelStatusCompleted ? '已完结' : '连载中'),
-                    icon: Icons.info_outline,
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
                   _StatItem(
                     label: '评分',
                     value: novel.rating != null ? '${novel.rating}' : '--',
-                    icon: Icons.star_outline,
                   ),
                 ],
               ),
@@ -624,31 +620,18 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  // 开始阅读按钮 - 使用渐变背景（与登录页按钮样式一致）
+                  // 开始阅读按钮
                   Expanded(
-                    child: Container(
-                      height: 48,
-                      decoration: BoxDecoration(
-                        gradient: const LinearGradient(
-                          colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
-                          begin: Alignment.centerLeft,
-                          end: Alignment.centerRight,
-                        ),
-                        borderRadius: BorderRadius.circular(12),
+                    child: FilledButton.icon(
+                      onPressed: _startReading,
+                      icon: const Icon(Icons.menu_book),
+                      label: Text(
+                        _isInBookshelf && _currentChapter > 1
+                            ? '继续阅读 第$_currentChapter章'
+                            : '开始阅读',
                       ),
-                      child: FilledButton.icon(
-                        onPressed: _startReading,
-                        icon: const Icon(Icons.menu_book),
-                        label: Text(
-                          _isInBookshelf && _currentChapter > 1
-                              ? '继续阅读 第$_currentChapter章'
-                              : '开始阅读',
-                        ),
-                        style: FilledButton.styleFrom(
-                          backgroundColor: Colors.transparent,
-                          shadowColor: Colors.transparent,
-                          padding: EdgeInsets.zero,
-                        ),
+                      style: FilledButton.styleFrom(
+                        padding: const EdgeInsets.symmetric(vertical: 14),
                       ),
                     ),
                   ),
@@ -898,31 +881,14 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 class _StatItem extends StatelessWidget {
   final String label;
   final String value;
-  final IconData icon;
 
-  const _StatItem({required this.label, required this.value, required this.icon});
+  const _StatItem({required this.label, required this.value});
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Expanded(
       child: Column(
         children: [
-          // 图标
-          Container(
-            width: 32,
-            height: 32,
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Icon(
-              icon,
-              size: 16,
-              color: colorScheme.primary,
-            ),
-          ),
-          const SizedBox(height: 4),
           Text(
             value,
             style: Theme.of(context).textTheme.titleSmall?.copyWith(

@@ -793,16 +793,8 @@ class _DashboardPageState extends State<DashboardPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            // 欢迎卡片 - 橙黄渐变背景
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                ),
-                borderRadius: BorderRadius.circular(16),
-              ),
+            // 欢迎卡片
+            Card(
               child: Padding(
                 padding: const EdgeInsets.all(20),
                 child: Column(
@@ -810,23 +802,19 @@ class _DashboardPageState extends State<DashboardPage> {
                   children: [
                     Text(
                       '欢迎回来',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        color: Colors.white,
-                      ),
+                      style: Theme.of(context).textTheme.headlineSmall,
                     ),
                     const SizedBox(height: 8),
                     Text(
                       AuthService.instance.currentUserName ?? '用户',
                       style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                        color: Colors.white.withOpacity(0.9),
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                     const SizedBox(height: 16),
                     Text(
                       '今天想做些什么？',
-                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                        color: Colors.white.withOpacity(0.8),
-                      ),
+                      style: Theme.of(context).textTheme.bodyMedium,
                     ),
                   ],
                 ),
@@ -1004,10 +992,10 @@ class _DashboardPageState extends State<DashboardPage> {
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
                 gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 4,
+                  crossAxisCount: 3,
                   mainAxisSpacing: 12,
                   crossAxisSpacing: 12,
-                  childAspectRatio: 0.85,
+                  childAspectRatio: 1,
                 ),
                 itemCount: visibleTools.length,
                 itemBuilder: (context, index) {
@@ -1212,41 +1200,28 @@ class _ToolCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     return Card(
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(12),
-        child: Padding(
-          padding: const EdgeInsets.symmetric(vertical: 8),
-          child: Column(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Container(
-                width: 44,
-                height: 44,
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    colors: [
-                      colorScheme.primary,
-                      colorScheme.secondary,
-                    ],
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                  ),
-                  shape: BoxShape.circle,
-                ),
-                child: Icon(icon, color: Colors.white, size: 22),
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Container(
+              width: 48,
+              height: 48,
+              decoration: BoxDecoration(
+                color: color.withOpacity(0.15),
+                shape: BoxShape.circle,
               ),
-              const SizedBox(height: 6),
-              Text(
-                label,
-                style: Theme.of(context).textTheme.bodySmall,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-            ],
-          ),
+              child: Icon(icon, color: color, size: 24),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              label,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+          ],
         ),
       ),
     );
@@ -2227,22 +2202,14 @@ class _ProfilePageState extends State<ProfilePage> {
           ? const Center(child: CircularProgressIndicator())
           : ListView(
         children: [
-          // 用户信息卡片 - 橙黄渐变背景
-          Container(
+          // 用户信息卡片
+          Card(
             margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              gradient: LinearGradient(
-                colors: [AppTheme.primaryOrange, AppTheme.primaryYellow],
-                begin: Alignment.topLeft,
-                end: Alignment.bottomRight,
-              ),
-              borderRadius: BorderRadius.circular(16),
-            ),
             child: Padding(
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  _buildAvatarWhite(),
+                  _buildAvatar(colorScheme, supabaseService),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -2250,22 +2217,20 @@ class _ProfilePageState extends State<ProfilePage> {
                       children: [
                         Text(
                           supabaseService.currentUserName ?? '用户',
-                          style: Theme.of(context).textTheme.titleLarge?.copyWith(
-                            color: Colors.white,
-                          ),
+                          style: Theme.of(context).textTheme.titleLarge,
                         ),
                         const SizedBox(height: 4),
                         Text(
                           supabaseService.currentUserEmail ?? '',
                           style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: Colors.white.withOpacity(0.85),
+                            color: colorScheme.onSurfaceVariant,
                           ),
                         ),
                       ],
                     ),
                   ),
                   IconButton(
-                    icon: const Icon(Icons.edit_outlined, color: Colors.white70),
+                    icon: const Icon(Icons.edit_outlined),
                     onPressed: () async {
                       final result = await Navigator.push(
                         context,
@@ -2274,6 +2239,7 @@ class _ProfilePageState extends State<ProfilePage> {
                         ),
                       );
                       if (result == true) {
+                        // 重新从 Supabase 加载用户数据
                         _loadUserData();
                       }
                     },
@@ -2447,36 +2413,6 @@ class _ProfilePageState extends State<ProfilePage> {
   String _getMemberLevelLabel(String? level) {
     if (level == null || level.isEmpty) return '普通会员';
     return DictService.instance.getLabelOrDefault('member_level', level, defaultValue: '普通会员');
-  }
-
-  /// 构建用户头像（白色背景，用于渐变卡片内）
-  Widget _buildAvatarWhite() {
-    final supabaseService = SupabaseService.instance;
-    final avatarUrl = supabaseService.currentUserAvatar;
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
-      return CircleAvatar(
-        radius: 32,
-        backgroundColor: Colors.white.withOpacity(0.25),
-        child: ClipOval(
-          child: Image.network(
-            avatarUrl,
-            width: 64,
-            height: 64,
-            fit: BoxFit.cover,
-            cacheWidth: 128,
-            cacheHeight: 128,
-            errorBuilder: (context, error, stackTrace) {
-              return const Icon(Icons.person, size: 32, color: Colors.white);
-            },
-          ),
-        ),
-      );
-    }
-    return CircleAvatar(
-      radius: 32,
-      backgroundColor: Colors.white.withOpacity(0.25),
-      child: const Icon(Icons.person, size: 32, color: Colors.white),
-    );
   }
 
   /// 构建用户头像

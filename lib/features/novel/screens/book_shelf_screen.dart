@@ -1245,42 +1245,30 @@ class _BookshelfItem extends StatelessWidget {
         child: Row(
           children: [
             // 封面
-            Container(
-              decoration: BoxDecoration(
-                borderRadius: BorderRadius.circular(6),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.orange.withOpacity(0.15),
-                    blurRadius: 8,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: ClipRRect(
-                borderRadius: BorderRadius.circular(6),
-                child: SizedBox(
-                  width: 56,
-                  height: 76,
-                  child: coverUrl != null && coverUrl.isNotEmpty
-                      ? Image.network(
-                          coverUrl,
-                          fit: BoxFit.cover,
-                          errorBuilder: (_, __, ___) => Container(
-                            color: colorScheme.surfaceContainerHighest,
-                            child: Icon(
-                              Icons.book,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        )
-                      : Container(
+            ClipRRect(
+              borderRadius: BorderRadius.circular(6),
+              child: SizedBox(
+                width: 56,
+                height: 76,
+                child: coverUrl != null && coverUrl.isNotEmpty
+                    ? Image.network(
+                        coverUrl,
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => Container(
                           color: colorScheme.surfaceContainerHighest,
                           child: Icon(
                             Icons.book,
                             color: colorScheme.onSurfaceVariant,
                           ),
                         ),
-                ),
+                      )
+                    : Container(
+                        color: colorScheme.surfaceContainerHighest,
+                        child: Icon(
+                          Icons.book,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
               ),
             ),
             const SizedBox(width: 12),
@@ -1328,84 +1316,36 @@ class _BookshelfItem extends StatelessWidget {
                   const SizedBox(height: 6),
                   Row(
                     children: [
-                      // 状态标签 - 使用Chip
-                      Chip(
-                        label: Text(
+                      // 状态标签
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: getStatusColor(progress, colorScheme)
+                              .withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(4),
+                        ),
+                        child: Text(
                           getStatusText(progress),
-                          style: const TextStyle(fontSize: 11, height: 1.2),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: getStatusColor(progress, colorScheme),
+                          ),
                         ),
-                        padding: const EdgeInsets.symmetric(horizontal: 2),
-                        materialTapTargetSize: MaterialTapTargetSize.shrinkWrap,
-                        backgroundColor: status == 'reading'
-                            ? Colors.orange.withOpacity(0.15)
-                            : status == 'completed'
-                                ? AppTheme.success.withOpacity(0.15)
-                                : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.1),
-                        side: BorderSide.none,
-                        labelStyle: TextStyle(
-                          color: status == 'reading'
-                              ? Colors.orange
-                              : status == 'completed'
-                                  ? AppTheme.success
-                                  : Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        visualDensity: VisualDensity.compact,
                       ),
                       const SizedBox(width: 8),
-                      // 阅读进度条
+                      // 阅读进度
                       Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              chapterCount == 0
-                                  ? '读到第 $lastChapter 章（共0章）'
-                                  : '读到第 $lastChapter / $chapterCount 章',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(color: colorScheme.onSurfaceVariant, fontSize: 11),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            const SizedBox(height: 4),
-                            SizedBox(
-                              height: 4,
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(2),
-                                child: Stack(
-                                  children: [
-                                    // 背景轨道
-                                    Container(
-                                      decoration: BoxDecoration(
-                                        color: colorScheme.surfaceContainerHighest,
-                                        borderRadius: BorderRadius.circular(2),
-                                      ),
-                                    ),
-                                    // 渐变进度条
-                                    FractionallySizedBox(
-                                      widthFactor: chapterCount > 0
-                                          ? (lastChapter / chapterCount).clamp(0.0, 1.0)
-                                          : 0.0,
-                                      child: Container(
-                                        decoration: BoxDecoration(
-                                          gradient: const LinearGradient(
-                                            colors: [
-                                              AppTheme.primaryOrange,
-                                              AppTheme.primaryYellow,
-                                            ],
-                                            begin: Alignment.centerLeft,
-                                            end: Alignment.centerRight,
-                                          ),
-                                          borderRadius: BorderRadius.circular(2),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          ],
+                        child: Text(
+                          chapterCount == 0
+                              ? '读到第 $lastChapter 章（共0章）'
+                              : '读到第 $lastChapter / $chapterCount 章',
+                          style: Theme.of(context)
+                              .textTheme
+                              .bodySmall
+                              ?.copyWith(color: colorScheme.onSurfaceVariant),
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
                         ),
                       ),
                     ],
