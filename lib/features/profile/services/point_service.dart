@@ -248,24 +248,30 @@ class PointService {
     }
   }
 
-  /// 从数据库查询用户总积分
+  /// 从 point_records 计算用户有效积分总和（排除过期）
   Future<int> fetchTotalPoints() async {
     try {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return 0;
 
+      final now = DateTime.now().toUtc();
       final result = await ApiClient.get(
-        'users',
-        filters: {'id': 'eq.$userId'},
-        columns: 'points',
-        limit: 1,
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'status': 'eq.active',
+          'or': '(expires_at.is.null,expires_at.gt.${now.toIso8601String()})',
+        },
+        columns: 'amount',
       );
 
-      if (result.isSuccess && result.data!.isNotEmpty) {
-        final points = result.data![0]['points'];
-        if (points is int) return points;
-        if (points is num) return points.toInt();
-        if (points is String) return int.tryParse(points) ?? 0;
+      if (result.isSuccess) {
+        final records = result.data!;
+        int total = 0;
+        for (final record in records) {
+          total += (record['amount'] as num?)?.toInt() ?? 0;
+        }
+        return total;
       }
 
       return 0;
@@ -324,11 +330,13 @@ class PointService {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return 0;
 
+      final now = DateTime.now().toUtc();
       final result = await ApiClient.get(
         'point_records',
         filters: {
           'user_id': 'eq.$userId',
           'status': 'eq.active',
+          'or': '(expires_at.is.null,expires_at.gt.${now.toIso8601String()})',
         },
         columns: 'amount',
       );

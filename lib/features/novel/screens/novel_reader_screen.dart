@@ -1677,10 +1677,14 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
 
     // 只有在明确需要重置页签时才跳转（如切换章节）
     // 菜单唤起、字体调整等操作不应重置页签
-    if (resetPage && _pageController.hasClients) {
-      // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
-      final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
-      _pageController.jumpToPage(targetPage);
+    if (resetPage) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (mounted && _pageController.hasClients) {
+          // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
+          final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
+          _pageController.jumpToPage(targetPage);
+        }
+      });
     }
   }
 

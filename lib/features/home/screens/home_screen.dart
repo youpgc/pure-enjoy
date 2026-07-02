@@ -2141,7 +2141,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isForceUpdate = false;
   String? _apkUrl;
   String? _githubUrl;
-  bool _isLoading = true;
+  bool _isLoading = false;
   int _totalPoints = 0;
 
   @override
@@ -2154,13 +2154,11 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// 从 Supabase 重新加载用户数据
   Future<void> _loadUserData() async {
-    setState(() => _isLoading = true);
     await SupabaseService.instance.reloadCurrentUser();
     final points = await PointService.instance.fetchTotalPoints();
     if (mounted) {
       setState(() {
         _totalPoints = points;
-        _isLoading = false;
       });
     }
   }
@@ -2276,9 +2274,7 @@ class _ProfilePageState extends State<ProfilePage> {
           ),
         ],
       ),
-      body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
-          : ListView(
+      body: ListView(
         children: [
           // 用户信息卡片
           Card(
