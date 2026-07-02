@@ -1,8 +1,14 @@
-name: Build APK and Upload to GitHub Releases (备用)
+name: Build APK and Upload to Gitee Releases
 
-# 注意：APK 主构建流程已迁移至 Gitee Go（.gitee-ci.yml）
-# 此 workflow 仅作为备用，支持手动触发
+# 构建在 GitHub Actions 执行，APK 发布到 Gitee Releases（国内访问更快）
+# 需在 GitHub Secrets 中配置 GITEE_TOKEN（Gitee 私人令牌，需 projects 权限）
 on:
+  push:
+    branches: [master]
+    tags: ['v*']
+  pull_request:
+    branches: [master]
+    types: [closed]
   workflow_dispatch:
 
 # 防止同一分支的重复构建
@@ -218,94 +224,101 @@ jobs:
           echo "Size: $FILESIZE bytes"
 
       # ===================================================================
-      # APK 分发策略：GitHub Releases + 国内镜像加速
+      # APK 分发策略：GitHub Actions 构建 → Gitee Releases 发布
       # ===================================================================
       # 问题背景：
       #   1. GitHub 国内访问不稳定，APK 下载经常超时/失败
       #   2. Supabase 免费存储上限 50M，APK 已超过限制
       #   3. 不引入其他第三方平台（阿里云/AWS/腾讯云等）
-      #   4. Gitee 需要实名认证，无法满足
       # 解决方案：
-      #   - 使用 GitHub Releases 存储 APK（主渠道）
-      #   - App 端通过国内镜像加速下载（ghproxy/mirror.ghproxy/ghps.cc）
-      #   - 镜像服务自动将 github.com 请求转发到国内 CDN 节点
+      #   - GitHub Actions 负责构建 APK（环境成熟、速度快）
+      #   - 构建完成后上传到 Gitee Releases（国内访问快）
+      #   - App 端直接从 Gitee 下载，无需镜像加速
       # ===================================================================
 
-      # 13. 上传 APK 到 GitHub Releases
-      - name: Upload APK to GitHub Releases
+      # 13. 上传 APK 到 Gitee Releases
+      - name: Upload APK to Gitee Releases
         id: upload
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
           TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
-          
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+
           echo "File: $FILE_PATH"
           ls -lh "$FILE_PATH"
-          
+
           # 读取 Release Notes（从 Step 8 传递）
           RELEASE_NOTES="${{ steps.version.outputs.release_notes }}"
           if [ -z "$RELEASE_NOTES" ]; then
             RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
-          # 创建 GitHub Release（使用 jq 构建 JSON 避免 YAML 缩进问题）
-          echo "Creating GitHub Release $TAG_NAME..."
-          RELEASE_PAYLOAD=$(jq -n --arg tag "$TAG_NAME" --arg name "Pure Enjoy $TAG_NAME" --arg body "$RELEASE_NOTES" '{tag_name: $tag, name: $name, body: $body, draft: false, prerelease: false}')
-
-          RELEASE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "https://api.github.com/repos/${{ github.repository }}/releases" \
-            -H "Authorization: token $GITHUB_TOKEN" \
+          # 创建 Gitee Release
+          echo "Creating Gitee Release $TAG_NAME..."
+          CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases" \
             -H "Content-Type: application/json" \
-            -d "$RELEASE_PAYLOAD")
-          
-          RELEASE_HTTP=$(echo "$RELEASE_RESPONSE" | tail -n1)
-          RELEASE_BODY=$(echo "$RELEASE_RESPONSE" | sed '$d')
-          echo "Release HTTP Code: $RELEASE_HTTP"
-          
-          # 如果 release 已存在，获取已有 release 的上传 URL
-          if [ "$RELEASE_HTTP" = "422" ]; then
-            echo "Release already exists, fetching existing release..."
-            RELEASE_RESPONSE=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases/tags/$TAG_NAME" \
-              -H "Authorization: token $GITHUB_TOKEN")
-            UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
-          else
-            UPLOAD_URL=$(echo "$RELEASE_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("upload_url","").replace("{?name,label}",""))')
-          fi
-          
-          echo "Upload URL: $UPLOAD_URL"
+            -H "Authorization: token ${GITEE_TOKEN}" \
+            -d "{\"tag_name\":\"${TAG_NAME}\",\"name\":\"${TAG_NAME}\",\"body\":\"${RELEASE_NOTES}\",\"prerelease\":false,\"target_commitish\":\"master\"}")
 
-          # 如果 release 已存在，检查并删除同名 asset（避免 422 already_exists）
-          if [ "$RELEASE_HTTP" = "422" ]; then
+          HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
+          BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
+          echo "Create Release HTTP: $HTTP_CODE"
+
+          # 如果 release 已存在，获取已有 release 的 ID
+          if [ "$HTTP_CODE" = "422" ]; then
+            echo "ℹ️ Release 已存在，获取已有 release"
+            RELEASE_RESPONSE=$(curl -s "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases/tags/${TAG_NAME}" \
+              -H "Authorization: token ${GITEE_TOKEN}")
+            RELEASE_ID=$(echo "$RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+          elif [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ 创建 Release 失败: HTTP $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          else
+            RELEASE_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "❌ 无法获取 Release ID"
+            exit 1
+          fi
+
+          # 如果 release 已存在，检查并删除同名附件（避免重复）
+          if [ "$HTTP_CODE" = "422" ]; then
             echo "Checking for existing asset with same name..."
             EXISTING_ASSET_ID=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; data=json.load(sys.stdin); assets=data.get("assets",[]); print(next((a["id"] for a in assets if a["name"]=="'"${{ steps.version.outputs.apk_name }}"'"), ""))')
             if [ -n "$EXISTING_ASSET_ID" ]; then
               echo "Deleting existing asset ID: $EXISTING_ASSET_ID"
-              DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE "https://api.github.com/repos/${{ github.repository }}/releases/assets/$EXISTING_ASSET_ID" \
-                -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json")
+              DELETE_RESPONSE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases/${RELEASE_ID}/attach_files/${EXISTING_ASSET_ID}" \
+                -H "Authorization: token ${GITEE_TOKEN}")
               echo "Delete asset HTTP: $DELETE_RESPONSE"
             fi
           fi
 
-          # 上传 APK 到 release
-          echo "Uploading APK to GitHub Release..."
-          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$UPLOAD_URL?name=${{ steps.version.outputs.apk_name }}" \
-            -H "Authorization: token $GITHUB_TOKEN" \
-            -H "Content-Type: application/vnd.android.package-archive" \
-            --data-binary @"$FILE_PATH")
+          # 上传 APK 附件到 Gitee Release
+          echo "Uploading APK to Gitee Release..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases/${RELEASE_ID}/attach_files" \
+            -H "Authorization: token ${GITEE_TOKEN}" \
+            -F "file=@${FILE_PATH}")
 
           UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
           UPLOAD_BODY=$(echo "$UPLOAD_RESPONSE" | sed '$d')
-          echo "Upload HTTP Code: $UPLOAD_HTTP"
+          echo "Upload HTTP: $UPLOAD_HTTP"
 
           if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
             echo "❌ Upload failed with HTTP $UPLOAD_HTTP"
             echo "Response: $UPLOAD_BODY"
             exit 1
           fi
-          
-          # 获取下载 URL（公开仓库可直接使用 browser_download_url）
-          DOWNLOAD_URL=$(echo "$UPLOAD_BODY" | python3 -c 'import sys,json; print(json.load(sys.stdin).get("browser_download_url",""))')
+
+          # Gitee 下载地址
+          DOWNLOAD_URL="https://gitee.com/${OWNER}/${REPO}/releases/download/${TAG_NAME}/${{ steps.version.outputs.apk_name }}"
           echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
           echo "✅ Uploaded to: $DOWNLOAD_URL"
 
@@ -412,31 +425,37 @@ jobs:
             exit 1
           fi
 
-      # Step 3: 清理旧 GitHub Releases（只保留最新 5 个 APK）
-      - name: Step 3 - Clean old GitHub Releases (keep 5)
+      # Step 3: 清理旧 Gitee Releases（只保留最新 5 个 APK）
+      # 注意：Gitee Release API 删除功能未在官方文档明确列出，此处通过获取列表并尝试删除实现
+      - name: Step 3 - Clean old Gitee Releases (keep 5)
         env:
-          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
-          echo "=== Step 3: 清理旧 GitHub Releases（保留最新 5 个）==="
-          
+          echo "=== Step 3: 清理旧 Gitee Releases（保留最新 5 个）==="
+          OWNER="${{ github.repository_owner }}"
+          REPO="${{ github.event.repository.name }}"
+
           # 获取所有 releases（按发布时间倒序）
-          RELEASES=$(curl -s "https://api.github.com/repos/${{ github.repository }}/releases?per_page=50" \
-            -H "Authorization: token $GITHUB_TOKEN")
-          
+          RELEASES=$(curl -s "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases" \
+            -H "Authorization: token ${GITEE_TOKEN}")
+
           # 提取第 6 个及以后的 release ID
           OLD_RELEASE_IDS=$(echo "$RELEASES" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)[5:]]' 2>/dev/null)
-          
+
           if [ -z "$OLD_RELEASE_IDS" ]; then
             echo "✅ 没有需要清理的旧 releases"
           else
             for RELEASE_ID in $OLD_RELEASE_IDS; do
-              echo "🗑️ 删除旧 release: $RELEASE_ID"
-              curl -s -o /dev/null -w "%{http_code}" -X DELETE "https://api.github.com/repos/${{ github.repository }}/releases/$RELEASE_ID" \
-                -H "Authorization: token $GITHUB_TOKEN" \
-                -H "Accept: application/vnd.github.v3+json"
-              echo ""
+              echo "🗑️ 尝试删除旧 release: $RELEASE_ID"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases/${RELEASE_ID}" \
+                -H "Authorization: token ${GITEE_TOKEN}")
+              if [ "$HTTP_CODE" = "204" ] || [ "$HTTP_CODE" = "200" ]; then
+                echo "✅ 删除成功"
+              else
+                echo "⚠️ 删除失败或 API 不支持 (HTTP $HTTP_CODE)，跳过"
+              fi
             done
-            echo "✅ 旧 releases 清理完成"
           fi
 
       # Step 4: 将第 6 个及更旧的 revoked 版本标记为 superseded（已失效）
