@@ -2,13 +2,14 @@ name: Build APK and Upload to Gitee Releases
 
 # 构建在 GitHub Actions 执行，APK 发布到 Gitee Releases（国内访问更快）
 # 需在 GitHub Secrets 中配置 GITEE_TOKEN（Gitee 私人令牌，需 projects 权限）
+# 自动构建已暂停，改为手动触发（workflow_dispatch）
 on:
-  push:
-    branches: [master]
-    tags: ['v*']
-  pull_request:
-    branches: [master]
-    types: [closed]
+  # push:
+  #   branches: [master]
+  #   tags: ['v*']
+  # pull_request:
+  #   branches: [master]
+  #   types: [closed]
   workflow_dispatch:
 
 # 防止同一分支的重复构建
