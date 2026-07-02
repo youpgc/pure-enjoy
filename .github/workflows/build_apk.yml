@@ -1,12 +1,8 @@
-name: Build APK and Upload to GitHub Releases
+name: Build APK and Upload to GitHub Releases (备用)
 
+# 注意：APK 主构建流程已迁移至 Gitee Go（.gitee-ci.yml）
+# 此 workflow 仅作为备用，支持手动触发
 on:
-  push:
-    branches: [master]
-    tags: ['v*']
-  pull_request:
-    branches: [master]
-    types: [closed]
   workflow_dispatch:
 
 # 防止同一分支的重复构建
