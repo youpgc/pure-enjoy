@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../services/gutendex_service.dart';
 import '../../../core/theme/app_theme.dart';
-import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/widgets.dart' as app_widgets;
 import '../models/public_domain_book_model.dart';
 import 'public_domain_reader_screen.dart';
 
@@ -171,7 +171,7 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
           if (_error != null)
             Padding(
               padding: const EdgeInsets.all(16),
-              child: ErrorWidget(
+              child: app_widgets.ErrorWidget(
                 message: '加载失败: $_error',
                 onRetry: () => _loadBooks(refresh: true),
               ),
@@ -180,9 +180,9 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
           // 列表
           Expanded(
             child: _isLoading && _books.isEmpty
-                ? const LoadingWidget()
+                ? const app_widgets.LoadingWidget()
                 : _books.isEmpty && !_isLoading
-                    ? EmptyWidget(
+                    ? app_widgets.EmptyWidget(
                         message: _searchQuery.isEmpty
                             ? '暂无公版书籍'
                             : '未找到相关书籍',

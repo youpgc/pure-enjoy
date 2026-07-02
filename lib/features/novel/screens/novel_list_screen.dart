@@ -12,6 +12,7 @@ import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
 import 'public_domain_list_screen.dart';
+import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 小说列表页面
