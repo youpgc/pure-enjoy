@@ -47,6 +47,13 @@ class VersionCheckService {
       final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
       final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
       final isForceUpdate = latestVersion['release_type'] == 'force';
+      final apkUrl = latestVersion['apk_url'] as String?;
+
+      // 防御：没有下载地址时不提示更新（数据不完整）
+      if (apkUrl == null || apkUrl.isEmpty) {
+        if (kDebugMode) debugPrint('📱 最新版本缺少下载地址，跳过更新提示');
+        return null;
+      }
 
       if (kDebugMode) debugPrint('📱 最新版本获取成功');
 
@@ -54,7 +61,7 @@ class VersionCheckService {
         return {
           'version': latestVersionStr,
           'build_number': latestBuildNumber,
-          'apk_url': latestVersion['apk_url'],
+          'apk_url': apkUrl,
           'github_url': latestVersion['github_url'],
           'release_notes': latestVersion['release_notes'],
           'is_force_update': isForceUpdate,
@@ -118,6 +125,15 @@ class VersionCheckService {
     final fallbackUrl = versionInfo['github_url'] as String?;
     final releaseNotes = versionInfo['release_notes'] as String? ?? '';
     final version = versionInfo['version'] as String? ?? '';
+
+    // 防御：没有下载地址时不弹出更新对话框
+    if (apkUrl == null || apkUrl.isEmpty) {
+      if (kDebugMode) debugPrint('📱 下载地址为空，跳过更新对话框');
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('发现新版本但下载地址暂不可用，请稍后重试')),
+      );
+      return;
+    }
 
     showDialog(
       context: context,
@@ -453,7 +469,14 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   }
 
   Future<void> _startUpdate() async {
-    if (widget.apkUrl == null) return;
+    if (widget.apkUrl == null || widget.apkUrl!.isEmpty) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('下载地址无效，请稍后重试')),
+        );
+      }
+      return;
+    }
 
     setState(() => _isDownloading = true);
 
