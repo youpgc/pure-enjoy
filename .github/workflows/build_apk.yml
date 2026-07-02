@@ -19,6 +19,9 @@ concurrency:
 env:
   FLUTTER_VERSION: '3.44.2'
   JAVA_VERSION: '17'
+  # Gitee 仓库信息（硬编码避免 GitHub/Gitee 大小写不一致问题）
+  GITEE_OWNER: 'YouPgC'
+  GITEE_REPO: 'pure-enjoy'
 
 jobs:
   build:
@@ -244,8 +247,8 @@ jobs:
         run: |
           FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
           TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
+          OWNER="${GITEE_OWNER}"
+          REPO="${GITEE_REPO}"
 
           echo "File: $FILE_PATH"
           ls -lh "$FILE_PATH"
@@ -432,8 +435,8 @@ jobs:
           GITEE_TOKEN: ${{ secrets.GITEE_TOKEN }}
         run: |
           echo "=== Step 3: 清理旧 Gitee Releases（保留最新 5 个）==="
-          OWNER="${{ github.repository_owner }}"
-          REPO="${{ github.event.repository.name }}"
+          OWNER="${GITEE_OWNER}"
+          REPO="${GITEE_REPO}"
 
           # 获取所有 releases（按发布时间倒序）
           RELEASES=$(curl -s "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases" \
