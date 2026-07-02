@@ -1085,27 +1085,42 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   Widget _buildBottomStatusBar() {
     return SafeArea(
       top: false,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
-        child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '$_currentTime  $_batteryLevel%',
-              style: TextStyle(
-                fontSize: 12,
-                color: _background.textColor.withOpacity(0.5),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          // 总体进度条
+          if (_chapters.isNotEmpty)
+            LinearProgressIndicator(
+              value: _readingProgress,
+              backgroundColor: _background.textColor.withOpacity(0.1),
+              valueColor: AlwaysStoppedAnimation<Color>(
+                Theme.of(context).colorScheme.primary,
               ),
+              minHeight: 2,
             ),
-            Text(
-              '${(_readingProgress * 100).toStringAsFixed(1)}%',
-              style: TextStyle(
-                fontSize: 12,
-                color: _background.textColor.withOpacity(0.5),
-              ),
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Text(
+                  '$_currentTime  $_batteryLevel%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _background.textColor.withOpacity(0.5),
+                  ),
+                ),
+                Text(
+                  '${(_readingProgress * 100).toStringAsFixed(1)}%',
+                  style: TextStyle(
+                    fontSize: 12,
+                    color: _background.textColor.withOpacity(0.5),
+                  ),
+                ),
+              ],
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
@@ -1239,7 +1254,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       mainAxisSize: MainAxisSize.min,
                       children: [
                         Text(
-                          _currentChapter?.title ?? widget.novel.title,
+                          widget.novel.title,
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
@@ -1248,13 +1263,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
                         ),
-                        if (_chapters.isNotEmpty)
+                        if (_currentChapter != null && _chapters.isNotEmpty)
                           Text(
-                            '${_currentChapterIndex + 1}/${_chapters.length}章 · $_progressText${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
+                            '${_currentChapter!.title} · ${_currentChapterIndex + 1}/${_chapters.length}章${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
                             style: TextStyle(
                               fontSize: 11,
                               color: _background.textColor.withOpacity(0.6),
                             ),
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
                           ),
                       ],
                     ),
@@ -1398,56 +1415,34 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
               : Stack(
                   children: [
-                    // 第1层：内容区域
-                    Positioned.fill(
-                      child: _isLoadingChapter
-                          ? Center(child: LoadingWidget())
-                          : _buildContent(),
+                    // Column 布局：顶部状态栏 → 内容铺满 → 底部状态栏
+                    Column(
+                      children: [
+                        // 顶部信息栏
+                        _buildTopStatusBar(),
+                        // 小说内容（铺满中间剩余空间）
+                        Expanded(
+                          child: _isLoadingChapter
+                              ? Center(child: LoadingWidget())
+                              : _buildContent(),
+                        ),
+                        // 底部状态栏
+                        _buildBottomStatusBar(),
+                      ],
                     ),
 
-                    // 第2层：顶部状态栏（始终显示）
-                    Positioned(
-                      top: 0, left: 0, right: 0,
-                      child: _buildTopStatusBar(),
-                    ),
-
-                    // 第3层：底部状态栏（始终显示）
-                    Positioned(
-                      left: 0, right: 0, bottom: 0,
-                      child: _buildBottomStatusBar(),
-                    ),
-
-                    // 第4层：顶部菜单（菜单显示时才显示，覆盖状态栏）
+                    // 顶部菜单（菜单显示时才显示，覆盖在内容上方）
                     if (_showMenu)
                       Positioned(
                         top: 0, left: 0, right: 0,
                         child: _buildTopMenu(),
                       ),
 
-                    // 第5层：底部菜单（菜单显示时才显示，覆盖状态栏）
+                    // 底部菜单（菜单显示时才显示，覆盖在内容上方）
                     if (_showMenu)
                       Positioned(
                         left: 0, right: 0, bottom: 0,
                         child: _buildBottomToolbar(),
-                      ),
-
-                    // 第6层：进度条（菜单显示时才显示）
-                    if (_chapters.isNotEmpty && _showMenu)
-                      Positioned(
-                        top: 0, left: 0, right: 0,
-                        child: Padding(
-                          padding: const EdgeInsets.only(top: 44),
-                          child: LinearProgressIndicator(
-                            value: _readingProgress,
-                            backgroundColor: _background.textColor.withOpacity(0.1),
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              _background == ReaderBackground.dark
-                                  ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.primary,
-                            ),
-                            minHeight: 3,
-                          ),
-                        ),
                       ),
                   ],
                 ),
