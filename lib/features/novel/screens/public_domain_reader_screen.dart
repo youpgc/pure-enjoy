@@ -621,10 +621,10 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                           Expanded(
                             child: SliderTheme(
                               data: SliderTheme.of(context).copyWith(
-                                activeTrackColor: AppTheme.primary,
+                                activeTrackColor: AppTheme.primaryOrange,
                                 inactiveTrackColor:
                                     colorScheme.outlineVariant.withOpacity(0.3),
-                                thumbColor: AppTheme.primary,
+                                thumbColor: AppTheme.primaryOrange,
                                 trackHeight: 2,
                                 thumbShape: const RoundSliderThumbShape(
                                   enabledThumbRadius: 6,
@@ -727,7 +727,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                         vertical: 1,
                       ),
                       decoration: BoxDecoration(
-                        color: AppTheme.primary,
+                        color: AppTheme.primaryOrange,
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(

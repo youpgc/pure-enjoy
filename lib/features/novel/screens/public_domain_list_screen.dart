@@ -325,14 +325,14 @@ class _BookCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primary.withOpacity(0.1),
+                              color: AppTheme.primaryOrange.withOpacity(0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(
                               '中文',
                               style: TextStyle(
                                 fontSize: 10,
-                                color: AppTheme.primary,
+                                color: AppTheme.primaryOrange,
                               ),
                             ),
                           ),

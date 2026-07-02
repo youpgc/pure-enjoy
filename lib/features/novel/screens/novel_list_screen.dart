@@ -396,8 +396,8 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.primary.withOpacity(0.8),
-                              AppTheme.primary.withOpacity(0.4),
+                              AppTheme.primaryOrange.withOpacity(0.8),
+                              AppTheme.primaryOrange.withOpacity(0.4),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
