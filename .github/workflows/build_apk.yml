@@ -25,7 +25,22 @@ env:
   GITEE_REPO: 'pure-enjoy-releases'
 
 jobs:
+  # 去重检查：避免 Gitee 镜像重复推送导致同一 commit 触发多次构建
+  skip_duplicate:
+    runs-on: ubuntu-latest
+    outputs:
+      should_skip: ${{ steps.skip_check.outputs.should_skip }}
+    steps:
+      - id: skip_check
+        uses: fkirc/skip-duplicate-actions@v5
+        with:
+          concurrent_skipping: 'same_content_newer'
+          skip_after_successful_duplicate: 'true'
+          do_not_skip: '["workflow_dispatch", "schedule"]'
+
   build:
+    needs: skip_duplicate
+    if: needs.skip_duplicate.outputs.should_skip != 'true'
     runs-on: ubuntu-latest
     permissions:
       contents: write
