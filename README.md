@@ -2,8 +2,6 @@
 
 一个免费的小说阅读与生活记录 App，无广告，简洁优雅。
 
-> **项目拆分说明**：后台管理系统已独立到 [pure-enjoy-admin](https://github.com/youpgc/pure-enjoy-admin) 仓库
-
 ## ✨ 功能特性
 
 ### 📖 小说阅读
@@ -125,42 +123,11 @@ pure-enjoy/
 
 ## 🔧 配置说明
 
-### Supabase 配置
-
-项目使用 `--dart-define` 注入环境变量，无需在源码中硬编码：
+项目使用 `--dart-define` 注入环境变量：
 
 ```bash
 flutter run --dart-define=SUPABASE_URL=YOUR_URL --dart-define=SUPABASE_ANON_KEY=YOUR_KEY
 ```
-
-CI 构建时通过 GitHub Secrets 注入。
-
-### 数据库表结构
-
-后端表结构见 `pure-enjoy-admin/database/schema.sql`，主要业务表包括：
-
-- `users` / `profiles` — 用户与资料
-- `expenses` / `mood_diaries` / `weight_records` / `notes` / `user_favorites` / `user_habits` / `habit_checkins` / `user_reminders` / `anniversaries` — 生活记录
-- `novels` / `novel_chapters` / `novel_comments` / `user_novels` — 小说
-- `app_versions` — App 版本管理（含 Gitee/GitHub 双下载链接）
-- `app_configs` / `dicts` / `sensitive_words` / `operation_logs` / `error_logs` — 系统配置
-
-## 📦 CI/CD
-
-推送 `master` 分支自动触发 GitHub Actions：
-
-1. 自动递增版本号（patch + build）
-2. 构建 Release APK（混淆 + 树摇优化）
-3. 同时发布到：
-   - **Gitee** `pure-enjoy-releases`（国内主下载源，公开仓库）
-   - **GitHub Releases**（备份源）
-4. 双端均只保留最新 5 个 Release
-5. 向 Supabase `app_versions` 表插入版本记录
-
-## 🔗 相关仓库
-
-- **App 端**（当前仓库）：Flutter 跨平台应用
-- **后台管理**：[pure-enjoy-admin](https://github.com/youpgc/pure-enjoy-admin) — React + Ant Design 管理后台
 
 ## 📄 许可证
 
