@@ -193,9 +193,9 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
                         itemCount: _books.length + (_hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index >= _books.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(child: LoadingWidget()),
+                            return Padding(
+                              padding: const EdgeInsets.all(16),
+                              child: Center(child: app_widgets.LoadingWidget()),
                             );
                           }
                           return _BookCard(
@@ -212,7 +212,7 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
 
   void _openReader(PublicDomainBookModel book) {
     if (book.textUrl == null && book.htmlUrl == null) {
-      showSnackBar(context, '该书暂无可读格式');
+      app_widgets.showSnackBar(context, '该书暂无可读格式');
       return;
     }
     Navigator.push(
