@@ -2140,6 +2140,7 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _hasUpdate = false;
   bool _isForceUpdate = false;
   String? _apkUrl;
+  String? _githubUrl;
   bool _isLoading = true;
   int _totalPoints = 0;
 
@@ -2190,6 +2191,7 @@ class _ProfilePageState extends State<ProfilePage> {
           _hasUpdate = true;
           _isForceUpdate = versionInfo['is_force_update'] == true;
           _apkUrl = versionInfo['apk_url'];
+          _githubUrl = versionInfo['github_url'];
         });
       }
     } catch (e) {
@@ -2247,7 +2249,10 @@ class _ProfilePageState extends State<ProfilePage> {
     showDialog(
       context: context,
       barrierDismissible: false,
-      builder: (context) => _DownloadProgressDialog(apkUrl: _apkUrl!),
+      builder: (context) => _DownloadProgressDialog(
+        apkUrl: _apkUrl!,
+        fallbackUrl: _githubUrl,
+      ),
     );
   }
 
@@ -2967,8 +2972,9 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
 /// 下载进度对话框
 class _DownloadProgressDialog extends StatefulWidget {
   final String apkUrl;
+  final String? fallbackUrl;
 
-  const _DownloadProgressDialog({required this.apkUrl});
+  const _DownloadProgressDialog({required this.apkUrl, this.fallbackUrl});
 
   @override
   State<_DownloadProgressDialog> createState() => _DownloadProgressDialogState();
@@ -3008,8 +3014,12 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
         }
       });
 
-      // 开始下载和安装
-      await versionService.downloadAndInstall(context, widget.apkUrl);
+      // 开始下载和安装（优先 Gitee，失败回退 GitHub）
+      await versionService.downloadAndInstall(
+        context,
+        widget.apkUrl,
+        fallbackUrl: widget.fallbackUrl,
+      );
 
       if (mounted) {
         setState(() {

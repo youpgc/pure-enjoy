@@ -20,8 +20,9 @@ env:
   FLUTTER_VERSION: '3.44.2'
   JAVA_VERSION: '17'
   # Gitee 仓库信息（硬编码避免 GitHub/Gitee 大小写不一致问题）
+  # pure-enjoy-releases 为专门存放 APK 的公开仓库，解决私有仓库下载 404 问题
   GITEE_OWNER: 'YouPgC'
-  GITEE_REPO: 'pure-enjoy'
+  GITEE_REPO: 'pure-enjoy-releases'
 
 jobs:
   build:
@@ -223,7 +224,7 @@ jobs:
       #   - App 端直接从 Gitee 下载，无需镜像加速
       # ===================================================================
 
-      # 13. 上传 APK 到 Gitee Releases
+      # 13. 上传 APK 到 Gitee Releases（国内主下载源）
       - name: Upload APK to Gitee Releases
         id: upload
         env:
@@ -305,9 +306,94 @@ jobs:
           fi
 
           # Gitee 下载地址
-          DOWNLOAD_URL="https://gitee.com/${OWNER}/${REPO}/releases/download/${TAG_NAME}/${{ steps.version.outputs.apk_name }}"
-          echo "download_url=$DOWNLOAD_URL" >> $GITHUB_OUTPUT
-          echo "✅ Uploaded to: $DOWNLOAD_URL"
+          GITEE_DOWNLOAD_URL="https://gitee.com/${OWNER}/${REPO}/releases/download/${TAG_NAME}/${{ steps.version.outputs.apk_name }}"
+          echo "download_url=$GITEE_DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "✅ Uploaded to Gitee: $GITEE_DOWNLOAD_URL"
+
+      # 13b. 上传 APK 到 GitHub Releases（备份源）
+      - name: Upload APK to GitHub Releases
+        id: upload_github
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          FILE_PATH="build/app/outputs/apk/release/${{ steps.version.outputs.apk_name }}"
+          TAG_NAME="v${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          OWNER="${{ github.repository_owner }}"
+          REPO="pure-enjoy"
+
+          echo "File: $FILE_PATH"
+
+          # 读取 Release Notes
+          RELEASE_NOTES="${{ steps.version.outputs.release_notes }}"
+          if [ -z "$RELEASE_NOTES" ]; then
+            RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
+          fi
+
+          # 创建 GitHub Release（若已存在则获取）
+          echo "Creating GitHub Release $TAG_NAME..."
+          CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "https://api.github.com/repos/${OWNER}/${REPO}/releases" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -d "{\"tag_name\":\"${TAG_NAME}\",\"name\":\"${TAG_NAME}\",\"body\":\"${RELEASE_NOTES}\",\"prerelease\":false}")
+
+          HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
+          BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
+          echo "Create GitHub Release HTTP: $HTTP_CODE"
+
+          if [ "$HTTP_CODE" = "422" ]; then
+            echo "ℹ️ GitHub Release 已存在，获取已有 release"
+            RELEASE_RESPONSE=$(curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases/tags/${TAG_NAME}" \
+              -H "Authorization: token ${GITHUB_TOKEN}")
+            RELEASE_ID=$(echo "$RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('id',''))")
+            UPLOAD_URL=$(echo "$RELEASE_RESPONSE" | python3 -c "import sys,json; print(json.load(sys.stdin).get('upload_url','').replace('{?name,label}',''))")
+          elif [ "$HTTP_CODE" != "201" ]; then
+            echo "❌ 创建 GitHub Release 失败: HTTP $HTTP_CODE"
+            echo "$BODY"
+            exit 1
+          else
+            RELEASE_ID=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['id'])")
+            UPLOAD_URL=$(echo "$BODY" | python3 -c "import sys,json; print(json.load(sys.stdin)['upload_url'].replace('{?name,label}',''))")
+          fi
+
+          if [ -z "$RELEASE_ID" ]; then
+            echo "❌ 无法获取 GitHub Release ID"
+            exit 1
+          fi
+
+          # 如果 release 已存在，检查并删除同名 asset
+          if [ "$HTTP_CODE" = "422" ]; then
+            echo "Checking for existing GitHub asset with same name..."
+            EXISTING_ASSET_ID=$(echo "$RELEASE_RESPONSE" | python3 -c 'import sys,json; data=json.load(sys.stdin); assets=data.get("assets",[]); print(next((a["id"] for a in assets if a["name"]=="'"${{ steps.version.outputs.apk_name }}"'"), ""))')
+            if [ -n "$EXISTING_ASSET_ID" ]; then
+              echo "Deleting existing GitHub asset ID: $EXISTING_ASSET_ID"
+              curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "https://api.github.com/repos/${OWNER}/${REPO}/releases/assets/${EXISTING_ASSET_ID}" \
+                -H "Authorization: token ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github.v3+json"
+            fi
+          fi
+
+          # 上传 APK 到 GitHub Release
+          echo "Uploading APK to GitHub Release..."
+          UPLOAD_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
+            "${UPLOAD_URL}?name=${{ steps.version.outputs.apk_name }}" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json" \
+            -H "Content-Type: application/vnd.android.package-archive" \
+            --data-binary "@${FILE_PATH}")
+
+          UPLOAD_HTTP=$(echo "$UPLOAD_RESPONSE" | tail -n1)
+          echo "Upload to GitHub HTTP: $UPLOAD_HTTP"
+
+          if [ "$UPLOAD_HTTP" -ne 201 ] && [ "$UPLOAD_HTTP" -ne 200 ]; then
+            echo "❌ Upload to GitHub failed with HTTP $UPLOAD_HTTP"
+            exit 1
+          fi
+
+          GITHUB_DOWNLOAD_URL="https://github.com/${OWNER}/${REPO}/releases/download/${TAG_NAME}/${{ steps.version.outputs.apk_name }}"
+          echo "github_download_url=$GITHUB_DOWNLOAD_URL" >> $GITHUB_OUTPUT
+          echo "✅ Uploaded to GitHub: $GITHUB_DOWNLOAD_URL"
 
       # ===================================================================
       # 版本状态管理逻辑（三级状态流转）
@@ -394,6 +480,7 @@ jobs:
               \"release_type\": \"feature\",
               \"release_notes\": \"$RELEASE_NOTES\",
               \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
+              \"github_url\": \"${{ steps.upload_github.outputs.github_download_url }}\",
               \"apk_size\": ${{ steps.filesize.outputs.bytes }},
               \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
               \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
@@ -445,6 +532,38 @@ jobs:
             done
           fi
 
+      # Step 3b: 清理旧 GitHub Releases（只保留最新 5 个）
+      - name: Step 3b - Clean old GitHub Releases (keep 5)
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          echo "=== Step 3b: 清理旧 GitHub Releases（保留最新 5 个）==="
+          OWNER="${{ github.repository_owner }}"
+          REPO="pure-enjoy"
+
+          RELEASES=$(curl -s "https://api.github.com/repos/${OWNER}/${REPO}/releases?per_page=20" \
+            -H "Authorization: token ${GITHUB_TOKEN}" \
+            -H "Accept: application/vnd.github.v3+json")
+
+          OLD_RELEASE_IDS=$(echo "$RELEASES" | python3 -c 'import sys,json; [print(r["id"]) for r in json.load(sys.stdin)[5:]]' 2>/dev/null)
+
+          if [ -z "$OLD_RELEASE_IDS" ]; then
+            echo "✅ 没有需要清理的旧 GitHub releases"
+          else
+            for RELEASE_ID in $OLD_RELEASE_IDS; do
+              echo "🗑️ 删除旧 GitHub release: $RELEASE_ID"
+              HTTP_CODE=$(curl -s -o /dev/null -w "%{http_code}" -X DELETE \
+                "https://api.github.com/repos/${OWNER}/${REPO}/releases/${RELEASE_ID}" \
+                -H "Authorization: token ${GITHUB_TOKEN}" \
+                -H "Accept: application/vnd.github.v3+json")
+              if [ "$HTTP_CODE" = "204" ]; then
+                echo "✅ GitHub release 删除成功"
+              else
+                echo "⚠️ 删除失败 (HTTP $HTTP_CODE)，跳过"
+              fi
+            done
+          fi
+
       # Step 4: 将第 6 个及更旧的 revoked 版本标记为 superseded（已失效）
       - name: Step 4 - Mark old revoked versions as superseded
         env:
@@ -489,6 +608,7 @@ jobs:
           echo "✅ Build completed!"
           echo "📱 Version: ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           echo "📦 File: ${{ steps.version.outputs.apk_name }}"
-          echo "🔗 Download: ${{ steps.upload.outputs.download_url }}"
+          echo "🔗 Gitee Download: ${{ steps.upload.outputs.download_url }}"
+          echo "🔗 GitHub Download: ${{ steps.upload_github.outputs.github_download_url }}"
           echo "💾 Size: ${{ steps.filesize.outputs.bytes }} bytes"
           echo "🔐 SHA256: ${{ steps.checksum.outputs.sha256 }}"

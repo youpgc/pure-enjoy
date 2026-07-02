@@ -55,6 +55,7 @@ class VersionCheckService {
           'version': latestVersionStr,
           'build_number': latestBuildNumber,
           'apk_url': latestVersion['apk_url'],
+          'github_url': latestVersion['github_url'],
           'release_notes': latestVersion['release_notes'],
           'is_force_update': isForceUpdate,
           'release_type': latestVersion['release_type'],
@@ -114,6 +115,7 @@ class VersionCheckService {
   void showUpdateDialog(BuildContext context, Map<String, dynamic> versionInfo) {
     final isForceUpdate = versionInfo['is_force_update'] == true;
     final apkUrl = versionInfo['apk_url'] as String?;
+    final fallbackUrl = versionInfo['github_url'] as String?;
     final releaseNotes = versionInfo['release_notes'] as String? ?? '';
     final version = versionInfo['version'] as String? ?? '';
 
@@ -125,6 +127,7 @@ class VersionCheckService {
         releaseNotes: releaseNotes,
         isForceUpdate: isForceUpdate,
         apkUrl: apkUrl,
+        fallbackUrl: fallbackUrl,
         versionService: this,
       ),
     );
@@ -157,15 +160,27 @@ class VersionCheckService {
   }
 
   /// 下载APK文件
-  /// APK 发布在 Gitee Releases，国内直接访问，无需镜像加速
-  Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
+  /// 优先从 Gitee 下载（国内快），失败时回退到 GitHub Releases（备份源）
+  Future<String?> downloadApk(String apkUrl, {String? fallbackUrl, ValueChanged<double>? onProgress}) async {
     if (kDebugMode) debugPrint('📱 开始下载 APK: $apkUrl');
     downloadStatus.value = '正在连接...';
 
-    final result = await _downloadFromUrl(apkUrl, onProgress: onProgress);
+    // 优先尝试主下载源（Gitee）
+    var result = await _downloadFromUrl(apkUrl, onProgress: onProgress);
     if (result != null) {
-      if (kDebugMode) debugPrint('📱 ✅ 下载成功');
+      if (kDebugMode) debugPrint('📱 ✅ 主源下载成功');
       return result;
+    }
+
+    // 主源失败，尝试备用源（GitHub）
+    if (fallbackUrl != null && fallbackUrl.isNotEmpty) {
+      if (kDebugMode) debugPrint('📱 主源失败，尝试备用源: $fallbackUrl');
+      downloadStatus.value = '主源连接失败，尝试备用源...';
+      result = await _downloadFromUrl(fallbackUrl, onProgress: onProgress);
+      if (result != null) {
+        if (kDebugMode) debugPrint('📱 ✅ 备用源下载成功');
+        return result;
+      }
     }
 
     downloadStatus.value = '下载失败：请检查网络连接';
@@ -336,13 +351,14 @@ class VersionCheckService {
   }
 
   /// 完整的下载并安装流程
-  Future<void> downloadAndInstall(BuildContext context, String apkUrl) async {
+  /// [apkUrl] 主下载源（Gitee），[fallbackUrl] 备用下载源（GitHub）
+  Future<void> downloadAndInstall(BuildContext context, String apkUrl, {String? fallbackUrl}) async {
     try {
       if (kDebugMode) debugPrint('📱 开始下载并安装流程');
       if (kDebugMode) debugPrint('📱 APK URL 已设置');
 
-      // 1. 下载APK
-      final filePath = await downloadApk(apkUrl);
+      // 1. 下载APK（优先主源，失败回退备用源）
+      final filePath = await downloadApk(apkUrl, fallbackUrl: fallbackUrl);
       if (filePath == null) {
         if (kDebugMode) debugPrint('📱 下载失败，filePath 为 null');
         return;
@@ -385,6 +401,7 @@ class _UpdateDialog extends StatefulWidget {
   final String releaseNotes;
   final bool isForceUpdate;
   final String? apkUrl;
+  final String? fallbackUrl;
   final VersionCheckService versionService;
 
   const _UpdateDialog({
@@ -392,6 +409,7 @@ class _UpdateDialog extends StatefulWidget {
     required this.releaseNotes,
     required this.isForceUpdate,
     required this.apkUrl,
+    this.fallbackUrl,
     required this.versionService,
   });
 
@@ -439,7 +457,11 @@ class _UpdateDialogState extends State<_UpdateDialog> {
 
     setState(() => _isDownloading = true);
 
-    await widget.versionService.downloadAndInstall(context, widget.apkUrl!);
+    await widget.versionService.downloadAndInstall(
+      context,
+      widget.apkUrl!,
+      fallbackUrl: widget.fallbackUrl,
+    );
 
     if (mounted) {
       setState(() => _isDownloading = false);
