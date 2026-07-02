@@ -156,51 +156,19 @@ class VersionCheckService {
     return false;
   }
 
-  /// GitHub 国内镜像加速地址列表（按优先级排序）
-  /// 当 GitHub 直接访问失败时，依次尝试这些镜像
-  static const List<String> _githubMirrors = [
-    '', // 空字符串表示直接访问 GitHub（原始地址）
-    'https://ghproxy.com/',
-    'https://mirror.ghproxy.com/',
-    'https://ghps.cc/',
-  ];
-
-  /// 将 GitHub URL 转换为镜像 URL
-  String _getMirrorUrl(String originalUrl, int mirrorIndex) {
-    if (mirrorIndex == 0 || mirrorIndex >= _githubMirrors.length) {
-      return originalUrl;
-    }
-    final mirror = _githubMirrors[mirrorIndex];
-    // 镜像服务通常需要完整的 https:// 前缀
-    if (originalUrl.startsWith('https://')) {
-      return '$mirror$originalUrl';
-    }
-    return originalUrl;
-  }
-
   /// 下载APK文件
-  /// 支持 GitHub Releases 下载，自动使用国内镜像加速
-  /// 当某个镜像失败时，自动切换到下一个镜像重试
+  /// APK 发布在 Gitee Releases，国内直接访问，无需镜像加速
   Future<String?> downloadApk(String apkUrl, {ValueChanged<double>? onProgress}) async {
-    // 尝试所有镜像地址（包括原始地址）
-    for (int mirrorIndex = 0; mirrorIndex < _githubMirrors.length; mirrorIndex++) {
-      final tryUrl = _getMirrorUrl(apkUrl, mirrorIndex);
-      final mirrorName = mirrorIndex == 0 ? 'GitHub直连' : _githubMirrors[mirrorIndex];
+    if (kDebugMode) debugPrint('📱 开始下载 APK: $apkUrl');
+    downloadStatus.value = '正在连接...';
 
-      if (kDebugMode) debugPrint('📱 尝试下载 [$mirrorName]');
-      downloadStatus.value = '正在连接${mirrorIndex > 0 ? " (镜像${mirrorIndex})" : ""}...';
-
-      final result = await _downloadFromUrl(tryUrl, onProgress: onProgress);
-      if (result != null) {
-        if (kDebugMode) debugPrint('📱 ✅ 下载成功');
-        return result;
-      }
-
-      if (kDebugMode) debugPrint('📱 ❌ 下载失败，尝试下一个...');
+    final result = await _downloadFromUrl(apkUrl, onProgress: onProgress);
+    if (result != null) {
+      if (kDebugMode) debugPrint('📱 ✅ 下载成功');
+      return result;
     }
 
-    // 所有镜像都失败了
-    downloadStatus.value = '下载失败：所有镜像均不可用，请检查网络连接';
+    downloadStatus.value = '下载失败：请检查网络连接';
     return null;
   }
 
