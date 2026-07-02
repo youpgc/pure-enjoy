@@ -52,11 +52,9 @@ jobs:
           cache: true
           cache-dependency-path: pubspec.lock
 
-      # 4. 验证 Flutter 环境
-      - name: Verify Flutter installation
-        run: |
-          flutter --version
-          flutter doctor -v
+      # 4. 验证 Flutter 版本
+      - name: Verify Flutter version
+        run: flutter --version
 
       # 5. 获取依赖
       - name: Get dependencies
@@ -69,11 +67,7 @@ jobs:
             flutter pub run build_runner build --delete-conflicting-outputs || true
           fi
 
-      # 7. 运行测试（可选）
-      - name: Run tests
-        run: flutter test || true
-
-      # 8. 提取版本信息并自动迭代
+      # 7. 提取版本信息并自动迭代
       - name: Extract and increment version
         id: version
         run: |
@@ -90,16 +84,6 @@ jobs:
             LATEST_COMMIT_MSG=$(git log -1 --pretty=format:"%s" HEAD)
             if echo "$LATEST_COMMIT_MSG" | grep -q "^chore:"; then
               echo "⚠️ 最新提交为 chore（自动版本号），跳过版本递增，直接使用当前版本构建"
-              VERSION="$CURRENT_VERSION"
-              BUILD_NUMBER="$CURRENT_BUILD"
-            # 检查上次构建是否失败（通过查询 GitHub API），失败时不递增构建号
-            elif curl -s -H "Authorization: token ${{ secrets.GITHUB_TOKEN }}" \
-              "https://api.github.com/repos/${{ github.repository }}/actions/runs?per_page=2&branch=${{ github.ref_name }}" | \
-              python3 -c "import sys,json; runs=json.load(sys.stdin).get('workflow_runs',[]); 
-              # 排除当前正在运行的构建，检查上一次完成的构建
-              completed=[r for r in runs if r.get('status')=='completed' and r.get('run_number')!=${{ github.run_number }}];
-              print('failure' if completed and completed[0].get('conclusion')=='failure' else 'success')" 2>/dev/null | grep -q "failure"; then
-              echo "⚠️ 上次构建失败，本次为修复推送，跳过版本递增，直接使用当前版本构建"
               VERSION="$CURRENT_VERSION"
               BUILD_NUMBER="$CURRENT_BUILD"
             else
@@ -129,8 +113,8 @@ jobs:
               # 带重试的 push，避免竞态冲突
               for i in 1 2 3; do
                 git pull --rebase origin ${{ github.ref_name }} && git push origin HEAD:${{ github.ref_name }} && break
-                echo "⚠️ Push failed, retrying in 3s... (attempt $i/3)"
-                sleep 3
+                echo "⚠️ Push failed, retrying in 1s... (attempt $i/3)"
+                sleep 1
                 # 重新读取可能被其他构建更新的版本号
                 CURRENT_VERSION=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f1)
                 CURRENT_BUILD=$(grep 'version:' pubspec.yaml | head -n 1 | awk '{print $2}' | cut -d'+' -f2)
