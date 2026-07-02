@@ -1453,9 +1453,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_pageTurnMode == PageTurnMode.scroll) {
       // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
       // onTap 和 onVerticalDrag 在手势竞技场中可以共存
-      final mediaQuery = MediaQuery.of(context);
-      final topPadding = mediaQuery.padding.top + 12.0;
-      final bottomPadding = mediaQuery.padding.bottom + 36.0;
+      // 内容已在 SafeArea 内（顶部/底部状态栏已处理安全区域），不需要再加 mediaQuery.padding
+      final topPadding = 12.0;
+      final bottomPadding = 36.0;
       return GestureDetector(
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
@@ -1629,9 +1629,9 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
-    final topStatusBarHeight = mediaQuery.padding.top + 12.0;
-    final bottomStatusBarHeight = mediaQuery.padding.bottom + 36.0;
+    // 减去顶部状态栏 + 底部状态栏高度（内容已在 SafeArea 内，不需要再加 mediaQuery.padding）
+    final topStatusBarHeight = 12.0;
+    final bottomStatusBarHeight = 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1705,8 +1705,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
         itemBuilder: (context, index) {
           final page = _pages[index];
           final mediaQuery = MediaQuery.of(context);
-          final topPadding = mediaQuery.padding.top + 12.0;
-          final bottomPadding = mediaQuery.padding.bottom + 36.0;
+          final topPadding = 12.0;
+          final bottomPadding = 36.0;
           return Container(
             color: widget.background.bgColor,
             padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
@@ -1832,8 +1832,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
-    final topStatusBarHeight = mediaQuery.padding.top + 12.0;
-    final bottomStatusBarHeight = mediaQuery.padding.bottom + 36.0;
+    final topStatusBarHeight = 12.0;
+    final bottomStatusBarHeight = 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1893,8 +1893,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
     final mediaQuery = MediaQuery.of(context);
-    final topPadding = mediaQuery.padding.top + 12.0;
-    final bottomPadding = mediaQuery.padding.bottom + 36.0;
+    final topPadding = 12.0;
+    final bottomPadding = 36.0;
     return Container(
       color: widget.background.bgColor,
       padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
