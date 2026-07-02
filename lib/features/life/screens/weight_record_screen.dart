@@ -23,7 +23,6 @@ class WeightRecordScreen extends StatefulWidget {
 class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedListMixin {
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
-  DateTimeRange? _selectedRange;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -98,12 +97,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
       final filters = <String, String>{
         'user_id': 'eq.$userId',
       };
-      if (_selectedRange != null) {
-        filters['and'] = '('
-            'date.gte.${_selectedRange!.start.toIso8601String().split('T').first},'
-            'date.lt.${_selectedRange!.end.add(const Duration(days: 1)).toIso8601String().split('T').first}'
-            ')';
-      }
 
       final (limit, offset) = paginationParams;
 
@@ -346,161 +339,134 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
               );
             },
           ),
-          IconButton(
-            icon: Icon(_selectedRange != null ? Icons.date_range : Icons.calendar_today_outlined),
-            tooltip: '选择日期范围',
-            onPressed: () async {
-              final now = DateTime.now();
-              final picked = await showDateRangePicker(
-                context: context,
-                firstDate: DateTime(2020),
-                lastDate: now,
-                initialDateRange: _selectedRange ?? DateTimeRange(
-                  start: now.subtract(const Duration(days: 30)),
-                  end: now,
-                ),
-              );
-              if (picked != null) {
-                setState(() => _selectedRange = picked);
-                _loadRecords(refresh: true);
-              }
-            },
-          ),
-          if (_selectedRange != null)
-            IconButton(
-              icon: const Icon(Icons.clear),
-              tooltip: '清除筛选',
-              onPressed: () {
-                setState(() => _selectedRange = null);
-                _loadRecords(refresh: true);
-              },
-            ),
         ],
       ),
-      body: _isLoading
-          ? const LoadingWidget()
-          : RefreshIndicator(
-              onRefresh: () => _loadRecords(refresh: true),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // 当前体重卡片
-                  Card(
-                    child: Padding(
-                      padding: const EdgeInsets.all(20),
-                      child: Column(
-                        children: [
-                          Text(
-                            '当前体重',
-                            style: Theme.of(context).textTheme.bodyMedium,
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            _latestWeight != null
-                                ? '${_latestWeight!.toStringAsFixed(2)} kg'
-                                : '-- kg',
-                            style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                          if (_weightChange != null) ...[
-                            const SizedBox(height: 8),
-                            Row(
-                              mainAxisAlignment: MainAxisAlignment.center,
-                              children: [
-                                Icon(
-                                  _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                                  size: 16,
-                                  color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                ),
-                                Text(
-                                  '${_weightChange!.abs().toStringAsFixed(2)} kg',
-                                  style: TextStyle(
-                                    color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ],
-                        ],
+      body: Column(
+        children: [
+          // 当前体重卡片
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(20),
+            margin: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: colorScheme.primaryContainer,
+              borderRadius: BorderRadius.circular(16),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '当前体重',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  _latestWeight != null
+                      ? '${_latestWeight!.toStringAsFixed(2)} kg'
+                      : '-- kg',
+                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
+                    fontWeight: FontWeight.bold,
+                    color: colorScheme.primary,
+                  ),
+                ),
+                if (_weightChange != null) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    children: [
+                      Icon(
+                        _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                        size: 16,
+                        color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
                       ),
-                    ),
+                      const SizedBox(width: 4),
+                      Text(
+                        '${_weightChange!.abs().toStringAsFixed(2)} kg',
+                        style: TextStyle(
+                          color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
+                        ),
+                      ),
+                    ],
                   ),
-                  const SizedBox(height: 24),
+                ],
+              ],
+            ),
+          ),
 
-                  // 记录列表
-                  Text(
-                    '历史记录',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  if (_records.isEmpty)
-                    const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
-                  else
-                    ..._records.map((record) {
-                      final displayDate = record.createdAt != null &&
-                              record.createdAt!.year == record.date.year &&
-                              record.createdAt!.month == record.date.month &&
-                              record.createdAt!.day == record.date.day
-                          ? record.createdAt!
-                          : record.date;
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 8),
-                        child: ListTile(
-                          leading: const Icon(Icons.monitor_weight),
-                          title: Row(
-                            children: [
-                              Text(
-                                '${record.weight.toStringAsFixed(2)} kg',
-                                style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                  fontWeight: FontWeight.bold,
+          // 记录列表
+          Expanded(
+            child: _isLoading
+                ? const LoadingWidget()
+                : _records.isEmpty
+                    ? const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
+                    : RefreshIndicator(
+                        onRefresh: () => _loadRecords(refresh: true),
+                        child: ListView.builder(
+                          controller: scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemCount: _records.length + 1,
+                          itemBuilder: (context, index) {
+                            if (index == _records.length) {
+                              return buildLoadMoreIndicator();
+                            }
+
+                            final record = _records[index];
+                            final displayDate = record.createdAt ?? record.date;
+                            return Card(
+                              margin: const EdgeInsets.only(bottom: 8),
+                              child: ListTile(
+                                leading: const Icon(Icons.monitor_weight),
+                                title: Row(
+                                  children: [
+                                    Text(
+                                      '${record.weight.toStringAsFixed(2)} kg',
+                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                    if (record.bodyFat != null) ...[
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                    if (record.bmi != null) ...[
+                                      const SizedBox(width: 12),
+                                      Text(
+                                        'BMI ${record.bmi!.toStringAsFixed(1)}',
+                                        style: Theme.of(context).textTheme.bodySmall,
+                                      ),
+                                    ],
+                                  ],
+                                ),
+                                subtitle: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(DateTimeUtils.formatStandard(displayDate)),
+                                    if (record.note != null && record.note!.isNotEmpty)
+                                      Text(
+                                        record.note!,
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: Theme.of(context).colorScheme.outline,
+                                          fontStyle: FontStyle.italic,
+                                        ),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                  ],
+                                ),
+                                trailing: EditDeletePopupMenu(
+                                  onEdit: () => _showEditRecordForm(record),
+                                  onDelete: () => _deleteWeightRecord(record.id),
                                 ),
                               ),
-                              if (record.bodyFat != null) ...[
-                                const SizedBox(width: 12),
-                                Text(
-                                  '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                              if (record.bmi != null) ...[
-                                const SizedBox(width: 12),
-                                Text(
-                                  'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                  style: Theme.of(context).textTheme.bodySmall,
-                                ),
-                              ],
-                            ],
-                          ),
-                          subtitle: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(DateTimeUtils.formatStandard(displayDate)),
-                              if (record.note != null && record.note!.isNotEmpty)
-                                Text(
-                                  record.note!,
-                                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                    color: Theme.of(context).colorScheme.outline,
-                                    fontStyle: FontStyle.italic,
-                                  ),
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                ),
-                            ],
-                          ),
-                          trailing: EditDeletePopupMenu(
-                            onEdit: () => _showEditRecordForm(record),
-                            onDelete: () => _deleteWeightRecord(record.id),
-                          ),
+                            );
+                          },
                         ),
-                      );
-                    }),
-                  buildLoadMoreIndicator(),
-                ],
-              ),
-            ),
+                      ),
+          ),
+        ],
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showRecordForm(),
         child: const Icon(Icons.add),
