@@ -519,12 +519,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                               expense.category,
                               defaultValue: expense.category,
                             );
-                            final displayDate = expense.createdAt != null &&
-                                    expense.createdAt!.year == expense.date.year &&
-                                    expense.createdAt!.month == expense.date.month &&
-                                    expense.createdAt!.day == expense.date.day
-                                ? expense.createdAt!
-                                : expense.date;
+                            final displayDate = expense.createdAt ?? expense.date;
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
