@@ -11,6 +11,7 @@ import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
+import 'public_domain_list_screen.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 小说列表页面
@@ -260,6 +261,16 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
     });
   }
 
+  /// 打开经典公版书列表
+  void _openPublicDomainBooks() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => const PublicDomainListScreen(),
+      ),
+    );
+  }
+
   /// 获取正在阅读的小说（只显示在读的：progress > 0 且 progress < 1，且章节数 > 0）
   List<NovelModel> get _readingNovels {
     final readingNovelIds = _userNovels.where((un) {
@@ -373,6 +384,74 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                       ),
                     ),
                     const SizedBox(height: 24),
+                  ],
+
+                  // 经典公版书入口（仅在未搜索时显示）
+                  if (_searchQuery.isEmpty) ...[
+                    InkWell(
+                      onTap: _openPublicDomainBooks,
+                      borderRadius: BorderRadius.circular(12),
+                      child: Container(
+                        padding: const EdgeInsets.all(16),
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(
+                            colors: [
+                              AppTheme.primary.withOpacity(0.8),
+                              AppTheme.primary.withOpacity(0.4),
+                            ],
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                          ),
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Row(
+                          children: [
+                            Container(
+                              padding: const EdgeInsets.all(10),
+                              decoration: BoxDecoration(
+                                color: Colors.white.withOpacity(0.2),
+                                borderRadius: BorderRadius.circular(10),
+                              ),
+                              child: const Icon(
+                                Icons.public,
+                                color: Colors.white,
+                                size: 28,
+                              ),
+                            ),
+                            const SizedBox(width: 14),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  const Text(
+                                    '经典公版书',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      fontWeight: FontWeight.bold,
+                                      color: Colors.white,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 2),
+                                  Text(
+                                    '古登堡计划 · 版权过期 · 完全免费',
+                                    style: TextStyle(
+                                      fontSize: 12,
+                                      color: Colors.white.withOpacity(0.85),
+                                    ),
+                                  ),
+                                ],
+                              ),
+                            ),
+                            Icon(
+                              Icons.arrow_forward_ios,
+                              color: Colors.white.withOpacity(0.7),
+                              size: 16,
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                    const SizedBox(height: 20),
                   ],
 
                   // 分类筛选
