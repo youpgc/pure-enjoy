@@ -12,7 +12,7 @@ import 'package:flutter/material.dart';
 /// 6. 在下拉刷新时调用 resetPagination() + 重新加载
 mixin PaginatedListMixin<T extends StatefulWidget> on State<T> {
   /// 每页数据量
-  int get pageSize => 20;
+  int get pageSize => 10;
 
   /// 触底加载的阈值（距离底部多少像素时触发）
   double get loadMoreThreshold => 200;

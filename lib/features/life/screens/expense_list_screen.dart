@@ -35,9 +35,6 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
-  int get pageSize => 10;
-
-  @override
   void initState() {
     super.initState();
     initPagination();
@@ -194,13 +191,30 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       if (result.isSuccess) {
         final data = result.data!;
-        var allExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
+        var newExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
+
+        // date 排序优先，相同 date 时 created_at 优先
+        newExpenses.sort((a, b) {
+          final dateCmp = b.date.compareTo(a.date);
+          if (dateCmp != 0) return dateCmp;
+          final aTime = a.createdAt ?? a.date;
+          final bTime = b.createdAt ?? b.date;
+          return bTime.compareTo(aTime);
+        });
 
         setState(() {
           if (refresh) {
-            _expenses = allExpenses;
+            _expenses = newExpenses;
           } else {
-            _expenses.addAll(allExpenses);
+            // 追加后重新全局排序（保证跨页合并后顺序正确）
+            _expenses.addAll(newExpenses);
+            _expenses.sort((a, b) {
+              final dateCmp = b.date.compareTo(a.date);
+              if (dateCmp != 0) return dateCmp;
+              final aTime = a.createdAt ?? a.date;
+              final bTime = b.createdAt ?? b.date;
+              return bTime.compareTo(aTime);
+            });
           }
           _isLoading = false;
           onPaginationDataLoaded(allExpenses.length);
@@ -535,7 +549,14 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                               expense.category,
                               defaultValue: expense.category,
                             );
-                            final displayDate = expense.createdAt ?? expense.date;
+                            // date 与 created_at 日期相同时展示 created_at（含时间），不同时展示 date
+                            final isSameDate = expense.createdAt != null &&
+                                expense.date.year == expense.createdAt!.year &&
+                                expense.date.month == expense.createdAt!.month &&
+                                expense.date.day == expense.createdAt!.day;
+                            final displayDate = (isSameDate && expense.createdAt != null)
+                                ? expense.createdAt!
+                                : expense.date;
 
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),

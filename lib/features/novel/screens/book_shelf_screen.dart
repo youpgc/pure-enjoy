@@ -543,40 +543,58 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
           : _isLoading
               ? SkeletonLoading.list(itemCount: 6, showAvatar: false)
               : _bookshelfItems.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(
-                            Icons.library_books_outlined,
-                            size: 64,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                          const SizedBox(height: 16),
-                          Text(
-                            '书架空空如也',
-                            style: TextStyle(
-                              fontSize: 16,
-                              color: colorScheme.onSurfaceVariant,
+                  ? RefreshIndicator(
+                      onRefresh: () => _loadBookshelf(refresh: true),
+                      child: CustomScrollView(
+                        slivers: [
+                          SliverFillRemaining(
+                            hasScrollBody: false,
+                            child: Center(
+                              child: Column(
+                                mainAxisAlignment: MainAxisAlignment.center,
+                                children: [
+                                  Icon(
+                                    Icons.library_books_outlined,
+                                    size: 64,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                  const SizedBox(height: 16),
+                                  Text(
+                                    '书架空空如也',
+                                    style: TextStyle(
+                                      fontSize: 16,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '点击右上角 + 添加小说',
+                                    style: TextStyle(
+                                      fontSize: 13,
+                                      color: colorScheme.onSurfaceVariant,
+                                    ),
+                                  ),
+                                  const SizedBox(height: 8),
+                                  Text(
+                                    '去小说列表添加你喜欢的小说吧',
+                                    style: TextStyle(color: colorScheme.onSurfaceVariant),
+                                  ),
+                                  const SizedBox(height: 24),
+                                  FilledButton.icon(
+                                    onPressed: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (_) => const _NovelListForAddScreen(),
+                                        ),
+                                      );
+                                    },
+                                    icon: const Icon(Icons.add),
+                                    label: const Text('去添加'),
+                                  ),
+                                ],
+                              ),
                             ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            '去小说列表添加你喜欢的小说吧',
-                            style: TextStyle(color: colorScheme.onSurfaceVariant),
-                          ),
-                          const SizedBox(height: 24),
-                          FilledButton.icon(
-                            onPressed: () {
-                              Navigator.push(
-                                context,
-                                MaterialPageRoute(
-                                  builder: (_) => const _NovelListForAddScreen(),
-                                ),
-                              );
-                            },
-                            icon: const Icon(Icons.add),
-                            label: const Text('去添加'),
                           ),
                         ],
                       ),

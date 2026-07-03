@@ -649,9 +649,19 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
       body: _isLoading
           ? const LoadingWidget()
           : _anniversaries.isEmpty
-              ? EmptyWidget(
-                  icon: isBirthday ? Icons.cake_outlined : Icons.celebration_outlined,
-                  message: '还没有$title',
+              ? RefreshIndicator(
+                  onRefresh: () => _loadAnniversaries(refresh: true),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyWidget(
+                          icon: isBirthday ? Icons.cake_outlined : Icons.celebration_outlined,
+                          message: '还没有$title',
+                        ),
+                      ),
+                    ],
+                  ),
                 )
               : RefreshIndicator(
                   onRefresh: () => _loadAnniversaries(refresh: true),

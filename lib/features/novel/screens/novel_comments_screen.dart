@@ -28,7 +28,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
   bool _isLoadingMore = false;
   bool _hasMore = true;
   int _page = 0;
-  static const int _pageSize = 20;
+  static const int _pageSize = 10;
 
   final TextEditingController _inputController = TextEditingController();
   bool _isSubmitting = false;

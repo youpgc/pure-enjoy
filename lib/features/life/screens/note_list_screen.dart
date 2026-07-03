@@ -350,7 +350,17 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
             child: _isLoading
                 ? const LoadingWidget()
                 : _notes.isEmpty
-                    ? const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记')
+                    ? RefreshIndicator(
+                        onRefresh: () => _loadNotes(refresh: true),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: const EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记'),
+                            ),
+                          ],
+                        ),
+                      )
                     : RefreshIndicator(
                         onRefresh: () => _loadNotes(refresh: true),
                         child: GridView.builder(

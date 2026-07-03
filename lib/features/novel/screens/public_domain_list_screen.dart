@@ -182,10 +182,20 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
             child: _isLoading && _books.isEmpty
                 ? const app_widgets.LoadingWidget()
                 : _books.isEmpty && !_isLoading
-                    ? app_widgets.EmptyWidget(
-                        message: _searchQuery.isEmpty
-                            ? '暂无公版书籍'
-                            : '未找到相关书籍',
+                    ? RefreshIndicator(
+                        onRefresh: () => _loadBooks(refresh: true),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: app_widgets.EmptyWidget(
+                                message: _searchQuery.isEmpty
+                                    ? '暂无公版书籍'
+                                    : '未找到相关书籍',
+                              ),
+                            ),
+                          ],
+                        ),
                       )
                     : ListView.builder(
                         controller: _scrollController,

@@ -109,13 +109,30 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
 
       if (result.isSuccess) {
         final data = result.data!;
-        final records = data.map((e) => WeightRecordModel.fromJson(e)).toList();
+        final newRecords = data.map((e) => WeightRecordModel.fromJson(e)).toList();
+
+        // date 排序优先，相同 date 时 created_at 优先
+        newRecords.sort((a, b) {
+          final dateCmp = b.date.compareTo(a.date);
+          if (dateCmp != 0) return dateCmp;
+          final aTime = a.createdAt ?? a.date;
+          final bTime = b.createdAt ?? b.date;
+          return bTime.compareTo(aTime);
+        });
 
         setState(() {
           if (refresh) {
-            _records = records;
+            _records = newRecords;
           } else {
-            _records.addAll(records);
+            // 追加后重新全局排序
+            _records.addAll(newRecords);
+            _records.sort((a, b) {
+              final dateCmp = b.date.compareTo(a.date);
+              if (dateCmp != 0) return dateCmp;
+              final aTime = a.createdAt ?? a.date;
+              final bTime = b.createdAt ?? b.date;
+              return bTime.compareTo(aTime);
+            });
           }
           _isLoading = false;
         });
@@ -422,7 +439,14 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
                             }
 
                             final record = _records[index];
-                            final displayDate = record.createdAt ?? record.date;
+                            // date 与 created_at 日期相同时展示 created_at（含时间），不同时展示 date
+                            final isSameDate = record.createdAt != null &&
+                                record.date.year == record.createdAt!.year &&
+                                record.date.month == record.createdAt!.month &&
+                                record.date.day == record.createdAt!.day;
+                            final displayDate = (isSameDate && record.createdAt != null)
+                                ? record.createdAt!
+                                : record.date;
                             return Card(
                               margin: const EdgeInsets.only(bottom: 8),
                               child: ListTile(

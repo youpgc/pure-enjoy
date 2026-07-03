@@ -375,7 +375,17 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       body: _isLoading
           ? const LoadingWidget()
           : _diaries.isEmpty
-              ? const EmptyWidget(icon: Icons.mood_outlined, message: '暂无日记，点击右下角按钮添加')
+              ? RefreshIndicator(
+                  onRefresh: () => _loadDiaries(refresh: true),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: const EmptyWidget(icon: Icons.mood_outlined, message: '暂无日记，点击右下角按钮添加'),
+                      ),
+                    ],
+                  ),
+                )
               : RefreshIndicator(
                   onRefresh: () => _loadDiaries(refresh: true),
                   child: ListView.builder(
