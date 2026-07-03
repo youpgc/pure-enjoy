@@ -33,6 +33,13 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   bool _isLoadingChapters = true;
   bool _isCollected = false;
 
+  // 章节列表分页
+  static const int _chapterPageSize = 10;
+  int _currentChapterPage = 0;
+  bool _hasMoreChapters = true;
+  bool _isLoadingMoreChapters = false;
+  final ScrollController _scrollController = ScrollController();
+
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
@@ -41,6 +48,21 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     _checkBookshelfStatus();
     _loadChapters();
     _updateCacheStatus();
+    _scrollController.addListener(_onScroll);
+  }
+
+  @override
+  void dispose() {
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  /// 滚动监听：触底加载更多章节
+  void _onScroll() {
+    if (_scrollController.position.pixels >=
+        _scrollController.position.maxScrollExtent - 200) {
+      _loadMoreChapters();
+    }
   }
 
   /// 检查书架状态
@@ -82,49 +104,109 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     }
   }
 
-  /// 加载章节列表（分批加载，无数量上限）
+  /// 加载章节列表第一页
   Future<void> _loadChapters() async {
+    try {
+      final result = await ApiClient.get(
+        'novel_chapters',
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'chapter_num': 'gte.1',
+        },
+        columns: 'id,title,chapter_num,word_count',
+        order: 'chapter_num.asc',
+        limit: _chapterPageSize,
+        offset: 0,
+      );
+
+      if (result.isSuccess) {
+        final data = result.data!;
+        final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+        if (mounted) {
+          setState(() {
+            _chapters = chapters;
+            _isLoadingChapters = false;
+            _hasMoreChapters = data.length >= _chapterPageSize;
+            _currentChapterPage = 1;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingChapters = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingChapters = false);
+    }
+  }
+
+  /// 触底加载更多章节
+  Future<void> _loadMoreChapters() async {
+    if (_isLoadingMoreChapters || !_hasMoreChapters) return;
+    setState(() => _isLoadingMoreChapters = true);
+
+    try {
+      final result = await ApiClient.get(
+        'novel_chapters',
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'chapter_num': 'gte.1',
+        },
+        columns: 'id,title,chapter_num,word_count',
+        order: 'chapter_num.asc',
+        limit: _chapterPageSize,
+        offset: _currentChapterPage * _chapterPageSize,
+      );
+
+      if (result.isSuccess) {
+        final data = result.data!;
+        final newChapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+        if (mounted) {
+          setState(() {
+            _chapters.addAll(newChapters);
+            _hasMoreChapters = data.length >= _chapterPageSize;
+            _currentChapterPage++;
+            _isLoadingMoreChapters = false;
+          });
+        }
+      } else {
+        if (mounted) setState(() => _isLoadingMoreChapters = false);
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingMoreChapters = false);
+    }
+  }
+
+  /// 全量加载章节（用于弹窗"查看全部"）
+  Future<List<NovelChapterModel>> _loadAllChapters() async {
     const batchSize = 50;
     final allChapters = <NovelChapterModel>[];
     int offset = 0;
     bool hasMore = true;
 
-    try {
-      while (hasMore) {
-        final result = await ApiClient.get(
-          'novel_chapters',
-          filters: {
-            'novel_id': 'eq.${widget.novel.id}',
-            'chapter_num': 'gte.1',
-          },
-          columns: 'id,title,chapter_num,word_count',
-          order: 'chapter_num.asc',
-          limit: batchSize,
-          offset: offset,
-        );
+    while (hasMore) {
+      final result = await ApiClient.get(
+        'novel_chapters',
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'chapter_num': 'gte.1',
+        },
+        columns: 'id,title,chapter_num,word_count',
+        order: 'chapter_num.asc',
+        limit: batchSize,
+        offset: offset,
+      );
 
-        if (result.isSuccess) {
-          final data = result.data!;
-          final batch = data.map((json) => NovelChapterModel.fromJson(json)).toList();
-          allChapters.addAll(batch);
-          hasMore = data.length >= batchSize;
-          offset += batchSize;
-        } else {
-          hasMore = false;
-        }
-      }
-
-      if (mounted) {
-        setState(() {
-          _chapters = allChapters;
-          _isLoadingChapters = false;
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() => _isLoadingChapters = false);
+      if (result.isSuccess) {
+        final data = result.data!;
+        final batch = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+        allChapters.addAll(batch);
+        hasMore = data.length >= batchSize;
+        offset += batchSize;
+      } else {
+        hasMore = false;
       }
     }
+
+    return allChapters;
   }
 
   /// 加入/移出书架
@@ -347,84 +429,108 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     );
   }
 
-  /// 显示章节目录
+  /// 显示章节目录（弹窗内独立全量加载）
   void _showChapterList() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => DraggableScrollableSheet(
-        initialChildSize: 0.6,
-        maxChildSize: 0.9,
-        minChildSize: 0.3,
-        expand: false,
-        builder: (context, scrollController) => Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Text(
-                    '章节目录',
-                    style: Theme.of(context).textTheme.titleLarge,
-                  ),
-                  const Spacer(),
-                  Text(
-                    '共 ${_chapters.length} 章',
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-            const Divider(height: 1),
-            Expanded(
-              child: _isLoadingChapters
-                  ? Center(child: LoadingWidget())
-                  : _chapters.isEmpty
-                      ? const Center(child: Text('暂无章节'))
-                      : ListView.builder(
-                          controller: scrollController,
-                          itemCount: _chapters.length,
-                          itemBuilder: (context, index) {
-                            final chapter = _chapters[index];
-                            final isCurrent = chapter.chapterOrder == _currentChapter;
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          List<NovelChapterModel> allChapters = [];
+          bool isLoading = true;
 
-                            return ListTile(
-                              dense: true,
-                              title: Text(
-                                chapter.title,
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: isCurrent
-                                      ? Theme.of(context).colorScheme.primary
-                                      : null,
-                                  fontWeight: isCurrent ? FontWeight.bold : null,
-                                ),
-                              ),
-                              trailing: isCurrent
-                                  ? Icon(
-                                      Icons.play_arrow,
-                                      color: Theme.of(context).colorScheme.primary,
-                                      size: 20,
-                                    )
-                                  : Text(
-                                      '${chapter.wordCount ?? ""}字',
-                                      style: TextStyle(
-                                        fontSize: 12,
-                                        color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                              onTap: () {
-                                Navigator.pop(context);
-                                _jumpToChapter(chapter.chapterOrder);
-                              },
-                            );
-                          },
+          // 异步加载全部章节
+          _loadAllChapters().then((chapters) {
+            if (mounted) {
+              setModalState(() {
+                allChapters = chapters;
+                isLoading = false;
+              });
+              // 同时更新详情页的 _chapters（避免后续重复加载）
+              if (_chapters.length < chapters.length) {
+                setState(() {
+                  _chapters = chapters;
+                  _hasMoreChapters = false;
+                });
+              }
+            }
+          });
+
+          return DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            maxChildSize: 0.9,
+            minChildSize: 0.3,
+            expand: false,
+            builder: (context, scrollController) => Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.all(16),
+                  child: Row(
+                    children: [
+                      Text(
+                        '章节目录',
+                        style: Theme.of(context).textTheme.titleLarge,
+                      ),
+                      const Spacer(),
+                      Text(
+                        isLoading ? '加载中...' : '共 ${allChapters.length} 章',
+                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
                         ),
+                      ),
+                    ],
+                  ),
+                ),
+                const Divider(height: 1),
+                Expanded(
+                  child: isLoading
+                      ? const Center(child: LoadingWidget())
+                      : allChapters.isEmpty
+                          ? const Center(child: Text('暂无章节'))
+                          : ListView.builder(
+                              controller: scrollController,
+                              itemCount: allChapters.length,
+                              itemBuilder: (context, index) {
+                                final chapter = allChapters[index];
+                                final isCurrent = chapter.chapterOrder == _currentChapter;
+
+                                return ListTile(
+                                  dense: true,
+                                  title: Text(
+                                    chapter.title,
+                                    style: TextStyle(
+                                      fontSize: 14,
+                                      color: isCurrent
+                                          ? Theme.of(context).colorScheme.primary
+                                          : null,
+                                      fontWeight: isCurrent ? FontWeight.bold : null,
+                                    ),
+                                  ),
+                                  trailing: isCurrent
+                                      ? Icon(
+                                          Icons.play_arrow,
+                                          color: Theme.of(context).colorScheme.primary,
+                                          size: 20,
+                                        )
+                                      : Text(
+                                          '${chapter.wordCount ?? ""}字',
+                                          style: TextStyle(
+                                            fontSize: 12,
+                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                          ),
+                                        ),
+                                  onTap: () {
+                                    Navigator.pop(context);
+                                    _jumpToChapter(chapter.chapterOrder);
+                                  },
+                                );
+                              },
+                            ),
+                ),
+              ],
             ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
@@ -442,6 +548,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
     return Scaffold(
       body: CustomScrollView(
+        controller: _scrollController,
         slivers: [
           // 顶部应用栏 + 封面
           SliverAppBar(
@@ -818,7 +925,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
           const SliverToBoxAdapter(child: SizedBox(height: 8)),
 
-          // 章节列表（显示前20章）
+          // 章节列表（分页加载，默认10条/页，触底加载更多）
           SliverList(
             delegate: SliverChildBuilderDelegate(
               (context, index) {
@@ -829,7 +936,18 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   );
                 }
 
-                if (index >= _chapters.length) return null;
+                // 加载更多指示器
+                if (index == _chapters.length) {
+                  if (_isLoadingMoreChapters) {
+                    return const ListTile(
+                      dense: true,
+                      title: Center(child: LoadingWidget()),
+                    );
+                  }
+                  return const SizedBox.shrink();
+                }
+
+                if (index > _chapters.length) return null;
 
                 final chapter = _chapters[index];
                 final isCurrent = chapter.chapterOrder == _currentChapter;
@@ -854,7 +972,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   onTap: () => _jumpToChapter(chapter.chapterOrder),
                 );
               },
-              childCount: _isLoadingChapters ? 1 : _chapters.length,
+              childCount: _isLoadingChapters ? 1 : _chapters.length + (_hasMoreChapters ? 1 : 0),
             ),
           ),
 
