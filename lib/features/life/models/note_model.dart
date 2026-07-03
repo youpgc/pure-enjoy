@@ -1,12 +1,13 @@
 /// 笔记模型 - 对应 Supabase notes 表
-/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), content(TEXT), category(VARCHAR), color(VARCHAR?), user_nickname(VARCHAR?), created_at, updated_at
+/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), content(TEXT), category(VARCHAR?), tags(ARRAY?), is_pinned(BOOLEAN), user_nickname(VARCHAR?), created_at, updated_at
 class NoteModel {
   final String id;
   final String userId;
   final String title;
   final String? content;
   final String? category;
-  final String? color;
+  final List<String>? tags;
+  final bool isPinned;
   final String? userNickname;
   final DateTime createdAt;
   final DateTime updatedAt;
@@ -17,13 +18,13 @@ class NoteModel {
     required this.title,
     this.content,
     this.category,
-    this.color,
+    this.tags,
+    this.isPinned = false,
     this.userNickname,
     DateTime? createdAt,
     DateTime? updatedAt,
-  }) :
-    createdAt = createdAt ?? DateTime.now(),
-    updatedAt = updatedAt ?? DateTime.now();
+  })  : createdAt = createdAt ?? DateTime.now(),
+        updatedAt = updatedAt ?? DateTime.now();
 
   factory NoteModel.fromJson(Map<String, dynamic> json) {
     return NoteModel(
@@ -32,10 +33,17 @@ class NoteModel {
       title: json['title'] as String,
       content: json['content'] as String?,
       category: json['category'] as String?,
-      color: json['color'] as String?,
+      tags: json['tags'] != null
+          ? List<String>.from(json['tags'] as List)
+          : null,
+      isPinned: json['is_pinned'] as bool? ?? false,
       userNickname: json['user_nickname'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
-      updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
+      createdAt: json['created_at'] != null
+          ? DateTime.parse(json['created_at'] as String)
+          : null,
+      updatedAt: json['updated_at'] != null
+          ? DateTime.parse(json['updated_at'] as String)
+          : null,
     );
   }
 
@@ -45,7 +53,8 @@ class NoteModel {
       'title': title,
       'content': content,
       'category': category,
-      'color': color,
+      'tags': tags,
+      'is_pinned': isPinned,
       'user_nickname': userNickname,
       'created_at': createdAt.toUtc().toIso8601String(),
       'updated_at': updatedAt.toUtc().toIso8601String(),
@@ -61,7 +70,8 @@ class NoteModel {
       'title': title,
       'content': content,
       'category': category,
-      'color': color,
+      'tags': tags,
+      'is_pinned': isPinned,
       'user_nickname': userNickname,
       'updated_at': DateTime.now().toUtc().toIso8601String(),
     };
@@ -73,7 +83,8 @@ class NoteModel {
     String? title,
     String? content,
     String? category,
-    String? color,
+    List<String>? tags,
+    bool? isPinned,
     String? userNickname,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -84,7 +95,8 @@ class NoteModel {
       title: title ?? this.title,
       content: content ?? this.content,
       category: category ?? this.category,
-      color: color ?? this.color,
+      tags: tags ?? this.tags,
+      isPinned: isPinned ?? this.isPinned,
       userNickname: userNickname ?? this.userNickname,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

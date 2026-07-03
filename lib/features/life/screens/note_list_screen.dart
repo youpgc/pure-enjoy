@@ -279,19 +279,6 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
     }
   }
 
-  Color? _parseColor(String? colorStr) {
-    if (colorStr == null || colorStr.isEmpty) return null;
-    try {
-      final hex = colorStr.replaceFirst('#', '');
-      if (hex.length == 6) {
-        return Color(int.parse('FF$hex', radix: 16));
-      } else if (hex.length == 8) {
-        return Color(int.parse(hex, radix: 16));
-      }
-    } catch (_) {}
-    return null;
-  }
-
   void _showNoteForm([NoteModel? note]) {
     Navigator.push(
       context,
@@ -408,12 +395,12 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
                                               overflow: TextOverflow.fade,
                                             ),
                                           ),
-                                          if (note.color != null)
+                                          if (note.isPinned)
                                             Container(
                                               width: 4,
                                               height: double.infinity,
                                               decoration: BoxDecoration(
-                                                color: _parseColor(note.color),
+                                                color: colorScheme.primary,
                                                 borderRadius: BorderRadius.circular(2),
                                               ),
                                             ),
@@ -428,7 +415,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
                                         ],
                                       ),
                                     ),
-                                    if (note.color != null)
+                                    if (note.isPinned)
                                       Positioned(
                                         top: 8,
                                         right: 8,
