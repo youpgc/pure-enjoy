@@ -363,29 +363,34 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final currentSize = _scaleToFontSize(_fontScale);
     showDialog(
       context: context,
-      builder: (context) => SimpleDialog(
+      builder: (dialogContext) => SimpleDialog(
         title: const Text('字体大小'),
-        children: ['小', '中', '大', '特大'].map((size) {
-          return ListTile(
-            leading: Radio<String>(
-              value: size,
-              groupValue: currentSize,
-              onChanged: (val) {
-                final scale = _fontSizeToScale(val!);
-                ref.read(themeProvider).setFontScale(scale);
-                setState(() => _fontScale = scale);
-                Navigator.pop(context);
-              },
-            ),
-            title: Text(size),
-            onTap: () {
-              final scale = _fontSizeToScale(size);
+        children: [
+          RadioGroup<String>(
+            groupValue: currentSize,
+            onChanged: (val) {
+              if (val == null) return;
+              final scale = _fontSizeToScale(val);
               ref.read(themeProvider).setFontScale(scale);
               setState(() => _fontScale = scale);
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
             },
-          );
-        }).toList(),
+            child: Column(
+              children: ['小', '中', '大', '特大'].map((size) {
+                return ListTile(
+                  leading: Radio<String>(value: size),
+                  title: Text(size),
+                  onTap: () {
+                    final scale = _fontSizeToScale(size);
+                    ref.read(themeProvider).setFontScale(scale);
+                    setState(() => _fontScale = scale);
+                    Navigator.pop(dialogContext);
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -393,28 +398,32 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void _showReadingBgDialog() {
     showDialog(
       context: context,
-      builder: (context) => SimpleDialog(
+      builder: (dialogContext) => SimpleDialog(
         title: const Text('阅读背景'),
-        children: ReaderBackgroundTheme.values.map((bg) {
-          return ListTile(
-            leading: Radio<ReaderBackgroundTheme>(
-              value: bg,
-              groupValue: _readerBg,
-              onChanged: (ReaderBackgroundTheme? val) {
-                if (val == null) return;
-                ref.read(themeProvider).setReaderBackground(val);
-                setState(() => _readerBg = val);
-                Navigator.pop(context);
-              },
-            ),
-            title: Text(bg.label),
-            onTap: () {
-              ref.read(themeProvider).setReaderBackground(bg);
-              setState(() => _readerBg = bg);
-              Navigator.pop(context);
+        children: [
+          RadioGroup<ReaderBackgroundTheme>(
+            groupValue: _readerBg,
+            onChanged: (val) {
+              if (val == null) return;
+              ref.read(themeProvider).setReaderBackground(val);
+              setState(() => _readerBg = val);
+              Navigator.pop(dialogContext);
             },
-          );
-        }).toList(),
+            child: Column(
+              children: ReaderBackgroundTheme.values.map((bg) {
+                return ListTile(
+                  leading: Radio<ReaderBackgroundTheme>(value: bg),
+                  title: Text(bg.label),
+                  onTap: () {
+                    ref.read(themeProvider).setReaderBackground(bg);
+                    setState(() => _readerBg = bg);
+                    Navigator.pop(dialogContext);
+                  },
+                );
+              }).toList(),
+            ),
+          ),
+        ],
       ),
     );
   }

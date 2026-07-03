@@ -2005,12 +2005,14 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                   firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
-                if (date == null || !mounted) return;
+                if (date == null) return;
+                if (!mounted) return;
                 final time = await showTimePicker(
                   context: context,
                   initialTime: TimeOfDay.fromDateTime(_remindAt),
                 );
-                if (time == null || !mounted) return;
+                if (time == null) return;
+                if (!mounted) return;
                 setState(() {
                   _remindAt = DateTime(
                     date.year, date.month, date.day,
