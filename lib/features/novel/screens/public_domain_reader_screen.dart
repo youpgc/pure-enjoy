@@ -383,7 +383,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
             Text(
               '正在加载文本...',
               style: TextStyle(
-                color: _background.textColor.withOpacity(0.6),
+                color: _background.textColor.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -401,7 +401,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
               Icon(
                 Icons.error_outline,
                 size: 48,
-                color: _background.textColor.withOpacity(0.4),
+                color: _background.textColor.withValues(alpha: 0.4),
               ),
               const SizedBox(height: 16),
               Text(
@@ -417,7 +417,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                 _errorMessage ?? '未知错误',
                 textAlign: TextAlign.center,
                 style: TextStyle(
-                  color: _background.textColor.withOpacity(0.6),
+                  color: _background.textColor.withValues(alpha: 0.6),
                 ),
               ),
               const SizedBox(height: 24),
@@ -467,10 +467,10 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
             opacity: opacity,
             child: Container(
               decoration: BoxDecoration(
-                color: _background.bgColor.withOpacity(0.95),
+                color: _background.bgColor.withValues(alpha: 0.95),
                 border: Border(
                   bottom: BorderSide(
-                    color: colorScheme.outlineVariant.withOpacity(0.3),
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
               ),
@@ -510,7 +510,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                               overflow: TextOverflow.ellipsis,
                               style: TextStyle(
                                 fontSize: 12,
-                                color: _background.textColor.withOpacity(0.6),
+                                color: _background.textColor.withValues(alpha: 0.6),
                               ),
                             ),
                           ],
@@ -593,10 +593,10 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
             opacity: opacity,
             child: Container(
               decoration: BoxDecoration(
-                color: _background.bgColor.withOpacity(0.95),
+                color: _background.bgColor.withValues(alpha: 0.95),
                 border: Border(
                   top: BorderSide(
-                    color: colorScheme.outlineVariant.withOpacity(0.3),
+                    color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                   ),
                 ),
               ),
@@ -614,7 +614,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                             '${(_readProgress * 100).toInt()}%',
                             style: TextStyle(
                               fontSize: 12,
-                              color: _background.textColor.withOpacity(0.6),
+                              color: _background.textColor.withValues(alpha: 0.6),
                             ),
                           ),
                           const SizedBox(width: 8),
@@ -623,7 +623,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                               data: SliderTheme.of(context).copyWith(
                                 activeTrackColor: AppTheme.primaryOrange,
                                 inactiveTrackColor:
-                                    colorScheme.outlineVariant.withOpacity(0.3),
+                                    colorScheme.outlineVariant.withValues(alpha: 0.3),
                                 thumbColor: AppTheme.primaryOrange,
                                 trackHeight: 2,
                                 thumbShape: const RoundSliderThumbShape(
@@ -715,7 +715,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
                 Icon(
                   icon,
                   size: 22,
-                  color: _background.textColor.withOpacity(0.8),
+                  color: _background.textColor.withValues(alpha: 0.8),
                 ),
                 if (badge != null)
                   Positioned(
@@ -746,7 +746,7 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
               label,
               style: TextStyle(
                 fontSize: 10,
-                color: _background.textColor.withOpacity(0.6),
+                color: _background.textColor.withValues(alpha: 0.6),
               ),
             ),
           ],
@@ -758,17 +758,17 @@ class _PublicDomainReaderScreenState extends State<PublicDomainReaderScreen>
   void _showResetProgressDialog() {
     showDialog(
       context: context,
-      builder: (context) => AlertDialog(
+      builder: (dialogContext) => AlertDialog(
         title: const Text('重置进度'),
         content: const Text('确定要重置阅读进度吗？'),
         actions: [
           TextButton(
-            onPressed: () => Navigator.pop(context),
+            onPressed: () => Navigator.pop(dialogContext),
             child: const Text('取消'),
           ),
           FilledButton(
             onPressed: () async {
-              Navigator.pop(context);
+              Navigator.pop(dialogContext);
               final prefs = await SharedPreferences.getInstance();
               final prefix = 'pd_reader_${widget.book.id}';
               await prefs.remove('${prefix}_progress');

@@ -1,2 +1,2 @@
-/// 常量导出文件
+// 常量导出文件
 export 'app_constants.dart';

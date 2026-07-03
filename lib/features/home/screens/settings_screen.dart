@@ -366,12 +366,20 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => SimpleDialog(
         title: const Text('字体大小'),
         children: ['小', '中', '大', '特大'].map((size) {
-          return RadioListTile<String>(
+          return ListTile(
+            leading: Radio<String>(
+              value: size,
+              groupValue: currentSize,
+              onChanged: (val) {
+                final scale = _fontSizeToScale(val!);
+                ref.read(themeProvider).setFontScale(scale);
+                setState(() => _fontScale = scale);
+                Navigator.pop(context);
+              },
+            ),
             title: Text(size),
-            value: size,
-            groupValue: currentSize,
-            onChanged: (val) {
-              final scale = _fontSizeToScale(val!);
+            onTap: () {
+              final scale = _fontSizeToScale(size);
               ref.read(themeProvider).setFontScale(scale);
               setState(() => _fontScale = scale);
               Navigator.pop(context);
@@ -388,14 +396,21 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       builder: (context) => SimpleDialog(
         title: const Text('阅读背景'),
         children: ReaderBackgroundTheme.values.map((bg) {
-          return RadioListTile<ReaderBackgroundTheme>(
+          return ListTile(
+            leading: Radio<ReaderBackgroundTheme>(
+              value: bg,
+              groupValue: _readerBg,
+              onChanged: (ReaderBackgroundTheme? val) {
+                if (val == null) return;
+                ref.read(themeProvider).setReaderBackground(val);
+                setState(() => _readerBg = val);
+                Navigator.pop(context);
+              },
+            ),
             title: Text(bg.label),
-            value: bg,
-            groupValue: _readerBg,
-            onChanged: (ReaderBackgroundTheme? val) {
-              if (val == null) return;
-              ref.read(themeProvider).setReaderBackground(val);
-              setState(() => _readerBg = val);
+            onTap: () {
+              ref.read(themeProvider).setReaderBackground(bg);
+              setState(() => _readerBg = bg);
               Navigator.pop(context);
             },
           );
@@ -553,8 +568,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
     showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: const Text('修改密码'),
           content: SingleChildScrollView(
             child: Column(
@@ -594,7 +609,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: isLoading ? null : () => Navigator.pop(context),
+              onPressed: isLoading ? null : () => Navigator.pop(dialogContext),
               child: const Text('取消'),
             ),
             FilledButton(

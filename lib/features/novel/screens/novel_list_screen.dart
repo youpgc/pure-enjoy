@@ -397,8 +397,8 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         decoration: BoxDecoration(
                           gradient: LinearGradient(
                             colors: [
-                              AppTheme.primaryOrange.withOpacity(0.8),
-                              AppTheme.primaryOrange.withOpacity(0.4),
+                              AppTheme.primaryOrange.withValues(alpha: 0.8),
+                              AppTheme.primaryOrange.withValues(alpha: 0.4),
                             ],
                             begin: Alignment.topLeft,
                             end: Alignment.bottomRight,
@@ -410,7 +410,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                             Container(
                               padding: const EdgeInsets.all(10),
                               decoration: BoxDecoration(
-                                color: Colors.white.withOpacity(0.2),
+                                color: Colors.white.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(10),
                               ),
                               child: const Icon(
@@ -437,7 +437,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                                     '古登堡计划 · 版权过期 · 完全免费',
                                     style: TextStyle(
                                       fontSize: 12,
-                                      color: Colors.white.withOpacity(0.85),
+                                      color: Colors.white.withValues(alpha: 0.85),
                                     ),
                                   ),
                                 ],
@@ -445,7 +445,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                             ),
                             Icon(
                               Icons.arrow_forward_ios,
-                              color: Colors.white.withOpacity(0.7),
+                              color: Colors.white.withValues(alpha: 0.7),
                               size: 16,
                             ),
                           ],

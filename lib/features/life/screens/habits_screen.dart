@@ -248,6 +248,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       await _loadHabits(refresh: true);
 
+      if (!mounted) return;
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
@@ -303,8 +304,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(isEditing ? '编辑习惯' : '添加习惯'),
           content: SingleChildScrollView(
             child: Column(
@@ -351,7 +352,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('取消'),
             ),
             FilledButton(
@@ -421,6 +422,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                     }
                   }
 
+                  if (!mounted) return;
                   Navigator.pop(context);
                   _loadHabits(refresh: true);
                 } catch (e) {
@@ -615,7 +617,7 @@ class _HabitCard extends StatelessWidget {
                   width: 48,
                   height: 48,
                   decoration: BoxDecoration(
-                    color: habitColor.withOpacity(0.2),
+                    color: habitColor.withValues(alpha: 0.2),
                     borderRadius: BorderRadius.circular(12),
                   ),
                   child: Icon(
@@ -643,7 +645,7 @@ class _HabitCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.2),
+                                color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.2),
                                 borderRadius: BorderRadius.circular(4),
                               ),
                               child: Text(

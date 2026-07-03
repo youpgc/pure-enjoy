@@ -1,6 +1,6 @@
-/// 应用配置文件
 import 'services/supabase_config.dart';
 
+/// 应用配置文件
 class AppConfig {
   // Supabase 配置（统一引用 SupabaseConfig）
   static String get supabaseUrl => SupabaseConfig.url;

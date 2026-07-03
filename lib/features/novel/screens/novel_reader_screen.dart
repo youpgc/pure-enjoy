@@ -1094,7 +1094,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           if (_chapters.isNotEmpty)
             LinearProgressIndicator(
               value: _readingProgress,
-              backgroundColor: _background.textColor.withOpacity(0.1),
+              backgroundColor: _background.textColor.withValues(alpha: 0.1),
               valueColor: AlwaysStoppedAnimation<Color>(
                 Theme.of(context).colorScheme.primary,
               ),
@@ -1109,14 +1109,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   '$_currentTime  $_batteryLevel%',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _background.textColor.withOpacity(0.5),
+                    color: _background.textColor.withValues(alpha: 0.5),
                   ),
                 ),
                 Text(
                   '${(_readingProgress * 100).toStringAsFixed(1)}%',
                   style: TextStyle(
                     fontSize: 12,
-                    color: _background.textColor.withOpacity(0.5),
+                    color: _background.textColor.withValues(alpha: 0.5),
                   ),
                 ),
               ],
@@ -1208,7 +1208,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               icon: Icon(
                 Icons.arrow_back_ios_new,
                 size: 18,
-                color: _background.textColor.withOpacity(0.7),
+                color: _background.textColor.withValues(alpha: 0.7),
               ),
               onPressed: () => Navigator.pop(context),
               padding: EdgeInsets.zero,
@@ -1220,7 +1220,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                 _currentChapter?.title ?? widget.novel.title,
                 style: TextStyle(
                   fontSize: 13,
-                  color: _background.textColor.withOpacity(0.6),
+                  color: _background.textColor.withValues(alpha: 0.6),
                 ),
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -1256,7 +1256,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           style: TextStyle(
                             fontSize: 14,
                             fontWeight: FontWeight.w600,
-                            color: _background.textColor.withOpacity(0.7),
+                            color: _background.textColor.withValues(alpha: 0.7),
                           ),
                           maxLines: 1,
                           overflow: TextOverflow.ellipsis,
@@ -1266,7 +1266,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             '${_currentChapter!.title} · ${_currentChapterIndex + 1}/${_chapters.length}章${_hasStartedReading ? ' · 已读${_formatReadingDuration(_currentReadingDuration)}' : ''}',
                             style: TextStyle(
                               fontSize: 11,
-                              color: _background.textColor.withOpacity(0.6),
+                              color: _background.textColor.withValues(alpha: 0.6),
                             ),
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
@@ -1333,7 +1333,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             onPressed: _currentChapterIndex > 0 ? _previousChapter : null,
                             style: OutlinedButton.styleFrom(
                               foregroundColor: _background.textColor,
-                              side: BorderSide(color: _background.textColor.withOpacity(0.3)),
+                              side: BorderSide(color: _background.textColor.withValues(alpha: 0.3)),
                             ),
                             child: const Text('上一章'),
                           ),
@@ -1492,7 +1492,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
               Center(
                 child: Text(
                   '${_currentChapter!.title} - 完',
-                  style: TextStyle(fontSize: 14, color: _background.textColor.withOpacity(0.5)),
+                  style: TextStyle(fontSize: 14, color: _background.textColor.withValues(alpha: 0.5)),
                 ),
               ),
               const SizedBox(height: 24),

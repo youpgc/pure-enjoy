@@ -116,19 +116,19 @@ class NotificationService {
       case 'novel':
         // 跳转到小说详情
         if (kDebugMode) {
-          debugPrint('跳转到小说详情');
+          debugPrint('跳转到小说详情: $id');
         }
         break;
       case 'expense':
         // 跳转到消费记录
         if (kDebugMode) {
-          debugPrint('跳转到消费记录');
+          debugPrint('跳转到消费记录: $id');
         }
         break;
       case 'reminder':
         // 跳转到提醒事项
         if (kDebugMode) {
-          debugPrint('跳转到提醒事项');
+          debugPrint('跳转到提醒事项: $id');
         }
         break;
       case 'notification':
@@ -137,7 +137,7 @@ class NotificationService {
         break;
       default:
         if (kDebugMode) {
-          debugPrint('未知通知类型: $type');
+          debugPrint('未知通知类型: $type, id: $id');
         }
     }
   }

@@ -225,7 +225,7 @@ class _MoodStatisticsScreenState extends State<MoodStatisticsScreen> {
                     width: 60,
                     child: LinearProgressIndicator(
                       value: mood.value / total,
-                      backgroundColor: colors[index % colors.length].withOpacity(0.2),
+                      backgroundColor: colors[index % colors.length].withValues(alpha: 0.2),
                       valueColor: AlwaysStoppedAnimation(colors[index % colors.length]),
                     ),
                   ),

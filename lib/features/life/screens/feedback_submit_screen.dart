@@ -119,7 +119,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
                     Builder(builder: (context) {
                       final categoryOptions = DictService.instance.getItemsSync('feedback_category');
                       return DropdownButtonFormField<String>(
-                        value: _category,
+                        initialValue: _category,
                         decoration: const InputDecoration(
                           labelText: '分类',
                           prefixIcon: Icon(Icons.category),

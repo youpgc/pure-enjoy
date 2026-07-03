@@ -347,7 +347,7 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
                     ),
                     belowBarData: BarAreaData(
                       show: true,
-                      color: Theme.of(context).colorScheme.primary.withOpacity(0.1),
+                      color: Theme.of(context).colorScheme.primary.withValues(alpha: 0.1),
                     ),
                   ),
                 ],
@@ -411,7 +411,7 @@ class _StatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Card(
-      color: color.withOpacity(0.1),
+      color: color.withValues(alpha: 0.1),
       child: Padding(
         padding: const EdgeInsets.all(12),
         child: Column(

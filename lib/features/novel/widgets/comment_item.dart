@@ -31,7 +31,7 @@ class CommentItem extends StatelessWidget {
           : BoxDecoration(
               border: Border(
                 bottom: BorderSide(
-                  color: theme.dividerColor.withOpacity(0.3),
+                  color: theme.dividerColor.withValues(alpha: 0.3),
                 ),
               ),
             ),

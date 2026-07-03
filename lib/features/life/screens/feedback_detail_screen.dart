@@ -195,7 +195,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
               _buildSectionTitle('管理员回复'),
               const SizedBox(height: 8),
               Card(
-                color: colorScheme.primaryContainer.withOpacity(0.3),
+                color: colorScheme.primaryContainer.withValues(alpha: 0.3),
                 child: Padding(
                   padding: const EdgeInsets.all(16),
                   child: Text(
@@ -225,7 +225,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
               Container(
                 padding: const EdgeInsets.all(24),
                 decoration: BoxDecoration(
-                  color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                  color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                   borderRadius: BorderRadius.circular(8),
                 ),
                 child: Center(
@@ -262,7 +262,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 4),
       decoration: BoxDecoration(
-        color: color.withOpacity(0.1),
+        color: color.withValues(alpha: 0.1),
         borderRadius: BorderRadius.circular(6),
       ),
       child: Text(
@@ -305,7 +305,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
                   Expanded(
                     child: Container(
                       width: 2,
-                      color: colorScheme.outlineVariant.withOpacity(0.3),
+                      color: colorScheme.outlineVariant.withValues(alpha: 0.3),
                     ),
                   ),
               ],
@@ -350,7 +350,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
                       width: double.infinity,
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                        color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                         borderRadius: BorderRadius.circular(6),
                       ),
                       child: Text(

@@ -199,8 +199,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(isEditing ? '编辑收藏' : '添加收藏'),
           content: SingleChildScrollView(
             child: Column(
@@ -233,7 +233,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  value: category,
+                  initialValue: category,
                   decoration: const InputDecoration(labelText: '分类'),
                   items: DictService.instance.getItemsSync('favorite_category').map((item) {
                     return DropdownMenuItem(
@@ -260,7 +260,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('取消'),
             ),
             FilledButton(
@@ -329,6 +329,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
                     }
                   }
+                  if (!mounted) return;
                   Navigator.pop(context);
                   _loadFavorites(refresh: true);
                 } catch (e) {
@@ -513,7 +514,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                                       DateTimeUtils.formatStandard(favorite.createdAt),
                                       style: TextStyle(
                                         fontSize: 11,
-                                        color: colorScheme.outline.withOpacity(0.7),
+                                        color: colorScheme.outline.withValues(alpha: 0.7),
                                       ),
                                     ),
                                   ],

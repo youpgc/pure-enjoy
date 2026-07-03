@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
 import '../../../services/gutendex_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart' as app_widgets;
@@ -250,7 +249,7 @@ class _BookCard extends StatelessWidget {
       elevation: 0,
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(12),
-        side: BorderSide(color: colorScheme.outlineVariant.withOpacity(0.5)),
+        side: BorderSide(color: colorScheme.outlineVariant.withValues(alpha: 0.5)),
       ),
       child: InkWell(
         onTap: onTap,
@@ -335,7 +334,7 @@ class _BookCard extends StatelessWidget {
                               vertical: 2,
                             ),
                             decoration: BoxDecoration(
-                              color: AppTheme.primaryOrange.withOpacity(0.1),
+                              color: AppTheme.primaryOrange.withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(4),
                             ),
                             child: const Text(

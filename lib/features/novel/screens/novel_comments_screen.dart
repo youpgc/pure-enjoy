@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
@@ -194,7 +193,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
                             Icon(Icons.comment_outlined,
                                 size: 64,
                                 color: theme.colorScheme.onSurfaceVariant
-                                    .withOpacity(0.3)),
+                                    .withValues(alpha: 0.3)),
                             const SizedBox(height: 16),
                             Text('暂无评论，快来发表第一条评论吧',
                                 style: TextStyle(
@@ -252,7 +251,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
       decoration: BoxDecoration(
         color: theme.colorScheme.surface,
         border: Border(
-            top: BorderSide(color: theme.dividerColor.withOpacity(0.3))),
+            top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
       ),
       padding: EdgeInsets.only(
           left: 12,
@@ -268,7 +267,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
                   const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
               margin: const EdgeInsets.only(bottom: 6),
               decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withOpacity(0.3),
+                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
                 borderRadius: BorderRadius.circular(4),
               ),
               child: Row(children: [
@@ -346,7 +345,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
                       borderSide: BorderSide.none),
                   filled: true,
                   fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withOpacity(0.5),
+                      .withValues(alpha: 0.5),
                   contentPadding: const EdgeInsets.symmetric(
                       horizontal: 16, vertical: 8),
                   isDense: true,

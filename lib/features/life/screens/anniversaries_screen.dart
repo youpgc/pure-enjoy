@@ -219,8 +219,8 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
     await showDialog(
       context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
+      builder: (_) => StatefulBuilder(
+        builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(isEditing ? '编辑$typeLabel' : '添加$typeLabel'),
           content: SingleChildScrollView(
             child: Column(
@@ -251,7 +251,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                     if (isLunar) {
                       // 农历日期选择器
                       final picked = await _showLunarDatePicker(
-                        context,
+                        dialogContext,
                         initialDate: selectedDate,
                       );
                       if (picked != null) {
@@ -259,7 +259,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                       }
                     } else {
                       final picked = await showDatePicker(
-                        context: context,
+                        context: dialogContext,
                         initialDate: selectedDate,
                         firstDate: DateTime(1900),
                         lastDate: DateTime(2100),
@@ -324,7 +324,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   const Text('提前提醒', style: TextStyle(fontSize: 12)),
                   const SizedBox(height: 4),
                   DropdownButtonFormField<int>(
-                    value: remindDaysBefore,
+                    initialValue: remindDaysBefore,
                     decoration: const InputDecoration(
                       border: OutlineInputBorder(),
                       contentPadding: EdgeInsets.symmetric(
@@ -350,7 +350,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
           ),
           actions: [
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () => Navigator.pop(dialogContext),
               child: const Text('取消'),
             ),
             FilledButton(
@@ -417,6 +417,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                       throw Exception('HTTP ${result.statusCode}');
                     }
                   }
+                  if (!mounted) return;
                   Navigator.pop(context);
                   _loadAnniversaries(refresh: true);
                 } catch (e) {
@@ -716,8 +717,8 @@ class _AnniversaryCard extends StatelessWidget {
 
     // 根据类型选择颜色
     final cardColor = isBirthday
-        ? colorScheme.primaryContainer.withOpacity(0.5)
-        : colorScheme.tertiaryContainer.withOpacity(0.5);
+        ? colorScheme.primaryContainer.withValues(alpha: 0.5)
+        : colorScheme.tertiaryContainer.withValues(alpha: 0.5);
 
     final iconColor = isBirthday
         ? colorScheme.primary
@@ -796,7 +797,7 @@ class _AnniversaryCard extends StatelessWidget {
                                 vertical: 2,
                               ),
                               decoration: BoxDecoration(
-                                color: Colors.orange.withOpacity(0.15),
+                                color: Colors.orange.withValues(alpha: 0.15),
                                 borderRadius: BorderRadius.circular(12),
                               ),
                               child: const Text(

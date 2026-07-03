@@ -196,7 +196,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: categoryInfo.color.withOpacity(0.1),
+                                  color: categoryInfo.color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(
@@ -213,7 +213,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
                                 padding: const EdgeInsets.symmetric(
                                     horizontal: 8, vertical: 2),
                                 decoration: BoxDecoration(
-                                  color: statusInfo.color.withOpacity(0.1),
+                                  color: statusInfo.color.withValues(alpha: 0.1),
                                   borderRadius: BorderRadius.circular(4),
                                 ),
                                 child: Text(

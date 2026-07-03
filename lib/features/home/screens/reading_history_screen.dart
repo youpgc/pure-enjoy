@@ -80,7 +80,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
         setState(() => _isLoading = false);
       }
     } catch (e) {
-      print('加载阅读历史失败: $e');
+      debugPrint('加载阅读历史失败: $e');
       setState(() => _isLoading = false);
     }
   }
@@ -128,7 +128,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
           }
         }
       } catch (e) {
-        print('清空阅读历史失败: $e');
+        debugPrint('清空阅读历史失败: $e');
       }
     }
   }

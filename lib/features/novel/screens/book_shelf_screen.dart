@@ -711,9 +711,9 @@ class _NovelListForAddScreen extends StatefulWidget {
 class _NovelListForAddScreenState extends State<_NovelListForAddScreen> with PaginatedListMixin {
   List<Map<String, dynamic>> _novels = [];
   Set<String> _addedNovelIds = {};
-  Set<String> _addingNovelIds = {};
+  final Set<String> _addingNovelIds = {};
   bool _isLoading = true;
-  String _searchQuery = '';
+  final String _searchQuery = '';
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -1355,7 +1355,7 @@ class _BookshelfItem extends StatelessWidget {
                             horizontal: 6, vertical: 2),
                         decoration: BoxDecoration(
                           color: getStatusColor(progress, colorScheme)
-                              .withOpacity(0.1),
+                              .withValues(alpha: 0.1),
                           borderRadius: BorderRadius.circular(4),
                         ),
                         child: Text(

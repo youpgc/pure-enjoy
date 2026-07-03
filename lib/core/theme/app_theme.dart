@@ -47,7 +47,7 @@ class AppTheme {
       onSurfaceVariant: neutral600,
       onError: Colors.white,
       outline: neutral400,
-      shadow: neutral900.withOpacity(0.1),
+      shadow: neutral900.withValues(alpha: 0.1),
     );
     return _buildTheme(colorScheme);
   }
@@ -69,7 +69,7 @@ class AppTheme {
       onSurfaceVariant: neutral400,
       onError: Colors.white,
       outline: neutral600,
-      shadow: Colors.black.withOpacity(0.3),
+      shadow: Colors.black.withValues(alpha: 0.3),
     );
     return _buildTheme(colorScheme);
   }
@@ -181,7 +181,7 @@ class AppTheme {
       dividerTheme: DividerThemeData(
         thickness: 0.5,
         space: 1,
-        color: colorScheme.outline.withOpacity(0.5),
+        color: colorScheme.outline.withValues(alpha: 0.5),
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(
@@ -230,7 +230,7 @@ class AppTheme {
         labelColor: colorScheme.primary,
         unselectedLabelColor: colorScheme.onSurfaceVariant,
         indicatorColor: colorScheme.primary,
-        dividerColor: colorScheme.outline.withOpacity(0.3),
+        dividerColor: colorScheme.outline.withValues(alpha: 0.3),
       ),
       switchTheme: SwitchThemeData(
         thumbColor: WidgetStateProperty.resolveWith((states) {
@@ -275,7 +275,7 @@ class AppTheme {
         activeTrackColor: colorScheme.primary,
         inactiveTrackColor: colorScheme.primaryContainer,
         thumbColor: colorScheme.primary,
-        overlayColor: colorScheme.primary.withOpacity(0.12),
+        overlayColor: colorScheme.primary.withValues(alpha: 0.12),
       ),
       tooltipTheme: TooltipThemeData(
         decoration: BoxDecoration(

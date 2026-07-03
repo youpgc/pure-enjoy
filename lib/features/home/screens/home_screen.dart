@@ -514,7 +514,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddMoodSheet(
+      builder: (_) => _AddMoodSheet(
         onSave: (diary) async {
           try {
             final result = await ApiClient.post(
@@ -550,7 +550,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddExpenseSheet(
+      builder: (_) => _AddExpenseSheet(
         onSave: (expense) async {
           try {
             final result = await ApiClient.post(
@@ -588,7 +588,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddWeightSheet(
+      builder: (_) => _AddWeightSheet(
         onSave: (record) async {
           try {
             final result = await ApiClient.post(
@@ -624,7 +624,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddNoteSheet(
+      builder: (_) => _AddNoteSheet(
         onSave: (note) async {
           try {
             final result = await ApiClient.post(
@@ -659,7 +659,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddReminderSheet(
+      builder: (_) => _AddReminderSheet(
         onSave: (reminder) async {
           try {
             final result = await ApiClient.post(
@@ -695,7 +695,7 @@ class _DashboardPageState extends State<DashboardPage> {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => _AddHabitSheet(
+      builder: (_) => _AddHabitSheet(
         onSave: (habit) async {
           try {
             final result = await ApiClient.post(
@@ -1146,7 +1146,7 @@ class _DashboardPageState extends State<DashboardPage> {
                                 width: 40,
                                 height: 40,
                                 decoration: BoxDecoration(
-                                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5),
+                                  color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
                                   borderRadius: BorderRadius.circular(20),
                                 ),
                               ),
@@ -1155,9 +1155,9 @@ class _DashboardPageState extends State<DashboardPage> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    Container(height: 12, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.5), borderRadius: BorderRadius.circular(4))),
+                                    Container(height: 12, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(4))),
                                     const SizedBox(height: 6),
-                                    Container(width: 120, height: 10, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withOpacity(0.3), borderRadius: BorderRadius.circular(4))),
+                                    Container(width: 120, height: 10, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4))),
                                   ],
                                 ),
                               ),
@@ -1232,7 +1232,7 @@ class _ToolCard extends StatelessWidget {
               width: 48,
               height: 48,
               decoration: BoxDecoration(
-                color: color.withOpacity(0.15),
+                color: color.withValues(alpha: 0.15),
                 shape: BoxShape.circle,
               ),
               child: Icon(icon, color: color, size: 24),
@@ -2005,20 +2005,18 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                   firstDate: DateTime.now(),
                   lastDate: DateTime.now().add(const Duration(days: 365)),
                 );
-                if (date != null) {
-                  final time = await showTimePicker(
-                    context: context,
-                    initialTime: TimeOfDay.fromDateTime(_remindAt),
+                if (date == null || !mounted) return;
+                final time = await showTimePicker(
+                  context: context,
+                  initialTime: TimeOfDay.fromDateTime(_remindAt),
+                );
+                if (time == null || !mounted) return;
+                setState(() {
+                  _remindAt = DateTime(
+                    date.year, date.month, date.day,
+                    time.hour, time.minute,
                   );
-                  if (time != null) {
-                    setState(() {
-                      _remindAt = DateTime(
-                        date.year, date.month, date.day,
-                        time.hour, time.minute,
-                      );
-                    });
-                  }
-                }
+                });
               },
             ),
             const SizedBox(height: 16),
@@ -2607,7 +2605,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                             boxShadow: isSelected
                                 ? [
                                     BoxShadow(
-                                      color: scheme.seedColor.withOpacity(0.4),
+                                      color: scheme.seedColor.withValues(alpha: 0.4),
                                       blurRadius: 8,
                                     ),
                                   ]
@@ -2709,7 +2707,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
                             border: Border.all(
                               color: isSelected
                                   ? Theme.of(context).colorScheme.primary
-                                  : Theme.of(context).colorScheme.onSurfaceVariant.withOpacity(0.3),
+                                  : Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.3),
                               width: isSelected ? 3 : 1,
                             ),
                           ),
@@ -2920,7 +2918,7 @@ class _ExportBottomSheetState extends State<_ExportBottomSheet> {
                             width: 40,
                             height: 40,
                             decoration: BoxDecoration(
-                              color: (_typeColors[type] ?? Theme.of(context).colorScheme.onSurfaceVariant).withOpacity(0.1),
+                              color: (_typeColors[type] ?? Theme.of(context).colorScheme.onSurfaceVariant).withValues(alpha: 0.1),
                               borderRadius: BorderRadius.circular(10),
                             ),
                             child: Icon(

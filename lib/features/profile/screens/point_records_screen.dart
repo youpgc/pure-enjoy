@@ -307,7 +307,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                       Icon(
                         Icons.monetization_on_outlined,
                         size: 48,
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.5),
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
                       ),
                       const SizedBox(height: 8),
                       Text(
@@ -327,7 +327,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
               final expiryInfo = _getExpiryInfo(record);
               return ListTile(
                 leading: CircleAvatar(
-                  backgroundColor: typeInfo.color.withOpacity(0.1),
+                  backgroundColor: typeInfo.color.withValues(alpha: 0.1),
                   child: Icon(
                     typeInfo.icon,
                     color: typeInfo.color,
@@ -341,7 +341,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
                       decoration: BoxDecoration(
-                        color: expiryInfo.color.withOpacity(0.1),
+                        color: expiryInfo.color.withValues(alpha: 0.1),
                         borderRadius: BorderRadius.circular(4),
                       ),
                       child: Text(
@@ -379,7 +379,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                       DateTimeUtils.formatStandard(record.createdAt),
                       style: TextStyle(
                         fontSize: 12,
-                        color: colorScheme.onSurfaceVariant.withOpacity(0.7),
+                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
                       ),
                     ),
                   ],
