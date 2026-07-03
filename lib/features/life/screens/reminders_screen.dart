@@ -364,7 +364,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                   if (date == null) return;
                   if (!mounted) return;
                   final time = await showTimePicker(
-                    context: context,
+                    context: this.context,
                     initialTime: TimeOfDay.fromDateTime(_remindAt),
                   );
                   if (time == null) return;

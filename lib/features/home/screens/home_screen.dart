@@ -2008,7 +2008,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
                 if (date == null) return;
                 if (!mounted) return;
                 final time = await showTimePicker(
-                  context: context,
+                  context: this.context,
                   initialTime: TimeOfDay.fromDateTime(_remindAt),
                 );
                 if (time == null) return;
