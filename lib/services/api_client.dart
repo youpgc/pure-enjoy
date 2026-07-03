@@ -78,7 +78,12 @@ class ApiClient {
     // 过滤条件
     if (filters != null) {
       filters.forEach((key, value) {
-        queryParts.add('$key=${Uri.encodeComponent(value)}');
+        // and/or 操作符的值包含括号与逗号，需保持原样供 PostgREST 解析
+        if (key == 'and' || key == 'or') {
+          queryParts.add('$key=$value');
+        } else {
+          queryParts.add('$key=${Uri.encodeComponent(value)}');
+        }
       });
     }
 
@@ -313,7 +318,12 @@ class ApiClient {
       ];
       if (filters != null) {
         filters.forEach((key, value) {
-          queryParts.add('$key=${Uri.encodeComponent(value)}');
+          // and/or 操作符的值包含括号与逗号，需保持原样供 PostgREST 解析
+          if (key == 'and' || key == 'or') {
+            queryParts.add('$key=$value');
+          } else {
+            queryParts.add('$key=${Uri.encodeComponent(value)}');
+          }
         });
       }
       final queryString = '?${queryParts.join('&')}';

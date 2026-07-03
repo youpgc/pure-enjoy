@@ -61,9 +61,13 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       await DictService.instance.initialize();
       await _loadCache();
       await _loadExpenses();
-      // 初始化后加载当前月份统计
-      if (mounted) {
-        _loadTotalAmountForMonth(_displayedMonth);
+      // 数据加载后，将显示月份更新为第一条数据的月份
+      if (mounted && _expenses.isNotEmpty) {
+        final firstMonth = DateTime(_expenses.first.date.year, _expenses.first.date.month);
+        if (firstMonth != _displayedMonth) {
+          setState(() => _displayedMonth = firstMonth);
+        }
+        _loadTotalAmountForMonth(firstMonth);
       }
     } catch (e, stackTrace) {
       if (kDebugMode) {
@@ -217,7 +221,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
             });
           }
           _isLoading = false;
-          onPaginationDataLoaded(allExpenses.length);
+          onPaginationDataLoaded(newExpenses.length);
         });
 
         // 刷新后更新顶部月份统计为当前视窗月份
@@ -233,7 +237,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
         if (refresh) {
           await CacheHelper.instance.saveList(
             CacheHelper.keyExpenses,
-            allExpenses.map((e) => e.toJson()).toList(),
+            _expenses.map((e) => e.toJson()).toList(),
           );
         }
       } else {
@@ -537,6 +541,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                         child: ListView.builder(
                           controller: scrollController,
                           padding: const EdgeInsets.symmetric(horizontal: 16),
+                          itemExtent: 72.0,
                           itemCount: _expenses.length + 1,
                           itemBuilder: (context, index) {
                             if (index == _expenses.length) {
