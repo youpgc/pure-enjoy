@@ -55,7 +55,7 @@ dependencies:
   # 农历
   lunar: ^1.0.0
   # 日期格式化
-  intl: ^0.19.0
+  intl: ^0.20.2
   # 骨架屏 shimmer 效果
   shimmer: ^3.0.0
 
