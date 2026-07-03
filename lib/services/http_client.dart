@@ -3,6 +3,7 @@ import 'dart:io';
 import 'package:http/http.dart' as http;
 import '../env.dart';
 import 'cancel_token.dart';
+import 'supabase_service.dart';
 
 /// 全局 HttpClient 配置（从环境变量读取）
 class HttpClientConfig {
@@ -230,8 +231,12 @@ class HttpClient {
           throw RequestCancelledException();
         }
 
-        // 处理 401：Token 失效
+        // 处理 401：尝试刷新 Token，失败才清空
         if (response.statusCode == 401) {
+          final refreshed = await _tryRefreshToken();
+          if (refreshed) {
+            continue; // Token 已刷新，重试当前请求
+          }
           _accessToken = null;
           throw HttpException('401_UNAUTHORIZED');
         }
@@ -259,4 +264,19 @@ class HttpClient {
 
     throw lastError ?? Exception('请求失败，已重试 $maxRetries 次');
   }
+
+  /// 尝试刷新 Token，成功则更新 _accessToken 并返回 true
+  Future<bool> _tryRefreshToken() async {
+    try {
+      final success = await SupabaseService.instance.refreshToken();
+      if (success) {
+        _accessToken = SupabaseService.instance.accessToken;
+        return _accessToken != null;
+      }
+      return false;
+    } catch (e) {
+      return false;
+    }
+  }
+
 }

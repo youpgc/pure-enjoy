@@ -56,6 +56,12 @@ class ExpenseModel {
     if (id.isNotEmpty) {
       json['id'] = id;
     }
+    if (createdAt != null) {
+      json['created_at'] = createdAt!.toIso8601String();
+    }
+    if (updatedAt != null) {
+      json['updated_at'] = updatedAt!.toIso8601String();
+    }
     return json;
   }
 

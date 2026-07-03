@@ -64,6 +64,10 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       await DictService.instance.initialize();
       await _loadCache();
       await _loadExpenses();
+      // 初始化后加载当前月份统计
+      if (mounted) {
+        _loadTotalAmountForMonth(_displayedMonth);
+      }
     } catch (e, stackTrace) {
       if (kDebugMode) {
         debugPrint('❌ ExpenseListScreen _initLoad 异常');
