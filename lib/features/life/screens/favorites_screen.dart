@@ -63,6 +63,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       return;
     }
 
+    final isFirstPage = _offset == 0;
+
     if (refresh) {
       setState(() {
         _offset = 0;
@@ -70,7 +72,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         _favorites = [];
         _isLoading = true;
       });
-    } else if (_offset == 0) {
+    } else if (isFirstPage) {
       // 1. 先加载本地缓存（仅在初始第一页时）
       final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
       if (cached.isNotEmpty && mounted) {
@@ -112,7 +114,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         }
         if (mounted) {
           setState(() {
-            if (refresh) {
+            if (refresh || isFirstPage) {
               _favorites = items;
             } else {
               _favorites.addAll(items);

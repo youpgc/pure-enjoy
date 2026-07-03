@@ -24,7 +24,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
   void initState() {
     super.initState();
     initPagination();
-    _loadHistory();
+    _loadHistory(refresh: true);
   }
 
   @override

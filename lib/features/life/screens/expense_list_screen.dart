@@ -115,7 +115,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     });
   }
 
-  /// 加载指定月份总支出（服务端聚合查询）
+  /// 加载指定月份总支出（客户端累加已加载列表数据）
   Future<void> _loadTotalAmountForMonth(DateTime month) async {
     final userId = _userId;
     if (userId == null) return;
@@ -123,27 +123,23 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     setState(() => _isLoadingTotal = true);
 
     try {
-      final startOfMonth = DateTime(month.year, month.month, 1);
-      final endOfMonth = DateTime(month.year, month.month + 1, 1);
-
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-        'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
-      };
-
-      if (_selectedCategory != 'all') {
-        filters['category'] = 'eq.$_selectedCategory';
+      // 客户端计算：从已加载的支出列表中筛选并累加
+      double total = 0.0;
+      for (final expense in _expenses) {
+        // 检查是否属于目标月份
+        if (expense.date.year != month.year || expense.date.month != month.month) {
+          continue;
+        }
+        // 检查分类筛选
+        if (_selectedCategory != 'all' && expense.category != _selectedCategory) {
+          continue;
+        }
+        total += expense.amount;
       }
-
-      final total = await ApiClient.sum(
-        'expenses',
-        column: 'amount',
-        filters: filters,
-      );
 
       if (mounted) {
         setState(() {
-          _totalAmount = total ?? 0.0;
+          _totalAmount = total;
           _isLoadingTotal = false;
         });
       }

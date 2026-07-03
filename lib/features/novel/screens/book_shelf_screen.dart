@@ -125,6 +125,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
 
       if (!result.isSuccess) {
         if (mounted) {
+          setState(() => _isLoading = false);
           showSnackBar(context, '加载书架失败: ${result.statusCode}');
         }
         return;

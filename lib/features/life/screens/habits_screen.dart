@@ -67,6 +67,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
       return;
     }
 
+    final isFirstPage = _offset == 0;
+
     if (refresh) {
       setState(() {
         _offset = 0;
@@ -76,7 +78,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         _reminderSchedules = {};
         _isLoading = true;
       });
-    } else if (_offset == 0) {
+    } else if (isFirstPage) {
       // 1. 先加载本地缓存（仅在初始第一页时）
       final cachedHabits = await CacheHelper.instance.loadList(CacheHelper.keyHabits);
       if (cachedHabits.isNotEmpty && mounted) {
@@ -166,7 +168,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       if (mounted) {
         setState(() {
-          if (refresh) {
+          if (refresh || isFirstPage) {
             _habits = items;
             _checkinHistory = history;
             _reminderSchedules = schedules;

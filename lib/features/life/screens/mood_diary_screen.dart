@@ -50,7 +50,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     try {
       await DictService.instance.initialize();
       await _loadCache();
-      await _loadDiaries();
+      await _loadDiaries(refresh: true);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ MoodDiaryScreen _initLoad 异常');

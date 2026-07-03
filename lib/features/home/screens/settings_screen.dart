@@ -7,7 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/api_client.dart';
 import '../../../services/chapter_cache_service.dart';
 import 'rich_text_page.dart';
-import '../../../services/data_export_service.dart';
+
 import '../../../services/version_check_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
@@ -223,13 +223,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
 
           // 数据管理
           const _SectionHeader(title: '数据管理'),
-          ListTile(
-            leading: const Icon(Icons.download_outlined),
-            title: const Text('数据导出'),
-            subtitle: const Text('导出消费、体重、心情数据'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showExportDialog(),
-          ),
           ListTile(
             leading: const Icon(Icons.cleaning_services_outlined),
             title: const Text('清除缓存'),
@@ -714,28 +707,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  Future<void> _showExportDialog() async {
-    if (!AuthService.instance.isAuthenticated) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录后再导出数据')),
-        );
-      }
-      return;
-    }
-    final result = await DataExportService.exportAndShare(type: DataExportService.typeAll);
-    if (mounted) {
-      if (result.success) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('数据导出成功，共${result.count}条记录')),
-        );
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出失败: ${result.error}')),
-        );
-      }
-    }
-  }
 }
 
 class _SectionHeader extends StatelessWidget {

@@ -48,7 +48,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
   Future<void> _initLoad() async {
     try {
       await _loadCache();
-      await _loadRecords();
+      await _loadRecords(refresh: true);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ WeightRecordScreen _initLoad 异常');
