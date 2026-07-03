@@ -397,7 +397,19 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
             child: _isLoading
                 ? const LoadingWidget()
                 : _records.isEmpty
-                    ? const EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录')
+                    ? RefreshIndicator(
+                        onRefresh: () => _loadRecords(refresh: true),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
+                                child: EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                     : RefreshIndicator(
                         onRefresh: () => _loadRecords(refresh: true),
                         child: ListView.builder(

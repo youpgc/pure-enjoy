@@ -505,7 +505,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
             child: _isLoading
                 ? const LoadingWidget()
                 : _expenses.isEmpty
-                    ? const EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录')
+                    ? RefreshIndicator(
+                        onRefresh: () => _loadExpenses(refresh: true),
+                        child: CustomScrollView(
+                          slivers: [
+                            SliverFillRemaining(
+                              hasScrollBody: false,
+                              child: Center(
+                                child: EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录'),
+                              ),
+                            ),
+                          ],
+                        ),
+                      )
                     : RefreshIndicator(
                         onRefresh: () => _loadExpenses(refresh: true),
                         child: ListView.builder(

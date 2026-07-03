@@ -18,3 +18,8 @@ supabase/
 .flutter-plugins*
 android/local.properties
 pubspec.lock
+
+# 构建产物和IDE配置
+build/
+.idea/
+android/.gradle/
