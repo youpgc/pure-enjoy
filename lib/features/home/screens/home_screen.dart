@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/theme_provider.dart';
@@ -2161,19 +2160,11 @@ class ProfilePage extends StatefulWidget {
 }
 
 class _ProfilePageState extends State<ProfilePage> {
-  String _currentVersion = '1.0.0';
-  String _latestVersion = '';
-  bool _hasUpdate = false;
-  bool _isForceUpdate = false;
-  String? _apkUrl;
-  String? _githubUrl;
   int _totalPoints = 0;
 
   @override
   void initState() {
     super.initState();
-    _loadCurrentVersion();
-    _checkVersion();
     _loadUserData();
   }
 
@@ -2186,97 +2177,6 @@ class _ProfilePageState extends State<ProfilePage> {
         _totalPoints = points;
       });
     }
-  }
-
-  /// 加载当前版本
-  Future<void> _loadCurrentVersion() async {
-    try {
-      final packageInfo = await PackageInfo.fromPlatform();
-      if (mounted) {
-        setState(() {
-          _currentVersion = '${packageInfo.version}+${packageInfo.buildNumber}';
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('获取版本信息失败');
-      }
-    }
-  }
-
-  /// 检查最新版本
-  Future<void> _checkVersion() async {
-    try {
-      final versionInfo = await VersionCheckService.instance.checkUpdate();
-      if (versionInfo != null && mounted) {
-        setState(() {
-          _latestVersion = versionInfo['version'] ?? '';
-          _hasUpdate = true;
-          _isForceUpdate = versionInfo['is_force_update'] == true;
-          _apkUrl = versionInfo['apk_url'];
-          _githubUrl = versionInfo['github_url'];
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('检查版本失败');
-      }
-    }
-  }
-
-  /// 显示版本信息对话框
-  void _showVersionDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('版本信息'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('当前版本: $_currentVersion'),
-            if (_hasUpdate) ...[
-              const SizedBox(height: 8),
-              Text('最新版本: $_latestVersion'),
-              if (_isForceUpdate)
-                Text(
-                  '【强制更新】',
-                  style: TextStyle(color: Theme.of(context).colorScheme.error, fontWeight: FontWeight.bold),
-                ),
-            ],
-          ],
-        ),
-        actions: [
-          if (_hasUpdate && _apkUrl != null)
-            FilledButton(
-              onPressed: () {
-                Navigator.pop(context);
-                _downloadAndInstall();
-              },
-              child: const Text('立即更新'),
-            ),
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 下载并安装APK（内部下载）
-  Future<void> _downloadAndInstall() async {
-    if (_apkUrl == null) return;
-
-    // 显示下载进度对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => _DownloadProgressDialog(
-        apkUrl: _apkUrl!,
-        fallbackUrl: _githubUrl,
-      ),
-    );
   }
 
   @override
@@ -2386,28 +2286,22 @@ class _ProfilePageState extends State<ProfilePage> {
             },
           ),
           
-          // 版本信息 - 带更新提示（保留在我的页面，方便查看）
+          // 版本信息
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
             title: const Text('版本信息'),
-            subtitle: Text('当前: $_currentVersion${_hasUpdate ? ' · 有新版本' : ''}'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_hasUpdate)
-                  Container(
-                    width: 8,
-                    height: 8,
-                    margin: const EdgeInsets.only(right: 8),
-                    decoration: BoxDecoration(
-                      color: colorScheme.error,
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: _showVersionDialog,
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () async {
+              final versionInfo = await VersionCheckService.instance.checkUpdate();
+              if (!context.mounted) return;
+              if (versionInfo != null) {
+                VersionCheckService.instance.showUpdateDialog(context, versionInfo);
+              } else {
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(content: Text('当前已是最新版本')),
+                );
+              }
+            },
           ),
           
           const Divider(),
@@ -2812,116 +2706,6 @@ class _ThemeModeTile extends StatelessWidget {
           ? Icon(Icons.check_circle, color: Theme.of(context).colorScheme.primary)
           : null,
       onTap: onTap,
-    );
-  }
-}
-
-/// 下载进度对话框
-class _DownloadProgressDialog extends StatefulWidget {
-  final String apkUrl;
-  final String? fallbackUrl;
-
-  const _DownloadProgressDialog({required this.apkUrl, this.fallbackUrl});
-
-  @override
-  State<_DownloadProgressDialog> createState() => _DownloadProgressDialogState();
-}
-
-class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
-  double _progress = 0;
-  String _status = '准备下载...';
-  bool _isComplete = false;
-  bool _hasError = false;
-
-  @override
-  void initState() {
-    super.initState();
-    _startDownload();
-  }
-
-  Future<void> _startDownload() async {
-    try {
-      final versionService = VersionCheckService.instance;
-
-      // 监听进度
-      versionService.downloadProgress.addListener(() {
-        if (mounted) {
-          setState(() {
-            _progress = versionService.downloadProgress.value;
-          });
-        }
-      });
-
-      // 监听状态
-      versionService.downloadStatus.addListener(() {
-        if (mounted) {
-          setState(() {
-            _status = versionService.downloadStatus.value;
-          });
-        }
-      });
-
-      // 开始下载和安装（优先 Gitee，失败回退 GitHub）
-      await versionService.downloadAndInstall(
-        context,
-        widget.apkUrl,
-        fallbackUrl: widget.fallbackUrl,
-      );
-
-      if (mounted) {
-        setState(() {
-          _isComplete = true;
-        });
-
-        // 延迟关闭对话框
-        Future.delayed(const Duration(seconds: 2), () {
-          if (mounted && Navigator.canPop(context)) {
-            Navigator.pop(context);
-          }
-        });
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _hasError = true;
-          _status = '更新失败: $e';
-        });
-      }
-    }
-  }
-
-  @override
-  Widget build(BuildContext context) {
-    return AlertDialog(
-      title: const Text('应用更新'),
-      content: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (!_isComplete && !_hasError) ...[
-            LinearProgressIndicator(value: _progress > 0 ? _progress : null),
-            const SizedBox(height: 16),
-          ],
-          Text(
-            _status,
-            textAlign: TextAlign.center,
-            style: TextStyle(
-              color: _hasError ? Theme.of(context).colorScheme.error : null,
-              fontWeight: _isComplete || _hasError ? FontWeight.bold : null,
-            ),
-          ),
-          if (_isComplete) ...[
-            const SizedBox(height: 8),
-            const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
-          ],
-        ],
-      ),
-      actions: [
-        if (_hasError || _isComplete)
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-      ],
     );
   }
 }

@@ -7,6 +7,7 @@ import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/reminder_model.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
 class RemindersScreen extends StatefulWidget {
@@ -356,17 +357,19 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 subtitle: Text(DateTimeUtils.formatStandard(_remindAt)),
                 trailing: const Icon(Icons.access_time),
                 onTap: () async {
-                  final date = await showDatePicker(
-                    context: context,
+                  final date = await AppDatePicker.show(
+                    context,
+                    type: DateTimeType.date,
                     initialDate: _remindAt,
-                    firstDate: DateTime.now(),
-                    lastDate: DateTime.now().add(const Duration(days: 365)),
+                    minDate: DateTime.now(),
+                    maxDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (date == null) return;
                   if (!mounted) return;
-                  final time = await showTimePicker(
-                    context: this.context,
-                    initialTime: TimeOfDay.fromDateTime(_remindAt),
+                  final time = await AppDatePicker.show(
+                    context,
+                    type: DateTimeType.time,
+                    initialDate: _remindAt,
                   );
                   if (time == null) return;
                   if (!mounted) return;

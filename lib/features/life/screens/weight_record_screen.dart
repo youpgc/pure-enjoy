@@ -11,6 +11,7 @@ import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/weight_record_model.dart';
 import 'weight_statistics_screen.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
@@ -657,11 +658,12 @@ class _RecordFormState extends State<_RecordForm> {
               title: const Text('日期'),
               trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
               onTap: () async {
-                final picked = await showDatePicker(
-                  context: context,
+                final picked = await AppDatePicker.show(
+                  context,
+                  type: DateTimeType.date,
                   initialDate: _selectedDate,
-                  firstDate: DateTime(2020),
-                  lastDate: DateTime.now(),
+                  minDate: DateTime(2020),
+                  maxDate: DateTime.now(),
                 );
                 if (picked != null) {
                   setState(() => _selectedDate = picked);

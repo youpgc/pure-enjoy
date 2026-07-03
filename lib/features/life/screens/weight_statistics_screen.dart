@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 体重统计页面
 class WeightStatisticsScreen extends StatefulWidget {
@@ -74,12 +75,13 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
   }
 
   Future<void> _pickStartMonth() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await AppDatePicker.show(
+      context,
+      type: DateTimeType.yearMonth,
       initialDate: _startMonth,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      helpText: '选择起始月份',
+      minDate: DateTime(2020),
+      maxDate: DateTime.now(),
+      title: '选择起始月份',
     );
     if (picked != null) {
       final newStart = DateTime(picked.year, picked.month);
@@ -98,12 +100,13 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
   }
 
   Future<void> _pickEndMonth() async {
-    final picked = await showDatePicker(
-      context: context,
+    final picked = await AppDatePicker.show(
+      context,
+      type: DateTimeType.yearMonth,
       initialDate: _endMonth,
-      firstDate: DateTime(2020),
-      lastDate: DateTime.now(),
-      helpText: '选择结束月份',
+      minDate: DateTime(2020),
+      maxDate: DateTime.now(),
+      title: '选择结束月份',
     );
     if (picked != null) {
       final newEnd = DateTime(picked.year, picked.month);

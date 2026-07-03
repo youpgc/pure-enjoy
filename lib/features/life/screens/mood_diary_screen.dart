@@ -11,6 +11,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/mood_diary_model.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
@@ -358,11 +359,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
+              final picked = await AppDatePicker.show(
+                context,
+                type: DateTimeType.yearMonth,
                 initialDate: _selectedMonth,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
+                minDate: DateTime(2020),
+                maxDate: DateTime.now(),
               );
               if (picked != null) {
                 setState(() => _selectedMonth = picked);
@@ -634,11 +636,12 @@ class _DiaryFormState extends State<_DiaryForm> {
             title: const Text('日期'),
             trailing: Text(DateTimeUtils.formatDate(_selectedDate)),
             onTap: () async {
-              final picked = await showDatePicker(
-                context: context,
+              final picked = await AppDatePicker.show(
+                context,
+                type: DateTimeType.date,
                 initialDate: _selectedDate,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
+                minDate: DateTime(2020),
+                maxDate: DateTime.now(),
               );
               if (picked != null) {
                 setState(() => _selectedDate = picked);

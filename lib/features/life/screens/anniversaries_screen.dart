@@ -10,6 +10,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
 class AnniversariesScreen extends StatefulWidget {
@@ -258,11 +259,12 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                         setDialogState(() => selectedDate = picked);
                       }
                     } else {
-                      final picked = await showDatePicker(
-                        context: dialogContext,
+                      final picked = await AppDatePicker.show(
+                        dialogContext,
+                        type: DateTimeType.date,
                         initialDate: selectedDate,
-                        firstDate: DateTime(1900),
-                        lastDate: DateTime(2100),
+                        minDate: DateTime(1900),
+                        maxDate: DateTime(2100),
                       );
                       if (picked != null) {
                         setDialogState(() => selectedDate = picked);
