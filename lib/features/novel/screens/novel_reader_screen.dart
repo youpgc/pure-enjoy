@@ -622,6 +622,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           body: {
             'last_chapter': chapterNum,
             'progress': progress,
+            'is_collected': true,
             'last_read_at': DateTime.now().toUtc().toIso8601String(),
           },
         );
@@ -638,6 +639,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             body: {
               'last_chapter': chapterNum,
               'progress': progress,
+              'is_collected': true,
               'last_read_at': DateTime.now().toUtc().toIso8601String(),
             },
           );
