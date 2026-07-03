@@ -23,40 +23,76 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
   Map<String, ReminderScheduleModel> _reminderSchedules = {};
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   bool? _filterStatus;
+  int _offset = 0;
+  final int _limit = 10;
+  final ScrollController _scrollController = ScrollController();
 
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadHabits();
   }
 
-  Future<void> _loadHabits() async {
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+      if (!_isLoading && !_isLoadingMore && _hasMore) {
+        _loadHabits();
+      }
+    }
+  }
+
+  Future<void> _loadHabits({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() {
         _habits = [];
         _checkinHistory = {};
+        _reminderSchedules = {};
         _isLoading = false;
+        _isLoadingMore = false;
       });
       return;
     }
 
-    // 1. 先加载本地缓存
-    final cachedHabits = await CacheHelper.instance.loadList(CacheHelper.keyHabits);
-    if (cachedHabits.isNotEmpty && mounted) {
+    if (refresh) {
       setState(() {
-        _habits = cachedHabits.map((e) => HabitModel.fromJson(e)).toList();
-        _checkinHistory = {}; // 缓存加载时重置打卡记录，避免显示旧状态
-        _isLoading = false;
+        _offset = 0;
+        _hasMore = true;
+        _habits = [];
+        _checkinHistory = {};
+        _reminderSchedules = {};
+        _isLoading = true;
       });
-    } else if (mounted) {
-      setState(() => _isLoading = true);
+    } else if (_offset == 0) {
+      // 1. 先加载本地缓存（仅在初始第一页时）
+      final cachedHabits = await CacheHelper.instance.loadList(CacheHelper.keyHabits);
+      if (cachedHabits.isNotEmpty && mounted) {
+        setState(() {
+          _habits = cachedHabits.map((e) => HabitModel.fromJson(e)).toList();
+          _checkinHistory = {}; // 缓存加载时重置打卡记录，避免显示旧状态
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoading = true);
+      }
+    } else {
+      setState(() => _isLoadingMore = true);
     }
 
-    // 2. 静默从网络刷新
+    // 2. 从网络分页加载
     try {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -69,6 +105,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
         'habits',
         filters: filters,
         order: 'is_active.desc',
+        limit: _limit,
+        offset: _offset,
       );
 
       if (!habitsResult.isSuccess) {
@@ -77,10 +115,13 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       final habitsData = habitsResult.data!;
       final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
-      // 保存习惯缓存
-      await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
 
-      // 并行加载打卡记录和提醒计划
+      // 仅第一页时保存缓存
+      if (_offset == 0) {
+        await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
+      }
+
+      // 并行加载打卡记录和提醒计划（分页）
       final history = <String, List<HabitCheckinModel>>{};
       final schedules = <String, ReminderScheduleModel>{};
       if (items.isNotEmpty) {
@@ -90,10 +131,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
             'habit_checkins',
             filters: {'habit_id': 'in.($habitIds)'},
             order: 'checkin_at.desc',
+            limit: _limit,
+            offset: _offset,
           ),
           ApiClient.get(
             'reminder_schedules',
             filters: {'habit_id': 'in.($habitIds)'},
+            limit: _limit,
+            offset: _offset,
           ),
         ]);
 
@@ -121,16 +166,31 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       if (mounted) {
         setState(() {
-          _habits = items;
-          _checkinHistory = history;
-          _reminderSchedules = schedules;
+          if (refresh) {
+            _habits = items;
+            _checkinHistory = history;
+            _reminderSchedules = schedules;
+          } else {
+            _habits.addAll(items);
+            _checkinHistory.addAll(history);
+            _reminderSchedules.addAll(schedules);
+          }
+          _offset += _limit;
+          _hasMore = items.length >= _limit;
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
-        _showError('加载习惯失败: $e');
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+        // 如果已有数据，静默失败不提示
+        if (_habits.isEmpty) {
+          _showError('加载习惯失败: $e');
+        }
       }
     }
   }
@@ -186,7 +246,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
       }
 
-      await _loadHabits();
+      await _loadHabits(refresh: true);
 
       // 显示成功提示
       ScaffoldMessenger.of(context).showSnackBar(
@@ -218,7 +278,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         );
 
         if (result.isSuccess) {
-          _loadHabits();
+          _loadHabits(refresh: true);
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }
@@ -362,7 +422,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   }
 
                   Navigator.pop(context);
-                  _loadHabits();
+                  _loadHabits(refresh: true);
                 } catch (e) {
                   _showError('保存失败: $e');
                 }
@@ -436,7 +496,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
               setState(() {
                 _filterStatus = value;
               });
-              _loadHabits();
+              _loadHabits(refresh: true);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -458,13 +518,35 @@ class _HabitsScreenState extends State<HabitsScreen> {
       body: _isLoading
           ? const LoadingWidget()
           : _habits.isEmpty
-              ? const EmptyWidget(icon: Icons.track_changes_outlined, message: '还没有习惯')
+              ? RefreshIndicator(
+                  onRefresh: () => _loadHabits(refresh: true),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      controller: _scrollController,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: const Center(
+                          child: EmptyWidget(icon: Icons.track_changes_outlined, message: '还没有习惯'),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
               : RefreshIndicator(
-                  onRefresh: _loadHabits,
+                  onRefresh: () => _loadHabits(refresh: true),
                   child: ListView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
-                    itemCount: _habits.length,
+                    itemCount: _habits.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
+                      if (index >= _habits.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
                       final habit = _habits[index];
                       final isCheckedIn = _isCheckedInToday(habit.id);
                       final totalCheckins = _getTotalCheckins(habit.id);

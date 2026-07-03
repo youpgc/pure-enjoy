@@ -18,11 +18,14 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
   List<Map<String, dynamic>> _expenses = [];
   bool _isLoading = true;
   String _error = '';
-  DateTime _selectedMonth = DateTime.now();
+  DateTime _startMonth = DateTime.now();
+  DateTime _endMonth = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    _startMonth = DateTime.now();
+    _endMonth = DateTime.now();
     _loadData();
   }
 
@@ -38,14 +41,14 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
     }
 
     try {
-      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final firstOfNextMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
+      final startOfRange = DateTime(_startMonth.year, _startMonth.month, 1);
+      final firstOfNextMonth = DateTime(_endMonth.year, _endMonth.month + 1, 1);
 
       final result = await ApiClient.get(
         'expenses',
         filters: {
           'user_id': 'eq.$userId',
-          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfMonth)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
+          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfRange)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
         },
         order: 'date.desc',
         limit: 500,
@@ -71,6 +74,67 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
     }
   }
 
+  Future<void> _pickStartMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startMonth,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: '选择起始月份',
+    );
+    if (picked != null) {
+      final newStart = DateTime(picked.year, picked.month);
+      // 限制最多6个月
+      final maxEnd = DateTime(newStart.year, newStart.month + 6, 0);
+      setState(() {
+        _startMonth = newStart;
+        if (_endMonth.isBefore(_startMonth)) {
+          _endMonth = _startMonth;
+        } else if (_endMonth.isAfter(maxEnd)) {
+          _endMonth = maxEnd;
+        }
+        _isLoading = true;
+      });
+      _loadData();
+    }
+  }
+
+  Future<void> _pickEndMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _endMonth,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: '选择结束月份',
+    );
+    if (picked != null) {
+      final newEnd = DateTime(picked.year, picked.month);
+      // 限制最多6个月
+      final minStart = DateTime(newEnd.year, newEnd.month - 5, 1);
+      setState(() {
+        _endMonth = newEnd;
+        if (_startMonth.isAfter(_endMonth)) {
+          _startMonth = _endMonth;
+        } else if (_startMonth.isBefore(minStart)) {
+          _startMonth = minStart;
+        }
+        _isLoading = true;
+      });
+      _loadData();
+    }
+  }
+
+  String get _rangeText {
+    final sameYear = _startMonth.year == _endMonth.year;
+    if (_startMonth.year == _endMonth.year && _startMonth.month == _endMonth.month) {
+      return '${_startMonth.year}年${_startMonth.month}月';
+    }
+    if (sameYear) {
+      return '${_startMonth.year}年${_startMonth.month}月 - ${_endMonth.month}月';
+    }
+    return '${_startMonth.year}年${_startMonth.month}月 - ${_endMonth.year}年${_endMonth.month}月';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -79,20 +143,9 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
         actions: [
           IconButton(
             icon: const Icon(Icons.calendar_month),
+            tooltip: '选择时间区间',
             onPressed: () async {
-              final picked = await showDatePicker(
-                context: context,
-                initialDate: _selectedMonth,
-                firstDate: DateTime(2020),
-                lastDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() {
-                  _selectedMonth = picked;
-                  _isLoading = true;
-                });
-                _loadData();
-              }
+              await _pickStartMonth();
             },
           ),
         ],
@@ -118,8 +171,29 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
             const Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
             const SizedBox(height: 16),
             Text(
-              '${_selectedMonth.year}年${_selectedMonth.month}月暂无消费记录',
+              '$_rangeText暂无消费记录',
               style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
+            ),
+            const SizedBox(height: 24),
+            // 时间区间选择按钮
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickStartMonth,
+                  icon: const Icon(Icons.date_range),
+                  label: Text('${_startMonth.year}-${_startMonth.month.toString().padLeft(2, '0')}'),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('至'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickEndMonth,
+                  icon: const Icon(Icons.date_range),
+                  label: Text('${_endMonth.year}-${_endMonth.month.toString().padLeft(2, '0')}'),
+                ),
+              ],
             ),
           ],
         ),
@@ -155,23 +229,47 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          // 月份标题
+          // 时间区间标题与选择
           Center(
-            child: Text(
-              '${_selectedMonth.year}年${_selectedMonth.month}月',
-              style: Theme.of(context).textTheme.titleMedium,
+            child: Column(
+              children: [
+                Text(
+                  _rangeText,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickStartMonth,
+                      icon: const Icon(Icons.date_range, size: 16),
+                      label: Text('${_startMonth.year}-${_startMonth.month.toString().padLeft(2, '0')}'),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('至'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickEndMonth,
+                      icon: const Icon(Icons.date_range, size: 16),
+                      label: Text('${_endMonth.year}-${_endMonth.month.toString().padLeft(2, '0')}'),
+                    ),
+                  ],
+                ),
+              ],
             ),
           ),
           const SizedBox(height: 16),
 
-          // 本月总消费
+          // 总消费
           Card(
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Column(
                 children: [
                   Text(
-                    '本月消费',
+                    '总消费',
                     style: Theme.of(context).textTheme.titleMedium,
                   ),
                   const SizedBox(height: 8),

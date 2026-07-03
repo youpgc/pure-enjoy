@@ -185,7 +185,8 @@ class _DashboardPageState extends State<DashboardPage> {
       final result = await ApiClient.get('habits',
           filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
           select: '*',
-          order: 'created_at.desc');
+          order: 'created_at.desc',
+          limit: 3);
 
       if (result.isSuccess) {
         final List data = result.data as List;
@@ -198,7 +199,8 @@ class _DashboardPageState extends State<DashboardPage> {
           final checkinsResult = await ApiClient.get('habit_checkins',
               filters: {'habit_id': 'in.(${habitIds.join(",")})'},
               select: '*',
-              order: 'checkin_at.desc');
+              order: 'checkin_at.desc',
+              limit: 3);
 
           if (checkinsResult.isSuccess) {
             final List checkinsData = checkinsResult.data as List;

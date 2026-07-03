@@ -708,7 +708,7 @@ class _NovelListForAddScreen extends StatefulWidget {
   State<_NovelListForAddScreen> createState() => _NovelListForAddScreenState();
 }
 
-class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
+class _NovelListForAddScreenState extends State<_NovelListForAddScreen> with PaginatedListMixin {
   List<Map<String, dynamic>> _novels = [];
   Set<String> _addedNovelIds = {};
   Set<String> _addingNovelIds = {};
@@ -731,12 +731,26 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
+    _loadData();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
     _loadData();
   }
 
   /// 加载公共小说列表和用户已添加的书架数据
-  Future<void> _loadData() async {
-    setState(() => _isLoading = true);
+  Future<void> _loadData({bool refresh = false}) async {
+    if (refresh) {
+      setState(() => _isLoading = true);
+    }
 
     try {
       final userId = _userId;
@@ -745,13 +759,21 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         return;
       }
 
-      // 并行请求：公共小说列表 + 用户已添加的书架
+      if (refresh) {
+        resetPagination();
+      }
+      if (!refresh && !beginLoadMore()) return;
+
+      final (limit, offset) = paginationParams;
+
+      // 并行请求：公共小说列表（分页）+ 用户已添加的书架（全部）
       final novelsFuture = ApiClient.get(
         'novels',
         filters: {'user_id': 'is.null'},
         columns: 'id,title,author,cover_url,category,description,chapter_count,word_count,status',
         order: 'created_at.desc',
-        limit: 200,
+        limit: limit,
+        offset: offset,
       );
       final shelfFuture = ApiClient.get(
         'user_novels',
@@ -760,7 +782,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
           'is_collected': 'eq.true',
         },
         columns: 'novel_id',
-        limit: 200,
+        limit: 1000,
       );
 
       final results = await Future.wait([novelsFuture, shelfFuture]);
@@ -770,7 +792,12 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
       if (novelsResult.isSuccess) {
         final novelsData = novelsResult.data!;
         setState(() {
-          _novels = novelsData.cast<Map<String, dynamic>>();
+          if (refresh) {
+            _novels = novelsData.cast<Map<String, dynamic>>();
+          } else {
+            _novels.addAll(novelsData.cast<Map<String, dynamic>>());
+          }
+          onPaginationDataLoaded(novelsData.length);
         });
       }
 
@@ -869,45 +896,62 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> {
         ],
       ),
       body: _isLoading
-          ? Center(child: LoadingWidget())
+          ? const Center(child: LoadingWidget())
           : _filteredNovels.isEmpty
-              ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(
-                        Icons.menu_book_outlined,
-                        size: 64,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(height: 16),
-                      Text(
-                        '暂无可添加的小说',
-                        style: TextStyle(
-                          fontSize: 16,
-                          color: colorScheme.onSurfaceVariant,
+              ? RefreshIndicator(
+                  onRefresh: () => _loadData(refresh: true),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Icon(
+                                Icons.menu_book_outlined,
+                                size: 64,
+                                color: colorScheme.onSurfaceVariant,
+                              ),
+                              const SizedBox(height: 16),
+                              Text(
+                                '暂无可添加的小说',
+                                style: TextStyle(
+                                  fontSize: 16,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ),
+                            ],
+                          ),
                         ),
                       ),
                     ],
                   ),
                 )
-              : ListView.separated(
-                  itemCount: _filteredNovels.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, index) {
-                    final novel = _filteredNovels[index];
-                    final novelId = novel['id'].toString();
-                    final isAdded = _addedNovelIds.contains(novelId);
-                    final isAdding = _addingNovelIds.contains(novelId);
+              : RefreshIndicator(
+                  onRefresh: () => _loadData(refresh: true),
+                  child: ListView.separated(
+                    controller: scrollController,
+                    itemCount: _filteredNovels.length + 1,
+                    separatorBuilder: (_, __) => const Divider(height: 1),
+                    itemBuilder: (context, index) {
+                      if (index == _filteredNovels.length) {
+                        return buildLoadMoreIndicator();
+                      }
+                      final novel = _filteredNovels[index];
+                      final novelId = novel['id'].toString();
+                      final isAdded = _addedNovelIds.contains(novelId);
+                      final isAdding = _addingNovelIds.contains(novelId);
 
-                    return _NovelListItem(
-                      novel: novel,
-                      colorScheme: colorScheme,
-                      isAdded: isAdded,
-                      isAdding: isAdding,
-                      onAdd: () => _addToBookshelf(novelId),
-                    );
-                  },
+                      return _NovelListItem(
+                        novel: novel,
+                        colorScheme: colorScheme,
+                        isAdded: isAdded,
+                        isAdding: isAdding,
+                        onAdd: () => _addToBookshelf(novelId),
+                      );
+                    },
+                  ),
                 ),
     );
   }

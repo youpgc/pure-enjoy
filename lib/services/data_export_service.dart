@@ -8,6 +8,7 @@ import 'api_client.dart';
 import 'supabase_service.dart';
 
 /// 数据导出服务
+@deprecated
 class DataExportService {
   /// 导出类型
   static const String typeExpenses = 'expenses';

@@ -17,10 +17,14 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
   List<Map<String, dynamic>> _records = [];
   bool _isLoading = true;
   String _error = '';
+  DateTime _startMonth = DateTime.now();
+  DateTime _endMonth = DateTime.now();
 
   @override
   void initState() {
     super.initState();
+    _startMonth = DateTime.now();
+    _endMonth = DateTime.now();
     _loadData();
   }
 
@@ -36,12 +40,17 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
     }
 
     try {
-      // 获取最近30条记录
+      final startOfRange = DateTime(_startMonth.year, _startMonth.month, 1);
+      final firstOfNextMonth = DateTime(_endMonth.year, _endMonth.month + 1, 1);
+
       final result = await ApiClient.get(
         'weight_records',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfRange)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
+        },
         order: 'date.desc',
-        limit: 30,
+        limit: 500,
       );
 
       if (result.isSuccess) {
@@ -64,11 +73,79 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
     }
   }
 
+  Future<void> _pickStartMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _startMonth,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: '选择起始月份',
+    );
+    if (picked != null) {
+      final newStart = DateTime(picked.year, picked.month);
+      final maxEnd = DateTime(newStart.year, newStart.month + 6, 0);
+      setState(() {
+        _startMonth = newStart;
+        if (_endMonth.isBefore(_startMonth)) {
+          _endMonth = _startMonth;
+        } else if (_endMonth.isAfter(maxEnd)) {
+          _endMonth = maxEnd;
+        }
+        _isLoading = true;
+      });
+      _loadData();
+    }
+  }
+
+  Future<void> _pickEndMonth() async {
+    final picked = await showDatePicker(
+      context: context,
+      initialDate: _endMonth,
+      firstDate: DateTime(2020),
+      lastDate: DateTime.now(),
+      helpText: '选择结束月份',
+    );
+    if (picked != null) {
+      final newEnd = DateTime(picked.year, picked.month);
+      final minStart = DateTime(newEnd.year, newEnd.month - 5, 1);
+      setState(() {
+        _endMonth = newEnd;
+        if (_startMonth.isAfter(_endMonth)) {
+          _startMonth = _endMonth;
+        } else if (_startMonth.isBefore(minStart)) {
+          _startMonth = minStart;
+        }
+        _isLoading = true;
+      });
+      _loadData();
+    }
+  }
+
+  String get _rangeText {
+    final sameYear = _startMonth.year == _endMonth.year;
+    if (_startMonth.year == _endMonth.year && _startMonth.month == _endMonth.month) {
+      return '${_startMonth.year}年${_startMonth.month}月';
+    }
+    if (sameYear) {
+      return '${_startMonth.year}年${_startMonth.month}月 - ${_endMonth.month}月';
+    }
+    return '${_startMonth.year}年${_startMonth.month}月 - ${_endMonth.year}年${_endMonth.month}月';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('体重统计'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.calendar_month),
+            tooltip: '选择时间区间',
+            onPressed: () async {
+              await _pickStartMonth();
+            },
+          ),
+        ],
       ),
       body: _buildBody(),
     );
@@ -84,15 +161,35 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
     }
 
     if (_records.isEmpty) {
-      return const Center(
+      return Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Icon(Icons.monitor_weight_outlined, size: 64, color: Colors.grey),
-            SizedBox(height: 16),
+            const Icon(Icons.monitor_weight_outlined, size: 64, color: Colors.grey),
+            const SizedBox(height: 16),
             Text(
-              '暂无体重记录',
-              style: TextStyle(color: Colors.grey, fontSize: 16),
+              '$_rangeText暂无体重记录',
+              style: const TextStyle(color: Colors.grey, fontSize: 16),
+            ),
+            const SizedBox(height: 24),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                OutlinedButton.icon(
+                  onPressed: _pickStartMonth,
+                  icon: const Icon(Icons.date_range),
+                  label: Text('${_startMonth.year}-${_startMonth.month.toString().padLeft(2, '0')}'),
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(horizontal: 8),
+                  child: Text('至'),
+                ),
+                OutlinedButton.icon(
+                  onPressed: _pickEndMonth,
+                  icon: const Icon(Icons.date_range),
+                  label: Text('${_endMonth.year}-${_endMonth.month.toString().padLeft(2, '0')}'),
+                ),
+              ],
             ),
           ],
         ),
@@ -120,6 +217,39 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          // 时间区间标题与选择
+          Center(
+            child: Column(
+              children: [
+                Text(
+                  _rangeText,
+                  style: Theme.of(context).textTheme.titleMedium,
+                ),
+                const SizedBox(height: 8),
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    OutlinedButton.icon(
+                      onPressed: _pickStartMonth,
+                      icon: const Icon(Icons.date_range, size: 16),
+                      label: Text('${_startMonth.year}-${_startMonth.month.toString().padLeft(2, '0')}'),
+                    ),
+                    const Padding(
+                      padding: EdgeInsets.symmetric(horizontal: 8),
+                      child: Text('至'),
+                    ),
+                    OutlinedButton.icon(
+                      onPressed: _pickEndMonth,
+                      icon: const Icon(Icons.date_range, size: 16),
+                      label: Text('${_endMonth.year}-${_endMonth.month.toString().padLeft(2, '0')}'),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 16),
+
           // 统计卡片
           Row(
             children: [

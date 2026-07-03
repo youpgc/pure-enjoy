@@ -175,18 +175,19 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               _saveBoolSetting(_wifiOnlyKey, val);
             },
           ),
-          ListTile(
-            leading: const Icon(Icons.cloud_sync_outlined),
-            title: const Text('数据同步'),
-            subtitle: const Text('手动同步数据到云端'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const DataSyncScreen()),
-              );
-            },
-          ),
+          // 数据同步入口暂不使用
+          // ListTile(
+          //   leading: const Icon(Icons.cloud_sync_outlined),
+          //   title: const Text('数据同步'),
+          //   subtitle: const Text('手动同步数据到云端'),
+          //   trailing: const Icon(Icons.chevron_right),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (_) => const DataSyncScreen()),
+          //     );
+          //   },
+          // ),
 
           // 通知设置
           const _SectionHeader(title: '通知设置'),

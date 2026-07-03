@@ -21,38 +21,71 @@ class FavoritesScreen extends StatefulWidget {
 class _FavoritesScreenState extends State<FavoritesScreen> {
   List<FavoriteModel> _favorites = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   String? _selectedCategory;
+  int _offset = 0;
+  final int _limit = 10;
+  final ScrollController _scrollController = ScrollController();
 
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadFavorites();
   }
 
-  Future<void> _loadFavorites() async {
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+      if (!_isLoading && !_isLoadingMore && _hasMore) {
+        _loadFavorites();
+      }
+    }
+  }
+
+  Future<void> _loadFavorites({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() {
         _favorites = [];
         _isLoading = false;
+        _isLoadingMore = false;
       });
       return;
     }
 
-    // 1. 先加载本地缓存
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
-    if (cached.isNotEmpty && mounted) {
+    if (refresh) {
       setState(() {
-        _favorites = cached.map((e) => FavoriteModel.fromJson(e)).toList();
-        _isLoading = false;
+        _offset = 0;
+        _hasMore = true;
+        _favorites = [];
+        _isLoading = true;
       });
-    } else if (mounted) {
-      setState(() => _isLoading = true);
+    } else if (_offset == 0) {
+      // 1. 先加载本地缓存（仅在初始第一页时）
+      final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _favorites = cached.map((e) => FavoriteModel.fromJson(e)).toList();
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoading = true);
+      }
+    } else {
+      setState(() => _isLoadingMore = true);
     }
 
-    // 2. 静默从网络刷新
+    // 2. 从网络分页加载
     try {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -66,17 +99,28 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         'user_favorites',
         filters: filters,
         order: 'created_at.desc',
+        limit: _limit,
+        offset: _offset,
       );
 
       if (result.isSuccess) {
         final data = result.data!;
         final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
-        // 保存缓存
-        await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
+        // 仅第一页时保存缓存
+        if (_offset == 0) {
+          await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
+        }
         if (mounted) {
           setState(() {
-            _favorites = items;
+            if (refresh) {
+              _favorites = items;
+            } else {
+              _favorites.addAll(items);
+            }
+            _offset += _limit;
+            _hasMore = items.length >= _limit;
             _isLoading = false;
+            _isLoadingMore = false;
           });
         }
       } else {
@@ -84,7 +128,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       }
     } catch (e) {
       if (mounted) {
-        setState(() => _isLoading = false);
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
         // 如果已有缓存数据，静默失败不提示
         if (_favorites.isEmpty) {
           _showError('加载收藏失败: $e');
@@ -129,7 +176,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         );
 
         if (result.isSuccess) {
-          _loadFavorites();
+          _loadFavorites(refresh: true);
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }
@@ -283,7 +330,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                     }
                   }
                   Navigator.pop(context);
-                  _loadFavorites();
+                  _loadFavorites(refresh: true);
                 } catch (e) {
                   _showError('保存失败: $e');
                 } finally {
@@ -313,7 +360,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
             tooltip: '筛选',
             onSelected: (value) {
               setState(() => _selectedCategory = value);
-              _loadFavorites();
+              _loadFavorites(refresh: true);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
@@ -331,14 +378,36 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       body: _isLoading
           ? const LoadingWidget()
           : _favorites.isEmpty
-              ? const EmptyWidget(icon: Icons.bookmark_border, message: '暂无收藏')
+              ? RefreshIndicator(
+                  onRefresh: () => _loadFavorites(refresh: true),
+                  child: LayoutBuilder(
+                    builder: (context, constraints) => SingleChildScrollView(
+                      physics: const AlwaysScrollableScrollPhysics(),
+                      controller: _scrollController,
+                      child: ConstrainedBox(
+                        constraints: BoxConstraints(minHeight: constraints.maxHeight),
+                        child: const Center(
+                          child: EmptyWidget(icon: Icons.bookmark_border, message: '暂无收藏'),
+                        ),
+                      ),
+                    ),
+                  ),
+                )
               : RefreshIndicator(
-                  onRefresh: _loadFavorites,
+                  onRefresh: () => _loadFavorites(refresh: true),
                   child: ListView.builder(
+                    controller: _scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
-                    itemCount: _favorites.length,
+                    itemCount: _favorites.length + (_isLoadingMore ? 1 : 0),
                     itemBuilder: (context, index) {
-                    final favorite = _favorites[index];
+                      if (index >= _favorites.length) {
+                        return const Padding(
+                          padding: EdgeInsets.all(16),
+                          child: Center(child: CircularProgressIndicator()),
+                        );
+                      }
+                      final favorite = _favorites[index];
                     final categoryLabel = DictService.instance.getLabelOrDefault('favorite_category', favorite.category ?? '', defaultValue: favorite.category ?? '其他');
 
                     return Card(

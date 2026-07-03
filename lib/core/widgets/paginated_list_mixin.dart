@@ -37,7 +37,7 @@ mixin PaginatedListMixin<T extends StatefulWidget> on State<T> {
 
   /// 初始化分页（在 initState 中调用）
   void initPagination() {
-    _scrollController?.addListener(_onScroll);
+    scrollController.addListener(_onScroll);
   }
 
   /// 释放分页资源（在 dispose 中调用）

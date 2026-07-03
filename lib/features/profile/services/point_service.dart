@@ -6,6 +6,11 @@ import '../../../services/api_client.dart';
 import '../models/point_record_model.dart';
 
 /// 积分服务
+///
+/// 核心变更：
+/// - 连续打卡天数改为读取 users.consecutive_checkin_days / last_checkin_date
+/// - 有效/可用/即将过期积分改为读取 users 表统计字段，不再全量查询 point_records
+/// - 积分变动时同步更新 users 表统计字段
 class PointService {
   static PointService? _instance;
 
@@ -46,6 +51,55 @@ class PointService {
     return today.add(const Duration(days: 1));
   }
 
+  /// 从 users 表获取用户统计字段
+  Future<Map<String, dynamic>?> _fetchUserStats() async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return null;
+    final result = await ApiClient.get(
+      'users',
+      filters: {'id': 'eq.$userId'},
+      columns: 'consecutive_checkin_days,last_checkin_date,effective_points,available_points,expiring_points,points',
+      limit: 1,
+    );
+    if (result.isSuccess && result.data!.isNotEmpty) {
+      return result.data![0];
+    }
+    return null;
+  }
+
+  /// 更新 users 表统计字段
+  Future<void> _updateUserStats({
+    int? consecutiveCheckinDays,
+    DateTime? lastCheckinDate,
+    int? effectivePoints,
+    int? availablePoints,
+    int? expiringPoints,
+    int? points,
+  }) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return;
+
+    final body = <String, dynamic>{};
+    if (consecutiveCheckinDays != null) {
+      body['consecutive_checkin_days'] = consecutiveCheckinDays;
+    }
+    if (lastCheckinDate != null) {
+      body['last_checkin_date'] = lastCheckinDate.toIso8601String().split('T').first;
+    }
+    if (effectivePoints != null) body['effective_points'] = effectivePoints;
+    if (availablePoints != null) body['available_points'] = availablePoints;
+    if (expiringPoints != null) body['expiring_points'] = expiringPoints;
+    if (points != null) body['points'] = points;
+
+    if (body.isNotEmpty) {
+      await ApiClient.patchByFilter(
+        'users',
+        filters: {'id': 'eq.$userId'},
+        body: body,
+      );
+    }
+  }
+
   /// 打卡获得积分
   Future<Map<String, dynamic>> checkin() async {
     try {
@@ -56,7 +110,6 @@ class PointService {
 
       final today = _beijingToday();
       final tomorrow = _beijingTomorrow();
-      final yesterday = _beijingYesterday();
 
       // 1. 查询用户今天是否已打卡
       final todayResult = await ApiClient.get(
@@ -76,77 +129,26 @@ class PointService {
         }
       }
 
-      // 2. 查询最近一次打卡记录，计算连续打卡天数
+      // 2. 读取 users 表连续打卡信息
+      final stats = await _fetchUserStats();
       int streak = 1;
-      final lastResult = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'type': 'eq.checkin',
-        },
-        columns: 'created_at',
-        order: 'created_at.desc',
-        limit: 1,
-      );
+      if (stats != null && stats['last_checkin_date'] != null) {
+        final lastDateStr = stats['last_checkin_date'] as String;
+        final lastDate = DateTime.parse(lastDateStr);
+        final yesterday = _beijingYesterday();
 
-      if (lastResult.isSuccess) {
-        final lastRecords = lastResult.data!;
-        if (lastRecords.isNotEmpty) {
-          final lastCreatedAt = DateTime.parse(lastRecords[0]['created_at']);
-
-          // 转换为北京时间日期进行比较
-          _ensureTimezone();
-          final beijing = tz.getLocation('Asia/Shanghai');
-          final lastBeijing = tz.TZDateTime.from(lastCreatedAt, beijing);
-          final lastDate = DateTime(lastBeijing.year, lastBeijing.month, lastBeijing.day);
-
-          // 判断最近一次打卡是否是昨天
-          if (lastDate.year == yesterday.year &&
-              lastDate.month == yesterday.month &&
-              lastDate.day == yesterday.day) {
-            // 最近一次是昨天，今天打卡后连续天数 = 已有连续天数 + 1
-            // 查询所有打卡记录，计算已有连续天数
-            final streakResult = await ApiClient.get(
-              'point_records',
-              filters: {
-                'user_id': 'eq.$userId',
-                'type': 'eq.checkin',
-              },
-              columns: 'created_at',
-              order: 'created_at.desc',
-            );
-
-            if (streakResult.isSuccess) {
-              final allCheckins = streakResult.data!;
-              // 从昨天的记录开始，向前统计连续天数
-              int consecutiveDays = 1; // 昨天是第1天
-              for (int i = 1; i < allCheckins.length; i++) {
-                final prev = tz.TZDateTime.from(
-                  DateTime.parse(allCheckins[i - 1]['created_at']),
-                  beijing,
-                );
-                final curr = tz.TZDateTime.from(
-                  DateTime.parse(allCheckins[i]['created_at']),
-                  beijing,
-                );
-                final prevDate = DateTime(prev.year, prev.month, prev.day);
-                final currDate = DateTime(curr.year, curr.month, curr.day);
-                final diff = prevDate.difference(currDate).inDays;
-                if (diff == 1) {
-                  consecutiveDays++;
-                } else {
-                  break;
-                }
-              }
-              // 今天打卡后，连续天数 = 已有连续天数 + 今天
-              streak = consecutiveDays + 1;
-            }
-          } else if (lastDate.isAtSameMomentAs(today)) {
-            // 今天已经打过卡（双重检查）
-            return {'success': false, 'message': '今天已打卡'};
-          }
-          // 否则不是昨天，streak 保持为 1（今天首次打卡）
+        if (lastDate.year == yesterday.year &&
+            lastDate.month == yesterday.month &&
+            lastDate.day == yesterday.day) {
+          // 昨天打卡了，连续天数 +1
+          streak = (stats['consecutive_checkin_days'] as num?)?.toInt() ?? 0;
+          streak += 1;
+        } else if (lastDate.year == today.year &&
+            lastDate.month == today.month &&
+            lastDate.day == today.day) {
+          return {'success': false, 'message': '今天已打卡'};
         }
+        // 否则断签，streak 保持为 1（今天首次打卡）
       }
 
       // 3. 计算积分 = min(连续天数, 7)
@@ -176,29 +178,21 @@ class PointService {
         return {'success': false, 'message': '打卡失败，请重试'};
       }
 
-      // 5. 从数据库查询实际积分，避免缓存不一致导致数据覆盖
-      final userResult = await ApiClient.get(
-        'users',
-        filters: {'id': 'eq.$userId'},
-        columns: 'points',
-        limit: 1,
-      );
-      final currentPoints = (userResult.isSuccess && userResult.data!.isNotEmpty)
-          ? (userResult.data![0]['points'] as num?)?.toInt() ?? 0
-          : 0;
-      final updateResult = await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$userId'},
-        body: {
-          'points': currentPoints + points,
-        },
-      );
+      // 5. 更新 users 表统计字段
+      final currentPoints = (stats?['points'] as num?)?.toInt() ?? 0;
+      final currentEffective = (stats?['effective_points'] as num?)?.toInt() ?? 0;
+      final currentAvailable = (stats?['available_points'] as num?)?.toInt() ?? 0;
+      final newPoints = currentPoints + points;
+      final newEffective = currentEffective + points;
+      final newAvailable = currentAvailable + points;
 
-      if (!updateResult.isSuccess) {
-        if (kDebugMode) {
-          debugPrint('更新用户积分失败');
-        }
-      }
+      await _updateUserStats(
+        consecutiveCheckinDays: streak,
+        lastCheckinDate: today,
+        effectivePoints: newEffective,
+        availablePoints: newAvailable,
+        points: newPoints,
+      );
 
       // 6. 更新 AuthService 中的用户缓存
       await AuthService.instance.reloadCurrentUser();
@@ -211,7 +205,7 @@ class PointService {
       };
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('打卡失败');
+        debugPrint('打卡失败: $e');
       }
       return {'success': false, 'message': '打卡失败: $e'};
     }
@@ -248,39 +242,10 @@ class PointService {
     }
   }
 
-  /// 从 point_records 计算用户有效积分总和（排除过期）
+  /// 获取用户有效积分总和（直接从 users 表读取）
   Future<int> fetchTotalPoints() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) return 0;
-
-      final now = DateTime.now().toUtc();
-      final result = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'status': 'eq.active',
-          'or': '(expires_at.is.null,expires_at.gt.${now.toIso8601String()})',
-        },
-        columns: 'amount',
-      );
-
-      if (result.isSuccess) {
-        final records = result.data!;
-        int total = 0;
-        for (final record in records) {
-          total += (record['amount'] as num?)?.toInt() ?? 0;
-        }
-        return total;
-      }
-
-      return 0;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('获取用户总积分失败');
-      }
-      return 0;
-    }
+    final stats = await _fetchUserStats();
+    return (stats?['effective_points'] as num?)?.toInt() ?? 0;
   }
 
   /// 从 AuthService 获取用户总积分（兼容旧代码）
@@ -288,74 +253,60 @@ class PointService {
     return AuthService.instance.currentPoints ?? 0;
   }
 
-  /// 查询30天内即将过期的积分总数
+  /// 查询30天内即将过期的积分总数（直接从 users 表读取）
   Future<int> getExpiringSoonPoints() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) return 0;
-
-      final now = DateTime.now().toUtc();
-      final thirtyDaysLater = now.add(const Duration(days: 30));
-      final result = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'status': 'eq.active',
-          'and': '(expires_at.gte.${now.toIso8601String()},expires_at.lte.${thirtyDaysLater.toIso8601String()})',
-        },
-        columns: 'amount',
-      );
-
-      if (result.isSuccess) {
-        final records = result.data!;
-        int total = 0;
-        for (final record in records) {
-          total += (record['amount'] as num?)?.toInt() ?? 0;
-        }
-        return total;
-      }
-
-      return 0;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('获取即将过期积分失败');
-      }
-      return 0;
-    }
+    final stats = await _fetchUserStats();
+    return (stats?['expiring_points'] as num?)?.toInt() ?? 0;
   }
 
-  /// 查询用户可用积分（排除过期）
+  /// 查询用户可用积分（直接从 users 表读取）
   Future<int> getAvailablePoints() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) return 0;
+    final stats = await _fetchUserStats();
+    return (stats?['available_points'] as num?)?.toInt() ?? 0;
+  }
 
-      final now = DateTime.now().toUtc();
-      final result = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'status': 'eq.active',
-          'or': '(expires_at.is.null,expires_at.gt.${now.toIso8601String()})',
-        },
-        columns: 'amount',
-      );
+  /// 积分变动时更新 users 表统计字段（供其他模块调用）
+  /// 
+  /// [delta] 变动值（正数增加，负数减少）
+  /// [type] 变动类型：'earn' | 'consume' | 'expire'
+  Future<void> updatePointsStats({required int delta, required String type}) async {
+    final stats = await _fetchUserStats();
+    if (stats == null) return;
 
-      if (result.isSuccess) {
-        final records = result.data!;
-        int total = 0;
-        for (final record in records) {
-          total += (record['amount'] as num?)?.toInt() ?? 0;
-        }
-        return total;
-      }
+    final currentEffective = (stats['effective_points'] as num?)?.toInt() ?? 0;
+    final currentAvailable = (stats['available_points'] as num?)?.toInt() ?? 0;
+    final currentPoints = (stats['points'] as num?)?.toInt() ?? 0;
 
-      return 0;
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('获取可用积分失败');
-      }
-      return 0;
+    int newEffective = currentEffective;
+    int newAvailable = currentAvailable;
+    int newPoints = currentPoints;
+
+    switch (type) {
+      case 'earn':
+        newEffective += delta;
+        newAvailable += delta;
+        newPoints += delta;
+        break;
+      case 'consume':
+        newAvailable -= delta;
+        newPoints -= delta;
+        break;
+      case 'expire':
+        newEffective -= delta;
+        newAvailable -= delta;
+        newPoints -= delta;
+        break;
     }
+
+    // 确保不为负数
+    newEffective = newEffective < 0 ? 0 : newEffective;
+    newAvailable = newAvailable < 0 ? 0 : newAvailable;
+    newPoints = newPoints < 0 ? 0 : newPoints;
+
+    await _updateUserStats(
+      effectivePoints: newEffective,
+      availablePoints: newAvailable,
+      points: newPoints,
+    );
   }
 }

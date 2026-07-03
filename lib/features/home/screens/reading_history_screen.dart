@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../novel/screens/novel_detail_screen.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../constants/app_constants.dart';
@@ -13,7 +14,7 @@ class ReadingHistoryScreen extends StatefulWidget {
   State<ReadingHistoryScreen> createState() => _ReadingHistoryScreenState();
 }
 
-class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
+class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with PaginatedListMixin {
   List<Map<String, dynamic>> _history = [];
   bool _isLoading = true;
 
@@ -22,11 +23,26 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
     _loadHistory();
   }
 
-  Future<void> _loadHistory() async {
-    setState(() => _isLoading = true);
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
+    _loadHistory();
+  }
+
+  Future<void> _loadHistory({bool refresh = false}) async {
+    if (refresh) {
+      setState(() => _isLoading = true);
+    }
+
     try {
       final userId = _userId;
       if (userId == null) {
@@ -34,18 +50,31 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
         return;
       }
 
+      if (refresh) {
+        resetPagination();
+      }
+      if (!refresh && !beginLoadMore()) return;
+
+      final (limit, offset) = paginationParams;
+
       final result = await ApiClient.get(
         'user_novels',
         filters: {'user_id': 'eq.$userId'},
         order: 'last_read_at.desc',
-        limit: 50,
+        limit: limit,
+        offset: offset,
       );
 
       if (result.isSuccess) {
         final data = result.data!;
         setState(() {
-          _history = data.cast<Map<String, dynamic>>();
+          if (refresh) {
+            _history = data.cast<Map<String, dynamic>>();
+          } else {
+            _history.addAll(data.cast<Map<String, dynamic>>());
+          }
           _isLoading = false;
+          onPaginationDataLoaded(data.length);
         });
       } else {
         setState(() => _isLoading = false);
@@ -121,8 +150,21 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
       body: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : _history.isEmpty
-              ? _buildEmptyView()
-              : _buildHistoryList(),
+              ? RefreshIndicator(
+                  onRefresh: () => _loadHistory(refresh: true),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: _buildEmptyView(),
+                      ),
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () => _loadHistory(refresh: true),
+                  child: _buildHistoryList(),
+                ),
     );
   }
 
@@ -159,8 +201,12 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> {
 
   Widget _buildHistoryList() {
     return ListView.builder(
-      itemCount: _history.length,
+      controller: scrollController,
+      itemCount: _history.length + 1,
       itemBuilder: (context, index) {
+        if (index == _history.length) {
+          return buildLoadMoreIndicator();
+        }
         final item = _history[index];
         final novelData = item['novels'] as Map<String, dynamic>? ?? {};
         final title = novelData['title'] ?? '未知小说';

@@ -15,27 +15,64 @@ class NotificationCenterScreen extends StatefulWidget {
 class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   List<Map<String, dynamic>> _notifications = [];
   bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
   String? _error;
+  int _offset = 0;
+  final int _limit = 10;
+  final ScrollController _scrollController = ScrollController();
 
   String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
     super.initState();
+    _scrollController.addListener(_onScroll);
     _loadNotifications();
   }
 
-  Future<void> _loadNotifications() async {
-    setState(() {
-      _isLoading = true;
-      _error = null;
-    });
+  @override
+  void dispose() {
+    _scrollController.removeListener(_onScroll);
+    _scrollController.dispose();
+    super.dispose();
+  }
+
+  void _onScroll() {
+    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 100) {
+      if (!_isLoading && !_isLoadingMore && _hasMore) {
+        _loadNotifications();
+      }
+    }
+  }
+
+  Future<void> _loadNotifications({bool refresh = false}) async {
+    if (refresh) {
+      setState(() {
+        _offset = 0;
+        _hasMore = true;
+        _notifications = [];
+        _isLoading = true;
+        _error = null;
+      });
+    } else if (_offset == 0) {
+      setState(() {
+        _isLoading = true;
+        _error = null;
+      });
+    } else {
+      setState(() {
+        _isLoadingMore = true;
+      });
+    }
+
     try {
       final userId = _userId;
       if (userId == null) {
         setState(() {
           _notifications = [];
           _isLoading = false;
+          _isLoadingMore = false;
         });
         return;
       }
@@ -44,24 +81,36 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         'notifications',
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
+        limit: _limit,
+        offset: _offset,
       );
 
       if (result.isSuccess) {
         final data = result.data!;
+        final newItems = data.cast<Map<String, dynamic>>();
         setState(() {
-          _notifications = data.cast<Map<String, dynamic>>();
+          if (refresh) {
+            _notifications = newItems;
+          } else {
+            _notifications.addAll(newItems);
+          }
+          _offset += _limit;
+          _hasMore = newItems.length >= _limit;
           _isLoading = false;
+          _isLoadingMore = false;
         });
       } else {
         setState(() {
           _error = '加载通知失败 (${result.statusCode})';
           _isLoading = false;
+          _isLoadingMore = false;
         });
       }
     } catch (e) {
       setState(() {
         _error = '网络异常，请稍后重试';
         _isLoading = false;
+        _isLoadingMore = false;
       });
     }
   }
@@ -203,15 +252,27 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         ),
       );
     }
-    if (_notifications.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            Icon(Icons.notifications_none_outlined, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
-            const SizedBox(height: 16),
-            Text('暂无通知', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
-          ],
+    if (_notifications.isEmpty && !_isLoadingMore) {
+      return RefreshIndicator(
+        onRefresh: () => _loadNotifications(refresh: true),
+        child: LayoutBuilder(
+          builder: (context, constraints) => SingleChildScrollView(
+            physics: const AlwaysScrollableScrollPhysics(),
+            controller: _scrollController,
+            child: ConstrainedBox(
+              constraints: BoxConstraints(minHeight: constraints.maxHeight),
+              child: Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    Icon(Icons.notifications_none_outlined, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
+                    const SizedBox(height: 16),
+                    Text('暂无通知', style: TextStyle(fontSize: 16, color: Theme.of(context).colorScheme.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+            ),
+          ),
         ),
       );
     }
@@ -220,11 +281,22 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Widget _buildNotificationList() {
     return RefreshIndicator(
-      onRefresh: _loadNotifications,
+      onRefresh: () => _loadNotifications(refresh: true),
       child: ListView.separated(
-        itemCount: _notifications.length,
-        separatorBuilder: (_, __) => const Divider(height: 1),
+        controller: _scrollController,
+        physics: const AlwaysScrollableScrollPhysics(),
+        itemCount: _notifications.length + (_isLoadingMore ? 1 : 0),
+        separatorBuilder: (_, index) {
+          if (index >= _notifications.length) return const SizedBox.shrink();
+          return const Divider(height: 1);
+        },
         itemBuilder: (context, index) {
+          if (index >= _notifications.length) {
+            return const Padding(
+              padding: EdgeInsets.all(16),
+              child: Center(child: CircularProgressIndicator()),
+            );
+          }
           final item = _notifications[index];
           final isRead = item['is_read'] as bool? ?? false;
           final icon = _getIcon(item['icon'] as String?);

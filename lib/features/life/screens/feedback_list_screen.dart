@@ -4,6 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/feedback_model.dart';
 import 'feedback_submit_screen.dart';
 import 'feedback_detail_screen.dart';
@@ -16,7 +17,7 @@ class FeedbackListScreen extends StatefulWidget {
   State<FeedbackListScreen> createState() => _FeedbackListScreenState();
 }
 
-class _FeedbackListScreenState extends State<FeedbackListScreen> {
+class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedListMixin {
   List<FeedbackModel> _feedbacks = [];
   bool _isLoading = true;
 
@@ -25,11 +26,23 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
   @override
   void initState() {
     super.initState();
+    initPagination();
+    _loadFeedbacks();
+  }
+
+  @override
+  void dispose() {
+    disposePagination();
+    super.dispose();
+  }
+
+  @override
+  void _onLoadMore() {
     _loadFeedbacks();
   }
 
   /// 加载反馈列表
-  Future<void> _loadFeedbacks() async {
+  Future<void> _loadFeedbacks({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() {
@@ -39,19 +52,33 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
       return;
     }
 
+    if (refresh) {
+      resetPagination();
+    }
+    if (!refresh && !beginLoadMore()) return;
+
     try {
+      final (limit, offset) = paginationParams;
+
       final result = await ApiClient.get(
         'user_feedback',
         filters: {'user_id': 'eq.$userId'},
         order: 'created_at.desc',
+        limit: limit,
+        offset: offset,
       );
 
       if (result.isSuccess) {
         final feedbacks = result.data!.map((e) => FeedbackModel.fromJson(e)).toList();
         if (mounted) {
           setState(() {
-            _feedbacks = feedbacks;
+            if (refresh) {
+              _feedbacks = feedbacks;
+            } else {
+              _feedbacks.addAll(feedbacks);
+            }
             _isLoading = false;
+            onPaginationDataLoaded(feedbacks.length);
           });
         }
       } else {
@@ -130,81 +157,98 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
       body: _isLoading
           ? const LoadingWidget()
           : _feedbacks.isEmpty
-              ? const EmptyWidget(
-                  icon: Icons.feedback_outlined,
-                  message: '暂无反馈记录',
-                )
-              : ListView.builder(
-                  itemCount: _feedbacks.length,
-                  itemBuilder: (context, index) {
-                    final feedback = _feedbacks[index];
-                    final categoryInfo = _getCategoryInfo(feedback.category);
-                    final statusInfo = _getStatusInfo(feedback.status);
-
-                    return Card(
-                      margin: const EdgeInsets.symmetric(
-                          horizontal: 16, vertical: 6),
-                      child: ListTile(
-                        title: Text(feedback.title),
-                        subtitle: Row(
-                          children: [
-                            // 分类标签
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: categoryInfo.color.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                categoryInfo.label,
-                                style: TextStyle(
-                                  color: categoryInfo.color,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const SizedBox(width: 8),
-                            // 状态标签
-                            Container(
-                              padding: const EdgeInsets.symmetric(
-                                  horizontal: 8, vertical: 2),
-                              decoration: BoxDecoration(
-                                color: statusInfo.color.withOpacity(0.1),
-                                borderRadius: BorderRadius.circular(4),
-                              ),
-                              child: Text(
-                                statusInfo.label,
-                                style: TextStyle(
-                                  color: statusInfo.color,
-                                  fontSize: 12,
-                                ),
-                              ),
-                            ),
-                            const Spacer(),
-                            // 创建时间
-                            Text(
-                              _formatDate(feedback.createdAt),
-                              style: TextStyle(
-                                color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                fontSize: 12,
-                              ),
-                            ),
-                          ],
+              ? RefreshIndicator(
+                  onRefresh: () => _loadFeedbacks(refresh: true),
+                  child: CustomScrollView(
+                    slivers: [
+                      SliverFillRemaining(
+                        hasScrollBody: false,
+                        child: EmptyWidget(
+                          icon: Icons.feedback_outlined,
+                          message: '暂无反馈记录',
                         ),
-                        onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (_) => FeedbackDetailScreen(
-                                feedback: feedback,
-                              ),
-                            ),
-                          );
-                        },
                       ),
-                    );
-                  },
+                    ],
+                  ),
+                )
+              : RefreshIndicator(
+                  onRefresh: () => _loadFeedbacks(refresh: true),
+                  child: ListView.builder(
+                    controller: scrollController,
+                    itemCount: _feedbacks.length + 1,
+                    itemBuilder: (context, index) {
+                      if (index == _feedbacks.length) {
+                        return buildLoadMoreIndicator();
+                      }
+                      final feedback = _feedbacks[index];
+                      final categoryInfo = _getCategoryInfo(feedback.category);
+                      final statusInfo = _getStatusInfo(feedback.status);
+
+                      return Card(
+                        margin: const EdgeInsets.symmetric(
+                            horizontal: 16, vertical: 6),
+                        child: ListTile(
+                          title: Text(feedback.title),
+                          subtitle: Row(
+                            children: [
+                              // 分类标签
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: categoryInfo.color.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  categoryInfo.label,
+                                  style: TextStyle(
+                                    color: categoryInfo.color,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const SizedBox(width: 8),
+                              // 状态标签
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: statusInfo.color.withOpacity(0.1),
+                                  borderRadius: BorderRadius.circular(4),
+                                ),
+                                child: Text(
+                                  statusInfo.label,
+                                  style: TextStyle(
+                                    color: statusInfo.color,
+                                    fontSize: 12,
+                                  ),
+                                ),
+                              ),
+                              const Spacer(),
+                              // 创建时间
+                              Text(
+                                _formatDate(feedback.createdAt),
+                                style: TextStyle(
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  fontSize: 12,
+                                ),
+                              ),
+                            ],
+                          ),
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => FeedbackDetailScreen(
+                                  feedback: feedback,
+                                ),
+                              ),
+                            );
+                          },
+                        ),
+                      );
+                    },
+                  ),
                 ),
       floatingActionButton: FloatingActionButton(
         onPressed: () async {
@@ -214,7 +258,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> {
               builder: (_) => const FeedbackSubmitScreen(),
             ),
           );
-          _loadFeedbacks(); // 返回后刷新列表
+          _loadFeedbacks(refresh: true); // 返回后刷新列表
         },
         child: const Icon(Icons.add),
       ),

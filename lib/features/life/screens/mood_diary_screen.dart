@@ -345,16 +345,17 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       appBar: AppBar(
         title: const Text('心情日记'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: '心情统计',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const MoodStatisticsScreen()),
-              );
-            },
-          ),
+          // 心情统计入口暂不使用
+          // IconButton(
+          //   icon: const Icon(Icons.bar_chart),
+          //   tooltip: '心情统计',
+          //   onPressed: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (_) => const MoodStatisticsScreen()),
+          //     );
+          //   },
+          // ),
           IconButton(
             icon: const Icon(Icons.calendar_month),
             onPressed: () async {
