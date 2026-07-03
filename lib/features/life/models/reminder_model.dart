@@ -29,11 +29,11 @@ class ReminderModel {
       userId: json['user_id'] as String,
       title: json['title'] as String,
       description: json['description'] as String?,
-      remindAt: DateTime.parse(json['remind_at'] as String).toLocal(),
+      remindAt: DateTime.parse(json['remind_at'] as String),
       isCompleted: json['is_completed'] as bool? ?? false,
       isRepeated: json['is_repeated'] as bool?,
       repeatType: json['repeat_type'] as String?,
-      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String).toLocal() : null,
+      createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );
   }
 

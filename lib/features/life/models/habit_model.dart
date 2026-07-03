@@ -110,7 +110,7 @@ class HabitCheckinModel {
     return HabitCheckinModel(
       id: json['id'] as String,
       habitId: json['habit_id'] as String,
-      checkinAt: DateTime.parse(json['checkin_at'] as String).toLocal(),
+      checkinAt: DateTime.parse(json['checkin_at'] as String),
       note: json['note'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
     );

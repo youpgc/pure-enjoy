@@ -308,14 +308,14 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
   String _formatTime(String? timeStr) {
     if (timeStr == null) return '';
     try {
-      final time = DateTime.parse(timeStr).toLocal();
-      final now = DateTime.now();
+      final time = DateTime.parse(timeStr);
+      final now = DateTime.now().toUtc();
       final diff = now.difference(time);
       if (diff.inMinutes < 1) return '刚刚';
       if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
       if (diff.inHours < 24) return '${diff.inHours}小时前';
       if (diff.inDays < 7) return '${diff.inDays}天前';
-      return DateFormat('MM-dd HH:mm').format(time);
+      return DateFormat('MM-dd HH:mm').format(time.add(const Duration(hours: 8)));
     } catch (_) {
       return '';
     }

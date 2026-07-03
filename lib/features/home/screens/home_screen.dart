@@ -489,14 +489,14 @@ class _DashboardPageState extends State<DashboardPage> {
   /// 格式化时间显示（优先创建时间，非同一天则展示选择日期）
   String _formatDisplayDate(String? createdAt, String? selectedDate) {
     if (createdAt == null && selectedDate == null) return '';
-    final created = createdAt != null ? DateTime.tryParse(createdAt)?.toLocal() : null;
+    final created = createdAt != null ? DateTime.tryParse(createdAt) : null;
     if (created == null) {
       final dt = selectedDate != null ? DateTime.tryParse(selectedDate) : null;
       if (dt == null) return '';
       return DateTimeUtils.formatStandard(dt);
     }
     if (selectedDate != null) {
-      final selected = DateTime.tryParse(selectedDate)?.toLocal();
+      final selected = DateTime.tryParse(selectedDate);
       if (selected != null &&
           (created.year != selected.year ||
               created.month != selected.month ||

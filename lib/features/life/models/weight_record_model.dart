@@ -1,3 +1,5 @@
+import '../../../utils/date_time_utils.dart';
+
 /// 体重记录模型 - 对应 Supabase weight_records 表
 /// 字段: id(UUID), user_id(VARCHAR), weight(DECIMAL), bmi(DECIMAL), body_fat(DECIMAL), note(TEXT), date(DATE), created_at, updated_at
 class WeightRecordModel {
@@ -33,22 +35,11 @@ class WeightRecordModel {
       bmi: json['bmi'] != null ? (json['bmi'] as num).toDouble() : null,
       bodyFat: json['body_fat'] != null ? (json['body_fat'] as num).toDouble() : null,
       note: json['note'] as String?,
-      date: WeightRecordModel._parseDate(json['date']),
+      date: DateTimeUtils.parseDate(json['date'] as String?) ?? DateTime.now(),
       userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
       updatedAt: json['updated_at'] != null ? DateTime.parse(json['updated_at'] as String) : null,
     );
-  }
-
-  /// 解析 DATE 字段（YYYY-MM-DD）为本地时间凌晨，避免 UTC 偏移导致时区问题
-  static DateTime _parseDate(dynamic dateValue) {
-    if (dateValue == null) return DateTime.now();
-    try {
-      final dateStr = dateValue.toString().split('T').first;
-      return DateTime.parse('${dateStr}T00:00:00.000');
-    } catch (_) {
-      return DateTime.now();
-    }
   }
 
   Map<String, dynamic> toJson() {

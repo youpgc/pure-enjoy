@@ -34,7 +34,7 @@ class FeedbackModel {
       adminReply: json['admin_reply'] as String?,
       userNickname: json['user_nickname'] as String?,
       createdAt: json['created_at'] != null
-          ? DateTime.parse(json['created_at'] as String).toLocal()
+          ? DateTime.parse(json['created_at'] as String)
           : null,
     );
   }

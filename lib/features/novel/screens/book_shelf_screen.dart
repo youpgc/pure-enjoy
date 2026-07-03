@@ -454,8 +454,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   String _formatLastRead(String? lastReadAt) {
     if (lastReadAt == null) return '';
     try {
-      final dateTime = DateTime.parse(lastReadAt).toLocal();
-      final now = DateTime.now();
+      final dateTime = DateTime.parse(lastReadAt);
+      final now = DateTime.now().toUtc();
       final diff = now.difference(dateTime);
 
       if (diff.inMinutes < 1) return '刚刚';

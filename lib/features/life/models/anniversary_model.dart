@@ -41,7 +41,7 @@ class AnniversaryModel {
       userId: json['user_id'] as String,
       userNickname: json['user_nickname'] as String?,
       title: json['title'] as String,
-      date: DateTime.parse(json['date'] as String).toLocal(),
+      date: DateTimeUtils.parseDate(json['date'] as String?) ?? DateTime.now(),
       type: json['type'] as String? ?? 'anniversary',
       description: json['description'] as String?,
       repeatYearly: json['repeat_yearly'] as bool? ?? true,

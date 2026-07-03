@@ -106,8 +106,7 @@ class _LifeScreenState extends State<LifeScreen> {
   String _formatDate(String? dateStr) {
     if (dateStr == null) return '';
     try {
-      final date = DateTime.parse(dateStr).toLocal();
-      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')} ${date.hour.toString().padLeft(2, '0')}:${date.minute.toString().padLeft(2, '0')}:${date.second.toString().padLeft(2, '0')}';
+      return DateTimeUtils.formatStandard(DateTime.parse(dateStr));
     } catch (e) {
       if (kDebugMode) {
         debugPrint('格式化日期失败');
