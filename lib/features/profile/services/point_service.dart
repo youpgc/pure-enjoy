@@ -31,12 +31,12 @@ class PointService {
     }
   }
 
-  /// 获取北京时间今天零点
+  /// 获取北京时间今天零点（带时区信息）
   DateTime _beijingToday() {
     _ensureTimezone();
     final beijing = tz.getLocation('Asia/Shanghai');
     final now = tz.TZDateTime.now(beijing);
-    return DateTime(now.year, now.month, now.day);
+    return tz.TZDateTime(beijing, now.year, now.month, now.day);
   }
 
   /// 获取北京时间昨天零点
@@ -173,9 +173,9 @@ class PointService {
 
       if (!insertResult.isSuccess) {
         if (kDebugMode) {
-          debugPrint('插入积分记录失败');
+          debugPrint('插入积分记录失败: ${insertResult.error}');
         }
-        return {'success': false, 'message': '打卡失败，请重试'};
+        return {'success': false, 'message': '打卡失败: ${insertResult.error}'};
       }
 
       // 5. 更新 users 表统计字段
