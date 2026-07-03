@@ -228,6 +228,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
               : RefreshIndicator(
                   onRefresh: _loadReminders,
                   child: ListView.builder(
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: _reminders.length,
                     itemBuilder: (context, index) {
                       final reminder = _reminders[index];

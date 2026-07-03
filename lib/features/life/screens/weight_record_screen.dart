@@ -431,6 +431,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
                         onRefresh: () => _loadRecords(refresh: true),
                         child: ListView.builder(
                           controller: scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemCount: _records.length + 1,
                           itemBuilder: (context, index) {

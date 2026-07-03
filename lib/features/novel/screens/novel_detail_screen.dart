@@ -291,6 +291,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           }
           if (mounted) {
             showSnackBar(context, '已加入书架');
+            Navigator.pop(context, true);
           }
         }
       } catch (e) {

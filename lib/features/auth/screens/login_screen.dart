@@ -212,7 +212,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
           textInputAction: TextInputAction.next,
           decoration: const InputDecoration(
             labelText: '账号',
-            hintText: '用户名/昵称/邮箱/手机号',
+            hintText: '用户名/邮箱/手机号',
             prefixIcon: Icon(Icons.person_outline),
           ),
           validator: (value) {
@@ -312,9 +312,15 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             textInputAction: TextInputAction.next,
             decoration: const InputDecoration(
               labelText: '用户名',
-              hintText: '请输入用户名（选填）',
+              hintText: '请输入用户名',
               prefixIcon: Icon(Icons.person_outline),
             ),
+            validator: (value) {
+              if (value == null || value.trim().isEmpty) {
+                return '请输入用户名';
+              }
+              return null;
+            },
           ),
           const SizedBox(height: 12),
           TextFormField(

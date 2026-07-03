@@ -116,6 +116,22 @@ class AuthApi {
     try {
       SecureLogger.log('📝 Supabase Auth 注册请求');
 
+      // 校验用户名唯一性
+      if (username != null && username.isNotEmpty) {
+        final exists = await _checkFieldExists('username', username);
+        if (exists) {
+          return SupabaseAuthResponse(error: '用户名已被使用');
+        }
+      }
+
+      // 校验手机号唯一性
+      if (phone != null && phone.isNotEmpty) {
+        final exists = await _checkFieldExists('phone', phone);
+        if (exists) {
+          return SupabaseAuthResponse(error: '手机号已被使用');
+        }
+      }
+
       final response = await http.post(
         Uri.parse('$_authUrl/signup'),
         headers: _anonHeaders,
@@ -236,7 +252,7 @@ class AuthApi {
       SecureLogger.log('🔐 解析类型: $type, 账号: $account');
       final filter = type == 'phone'
           ? 'phone=eq.$account'
-          : 'or=(username.eq.$account,nickname.eq.$account)';
+          : 'username=eq.$account';
 
       final response = await http.get(
         Uri.parse(
@@ -261,6 +277,33 @@ class AuthApi {
       SecureLogger.warning(
           '⚠️ 解析账号异常: ${SecureLogger.extractError(e)}');
       return null;
+    }
+  }
+
+  // ==================== 唯一性校验 ====================
+
+  /// 检查 users 表中指定字段是否已存在（用于注册校验）
+  Future<bool> _checkFieldExists(String field, String value) async {
+    try {
+      final response = await http.get(
+        Uri.parse(
+          '${SupabaseConfig.url}/rest/v1/users?$field=eq.${Uri.encodeComponent(value)}&select=id',
+        ),
+        headers: {
+          'apikey': SupabaseConfig.anonKey,
+          'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+        },
+      );
+
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body) as List<dynamic>;
+        return data.isNotEmpty;
+      }
+      return false;
+    } catch (e) {
+      SecureLogger.warning(
+          '⚠️ 校验字段唯一性异常: ${SecureLogger.extractError(e)}');
+      return false;
     }
   }
 }

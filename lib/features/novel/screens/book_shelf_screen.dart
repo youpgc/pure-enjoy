@@ -318,7 +318,11 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       MaterialPageRoute(
         builder: (_) => NovelDetailScreen(novel: novel),
       ),
-    );
+    ).then((result) {
+      if (result == true && mounted) {
+        _loadBookshelf(refresh: true);
+      }
+    });
   }
 
   /// 解析小说数据
@@ -671,6 +675,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
                                   )
                                 : ListView.separated(
                                     controller: scrollController,
+                                    physics: const AlwaysScrollableScrollPhysics(),
                                     itemCount: _filteredItems.length + 1,
                                     separatorBuilder: (_, __) =>
                                         const Divider(height: 1),
@@ -933,6 +938,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> with Pag
                   onRefresh: () => _loadData(refresh: true),
                   child: ListView.separated(
                     controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: _filteredNovels.length + 1,
                     separatorBuilder: (_, __) => const Divider(height: 1),
                     itemBuilder: (context, index) {

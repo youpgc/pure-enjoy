@@ -246,11 +246,48 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     setState(() => _isSaving = true);
 
     try {
+      final newUsername = _usernameController.text.trim();
+      final newPhone = _phoneController.text.trim();
+
+      // 校验用户名唯一性（排除当前用户）
+      if (newUsername.isNotEmpty && newUsername != (_userData?['username'] ?? '')) {
+        final checkResult = await ApiClient.get(
+          'users',
+          filters: {
+            'username': 'eq.$newUsername',
+            'id': 'neq.$_userId',
+          },
+          limit: 1,
+        );
+        if (checkResult.isSuccess && (checkResult.data?.isNotEmpty ?? false)) {
+          _showError('用户名已被其他用户使用');
+          setState(() => _isSaving = false);
+          return;
+        }
+      }
+
+      // 校验手机号唯一性（排除当前用户）
+      if (newPhone.isNotEmpty && newPhone != (_userData?['phone'] ?? '')) {
+        final checkResult = await ApiClient.get(
+          'users',
+          filters: {
+            'phone': 'eq.$newPhone',
+            'id': 'neq.$_userId',
+          },
+          limit: 1,
+        );
+        if (checkResult.isSuccess && (checkResult.data?.isNotEmpty ?? false)) {
+          _showError('手机号已被其他用户使用');
+          setState(() => _isSaving = false);
+          return;
+        }
+      }
+
       final updateData = {
         'nickname': _nicknameController.text.trim(),
         'email': _emailController.text.trim(),
-        'phone': _phoneController.text.trim(),
-        'username': _usernameController.text.trim(),
+        'phone': newPhone,
+        'username': newUsername,
         'bio': _bioController.text.trim(),
         'location': _locationController.text.trim(),
         'birthday': _birthdayController.text.trim(),

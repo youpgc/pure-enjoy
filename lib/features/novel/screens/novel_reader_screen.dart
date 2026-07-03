@@ -1627,9 +1627,11 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 减去顶部状态栏 + 底部状态栏高度（内容已在 SafeArea 内，不需要再加 mediaQuery.padding）
-    const topStatusBarHeight = 12.0;
-    const bottomStatusBarHeight = 36.0;
+    // 顶部状态栏高度 = SafeArea top padding + 固定高度 44
+    // 底部状态栏高度 = SafeArea bottom padding + 内部内容高度（进度条 ~2 + padding 20 = ~22）
+    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容截断
+    final topStatusBarHeight = mediaQuery.padding.top + 44.0;
+    final bottomStatusBarHeight = mediaQuery.padding.bottom + 24.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1831,9 +1833,11 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   void _calculatePages({bool resetPage = true}) {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
-    // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
-    const topStatusBarHeight = 12.0;
-    const bottomStatusBarHeight = 36.0;
+    // 顶部状态栏高度 = SafeArea top padding + 固定高度 44
+    // 底部状态栏高度 = SafeArea bottom padding + 内部内容高度（进度条 ~2 + padding 20 = ~22）
+    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容截断
+    final topStatusBarHeight = mediaQuery.padding.top + 44.0;
+    final bottomStatusBarHeight = mediaQuery.padding.bottom + 24.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(

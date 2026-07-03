@@ -668,6 +668,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   onRefresh: () => _loadAnniversaries(refresh: true),
                   child: ListView.builder(
                     controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: _anniversaries.length + 1,
                     itemBuilder: (context, index) {

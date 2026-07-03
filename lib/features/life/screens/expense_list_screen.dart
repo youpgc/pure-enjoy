@@ -536,6 +536,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                         onRefresh: () => _loadExpenses(refresh: true),
                         child: ListView.builder(
                           controller: scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
                           itemExtent: 72.0,
                           itemCount: _expenses.length + 1,

@@ -175,6 +175,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
                   onRefresh: () => _loadFeedbacks(refresh: true),
                   child: ListView.builder(
                     controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     itemCount: _feedbacks.length + 1,
                     itemBuilder: (context, index) {
                       if (index == _feedbacks.length) {

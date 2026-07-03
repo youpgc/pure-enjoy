@@ -390,6 +390,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
                   onRefresh: () => _loadDiaries(refresh: true),
                   child: ListView.builder(
                     controller: scrollController,
+                    physics: const AlwaysScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     itemCount: _diaries.length + 1,
                     itemBuilder: (context, index) {

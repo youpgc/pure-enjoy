@@ -352,6 +352,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
                         onRefresh: () => _loadNotes(refresh: true),
                         child: GridView.builder(
                           controller: scrollController,
+                          physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(16),
                           gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
                             maxCrossAxisExtent: 200,

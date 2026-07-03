@@ -35,6 +35,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     super.initState();
     _scrollController.addListener(_onScroll);
     _loadFavorites();
+    // 预加载字典缓存，避免下拉框首次打开时为空
+    DictService.instance.ensureInitialized();
   }
 
   @override
@@ -189,6 +191,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   }
 
   Future<void> _showEditDialog({FavoriteModel? favorite}) async {
+    // 确保字典已加载，避免下拉选项为空
+    await DictService.instance.ensureInitialized();
+
     final isEditing = favorite != null;
     final titleController = TextEditingController(text: favorite?.title ?? '');
     final urlController = TextEditingController(text: favorite?.url ?? '');
