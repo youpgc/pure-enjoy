@@ -207,7 +207,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
     final descController =
         TextEditingController(text: anniversary?.description ?? '');
 
-    String selectedType = anniversary?.type ?? widget.filterType;
+    final String selectedType = anniversary?.type ?? widget.filterType;
     DateTime selectedDate = anniversary?.date ?? DateTime.now();
     bool repeatYearly = anniversary?.repeatYearly ?? true;
     bool remindEnabled = anniversary?.remindEnabled ?? false;
@@ -633,7 +633,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
     } else if (days < 0) {
       return '已过${-days}天';
     } else {
-      return '还有${days}天';
+      return '还有$days天';
     }
   }
 

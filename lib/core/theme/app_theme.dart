@@ -62,7 +62,7 @@ class AppTheme {
       tertiary: secondaryColor,
       surface: neutral900,
       surfaceContainerHighest: neutral800,
-      error: Color(0xFFEF5350),
+      error: const Color(0xFFEF5350),
       onPrimary: neutral900,
       onSecondary: neutral900,
       onSurface: neutral200,
@@ -173,7 +173,7 @@ class AppTheme {
       ),
       bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
-        shape: RoundedRectangleBorder(
+        shape: const RoundedRectangleBorder(
           borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
         ),
         backgroundColor: colorScheme.surface,

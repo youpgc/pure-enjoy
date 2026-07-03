@@ -159,7 +159,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
           : _feedbacks.isEmpty
               ? RefreshIndicator(
                   onRefresh: () => _loadFeedbacks(refresh: true),
-                  child: CustomScrollView(
+                  child: const CustomScrollView(
                     slivers: [
                       SliverFillRemaining(
                         hasScrollBody: false,

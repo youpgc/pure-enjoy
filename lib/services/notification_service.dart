@@ -106,7 +106,7 @@ class NotificationService {
     // payload 格式: "type:id" 例如 "novel:xxx" "expense:xxx" "reminder:xxx"
     final parts = payload.split(':');
     final type = parts.first;
-    final _id = parts.length > 1 ? parts.sublist(1).join(':') : '';
+    final id = parts.length > 1 ? parts.sublist(1).join(':') : '';
 
     // 使用全局 NavigatorKey 进行页面跳转
     final context = navigatorKey.currentContext;

@@ -737,7 +737,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                     width: 48,
                     height: 48,
                     child: _isLoadingShelf
-                        ? Center(child: LoadingWidget(size: 24))
+                        ? const Center(child: LoadingWidget(size: 24))
                         : OutlinedButton(
                             onPressed: _toggleBookshelf,
                             style: OutlinedButton.styleFrom(
@@ -758,7 +758,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                     width: 48,
                     height: 48,
                     child: _isDownloading
-                        ? Center(child: LoadingWidget(size: 24))
+                        ? const Center(child: LoadingWidget(size: 24))
                         : OutlinedButton(
                             onPressed: _cachedChapterCount > 0 && _cachedChapterCount >= _chapters.length
                                 ? _clearCache

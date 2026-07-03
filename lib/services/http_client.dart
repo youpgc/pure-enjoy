@@ -238,7 +238,7 @@ class HttpClient {
             continue; // Token 已刷新，重试当前请求
           }
           _accessToken = null;
-          throw HttpException('401_UNAUTHORIZED');
+          throw const HttpException('401_UNAUTHORIZED');
         }
 
         return response;

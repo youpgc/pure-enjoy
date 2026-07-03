@@ -452,7 +452,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   itemBuilder: (context, index) {
                     final checkin = checkins[index];
                     return ListTile(
-                      leading: Icon(Icons.check_circle, color: AppTheme.success),
+                      leading: const Icon(Icons.check_circle, color: AppTheme.success),
                       title: Text(DateTimeUtils.formatStandard(checkin.checkinAt)),
                     );
                   },

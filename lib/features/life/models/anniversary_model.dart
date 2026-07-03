@@ -189,15 +189,15 @@ class AnniversaryModel {
       final lunarDay = lunar.getDay();
 
       // 计算今年的农历对应公历日期
-      var thisYearLunar = Lunar.fromYmd(now.year, lunarMonth, lunarDay);
-      var thisYearSolar = thisYearLunar.getSolar();
+      final thisYearLunar = Lunar.fromYmd(now.year, lunarMonth, lunarDay);
+      final thisYearSolar = thisYearLunar.getSolar();
 
       // 如果今年还没到，就用今年的
       var nextSolar = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
       if (nextSolar.isBefore(today) || nextSolar.isAtSameMomentAs(today)) {
         // 今年的已过，算明年的
-        var nextYearLunar = Lunar.fromYmd(now.year + 1, lunarMonth, lunarDay);
-        var nextYearSolar = nextYearLunar.getSolar();
+        final nextYearLunar = Lunar.fromYmd(now.year + 1, lunarMonth, lunarDay);
+        final nextYearSolar = nextYearLunar.getSolar();
         nextSolar = DateTime(nextYearSolar.getYear(), nextYearSolar.getMonth(), nextYearSolar.getDay());
       }
 
@@ -230,9 +230,9 @@ class AnniversaryModel {
       // 检查今年的农历生日是否已过
       final solar = Solar.fromDate(date);
       final lunar = solar.getLunar();
-      var thisYearLunar = Lunar.fromYmd(now.year, lunar.getMonth(), lunar.getDay());
-      var thisYearSolar = thisYearLunar.getSolar();
-      var thisYearBirthday = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
+      final thisYearLunar = Lunar.fromYmd(now.year, lunar.getMonth(), lunar.getDay());
+      final thisYearSolar = thisYearLunar.getSolar();
+      final thisYearBirthday = DateTime(thisYearSolar.getYear(), thisYearSolar.getMonth(), thisYearSolar.getDay());
 
       if (thisYearBirthday.isAfter(today)) {
         age--;

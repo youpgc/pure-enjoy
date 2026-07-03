@@ -416,7 +416,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
                 : _records.isEmpty
                     ? RefreshIndicator(
                         onRefresh: () => _loadRecords(refresh: true),
-                        child: CustomScrollView(
+                        child: const CustomScrollView(
                           slivers: [
                             SliverFillRemaining(
                               hasScrollBody: false,

@@ -521,11 +521,11 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       child: InkWell(
         onTap: _selectGender,
         child: InputDecorator(
-          decoration: InputDecoration(
+          decoration: const InputDecoration(
             labelText: '性别',
-            prefixIcon: const Icon(Icons.people_outline),
-            suffixIcon: const Icon(Icons.arrow_drop_down),
-            border: const OutlineInputBorder(),
+            prefixIcon: Icon(Icons.people_outline),
+            suffixIcon: Icon(Icons.arrow_drop_down),
+            border: OutlineInputBorder(),
           ),
           child: Text(
             _gender ?? '保密',

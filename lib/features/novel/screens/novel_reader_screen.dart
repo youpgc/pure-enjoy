@@ -1408,7 +1408,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       backgroundColor: _background.bgColor,
       appBar: null, // 始终不显示 AppBar
       body: _isLoading
-          ? Center(child: LoadingWidget())
+          ? const Center(child: LoadingWidget())
           : _currentChapter == null
               ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
               : Stack(
@@ -1421,7 +1421,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         // 小说内容（铺满中间剩余空间）
                         Expanded(
                           child: _isLoadingChapter
-                              ? Center(child: LoadingWidget())
+                              ? const Center(child: LoadingWidget())
                               : _buildContent(),
                         ),
                         // 底部状态栏
@@ -1452,13 +1452,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
       // onTap 和 onVerticalDrag 在手势竞技场中可以共存
       // 内容已在 SafeArea 内（顶部/底部状态栏已处理安全区域），不需要再加 mediaQuery.padding
-      final topPadding = 12.0;
-      final bottomPadding = 36.0;
+      const topPadding = 12.0;
+      const bottomPadding = 36.0;
       return GestureDetector(
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
-          padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
+          padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
@@ -1628,8 +1628,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     // 减去顶部状态栏 + 底部状态栏高度（内容已在 SafeArea 内，不需要再加 mediaQuery.padding）
-    final topStatusBarHeight = 12.0;
-    final bottomStatusBarHeight = 36.0;
+    const topStatusBarHeight = 12.0;
+    const bottomStatusBarHeight = 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1688,7 +1688,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
   @override
   Widget build(BuildContext context) {
     if (_isCalculating || _pages.isEmpty) {
-      return Center(child: LoadingWidget());
+      return const Center(child: LoadingWidget());
     }
 
     // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
@@ -1706,10 +1706,10 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
         itemBuilder: (context, index) {
           final page = _pages[index];
           const topPadding = 12.0;
-          final bottomPadding = 36.0;
+          const bottomPadding = 36.0;
           return Container(
             color: widget.background.bgColor,
-            padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
+            padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -1832,8 +1832,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
     final mediaQuery = MediaQuery.of(context);
     final width = mediaQuery.size.width;
     // 减去顶部状态栏 + 底部状态栏高度（底部状态栏始终展示，菜单悬浮在上层允许覆盖内容）
-    final topStatusBarHeight = 12.0;
-    final bottomStatusBarHeight = 36.0;
+    const topStatusBarHeight = 12.0;
+    const bottomStatusBarHeight = 36.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
 
     final textStyle = TextStyle(
@@ -1892,10 +1892,10 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
     const topPadding = 12.0;
-    final bottomPadding = 36.0;
+    const bottomPadding = 36.0;
     return Container(
       color: widget.background.bgColor,
-      padding: EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
+      padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -1936,7 +1936,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
   @override
   Widget build(BuildContext context) {
     if (_isCalculating || _pages.isEmpty) {
-      return Center(child: LoadingWidget());
+      return const Center(child: LoadingWidget());
     }
 
     // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势

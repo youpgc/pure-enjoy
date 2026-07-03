@@ -290,7 +290,7 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
             height: 250,
             child: LineChart(
               LineChartData(
-                gridData: FlGridData(
+                gridData: const FlGridData(
                   show: true,
                   drawVerticalLine: false,
                   horizontalInterval: 5,

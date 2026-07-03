@@ -264,7 +264,7 @@ class ReminderScheduleModel {
 
       case 'monthly':
         if (monthDays.isEmpty) return '每月 $timeStr';
-        final days = monthDays.map((d) => '${d}日').join('、');
+        final days = monthDays.map((d) => '$d日').join('、');
         return '每月 $days $timeStr';
 
       case 'yearly':

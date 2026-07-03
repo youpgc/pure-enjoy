@@ -203,8 +203,8 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
                         itemCount: _books.length + (_hasMore ? 1 : 0),
                         itemBuilder: (context, index) {
                           if (index >= _books.length) {
-                            return Padding(
-                              padding: const EdgeInsets.all(16),
+                            return const Padding(
+                              padding: EdgeInsets.all(16),
                               child: Center(child: app_widgets.LoadingWidget()),
                             );
                           }

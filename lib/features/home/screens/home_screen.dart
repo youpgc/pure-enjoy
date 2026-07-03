@@ -2550,7 +2550,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
         padding: const EdgeInsets.all(16),
         children: [
           // ====== 主题模式 ======
-          _SectionTitle(title: '主题模式'),
+          const _SectionTitle(title: '主题模式'),
           const SizedBox(height: 8),
           Card(
               child: Column(
@@ -2581,7 +2581,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // ====== 配色方案 ======
-          _SectionTitle(title: '配色方案'),
+          const _SectionTitle(title: '配色方案'),
           const SizedBox(height: 8),
           Card(
               child: Padding(
@@ -2638,7 +2638,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // ====== 字体大小 ======
-          _SectionTitle(title: '字体大小'),
+          const _SectionTitle(title: '字体大小'),
           const SizedBox(height: 8),
           Card(
               child: Padding(
@@ -2686,7 +2686,7 @@ class ThemeSettingsScreen extends ConsumerWidget {
           const SizedBox(height: 24),
 
           // ====== 阅读背景 ======
-          _SectionTitle(title: '阅读背景'),
+          const _SectionTitle(title: '阅读背景'),
           const SizedBox(height: 8),
           Card(
               child: Padding(
@@ -3061,7 +3061,7 @@ class _DownloadProgressDialogState extends State<_DownloadProgressDialog> {
           ),
           if (_isComplete) ...[
             const SizedBox(height: 8),
-            Icon(Icons.check_circle, color: AppTheme.success, size: 48),
+            const Icon(Icons.check_circle, color: AppTheme.success, size: 48),
           ],
         ],
       ),

@@ -398,7 +398,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
               leading: const Icon(Icons.done_all),
               title: const Text('已读完'),
               trailing: currentStatus == 'completed'
-                  ? Icon(Icons.check, color: AppTheme.success)
+                  ? const Icon(Icons.check, color: AppTheme.success)
                   : null,
               onTap: () {
                 Navigator.pop(context);

@@ -51,7 +51,7 @@ class OfflineSyncService {
     _isSyncing = true;
 
     try {
-      var queue = await _loadQueue();
+      final queue = await _loadQueue();
       if (queue.isEmpty) return;
 
       if (kDebugMode) {

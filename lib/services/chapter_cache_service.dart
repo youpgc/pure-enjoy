@@ -5,7 +5,7 @@ import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 /// 缓存条目
-class _CacheEntry {
+class CacheEntry {
   final String chapterId;
   final String novelId;
   final String title;
@@ -13,7 +13,7 @@ class _CacheEntry {
   final int contentLength;
   final DateTime cachedAt;
 
-  _CacheEntry({
+  CacheEntry({
     required this.chapterId,
     required this.novelId,
     required this.title,
@@ -31,7 +31,7 @@ class _CacheEntry {
     'cached_at': cachedAt.toIso8601String(),
   };
 
-  factory _CacheEntry.fromJson(Map<String, dynamic> json) => _CacheEntry(
+  factory CacheEntry.fromJson(Map<String, dynamic> json) => CacheEntry(
     chapterId: json['chapter_id']?.toString() ?? '',
     novelId: json['novel_id']?.toString() ?? '',
     title: json['title']?.toString() ?? '',
@@ -48,7 +48,7 @@ class ChapterCacheService {
   static final ChapterCacheService instance = ChapterCacheService._();
 
   static const String _cacheIndexKey = 'chapter_cache_index';
-  Map<String, _CacheEntry>? _index;
+  Map<String, CacheEntry>? _index;
 
   /// 初始化缓存索引
   Future<void> initialize() async {
@@ -57,7 +57,7 @@ class ChapterCacheService {
     if (indexJson != null) {
       try {
         final Map<String, dynamic> decoded = jsonDecode(indexJson);
-        _index = decoded.map((k, v) => MapEntry(k, _CacheEntry.fromJson(v as Map<String, dynamic>)));
+        _index = decoded.map((k, v) => MapEntry(k, CacheEntry.fromJson(v as Map<String, dynamic>)));
       } catch (e) {
         if (kDebugMode) debugPrint('❌ 加载缓存索引失败');
         _index = {};
@@ -96,7 +96,7 @@ class ChapterCacheService {
 
       // 更新索引
       _index ??= {};
-      _index![chapterId] = _CacheEntry(
+      _index![chapterId] = CacheEntry(
         chapterId: chapterId,
         novelId: novelId,
         title: title,
@@ -132,7 +132,7 @@ class ChapterCacheService {
   }
 
   /// 获取某本小说的已缓存章节列表
-  List<_CacheEntry> getCachedChapters(String novelId) {
+  List<CacheEntry> getCachedChapters(String novelId) {
     if (_index == null) return [];
     return _index!.values
         .where((entry) => entry.novelId == novelId)

@@ -545,7 +545,7 @@ class DictService {
 
   /// 兼容旧代码：getLabel 带 defaultValue 参数
   String getLabelOrDefault(String typeCode, String value, {String? defaultValue}) {
-    final label = this.getLabel(typeCode, value);
+    final label = getLabel(typeCode, value);
     return label ?? defaultValue ?? value;
   }
 }

@@ -195,7 +195,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
 
       if (result.isSuccess) {
         final data = result.data!;
-        var newExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
+        final newExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
 
         // date 排序优先，相同 date 时 created_at 优先
         newExpenses.sort((a, b) {
@@ -525,7 +525,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                 : _expenses.isEmpty
                     ? RefreshIndicator(
                         onRefresh: () => _loadExpenses(refresh: true),
-                        child: CustomScrollView(
+                        child: const CustomScrollView(
                           slivers: [
                             SliverFillRemaining(
                               hasScrollBody: false,
