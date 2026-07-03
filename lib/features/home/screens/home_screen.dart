@@ -29,6 +29,8 @@ import '../../life/models/weight_record_model.dart';
 import '../../life/models/note_model.dart';
 import '../../life/models/reminder_model.dart';
 import '../../life/models/habit_model.dart';
+import '../../life/models/reminder_schedule_model.dart';
+import '../../life/widgets/reminder_schedule_picker.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../profile/screens/point_records_screen.dart';
@@ -696,7 +698,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => _AddHabitSheet(
-        onSave: (habit) async {
+        onSave: (habit, reminderSchedule) async {
           try {
             final result = await ApiClient.post(
               'habits',
@@ -704,6 +706,14 @@ class _DashboardPageState extends State<DashboardPage> {
               returnRepresentation: false,
             );
             if (result.isSuccess) {
+              // 保存提醒计划
+              if (reminderSchedule != null) {
+                await ApiClient.post(
+                  'reminder_schedules',
+                  reminderSchedule.copyWith(habitId: habit.id).toJson(),
+                  returnRepresentation: false,
+                );
+              }
               if (mounted) {
                 Navigator.pop(context);
                 ScaffoldMessenger.of(context).showSnackBar(
@@ -1549,6 +1559,7 @@ class _AddExpenseSheet extends StatefulWidget {
 class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   final _formKey = GlobalKey<FormState>();
   final _amountController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _noteController = TextEditingController();
   String _selectedCategoryCode = '';
   DateTime _selectedDate = DateTime.now();
@@ -1593,6 +1604,7 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
   void dispose() {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _amountController.dispose();
+    _descriptionController.dispose();
     _noteController.dispose();
     super.dispose();
   }
@@ -1607,7 +1619,8 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
         userId: AuthService.instance.currentUserId ?? 'local_user',
         amount: double.parse(_amountController.text),
         category: _selectedCategoryCode,
-        description: _noteController.text.isEmpty ? null : _noteController.text,
+        description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
+        note: _noteController.text.isEmpty ? null : _noteController.text,
         date: _selectedDate,
       );
 
@@ -1668,6 +1681,11 @@ class _AddExpenseSheetState extends State<_AddExpenseSheet> {
                   );
                 }).toList(),
               ),
+            const SizedBox(height: 12),
+            TextFormField(
+              controller: _descriptionController,
+              decoration: const InputDecoration(labelText: '描述（可选）'),
+            ),
             const SizedBox(height: 12),
             TextFormField(
               controller: _noteController,
@@ -2032,7 +2050,7 @@ class _AddReminderSheetState extends State<_AddReminderSheet> {
 
 /// 添加习惯底部弹窗
 class _AddHabitSheet extends StatefulWidget {
-  final Function(HabitModel) onSave;
+  final Function(HabitModel, ReminderScheduleModel?) onSave;
 
   const _AddHabitSheet({required this.onSave});
 
@@ -2044,6 +2062,7 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
   final _nameController = TextEditingController();
   final _descController = TextEditingController();
   final _targetDaysController = TextEditingController(text: '21');
+  ReminderScheduleModel? _reminderSchedule;
   bool _isSaving = false;
 
   @override
@@ -2075,7 +2094,7 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
         isActive: true,
       );
 
-      widget.onSave(habit);
+      widget.onSave(habit, _reminderSchedule);
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -2119,6 +2138,11 @@ class _AddHabitSheetState extends State<_AddHabitSheet> {
               labelText: '目标天数',
             ),
             keyboardType: TextInputType.number,
+          ),
+          const SizedBox(height: 12),
+          ReminderSchedulePicker(
+            initialSchedule: _reminderSchedule,
+            onChanged: (schedule) => setState(() => _reminderSchedule = schedule),
           ),
           const SizedBox(height: 16),
           FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),

@@ -196,22 +196,25 @@ class _PublicDomainListScreenState extends State<PublicDomainListScreen> {
                           ],
                         ),
                       )
-                    : ListView.builder(
-                        controller: _scrollController,
-                        padding: const EdgeInsets.symmetric(horizontal: 12),
-                        itemCount: _books.length + (_hasMore ? 1 : 0),
-                        itemBuilder: (context, index) {
-                          if (index >= _books.length) {
-                            return const Padding(
-                              padding: EdgeInsets.all(16),
-                              child: Center(child: app_widgets.LoadingWidget()),
+                    : RefreshIndicator(
+                        onRefresh: () => _loadBooks(refresh: true),
+                        child: ListView.builder(
+                          controller: _scrollController,
+                          padding: const EdgeInsets.symmetric(horizontal: 12),
+                          itemCount: _books.length + (_hasMore ? 1 : 0),
+                          itemBuilder: (context, index) {
+                            if (index >= _books.length) {
+                              return const Padding(
+                                padding: EdgeInsets.all(16),
+                                child: Center(child: app_widgets.LoadingWidget()),
+                              );
+                            }
+                            return _BookCard(
+                              book: _books[index],
+                              onTap: () => _openReader(_books[index]),
                             );
-                          }
-                          return _BookCard(
-                            book: _books[index],
-                            onTap: () => _openReader(_books[index]),
-                          );
-                        },
+                          },
+                        ),
                       ),
           ),
         ],

@@ -461,6 +461,7 @@ class _NoteEditScreen extends StatefulWidget {
 class _NoteEditScreenState extends State<_NoteEditScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
+  final _categoryController = TextEditingController();
   bool _isSaving = false;
 
   @override
@@ -469,6 +470,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
     if (widget.note != null) {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content ?? '';
+      _categoryController.text = widget.note!.category ?? '';
     }
   }
 
@@ -476,6 +478,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   void dispose() {
     _titleController.dispose();
     _contentController.dispose();
+    _categoryController.dispose();
     super.dispose();
   }
 
@@ -495,6 +498,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
         userId: widget.userId,
         title: _titleController.text,
         content: _contentController.text.isEmpty ? null : _contentController.text,
+        category: _categoryController.text.isEmpty ? null : _categoryController.text,
       );
 
       widget.onSave(newNote);
@@ -537,6 +541,14 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
               ),
             ),
             const SizedBox(height: 8),
+            TextField(
+              controller: _categoryController,
+              decoration: const InputDecoration(
+                hintText: '分类（可选）',
+                border: InputBorder.none,
+                prefixIcon: Icon(Icons.folder_outlined),
+              ),
+            ),
             const Divider(),
             const SizedBox(height: 8),
             Expanded(
