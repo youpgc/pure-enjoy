@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest.dart' as tz_data;
+import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../models/point_record_model.dart';
@@ -161,6 +162,7 @@ class PointService {
       final insertResult = await ApiClient.post(
         'point_records',
         {
+          'id': const Uuid().v4(),
           'user_id': userId,
           'type': 'checkin',
           'amount': points,
