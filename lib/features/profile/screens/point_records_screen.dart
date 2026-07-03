@@ -76,6 +76,18 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
         onPaginationDataLoaded(newRecords.length);
         _isLoading = false;
       });
+
+      // 如果还有更多数据但内容未填满屏幕，自动加载下一页
+      if (hasMore && newRecords.isNotEmpty) {
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          if (!mounted) return;
+          final sc = scrollController;
+          if (!sc.hasClients) return;
+          if (sc.position.maxScrollExtent <= 200) {
+            _onLoadMore();
+          }
+        });
+      }
     }
   }
 
