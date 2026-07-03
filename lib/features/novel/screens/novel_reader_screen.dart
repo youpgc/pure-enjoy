@@ -1143,10 +1143,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return (_currentChapterIndex + 1) / _chapters.length;
   }
 
-  String get _progressText {
-    return '${(_readingProgress * 100).toStringAsFixed(1)}%';
-  }
-
   String get _currentTime {
     final now = DateTime.now();
     return '${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}';
@@ -1709,8 +1705,7 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
         },
         itemBuilder: (context, index) {
           final page = _pages[index];
-          final mediaQuery = MediaQuery.of(context);
-          final topPadding = 12.0;
+          const topPadding = 12.0;
           final bottomPadding = 36.0;
           return Container(
             color: widget.background.bgColor,
@@ -1896,8 +1891,7 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
 
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
-    final mediaQuery = MediaQuery.of(context);
-    final topPadding = 12.0;
+    const topPadding = 12.0;
     final bottomPadding = 36.0;
     return Container(
       color: widget.background.bgColor,

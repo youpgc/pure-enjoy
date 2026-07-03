@@ -6,7 +6,6 @@ import '../../../core/theme/theme_provider.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/api_client.dart';
 import '../../../services/chapter_cache_service.dart';
-import 'data_sync_screen.dart';
 import 'rich_text_page.dart';
 import '../../../services/data_export_service.dart';
 import '../../../services/version_check_service.dart';

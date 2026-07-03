@@ -37,7 +37,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadFeedbacks();
   }
 

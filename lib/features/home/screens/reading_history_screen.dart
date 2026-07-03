@@ -34,7 +34,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadHistory();
   }
 

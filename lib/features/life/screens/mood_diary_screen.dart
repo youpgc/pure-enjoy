@@ -11,7 +11,6 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/mood_diary_model.dart';
-import 'mood_statistics_screen.dart';
 
 /// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
@@ -42,7 +41,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadDiaries();
   }
 
@@ -52,7 +51,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       await DictService.instance.initialize();
       await _loadCache();
       await _loadDiaries();
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ MoodDiaryScreen _initLoad 异常');
         debugPrint('堆栈信息');
@@ -166,7 +165,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ MoodDiaryScreen _loadDiaries 异常');
         debugPrint('堆栈信息');

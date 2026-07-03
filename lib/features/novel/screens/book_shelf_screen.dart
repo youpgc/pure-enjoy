@@ -55,7 +55,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadBookshelf();
   }
 
@@ -64,7 +64,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     try {
       await _loadCache();
       await _loadBookshelf(refresh: true);
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ BookShelfScreen _initLoad 异常: ');
         debugPrint('堆栈信息: ');
@@ -742,7 +742,7 @@ class _NovelListForAddScreenState extends State<_NovelListForAddScreen> with Pag
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadData();
   }
 

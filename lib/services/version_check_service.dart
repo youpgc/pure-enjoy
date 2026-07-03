@@ -403,7 +403,7 @@ class VersionCheckService {
       if (kDebugMode) debugPrint('📱 开始安装APK...');
       final result = await installApk(filePath);
       if (kDebugMode) debugPrint('📱 安装结果: $result');
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) debugPrint('📱 下载安装流程出错');
       if (kDebugMode) debugPrint('📱 堆栈信息');
       downloadStatus.value = '更新失败: $e';

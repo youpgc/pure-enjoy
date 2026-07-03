@@ -40,7 +40,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadRecords();
   }
 
@@ -49,7 +49,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
     try {
       await _loadCache();
       await _loadRecords();
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ WeightRecordScreen _initLoad 异常');
         debugPrint('堆栈信息');
@@ -136,13 +136,13 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
           }
           _isLoading = false;
         });
-        onPaginationDataLoaded(records.length);
+        onPaginationDataLoaded(newRecords.length);
 
         // 只在刷新时写入缓存
         if (refresh) {
           await CacheHelper.instance.saveList(
             CacheHelper.keyWeightRecords,
-            records.map((r) => r.toJson()).toList(),
+            _records.map((r) => r.toJson()).toList(),
           );
         }
       } else {

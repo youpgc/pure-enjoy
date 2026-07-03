@@ -36,7 +36,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadRecords();
   }
 
@@ -84,7 +84,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
           final sc = scrollController;
           if (!sc.hasClients) return;
           if (sc.position.maxScrollExtent <= 200) {
-            _onLoadMore();
+            onLoadMore();
           }
         });
       }

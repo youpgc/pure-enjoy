@@ -39,7 +39,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadNotes();
   }
 
@@ -48,7 +48,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
     try {
       await _loadCache();
       await _loadNotes(refresh: true);
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ NoteListScreen _initLoad 异常');
         debugPrint('堆栈信息');

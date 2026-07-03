@@ -2143,7 +2143,6 @@ class _ProfilePageState extends State<ProfilePage> {
   bool _isForceUpdate = false;
   String? _apkUrl;
   String? _githubUrl;
-  bool _isLoading = false;
   int _totalPoints = 0;
 
   @override

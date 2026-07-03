@@ -51,7 +51,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadExpenses();
   }
 
@@ -69,7 +69,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
         }
         _loadTotalAmountForMonth(firstMonth);
       }
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ ExpenseListScreen _initLoad 异常');
         debugPrint('堆栈信息');

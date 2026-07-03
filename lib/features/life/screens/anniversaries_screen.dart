@@ -45,7 +45,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadAnniversaries();
   }
 

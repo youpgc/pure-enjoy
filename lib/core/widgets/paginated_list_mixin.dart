@@ -86,12 +86,12 @@ mixin PaginatedListMixin<T extends StatefulWidget> on State<T> {
     final currentScroll = _scrollController!.position.pixels;
 
     if (maxScroll - currentScroll <= loadMoreThreshold) {
-      _onLoadMore();
+      onLoadMore();
     }
   }
 
   /// 子类实现：触底加载更多数据
-  void _onLoadMore();
+  void onLoadMore();
 
   /// 构建加载更多指示器
   Widget buildLoadMoreIndicator() {

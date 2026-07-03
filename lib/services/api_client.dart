@@ -6,10 +6,6 @@ import 'cancel_token.dart';
 
 /// 安全日志工具：仅在开发模式下输出日志，生产环境静默处理
 class _SecureLogger {
-  static void log(String message) {
-    if (kDebugMode) debugPrint(message);
-  }
-
   static void error(String message) {
     if (kDebugMode) debugPrint(message);
   }

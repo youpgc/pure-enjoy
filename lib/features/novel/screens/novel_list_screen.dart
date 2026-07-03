@@ -64,7 +64,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       await DictService.instance.initialize();
       await _loadCache();
       await _loadNovels(refresh: true);
-    } catch (e, stackTrace) {
+    } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ NovelListScreen _initLoad 异常');
         debugPrint('堆栈信息');
@@ -77,7 +77,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
   }
 
   @override
-  void _onLoadMore() {
+  void onLoadMore() {
     _loadNovels();
   }
 
