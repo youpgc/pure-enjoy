@@ -7,6 +7,8 @@ library;
 import 'supabase_config.dart';
 import 'session_manager.dart';
 import 'auth_api.dart';
+import '../utils/cache_helper.dart';
+import 'chapter_cache_service.dart';
 
 // 重新导出，保持向后兼容
 export 'supabase_config.dart';
@@ -107,6 +109,13 @@ class AuthService {
 
   /// 退出登录
   Future<void> signOut() async {
+    // 切换账号前清除本地缓存数据，防止旧账号数据残留
+    try {
+      await CacheHelper.instance.clearAllUserData();
+    } catch (_) {}
+    try {
+      await ChapterCacheService.instance.clearAllCache();
+    } catch (_) {}
     await _session.clearSession();
   }
 

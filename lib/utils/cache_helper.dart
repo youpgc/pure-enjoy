@@ -65,4 +65,34 @@ class CacheHelper {
     final prefs = await SharedPreferences.getInstance();
     await prefs.remove(key);
   }
+
+  /// 清除所有用户数据缓存
+  /// 切换账号时调用，避免旧账号数据残留
+  Future<void> clearAllUserData() async {
+    final prefs = await SharedPreferences.getInstance();
+    final keysToRemove = [
+      keyBookshelf,
+      keyNovelList,
+      keyDiaries,
+      keyExpenses,
+      keyWeightRecords,
+      keyNotes,
+      keyFavorites,
+      keyReminders,
+      keyHabits,
+    ];
+    for (final key in keysToRemove) {
+      await prefs.remove(key);
+    }
+
+    // 清除阅读器相关进度缓存（pd_reader_* 前缀）
+    final allKeys = prefs.getKeys();
+    final readerKeys = allKeys.where((k) => k.startsWith('pd_reader_'));
+    for (final key in readerKeys) {
+      await prefs.remove(key);
+    }
+
+    // 清除离线同步队列
+    await prefs.remove('offline_sync_queue');
+  }
 }
