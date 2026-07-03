@@ -1664,9 +1664,8 @@ class _PagedChapterContentState extends State<_PagedChapterContent> {
       height: height,
       style: textStyle,
       lineHeight: widget.lineHeight,
-      // 垂直方向不额外加 padding，因为 Container 已经加了 padding
-      // 水平方向保留 padding 用于文本宽度计算
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      // padding 必须与渲染 Container 的 padding 一致，否则分页器会多算可用高度导致内容被裁剪
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
       firstPageExtraHeight: firstPageExtraHeight,
     );
 
@@ -1870,9 +1869,8 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
       height: height,
       style: textStyle,
       lineHeight: widget.lineHeight,
-      // 垂直方向不额外加 padding，因为 Container 已经加了 padding
-      // 水平方向保留 padding 用于文本宽度计算
-      padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 0),
+      // padding 必须与渲染 Container 的 padding 一致，否则分页器会多算可用高度导致内容被裁剪
+      padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
       firstPageExtraHeight: firstPageExtraHeight,
     );
 
