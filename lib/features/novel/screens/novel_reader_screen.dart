@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -770,9 +771,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
 
     try {
-      final result = await AnnotationService().getAnnotations(
-        novelId: widget.novel.id,
-        chapterId: _currentChapter!.id,
+      final result = await AnnotationService().getChapterAnnotations(
+        widget.novel.id,
+        _currentChapter!.id,
       );
       if (mounted) {
         setState(() => _annotations = result);
@@ -929,7 +930,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 6.1 新增：跳转到书签位置（支持字符偏移）
   void _jumpToBookmark(NovelBookmark bookmark) {
-    _jumpToChapter(bookmark.chapterOrder - 1);
+    _loadChapterContent(_chapters[bookmark.chapterOrder - 1]);
     // 章节加载完成后，滚动到字符偏移位置
     if (bookmark.charOffset > 0 && _pageTurnMode == PageTurnMode.scroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -959,10 +960,20 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
+  /// 6.1 新增：字符串转 AnnotationColor 枚举
+  AnnotationColor _parseAnnotationColor(String color) {
+    switch (color) {
+      case 'green': return AnnotationColor.green;
+      case 'blue': return AnnotationColor.blue;
+      case 'red': return AnnotationColor.red;
+      default: return AnnotationColor.yellow;
+    }
+  }
+
   /// 6.1 新增：构建带高亮的文本 Span
   TextSpan _buildAnnotatedTextSpan(String content, TextStyle baseStyle) {
     final activeAnnotations = _annotations.where((a) => !a.isDeleted).toList()
-      ..sort((a, b) => a.startCharOffset.compareTo(b.startCharOffset));
+      ..sort((a, b) => a.startOffset.compareTo(b.startOffset));
 
     if (activeAnnotations.isEmpty) {
       return TextSpan(text: content, style: baseStyle);
@@ -972,8 +983,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     int currentPos = 0;
 
     for (final annotation in activeAnnotations) {
-      final start = annotation.startCharOffset.clamp(0, content.length);
-      final end = annotation.endCharOffset.clamp(0, content.length);
+      final start = annotation.startOffset.clamp(0, content.length);
+      final end = annotation.endOffset.clamp(0, content.length);
 
       if (start > currentPos) {
         spans.add(TextSpan(
@@ -986,7 +997,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         spans.add(TextSpan(
           text: content.substring(start, end),
           style: baseStyle.copyWith(
-            backgroundColor: _parseHighlightColor(annotation.highlightColor),
+            backgroundColor: _parseHighlightColor(annotation.color.name),
           ),
         ));
       }
@@ -1147,11 +1158,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       await AnnotationService().addAnnotation(
         novelId: widget.novel.id,
         chapterId: _currentChapter!.id,
-        selectedText: selectedText,
-        startCharOffset: startOffset,
-        endCharOffset: endOffset,
+        chapterOrder: _currentChapter!.chapterOrder,
+        startOffset: startOffset,
+        endOffset: endOffset,
+        highlightedText: selectedText,
         note: note,
-        highlightColor: color,
+        color: _parseAnnotationColor(color),
       );
       if (mounted) {
         showSnackBar(context, '批注已添加');
@@ -1217,12 +1229,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             width: 12,
                             height: 12,
                             decoration: BoxDecoration(
-                              color: _parseHighlightColor(annotation.highlightColor),
+                              color: _parseHighlightColor(annotation.color.name),
                               borderRadius: BorderRadius.circular(2),
                             ),
                           ),
                           title: Text(
-                            annotation.selectedText,
+                            annotation.highlightedText,
                             maxLines: 1,
                             overflow: TextOverflow.ellipsis,
                             style: const TextStyle(fontSize: 13),
@@ -1242,14 +1254,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                             icon: const Icon(Icons.delete_outline, size: 18),
                             onPressed: () {
                               showConfirmDialog(
-                                context: context,
+                                context,
                                 title: '删除批注',
                                 content: '确定要删除这条批注吗？',
-                                onConfirm: () {
+                              ).then((confirmed) {
+                                if (confirmed == true) {
                                   Navigator.pop(context);
                                   _deleteAnnotation(annotation.id);
-                                },
-                              );
+                                }
+                              });
                             },
                           ),
                           onTap: () {
@@ -2299,7 +2312,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           editableTextState.hideToolbar();
                           item.onPressed?.call();
                         },
-                        child: Text(item.label),
+                        child: Text(item.label ?? ''),
                       ),
                     ),
                   ];

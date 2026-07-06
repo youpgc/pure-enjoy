@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ErrorWidget;
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/widgets/widgets.dart';
@@ -37,7 +37,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
     try {
       final result = await RecommendationService().getRecommendations(
-        userId: _userId,
         limit: 20,
       );
 
@@ -95,10 +94,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     }
 
     try {
-      await RecommendationService().markNotInterested(
-        novelId: novel.id,
-        reason: 'user_dislike',
-      );
+      await RecommendationService().markNotInterested(novel.id);
       if (!mounted) return;
       setState(() {
         _recommendations.removeWhere((n) => n.id == novel.id);
@@ -116,7 +112,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
     if (_userId != null) {
       RecommendationService().recordFeedback(
         novelId: novel.id,
-        action: 'click',
+        feedbackType: RecommendationFeedbackType.click,
       );
     }
     Navigator.push(
