@@ -11,6 +11,8 @@ import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
+import 'ranking_screen.dart';
+import 'recommendation_screen.dart';
 
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
@@ -315,6 +317,16 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         title: const Text('小说'),
         actions: [
           IconButton(
+            icon: const Icon(Icons.emoji_events_outlined),
+            onPressed: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const RankingScreen()),
+              );
+            },
+            tooltip: '排行榜',
+          ),
+          IconButton(
             icon: const Icon(Icons.search),
             onPressed: _showSearchDialog,
             tooltip: '搜索',
@@ -376,6 +388,68 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                     ),
                     const SizedBox(height: 24),
                   ],
+
+                  // 猜你喜欢入口
+                  if (_searchQuery.isEmpty)
+                    Padding(
+                      padding: const EdgeInsets.only(bottom: 16),
+                      child: Card(
+                        clipBehavior: Clip.antiAlias,
+                        child: InkWell(
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (_) => const RecommendationScreen(),
+                              ),
+                            );
+                          },
+                          child: Padding(
+                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                            child: Row(
+                              children: [
+                                Container(
+                                  padding: const EdgeInsets.all(8),
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.primary.withValues(alpha: 0.1),
+                                    borderRadius: BorderRadius.circular(8),
+                                  ),
+                                  child: Icon(
+                                    Icons.recommend,
+                                    color: colorScheme.primary,
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    children: [
+                                      Text(
+                                        '猜你喜欢',
+                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
+                                          fontWeight: FontWeight.bold,
+                                        ),
+                                      ),
+                                      const SizedBox(height: 2),
+                                      Text(
+                                        '基于你的阅读偏好智能推荐',
+                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                                          color: colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                Icon(
+                                  Icons.chevron_right,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
+                      ),
+                    ),
 
                   // 分类筛选
                   SizedBox(

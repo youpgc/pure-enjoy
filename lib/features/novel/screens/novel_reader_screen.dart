@@ -8,6 +8,10 @@ import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../services/api_client.dart';
 import '../models/novel_model.dart';
+import '../services/bookmark_service.dart';
+import '../services/reading_history_service.dart';
+import '../services/annotation_service.dart';
+import '../services/tts_service.dart';
 import '../widgets/reader_page_turn.dart';
 import 'novel_detail_screen.dart';
 import '../../../core/widgets/widgets.dart';
@@ -102,6 +106,23 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   bool _isCollected = false;
   String? _bookshelfId;
 
+  // 6.1 新增：书签状态
+  bool _isBookmarked = false;
+  List<NovelBookmark> _bookmarks = [];
+
+  // 6.1 新增：批注列表（当前章节）
+  List<NovelAnnotation> _annotations = [];
+
+  // 6.1 新增：当前选中的文本范围
+  TextSelection? _selectedTextRange;
+
+  // 6.1 新增：TTS 状态
+  bool _isTtsPlaying = false;
+
+  // 6.1 新增：阅读历史定时器
+  Timer? _readingHistoryTimer;
+  DateTime? _chapterReadStartTime;
+
   // 防止重复触发下一章
   bool _hasTriggeredNextChapter = false;
 
@@ -169,6 +190,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _toolbarAnimationController.dispose();
     _saveProgress();
     _scrollController.dispose();
+    // 6.1 新增：清理 TTS 和阅读历史定时器
+    TtsService().dispose();
+    _readingHistoryTimer?.cancel();
     // 退出阅读器时恢复系统UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
@@ -363,6 +387,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       _scrollToPosition();
       _saveProgress();
       _startReadingTimer();
+      _checkBookmarkStatus();
+      _chapterReadStartTime = DateTime.now();
       return;
     }
 
@@ -398,6 +424,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _scrollToPosition();
         _saveProgress();
         _startReadingTimer();
+        _checkBookmarkStatus();
+        _chapterReadStartTime = DateTime.now();
         // 继续等待网络请求更新缓存
       }
 
@@ -434,6 +462,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             _scrollToPosition();
             _saveProgress();
             _startReadingTimer();
+            _checkBookmarkStatus();
+            _chapterReadStartTime = DateTime.now();
           }
 
           if (normalizedContent.isNotEmpty) {
@@ -615,6 +645,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final totalChapters = _chapters.length;
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
+      // 6.1 新增：记录阅读历史
+      await _recordReadingHistory(progress);
+
       if (_isInBookshelf && _bookshelfId != null) {
         await ApiClient.patchByFilter(
           'user_novels',
@@ -675,6 +708,738 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         debugPrint('保存阅读进度失败');
       }
     }
+  }
+
+  /// 6.1 新增：记录阅读历史明细
+  Future<void> _recordReadingHistory(double progress) async {
+    if (_currentChapter == null) return;
+    final userId = _userId;
+    if (userId == null) return;
+
+    final now = DateTime.now();
+    final readDuration = _chapterReadStartTime != null
+        ? now.difference(_chapterReadStartTime!).inSeconds
+        : 0;
+
+    // 至少阅读了5秒才记录
+    if (readDuration < 5) return;
+
+    await ReadingHistoryService().recordReading(
+      novelId: widget.novel.id,
+      chapterId: _currentChapter!.id,
+      chapterOrder: _currentChapter!.chapterOrder,
+      readDurationSeconds: readDuration,
+      progress: progress,
+    );
+
+    _chapterReadStartTime = now;
+  }
+
+  /// 6.1 新增：检查当前位置是否有书签
+  Future<void> _checkBookmarkStatus() async {
+    if (_currentChapter == null) return;
+    final userId = _userId;
+    if (userId == null) return;
+
+    final bookmarked = await BookmarkService().hasBookmark(
+      widget.novel.id,
+      _currentChapter!.id,
+      0, // 简化为章节级别书签
+    );
+    if (mounted) {
+      setState(() => _isBookmarked = bookmarked);
+    }
+
+    // 加载本书所有书签
+    final bookmarks = await BookmarkService().getBookmarks(widget.novel.id);
+    if (mounted) {
+      setState(() => _bookmarks = bookmarks);
+    }
+
+    // 同时加载当前章节批注
+    await _loadAnnotations();
+  }
+
+  /// 6.1 新增：加载当前章节批注
+  Future<void> _loadAnnotations() async {
+    if (_currentChapter == null) return;
+    final userId = _userId;
+    if (userId == null) {
+      setState(() => _annotations = []);
+      return;
+    }
+
+    try {
+      final result = await AnnotationService().getAnnotations(
+        novelId: widget.novel.id,
+        chapterId: _currentChapter!.id,
+      );
+      if (mounted) {
+        setState(() => _annotations = result);
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('加载批注失败');
+      }
+      if (mounted) {
+        setState(() => _annotations = []);
+      }
+    }
+  }
+
+  /// 6.1 新增：估算当前阅读字符偏移
+  int _estimateCharOffset() {
+    if (_currentChapter == null) return 0;
+    final content = _currentChapter!.content;
+    if (_pageTurnMode == PageTurnMode.scroll &&
+        _scrollController.hasClients) {
+      final maxScroll = _scrollController.position.maxScrollExtent;
+      if (maxScroll > 0) {
+        final ratio = _scrollController.offset / maxScroll;
+        return (ratio * content.length).toInt().clamp(0, content.length);
+      }
+    }
+    return 0;
+  }
+
+  /// 6.1 新增：获取段落预览文本
+  String _getParagraphPreview(int charOffset) {
+    if (_currentChapter == null) return '';
+    final content = _currentChapter!.content;
+    final start = charOffset.clamp(0, content.length);
+    final end = (start + 50).clamp(0, content.length);
+    return content.substring(start, end);
+  }
+
+  /// 6.1 新增：切换书签
+  Future<void> _toggleBookmark() async {
+    if (_currentChapter == null) return;
+    final userId = _userId;
+    if (userId == null) {
+      if (mounted) showSnackBar(context, '请先登录');
+      return;
+    }
+
+    final charOffset = _estimateCharOffset();
+    final preview = _getParagraphPreview(charOffset);
+
+    final success = await BookmarkService().toggleBookmark(
+      novelId: widget.novel.id,
+      chapterId: _currentChapter!.id,
+      chapterOrder: _currentChapter!.chapterOrder,
+      charOffset: charOffset,
+      note: preview.isNotEmpty ? preview : null,
+    );
+
+    if (success && mounted) {
+      setState(() => _isBookmarked = !_isBookmarked);
+      showSnackBar(context, _isBookmarked ? '书签已添加' : '书签已移除');
+      await _checkBookmarkStatus();
+    }
+  }
+
+  /// 6.1 新增：显示书签列表
+  void _showBookmarkList() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '书签列表',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('关闭'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _bookmarks.isEmpty
+                  ? const EmptyWidget(message: '暂无书签')
+                  : ListView.builder(
+                      itemCount: _bookmarks.length,
+                      itemBuilder: (context, index) {
+                        final bm = _bookmarks[index];
+                        return ListTile(
+                          leading: Icon(
+                            bm.type == BookmarkType.auto
+                                ? Icons.auto_stories
+                                : Icons.bookmark,
+                            color: bm.type == BookmarkType.auto
+                                ? Colors.grey
+                                : Theme.of(context).colorScheme.primary,
+                          ),
+                          title: Text('第${bm.chapterOrder}章'),
+                          subtitle: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              if (bm.note != null && bm.note!.isNotEmpty)
+                                Text(
+                                  bm.note!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              Text(
+                                bm.charOffset > 0
+                                    ? '进度 ${(bm.charOffset / (_currentChapter?.content.length ?? 1) * 100).toStringAsFixed(0)}%'
+                                    : '章节开头',
+                                style: TextStyle(
+                                  fontSize: 11,
+                                  color: Theme.of(context).colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+                                ),
+                              ),
+                            ],
+                          ),
+                          isThreeLine: bm.note != null && bm.note!.isNotEmpty,
+                          trailing: Text(
+                            '${bm.createdAt.month}/${bm.createdAt.day}',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Theme.of(context).colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            _jumpToBookmark(bm);
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 6.1 新增：跳转到书签位置（支持字符偏移）
+  void _jumpToBookmark(NovelBookmark bookmark) {
+    _jumpToChapter(bookmark.chapterOrder - 1);
+    // 章节加载完成后，滚动到字符偏移位置
+    if (bookmark.charOffset > 0 && _pageTurnMode == PageTurnMode.scroll) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (_scrollController.hasClients && _currentChapter != null) {
+          final content = _currentChapter!.content;
+          final ratio = bookmark.charOffset / content.length;
+          final targetOffset = ratio * _scrollController.position.maxScrollExtent;
+          _scrollController.animateTo(
+            targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        }
+      });
+    }
+  }
+
+  /// 6.1 新增：解析高亮色值
+  Color _parseHighlightColor(String color) {
+    switch (color) {
+      case 'yellow': return const Color(0xFFFFF176);
+      case 'green': return const Color(0xFFA5D6A7);
+      case 'blue': return const Color(0xFF90CAF9);
+      case 'pink': return const Color(0xFFF48FB1);
+      case 'purple': return const Color(0xFFCE93D8);
+      default: return const Color(0xFFFFF176);
+    }
+  }
+
+  /// 6.1 新增：构建带高亮的文本 Span
+  TextSpan _buildAnnotatedTextSpan(String content, TextStyle baseStyle) {
+    final activeAnnotations = _annotations.where((a) => !a.isDeleted).toList()
+      ..sort((a, b) => a.startCharOffset.compareTo(b.startCharOffset));
+
+    if (activeAnnotations.isEmpty) {
+      return TextSpan(text: content, style: baseStyle);
+    }
+
+    final List<InlineSpan> spans = [];
+    int currentPos = 0;
+
+    for (final annotation in activeAnnotations) {
+      final start = annotation.startCharOffset.clamp(0, content.length);
+      final end = annotation.endCharOffset.clamp(0, content.length);
+
+      if (start > currentPos) {
+        spans.add(TextSpan(
+          text: content.substring(currentPos, start),
+          style: baseStyle,
+        ));
+      }
+
+      if (start < end) {
+        spans.add(TextSpan(
+          text: content.substring(start, end),
+          style: baseStyle.copyWith(
+            backgroundColor: _parseHighlightColor(annotation.highlightColor),
+          ),
+        ));
+      }
+
+      currentPos = end;
+    }
+
+    if (currentPos < content.length) {
+      spans.add(TextSpan(text: content.substring(currentPos), style: baseStyle));
+    }
+
+    return TextSpan(children: spans);
+  }
+
+  /// 6.1 新增：显示批注输入面板
+  void _showAnnotationInputPanel(String selectedText, int startOffset, int endOffset) {
+    final noteController = TextEditingController();
+    String selectedColor = 'yellow';
+    final colorOptions = [
+      ('yellow', const Color(0xFFFFF176)),
+      ('green', const Color(0xFFA5D6A7)),
+      ('blue', const Color(0xFF90CAF9)),
+      ('pink', const Color(0xFFF48FB1)),
+      ('purple', const Color(0xFFCE93D8)),
+    ];
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return SafeArea(
+            child: Padding(
+              padding: EdgeInsets.only(
+                bottom: MediaQuery.of(context).viewInsets.bottom,
+                left: 16,
+                right: 16,
+                top: 16,
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      const Expanded(
+                        child: Text(
+                          '添加批注',
+                          style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                        ),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.pop(context),
+                        child: const Text('取消'),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 原文预览
+                  Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Theme.of(context).colorScheme.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    child: Text(
+                      selectedText,
+                      style: TextStyle(
+                        fontSize: 14,
+                        color: Theme.of(context).colorScheme.onSurfaceVariant,
+                      ),
+                      maxLines: 3,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  // 颜色选择
+                  Text('高亮颜色', style: Theme.of(context).textTheme.bodySmall),
+                  const SizedBox(height: 8),
+                  Wrap(
+                    spacing: 8,
+                    children: colorOptions.map((option) {
+                      final (colorName, color) = option;
+                      final isSelected = selectedColor == colorName;
+                      return GestureDetector(
+                        onTap: () => setModalState(() => selectedColor = colorName),
+                        child: Container(
+                          width: 36,
+                          height: 36,
+                          decoration: BoxDecoration(
+                            color: color,
+                            borderRadius: BorderRadius.circular(18),
+                            border: isSelected
+                                ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
+                                : null,
+                          ),
+                          child: isSelected
+                              ? Icon(Icons.check, size: 18, color: Theme.of(context).colorScheme.primary)
+                              : null,
+                        ),
+                      );
+                    }).toList(),
+                  ),
+                  const SizedBox(height: 12),
+                  // 笔记输入
+                  TextField(
+                    controller: noteController,
+                    maxLines: 3,
+                    decoration: const InputDecoration(
+                      hintText: '输入你的笔记（可选）',
+                      border: OutlineInputBorder(),
+                    ),
+                  ),
+                  const SizedBox(height: 12),
+                  SizedBox(
+                    width: double.infinity,
+                    child: FilledButton(
+                      onPressed: () async {
+                        Navigator.pop(context);
+                        await _addAnnotation(
+                          selectedText: selectedText,
+                          startOffset: startOffset,
+                          endOffset: endOffset,
+                          note: noteController.text.isEmpty ? null : noteController.text,
+                          color: selectedColor,
+                        );
+                      },
+                      child: const Text('保存批注'),
+                    ),
+                  ),
+                  const SizedBox(height: 8),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+
+  /// 6.1 新增：添加批注
+  Future<void> _addAnnotation({
+    required String selectedText,
+    required int startOffset,
+    required int endOffset,
+    required String? note,
+    required String color,
+  }) async {
+    final userId = _userId;
+    if (userId == null) {
+      showSnackBar(context, '请先登录');
+      return;
+    }
+    if (_currentChapter == null) return;
+
+    try {
+      await AnnotationService().addAnnotation(
+        novelId: widget.novel.id,
+        chapterId: _currentChapter!.id,
+        selectedText: selectedText,
+        startCharOffset: startOffset,
+        endCharOffset: endOffset,
+        note: note,
+        highlightColor: color,
+      );
+      if (mounted) {
+        showSnackBar(context, '批注已添加');
+        await _loadAnnotations();
+      }
+    } catch (e) {
+      if (mounted) {
+        showSnackBar(context, '添加批注失败');
+      }
+    }
+  }
+
+  /// 6.1 新增：删除批注
+  Future<void> _deleteAnnotation(String annotationId) async {
+    try {
+      await AnnotationService().deleteAnnotation(annotationId);
+      if (mounted) {
+        showSnackBar(context, '批注已删除');
+        await _loadAnnotations();
+      }
+    } catch (e) {
+      if (mounted) {
+        showSnackBar(context, '删除失败');
+      }
+    }
+  }
+
+  /// 6.1 新增：显示批注列表
+  void _showAnnotationList() {
+    showModalBottomSheet(
+      context: context,
+      builder: (context) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Padding(
+              padding: const EdgeInsets.all(16),
+              child: Row(
+                children: [
+                  const Expanded(
+                    child: Text(
+                      '我的批注',
+                      style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => Navigator.pop(context),
+                    child: const Text('关闭'),
+                  ),
+                ],
+              ),
+            ),
+            const Divider(height: 1),
+            Expanded(
+              child: _annotations.isEmpty
+                  ? const EmptyWidget(message: '暂无批注，长按正文选中文本添加')
+                  : ListView.builder(
+                      itemCount: _annotations.length,
+                      itemBuilder: (context, index) {
+                        final annotation = _annotations[index];
+                        return ListTile(
+                          leading: Container(
+                            width: 12,
+                            height: 12,
+                            decoration: BoxDecoration(
+                              color: _parseHighlightColor(annotation.highlightColor),
+                              borderRadius: BorderRadius.circular(2),
+                            ),
+                          ),
+                          title: Text(
+                            annotation.selectedText,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: const TextStyle(fontSize: 13),
+                          ),
+                          subtitle: annotation.note != null && annotation.note!.isNotEmpty
+                              ? Text(
+                                  annotation.note!,
+                                  maxLines: 1,
+                                  overflow: TextOverflow.ellipsis,
+                                  style: TextStyle(
+                                    fontSize: 12,
+                                    color: Theme.of(context).colorScheme.onSurfaceVariant,
+                                  ),
+                                )
+                              : null,
+                          trailing: IconButton(
+                            icon: const Icon(Icons.delete_outline, size: 18),
+                            onPressed: () {
+                              showConfirmDialog(
+                                context: context,
+                                title: '删除批注',
+                                content: '确定要删除这条批注吗？',
+                                onConfirm: () {
+                                  Navigator.pop(context);
+                                  _deleteAnnotation(annotation.id);
+                                },
+                              );
+                            },
+                          ),
+                          onTap: () {
+                            Navigator.pop(context);
+                            // 滚动到对应位置（简化实现）
+                          },
+                        );
+                      },
+                    ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 6.1 新增：显示TTS控制面板
+  void _showTtsPanel() {
+    double tempSpeechRate = TtsService().speechRate;
+    int? tempTimerMinutes = TtsService().timerMinutes;
+
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setModalState) {
+          return SafeArea(
+            child: Padding(
+              padding: const EdgeInsets.all(16),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  const Text(
+                    '听书模式',
+                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
+                  ),
+                  const SizedBox(height: 16),
+                  // 播放控制
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                    children: [
+                      IconButton(
+                        icon: const Icon(Icons.skip_previous),
+                        tooltip: '上一句',
+                        onPressed: () => TtsService().previousSentence(),
+                      ),
+                      IconButton(
+                        icon: Icon(_isTtsPlaying ? Icons.pause_circle : Icons.play_circle),
+                        iconSize: 56,
+                        tooltip: _isTtsPlaying ? '暂停' : '播放',
+                        onPressed: () {
+                          setState(() => _isTtsPlaying = !_isTtsPlaying);
+                          if (_isTtsPlaying) {
+                            TtsService().playChapter(
+                              widget.novel.id,
+                              _currentChapter?.id ?? '',
+                              _currentChapter?.content ?? '',
+                              0,
+                            );
+                          } else {
+                            TtsService().stop();
+                          }
+                        },
+                      ),
+                      IconButton(
+                        icon: const Icon(Icons.skip_next),
+                        tooltip: '下一句',
+                        onPressed: () => TtsService().nextSentence(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  // 当前朗读句子预览
+                  if (TtsService().currentSentence != null)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 16),
+                      child: Text(
+                        TtsService().currentSentence!,
+                        style: TextStyle(
+                          fontSize: 13,
+                          color: Theme.of(context).colorScheme.onSurfaceVariant,
+                        ),
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        textAlign: TextAlign.center,
+                      ),
+                    ),
+                  const SizedBox(height: 20),
+                  const Divider(),
+                  const SizedBox(height: 12),
+                  // 语速滑块
+                  Row(
+                    children: [
+                      const Icon(Icons.speed, size: 20),
+                      const SizedBox(width: 8),
+                      Text('语速: ${tempSpeechRate.toStringAsFixed(1)}x'),
+                      Expanded(
+                        child: Slider(
+                          value: tempSpeechRate,
+                          min: 0.5,
+                          max: 2.0,
+                          divisions: 15,
+                          label: '${tempSpeechRate.toStringAsFixed(1)}x',
+                          onChanged: (value) {
+                            setModalState(() => tempSpeechRate = value);
+                          },
+                          onChangeEnd: (value) {
+                            TtsService().setSpeechRate(value);
+                            TtsService().savePreferences();
+                          },
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 定时关闭
+                  Row(
+                    children: [
+                      const Icon(Icons.timer, size: 20),
+                      const SizedBox(width: 8),
+                      const Text('定时关闭'),
+                      const Spacer(),
+                      Wrap(
+                        spacing: 8,
+                        children: [
+                          (null, '关闭'),
+                          (15, '15分'),
+                          (30, '30分'),
+                          (60, '60分'),
+                          (-1, '本章'),
+                        ].map((option) {
+                          final (minutes, label) = option;
+                          final isSelected = tempTimerMinutes == minutes ||
+                              (minutes == -1 && tempTimerMinutes == -1);
+                          return ChoiceChip(
+                            label: Text(label),
+                            selected: isSelected,
+                            onSelected: (selected) {
+                              if (selected) {
+                                setModalState(() => tempTimerMinutes = minutes);
+                                TtsService().setTimer(minutes);
+                                TtsService().savePreferences();
+                              }
+                            },
+                          );
+                        }).toList(),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  // 播放模式
+                  Row(
+                    children: [
+                      const Icon(Icons.playlist_play, size: 20),
+                      const SizedBox(width: 8),
+                      const Text('播放模式'),
+                      const Spacer(),
+                      SegmentedButton<TtsPlaybackMode>(
+                        segments: const [
+                          ButtonSegment(
+                            value: TtsPlaybackMode.sentence,
+                            label: Text('逐句'),
+                          ),
+                          ButtonSegment(
+                            value: TtsPlaybackMode.paragraph,
+                            label: Text('逐段'),
+                          ),
+                          ButtonSegment(
+                            value: TtsPlaybackMode.chapter,
+                            label: Text('整章'),
+                          ),
+                        ],
+                        selected: {TtsService().playbackMode},
+                        onSelectionChanged: (selected) {
+                          final mode = selected.first;
+                          TtsService().setPlaybackMode(mode);
+                          TtsService().savePreferences();
+                          setModalState(() {});
+                        },
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 16),
+                ],
+              ),
+            ),
+          );
+        },
+      ),
+    );
   }
 
   Future<void> _addToBookshelf() async {
@@ -1284,11 +2049,24 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   ),
                   IconButton(
                     icon: Icon(
+                      _isBookmarked ? Icons.bookmark : Icons.bookmark_border,
+                      color: _isBookmarked ? Theme.of(context).colorScheme.primary : _background.textColor,
+                    ),
+                    onPressed: _toggleBookmark,
+                    tooltip: _isBookmarked ? '移除书签' : '添加书签',
+                  ),
+                  IconButton(
+                    icon: Icon(
                       _isCollected ? Icons.favorite : Icons.favorite_border,
                       color: _isCollected ? Theme.of(context).colorScheme.error : _background.textColor,
                     ),
                     onPressed: () => _toggleCollection(),
                     tooltip: '收藏',
+                  ),
+                  IconButton(
+                    icon: Icon(Icons.headphones_outlined, color: _background.textColor),
+                    onPressed: _showTtsPanel,
+                    tooltip: '听书',
                   ),
                   IconButton(
                     icon: Icon(Icons.info_outline, color: _background.textColor),
@@ -1362,6 +2140,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                         label: '目录',
                         textColor: _background.textColor,
                         onTap: _showChapterList,
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.bookmark_outline,
+                        label: '书签',
+                        textColor: _background.textColor,
+                        onTap: _showBookmarkList,
+                      ),
+                      _ToolbarButton(
+                        icon: Icons.comment_outlined,
+                        label: '批注',
+                        textColor: _background.textColor,
+                        onTap: _showAnnotationList,
                       ),
                       _ToolbarButton(
                         icon: Icons.text_fields,
@@ -1478,8 +2268,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   ),
                 ),
               ),
-              Text(
-                _currentChapter!.content,
+              SelectableText.rich(
+                _buildAnnotatedTextSpan(
+                  _currentChapter!.content,
+                  TextStyle(
+                    fontSize: _fontSize,
+                    height: _lineHeight,
+                    color: _background.textColor,
+                    letterSpacing: 0.5,
+                    fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+                  ),
+                ),
                 style: TextStyle(
                   fontSize: _fontSize,
                   height: _lineHeight,
@@ -1487,6 +2286,66 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   letterSpacing: 0.5,
                   fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
                 ),
+                onSelectionChanged: (selection, cause) {
+                  _selectedTextRange = selection;
+                },
+                contextMenuBuilder: (context, editableTextState) {
+                  final selected = _selectedTextRange;
+                  final buttons = <Widget>[
+                    ...editableTextState.contextMenuButtonItems.map(
+                      (item) => CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onPressed: () {
+                          editableTextState.hideToolbar();
+                          item.onPressed?.call();
+                        },
+                        child: Text(item.label),
+                      ),
+                    ),
+                  ];
+                  if (selected != null && selected.start != selected.end) {
+                    final selectedText = _currentChapter!.content.substring(
+                      selected.start.clamp(0, _currentChapter!.content.length),
+                      selected.end.clamp(0, _currentChapter!.content.length),
+                    );
+                    buttons.add(
+                      CupertinoButton(
+                        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                        onPressed: () {
+                          editableTextState.hideToolbar();
+                          _showAnnotationInputPanel(
+                            selectedText,
+                            selected.start,
+                            selected.end,
+                          );
+                        },
+                        child: const Text('添加批注'),
+                      ),
+                    );
+                  }
+                  return AdaptiveTextSelectionToolbar.buttonItems(
+                    anchors: editableTextState.contextMenuAnchors,
+                    buttonItems: [
+                      ...editableTextState.contextMenuButtonItems,
+                      if (selected != null && selected.start != selected.end)
+                        ContextMenuButtonItem(
+                          label: '添加批注',
+                          onPressed: () {
+                            editableTextState.hideToolbar();
+                            final selectedText = _currentChapter!.content.substring(
+                              selected.start.clamp(0, _currentChapter!.content.length),
+                              selected.end.clamp(0, _currentChapter!.content.length),
+                            );
+                            _showAnnotationInputPanel(
+                              selectedText,
+                              selected.start,
+                              selected.end,
+                            );
+                          },
+                        ),
+                    ],
+                  );
+                },
               ),
               const SizedBox(height: 40),
               Center(

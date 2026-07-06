@@ -58,6 +58,12 @@ dependencies:
   intl: ^0.20.2
   # 骨架屏 shimmer 效果
   shimmer: ^3.0.0
+  # 语音合成
+  flutter_tts: ^4.2.2
+  # 本地 SQLite 数据库（批注离线同步）
+  sqflite: ^2.3.0
+  # 网络状态监听
+  connectivity_plus: ^5.0.0
 
 dev_dependencies:
   flutter_test:

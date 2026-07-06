@@ -390,6 +390,26 @@ class ApiClient {
     }
   }
 
+  /// RPC 调用（调用 Supabase PostgreSQL 函数）
+  static Future<ApiResponse> rpc(
+    String functionName, {
+    Map<String, dynamic>? params,
+    Duration? timeout,
+  }) async {
+    try {
+      final url = '$_baseUrl/rest/v1/rpc/$functionName';
+      final response = await HttpClient.instance.post(
+        url,
+        body: params ?? {},
+        timeout: timeout ?? RequestTimeout.simple,
+      );
+      return _handleResponse(response);
+    } catch (e) {
+      _SecureLogger.error('❌ RPC 请求失败 [$functionName]');
+      return ApiResponse.error('请求失败: $e');
+    }
+  }
+
   /// 处理响应
   static ApiResponse _handleResponse(dynamic response) {
     final statusCode = response.statusCode;

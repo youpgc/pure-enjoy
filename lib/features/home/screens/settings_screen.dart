@@ -325,7 +325,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
               );
             },
           ),
-
           // 版本信息
           const _SectionHeader(title: '版本'),
           ListTile(
@@ -706,7 +705,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       }
     }
   }
-
 }
 
 class _SectionHeader extends StatelessWidget {
