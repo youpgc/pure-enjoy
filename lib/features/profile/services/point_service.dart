@@ -102,6 +102,11 @@ class PointService {
   }
 
   /// 打卡获得积分
+  ///
+  /// 核心逻辑：只插入 point_records 流水 + 更新打卡统计字段。
+  /// users 表的 effective_points / available_points / points 由数据库
+  /// 触发器 trg_maintain_user_points 自动维护，App 端不再手动更新，
+  /// 避免与触发器冲突导致积分重复累加。
   Future<Map<String, dynamic>> checkin() async {
     try {
       final userId = AuthService.instance.currentUserId;
@@ -155,7 +160,7 @@ class PointService {
       // 3. 计算积分 = min(连续天数, 7)
       final points = streak > 7 ? 7 : streak;
 
-      // 4. 插入 point_records 记录
+      // 4. 插入 point_records 记录（触发器自动维护 users 统计字段）
       final now = DateTime.now();
       final nowIso = now.toUtc().toIso8601String();
       final expiresAt = now.add(const Duration(days: 180)).toUtc().toIso8601String();
@@ -180,20 +185,10 @@ class PointService {
         return {'success': false, 'message': '打卡失败: ${insertResult.error}'};
       }
 
-      // 5. 更新 users 表统计字段
-      final currentPoints = (stats?['points'] as num?)?.toInt() ?? 0;
-      final currentEffective = (stats?['effective_points'] as num?)?.toInt() ?? 0;
-      final currentAvailable = (stats?['available_points'] as num?)?.toInt() ?? 0;
-      final newPoints = currentPoints + points;
-      final newEffective = currentEffective + points;
-      final newAvailable = currentAvailable + points;
-
+      // 5. 更新 users 表打卡统计字段（积分统计由数据库触发器自动维护）
       await _updateUserStats(
         consecutiveCheckinDays: streak,
         lastCheckinDate: today,
-        effectivePoints: newEffective,
-        availablePoints: newAvailable,
-        points: newPoints,
       );
 
       // 6. 更新 AuthService 中的用户缓存
@@ -267,48 +262,40 @@ class PointService {
     return (stats?['available_points'] as num?)?.toInt() ?? 0;
   }
 
-  /// 积分变动时更新 users 表统计字段（供其他模块调用）
-  /// 
+  /// 积分变动时插入 point_records 流水记录（供其他模块调用）
+  ///
+  /// 数据库触发器 trg_maintain_user_points 会自动根据 point_records
+  /// 重算 users.effective_points，App 端不再直接修改统计字段。
+  ///
   /// [delta] 变动值（正数增加，负数减少）
-  /// [type] 变动类型：'earn' | 'consume' | 'expire'
+  /// [type] 变动类型：'earn' | 'consume'
   Future<void> updatePointsStats({required int delta, required String type}) async {
-    final stats = await _fetchUserStats();
-    if (stats == null) return;
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return;
 
-    final currentEffective = (stats['effective_points'] as num?)?.toInt() ?? 0;
-    final currentAvailable = (stats['available_points'] as num?)?.toInt() ?? 0;
-    final currentPoints = (stats['points'] as num?)?.toInt() ?? 0;
-
-    int newEffective = currentEffective;
-    int newAvailable = currentAvailable;
-    int newPoints = currentPoints;
-
+    String recordType;
+    String remark;
     switch (type) {
       case 'earn':
-        newEffective += delta;
-        newAvailable += delta;
-        newPoints += delta;
+        recordType = 'earn';
+        remark = '获得积分';
         break;
       case 'consume':
-        newAvailable -= delta;
-        newPoints -= delta;
+        recordType = 'spend';
+        remark = '消费积分';
         break;
-      case 'expire':
-        newEffective -= delta;
-        newAvailable -= delta;
-        newPoints -= delta;
-        break;
+      default:
+        return;
     }
 
-    // 确保不为负数
-    newEffective = newEffective < 0 ? 0 : newEffective;
-    newAvailable = newAvailable < 0 ? 0 : newAvailable;
-    newPoints = newPoints < 0 ? 0 : newPoints;
-
-    await _updateUserStats(
-      effectivePoints: newEffective,
-      availablePoints: newAvailable,
-      points: newPoints,
-    );
+    await ApiClient.post('point_records', {
+      'id': const Uuid().v4(),
+      'user_id': userId,
+      'type': recordType,
+      'amount': delta,
+      'remark': remark,
+      'status': 'active',
+      'created_at': DateTime.now().toUtc().toIso8601String(),
+    });
   }
 }

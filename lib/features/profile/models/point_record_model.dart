@@ -1,7 +1,7 @@
 class PointRecord {
   final String id;
   final String userId;
-  final String type; // checkin, recharge, deduct, admin_recharge, admin_deduct
+  final String type; // checkin, earn, spend, adjust, admin_adjust
   final int amount;
   final String? remark;
   final String? operatorName;
