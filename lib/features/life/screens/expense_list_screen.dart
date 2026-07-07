@@ -116,7 +116,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     });
   }
 
-  /// 加载指定月份总支出（客户端累加已加载列表数据）
+  /// 加载指定月份总支出（服务端 RPC SUM 聚合，不受分页限制）
   Future<void> _loadTotalAmountForMonth(DateTime month) async {
     final userId = _userId;
     if (userId == null) return;
@@ -124,18 +124,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     setState(() => _isLoadingTotal = true);
 
     try {
-      // 客户端计算：从已加载的支出列表中筛选并累加
+      final result = await ApiClient.rpc('fn_get_monthly_expense_total', params: {
+        'p_user_id': userId,
+        'p_year': month.year,
+        'p_month': month.month,
+        'p_category': _selectedCategory,
+      });
+
       double total = 0.0;
-      for (final expense in _expenses) {
-        // 检查是否属于目标月份
-        if (expense.date.year != month.year || expense.date.month != month.month) {
-          continue;
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        final value = result.data!.first['total'];
+        if (value != null) {
+          total = (value as num).toDouble();
         }
-        // 检查分类筛选
-        if (_selectedCategory != 'all' && expense.category != _selectedCategory) {
-          continue;
-        }
-        total += expense.amount;
       }
 
       if (mounted) {
@@ -146,7 +147,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('❌ 加载总支出失败');
+        debugPrint('❌ 加载总支出失败: $e');
       }
       if (mounted) {
         setState(() => _isLoadingTotal = false);
