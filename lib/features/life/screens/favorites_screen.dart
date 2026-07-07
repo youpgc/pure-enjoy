@@ -204,6 +204,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     String category = favorite?.category ?? 'other';
     bool isSaving = false;
 
+    if (!mounted) return;
     await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(

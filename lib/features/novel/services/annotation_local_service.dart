@@ -160,7 +160,7 @@ class AnnotationLocalService {
   Future<void> markAsSynced(String localIdOrRemoteId) async {
     final db = await database;
     // 先尝试按 remote id 更新
-    var count = await db.update(
+    final count = await db.update(
       'novel_annotations_local',
       {'sync_status': 'synced'},
       where: 'id = ?',
@@ -180,7 +180,7 @@ class AnnotationLocalService {
   /// 标记为同步失败
   Future<void> markAsFailed(String localIdOrRemoteId) async {
     final db = await database;
-    var count = await db.update(
+    final count = await db.update(
       'novel_annotations_local',
       {'sync_status': 'failed'},
       where: 'id = ?',
