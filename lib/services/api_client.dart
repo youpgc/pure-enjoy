@@ -412,6 +412,9 @@ class ApiClient {
 
   /// 处理响应
   static ApiResponse _handleResponse(dynamic response) {
+    if (response == null) {
+      return ApiResponse.error('网络请求失败: 无响应', statusCode: 0);
+    }
     final statusCode = response.statusCode;
 
     if (statusCode >= 200 && statusCode < 300) {
