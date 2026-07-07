@@ -127,8 +127,21 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 防止重复触发下一章
   bool _hasTriggeredNextChapter = false;
 
+  // 防止重复触发预加载（70% 进度）
+  bool _hasTriggeredPreload = false;
+
   /// 标记是否需要跳转到最后一页（上一章时）
   bool _shouldJumpToLastPage = false;
+
+  // 渲染优化：TextSpan 缓存
+  TextSpan? _cachedTextSpan;
+  String? _cachedSpanForChapterId;
+  int? _cachedSpanFontHash;
+
+  // 渲染优化：静态 TextStyle 缓存
+  static final Map<int, TextStyle> _textStyleCache = {};
+
+  int get _fontStyleHash => Object.hash(_fontSize, _lineHeight, _background, _font);
 
   /// 当前正在加载的章节ID，用于防止快速切换时竞态条件（Bug 2 修复）
   String? _loadingChapterId;
@@ -393,6 +406,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       return;
     }
 
+    // 设置当前保护章节（内存压力时不清理）
+    ChapterCacheService.instance.setProtectedChapter(chapter.id);
+
     try {
       // 2. 检查本地持久化缓存，同时发起网络请求（并行加载）
       final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
@@ -556,14 +572,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 预加载当前章节前后各一章（共3章）
+  /// 智能预加载：根据网络环境决定预加载数量
+  /// WiFi 环境下预加载 5 章，蜂窝网络下预加载 2 章
   void _preloadAdjacentChapters(int index) {
-    for (int i = index - 1; i <= index + 1; i++) {
-      if (i < 0 || i >= _chapters.length) continue;
+    // 重置预加载触发标志
+    _hasTriggeredPreload = false;
+
+    final preloadIds = <String>[];
+    // 优先预加载后续章节（阅读主要向前）
+    for (int i = index + 1; i < _chapters.length && preloadIds.length < 5; i++) {
       final chapter = _chapters[i];
-      if (chapter.content.isNotEmpty) continue;
-      _fetchChapterContent(chapter);
+      if (chapter.content.isEmpty) {
+        preloadIds.add(chapter.id);
+      }
     }
+
+    if (preloadIds.isEmpty) return;
+
+    ChapterCacheService.instance.triggerPreload(
+      chapterIds: preloadIds,
+      fetcher: (chapterId) async {
+        final chapter = _chapters.firstWhere((c) => c.id == chapterId);
+        await _fetchChapterContent(chapter);
+        return chapter.content;
+      },
+    );
   }
 
   /// 根据阅读方向滚动到合适位置
@@ -589,6 +622,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void _onScroll() {
     if (!_scrollController.hasClients) return;
     if (_pageTurnMode != PageTurnMode.scroll) return; // 只在滚动模式下生效
+
+    // 70% 进度触发预加载（智能预加载）
+    if (!_hasTriggeredPreload && !_isLoadingChapter) {
+      final maxExtent = _scrollController.position.maxScrollExtent;
+      if (maxExtent > 0) {
+        final progress = _scrollController.position.pixels / maxExtent;
+        if (progress >= 0.7) {
+          _hasTriggeredPreload = true;
+          _preloadAdjacentChapters(_currentChapterIndex);
+        }
+      }
+    }
+
     if (_hasTriggeredNextChapter) return; // 防止重复触发
     if (_isLoadingChapter) return;
 
@@ -970,46 +1016,65 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 6.1 新增：构建带高亮的文本 Span
+  /// 6.1 新增：构建带高亮的文本 Span（带缓存）
   TextSpan _buildAnnotatedTextSpan(String content, TextStyle baseStyle) {
+    final chapterId = _currentChapter?.id ?? '';
+    final fontHash = _fontStyleHash;
+    final annotationHash = Object.hashAll(_annotations.where((a) => !a.isDeleted).map((a) => Object.hash(a.id, a.startOffset, a.endOffset)));
+    final cacheKey = Object.hash(chapterId, fontHash, annotationHash);
+
+    // 缓存命中且章节未变、字体未变、批注未变
+    if (_cachedTextSpan != null &&
+        _cachedSpanForChapterId == chapterId &&
+        _cachedSpanFontHash == cacheKey) {
+      return _cachedTextSpan!;
+    }
+
     final activeAnnotations = _annotations.where((a) => !a.isDeleted).toList()
       ..sort((a, b) => a.startOffset.compareTo(b.startOffset));
 
+    TextSpan result;
     if (activeAnnotations.isEmpty) {
-      return TextSpan(text: content, style: baseStyle);
-    }
+      result = TextSpan(text: content, style: baseStyle);
+    } else {
+      final List<InlineSpan> spans = [];
+      int currentPos = 0;
 
-    final List<InlineSpan> spans = [];
-    int currentPos = 0;
+      for (final annotation in activeAnnotations) {
+        final start = annotation.startOffset.clamp(0, content.length);
+        final end = annotation.endOffset.clamp(0, content.length);
 
-    for (final annotation in activeAnnotations) {
-      final start = annotation.startOffset.clamp(0, content.length);
-      final end = annotation.endOffset.clamp(0, content.length);
+        if (start > currentPos) {
+          spans.add(TextSpan(
+            text: content.substring(currentPos, start),
+            style: baseStyle,
+          ));
+        }
 
-      if (start > currentPos) {
-        spans.add(TextSpan(
-          text: content.substring(currentPos, start),
-          style: baseStyle,
-        ));
+        if (start < end) {
+          spans.add(TextSpan(
+            text: content.substring(start, end),
+            style: baseStyle.copyWith(
+              backgroundColor: _parseHighlightColor(annotation.color.name),
+            ),
+          ));
+        }
+
+        currentPos = end;
       }
 
-      if (start < end) {
-        spans.add(TextSpan(
-          text: content.substring(start, end),
-          style: baseStyle.copyWith(
-            backgroundColor: _parseHighlightColor(annotation.color.name),
-          ),
-        ));
+      if (currentPos < content.length) {
+        spans.add(TextSpan(text: content.substring(currentPos), style: baseStyle));
       }
 
-      currentPos = end;
+      result = TextSpan(children: spans);
     }
 
-    if (currentPos < content.length) {
-      spans.add(TextSpan(text: content.substring(currentPos), style: baseStyle));
-    }
-
-    return TextSpan(children: spans);
+    // 写入缓存
+    _cachedTextSpan = result;
+    _cachedSpanForChapterId = chapterId;
+    _cachedSpanFontHash = cacheKey;
+    return result;
   }
 
   /// 6.1 新增：显示批注输入面板
@@ -1526,6 +1591,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_currentChapterIndex > 0) {
       // 标记需要跳转到最后一页（上一章）
       _shouldJumpToLastPage = true;
+      // 重置预加载触发标志
+      _hasTriggeredPreload = false;
+      _hasTriggeredNextChapter = false;
       final prevIndex = _currentChapterIndex - 1;
       setState(() {
         _currentChapterIndex = prevIndex;
@@ -1544,6 +1612,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (_currentChapterIndex < _chapters.length - 1) {
       // 标记需要跳转到第一页（下一章）
       _shouldJumpToLastPage = false;
+      // 重置预加载触发标志
+      _hasTriggeredPreload = false;
+      _hasTriggeredNextChapter = false;
       final nextIndex = _currentChapterIndex + 1;
       setState(() {
         _currentChapterIndex = nextIndex;
@@ -2250,6 +2321,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     );
   }
 
+  /// 渲染优化：获取缓存的 TextStyle，避免每帧重建
+  TextStyle _getCachedTextStyle({bool isTitle = false}) {
+    final hash = Object.hash(_fontStyleHash, isTitle);
+    return _textStyleCache.putIfAbsent(hash, () => TextStyle(
+      fontSize: isTitle ? _fontSize + 4 : _fontSize,
+      height: isTitle ? 1.6 : _lineHeight,
+      color: _background.textColor,
+      letterSpacing: isTitle ? 0 : 0.5,
+      fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+      fontWeight: isTitle ? FontWeight.bold : FontWeight.normal,
+    ));
+  }
+
   Widget _buildContent() {
     if (_pageTurnMode == PageTurnMode.scroll) {
       // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
@@ -2257,51 +2341,37 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       // 内容已在 SafeArea 内（顶部/底部状态栏已处理安全区域），不需要再加 mediaQuery.padding
       const topPadding = 12.0;
       const bottomPadding = 36.0;
+      final textStyle = _getCachedTextStyle();
       return GestureDetector(
         onTapUp: _handleScreenTap,
         child: SingleChildScrollView(
           controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Center(
-                child: Padding(
-                  padding: const EdgeInsets.only(bottom: 24),
-                  child: Text(
-                    _currentChapter!.title,
-                    style: TextStyle(
-                      fontSize: _fontSize + 4,
-                      fontWeight: FontWeight.bold,
-                      color: _background.textColor,
-                      height: 1.6,
-                      fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+          // 渲染优化：增大 cacheExtent 预渲染更多内容，减少滚动时的空白闪烁
+          cacheExtent: 500,
+          child: RepaintBoundary(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Center(
+                  child: Padding(
+                    padding: const EdgeInsets.only(bottom: 24),
+                    child: Text(
+                      _currentChapter!.title,
+                      style: _getCachedTextStyle(isTitle: true),
+                      textAlign: TextAlign.center,
                     ),
-                    textAlign: TextAlign.center,
                   ),
                 ),
-              ),
-              SelectableText.rich(
-                _buildAnnotatedTextSpan(
-                  _currentChapter!.content,
-                  TextStyle(
-                    fontSize: _fontSize,
-                    height: _lineHeight,
-                    color: _background.textColor,
-                    letterSpacing: 0.5,
-                    fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
+                SelectableText.rich(
+                  _buildAnnotatedTextSpan(
+                    _currentChapter!.content,
+                    textStyle,
                   ),
-                ),
-                style: TextStyle(
-                  fontSize: _fontSize,
-                  height: _lineHeight,
-                  color: _background.textColor,
-                  letterSpacing: 0.5,
-                  fontFamily: _font.fontFamily == 'system' ? null : _font.fontFamily,
-                ),
-                onSelectionChanged: (selection, cause) {
-                  _selectedTextRange = selection;
-                },
+                  style: textStyle,
+                  onSelectionChanged: (selection, cause) {
+                    _selectedTextRange = selection;
+                  },
                 contextMenuBuilder: (context, editableTextState) {
                   final selected = _selectedTextRange;
                   final buttons = <Widget>[
@@ -2371,7 +2441,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             ],
           ),
         ),
-      );
+      ),
+    );
     }
 
     // 仿真翻页模式：使用 SimulationPageView
