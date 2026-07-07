@@ -193,6 +193,8 @@ class ReadingProgressModel {
   final String novelId;
   final double progress;
   final int? lastChapter;
+  final int? lastCharOffset;
+  final String? readingStatus;
   final bool? isCollected;
   final DateTime? lastReadAt;
   final DateTime createdAt;
@@ -204,6 +206,8 @@ class ReadingProgressModel {
     required this.novelId,
     this.progress = 0.0,
     this.lastChapter,
+    this.lastCharOffset,
+    this.readingStatus,
     this.isCollected,
     this.lastReadAt,
     required this.createdAt,
@@ -217,6 +221,8 @@ class ReadingProgressModel {
       novelId: json['novel_id'] as String,
       progress: json['progress'] != null ? (json['progress'] as num).toDouble() : 0.0,
       lastChapter: json['last_chapter'] as int?,
+      lastCharOffset: json['last_char_offset'] as int?,
+      readingStatus: json['reading_status'] as String?,
       isCollected: json['is_collected'] as bool?,
       lastReadAt: json['last_read_at'] != null
           ? DateTime.tryParse(json['last_read_at'] as String)
@@ -234,6 +240,8 @@ class ReadingProgressModel {
       'novel_id': novelId,
       'progress': progress,
       'last_chapter': lastChapter,
+      'last_char_offset': lastCharOffset,
+      'reading_status': readingStatus,
       'is_collected': isCollected,
       'last_read_at': lastReadAt?.toUtc().toIso8601String(),
       'created_at': createdAt.toUtc().toIso8601String(),
