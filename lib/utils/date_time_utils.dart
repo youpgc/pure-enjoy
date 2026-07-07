@@ -21,10 +21,21 @@ class DateTimeUtils {
   /// 时间格式：HH:mm:ss
   static final DateFormat _timeFormat = DateFormat('HH:mm:ss');
 
-  /// 将 UTC DateTime 转换为北京时间
+  /// 将 DateTime 转换为北京时间展示
+  ///
+  /// - UTC 时间：加 8 小时偏移后转为本地时区 DateTime
+  /// - 本地时间（如 DATE 字段解析的 00:00:00）：直接返回，不再加偏移
   static DateTime _toBeijingTime(DateTime dt) {
-    // 如果已经是带时区信息的 DateTime，直接加 8 小时偏移
-    return dt.add(_beijingOffset);
+    if (dt.isUtc) {
+      final beijing = dt.add(_beijingOffset);
+      // 转为本地时区 DateTime，使 DateFormat 按本地时区格式化
+      return DateTime(
+        beijing.year, beijing.month, beijing.day,
+        beijing.hour, beijing.minute, beijing.second,
+      );
+    }
+    // 本地时间直接返回（如 DATE 字段解析的 DateTime）
+    return dt;
   }
 
   /// 格式化为标准格式：YYYY-MM-DD HH:mm:ss

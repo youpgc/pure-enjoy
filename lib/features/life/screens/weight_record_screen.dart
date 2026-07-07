@@ -441,11 +441,13 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
                             }
 
                             final record = _records[index];
-                            // date 与 created_at 日期相同时展示 created_at（含时间），不同时展示 date
-                            final isSameDate = record.createdAt != null &&
-                                record.date.year == record.createdAt!.year &&
-                                record.date.month == record.createdAt!.month &&
-                                record.date.day == record.createdAt!.day;
+                            // date 与 created_at 日期相同时展示 created_at（含真实时分秒），不同时展示 date
+                            // 注意：createdAt 为 UTC，需先转本地时区再比较日期
+                            final createdAtLocal = record.createdAt?.toLocal();
+                            final isSameDate = createdAtLocal != null &&
+                                record.date.year == createdAtLocal.year &&
+                                record.date.month == createdAtLocal.month &&
+                                record.date.day == createdAtLocal.day;
                             final displayDate = (isSameDate && record.createdAt != null)
                                 ? record.createdAt!
                                 : record.date;
