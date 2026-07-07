@@ -62,7 +62,10 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
 
       final result = await ApiClient.get(
         'user_feedback',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {
+          'user_id': 'eq.$userId',
+          'is_deleted': 'eq.false',
+        },
         order: 'created_at.desc',
         limit: limit,
         offset: offset,

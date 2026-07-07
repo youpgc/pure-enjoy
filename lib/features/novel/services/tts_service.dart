@@ -274,7 +274,10 @@ class TtsService {
 
     final result = await ApiClient.get(
       'users',
-      filters: {'id': 'eq.$userId'},
+      filters: {
+        'id': 'eq.$userId',
+        'is_deleted': 'eq.false',
+      },
       select: 'tts_speech_rate,tts_timer_minutes,tts_playback_mode',
       limit: 1,
     );

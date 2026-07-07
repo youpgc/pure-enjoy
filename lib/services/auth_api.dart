@@ -256,7 +256,7 @@ class AuthApi {
 
       final response = await http.get(
         Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/users?$filter&select=email'),
+            '${SupabaseConfig.url}/rest/v1/users?$filter&is_deleted=eq.false&select=email'),
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
@@ -287,7 +287,7 @@ class AuthApi {
     try {
       final response = await http.get(
         Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?$field=eq.${Uri.encodeComponent(value)}&select=id',
+          '${SupabaseConfig.url}/rest/v1/users?$field=eq.${Uri.encodeComponent(value)}&is_deleted=eq.false&select=id',
         ),
         headers: {
           'apikey': SupabaseConfig.anonKey,

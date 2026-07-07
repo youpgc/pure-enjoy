@@ -12,6 +12,7 @@ class ReadingHistoryService {
   String? get _userId => SessionManager.instance.currentUserId;
 
   /// 记录阅读历史
+  /// 同一用户+小说+分钟内去重：存在则更新，不存在则插入
   Future<bool> recordReading({
     required String novelId,
     required String? chapterId,
@@ -21,6 +22,40 @@ class ReadingHistoryService {
   }) async {
     final userId = _userId;
     if (userId == null) return false;
+
+    final now = DateTime.now().toUtc();
+    // 当前分钟起始和结束（用于去重范围）
+    final startOfMinute = DateTime.utc(now.year, now.month, now.day, now.hour, now.minute);
+    final endOfMinute = startOfMinute.add(const Duration(minutes: 1));
+
+    // 1. 查询同分钟内是否已有记录
+    final existingResult = await ApiClient.get(
+      'reading_history',
+      filters: {
+        'user_id': 'eq.$userId',
+        'novel_id': 'eq.$novelId',
+        'and': '(created_at.gte.${startOfMinute.toIso8601String()},created_at.lt.${endOfMinute.toIso8601String()})',
+      },
+      limit: 1,
+    );
+
+    // 2. 存在则更新，不存在则插入
+    if (existingResult.isSuccess &&
+        existingResult.data != null &&
+        existingResult.data!.isNotEmpty) {
+      final existingId = existingResult.data!.first['id'];
+      final updateResult = await ApiClient.patch(
+        'reading_history',
+        {
+          'chapter_id': chapterId,
+          'chapter_order': chapterOrder,
+          'read_duration_seconds': readDurationSeconds,
+          'progress': progress,
+        },
+        id: existingId.toString(),
+      );
+      return updateResult.isSuccess;
+    }
 
     final record = ReadingHistoryRecord(
       id: '',

@@ -58,7 +58,10 @@ class PointService {
     if (userId == null) return null;
     final result = await ApiClient.get(
       'users',
-      filters: {'id': 'eq.$userId'},
+      filters: {
+        'id': 'eq.$userId',
+        'is_deleted': 'eq.false',
+      },
       columns: 'consecutive_checkin_days,last_checkin_date,effective_points,available_points,expiring_points,points',
       limit: 1,
     );

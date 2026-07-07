@@ -1538,6 +1538,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           'progress': 0,
           'last_chapter': _currentChapter?.chapterOrder ?? 1,
           'is_collected': true,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
           'updated_at': DateTime.now().toUtc().toIso8601String(),
         },

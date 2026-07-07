@@ -72,7 +72,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       final result = await ApiClient.get(
         'users',
-        filters: {'id': 'eq.$userId'},
+        filters: {
+          'id': 'eq.$userId',
+          'is_deleted': 'eq.false',
+        },
       );
 
       if (result.isSuccess) {
@@ -261,6 +264,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           filters: {
             'username': 'eq.$newUsername',
             'id': 'neq.$_userId',
+            'is_deleted': 'eq.false',
           },
           limit: 1,
         );
@@ -278,6 +282,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           filters: {
             'phone': 'eq.$newPhone',
             'id': 'neq.$_userId',
+            'is_deleted': 'eq.false',
           },
           limit: 1,
         );
