@@ -72,6 +72,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
         final newComments = result.data!
             .map((json) => NovelCommentModel.fromJson(json))
             .toList();
+        if (!mounted) return;
         setState(() {
           if (refresh) _comments.clear();
           _comments.addAll(newComments);
@@ -79,16 +80,16 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
           _isLoading = false;
         });
       } else {
-        setState(() => _isLoading = false);
         if (mounted) {
+          setState(() => _isLoading = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('加载评论失败: ${result.errorMessage}')),
           );
         }
       }
     } catch (e) {
-      setState(() => _isLoading = false);
       if (mounted) {
+        setState(() => _isLoading = false);
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('加载评论失败: $e')),
         );
@@ -130,6 +131,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
           await ApiClient.post(AppConfig.novelCommentsTable, comment.toJson());
       if (result.isSuccess) {
         _inputController.clear();
+        if (!mounted) return;
         setState(() {
           _isSubmitting = false;
           _selectedRating = null;
@@ -143,16 +145,16 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
               const SnackBar(content: Text('评论成功')));
         }
       } else {
-        setState(() => _isSubmitting = false);
         if (mounted) {
+          setState(() => _isSubmitting = false);
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('评论失败: ${result.errorMessage}')),
           );
         }
       }
     } catch (e) {
-      setState(() => _isSubmitting = false);
       if (mounted) {
+        setState(() => _isSubmitting = false);
         ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('评论失败: $e')));
       }
@@ -380,6 +382,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
         filters: {'id': 'eq.${comment.id}'},
         body: {'like_count': comment.likeCount + 1},
       );
+      if (!mounted) return;
       setState(() {
         final index = _comments.indexWhere((c) => c.id == comment.id);
         if (index != -1) {

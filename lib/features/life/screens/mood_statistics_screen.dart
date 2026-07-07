@@ -54,6 +54,7 @@ class _MoodStatisticsScreenState extends State<MoodStatisticsScreen> {
         limit: 30,
       );
 
+      if (!mounted) return;
       if (result.isSuccess) {
         final List<dynamic> data = result.data!;
         setState(() {
@@ -67,10 +68,12 @@ class _MoodStatisticsScreenState extends State<MoodStatisticsScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

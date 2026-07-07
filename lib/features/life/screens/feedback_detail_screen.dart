@@ -34,6 +34,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
         order: 'created_at.desc',
       );
 
+      if (!mounted) return;
       if (result.isSuccess) {
         setState(() {
           _flowRecords = result.data!;
@@ -46,7 +47,9 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
       if (kDebugMode) {
         debugPrint('加载流转记录失败');
       }
-      setState(() => _loadingFlow = false);
+      if (mounted) {
+        setState(() => _loadingFlow = false);
+      }
     }
   }
 

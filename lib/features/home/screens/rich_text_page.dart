@@ -32,6 +32,7 @@ class _RichTextPageState extends State<RichTextPage> {
         columns: 'title,content',
       );
 
+      if (!mounted) return;
       if (result.isSuccess) {
         final data = result.data!;
         if (data.isNotEmpty) {
@@ -52,10 +53,12 @@ class _RichTextPageState extends State<RichTextPage> {
         });
       }
     } catch (e) {
-      setState(() {
-        _error = '加载失败: $e';
-        _loading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = '加载失败: $e';
+          _loading = false;
+        });
+      }
     }
   }
 

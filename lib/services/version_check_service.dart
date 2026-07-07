@@ -251,7 +251,9 @@ class VersionCheckService {
         if (await oldFile.exists()) {
           await oldFile.delete();
         }
-      } catch (_) {}
+      } catch (e) {
+        debugPrint('删除旧文件失败: $e');
+      }
 
       // 使用独立 Client 发送请求，不注入任何额外 headers
       final request = http.Request('GET', uri);

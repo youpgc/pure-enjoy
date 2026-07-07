@@ -67,6 +67,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
 
       if (result.isSuccess) {
         final data = result.data!;
+        if (!mounted) return;
         setState(() {
           if (refresh) {
             _history = data.cast<Map<String, dynamic>>();
@@ -77,11 +78,15 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
           onPaginationDataLoaded(data.length);
         });
       } else {
-        setState(() => _isLoading = false);
+        if (mounted) {
+          setState(() => _isLoading = false);
+        }
       }
     } catch (e) {
       debugPrint('加载阅读历史失败: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 

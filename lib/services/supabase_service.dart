@@ -112,10 +112,14 @@ class AuthService {
     // 切换账号前清除本地缓存数据，防止旧账号数据残留
     try {
       await CacheHelper.instance.clearAllUserData();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('清理缓存失败: $e');
+    }
     try {
       await ChapterCacheService.instance.clearAllCache();
-    } catch (_) {}
+    } catch (e) {
+      debugPrint('清理缓存失败: $e');
+    }
     await _session.clearSession();
   }
 

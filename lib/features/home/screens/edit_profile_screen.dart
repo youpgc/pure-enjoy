@@ -78,6 +78,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (result.isSuccess) {
         final data = result.data!;
         if (data.isNotEmpty) {
+          if (!mounted) return;
           setState(() {
             _userData = data.first;
             _initializeControllers();
@@ -89,7 +90,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       _showError('加载用户数据出错: $e');
     } finally {
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -179,7 +182,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         );
       }
     } finally {
-      setState(() => _isUploadingAvatar = false);
+      if (mounted) {
+        setState(() => _isUploadingAvatar = false);
+      }
     }
   }
 
@@ -317,7 +322,9 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     } catch (e) {
       _showError('保存出错: $e');
     } finally {
-      setState(() => _isSaving = false);
+      if (mounted) {
+        setState(() => _isSaving = false);
+      }
     }
   }
 

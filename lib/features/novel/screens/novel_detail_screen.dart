@@ -83,6 +83,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         columns: 'id,is_collected,last_chapter,last_read_at',
       );
 
+      if (!mounted) return;
       if (result.isSuccess) {
         final data = result.data!;
         if (data.isNotEmpty) {
@@ -100,7 +101,9 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         setState(() => _isLoadingShelf = false);
       }
     } catch (e) {
-      setState(() => _isLoadingShelf = false);
+      if (mounted) {
+        setState(() => _isLoadingShelf = false);
+      }
     }
   }
 
@@ -250,6 +253,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           filters: {'id': 'eq.$_bookshelfId'},
         );
 
+        if (!mounted) return;
         if (result.isSuccess) {
           setState(() {
             _isInBookshelf = false;
@@ -281,6 +285,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           },
         );
 
+        if (!mounted) return;
         if (result.isSuccess) {
           final data = result.data!;
           if (data.isNotEmpty) {
@@ -382,7 +387,9 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
               content: content,
             );
             downloaded++;
-            setState(() => _cachedChapterCount = _cachedChapterCount + 1);
+            if (mounted) {
+              setState(() => _cachedChapterCount = _cachedChapterCount + 1);
+            }
           }
         }
       } catch (e) {
@@ -394,8 +401,10 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
     // 已缓存的章节直接计数
     downloaded += _chapters.length - uncachedChapters.length;
-    setState(() => _cachedChapterCount = downloaded);
-    setState(() => _isDownloading = false);
+    if (mounted) {
+      setState(() => _cachedChapterCount = downloaded);
+      setState(() => _isDownloading = false);
+    }
   }
 
   /// 清除缓存

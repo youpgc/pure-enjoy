@@ -55,6 +55,7 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
         limit: 500,
       );
 
+      if (!mounted) return;
       if (result.isSuccess) {
         final List<dynamic> data = result.data!;
         setState(() {
@@ -68,10 +69,12 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
         });
       }
     } catch (e) {
-      setState(() {
-        _error = e.toString();
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _error = e.toString();
+          _isLoading = false;
+        });
+      }
     }
   }
 

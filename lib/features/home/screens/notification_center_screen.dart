@@ -69,11 +69,13 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
     try {
       final userId = _userId;
       if (userId == null) {
-        setState(() {
-          _notifications = [];
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
+        if (mounted) {
+          setState(() {
+            _notifications = [];
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
         return;
       }
       // 查询当前用户的通知 + 系统通知（user_id 为 null）
@@ -88,6 +90,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       if (result.isSuccess) {
         final data = result.data!;
         final newItems = data.cast<Map<String, dynamic>>();
+        if (!mounted) return;
         setState(() {
           if (refresh) {
             _notifications = newItems;
@@ -100,18 +103,22 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           _isLoadingMore = false;
         });
       } else {
+        if (mounted) {
+          setState(() {
+            _error = '加载通知失败 (${result.statusCode})';
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+      }
+    } catch (e) {
+      if (mounted) {
         setState(() {
-          _error = '加载通知失败 (${result.statusCode})';
+          _error = '网络异常，请稍后重试';
           _isLoading = false;
           _isLoadingMore = false;
         });
       }
-    } catch (e) {
-      setState(() {
-        _error = '网络异常，请稍后重试';
-        _isLoading = false;
-        _isLoadingMore = false;
-      });
     }
   }
 
@@ -122,6 +129,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         filters: {'id': 'eq.$id'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
+      if (!mounted) return;
       setState(() {
         final idx = _notifications.indexWhere((n) => n['id'] == id);
         if (idx >= 0) {
@@ -153,6 +161,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
+      if (!mounted) return;
       setState(() {
         for (var n in _notifications) {
           n['is_read'] = true;
