@@ -209,7 +209,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
     _toolbarAnimationController.dispose();
-    _saveProgress();
     _scrollController.dispose();
     // 6.1 新增：清理 TTS 和阅读历史定时器
     TtsService().dispose();
@@ -217,6 +216,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 退出阅读器时恢复系统UI
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
     super.dispose();
+  }
+
+  /// 使用 PopScope 替代 dispose 保存进度，确保在页面真正退出前完成保存
+  Future<bool> _onWillPop() async {
+    await _saveProgress();
+    return true;
   }
 
   @override
@@ -2086,7 +2091,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                 size: 18,
                 color: _background.textColor.withValues(alpha: 0.7),
               ),
-              onPressed: () => Navigator.pop(context),
+              onPressed: () async {
+                await _saveProgress();
+                if (mounted) Navigator.pop(context);
+              },
               padding: EdgeInsets.zero,
               constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
               tooltip: '返回',
@@ -2302,7 +2310,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) async {
+        if (didPop) return;
+        await _saveProgress();
+        if (mounted) Navigator.of(context).pop();
+      },
+      child: Scaffold(
       key: _scaffoldKey,
       backgroundColor: _background.bgColor,
       appBar: null, // 始终不显示 AppBar
