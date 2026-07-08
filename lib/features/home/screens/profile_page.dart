@@ -124,7 +124,7 @@ class _ProfilePageState extends State<ProfilePage> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () async {
                       await SupabaseService.instance.signOut();
-                      if (!mounted) return;
+                      if (!context.mounted) return;
                       Navigator.of(context).pushAndRemoveUntil(
                         MaterialPageRoute(builder: (_) => const LoginScreen()),
                         (route) => false,

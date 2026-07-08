@@ -453,6 +453,10 @@ class AnnotationService {
         return 0xFF90CAF9;
       case AnnotationColor.red:
         return 0xFFEF9A9A;
+      case AnnotationColor.pink:
+        return 0xFFF48FB1;
+      case AnnotationColor.purple:
+        return 0xFFCE93D8;
     }
   }
 }
