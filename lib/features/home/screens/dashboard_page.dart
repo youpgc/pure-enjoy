@@ -4,21 +4,18 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/utils/event_bus.dart';
-import '../../../core/widgets/skeleton_loading.dart';
 import '../../../services/api_client.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../life/models/habit_model.dart';
 import '../../life/models/reminder_model.dart';
-import '../../life/screens/habits_screen.dart';
 import '../../life/screens/reminders_screen.dart';
 import '../../novel/models/novel_model.dart';
 import '../../novel/screens/novel_reader_screen.dart';
 import 'notification_center_screen.dart';
 import 'sheets/sheets.dart';
-import '../widgets/activity_item.dart';
-import '../widgets/tool_card.dart';
+import '../widgets/dashboard/dashboard_widgets.dart';
 
 /// 首页仪表板页面
 ///
@@ -405,38 +402,51 @@ class _DashboardPageState extends State<DashboardPage> {
     return DateTimeUtils.formatStandard(created);
   }
 
+  /// 通用保存记录并刷新
+  Future<void> _postRecord(
+    String table,
+    Map<String, dynamic> data,
+    String successMessage, {
+    VoidCallback? onSuccess,
+  }) async {
+    try {
+      final result = await ApiClient.post(
+        table,
+        data,
+        returnRepresentation: false,
+      );
+      if (result.isSuccess) {
+        if (mounted) {
+          Navigator.pop(context);
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text(successMessage)),
+          );
+          onSuccess?.call();
+        }
+      } else {
+        throw Exception(result.errorMessage ?? '请求失败');
+      }
+    } catch (e) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('添加失败: $e')),
+        );
+      }
+    }
+  }
+
   /// 显示添加心情日记弹窗
   void _showAddMoodSheet() {
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
       builder: (_) => AddMoodSheet(
-        onSave: (diary) async {
-          try {
-            final result = await ApiClient.post(
-              'mood_diaries',
-              diary.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('日记添加成功')),
-                );
-                _loadRecentActivities();
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
-            }
-          }
-        },
+        onSave: (diary) => _postRecord(
+          'mood_diaries',
+          diary.toJson(),
+          '日记添加成功',
+          onSuccess: _loadRecentActivities,
+        ),
       ),
     );
   }
@@ -447,34 +457,15 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AddExpenseSheet(
-        onSave: (expense) async {
-          try {
-            final result = await ApiClient.post(
-              'expenses',
-              expense.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('支出添加成功')),
-                );
-                _loadRecentActivities();
-                // 通知生活页刷新最新记账记录
-                EventBus.instance.fire(EventType.expenseUpdated);
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
-            }
-          }
-        },
+        onSave: (expense) => _postRecord(
+          'expenses',
+          expense.toJson(),
+          '支出添加成功',
+          onSuccess: () {
+            _loadRecentActivities();
+            EventBus.instance.fire(EventType.expenseUpdated);
+          },
+        ),
       ),
     );
   }
@@ -485,32 +476,12 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AddWeightSheet(
-        onSave: (record) async {
-          try {
-            final result = await ApiClient.post(
-              'weight_records',
-              record.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('体重记录添加成功')),
-                );
-                _loadRecentActivities();
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
-            }
-          }
-        },
+        onSave: (record) => _postRecord(
+          'weight_records',
+          record.toJson(),
+          '体重记录添加成功',
+          onSuccess: _loadRecentActivities,
+        ),
       ),
     );
   }
@@ -521,31 +492,7 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AddNoteSheet(
-        onSave: (note) async {
-          try {
-            final result = await ApiClient.post(
-              'notes',
-              note.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('笔记添加成功')),
-                );
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
-            }
-          }
-        },
+        onSave: (note) => _postRecord('notes', note.toJson(), '笔记添加成功'),
       ),
     );
   }
@@ -556,32 +503,12 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AddReminderSheet(
-        onSave: (reminder) async {
-          try {
-            final result = await ApiClient.post(
-              'reminders',
-              reminder.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              if (mounted) {
-                Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('提醒添加成功')),
-                );
-                _loadPendingReminders();
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
-            }
-          }
-        },
+        onSave: (reminder) => _postRecord(
+          'reminders',
+          reminder.toJson(),
+          '提醒添加成功',
+          onSuccess: _loadPendingReminders,
+        ),
       ),
     );
   }
@@ -686,449 +613,6 @@ class _DashboardPageState extends State<DashboardPage> {
     ).then((_) => _loadRecentNovels());
   }
 
-  /// 构建欢迎卡片区块，展示用户欢迎语和用户名。
-  Widget _buildWelcomeSection() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '欢迎回来',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  AuthService.instance.currentUserName ?? '用户',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '今天想做些什么？',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  /// 构建待办提醒横幅区块，展示即将到期或已过期的提醒事项。
-  Widget _buildTodoReminderSection() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    if (_pendingReminders.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      children: [
-        ..._pendingReminders.map((reminder) {
-          final isOverdue = reminder.remindAt.isBefore(DateTime.now());
-          return Padding(
-            padding: const EdgeInsets.only(bottom: 8),
-            child: InkWell(
-              onTap: () => _goToReminderDetail(reminder),
-              borderRadius: BorderRadius.circular(12),
-              child: Card(
-                color: isOverdue ? colorScheme.errorContainer : colorScheme.primaryContainer,
-                child: Padding(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                  child: Row(
-                    children: [
-                      Icon(
-                        isOverdue ? Icons.notification_important : Icons.notifications_active,
-                        color: isOverdue ? colorScheme.error : colorScheme.primary,
-                      ),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              reminder.title,
-                              style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                                fontWeight: FontWeight.bold,
-                              ),
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                            ),
-                            if (reminder.description != null && reminder.description!.isNotEmpty)
-                              Text(
-                                reminder.description!,
-                                style: Theme.of(context).textTheme.bodySmall,
-                                maxLines: 1,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                            Text(
-                              DateTimeUtils.formatStandard(reminder.remindAt),
-                              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                color: isOverdue ? colorScheme.error : colorScheme.onSurfaceVariant,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(
-                        Icons.chevron_right,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-          );
-        }),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
-
-  /// 构建习惯打卡区块，展示今日待打卡的习惯列表。
-  Widget _buildHabitSection() {
-    final colorScheme = Theme.of(context).colorScheme;
-    final habits = _pendingHabits;
-
-    if (habits.isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '今日打卡',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            TextButton(
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const HabitsScreen()),
-                ).then((_) => _loadHabitsForCheckin());
-              },
-              child: const Text('查看全部'),
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: habits.map((habit) {
-            final habitColor = colorScheme.primary;
-            final isChecking = _checkingHabitId == habit.id;
-
-            return SizedBox(
-              width: (MediaQuery.of(context).size.width - 16 * 2 - 12) / 2,
-              height: 52,
-              child: Card(
-                clipBehavior: Clip.antiAlias,
-                margin: EdgeInsets.zero,
-                child: InkWell(
-                  onTap: isChecking ? null : () => _quickCheckIn(habit),
-                  child: Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 16),
-                    child: Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            habit.name,
-                            style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                              fontWeight: FontWeight.w500,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        if (isChecking)
-                          const SizedBox(
-                            width: 24,
-                            height: 24,
-                            child: CircularProgressIndicator(strokeWidth: 2.5),
-                          )
-                        else
-                          Icon(
-                            Icons.check_circle_outline,
-                            color: habitColor,
-                            size: 22,
-                          ),
-                      ],
-                    ),
-                  ),
-                ),
-              ),
-            );
-          }).toList(),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  /// 构建快捷工具网格区块，展示用户配置的常用工具入口。
-  Widget _buildQuickToolsSection(List<ToolItem> visibleTools) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-          children: [
-            Text(
-              '常用工具',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            IconButton(
-              icon: const Icon(Icons.settings_outlined, size: 20),
-              onPressed: _showToolConfigSheet,
-              tooltip: '配置',
-            ),
-          ],
-        ),
-        const SizedBox(height: 12),
-        if (visibleTools.isEmpty)
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Center(
-                child: Text(
-                  '点击右上角配置按钮添加工具',
-                  style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ),
-            ),
-          )
-        else
-          GridView.builder(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-              crossAxisCount: 3,
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: 1,
-            ),
-            itemCount: visibleTools.length,
-            itemBuilder: (context, index) {
-              final tool = visibleTools[index];
-              return ToolCard(
-                icon: tool.icon,
-                label: tool.label,
-                color: tool.color,
-                onTap: () => _onToolTap(tool),
-              );
-            },
-          ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  /// 构建最近阅读区块，展示用户最近阅读的小说列表。
-  Widget _buildRecentReadingSection() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '最近阅读',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: _isLoadingNovels
-              ? SizedBox(
-                  height: 180,
-                  child: SkeletonLoading.grid(
-                    itemCount: 3,
-                    crossAxisCount: 3,
-                    aspectRatio: 0.75,
-                  ),
-                )
-              : _recentNovels.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Center(
-                        child: Text(
-                          '暂无阅读记录',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                  : SizedBox(
-                      height: 180,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        padding: const EdgeInsets.all(12),
-                        itemCount: _recentNovels.length,
-                        itemBuilder: (context, index) {
-                          final item = _recentNovels[index];
-                          final novel = item['novel'] as NovelModel;
-                          final lastChapter = item['lastChapter'] as int;
-                          return Padding(
-                            padding: const EdgeInsets.only(right: 12),
-                            child: InkWell(
-                              onTap: () => _continueReading(novel, lastChapter),
-                              borderRadius: BorderRadius.circular(12),
-                              child: SizedBox(
-                                width: 120,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: novel.cover != null && novel.cover!.isNotEmpty
-                                          ? Image.network(
-                                              novel.cover!,
-                                              height: 100,
-                                              width: 120,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) => Container(
-                                                height: 100,
-                                                width: 120,
-                                                color: colorScheme.surfaceContainerHighest,
-                                                child: const Icon(Icons.book, size: 40),
-                                              ),
-                                            )
-                                          : Container(
-                                              height: 100,
-                                              width: 120,
-                                              color: colorScheme.surfaceContainerHighest,
-                                              child: const Icon(Icons.book, size: 40),
-                                            ),
-                                    ),
-                                    const SizedBox(height: 8),
-                                    Text(
-                                      novel.title,
-                                      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      '第$lastChapter章',
-                                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ),
-                          );
-                        },
-                      ),
-                    ),
-        ),
-        const SizedBox(height: 24),
-      ],
-    );
-  }
-
-  /// 构建最近活动区块，展示用户最近的心情日记、支出记录和体重记录。
-  Widget _buildRecentActivitySection() {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Text(
-          '最近活动',
-          style: Theme.of(context).textTheme.titleMedium,
-        ),
-        const SizedBox(height: 12),
-        Card(
-          child: _isLoadingActivities
-              ? Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    children: List.generate(3, (i) => Padding(
-                      padding: EdgeInsets.only(bottom: i < 2 ? 12 : 0),
-                      child: Row(
-                        children: [
-                          Container(
-                            width: 40,
-                            height: 40,
-                            decoration: BoxDecoration(
-                              color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                              borderRadius: BorderRadius.circular(20),
-                            ),
-                          ),
-                          const SizedBox(width: 12),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Container(height: 12, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.5), borderRadius: BorderRadius.circular(4))),
-                                const SizedBox(height: 6),
-                                Container(width: 120, height: 10, decoration: BoxDecoration(color: Theme.of(context).colorScheme.surfaceContainerHighest.withValues(alpha: 0.3), borderRadius: BorderRadius.circular(4))),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                    )),
-                  ),
-                )
-              : _recentActivities.isEmpty
-                  ? Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Center(
-                        child: Text(
-                          '暂无最近活动',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    )
-                  : Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 8),
-                      child: Column(
-                        children: List.generate(_recentActivities.length, (index) {
-                          final activity = _recentActivities[index];
-                          return Column(
-                            children: [
-                              ActivityItem(
-                                icon: activity['icon'] as IconData,
-                                title: activity['title'] as String,
-                                subtitle: activity['subtitle'] as String,
-                                time: activity['time'] as String,
-                              ),
-                              if (index < _recentActivities.length - 1)
-                                const Divider(),
-                            ],
-                          );
-                        }),
-                      ),
-                    ),
-        ),
-      ],
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     final visibleTools = allTools.where((t) => _visibleToolIds.contains(t.id)).toList();
@@ -1159,12 +643,31 @@ class _DashboardPageState extends State<DashboardPage> {
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
-            _buildWelcomeSection(),
-            _buildTodoReminderSection(),
-            _buildHabitSection(),
-            _buildQuickToolsSection(visibleTools),
-            _buildRecentReadingSection(),
-            _buildRecentActivitySection(),
+            const WelcomeSection(),
+            TodoReminderSection(
+              reminders: _pendingReminders,
+              onTap: _goToReminderDetail,
+            ),
+            HabitCheckinSection(
+              pendingHabits: _pendingHabits,
+              checkingHabitId: _checkingHabitId,
+              onCheckIn: _quickCheckIn,
+              onViewAll: _loadHabitsForCheckin,
+            ),
+            QuickToolsSection(
+              visibleTools: visibleTools,
+              onConfigTap: _showToolConfigSheet,
+              onToolTap: _onToolTap,
+            ),
+            RecentReadingSection(
+              isLoading: _isLoadingNovels,
+              novels: _recentNovels,
+              onContinueReading: _continueReading,
+            ),
+            RecentActivitySection(
+              isLoading: _isLoadingActivities,
+              activities: _recentActivities,
+            ),
           ],
         ),
       ),
