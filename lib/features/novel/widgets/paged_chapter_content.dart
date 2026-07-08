@@ -39,10 +39,10 @@ class PagedChapterContent extends StatefulWidget {
   });
 
   @override
-  State<PagedChapterContent> createState() => _PagedChapterContentState();
+  State<PagedChapterContent> createState() => PagedChapterContentState();
 }
 
-class _PagedChapterContentState extends State<PagedChapterContent> {
+class PagedChapterContentState extends State<PagedChapterContent> {
   List<ContentPage> _pages = [];
   late PageController _pageController;
   bool _isCalculating = true;

@@ -10,6 +10,7 @@ class ActivityItem extends StatelessWidget {
   final String time;
 
   const ActivityItem({
+    super.key,
     required this.icon,
     required this.title,
     required this.subtitle,

@@ -15,8 +15,6 @@ import 'novel_list_screen.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../../core/widgets/widgets.dart';
 import 'novel_list_for_add_screen.dart';
-import 'novel_search_delegate.dart';
-import '../widgets/novel_list_item.dart';
 import '../widgets/bookshelf_item.dart';
 import '../widgets/filter_chip.dart';
 

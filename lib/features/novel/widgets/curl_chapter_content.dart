@@ -17,7 +17,7 @@ class CurlChapterContent extends StatefulWidget {
   /// 是否跳转到最后一页（上一章时使用）
   final bool jumpToLastPage;
 
-  const _CurlChapterContent({
+  const CurlChapterContent({
     super.key,
     required this.chapter,
     required this.background,
@@ -31,7 +31,7 @@ class CurlChapterContent extends StatefulWidget {
   });
 
   @override
-  State<CurlChapterContent> createState() => _CurlChapterContentState();
+  State<CurlChapterContent> createState() => CurlChapterContentState();
 }
 
 class CurlChapterContentState extends State<CurlChapterContent> {

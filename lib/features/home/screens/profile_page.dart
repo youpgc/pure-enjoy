@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../services/supabase_service.dart';
 import '../../profile/services/point_service.dart';
 import '../../auth/screens/login_screen.dart';
@@ -71,14 +70,14 @@ class _ProfilePageState extends State<ProfilePage> {
                     _buildAvatar(colorScheme, supabaseService),
                     const SizedBox(height: 12),
                     Text(
-                      supabaseService.currentUser?.userMetadata?['nickname'] ??
-                          supabaseService.currentUser?.email?.split('@').first ??
+                      supabaseService.currentUserName ??
+                          supabaseService.currentUserEmail?.split('@').first ??
                           '用户',
                       style: Theme.of(context).textTheme.titleLarge,
                     ),
                     const SizedBox(height: 4),
                     Text(
-                      supabaseService.currentUser?.email ?? '',
+                      supabaseService.currentUserEmail ?? '',
                       style: Theme.of(context).textTheme.bodySmall,
                     ),
                   ],
@@ -125,12 +124,11 @@ class _ProfilePageState extends State<ProfilePage> {
                     trailing: const Icon(Icons.chevron_right),
                     onTap: () async {
                       await SupabaseService.instance.signOut();
-                      if (mounted) {
-                        Navigator.of(context).pushAndRemoveUntil(
-                          MaterialPageRoute(builder: (_) => const LoginScreen()),
-                          (route) => false,
-                        );
-                      }
+                      if (!mounted) return;
+                      Navigator.of(context).pushAndRemoveUntil(
+                        MaterialPageRoute(builder: (_) => const LoginScreen()),
+                        (route) => false,
+                      );
                     },
                   ),
                 ],
@@ -144,7 +142,7 @@ class _ProfilePageState extends State<ProfilePage> {
 
   /// 构建用户头像
   Widget _buildAvatar(ColorScheme colorScheme, SupabaseService supabaseService) {
-    final avatarUrl = supabaseService.currentUser?.userMetadata?['avatar_url'] as String?;
+    final avatarUrl = supabaseService.currentUserAvatar;
     return CircleAvatar(
       radius: 40,
       backgroundColor: colorScheme.primaryContainer,

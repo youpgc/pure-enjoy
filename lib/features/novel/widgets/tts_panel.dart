@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../novel/models/novel_model.dart';
 import '../services/tts_service.dart';
 
 /// TTS（听书）控制面板

@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 /// 用于设置页面中各功能分组的标题展示。
 class SectionHeader extends StatelessWidget {
   final String title;
-  const SectionHeader({required this.title});
+  const SectionHeader({super.key, required this.title});
 
   @override
   Widget build(BuildContext context) {

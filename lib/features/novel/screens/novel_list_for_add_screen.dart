@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/api_client.dart';
+import '../../../services/supabase_service.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/widgets.dart';
 import 'novel_search_delegate.dart';

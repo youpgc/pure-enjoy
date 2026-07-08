@@ -10,6 +10,7 @@ class ToolCard extends StatelessWidget {
   final VoidCallback onTap;
 
   const ToolCard({
+    super.key,
     required this.icon,
     required this.label,
     required this.color,

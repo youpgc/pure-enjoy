@@ -199,12 +199,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     super.dispose();
   }
 
-  /// 使用 PopScope 替代 dispose 保存进度，确保在页面真正退出前完成保存
-  Future<bool> _onWillPop() async {
-    await _saveProgress();
-    return true;
-  }
-
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused || state == AppLifecycleState.detached) {
@@ -1995,7 +1989,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       onPopInvokedWithResult: (didPop, _) async {
         if (didPop) return;
         await _saveProgress();
-        if (mounted) Navigator.of(context).pop();
+        if (!mounted) return;
+        Navigator.of(context).pop();
       },
       child: Scaffold(
       key: _scaffoldKey,

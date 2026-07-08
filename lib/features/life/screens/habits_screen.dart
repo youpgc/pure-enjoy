@@ -10,7 +10,6 @@ import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
 import '../widgets/reminder_schedule_picker.dart';
 import '../widgets/habit_card.dart';
-import '../../../core/widgets/stat_item.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
