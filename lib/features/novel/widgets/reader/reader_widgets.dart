@@ -1,3 +1,5 @@
+library reader_widgets;
+
 /// 小说阅读器组件统一导出文件
 export 'reader_chapter_drawer.dart';
 export 'reader_top_menu.dart';

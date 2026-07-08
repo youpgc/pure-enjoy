@@ -3,6 +3,8 @@ part of 'novel_reader_screen.dart';
 /// 小说阅读器业务逻辑方法集合
 /// 从 NovelReaderScreen 中拆分出来，保持主文件聚焦 UI 与生命周期
 
+extension _NovelReaderScreenStateLogic on _NovelReaderScreenState {
+
   Future<void> _loadSettings() async {
     final prefs = await SharedPreferences.getInstance();
     if (!mounted) return;
@@ -1010,3 +1012,4 @@ part of 'novel_reader_screen.dart';
       _toggleMenu();
     }
   }
+}

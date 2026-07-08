@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
 import '../reader_enums.dart';
-import '../../../core/widgets/widgets.dart';
+import '../../../../core/widgets/widgets.dart';
 
 /// 小说阅读器目录抽屉组件
 class ReaderChapterDrawer extends StatefulWidget {

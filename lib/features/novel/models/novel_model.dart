@@ -344,7 +344,7 @@ class NovelBookmark {
 }
 
 /// 批注高亮颜色枚举
-enum AnnotationColor { yellow, green, blue, red }
+enum AnnotationColor { yellow, green, blue, red, pink, purple }
 
 /// 小说批注/笔记模型 — 对应 novel_annotations 表
 class NovelAnnotation {

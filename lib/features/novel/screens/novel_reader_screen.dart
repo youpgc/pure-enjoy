@@ -1,3 +1,5 @@
+// ignore_for_file: prefer_final_fields
+
 import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
@@ -98,9 +100,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 6.1 新增：批注列表（当前章节）
   List<NovelAnnotation> _annotations = [];
 
-  // 6.1 新增：当前选中的文本范围
-  TextSelection? _selectedTextRange;
-
   // 6.1 新增：TTS 状态
   bool _isTtsPlaying = false;
 
@@ -125,8 +124,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  // 目录分页
-  int _catalogPage = 0;
   static const int _catalogPageSize = 20;
 
   int get _fontStyleHash => Object.hash(_fontSize, _lineHeight, _background, _font);

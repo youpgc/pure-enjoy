@@ -2,6 +2,7 @@ import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
 import '../reader_enums.dart';
+import '../reader_page_turn.dart';
 import '../paged_chapter_content.dart';
 import '../curl_chapter_content.dart';
 

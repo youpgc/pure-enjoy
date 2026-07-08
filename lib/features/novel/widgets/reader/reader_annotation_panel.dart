@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
-import '../../../core/widgets/widgets.dart';
+import '../../../../core/widgets/widgets.dart';
 
 /// 小说阅读器批注输入面板（用于 showModalBottomSheet）
 class ReaderAnnotationPanel extends StatefulWidget {

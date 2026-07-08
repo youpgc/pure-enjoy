@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
-import '../../../core/widgets/widgets.dart';
+import '../../../../core/widgets/widgets.dart';
 
 /// 小说阅读器书签列表面板（用于 showModalBottomSheet）
 class ReaderBookmarkPanel extends StatelessWidget {
