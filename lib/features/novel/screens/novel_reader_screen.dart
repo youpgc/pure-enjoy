@@ -1463,30 +1463,35 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       const SizedBox(width: 8),
                       const Text('定时关闭'),
                       const Spacer(),
-                      Wrap(
-                        spacing: 8,
-                        children: [
-                          (null, '关闭'),
-                          (15, '15分'),
-                          (30, '30分'),
-                          (60, '60分'),
-                          (-1, '本章'),
-                        ].map((option) {
-                          final (minutes, label) = option;
-                          final isSelected = tempTimerMinutes == minutes ||
-                              (minutes == -1 && tempTimerMinutes == -1);
-                          return ChoiceChip(
-                            label: Text(label),
-                            selected: isSelected,
-                            onSelected: (selected) {
-                              if (selected) {
-                                setModalState(() => tempTimerMinutes = minutes);
-                                TtsService().setTimer(minutes);
-                                TtsService().savePreferences();
-                              }
-                            },
-                          );
-                        }).toList(),
+                      Flexible(
+                        child: SingleChildScrollView(
+                          scrollDirection: Axis.horizontal,
+                          child: Wrap(
+                            spacing: 8,
+                            children: [
+                              (null, '关闭'),
+                              (15, '15分'),
+                              (30, '30分'),
+                              (60, '60分'),
+                              (-1, '本章'),
+                            ].map((option) {
+                              final (minutes, label) = option;
+                              final isSelected = tempTimerMinutes == minutes ||
+                                  (minutes == -1 && tempTimerMinutes == -1);
+                              return ChoiceChip(
+                                label: Text(label),
+                                selected: isSelected,
+                                onSelected: (selected) {
+                                  if (selected) {
+                                    setModalState(() => tempTimerMinutes = minutes);
+                                    TtsService().setTimer(minutes);
+                                    TtsService().savePreferences();
+                                  }
+                                },
+                              );
+                            }).toList(),
+                          ),
+                        ),
                       ),
                     ],
                   ),
@@ -1498,7 +1503,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       const SizedBox(width: 8),
                       const Text('播放模式'),
                       const Spacer(),
-                      SegmentedButton<TtsPlaybackMode>(
+                      Flexible(
+                        child: SegmentedButton<TtsPlaybackMode>(
                         segments: const [
                           ButtonSegment(
                             value: TtsPlaybackMode.sentence,
@@ -1521,6 +1527,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                           setModalState(() {});
                         },
                       ),
+                    ),
                     ],
                   ),
                   const SizedBox(height: 16),
