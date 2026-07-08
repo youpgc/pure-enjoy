@@ -23,7 +23,7 @@ class ReaderContentArea extends StatelessWidget {
   final bool shouldJumpToLastPage;
   final ScrollController scrollController;
   final TextSpan Function(String content, TextStyle baseStyle) buildAnnotatedTextSpan;
-  final void Function(TextSelection?) onSelectionChanged;
+  final void Function(TextSelection?)? onSelectionChanged;
   final void Function(String selectedText, int startOffset, int endOffset) onShowAnnotationInput;
   final TextStyle Function({bool isTitle}) getCachedTextStyle;
 
@@ -43,7 +43,7 @@ class ReaderContentArea extends StatelessWidget {
     required this.shouldJumpToLastPage,
     required this.scrollController,
     required this.buildAnnotatedTextSpan,
-    required this.onSelectionChanged,
+    this.onSelectionChanged,
     required this.onShowAnnotationInput,
     required this.getCachedTextStyle,
   });
@@ -87,7 +87,7 @@ class ReaderContentArea extends StatelessWidget {
                   ),
                   style: textStyle,
                   onSelectionChanged: (selection, cause) {
-                    onSelectionChanged(selection);
+                    onSelectionChanged?.call(selection);
                   },
                   contextMenuBuilder: (context, editableTextState) {
                     final selected = editableTextState.textEditingValue.selection;

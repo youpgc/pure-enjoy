@@ -21,8 +21,6 @@ import '../widgets/reader_enums.dart';
 import '../widgets/tts_panel.dart';
 import '../widgets/reader_settings_panel.dart';
 import '../widgets/reader/reader_widgets.dart';
-import '../widgets/reader/reader_text_utils.dart';
-import '../widgets/reader/reader_annotated_text_builder.dart';
 import '../../../core/widgets/widgets.dart';
 
 
