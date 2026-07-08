@@ -1,7 +1,7 @@
 name: pure_enjoy
 description: 纯享App - 记录生活，享受每一天
 publish_to: 'none'
-version: 1.9.274+320
+version: 1.9.275+321
 
 environment:
   sdk: '>=3.0.0 <4.0.0'
@@ -62,6 +62,7 @@ dependencies:
   flutter_tts: ^4.2.2
   # 本地 SQLite 数据库（批注离线同步）
   sqflite: ^2.3.0
+  path: ^1.8.0
   # 网络状态监听
   connectivity_plus: ^5.0.0
 

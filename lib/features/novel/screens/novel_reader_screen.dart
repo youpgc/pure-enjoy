@@ -1324,7 +1324,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                                 content: '确定要删除这条批注吗？',
                               ).then((confirmed) {
                                 if (confirmed == true) {
-                                  Navigator.pop(context);
+                                  if (!mounted) return;
+                                  Navigator.pop(context); // ignore: use_build_context_synchronously
                                   _deleteAnnotation(annotation.id);
                                 }
                               });
@@ -2348,8 +2349,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         child: SingleChildScrollView(
           controller: _scrollController,
           padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
-          // 渲染优化：增大 cacheExtent 预渲染更多内容，减少滚动时的空白闪烁
-          cacheExtent: 500,
           child: RepaintBoundary(
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,

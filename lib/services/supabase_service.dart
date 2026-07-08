@@ -9,6 +9,7 @@ import 'session_manager.dart';
 import 'auth_api.dart';
 import '../utils/cache_helper.dart';
 import 'chapter_cache_service.dart';
+import 'package:flutter/foundation.dart';
 
 // 重新导出，保持向后兼容
 export 'supabase_config.dart';

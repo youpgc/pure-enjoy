@@ -14,7 +14,6 @@ import 'novel_detail_screen.dart';
 import 'ranking_screen.dart';
 import 'recommendation_screen.dart';
 
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 小说列表页面

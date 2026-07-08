@@ -164,8 +164,6 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('猜你喜欢'),
@@ -332,7 +330,7 @@ class _RecommendationCard extends StatelessWidget {
                           ),
                         const Spacer(),
                         if (novel.rating != null) ...[
-                          Icon(Icons.star, size: 14, color: Colors.amber),
+                          const Icon(Icons.star, size: 14, color: Colors.amber),
                           const SizedBox(width: 2),
                           Text(
                             novel.rating!.toStringAsFixed(1),
