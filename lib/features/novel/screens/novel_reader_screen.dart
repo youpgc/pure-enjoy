@@ -18,6 +18,8 @@ import '../widgets/paged_chapter_content.dart';
 import '../widgets/curl_chapter_content.dart';
 import '../widgets/reader_enums.dart';
 import '../widgets/reader_toolbar_button.dart';
+import '../widgets/tts_panel.dart';
+import '../widgets/reader_settings_panel.dart';
 import 'novel_detail_screen.dart';
 import '../../../core/widgets/widgets.dart';
 
@@ -1338,183 +1340,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 6.1 新增：显示TTS控制面板
   void _showTtsPanel() {
-    double tempSpeechRate = TtsService().speechRate;
-    int? tempTimerMinutes = TtsService().timerMinutes;
-
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          return SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    '听书模式',
-                    style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold),
-                  ),
-                  const SizedBox(height: 16),
-                  // 播放控制
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                    children: [
-                      IconButton(
-                        icon: const Icon(Icons.skip_previous),
-                        tooltip: '上一句',
-                        onPressed: () => TtsService().previousSentence(),
-                      ),
-                      IconButton(
-                        icon: Icon(_isTtsPlaying ? Icons.pause_circle : Icons.play_circle),
-                        iconSize: 56,
-                        tooltip: _isTtsPlaying ? '暂停' : '播放',
-                        onPressed: () {
-                          setState(() => _isTtsPlaying = !_isTtsPlaying);
-                          if (_isTtsPlaying) {
-                            TtsService().playChapter(
-                              widget.novel.id,
-                              _currentChapter?.id ?? '',
-                              _currentChapter?.content ?? '',
-                              0,
-                            );
-                          } else {
-                            TtsService().stop();
-                          }
-                        },
-                      ),
-                      IconButton(
-                        icon: const Icon(Icons.skip_next),
-                        tooltip: '下一句',
-                        onPressed: () => TtsService().nextSentence(),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  // 当前朗读句子预览
-                  if (TtsService().currentSentence != null)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 16),
-                      child: Text(
-                        TtsService().currentSentence!,
-                        style: TextStyle(
-                          fontSize: 13,
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                        maxLines: 2,
-                        overflow: TextOverflow.ellipsis,
-                        textAlign: TextAlign.center,
-                      ),
-                    ),
-                  const SizedBox(height: 20),
-                  const Divider(),
-                  const SizedBox(height: 12),
-                  // 语速滑块
-                  Row(
-                    children: [
-                      const Icon(Icons.speed, size: 20),
-                      const SizedBox(width: 8),
-                      Text('语速: ${tempSpeechRate.toStringAsFixed(1)}x'),
-                      Expanded(
-                        child: Slider(
-                          value: tempSpeechRate,
-                          min: 0.5,
-                          max: 2.0,
-                          divisions: 15,
-                          label: '${tempSpeechRate.toStringAsFixed(1)}x',
-                          onChanged: (value) {
-                            setModalState(() => tempSpeechRate = value);
-                          },
-                          onChangeEnd: (value) {
-                            TtsService().setSpeechRate(value);
-                            TtsService().savePreferences();
-                          },
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // 定时关闭
-                  Row(
-                    children: [
-                      const Icon(Icons.timer, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('定时关闭'),
-                      const Spacer(),
-                      Flexible(
-                        child: SingleChildScrollView(
-                          scrollDirection: Axis.horizontal,
-                          child: Wrap(
-                            spacing: 8,
-                            children: [
-                              (null, '关闭'),
-                              (15, '15分'),
-                              (30, '30分'),
-                              (60, '60分'),
-                              (-1, '本章'),
-                            ].map((option) {
-                              final (minutes, label) = option;
-                              final isSelected = tempTimerMinutes == minutes ||
-                                  (minutes == -1 && tempTimerMinutes == -1);
-                              return ChoiceChip(
-                                label: Text(label),
-                                selected: isSelected,
-                                onSelected: (selected) {
-                                  if (selected) {
-                                    setModalState(() => tempTimerMinutes = minutes);
-                                    TtsService().setTimer(minutes);
-                                    TtsService().savePreferences();
-                                  }
-                                },
-                              );
-                            }).toList(),
-                          ),
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  // 播放模式
-                  Row(
-                    children: [
-                      const Icon(Icons.playlist_play, size: 20),
-                      const SizedBox(width: 8),
-                      const Text('播放模式'),
-                      const Spacer(),
-                      Flexible(
-                        child: SegmentedButton<TtsPlaybackMode>(
-                        segments: const [
-                          ButtonSegment(
-                            value: TtsPlaybackMode.sentence,
-                            label: Text('逐句'),
-                          ),
-                          ButtonSegment(
-                            value: TtsPlaybackMode.paragraph,
-                            label: Text('逐段'),
-                          ),
-                          ButtonSegment(
-                            value: TtsPlaybackMode.chapter,
-                            label: Text('整章'),
-                          ),
-                        ],
-                        selected: {TtsService().playbackMode},
-                        onSelectionChanged: (selected) {
-                          final mode = selected.first;
-                          TtsService().setPlaybackMode(mode);
-                          TtsService().savePreferences();
-                          setModalState(() {});
-                        },
-                      ),
-                    ),
-                    ],
-                  ),
-                  const SizedBox(height: 16),
-                ],
-              ),
-            ),
-          );
+      builder: (context) => TtsPanel(
+        isPlaying: _isTtsPlaying,
+        onPlayStateChanged: (playing) {
+          setState(() => _isTtsPlaying = playing);
         },
+        novelId: widget.novel.id,
+        chapterId: _currentChapter?.id ?? '',
+        chapterContent: _currentChapter?.content ?? '',
       ),
     );
   }
@@ -1769,182 +1605,40 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       context: context,
       isScrollControlled: true,
       builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) => SingleChildScrollView(
-          padding: EdgeInsets.only(
-            left: 24,
-            right: 24,
-            top: 24,
-            bottom: 24 + MediaQuery.of(context).viewInsets.bottom,
-          ),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text('阅读设置', style: Theme.of(context).textTheme.titleLarge),
-              const SizedBox(height: 24),
-              Row(
-                children: [
-                  const Text('字体大小'),
-                  const Spacer(),
-                  IconButton.filledTonal(
-                    icon: const Text('A-', style: TextStyle(fontSize: 12)),
-                    onPressed: _fontSizeIndex > 0
-                        ? () {
-                            setModalState(() => _fontSizeIndex--);
-                            setState(() {});
-                            _saveSettings();
-                          }
-                        : null,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text('${_fontSize.toInt()}', style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                  IconButton.filledTonal(
-                    icon: const Text('A+', style: TextStyle(fontSize: 16)),
-                    onPressed: _fontSizeIndex < _fontSizes.length - 1
-                        ? () {
-                            setModalState(() => _fontSizeIndex++);
-                            setState(() {});
-                            _saveSettings();
-                          }
-                        : null,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              Row(
-                children: [
-                  const Text('行高'),
-                  const Spacer(),
-                  IconButton.filledTonal(
-                    icon: const Icon(Icons.remove),
-                    onPressed: _lineHeightIndex > 0
-                        ? () {
-                            setModalState(() => _lineHeightIndex--);
-                            setState(() {});
-                            _saveSettings();
-                          }
-                        : null,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  ),
-                  Padding(
-                    padding: const EdgeInsets.symmetric(horizontal: 12),
-                    child: Text(_lineHeight.toStringAsFixed(1), style: Theme.of(context).textTheme.titleMedium),
-                  ),
-                  IconButton.filledTonal(
-                    icon: const Icon(Icons.add),
-                    onPressed: _lineHeightIndex < _lineHeights.length - 1
-                        ? () {
-                            setModalState(() => _lineHeightIndex++);
-                            setState(() {});
-                            _saveSettings();
-                          }
-                        : null,
-                    constraints: const BoxConstraints(minWidth: 40, minHeight: 40),
-                  ),
-                ],
-              ),
-              const SizedBox(height: 20),
-              const Text('翻页模式'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: PageTurnMode.values.map((mode) {
-                  final isSelected = _pageTurnMode == mode;
-                  return ChoiceChip(
-                    avatar: Icon(mode.icon, size: 18),
-                    label: Text(mode.label),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setModalState(() => _pageTurnMode = mode);
-                        setState(() {});
-                        _saveSettings();
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              const Text('字体'),
-              const SizedBox(height: 12),
-              Wrap(
-                spacing: 8,
-                children: ReaderFont.values.map((font) {
-                  final isSelected = _font == font;
-                  return ChoiceChip(
-                    label: Text(font.label),
-                    selected: isSelected,
-                    onSelected: (selected) {
-                      if (selected) {
-                        setModalState(() => _font = font);
-                        setState(() {});
-                        _saveSettings();
-                      }
-                    },
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 20),
-              const Text('背景'),
-              const SizedBox(height: 12),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: ReaderBackground.values.map((bg) {
-                  final isSelected = _background == bg;
-                  return GestureDetector(
-                    onTap: () {
-                      setModalState(() => _background = bg);
-                      setState(() {});
-                      if (bg != ReaderBackground.dark) {
-                        _lastDayBackground = bg;
-                      }
-                      _saveSettings();
-                    },
-                    child: Column(
-                      children: [
-                        Container(
-                          width: 48,
-                          height: 48,
-                          decoration: BoxDecoration(
-                            color: bg.bgColor,
-                            borderRadius: BorderRadius.circular(8),
-                            border: isSelected
-                                ? Border.all(color: Theme.of(context).colorScheme.primary, width: 2)
-                                : Border.all(color: Theme.of(context).colorScheme.outlineVariant),
-                          ),
-                          child: Center(
-                            child: Text(
-                              'Aa',
-                              style: TextStyle(
-                                color: bg.textColor,
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ),
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          bg.label,
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  );
-                }).toList(),
-              ),
-              const SizedBox(height: 24),
-            ],
-          ),
+        builder: (context, setModalState) => ReaderSettingsPanel(
+          fontSize: _fontSize,
+          fontSizeIndex: _fontSizeIndex,
+          fontSizes: _fontSizes,
+          lineHeight: _lineHeight,
+          lineHeightIndex: _lineHeightIndex,
+          lineHeights: _lineHeights,
+          pageTurnMode: _pageTurnMode,
+          font: _font,
+          background: _background,
+          onFontSizeIndexChanged: (index) {
+            setModalState(() => _fontSizeIndex = index);
+            setState(() {});
+          },
+          onLineHeightIndexChanged: (index) {
+            setModalState(() => _lineHeightIndex = index);
+            setState(() {});
+          },
+          onPageTurnModeChanged: (mode) {
+            setModalState(() => _pageTurnMode = mode);
+            setState(() {});
+          },
+          onFontChanged: (font) {
+            setModalState(() => _font = font);
+            setState(() {});
+          },
+          onBackgroundChanged: (bg) {
+            setModalState(() => _background = bg);
+            setState(() {});
+            if (bg != ReaderBackground.dark) {
+              _lastDayBackground = bg;
+            }
+          },
+          onSave: _saveSettings,
         ),
       ),
     );

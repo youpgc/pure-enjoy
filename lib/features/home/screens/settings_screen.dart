@@ -11,6 +11,7 @@ import 'rich_text_page.dart';
 import '../../../services/version_check_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
+import '../widgets/section_header.dart';
 
 /// 系统设置页面
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -126,7 +127,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: ListView(
         children: [
           // 阅读设置
-          const _SectionHeader(title: '阅读设置'),
+          const SectionHeader(title: '阅读设置'),
           SwitchListTile(
             secondary: const Icon(Icons.nightlight_outlined),
             title: const Text('深色模式'),
@@ -153,7 +154,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // 同步设置
-          const _SectionHeader(title: '同步设置'),
+          const SectionHeader(title: '同步设置'),
           SwitchListTile(
             secondary: const Icon(Icons.sync),
             title: const Text('自动同步'),
@@ -189,7 +190,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // ),
 
           // 通知设置
-          const _SectionHeader(title: '通知设置'),
+          const SectionHeader(title: '通知设置'),
           SwitchListTile(
             secondary: const Icon(Icons.notifications_outlined),
             title: const Text('推送通知'),
@@ -222,7 +223,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // 数据管理
-          const _SectionHeader(title: '数据管理'),
+          const SectionHeader(title: '数据管理'),
           ListTile(
             leading: const Icon(Icons.cleaning_services_outlined),
             title: const Text('清除缓存'),
@@ -246,7 +247,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ),
 
           // 关于与法律
-          const _SectionHeader(title: '关于与法律'),
+          const SectionHeader(title: '关于与法律'),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于纯享'),
@@ -326,7 +327,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
             },
           ),
           // 版本信息
-          const _SectionHeader(title: '版本'),
+          const SectionHeader(title: '版本'),
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
             title: const Text('检查更新'),
@@ -707,22 +708,4 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   }
 }
 
-class _SectionHeader extends StatelessWidget {
-  final String title;
-  const _SectionHeader({required this.title});
 
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 16, 16, 4),
-      child: Text(
-        title,
-        style: TextStyle(
-          fontSize: 14,
-          fontWeight: FontWeight.bold,
-          color: Theme.of(context).colorScheme.onSurfaceVariant,
-        ),
-      ),
-    );
-  }
-}

@@ -11,6 +11,7 @@ import '../../../constants/app_constants.dart';
 import 'novel_reader_screen.dart';
 import 'novel_comments_screen.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/widgets/stat_item.dart';
 
 /// 小说详情页面
 class NovelDetailScreen extends StatefulWidget {
@@ -696,22 +697,22 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
               child: Row(
                 children: [
-                  _StatItem(
+                  StatItem(
                     label: '字数',
                     value: _formatWordCount(novel.wordCount),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  _StatItem(
+                  StatItem(
                     label: '章节',
                     value: '${novel.chapterCount} 章',
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  _StatItem(
+                  StatItem(
                     label: '状态',
                     value: DictService.instance.getLabelOrDefault(dictNovelStatus, novel.status ?? '', defaultValue: novel.status == novelStatusCompleted ? '已完结' : '连载中'),
                   ),
                   Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  _StatItem(
+                  StatItem(
                     label: '评分',
                     value: novel.rating != null ? '${novel.rating}' : '--',
                   ),
@@ -994,33 +995,3 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   }
 }
 
-/// 统计信息项
-class _StatItem extends StatelessWidget {
-  final String label;
-  final String value;
-
-  const _StatItem({required this.label, required this.value});
-
-  @override
-  Widget build(BuildContext context) {
-    return Expanded(
-      child: Column(
-        children: [
-          Text(
-            value,
-            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-          const SizedBox(height: 2),
-          Text(
-            label,
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-              color: Theme.of(context).colorScheme.onSurfaceVariant,
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-}
