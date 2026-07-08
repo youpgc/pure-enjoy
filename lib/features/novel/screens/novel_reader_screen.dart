@@ -14,33 +14,10 @@ import '../services/reading_history_service.dart';
 import '../services/annotation_service.dart';
 import '../services/tts_service.dart';
 import '../widgets/reader_page_turn.dart';
+import '../widgets/reader_enums.dart';
+import '../widgets/reader_toolbar_button.dart';
 import 'novel_detail_screen.dart';
 import '../../../core/widgets/widgets.dart';
-
-/// 背景主题枚举
-enum ReaderBackground {
-  white('白色', Colors.white, Colors.black87),
-  yellow('护眼黄', Color(0xFFF5F0E6), Color(0xFF333333)),
-  dark('深色', Color(0xFF1A1A2E), Color(0xFFE0E0E0)),
-  gray('灰色', Color(0xFFE8E8E8), Color(0xFF333333));
-
-  const ReaderBackground(this.label, this.bgColor, this.textColor);
-  final String label;
-  final Color bgColor;
-  final Color textColor;
-}
-
-/// 字体选择枚举
-enum ReaderFont {
-  system('系统默认', 'system'),
-  serif('宋体', 'serif'),
-  sansSerif('黑体', 'sans-serif'),
-  monospace('等宽', 'monospace');
-
-  const ReaderFont(this.label, this.fontFamily);
-  final String label;
-  final String fontFamily;
-}
 
 /// 小说阅读器页面
 class NovelReaderScreen extends StatefulWidget {
@@ -2261,31 +2238,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                     children: [
-                      _ToolbarButton(
+                      ReaderToolbarButton(
                         icon: Icons.list_outlined,
                         label: '目录',
                         textColor: _background.textColor,
                         onTap: () => _scaffoldKey.currentState?.openDrawer(),
                       ),
-                      _ToolbarButton(
+                      ReaderToolbarButton(
                         icon: Icons.bookmark_outline,
                         label: '书签',
                         textColor: _background.textColor,
                         onTap: _showBookmarkList,
                       ),
-                      _ToolbarButton(
+                      ReaderToolbarButton(
                         icon: Icons.comment_outlined,
                         label: '批注',
                         textColor: _background.textColor,
                         onTap: _showAnnotationList,
                       ),
-                      _ToolbarButton(
+                      ReaderToolbarButton(
                         icon: Icons.settings_outlined,
                         label: '设置',
                         textColor: _background.textColor,
                         onTap: _showSettings,
                       ),
-                      _ToolbarButton(
+                      ReaderToolbarButton(
                         icon: _background == ReaderBackground.dark
                             ? Icons.light_mode_outlined
                             : Icons.dark_mode_outlined,
@@ -2945,39 +2922,6 @@ class _CurlChapterContentState extends State<_CurlChapterContent> {
         onPageChanged: (index) {
           widget.onPageChanged(index, _pages.length);
         },
-      ),
-    );
-  }
-}
-
-class _ToolbarButton extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final Color textColor;
-  final VoidCallback onTap;
-
-  const _ToolbarButton({
-    required this.icon,
-    required this.label,
-    required this.textColor,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onTap: onTap,
-      behavior: HitTestBehavior.opaque,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            Icon(icon, color: textColor, size: 22),
-            const SizedBox(height: 2),
-            Text(label, style: TextStyle(fontSize: 11, color: textColor)),
-          ],
-        ),
       ),
     );
   }
