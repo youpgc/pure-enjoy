@@ -2366,7 +2366,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                       ),
                   ],
                 ),
-    );
+              ),
+            );
   }
 
   /// 渲染优化：获取缓存的 TextStyle，避免每帧重建
