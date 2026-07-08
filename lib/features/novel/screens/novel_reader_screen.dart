@@ -301,29 +301,35 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _isLoading = true);
 
     try {
-      // 1. 先加载前200章（足够开始阅读，减少初始等待）
-      const initialBatchSize = 200;
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {'novel_id': 'eq.${widget.novel.id}'},
-        columns: 'id,title,chapter_num',
-        order: 'chapter_num.asc',
-        limit: initialBatchSize,
-      );
-
+      // 分批加载章节列表（id,title,chapter_num 轻量查询）
+      const batchSize = 50;
       final allChapters = <NovelChapterModel>[];
-      if (result.isSuccess && result.data != null) {
-        allChapters.addAll(
-          result.data!.map((json) => NovelChapterModel.fromJson(json)).toList(),
+      int offset = 0;
+      bool hasMore = true;
+
+      while (hasMore) {
+        final result = await ApiClient.get(
+          'novel_chapters',
+          filters: {'novel_id': 'eq.${widget.novel.id}'},
+          columns: 'id,title,chapter_num',
+          order: 'chapter_num.asc',
+          limit: batchSize,
+          offset: offset,
         );
+
+        if (result.isSuccess && result.data != null) {
+          final batch = result.data!
+              .map((json) => NovelChapterModel.fromJson(json))
+              .toList();
+          allChapters.addAll(batch);
+          hasMore = batch.length >= batchSize;
+          offset += batchSize;
+        } else {
+          hasMore = false;
+        }
       }
 
       allChapters.removeWhere((c) => c.chapterOrder <= 0);
-
-      // 2. 如果有更多章节，异步加载剩余部分（不阻塞UI）
-      if (allChapters.length >= initialBatchSize) {
-        _loadRemainingChapters(widget.novel.id, initialBatchSize);
-      }
 
       // 获取阅读进度
       final userId = _userId;
@@ -378,39 +384,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     } catch (e) {
       if (mounted) setState(() => _isLoading = false);
       if (mounted) showSnackBar(context, '加载章节失败: $e');
-    }
-  }
-
-  /// 异步加载剩余章节（不阻塞UI）
-  Future<void> _loadRemainingChapters(String novelId, int offset) async {
-    const batchSize = 200;
-    bool hasMore = true;
-
-    while (hasMore && mounted) {
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {'novel_id': 'eq.$novelId'},
-        columns: 'id,title,chapter_num',
-        order: 'chapter_num.asc',
-        limit: batchSize,
-        offset: offset,
-      );
-
-      if (result.isSuccess && result.data != null) {
-        final batch = result.data!.map((json) => NovelChapterModel.fromJson(json)).toList();
-        batch.removeWhere((c) => c.chapterOrder <= 0);
-        if (batch.isEmpty) {
-          hasMore = false;
-        } else {
-          if (mounted) {
-            setState(() => _chapters.addAll(batch));
-          }
-          hasMore = batch.length >= batchSize;
-          offset += batchSize;
-        }
-      } else {
-        hasMore = false;
-      }
     }
   }
 
