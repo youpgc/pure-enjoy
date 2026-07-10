@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
+import 'package:shared_preferences/shared_preferences.dart';
 import '../env.dart';
 import 'cancel_token.dart';
 import 'supabase_service.dart';
@@ -28,8 +30,31 @@ class RequestTimeout {
   static const Duration file = Duration(seconds: 60);
 }
 
+/// ETag 缓存条目
+class _ETagEntry {
+  final String etag;
+  final String body;
+  final DateTime cachedAt;
+
+  _ETagEntry({required this.etag, required this.body, required this.cachedAt});
+
+  Map<String, dynamic> toJson() => {
+        'etag': etag,
+        'body': body,
+        'cachedAt': cachedAt.toIso8601String(),
+      };
+
+  factory _ETagEntry.fromJson(Map<String, dynamic> json) {
+    return _ETagEntry(
+      etag: json['etag'] as String,
+      body: json['body'] as String,
+      cachedAt: DateTime.parse(json['cachedAt'] as String),
+    );
+  }
+}
+
 /// 统一的 HTTP 客户端
-/// 所有 API 请求都通过此类发送，自动处理认证头、超时、重试等
+/// 所有 API 请求都通过此类发送，自动处理认证头、超时、重试、ETag 缓存等
 class HttpClient {
   static HttpClient? _instance;
 
@@ -43,10 +68,56 @@ class HttpClient {
   /// 当前 JWT Access Token
   String? _accessToken;
 
+  /// ETag 缓存：URL -> 缓存条目
+  final Map<String, _ETagEntry> _etagCache = {};
+
+  /// ETag 缓存是否已加载
+  bool _etagLoaded = false;
+
+  static const String _etagPrefsKey = 'http_etag_cache_v1';
+
   /// 设置 JWT Access Token
   /// 登录成功后调用，后续请求将自动携带 Authorization: Bearer <token>
   void setAccessToken(String? token) {
     _accessToken = token;
+  }
+
+  /// 加载持久化的 ETag 缓存
+  Future<void> _loadETagCache() async {
+    if (_etagLoaded) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final jsonStr = prefs.getString(_etagPrefsKey);
+      if (jsonStr != null && jsonStr.isNotEmpty) {
+        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
+        _etagCache.clear();
+        for (final entry in decoded.entries) {
+          try {
+            final cacheEntry = _ETagEntry.fromJson(Map<String, dynamic>.from(entry.value));
+            // 只加载30天内的缓存
+            if (DateTime.now().difference(cacheEntry.cachedAt) < const Duration(days: 30)) {
+              _etagCache[entry.key] = cacheEntry;
+            }
+          } catch (_) {}
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 加载 ETag 缓存失败: $e');
+    }
+    _etagLoaded = true;
+  }
+
+  /// 保存 ETag 缓存到磁盘
+  Future<void> _saveETagCache() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final Map<String, dynamic> encoded = _etagCache.map(
+        (k, v) => MapEntry(k, v.toJson()),
+      );
+      await prefs.setString(_etagPrefsKey, jsonEncode(encoded));
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 保存 ETag 缓存失败: $e');
+    }
   }
 
   /// 获取认证头
@@ -70,20 +141,65 @@ class HttpClient {
 
   // ==================== HTTP 方法 ====================
 
-  /// GET 请求
+  /// GET 请求（支持 ETag/304 缓存）
   Future<http.Response> get(
     String path, {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
+    bool useETag = true,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return _requestWithRetry(
-      () => http.get(uri, headers: _mergeHeaders(headers)),
+    final url = uri.toString();
+
+    // 加载 ETag 缓存
+    if (useETag) await _loadETagCache();
+
+    // 构建请求头（如有 ETag 则带上 If-None-Match）
+    final requestHeaders = _mergeHeaders(headers);
+    if (useETag && _etagCache.containsKey(url)) {
+      requestHeaders['If-None-Match'] = _etagCache[url]!.etag;
+    }
+
+    final response = await _requestWithRetry(
+      () => http.get(uri, headers: requestHeaders),
       timeout: timeout,
       cancelToken: cancelToken,
     );
+
+    // 处理 304 Not Modified：返回缓存内容
+    if (useETag && response.statusCode == 304) {
+      final cached = _etagCache[url];
+      if (cached != null) {
+        if (kDebugMode) debugPrint('📦 ETag 304 缓存命中: $path');
+        // 构造伪 200 响应，使用缓存的 body
+        return http.Response(
+          cached.body,
+          200,
+          headers: {
+            ...response.headers,
+            'X-Cache': 'HIT',
+          },
+          request: response.request,
+        );
+      }
+    }
+
+    // 处理 200 OK：保存 ETag 缓存
+    if (useETag && response.statusCode == 200) {
+      final etag = response.headers['etag'];
+      if (etag != null && etag.isNotEmpty) {
+        _etagCache[url] = _ETagEntry(
+          etag: etag,
+          body: response.body,
+          cachedAt: DateTime.now(),
+        );
+        unawaited(_saveETagCache());
+      }
+    }
+
+    return response;
   }
 
   /// POST 请求

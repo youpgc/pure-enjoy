@@ -333,7 +333,9 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 加载最近阅读的小说（嵌套查询：通过外键一次获取 user_novels + novels）
+  /// 加载最近阅读的小说
+  /// 分两步查询：先查 user_novels 获取阅读记录，再查 novels 获取详情
+  /// 避免嵌套查询因外键关系或RLS导致解析失败
   Future<void> _loadRecentNovels() async {
     try {
       final userId = AuthService.instance.currentUserId;
@@ -342,30 +344,65 @@ class _DashboardPageState extends State<DashboardPage> {
         return;
       }
 
-      // 嵌套查询：一次请求获取 user_novels + novels 详情
-      final result = await ApiClient.get('user_novels',
-          filters: {'user_id': 'eq.$userId', 'is_collected': 'eq.true'},
-          select: 'novel_id,last_chapter,progress,last_read_at,novels(id,title,author,cover_url,category)',
+      // 第一步：查询用户有阅读记录的小说（不限制 is_collected）
+      final progressResult = await ApiClient.get('user_novels',
+          filters: {'user_id': 'eq.$userId'},
+          select: 'novel_id,last_chapter,progress,last_read_at',
           order: 'last_read_at.desc.nullslast',
           limit: 5);
 
-      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
+      if (!progressResult.isSuccess ||
+          progressResult.data == null ||
+          progressResult.data!.isEmpty) {
         if (mounted) setState(() => _isLoadingNovels = false);
         return;
       }
 
-      // 直接从嵌套数据中构建结果
-      final novels = <Map<String, dynamic>>[];
-      for (final item in result.data!) {
-        final novelData = item['novels'] as Map<String, dynamic>?;
-        if (novelData != null) {
-          novels.add({
-            'novel': NovelModel.fromJson(novelData),
-            'lastChapter': item['last_chapter'] as int? ?? 1,
-            'progress': item['progress'] as num? ?? 0.0,
-          });
+      // 收集 novel_id 列表
+      final novelIds = <String>[];
+      final progressMap = <String, Map<String, dynamic>>{};
+      for (final item in progressResult.data!) {
+        final novelId = item['novel_id']?.toString();
+        if (novelId != null && novelId.isNotEmpty) {
+          novelIds.add(novelId);
+          progressMap[novelId] = item;
         }
       }
+
+      if (novelIds.isEmpty) {
+        if (mounted) setState(() => _isLoadingNovels = false);
+        return;
+      }
+
+      // 第二步：查询 novels 详情
+      final novelsResult = await ApiClient.get('novels',
+          filters: {'id': 'in.(${novelIds.join(",")})'},
+          select: 'id,title,author,cover_url,category,chapter_count',
+          limit: novelIds.length);
+
+      final novels = <Map<String, dynamic>>[];
+      if (novelsResult.isSuccess && novelsResult.data != null) {
+        for (final novelData in novelsResult.data!) {
+          final novelId = novelData['id']?.toString() ?? '';
+          final progressItem = progressMap[novelId];
+          if (progressItem != null) {
+            novels.add({
+              'novel': NovelModel.fromJson(novelData),
+              'lastChapter': progressItem['last_chapter'] as int? ?? 1,
+              'progress': progressItem['progress'] as num? ?? 0.0,
+            });
+          }
+        }
+      }
+
+      // 按阅读时间排序（因为 novels 查询不保证顺序）
+      novels.sort((a, b) {
+        final idA = (a['novel'] as NovelModel).id;
+        final idB = (b['novel'] as NovelModel).id;
+        final idxA = novelIds.indexOf(idA);
+        final idxB = novelIds.indexOf(idB);
+        return idxA.compareTo(idxB);
+      });
 
       if (mounted) {
         setState(() {
@@ -375,7 +412,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('加载最近阅读失败');
+        debugPrint('加载最近阅读失败: $e');
       }
       if (mounted) setState(() => _isLoadingNovels = false);
     }

@@ -198,9 +198,10 @@ class ChapterCacheService extends WidgetsBindingObserver {
     WidgetsBinding.instance.removeObserver(this);
   }
 
-  // ==================== L2 磁盘缓存（原有，扩展）====================
+  // ==================== L2 磁盘缓存（按小说分目录）====================
 
-  Future<Directory> get _cacheDir async {
+  /// 获取应用级缓存根目录
+  Future<Directory> get _cacheRootDir async {
     final appDir = await getApplicationDocumentsDirectory();
     final cacheDir = Directory('${appDir.path}/chapter_cache');
     if (!await cacheDir.exists()) {
@@ -209,7 +210,17 @@ class ChapterCacheService extends WidgetsBindingObserver {
     return cacheDir;
   }
 
-  String _cacheFileName(String chapterId) => 'chapter_${chapterId.replaceAll('-', '')}.txt';
+  /// 获取指定小说的缓存目录
+  Future<Directory> _cacheDir(String novelId) async {
+    final root = await _cacheRootDir;
+    final novelDir = Directory('${root.path}/$novelId');
+    if (!await novelDir.exists()) {
+      await novelDir.create(recursive: true);
+    }
+    return novelDir;
+  }
+
+  String _cacheFileName(String chapterId) => '${chapterId.replaceAll('-', '')}.txt';
 
   /// 缓存章节内容（L1 + L2 同时写入）
   Future<void> cacheChapter({
@@ -234,7 +245,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
     String content,
   ) async {
     try {
-      final dir = await _cacheDir;
+      final dir = await _cacheDir(novelId);
       final file = File('${dir.path}/${_cacheFileName(chapterId)}');
       await file.writeAsString(content);
 
@@ -265,9 +276,12 @@ class ChapterCacheService extends WidgetsBindingObserver {
       return memContent;
     }
 
-    // 2. L2 磁盘缓存
+    // 2. L2 磁盘缓存（需从索引中获取 novelId 定位目录）
     try {
-      final dir = await _cacheDir;
+      final novelId = _diskIndex?[chapterId]?.novelId;
+      if (novelId == null) return null;
+
+      final dir = await _cacheDir(novelId);
       final file = File('${dir.path}/${_cacheFileName(chapterId)}');
       if (await file.exists()) {
         final content = await file.readAsString();
@@ -285,7 +299,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
 
   /// 检查缓存是否在 TTL 有效期内
   /// 返回 true 表示缓存仍新鲜，可跳过网络请求
-  static const Duration _cacheTtl = Duration(minutes: 30);
+  static const Duration _cacheTtl = Duration(days: 30);
   bool isCacheFresh(String chapterId) {
     if (_diskIndex == null || !_diskIndex!.containsKey(chapterId)) return false;
     final entry = _diskIndex![chapterId]!;
@@ -367,7 +381,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
       final chapterId = _preloadQueue.removeAt(0);
 
       // 跳过已缓存的
-      if (_memoryCache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false)) {
+      if (_l1Cache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false)) {
         continue;
       }
 
@@ -396,7 +410,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
   // ==================== 原有方法（保持不变）====================
 
   bool isCached(String chapterId) {
-    return _memoryCache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false);
+    return _l1Cache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false);
   }
 
   List<CacheEntry> getCachedChapters(String novelId) {
@@ -423,50 +437,59 @@ class ChapterCacheService extends WidgetsBindingObserver {
     return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
   }
 
+  /// 清理指定小说的所有缓存（L1 + L2 一起清理）
   Future<int> clearNovelCache(String novelId) async {
     final chapters = getCachedChapters(novelId);
     if (chapters.isEmpty) return 0;
+
+    // 1. 清理 L1 内存缓存
+    for (final chapter in chapters) {
+      _l1Cache.remove(chapter.chapterId);
+      _lruOrder?.remove(chapter.chapterId);
+    }
+    _recalculateMemoryBytes();
+
+    // 2. 清理 L2 磁盘缓存（直接删除小说目录）
     int count = 0;
     try {
-      final dir = await _cacheDir;
-      for (final chapter in chapters) {
-        try {
-          // L1 清理
-          _memoryCache.remove(chapter.chapterId);
-          // L2 清理
-          final file = File('${dir.path}/${_cacheFileName(chapter.chapterId)}');
-          if (await file.exists()) {
-            await file.delete();
-            count++;
-          }
-          _diskIndex?.remove(chapter.chapterId);
-        } catch (e) {
-          if (kDebugMode) debugPrint('❌ 删除缓存失败: $e');
-        }
+      final root = await _cacheRootDir;
+      final novelDir = Directory('${root.path}/$novelId');
+      if (await novelDir.exists()) {
+        final files = novelDir.listSync();
+        await novelDir.delete(recursive: true);
+        count = files.whereType<File>().length;
       }
-      _recalculateMemoryBytes();
-      await _saveIndex();
     } catch (e) {
-      if (kDebugMode) debugPrint('❌ 清除小说缓存失败: $e');
+      if (kDebugMode) debugPrint('❌ 删除小说缓存目录失败: $e');
     }
+
+    // 3. 更新索引
+    for (final chapter in chapters) {
+      _diskIndex?.remove(chapter.chapterId);
+    }
+    await _saveIndex();
+
     if (kDebugMode) debugPrint('🗑️ 清除小说缓存 $count 章');
     return count;
   }
 
+  /// 清理所有缓存
   Future<int> clearAllCache() async {
     int count = 0;
     try {
-      final dir = await _cacheDir;
-      if (await dir.exists()) {
-        final files = dir.listSync();
-        for (final file in files) {
-          if (file is File) {
-            await file.delete();
-            count++;
+      final root = await _cacheRootDir;
+      if (await root.exists()) {
+        final items = root.listSync();
+        for (final item in items) {
+          if (item is Directory) {
+            final files = item.listSync();
+            await item.delete(recursive: true);
+            count += files.whereType<File>().length;
           }
         }
       }
-      _memoryCache.clear();
+      _l1Cache.clear();
+      _lruOrder?.clear();
       _currentMemoryCacheBytes = 0;
       _diskIndex?.clear();
       await _saveIndex();

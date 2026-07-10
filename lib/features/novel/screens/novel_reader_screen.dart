@@ -122,8 +122,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   final _scaffoldKey = GlobalKey<ScaffoldState>();
 
-  static const int _catalogPageSize = 20;
-
   int get _fontStyleHash => Object.hash(_fontSize, _lineHeight, _background, _font);
 
   /// 当前正在加载的章节ID，用于防止快速切换时竞态条件（Bug 2 修复）
@@ -132,8 +130,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 按需加载目录相关状态
   bool _hasMoreChapters = true;      // 是否还有更多章节目录未加载
   bool _isLoadingMoreMeta = false;   // 是否正在加载更多目录
-  int _loadedMetaOffset = 0;         // 已加载目录的 offset
   static const int _metaBatchSize = 50; // 每次加载目录的批次大小
+  int _lastLoadedChapterNum = 0;     // 键集分页游标：最后加载的章节号
 
   /// 书架状态检查完成信号，防止 _saveProgress 在检查完成前创建重复记录（Bug 3 修复）
   final Completer<void> _bookshelfStatusCompleter = Completer<void>();
@@ -243,7 +241,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       chapters: _chapters,
       currentChapterIndex: _currentChapterIndex,
       background: _background,
-      catalogPageSize: _catalogPageSize,
+      totalChapterCount: _totalChapterCount,
       hasMoreChapters: _hasMoreChapters,
       isLoadingMore: _isLoadingMoreMeta,
       onCloseDrawer: () => _scaffoldKey.currentState?.closeDrawer(),
@@ -253,6 +251,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _loadChapterContent(chapter);
       },
       onLoadMore: () => _loadMoreChapterMeta(),
+      onRefresh: _chapters.isNotEmpty ? () async {
+        // 下拉刷新：重新加载当前窗口附近的目录
+        final targetNum = _currentChapter?.chapterOrder ?? 1;
+        final rangeStart = math.max(1, targetNum - 25);
+        final result = await ApiClient.get(
+          'novel_chapters',
+          filters: {
+            'novel_id': 'eq.${widget.novel.id}',
+            'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.${targetNum + 25})',
+          },
+          columns: 'id,title,chapter_num',
+          order: 'chapter_num.asc',
+        );
+        if (result.isSuccess && result.data != null && mounted) {
+          final refreshed = result.data!
+              .map((json) => NovelChapterModel.fromJson(json))
+              .toList();
+          refreshed.removeWhere((c) => c.chapterOrder <= 0);
+          setState(() {
+            _chapters = refreshed;
+            _lastLoadedChapterNum = 0;
+            _hasMoreChapters = refreshed.length >= 50;
+          });
+        }
+      } : null,
     );
   }
 
@@ -277,9 +300,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
+  /// 使用小说总章节数计算阅读进度（而非已加载章节数）
   double get _readingProgress {
-    if (_chapters.isEmpty) return 0;
-    return (_currentChapterIndex + 1) / _chapters.length;
+    final total = widget.novel.chapterCount;
+    if (total <= 0) return 0;
+    final currentOrder = _currentChapter?.chapterOrder ?? _currentChapterIndex + 1;
+    return currentOrder / total;
+  }
+
+  /// 总章节数（优先使用小说元数据）
+  int get _totalChapterCount {
+    final novelCount = widget.novel.chapterCount;
+    return novelCount > 0 ? novelCount : _chapters.length;
   }
 
   String get _currentTime {
@@ -309,7 +341,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       novel: widget.novel,
       currentChapter: _currentChapter,
       currentChapterIndex: _currentChapterIndex,
-      chapterCount: _chapters.length,
+      chapterCount: _totalChapterCount,
       hasStartedReading: _hasStartedReading,
       currentReadingDuration: _currentReadingDuration,
       isInBookshelf: _isInBookshelf,
@@ -329,7 +361,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       slideAnimation: _bottomToolbarSlideAnimation,
       background: _background,
       currentChapterIndex: _currentChapterIndex,
-      chapterCount: _chapters.length,
+      chapterCount: _totalChapterCount,
       onPreviousChapter: _previousChapter,
       onNextChapter: _nextChapter,
       onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
@@ -428,7 +460,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       // 判断是否有更多章节
       _hasMoreChapters = allChapters.length >= 50;
-      _loadedMetaOffset = 0;
+      _lastLoadedChapterNum = allChapters.isNotEmpty ? allChapters.last.chapterOrder : 0;
 
       // 找到当前章节索引
       int startIndex = 0;
@@ -483,6 +515,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 按需加载更多章节目录
   /// [targetChapterNum] 可选，如果需要加载到包含特定章节号的位置
+  /// 使用键集分页（chapter_num 游标）替代 offset，避免深度分页性能衰减
   Future<void> _loadMoreChapterMeta({int? targetChapterNum}) async {
     if (_isLoadingMoreMeta) return;
     if (!_hasMoreChapters && targetChapterNum == null) return;
@@ -490,53 +523,25 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _isLoadingMoreMeta = true);
 
     try {
-      int offset = _loadedMetaOffset + _chapters.length;
+      // 获取当前已加载的最大章节号作为游标
+      final lastChapterNum = _chapters.isNotEmpty ? _chapters.last.chapterOrder : 0;
 
-      // 如果指定了目标章节号，计算需要加载的 offset
-      if (targetChapterNum != null && _chapters.isNotEmpty) {
-        // 从当前最大章节号之后开始加载
-        final lastChapterNum = _chapters.last.chapterOrder;
-        if (targetChapterNum <= lastChapterNum) {
-          setState(() => _isLoadingMoreMeta = false);
-          return; // 目标章节已在范围内
-        }
-        // 使用 chapter_num 范围查询，从 lastChapterNum + 1 开始
-        final result = await ApiClient.get(
-          'novel_chapters',
-          filters: {
-            'novel_id': 'eq.${widget.novel.id}',
-            'chapter_num': 'gt.$lastChapterNum',
-          },
-          columns: 'id,title,chapter_num',
-          order: 'chapter_num.asc',
-          limit: _metaBatchSize,
-        );
-
-        if (result.isSuccess && result.data != null) {
-          final newChapters = result.data!
-              .map((json) => NovelChapterModel.fromJson(json))
-              .toList();
-          newChapters.removeWhere((c) => c.chapterOrder <= 0);
-
-          if (mounted) {
-            setState(() {
-              _chapters.addAll(newChapters);
-              _hasMoreChapters = newChapters.length >= _metaBatchSize;
-            });
-          }
-        }
+      // 如果指定了目标章节号且已在范围内，无需加载
+      if (targetChapterNum != null && targetChapterNum <= lastChapterNum) {
         setState(() => _isLoadingMoreMeta = false);
         return;
       }
 
-      // 常规加载：按 offset 加载下一批
+      // 键集分页：以上一批最后一条 chapter_num 为起点
       final result = await ApiClient.get(
         'novel_chapters',
-        filters: {'novel_id': 'eq.${widget.novel.id}'},
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'chapter_num': 'gt.$lastChapterNum',
+        },
         columns: 'id,title,chapter_num',
         order: 'chapter_num.asc',
         limit: _metaBatchSize,
-        offset: offset,
       );
 
       if (result.isSuccess && result.data != null) {
@@ -586,7 +591,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   Future<void> _loadChapterContent(NovelChapterModel chapter) async {
     // 记录当前加载的章节ID，用于防止竞态条件（Bug 2 修复）
     _loadingChapterId = chapter.id;
-    setState(() => _isLoadingChapter = true);
     _hasTriggeredNextChapter = false;
     // 重置页码信息
     _currentPageIndex = 0;
@@ -606,6 +610,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       _startReadingTimer();
       _checkBookmarkStatus();
       _chapterReadStartTime = DateTime.now();
+      // 后台静默更新（如果缓存过期）
+      _silentRefreshChapter(chapter);
       return;
     }
 
@@ -613,14 +619,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     ChapterCacheService.instance.setProtectedChapter(chapter.id);
 
     try {
-      // 2. 检查本地缓存是否新鲜（TTL 内跳过网络请求）
+      // 2. 检查本地缓存（L1/L2）
       final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
 
       // 检查是否已切换到其他章节
       if (_loadingChapterId != chapter.id) return;
 
-      // 缓存命中且在 TTL 有效期内：直接使用缓存，跳过网络请求
-      if (cachedContent != null && ChapterCacheService.instance.isCacheFresh(chapter.id)) {
+      if (cachedContent != null) {
+        // 缓存命中：立即显示缓存内容，不显示loading（无感切换）
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         final cachedChapter = chapter.copyWith(content: normalizedContent);
         final chapterIndex = _chapters.indexWhere((c) => c.id == chapter.id);
@@ -638,27 +644,42 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _startReadingTimer();
         _checkBookmarkStatus();
         _chapterReadStartTime = DateTime.now();
+
+        // 缓存过期时在后台静默刷新
+        if (!ChapterCacheService.instance.isCacheFresh(chapter.id)) {
+          _silentRefreshChapter(chapter);
+        }
         return;
       }
 
-      // 3. 缓存未命中或已过期：发起网络请求
-      final networkFuture = ApiClient.get(
+      // 3. 无缓存：显示loading并发起网络请求
+      if (mounted) {
+        setState(() => _isLoadingChapter = true);
+      }
+
+      final result = await ApiClient.get(
         'novel_chapters',
         filters: {'id': 'eq.${chapter.id}'},
         columns: 'id,title,content,chapter_num,word_count',
       );
 
-      if (cachedContent != null) {
-        // 有缓存但已过期：先显示缓存内容，再等待网络更新
-        final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-        final cachedChapter = chapter.copyWith(content: normalizedContent);
-        final chapterIndex = _chapters.indexWhere((c) => c.id == chapter.id);
-        if (chapterIndex != -1) {
-          _chapters[chapterIndex] = cachedChapter;
+      // 再次检查是否已切换到其他章节（Bug 2 核心修复）
+      if (_loadingChapterId != chapter.id) return;
+
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        final chapterData = result.data!.first;
+        final parsedChapter = NovelChapterModel.fromJson(chapterData);
+        final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+        final loadedChapter = parsedChapter.copyWith(content: normalizedContent);
+        final loadedIndex = _chapters.indexWhere((c) => c.id == parsedChapter.id);
+        if (loadedIndex != -1) {
+          _chapters[loadedIndex] = loadedChapter;
         }
+
         if (mounted) {
           setState(() {
-            _currentChapter = cachedChapter;
+            _currentChapter = loadedChapter;
             _isLoadingChapter = false;
           });
         }
@@ -667,64 +688,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _startReadingTimer();
         _checkBookmarkStatus();
         _chapterReadStartTime = DateTime.now();
-      }
 
-      // 等待网络请求
-      final result = await networkFuture;
-
-      // 再次检查是否已切换到其他章节（Bug 2 核心修复）
-      if (_loadingChapterId != chapter.id) return;
-
-      if (result.isSuccess) {
-        final data = result.data!;
-        if (data.isNotEmpty) {
-          final chapterData = data.first;
-          final parsedChapter = NovelChapterModel.fromJson(chapterData);
-          // 归一化换行符，避免 \r\n 导致渲染异常
-          final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
-
-          // 更新 _chapters 列表中的章节内容
-          final loadedChapter = parsedChapter.copyWith(content: normalizedContent);
-          final loadedIndex = _chapters.indexWhere((c) => c.id == parsedChapter.id);
-          if (loadedIndex != -1) {
-            _chapters[loadedIndex] = loadedChapter;
-          }
-
-          // 只有当网络内容比缓存新或不同才更新UI
-          if (_currentChapter == null || _currentChapter!.content != normalizedContent) {
-            if (mounted) {
-              setState(() {
-                _currentChapter = loadedChapter;
-                _isLoadingChapter = false;
-              });
-            }
-            // 根据方向决定滚动位置
-            _scrollToPosition();
-            _saveProgress();
-            _startReadingTimer();
-            _checkBookmarkStatus();
-            _chapterReadStartTime = DateTime.now();
-          }
-
-          if (normalizedContent.isNotEmpty) {
-            ChapterCacheService.instance.cacheChapter(
-              chapterId: parsedChapter.id,
-              novelId: widget.novel.id,
-              title: parsedChapter.title,
-              chapterOrder: parsedChapter.chapterOrder,
-              content: normalizedContent,
-            );
-          }
-        } else if (_currentChapter == null) {
-          if (mounted) {
-            setState(() {
-              _currentChapter = chapter;
-              _isLoadingChapter = false;
-            });
-          }
-          _scrollToPosition();
+        if (normalizedContent.isNotEmpty) {
+          ChapterCacheService.instance.cacheChapter(
+            chapterId: parsedChapter.id,
+            novelId: widget.novel.id,
+            title: parsedChapter.title,
+            chapterOrder: parsedChapter.chapterOrder,
+            content: normalizedContent,
+          );
         }
-      } else if (_currentChapter == null) {
+      } else {
+        // 网络请求失败且无任何缓存：降级显示空内容章节
         if (mounted) {
           setState(() {
             _currentChapter = chapter;
@@ -736,15 +711,60 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     } catch (e) {
       // 异常时也检查是否已切换章节
       if (_loadingChapterId != chapter.id) return;
-      if (_currentChapter == null) {
-        if (mounted) {
-          setState(() {
-            _currentChapter = chapter;
-            _isLoadingChapter = false;
-          });
-        }
-        _scrollToPosition();
+      if (mounted) {
+        setState(() {
+          _currentChapter = chapter;
+          _isLoadingChapter = false;
+        });
       }
+      _scrollToPosition();
+    }
+  }
+
+  /// 后台静默刷新章节内容（不显示loading，不阻塞阅读）
+  Future<void> _silentRefreshChapter(NovelChapterModel chapter) async {
+    try {
+      final result = await ApiClient.get(
+        'novel_chapters',
+        filters: {'id': 'eq.${chapter.id}'},
+        columns: 'id,title,content,chapter_num,word_count',
+      );
+
+      if (_loadingChapterId != chapter.id) return;
+
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        final chapterData = result.data!.first;
+        final parsedChapter = NovelChapterModel.fromJson(chapterData);
+        final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+
+        // 只有当内容确实变化时才更新UI
+        final currentIndex = _chapters.indexWhere((c) => c.id == chapter.id);
+        if (currentIndex != -1) {
+          final oldContent = _chapters[currentIndex].content;
+          _chapters[currentIndex] = parsedChapter.copyWith(content: normalizedContent);
+
+          // 如果当前正在显示此章节且内容有变化，无感更新
+          if (_currentChapter?.id == chapter.id && oldContent != normalizedContent) {
+            if (mounted) {
+              setState(() {
+                _currentChapter = _chapters[currentIndex];
+              });
+            }
+          }
+        }
+
+        if (normalizedContent.isNotEmpty) {
+          ChapterCacheService.instance.cacheChapter(
+            chapterId: parsedChapter.id,
+            novelId: widget.novel.id,
+            title: parsedChapter.title,
+            chapterOrder: parsedChapter.chapterOrder,
+            content: normalizedContent,
+          );
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('静默刷新章节失败: ${chapter.title}');
     }
   }
 
@@ -931,7 +951,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
     try {
       final chapterNum = _currentChapter!.chapterOrder;
-      final totalChapters = _chapters.length;
+      final totalChapters = _totalChapterCount;
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
       // 并行执行：记录阅读历史 + 保存阅读进度（两者无依赖关系）
@@ -1519,41 +1539,40 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       drawer: _buildChapterDrawer(),
       body: _isLoading
           ? const Center(child: LoadingWidget())
-          : _currentChapter == null
-              ? Center(child: Text('暂无章节', style: TextStyle(color: _background.textColor)))
-              : Stack(
+          : Stack(
+              children: [
+                // Column 布局：顶部状态栏 → 内容铺满 → 底部状态栏
+                Column(
                   children: [
-                    // Column 布局：顶部状态栏 → 内容铺满 → 底部状态栏
-                    Column(
-                      children: [
-                        // 顶部信息栏
-                        _buildTopStatusBar(),
-                        // 小说内容（铺满中间剩余空间）
-                        Expanded(
-                          child: _isLoadingChapter
-                              ? const Center(child: LoadingWidget())
-                              : _buildContent(),
-                        ),
-                        // 底部状态栏
-                        _buildBottomStatusBar(),
-                      ],
+                    // 顶部信息栏
+                    _buildTopStatusBar(),
+                    // 小说内容（铺满中间剩余空间）
+                    // 优先显示已有内容，无缓存且正在加载时才显示loading
+                    Expanded(
+                      child: (_isLoadingChapter && _currentChapter == null)
+                          ? const Center(child: LoadingWidget())
+                          : _buildContent(),
                     ),
-
-                    // 顶部菜单（菜单显示时才显示，覆盖在内容上方）
-                    if (_showMenu)
-                      Positioned(
-                        top: 0, left: 0, right: 0,
-                        child: _buildTopMenu(),
-                      ),
-
-                    // 底部菜单（菜单显示时才显示，覆盖在内容上方）
-                    if (_showMenu)
-                      Positioned(
-                        left: 0, right: 0, bottom: 0,
-                        child: _buildBottomToolbar(),
-                      ),
+                    // 底部状态栏
+                    _buildBottomStatusBar(),
                   ],
                 ),
+
+                // 顶部菜单（菜单显示时才显示，覆盖在内容上方）
+                if (_showMenu)
+                  Positioned(
+                    top: 0, left: 0, right: 0,
+                    child: _buildTopMenu(),
+                  ),
+
+                // 底部菜单（菜单显示时才显示，覆盖在内容上方）
+                if (_showMenu)
+                  Positioned(
+                    left: 0, right: 0, bottom: 0,
+                    child: _buildBottomToolbar(),
+                  ),
+              ],
+            ),
               ),
             );
   }
