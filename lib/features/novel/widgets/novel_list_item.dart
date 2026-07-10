@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/widgets.dart';
+import 'novel_cover.dart';
 
 /// 小说列表项组件
 class NovelListItem extends StatelessWidget {
@@ -33,31 +34,11 @@ class NovelListItem extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           // 封面
-          ClipRRect(
-            borderRadius: BorderRadius.circular(6),
-            child: SizedBox(
-              width: 64,
-              height: 88,
-              child: coverUrl != null && coverUrl.isNotEmpty
-                  ? Image.network(
-                      coverUrl,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          Icons.book,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    )
-                  : Container(
-                      color: colorScheme.surfaceContainerHighest,
-                      child: Icon(
-                        Icons.book,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-            ),
+          NovelCover(
+            coverUrl: coverUrl,
+            title: title,
+            width: 64,
+            height: 88,
           ),
           const SizedBox(width: 12),
           // 信息

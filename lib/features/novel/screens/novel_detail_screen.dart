@@ -7,6 +7,7 @@ import '../../../core/theme/app_theme.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
+import '../widgets/novel_cover.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_reader_screen.dart';
 import 'novel_comments_screen.dart';
@@ -689,16 +690,13 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                 fit: StackFit.expand,
                 children: [
                   // 背景封面（模糊效果）
-                  if (novel.cover != null)
-                    Image.network(
-                      novel.cover!,
-                      fit: BoxFit.cover,
-                      errorBuilder: (_, __, ___) => Container(
-                        color: colorScheme.primaryContainer,
-                      ),
-                    )
-                  else
-                    Container(color: colorScheme.primaryContainer),
+                  NovelCover(
+                    coverUrl: novel.cover,
+                    title: novel.title,
+                    width: double.infinity,
+                    height: double.infinity,
+                    borderRadius: 0,
+                  ),
                   // 渐变遮罩
                   Container(
                     decoration: BoxDecoration(
@@ -723,33 +721,12 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                       crossAxisAlignment: CrossAxisAlignment.end,
                       children: [
                         // 封面缩略图
-                        ClipRRect(
-                          borderRadius: BorderRadius.circular(8),
-                          child: SizedBox(
-                            width: 90,
-                            height: 120,
-                            child: novel.cover != null
-                                ? Image.network(
-                                    novel.cover!,
-                                    fit: BoxFit.cover,
-                                    errorBuilder: (_, __, ___) => Container(
-                                      color: colorScheme.surfaceContainerHighest,
-                                      child: Icon(
-                                        Icons.book,
-                                        size: 40,
-                                        color: colorScheme.onSurfaceVariant,
-                                      ),
-                                    ),
-                                  )
-                                : Container(
-                                    color: colorScheme.surfaceContainerHighest,
-                                    child: Icon(
-                                      Icons.book,
-                                      size: 40,
-                                      color: colorScheme.onSurfaceVariant,
-                                    ),
-                                  ),
-                          ),
+                        NovelCover(
+                          coverUrl: novel.cover,
+                          title: novel.title,
+                          width: 90,
+                          height: 120,
+                          borderRadius: 8,
                         ),
                         const SizedBox(width: 16),
                         // 标题和作者

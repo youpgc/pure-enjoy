@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'novel_cover.dart';
 
 /// 书架列表项
 class BookshelfItem extends StatelessWidget {
@@ -55,31 +56,11 @@ class BookshelfItem extends StatelessWidget {
         child: Row(
           children: [
             // 封面
-            ClipRRect(
-              borderRadius: BorderRadius.circular(6),
-              child: SizedBox(
-                width: 56,
-                height: 76,
-                child: coverUrl != null && coverUrl.isNotEmpty
-                    ? Image.network(
-                        coverUrl,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => Container(
-                          color: colorScheme.surfaceContainerHighest,
-                          child: Icon(
-                            Icons.book,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      )
-                    : Container(
-                        color: colorScheme.surfaceContainerHighest,
-                        child: Icon(
-                          Icons.book,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-              ),
+            NovelCover(
+              coverUrl: coverUrl,
+              title: title,
+              width: 56,
+              height: 76,
             ),
             const SizedBox(width: 12),
             // 信息

@@ -4,6 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/novel_model.dart';
 import '../services/recommendation_service.dart';
+import '../widgets/novel_cover.dart';
 import 'novel_detail_screen.dart';
 import '../../../constants/app_constants.dart';
 
@@ -269,17 +270,12 @@ class _RecommendationCard extends StatelessWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               // 封面
-              ClipRRect(
-                borderRadius: BorderRadius.circular(4),
-                child: novel.cover != null
-                    ? Image.network(
-                        novel.cover!,
-                        width: 80,
-                        height: 110,
-                        fit: BoxFit.cover,
-                        errorBuilder: (_, __, ___) => _buildPlaceholder(colorScheme),
-                      )
-                    : _buildPlaceholder(colorScheme),
+              NovelCover(
+                coverUrl: novel.cover,
+                title: novel.title,
+                width: 80,
+                height: 110,
+                borderRadius: 4,
               ),
               const SizedBox(width: 12),
               // 信息
@@ -349,12 +345,4 @@ class _RecommendationCard extends StatelessWidget {
     );
   }
 
-  Widget _buildPlaceholder(ColorScheme colorScheme) {
-    return Container(
-      width: 80,
-      height: 110,
-      color: colorScheme.surfaceContainerHighest,
-      child: Icon(Icons.book, size: 32, color: colorScheme.onSurfaceVariant),
-    );
-  }
 }

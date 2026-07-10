@@ -9,6 +9,7 @@ import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
+import '../widgets/novel_cover.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
 import 'ranking_screen.dart';
@@ -594,26 +595,12 @@ class _NovelCard extends StatelessWidget {
               flex: 3,
               child: Stack(
                 children: [
-                  Container(
+                  NovelCover(
+                    coverUrl: novel.cover,
+                    title: novel.title,
                     width: double.infinity,
-                    color: colorScheme.surfaceContainerHighest,
-                    child: novel.cover != null
-                        ? Image.network(
-                            novel.cover!,
-                            fit: BoxFit.cover,
-                            errorBuilder: (_, __, ___) => Icon(
-                              Icons.book,
-                              size: 48,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          )
-                        : Center(
-                            child: Icon(
-                              Icons.book,
-                              size: 48,
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
+                    height: double.infinity,
+                    borderRadius: 0,
                   ),
                   if (onAddToBookshelf != null)
                     Positioned(

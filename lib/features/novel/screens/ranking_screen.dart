@@ -3,6 +3,7 @@ import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/novel_model.dart';
 import '../services/ranking_service.dart';
+import '../widgets/novel_cover.dart';
 import 'novel_detail_screen.dart';
 
 /// 排行榜页面
@@ -169,28 +170,13 @@ class _RankingScreenState extends State<RankingScreen>
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
-          trailing: item.coverUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.network(
-                    item.coverUrl!,
-                    width: 48,
-                    height: 64,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 48,
-                      height: 64,
-                      color: Colors.grey[300],
-                      child: const Icon(Icons.book, size: 24),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 48,
-                  height: 64,
-                  color: Colors.grey[300],
-                  child: const Icon(Icons.book, size: 24),
-                ),
+          trailing: NovelCover(
+            coverUrl: item.coverUrl,
+            title: item.title,
+            width: 48,
+            height: 64,
+            borderRadius: 4,
+          ),
           onTap: () => _onItemTap(item),
           onLongPress: () => _onItemLongPress(item),
         );
