@@ -188,10 +188,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
-    // 先停止滚动活动再 dispose，避免 BallisticScrollActivity 断言错误
-    if (_scrollController.hasClients && _scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
-      _scrollController.position.hold(() {});
-    }
     _toolbarAnimationController.dispose();
     _scrollController.dispose();
     // 6.1 新增：清理 TTS 和阅读历史定时器
@@ -888,16 +884,16 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 延迟到下一帧执行，避免与正在进行的 BallisticScrollActivity 冲突
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
-      // 先停止任何正在进行的滚动动画
-      if (_scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
-        _scrollController.position.hold(() {});
-      }
-      if (_shouldJumpToLastPage) {
-        // 上一章：跳转到末尾
-        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-      } else {
-        // 下一章：跳转到顶部
-        _scrollController.jumpTo(0);
+      try {
+        if (_shouldJumpToLastPage) {
+          // 上一章：跳转到末尾
+          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+        } else {
+          // 下一章：跳转到顶部
+          _scrollController.jumpTo(0);
+        }
+      } catch (_) {
+        // 忽略滚动中断异常
       }
     });
   }
@@ -1148,18 +1144,18 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     if (bookmark.charOffset > 0 && _pageTurnMode == PageTurnMode.scroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients || _currentChapter == null) return;
-        // 先停止任何正在进行的滚动动画
-        if (_scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
-          _scrollController.position.hold(() {});
-        }
         final content = _currentChapter!.content;
         final ratio = bookmark.charOffset / content.length;
         final targetOffset = ratio * _scrollController.position.maxScrollExtent;
-        _scrollController.animateTo(
-          targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
-          duration: const Duration(milliseconds: 300),
-          curve: Curves.easeOut,
-        );
+        try {
+          _scrollController.animateTo(
+            targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+            duration: const Duration(milliseconds: 300),
+            curve: Curves.easeOut,
+          );
+        } catch (_) {
+          // 忽略滚动中断异常
+        }
       });
     }
   }
@@ -1237,8 +1233,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void _showAnnotationList() async {
     if (_currentChapter == null) return;
     final userId = _userId;
+    final currentContext = context;
     if (userId == null) {
-      showSnackBar(context, '请先登录');
+      showSnackBar(currentContext, '请先登录');
       return;
     }
 
@@ -1246,7 +1243,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     await _loadAnnotations();
 
     if (!mounted) return;
-    final currentContext = context;
     showModalBottomSheet(
       context: currentContext,
       isScrollControlled: true,
