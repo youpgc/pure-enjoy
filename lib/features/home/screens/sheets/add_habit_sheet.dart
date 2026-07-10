@@ -71,11 +71,15 @@ class AddHabitSheetState extends State<AddHabitSheet> {
         16,
         MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      child: SingleChildScrollView(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.stretch,
-          children: [
+      child: ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * 0.7,
+        ),
+        child: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.stretch,
+            children: [
             Text('添加习惯', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             TextField(
@@ -109,6 +113,7 @@ class AddHabitSheetState extends State<AddHabitSheet> {
             FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
           ],
         ),
+      ),
       ),
     );
   }
