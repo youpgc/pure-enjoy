@@ -33,6 +33,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   List<NovelChapterModel> _chapters = [];
   bool _isLoadingChapters = true;
   bool _isCollected = false;
+  double? _userRating; // 用户对这本小说的评分
 
   // 章节列表分页
   static const int _chapterPageSize = 10;
@@ -49,6 +50,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     _checkBookshelfStatus();
     _loadChapters();
     _updateCacheStatus();
+    _loadUserRating();
     _scrollController.addListener(_onScroll);
   }
 
@@ -63,6 +65,63 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     if (_scrollController.position.pixels >=
         _scrollController.position.maxScrollExtent - 200) {
       _loadMoreChapters();
+    }
+  }
+
+  /// 加载用户对本书的评分
+  Future<void> _loadUserRating() async {
+    final userId = _userId;
+    if (userId == null) return;
+    try {
+      final result = await ApiClient.get('novel_ratings',
+          filters: {'user_id': 'eq.$userId', 'novel_id': 'eq.${widget.novel.id}'},
+          columns: 'rating',
+          limit: 1);
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        if (mounted) {
+          setState(() {
+            _userRating = (result.data!.first['rating'] as num?)?.toDouble();
+          });
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('加载用户评分失败: $e');
+    }
+  }
+
+  /// 提交/更新用户评分
+  Future<void> _submitRating(double rating) async {
+    final userId = _userId;
+    if (userId == null) {
+      if (mounted) showSnackBar(context, '请先登录');
+      return;
+    }
+    try {
+      // 检查是否已有评分
+      final existing = await ApiClient.get('novel_ratings',
+          filters: {'user_id': 'eq.$userId', 'novel_id': 'eq.${widget.novel.id}'},
+          columns: 'id',
+          limit: 1);
+
+      if (existing.isSuccess && existing.data != null && existing.data!.isNotEmpty) {
+        // 更新
+        final id = existing.data!.first['id'] as String;
+        await ApiClient.update('novel_ratings', id, {'rating': rating});
+      } else {
+        // 新增
+        await ApiClient.post('novel_ratings', {
+          'user_id': userId,
+          'novel_id': widget.novel.id,
+          'rating': rating,
+        });
+      }
+      if (mounted) {
+        setState(() => _userRating = rating);
+        showSnackBar(context, '评分成功');
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('评分提交失败: $e');
+      if (mounted) showSnackBar(context, '评分失败');
     }
   }
 
@@ -140,6 +199,66 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     } catch (e) {
       if (mounted) setState(() => _isLoadingChapters = false);
     }
+  }
+
+  /// 显示评分对话框
+  void _showRatingDialog(BuildContext context) {
+    double tempRating = _userRating ?? 0;
+    showDialog(
+      context: context,
+      builder: (dialogContext) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: const Text('为这本小说评分'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Text(
+                widget.novel.title,
+                style: Theme.of(context).textTheme.bodyMedium,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              const SizedBox(height: 16),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: List.generate(5, (i) {
+                  return IconButton(
+                    iconSize: 36,
+                    icon: Icon(
+                      i < tempRating.round() ? Icons.star : Icons.star_border,
+                      color: i < tempRating.round() ? Colors.amber : null,
+                    ),
+                    onPressed: () {
+                      setDialogState(() => tempRating = (i + 1).toDouble());
+                    },
+                  );
+                }),
+              ),
+              const SizedBox(height: 8),
+              Text(
+                tempRating > 0 ? '${tempRating.toStringAsFixed(1)} 分' : '请选择评分',
+                style: Theme.of(context).textTheme.bodySmall,
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.pop(dialogContext),
+              child: const Text('取消'),
+            ),
+            FilledButton(
+              onPressed: tempRating > 0
+                  ? () {
+                      Navigator.pop(dialogContext);
+                      _submitRating(tempRating);
+                    }
+                  : null,
+              child: const Text('提交'),
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   /// 触底加载更多章节
@@ -715,6 +834,37 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   StatItem(
                     label: '评分',
                     value: novel.rating != null ? '${novel.rating}' : '--',
+                  ),
+                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
+                  InkWell(
+                    onTap: () {
+                      _showRatingDialog(context);
+                    },
+                    borderRadius: BorderRadius.circular(8),
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Row(
+                            mainAxisSize: MainAxisSize.min,
+                            children: List.generate(5, (i) {
+                              final filled = i < (_userRating?.round() ?? 0);
+                              return Icon(
+                                filled ? Icons.star : Icons.star_border,
+                                size: 18,
+                                color: filled ? Colors.amber : colorScheme.outline,
+                              );
+                            }),
+                          ),
+                          const SizedBox(height: 2),
+                          Text(
+                            _userRating != null ? '我的评分: ${_userRating!.toStringAsFixed(1)}' : '点击评分',
+                            style: TextStyle(fontSize: 10, color: colorScheme.outline),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ],
               ),

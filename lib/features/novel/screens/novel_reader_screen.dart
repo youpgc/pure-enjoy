@@ -1083,9 +1083,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     await annotationFuture;
 
     if (mounted) {
-      // 从已加载的书签列表中本地判断当前章节是否有书签，省去一次独立请求
+      // 从已加载的书签列表中按 chapter_id 判断，兼容所有翻页模式
       final bookmarked = bookmarks.any((b) =>
-        b.chapterId == _currentChapter!.id && b.charOffset == 0
+        b.chapterId == _currentChapter!.id
       );
       setState(() {
         _isBookmarked = bookmarked;
@@ -1145,7 +1145,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return content.substring(start, end);
   }
 
-  /// 6.1 新增：切换书签
+  /// 6.1 新增：切换书签（章节级书签，不依赖 charOffset）
   Future<void> _toggleBookmark() async {
     if (_currentChapter == null) return;
     final userId = _userId;
@@ -1154,21 +1154,40 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       return;
     }
 
-    final charOffset = _estimateCharOffset();
-    final preview = _getParagraphPreview(charOffset);
+    try {
+      final charOffset = _estimateCharOffset();
+      final preview = _getParagraphPreview(charOffset);
 
-    final success = await BookmarkService().toggleBookmark(
-      novelId: widget.novel.id,
-      chapterId: _currentChapter!.id,
-      chapterOrder: _currentChapter!.chapterOrder,
-      charOffset: charOffset,
-      note: preview.isNotEmpty ? preview : null,
-    );
+      // 查找当前章节是否已有书签（按 chapter_id 匹配，不依赖 charOffset）
+      final existing = _bookmarks.where((b) =>
+        b.chapterId == _currentChapter!.id).toList();
 
-    if (success && mounted) {
-      setState(() => _isBookmarked = !_isBookmarked);
-      showSnackBar(context, _isBookmarked ? '书签已添加' : '书签已移除');
-      await _checkBookmarkStatus();
+      bool success;
+      if (existing.isNotEmpty) {
+        // 删除该章节所有书签
+        for (final bm in existing) {
+          await BookmarkService().removeBookmark(bm.id);
+        }
+        success = true;
+      } else {
+        // 添加新书签
+        final added = await BookmarkService().addBookmark(
+          novelId: widget.novel.id,
+          chapterId: _currentChapter!.id,
+          chapterOrder: _currentChapter!.chapterOrder,
+          charOffset: charOffset,
+          note: preview.isNotEmpty ? preview : null,
+        );
+        success = added != null;
+      }
+
+      if (success && mounted) {
+        showSnackBar(context, existing.isNotEmpty ? '书签已移除' : '书签已添加');
+        await _checkBookmarkStatus();
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('书签操作失败: $e');
+      if (mounted) showSnackBar(context, '书签操作失败');
     }
   }
 
@@ -1224,7 +1243,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     );
   }
 
-  /// 6.1 新增：显示批注输入面板
+  /// 非滚动模式下长按弹出快捷批注菜单（无文本选择，直接输入批注笔记）
+  void _showQuickAnnotationMenu(BuildContext context) {
+    if (_currentChapter == null) return;
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      builder: (context) => ReaderAnnotationPanel(
+        selectedText: '第${_currentChapter!.chapterOrder}章 ${_currentChapter!.title}',
+        startOffset: 0,
+        endOffset: 0,
+        onSave: (selectedText, startOffset, endOffset, note, color) async {
+          Navigator.pop(context);
+          if (note == null || note.isEmpty) return;
+          await _addAnnotation(
+            startOffset: startOffset,
+            endOffset: endOffset,
+            note: note!,
+            color: color,
+          );
+        },
+      ),
+    );
+  }
+
+  /// 6.1 新增：显示批注输入面板（滚动模式：传入选中文本）
   void _showAnnotationInputPanel(String selectedText, int startOffset, int endOffset) {
     showModalBottomSheet(
       context: context,
@@ -1616,25 +1659,26 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   Widget _buildContent() {
-    return ReaderContentArea(
-      pageTurnMode: _pageTurnMode,
-      chapter: _currentChapter,
-      background: _background,
-      font: _font,
-      fontSize: _fontSize,
-      lineHeight: _lineHeight,
-      pagedContentKey: _pagedContentKey,
-      curlContentKey: _curlContentKey,
-      onPageChanged: _onPageChanged,
-      onBoundaryReached: _onPageBoundaryReached,
-      onTapScreen: _handleScreenTap,
-      shouldJumpToLastPage: _shouldJumpToLastPage,
-      scrollController: _scrollController,
-      buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
-      onShowAnnotationInput: _showAnnotationInputPanel,
-      getCachedTextStyle: _getCachedTextStyle,
-    );
-  }
+      return ReaderContentArea(
+        pageTurnMode: _pageTurnMode,
+        chapter: _currentChapter,
+        background: _background,
+        font: _font,
+        fontSize: _fontSize,
+        lineHeight: _lineHeight,
+        pagedContentKey: _pagedContentKey,
+        curlContentKey: _curlContentKey,
+        onPageChanged: _onPageChanged,
+        onBoundaryReached: _onPageBoundaryReached,
+        onTapScreen: _handleScreenTap,
+        shouldJumpToLastPage: _shouldJumpToLastPage,
+        scrollController: _scrollController,
+        buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
+        onShowAnnotationInput: _showAnnotationInputPanel,
+        onLongPressAddAnnotation: () => _showQuickAnnotationMenu(context),
+        getCachedTextStyle: _getCachedTextStyle,
+      );
+    }
 
 }
 

@@ -25,6 +25,7 @@ class ReaderContentArea extends StatelessWidget {
   final TextSpan Function(String content, TextStyle baseStyle) buildAnnotatedTextSpan;
   final void Function(TextSelection?)? onSelectionChanged;
   final void Function(String selectedText, int startOffset, int endOffset) onShowAnnotationInput;
+  final VoidCallback? onLongPressAddAnnotation;
   final TextStyle Function({bool isTitle}) getCachedTextStyle;
 
   const ReaderContentArea({
@@ -45,6 +46,7 @@ class ReaderContentArea extends StatelessWidget {
     required this.buildAnnotatedTextSpan,
     this.onSelectionChanged,
     required this.onShowAnnotationInput,
+    this.onLongPressAddAnnotation,
     required this.getCachedTextStyle,
   });
 
@@ -162,9 +164,13 @@ class ReaderContentArea extends StatelessWidget {
       );
     }
 
-    // 仿真翻页模式：使用 CurlChapterContent
+    // 仿真翻页模式：使用 CurlChapterContent，长按可添加批注
     if (pageTurnMode == PageTurnMode.simulation) {
-      return CurlChapterContent(
+      return GestureDetector(
+        onLongPressStart: onLongPressAddAnnotation != null
+            ? (_) => onLongPressAddAnnotation!()
+            : null,
+        child: CurlChapterContent(
         key: curlContentKey,
         chapter: chapter!,
         background: background,
@@ -175,22 +181,28 @@ class ReaderContentArea extends StatelessWidget {
         onBoundaryReached: onBoundaryReached,
         onTapScreen: onTapScreen,
         jumpToLastPage: shouldJumpToLastPage,
+      ),
       );
     }
 
-    // 分页模式（slide/cover）：使用 PagedChapterContent
-    return PagedChapterContent(
-      key: pagedContentKey,
-      chapter: chapter!,
-      background: background,
-      font: font,
-      fontSize: fontSize,
-      lineHeight: lineHeight,
-      pageTurnMode: pageTurnMode,
-      onPageChanged: onPageChanged,
-      onBoundaryReached: onBoundaryReached,
-      onTapScreen: onTapScreen,
-      jumpToLastPage: shouldJumpToLastPage,
+    // 分页模式（slide/cover）：使用 PagedChapterContent，长按可添加批注
+    return GestureDetector(
+      onLongPressStart: onLongPressAddAnnotation != null
+          ? (_) => onLongPressAddAnnotation!()
+          : null,
+      child: PagedChapterContent(
+        key: pagedContentKey,
+        chapter: chapter!,
+        background: background,
+        font: font,
+        fontSize: fontSize,
+        lineHeight: lineHeight,
+        pageTurnMode: pageTurnMode,
+        onPageChanged: onPageChanged,
+        onBoundaryReached: onBoundaryReached,
+        onTapScreen: onTapScreen,
+        jumpToLastPage: shouldJumpToLastPage,
+      ),
     );
   }
 }
