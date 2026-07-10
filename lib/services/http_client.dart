@@ -142,19 +142,19 @@ class HttpClient {
 
   // ==================== HTTP 方法 ====================
 
-  /// GET 请求（支持 ETag/304 缓存）
+  /// GET 请求（支持 ETag/304 缓存，默认关闭，仅对章节内容等不常变的数据启用）
   Future<http.Response> get(
     String path, {
     Map<String, String>? headers,
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
-    bool useETag = true,
+    bool useETag = false,
   }) async {
     final uri = _buildUri(path, queryParams);
     final url = uri.toString();
 
-    // 加载 ETag 缓存
+    // 加载 ETag 缓存（仅在需要时）
     if (useETag) await _loadETagCache();
 
     // 构建请求头（如有 ETag 则带上 If-None-Match）
@@ -163,31 +163,43 @@ class HttpClient {
       requestHeaders['If-None-Match'] = _etagCache[url]!.etag;
     }
 
-    final response = await _requestWithRetry(
-      () => http.get(uri, headers: requestHeaders),
+    http.Response response;
+    if (useETag && _etagCache.containsKey(url)) {
+      // 有 ETag 缓存时：先尝试带 If-None-Match 请求
+      try {
+        response = await _requestWithRetry(
+          () => http.get(uri, headers: requestHeaders),
+          timeout: timeout,
+          cancelToken: cancelToken,
+        );
+
+        // 处理 304 Not Modified：返回缓存内容
+        if (response.statusCode == 304) {
+          final cached = _etagCache[url];
+          if (cached != null) {
+            if (kDebugMode) debugPrint('📦 ETag 304 缓存命中: $path');
+            return http.Response(
+              cached.body,
+              200,
+              headers: {'X-Cache': 'HIT'},
+            );
+          }
+        }
+      } catch (e) {
+        // ETag 请求失败：清除该条缓存，回退到普通请求
+        if (kDebugMode) debugPrint('⚠️ ETag 请求失败，回退普通请求: $path');
+        _etagCache.remove(url);
+      }
+    }
+
+    // 普通请求（无 ETag 或 ETag 未命中）
+    response = await _requestWithRetry(
+      () => http.get(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
     );
 
-    // 处理 304 Not Modified：返回缓存内容
-    if (useETag && response.statusCode == 304) {
-      final cached = _etagCache[url];
-      if (cached != null) {
-        if (kDebugMode) debugPrint('📦 ETag 304 缓存命中: $path');
-        // 构造伪 200 响应，使用缓存的 body
-        return http.Response(
-          cached.body,
-          200,
-          headers: {
-            ...response.headers,
-            'X-Cache': 'HIT',
-          },
-          request: response.request,
-        );
-      }
-    }
-
-    // 处理 200 OK：保存 ETag 缓存
+    // 处理 200 OK：保存 ETag 缓存（仅当 useETag 启用时）
     if (useETag && response.statusCode == 200) {
       final etag = response.headers['etag'];
       if (etag != null && etag.isNotEmpty) {

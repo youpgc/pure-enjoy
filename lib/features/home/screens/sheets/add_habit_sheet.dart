@@ -71,42 +71,44 @@ class AddHabitSheetState extends State<AddHabitSheet> {
         16,
         MediaQuery.of(context).viewInsets.bottom + 16,
       ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: [
-          Text('添加习惯', style: Theme.of(context).textTheme.titleLarge),
-          const SizedBox(height: 16),
-          TextField(
-            controller: _nameController,
-            decoration: const InputDecoration(
-              labelText: '习惯名称 *',
-              hintText: '例如：早起、阅读、运动',
+      child: SingleChildScrollView(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            Text('添加习惯', style: Theme.of(context).textTheme.titleLarge),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _nameController,
+              decoration: const InputDecoration(
+                labelText: '习惯名称 *',
+                hintText: '例如：早起、阅读、运动',
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _descController,
-            decoration: const InputDecoration(
-              labelText: '描述（可选）',
+            const SizedBox(height: 12),
+            TextField(
+              controller: _descController,
+              decoration: const InputDecoration(
+                labelText: '描述（可选）',
+              ),
             ),
-          ),
-          const SizedBox(height: 12),
-          TextField(
-            controller: _targetDaysController,
-            decoration: const InputDecoration(
-              labelText: '目标天数',
+            const SizedBox(height: 12),
+            TextField(
+              controller: _targetDaysController,
+              decoration: const InputDecoration(
+                labelText: '目标天数',
+              ),
+              keyboardType: TextInputType.number,
             ),
-            keyboardType: TextInputType.number,
-          ),
-          const SizedBox(height: 12),
-          ReminderSchedulePicker(
-            initialSchedule: _reminderSchedule,
-            onChanged: (schedule) => setState(() => _reminderSchedule = schedule),
-          ),
-          const SizedBox(height: 16),
-          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
-        ],
+            const SizedBox(height: 12),
+            ReminderSchedulePicker(
+              initialSchedule: _reminderSchedule,
+              onChanged: (schedule) => setState(() => _reminderSchedule = schedule),
+            ),
+            const SizedBox(height: 16),
+            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
+          ],
+        ),
       ),
     );
   }
