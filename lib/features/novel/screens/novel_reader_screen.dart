@@ -1244,7 +1244,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
     if (!mounted) return;
     showModalBottomSheet(
-      context: currentContext,
+      context: context,
       isScrollControlled: true,
       builder: (context) => ReaderAnnotationListPanel(
         annotations: _annotations,
@@ -1255,9 +1255,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             setState(() {
               _annotations.removeWhere((a) => a.id == annotation.id);
             });
-            if (mounted) showSnackBar(currentContext, '批注已删除');
+            if (mounted) showSnackBar(context, '批注已删除'); // ignore: use_build_context_synchronously
           } catch (e) {
-            if (mounted) showSnackBar(currentContext, '删除失败');
+            if (mounted) showSnackBar(context, '删除失败'); // ignore: use_build_context_synchronously
           }
         },
       ),
