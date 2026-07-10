@@ -66,7 +66,7 @@ class _ReaderChapterDrawerState extends State<ReaderChapterDrawer> {
   @override
   Widget build(BuildContext context) {
     if (widget.chapters.isEmpty) {
-      return Drawer(child: Center(child: LoadingWidget()));
+      return const Drawer(child: const Center(child: const LoadingWidget()));
     }
 
     final displayCount = widget.totalChapterCount > 0

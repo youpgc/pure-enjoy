@@ -381,7 +381,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
       final chapterId = _preloadQueue.removeAt(0);
 
       // 跳过已缓存的
-      if (_l1Cache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false)) {
+      if (_memoryCache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false)) {
         continue;
       }
 
@@ -410,7 +410,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
   // ==================== 原有方法（保持不变）====================
 
   bool isCached(String chapterId) {
-    return _l1Cache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false);
+    return _memoryCache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false);
   }
 
   List<CacheEntry> getCachedChapters(String novelId) {
@@ -444,8 +444,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
 
     // 1. 清理 L1 内存缓存
     for (final chapter in chapters) {
-      _l1Cache.remove(chapter.chapterId);
-      _lruOrder?.remove(chapter.chapterId);
+      _memoryCache.remove(chapter.chapterId);
     }
     _recalculateMemoryBytes();
 
@@ -488,8 +487,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
           }
         }
       }
-      _l1Cache.clear();
-      _lruOrder?.clear();
+      _memoryCache.clear();
       _currentMemoryCacheBytes = 0;
       _diskIndex?.clear();
       await _saveIndex();

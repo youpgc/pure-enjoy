@@ -188,9 +188,9 @@ class OfflineService {
       final Map<String, dynamic> meta = jsonDecode(jsonStr);
       return meta.entries
           .where((e) => (e.value['downloaded'] ?? 0) > 0)
-          .map((e) => {
+          .map<Map<String, dynamic>>((e) => {
                 'novelId': e.key,
-                ...e.value,
+                ...(e.value as Map<String, dynamic>),
               })
           .toList();
     } catch (e) {

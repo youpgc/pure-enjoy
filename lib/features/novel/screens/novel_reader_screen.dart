@@ -131,7 +131,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   bool _hasMoreChapters = true;      // 是否还有更多章节目录未加载
   bool _isLoadingMoreMeta = false;   // 是否正在加载更多目录
   static const int _metaBatchSize = 50; // 每次加载目录的批次大小
-  int _lastLoadedChapterNum = 0;     // 键集分页游标：最后加载的章节号
 
   /// 书架状态检查完成信号，防止 _saveProgress 在检查完成前创建重复记录（Bug 3 修复）
   final Completer<void> _bookshelfStatusCompleter = Completer<void>();
@@ -271,7 +270,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           refreshed.removeWhere((c) => c.chapterOrder <= 0);
           setState(() {
             _chapters = refreshed;
-            _lastLoadedChapterNum = 0;
             _hasMoreChapters = refreshed.length >= 50;
           });
         }
@@ -460,7 +458,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       // 判断是否有更多章节
       _hasMoreChapters = allChapters.length >= 50;
-      _lastLoadedChapterNum = allChapters.isNotEmpty ? allChapters.last.chapterOrder : 0;
 
       // 找到当前章节索引
       int startIndex = 0;
