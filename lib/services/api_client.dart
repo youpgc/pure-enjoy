@@ -197,13 +197,14 @@ class ApiClient {
       final payload = body ?? data;
       final response = await HttpClient.instance.patch(
         url,
+        headers: {'Prefer': 'return=representation'},
         body: payload,
         timeout: timeout ?? RequestTimeout.simple,
       );
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ PATCH 请求失败 [$table]');
+      _SecureLogger.error('❌ PATCH请求失败 [$table]');
       return ApiResponse.error('请求失败: $e');
     }
   }
@@ -223,6 +224,7 @@ class ApiClient {
       );
       final response = await HttpClient.instance.patch(
         url,
+        headers: {'Prefer': 'return=representation'},
         body: body,
         timeout: timeout ?? RequestTimeout.simple,
       );
@@ -420,7 +422,14 @@ class ApiClient {
     if (statusCode >= 200 && statusCode < 300) {
       try {
         final body = response.body;
+        // PATCH/PUT 带 Prefer: return=representation 时：
+        //   200 + 有数据 = 更新成功
+        //   204 + 空 body = 无匹配行（RLS 拦截或过滤条件无结果）
         if (body.isEmpty) {
+          // 204 No Content：对写操作（PATCH/PUT/DELETE）意味着 0 行被更新
+          if (statusCode == 204) {
+            return ApiResponse.error('更新失败：未匹配到任何记录', statusCode: statusCode);
+          }
           return ApiResponse.success([], statusCode: statusCode);
         }
         final data = jsonDecode(body) as List<dynamic>;
