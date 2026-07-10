@@ -26,6 +26,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
   final _bioController = TextEditingController();
   final _locationController = TextEditingController();
   final _birthdayController = TextEditingController();
+  final _heightController = TextEditingController();
   final _occupationController = TextEditingController();
   final _companyController = TextEditingController();
   final _websiteController = TextEditingController();
@@ -52,6 +53,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _bioController.dispose();
     _locationController.dispose();
     _birthdayController.dispose();
+    _heightController.dispose();
     _occupationController.dispose();
     _companyController.dispose();
     _websiteController.dispose();
@@ -110,6 +112,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     _bioController.text = _userData!['bio'] ?? '';
     _locationController.text = _userData!['location'] ?? '';
     _birthdayController.text = _userData!['birthday'] ?? '';
+    _heightController.text = _userData!['height'] != null ? _userData!['height'].toString() : '';
     _occupationController.text = _userData!['occupation'] ?? '';
     _companyController.text = _userData!['company'] ?? '';
     _websiteController.text = _userData!['website'] ?? '';
@@ -293,6 +296,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         }
       }
 
+      final heightText = _heightController.text.trim();
       final updateData = {
         'nickname': _nicknameController.text.trim(),
         'email': _emailController.text.trim(),
@@ -301,6 +305,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'bio': _bioController.text.trim(),
         'location': _locationController.text.trim(),
         'birthday': _birthdayController.text.trim(),
+        'height': heightText.isNotEmpty ? double.tryParse(heightText) : null,
         'gender': _gender ?? '保密',
         'occupation': _occupationController.text.trim(),
         'company': _companyController.text.trim(),
@@ -467,6 +472,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                     hint: '选择生日',
                     icon: Icons.cake_outlined,
                     onTap: _selectBirthday,
+                  ),
+                  _buildTextField(
+                    controller: _heightController,
+                    label: '身高',
+                    hint: '请输入身高（cm）',
+                    icon: Icons.height_outlined,
+                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
                   _buildTextField(
                     controller: _locationController,
