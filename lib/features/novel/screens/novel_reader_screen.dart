@@ -428,7 +428,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       int targetChapterNum = widget.startChapter;
 
       // 并行启动：查询阅读进度 + 查询章节列表
-      Future<ApiResult?>? progressFuture;
+      Future<dynamic>? progressFuture;
       if (targetChapterNum <= 0 && userId != null) {
         progressFuture = ApiClient.get(
           'user_novels',

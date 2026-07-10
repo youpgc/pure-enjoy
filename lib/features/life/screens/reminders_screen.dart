@@ -367,14 +367,12 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                     maxDate: DateTime.now().add(const Duration(days: 365)),
                   );
                   if (date == null) return;
-                  if (!mounted) return;
                   final time = await AppDatePicker.show(
-                    context,
+                    context, // ignore: use_build_context_synchronously
                     type: DateTimeType.time,
                     initialDate: _remindAt,
                   );
-                  if (time == null) return;
-                  if (!mounted) return;
+                  if (time == null || !mounted) return;
                   setState(() {
                     _remindAt = DateTime(
                       date.year, date.month, date.day,
