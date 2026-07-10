@@ -35,10 +35,8 @@ class NovelCommentModel {
       id: json['id']?.toString() ?? '',
       novelId: json['novel_id']?.toString() ?? '',
       userId: json['user_id']?.toString() ?? '',
-      userNickname: json['user_nickname']?.toString() ??
-          json['user_metadata']?['nickname']?.toString(),
-      userAvatar: json['user_avatar']?.toString() ??
-          json['user_metadata']?['avatar_url']?.toString(),
+      userNickname: json['user_nickname']?.toString(),
+      userAvatar: json['user_avatar']?.toString(),
       content: json['content']?.toString() ?? '',
       rating: json['rating'] is int ? json['rating'] as int : null,
       parentId: json['parent_id']?.toString(),
@@ -59,6 +57,8 @@ class NovelCommentModel {
       'id': id,
       'novel_id': novelId,
       'user_id': userId,
+      'user_nickname': userNickname,
+      'user_avatar': userAvatar,
       'content': content,
       if (rating != null) 'rating': rating,
       if (parentId != null) 'parent_id': parentId,

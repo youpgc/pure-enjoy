@@ -52,6 +52,9 @@ class SessionManager {
     return nickname ?? currentUserEmail?.split('@').first ?? '用户';
   }
 
+  /// 用户昵称（别名，与 currentUserName 一致）
+  String? get currentUserNickname => currentUserName;
+
   String? get currentUserAvatar =>
       _authUser?['user_metadata']?['avatar_url'] as String?;
 

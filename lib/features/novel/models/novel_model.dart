@@ -151,6 +151,7 @@ class NovelChapterModel {
       'title': title,
       'content': content,
       'chapter_num': chapterNumber ?? chapterOrder,
+      'chapter_number': chapterNumber ?? chapterOrder,
       'word_count': wordCount,
       'is_free': isFree,
       'created_at': createdAt.toUtc().toIso8601String(),
