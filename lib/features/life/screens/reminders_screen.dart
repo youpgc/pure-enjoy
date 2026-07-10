@@ -20,7 +20,7 @@ class RemindersScreen extends StatefulWidget {
 class _RemindersScreenState extends State<RemindersScreen> {
   List<ReminderModel> _reminders = [];
   bool _isLoading = true;
-  String _filter = 'pending'; // all, pending, completed
+  String _filter = 'all'; // all, pending, completed
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -40,18 +40,16 @@ class _RemindersScreenState extends State<RemindersScreen> {
       return;
     }
 
-    // 1. 先加载本地缓存
+    // 1. 先加载本地缓存（显示缓存数据的同时保持 loading 状态）
     final cached = await CacheHelper.instance.loadList(CacheHelper.keyReminders);
     if (cached.isNotEmpty && mounted) {
       setState(() {
         _reminders = cached.map((e) => ReminderModel.fromJson(e)).toList();
-        _isLoading = false;
+        // 不设置 _isLoading = false，网络数据返回后才关闭 loading
       });
-    } else if (mounted) {
-      setState(() => _isLoading = true);
     }
 
-    // 2. 静默从网络刷新
+    // 2. 从网络刷新
     try {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
@@ -339,10 +337,12 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
         child: SingleChildScrollView(
           child: Column(
             mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               TextFormField(
                 controller: _titleController,
                 decoration: const InputDecoration(labelText: '标题'),
+                textAlign: TextAlign.start,
                 validator: (v) => v?.isEmpty == true ? '请输入标题' : null,
               ),
               const SizedBox(height: 16),
@@ -350,12 +350,14 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 controller: _descController,
                 decoration: const InputDecoration(labelText: '描述（可选）'),
                 maxLines: 3,
+                textAlign: TextAlign.start,
               ),
               const SizedBox(height: 16),
               ListTile(
+                contentPadding: EdgeInsets.zero,
                 title: const Text('提醒时间'),
                 subtitle: Text(DateTimeUtils.formatStandard(_remindAt)),
-                trailing: const Icon(Icons.access_time),
+                trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
                   final date = await AppDatePicker.show(
                     context,
@@ -367,7 +369,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                   if (date == null) return;
                   if (!mounted) return;
                   final time = await AppDatePicker.show(
-                    context, // ignore: use_build_context_synchronously
+                    context,
                     type: DateTimeType.time,
                     initialDate: _remindAt,
                   );

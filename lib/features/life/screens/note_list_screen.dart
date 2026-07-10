@@ -532,6 +532,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       body: Padding(
         padding: const EdgeInsets.all(16),
         child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             TextField(
               controller: _titleController,
@@ -540,6 +541,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 hintText: '标题',
                 border: InputBorder.none,
               ),
+              textAlign: TextAlign.start,
             ),
             const SizedBox(height: 8),
             TextField(
@@ -549,6 +551,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 border: InputBorder.none,
                 prefixIcon: Icon(Icons.folder_outlined),
               ),
+              textAlign: TextAlign.start,
             ),
             const Divider(),
             const SizedBox(height: 8),
@@ -557,9 +560,11 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 controller: _contentController,
                 maxLines: null,
                 expands: true,
+                textAlign: TextAlign.start,
                 decoration: const InputDecoration(
                   hintText: '写点什么...',
                   border: InputBorder.none,
+                  alignLabelWithHint: true,
                 ),
               ),
             ),

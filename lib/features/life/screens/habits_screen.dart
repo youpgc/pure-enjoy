@@ -10,6 +10,7 @@ import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
 import '../widgets/reminder_schedule_picker.dart';
 import '../widgets/habit_card.dart';
+import '../widgets/app_date_picker.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
@@ -310,47 +311,55 @@ class _HabitsScreenState extends State<HabitsScreen> {
       builder: (_) => StatefulBuilder(
         builder: (dialogContext, setDialogState) => AlertDialog(
           title: Text(isEditing ? '编辑习惯' : '添加习惯'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                TextField(
-                  controller: nameController,
-                  decoration: const InputDecoration(
-                    labelText: '习惯名称 *',
-                    hintText: '例如：早起、阅读、运动',
+          content: ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.75,
+            ),
+            child: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  TextField(
+                    controller: nameController,
+                    decoration: const InputDecoration(
+                      labelText: '习惯名称 *',
+                      hintText: '例如：早起、阅读、运动',
+                    ),
+                    textAlign: TextAlign.start,
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: '描述',
-                    hintText: '输入习惯描述（可选）',
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: descController,
+                    decoration: const InputDecoration(
+                      labelText: '描述',
+                      hintText: '输入习惯描述（可选）',
+                    ),
+                    textAlign: TextAlign.start,
                   ),
-                ),
-                const SizedBox(height: 12),
-                TextField(
-                  controller: targetDaysController,
-                  decoration: const InputDecoration(
-                    labelText: '目标天数',
-                    hintText: '例如：21',
+                  const SizedBox(height: 12),
+                  TextField(
+                    controller: targetDaysController,
+                    decoration: const InputDecoration(
+                      labelText: '目标天数',
+                      hintText: '例如：21',
+                    ),
+                    keyboardType: TextInputType.number,
+                    textAlign: TextAlign.start,
                   ),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                const Divider(),
-                const SizedBox(height: 8),
-                ReminderSchedulePicker(
-                  initialSchedule: reminderSchedule,
-                  onChanged: (schedule) {
-                    setDialogState(() {
-                      reminderSchedule = schedule;
-                    });
-                  },
-                ),
-              ],
+                  const SizedBox(height: 16),
+                  const Divider(),
+                  const SizedBox(height: 8),
+                  ReminderSchedulePicker(
+                    initialSchedule: reminderSchedule,
+                    onChanged: (schedule) {
+                      setDialogState(() {
+                        reminderSchedule = schedule;
+                      });
+                    },
+                  ),
+                ],
+              ),
             ),
           ),
           actions: [

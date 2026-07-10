@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/reminder_schedule_model.dart';
+import 'app_date_picker.dart';
 
 /// 习惯提醒计划选择器
 /// 支持按周、按月、按年、自定义日期组合提醒
@@ -66,19 +67,15 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
 
   Future<void> _pickTime() async {
     final parts = _time.split(':');
-    final initialTime = TimeOfDay(
-      hour: int.tryParse(parts[0]) ?? 8,
-      minute: int.tryParse(parts[1]) ?? 0,
+    final initialTime = DateTime(
+      1970, 1, 1,
+      int.tryParse(parts[0]) ?? 8,
+      int.tryParse(parts[1]) ?? 0,
     );
-    final picked = await showTimePicker(
-      context: context,
-      initialTime: initialTime,
-      builder: (context, child) {
-        return MediaQuery(
-          data: MediaQuery.of(context).copyWith(alwaysUse24HourFormat: true),
-          child: child!,
-        );
-      },
+    final picked = await AppDatePicker.show(
+      context,
+      type: DateTimeType.time,
+      initialDate: initialTime,
     );
     if (picked != null) {
       setState(() {
