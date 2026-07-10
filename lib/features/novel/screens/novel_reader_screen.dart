@@ -91,8 +91,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   bool _isCollected = false;
   String? _bookshelfId;
 
-  // 6.1 新增：书签状态
-  bool _isBookmarked = false;
+  // 6.1 新增：书签列表
   List<NovelBookmark> _bookmarks = [];
 
   // 6.1 新增：批注列表（当前章节）
@@ -227,13 +226,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       _hasStartedReading = true;
       _readingStartTime = DateTime.now();
     }
-  }
-
-  Duration get _currentReadingDuration {
-    if (_readingStartTime != null) {
-      return _totalReadingTime + DateTime.now().difference(_readingStartTime!);
-    }
-    return _totalReadingTime;
   }
 
   Widget _buildChapterDrawer() {
@@ -1075,12 +1067,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     await annotationFuture;
 
     if (mounted) {
-      // 从已加载的书签列表中按 chapter_id 判断，兼容所有翻页模式
-      final bookmarked = bookmarks.any((b) =>
-        b.chapterId == _currentChapter!.id
-      );
       setState(() {
-        _isBookmarked = bookmarked;
         _bookmarks = bookmarks;
       });
     }
@@ -1135,52 +1122,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     final start = charOffset.clamp(0, content.length);
     final end = (start + 50).clamp(0, content.length);
     return content.substring(start, end);
-  }
-
-  /// 6.1 新增：切换书签（章节级书签，不依赖 charOffset）
-  Future<void> _toggleBookmark() async {
-    if (_currentChapter == null) return;
-    final userId = _userId;
-    if (userId == null) {
-      if (mounted) showSnackBar(context, '请先登录');
-      return;
-    }
-
-    try {
-      final charOffset = _estimateCharOffset();
-      final preview = _getParagraphPreview(charOffset);
-
-      // 查找当前章节是否已有书签（按 chapter_id 匹配，不依赖 charOffset）
-      final existing = _bookmarks.where((b) =>
-        b.chapterId == _currentChapter!.id).toList();
-
-      bool success;
-      if (existing.isNotEmpty) {
-        // 删除该章节所有书签
-        for (final bm in existing) {
-          await BookmarkService().removeBookmark(bm.id);
-        }
-        success = true;
-      } else {
-        // 添加新书签
-        final added = await BookmarkService().addBookmark(
-          novelId: widget.novel.id,
-          chapterId: _currentChapter!.id,
-          chapterOrder: _currentChapter!.chapterOrder,
-          charOffset: charOffset,
-          note: preview.isNotEmpty ? preview : null,
-        );
-        success = added != null;
-      }
-
-      if (success && mounted) {
-        showSnackBar(context, existing.isNotEmpty ? '书签已移除' : '书签已添加');
-        await _checkBookmarkStatus();
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('书签操作失败: $e');
-      if (mounted) showSnackBar(context, '书签操作失败');
-    }
   }
 
   /// 6.1 新增：显示书签列表
@@ -1249,9 +1190,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           Navigator.pop(context);
           if (note == null || note.isEmpty) return;
           await _addAnnotation(
+            selectedText: selectedText,
             startOffset: startOffset,
             endOffset: endOffset,
-            note: note!,
+            note: note,
             color: color,
           );
         },

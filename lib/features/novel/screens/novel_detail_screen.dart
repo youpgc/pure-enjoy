@@ -106,7 +106,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       if (existing.isSuccess && existing.data != null && existing.data!.isNotEmpty) {
         // 更新
         final id = existing.data!.first['id'] as String;
-        await ApiClient.update('novel_ratings', id, {'rating': rating});
+        await ApiClient.patch('novel_ratings', id, {'rating': rating});
       } else {
         // 新增
         await ApiClient.post('novel_ratings', {
