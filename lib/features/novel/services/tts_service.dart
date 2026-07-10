@@ -59,15 +59,35 @@ class TtsService {
   }
 
   /// 初始化 TTS
+  /// 返回是否成功，如果设备不支持中文 TTS 则返回 false
   Future<bool> initialize() async {
+    if (_isInitialized) return true;
     try {
-      await _flutterTts.setLanguage('zh-CN');
+      // 检测可用的语言
+      final languages = await _flutterTts.getLanguages;
+      if (kDebugMode) debugPrint('TTS 可用语言: $languages');
+
+      // 尝试设置中文，如果失败尝试其他中文变体
+      var langSet = await _flutterTts.setLanguage('zh-CN');
+      if (langSet != 1 && langSet != true) {
+        langSet = await _flutterTts.setLanguage('zh-CN');
+      }
+      if (langSet != 1 && langSet != true) {
+        langSet = await _flutterTts.setLanguage('cmn');
+      }
+      if (langSet != 1 && langSet != true) {
+        if (kDebugMode) debugPrint('TTS 不支持中文语音');
+        return false;
+      }
+
       await _flutterTts.setSpeechRate(_speechRate);
       await _flutterTts.setVolume(1.0);
       await _flutterTts.setPitch(1.0);
-      await _flutterTts.awaitSpeakCompletion(true);
+      // 使用 false 避免 speak() 阻塞，通过 completion handler 驱动下一句
+      await _flutterTts.awaitSpeakCompletion(false);
 
       _flutterTts.setCompletionHandler(() {
+        if (kDebugMode) debugPrint('TTS 播放完成，触发下一句');
         _onSpeakComplete();
       });
 
@@ -90,7 +110,10 @@ class TtsService {
   Future<bool> speak(String text) async {
     if (!_isInitialized) {
       final ok = await initialize();
-      if (!ok) return false;
+      if (!ok) {
+        if (kDebugMode) debugPrint('TTS 初始化失败，无法播放');
+        return false;
+      }
     }
 
     try {
@@ -99,7 +122,13 @@ class TtsService {
       _playbackStartTime = DateTime.now();
       _notifyListeners();
 
-      await _flutterTts.speak(text);
+      final result = await _flutterTts.speak(text);
+      if (result != 1 && result != true) {
+        if (kDebugMode) debugPrint('TTS speak() 返回失败: $result');
+        _isPlaying = false;
+        _notifyListeners();
+        return false;
+      }
       return true;
     } catch (e) {
       if (kDebugMode) debugPrint('TTS 播放失败: $e');

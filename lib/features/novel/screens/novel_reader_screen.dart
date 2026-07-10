@@ -172,7 +172,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _annotatedTextBuilder = ReaderAnnotatedTextBuilder(annotations: _annotations);
     _scrollController.addListener(_onScroll);
     _loadSettings();
-    _loadChapters();
+    // 初始化阅读器（章节加载与书架检查并行）
+    _initializeReader();
     _checkBookshelfStatus();
 
     // 初始化电池电量
@@ -250,28 +251,34 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _loadChapterContent(chapter);
       },
       onLoadMore: () => _loadMoreChapterMeta(),
-      onRefresh: _chapters.isNotEmpty ? () async {
-        // 下拉刷新：重新加载当前窗口附近的目录
-        final targetNum = _currentChapter?.chapterOrder ?? 1;
-        final rangeStart = math.max(1, targetNum - 25);
+      onRefresh: _chapters.isNotEmpty && _chapters.first.chapterOrder > 1 ? () async {
+        // 下拉刷新：加载前面未加载的章节（插入到列表头部）
+        final firstOrder = _chapters.first.chapterOrder;
+        final rangeStart = math.max(1, firstOrder - 50);
+        final rangeEnd = firstOrder - 1;
+
         final result = await ApiClient.get(
           'novel_chapters',
           filters: {
             'novel_id': 'eq.${widget.novel.id}',
-            'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.${targetNum + 25})',
+            'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.$rangeEnd)',
           },
           columns: 'id,title,chapter_num',
           order: 'chapter_num.asc',
         );
         if (result.isSuccess && result.data != null && mounted) {
-          final refreshed = result.data!
+          final newChapters = result.data!
               .map((json) => NovelChapterModel.fromJson(json))
               .toList();
-          refreshed.removeWhere((c) => c.chapterOrder <= 0);
-          setState(() {
-            _chapters = refreshed;
-            _hasMoreChapters = refreshed.length >= 50;
-          });
+          newChapters.removeWhere((c) => c.chapterOrder <= 0);
+          if (newChapters.isNotEmpty) {
+            setState(() {
+              // 插入到列表头部
+              _chapters.insertAll(0, newChapters);
+              // 更新当前章节索引（因为前面插入了新章节）
+              _currentChapterIndex += newChapters.length;
+            });
+          }
         }
       } : null,
     );
@@ -411,16 +418,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     await prefs.setInt('reader_page_turn_mode', _pageTurnMode.index);
   }
 
-  Future<void> _loadChapters() async {
+  /// 初始化阅读器：统一入口，避免重复加载
+  /// 并行化 user_novels 和 novel_chapters 查询，减少串行等待
+  Future<void> _initializeReader() async {
     setState(() => _isLoading = true);
 
     try {
       final userId = _userId;
-
-      // 第一步：查询阅读进度（轻量，快）
       int targetChapterNum = widget.startChapter;
-      if (userId != null) {
-        final progressResult = await ApiClient.get(
+
+      // 并行启动：查询阅读进度 + 查询章节列表
+      Future<ApiResult?>? progressFuture;
+      if (targetChapterNum <= 0 && userId != null) {
+        progressFuture = ApiClient.get(
           'user_novels',
           filters: {
             'user_id': 'eq.$userId',
@@ -428,16 +438,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           },
           columns: 'last_chapter',
         );
-        if (progressResult.isSuccess && progressResult.data != null && progressResult.data!.isNotEmpty) {
-          targetChapterNum = progressResult.data!.first['last_chapter'] as int? ?? widget.startChapter;
-        }
       }
 
-      // 第二步：加载目标章节附近的目录（前后各25章，共约50章）
       final rangeStart = math.max(1, targetChapterNum - 25);
       final rangeEnd = targetChapterNum + 25;
 
-      final chaptersResult = await ApiClient.get(
+      final chaptersFuture = ApiClient.get(
         'novel_chapters',
         filters: {
           'novel_id': 'eq.${widget.novel.id}',
@@ -447,16 +453,28 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         order: 'chapter_num.asc',
       );
 
+      // 等待进度查询结果（如果发起了）
+      if (progressFuture != null) {
+        final progressResult = await progressFuture;
+        if (progressResult.isSuccess &&
+            progressResult.data != null &&
+            progressResult.data!.isNotEmpty) {
+          targetChapterNum = progressResult.data!.first['last_chapter'] as int? ?? 1;
+        }
+        if (targetChapterNum <= 0) targetChapterNum = 1;
+      }
+
+      // 等待章节列表
+      final chaptersResult = await chaptersFuture;
+
       final allChapters = <NovelChapterModel>[];
       if (chaptersResult.isSuccess && chaptersResult.data != null) {
         allChapters.addAll(
           chaptersResult.data!.map((json) => NovelChapterModel.fromJson(json)),
         );
       }
-
       allChapters.removeWhere((c) => c.chapterOrder <= 0);
 
-      // 判断是否有更多章节
       _hasMoreChapters = allChapters.length >= 50;
 
       // 找到当前章节索引
@@ -468,11 +486,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         }
       }
 
-      // 先将已加载的目录赋值给 _chapters
       _chapters = allChapters;
 
-      // 如果当前章不在已加载范围内（目标章号大于已加载的最大章号），需要向后加载更多
-      if (startIndex == 0 && allChapters.isNotEmpty && targetChapterNum > allChapters.last.chapterOrder) {
+      // 如果目标章不在已加载范围内，向后加载更多
+      if (startIndex == 0 &&
+          allChapters.isNotEmpty &&
+          targetChapterNum > allChapters.last.chapterOrder) {
         await _loadMoreChapterMeta(targetChapterNum: targetChapterNum);
         for (int i = 0; i < _chapters.length; i++) {
           if (_chapters[i].chapterOrder >= targetChapterNum) {
@@ -489,7 +508,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         });
       }
 
-      // 第三步：并行加载当前章 + 前后各1章内容
+      // 并行加载当前章 + 前后各1章内容
       if (_chapters.isNotEmpty) {
         final current = _chapters[startIndex];
         final futures = <Future<void>>[_loadChapterContent(current)];
@@ -505,8 +524,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         _preloadAdjacentChapters(startIndex);
       }
     } catch (e) {
-      if (mounted) setState(() => _isLoading = false);
-      if (mounted) showSnackBar(context, '加载章节失败: $e');
+      if (kDebugMode) debugPrint('初始化阅读器失败: $e');
+      if (mounted) {
+        setState(() => _isLoading = false);
+        showSnackBar(context, '加载章节失败: $e');
+      }
     }
   }
 
@@ -1168,7 +1190,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 6.1 新增：跳转到书签位置（支持字符偏移）
   void _jumpToBookmark(NovelBookmark bookmark) {
-    _loadChapterContent(_chapters[bookmark.chapterOrder - 1]);
+    // 安全查找：按 chapterOrder 匹配，避免数组越界
+    final index = _chapters.indexWhere((c) => c.chapterOrder == bookmark.chapterOrder);
+    if (index == -1) {
+      if (mounted) showSnackBar(context, '该章节尚未加载，请稍后再试');
+      return;
+    }
+    _loadChapterContent(_chapters[index]);
     // 章节加载完成后，滚动到字符偏移位置
     if (bookmark.charOffset > 0 && _pageTurnMode == PageTurnMode.scroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {

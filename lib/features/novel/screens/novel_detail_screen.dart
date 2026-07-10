@@ -913,7 +913,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
                   const Spacer(),
                   if (!_isLoadingChapters)
                     Text(
-                      '共 ${_chapters.length} 章',
+                      '共 ${widget.novel.chapterCount} 章',
                       style: Theme.of(context).textTheme.bodySmall?.copyWith(
                         color: colorScheme.onSurfaceVariant,
                       ),
