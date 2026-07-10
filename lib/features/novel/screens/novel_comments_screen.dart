@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/session_manager.dart';
 import '../../../config.dart';
 import '../models/novel_comment_model.dart';
 import '../widgets/comment_item.dart';
@@ -112,9 +113,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
     setState(() => _isSubmitting = true);
     try {
       final userId = AuthService.instance.currentUserId ?? '';
-      final user = AuthService.instance.currentUser;
-      final nickname =
-          user?['user_metadata']?['nickname']?.toString() ?? '匿名用户';
+      final nickname = SessionManager.instance.currentUserNickname;
       final comment = NovelCommentModel(
         id: const Uuid().v4(),
         novelId: widget.novelId,

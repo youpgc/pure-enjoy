@@ -57,110 +57,85 @@ class ReaderContentArea extends StatelessWidget {
     }
 
     if (pageTurnMode == PageTurnMode.scroll) {
-      // 滚动模式：GestureDetector 处理点击（菜单唤起），ScrollView 处理垂直滑动
-      // onTap 和 onVerticalDrag 在手势竞技场中可以共存
-      // 内容已在 SafeArea 内（顶部/底部状态栏已处理安全区域），不需要再加 mediaQuery.padding
+      // 滚动模式：Stack 叠加透明点击层，避免 SelectableText 拦截 onTapUp
       const topPadding = 12.0;
       const bottomPadding = 36.0;
       final textStyle = getCachedTextStyle();
-      return GestureDetector(
-        onTapUp: onTapScreen,
-        child: SingleChildScrollView(
-          controller: scrollController,
-          padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
-          child: RepaintBoundary(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Center(
-                  child: Padding(
-                    padding: const EdgeInsets.only(bottom: 24),
-                    child: Text(
-                      chapter!.title,
-                      style: getCachedTextStyle(isTitle: true),
-                      textAlign: TextAlign.center,
+      return Stack(
+        children: [
+          SingleChildScrollView(
+            controller: scrollController,
+            padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
+            child: RepaintBoundary(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Center(
+                    child: Padding(
+                      padding: const EdgeInsets.only(bottom: 24),
+                      child: Text(
+                        chapter!.title,
+                        style: getCachedTextStyle(isTitle: true),
+                        textAlign: TextAlign.center,
+                      ),
                     ),
                   ),
-                ),
-                SelectableText.rich(
-                  buildAnnotatedTextSpan(
-                    chapter!.content,
-                    textStyle,
-                  ),
-                  style: textStyle,
-                  onSelectionChanged: (selection, cause) {
-                    onSelectionChanged?.call(selection);
-                  },
-                  contextMenuBuilder: (context, editableTextState) {
-                    final selected = editableTextState.textEditingValue.selection;
-                    final buttons = <Widget>[
-                      ...editableTextState.contextMenuButtonItems.map(
-                        (item) => CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          onPressed: () {
-                            editableTextState.hideToolbar();
-                            item.onPressed?.call();
-                          },
-                          child: Text(item.label ?? ''),
-                        ),
-                      ),
-                    ];
-                    if (selected.start != selected.end) {
-                      final selectedText = chapter!.content.substring(
-                        selected.start.clamp(0, chapter!.content.length),
-                        selected.end.clamp(0, chapter!.content.length),
+                  SelectableText.rich(
+                    buildAnnotatedTextSpan(
+                      chapter!.content,
+                      textStyle,
+                    ),
+                    style: textStyle,
+                    onSelectionChanged: (selection, cause) {
+                      onSelectionChanged?.call(selection);
+                    },
+                    contextMenuBuilder: (context, editableTextState) {
+                      final selected = editableTextState.textEditingValue.selection;
+                      return AdaptiveTextSelectionToolbar.buttonItems(
+                        anchors: editableTextState.contextMenuAnchors,
+                        buttonItems: [
+                          ...editableTextState.contextMenuButtonItems,
+                          if (selected.start != selected.end)
+                            ContextMenuButtonItem(
+                              label: '添加批注',
+                              onPressed: () {
+                                editableTextState.hideToolbar();
+                                final selectedText = chapter!.content.substring(
+                                  selected.start.clamp(0, chapter!.content.length),
+                                  selected.end.clamp(0, chapter!.content.length),
+                                );
+                                onShowAnnotationInput(
+                                  selectedText,
+                                  selected.start,
+                                  selected.end,
+                                );
+                              },
+                            ),
+                        ],
                       );
-                      buttons.add(
-                        CupertinoButton(
-                          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                          onPressed: () {
-                            editableTextState.hideToolbar();
-                            onShowAnnotationInput(
-                              selectedText,
-                              selected.start,
-                              selected.end,
-                            );
-                          },
-                          child: const Text('添加批注'),
-                        ),
-                      );
-                    }
-                    return AdaptiveTextSelectionToolbar.buttonItems(
-                      anchors: editableTextState.contextMenuAnchors,
-                      buttonItems: [
-                        ...editableTextState.contextMenuButtonItems,
-                        if (selected.start != selected.end)
-                          ContextMenuButtonItem(
-                            label: '添加批注',
-                            onPressed: () {
-                              editableTextState.hideToolbar();
-                              final selectedText = chapter!.content.substring(
-                                selected.start.clamp(0, chapter!.content.length),
-                                selected.end.clamp(0, chapter!.content.length),
-                              );
-                              onShowAnnotationInput(
-                                selectedText,
-                                selected.start,
-                                selected.end,
-                              );
-                            },
-                          ),
-                      ],
-                    );
-                  },
-                ),
-                const SizedBox(height: 40),
-                Center(
-                  child: Text(
-                    '${chapter!.title} - 完',
-                    style: TextStyle(fontSize: 14, color: background.textColor.withValues(alpha: 0.5)),
+                    },
                   ),
-                ),
-                const SizedBox(height: 24),
-              ],
+                  const SizedBox(height: 40),
+                  Center(
+                    child: Text(
+                      '${chapter!.title} - 完',
+                      style: TextStyle(fontSize: 14, color: background.textColor.withValues(alpha: 0.5)),
+                    ),
+                  ),
+                  const SizedBox(height: 24),
+                ],
+              ),
             ),
           ),
-        ),
+          // 透明点击层：中间区域点击唤起菜单
+          Positioned.fill(
+            child: GestureDetector(
+              behavior: HitTestBehavior.translucent,
+              onTapUp: onTapScreen,
+              child: Container(color: Colors.transparent),
+            ),
+          ),
+        ],
       );
     }
 

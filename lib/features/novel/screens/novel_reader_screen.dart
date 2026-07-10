@@ -71,6 +71,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   // 阅读时长统计
   DateTime? _readingStartTime;
+  Duration _totalReadingTime = Duration.zero;
   bool _hasStartedReading = false;
 
   // 阅读设置
@@ -209,6 +210,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   void _pauseReadingTimer() {
     if (_readingStartTime != null && _hasStartedReading) {
+      _totalReadingTime += DateTime.now().difference(_readingStartTime!);
       _readingStartTime = null;
     }
   }
@@ -224,6 +226,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       _hasStartedReading = true;
       _readingStartTime = DateTime.now();
     }
+  }
+
+  Duration get _currentReadingDuration {
+    if (_readingStartTime != null) {
+      return _totalReadingTime + DateTime.now().difference(_readingStartTime!);
+    }
+    return _totalReadingTime;
   }
 
   Widget _buildChapterDrawer() {
@@ -334,6 +343,11 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       slideAnimation: _topToolbarSlideAnimation,
       background: _background,
       novel: widget.novel,
+      currentChapter: _currentChapter,
+      currentChapterIndex: _currentChapterIndex,
+      chapterCount: _totalChapterCount,
+      hasStartedReading: _hasStartedReading,
+      currentReadingDuration: _currentReadingDuration,
       isCollected: _isCollected,
       onBack: () => Navigator.pop(context),
       onToggleCollection: _toggleCollection,
@@ -1249,25 +1263,35 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 6.1 新增：显示批注列表
-  void _showAnnotationList() {
+  /// 6.1 新增：显示批注列表（先刷新再展示）
+  void _showAnnotationList() async {
+    if (_currentChapter == null) return;
+    final userId = _userId;
+    if (userId == null) {
+      showSnackBar(context, '请先登录');
+      return;
+    }
+
+    // 先刷新批注数据
+    await _loadAnnotations();
+
+    if (!mounted) return;
     showModalBottomSheet(
       context: context,
+      isScrollControlled: true,
       builder: (context) => ReaderAnnotationListPanel(
         annotations: _annotations,
-        onClose: () => Navigator.pop(context),
-        onDelete: (annotation) {
-          showConfirmDialog(
-            context,
-            title: '删除批注',
-            content: '确定要删除这条批注吗？',
-          ).then((confirmed) {
-            if (confirmed == true) {
-              if (!mounted) return;
-              Navigator.pop(context); // ignore: use_build_context_synchronously
-              _deleteAnnotation(annotation.id);
-            }
-          });
+        currentChapterId: _currentChapter!.id,
+        onDelete: (annotation) async {
+          try {
+            await AnnotationService().removeAnnotation(annotation.id);
+            setState(() {
+              _annotations.removeWhere((a) => a.id == annotation.id);
+            });
+            if (mounted) showSnackBar(context, '批注已删除');
+          } catch (e) {
+            if (mounted) showSnackBar(context, '删除失败');
+          }
         },
       ),
     );
