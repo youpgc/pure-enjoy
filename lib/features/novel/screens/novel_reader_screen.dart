@@ -188,6 +188,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
+    // 先停止滚动活动再 dispose，避免 BallisticScrollActivity 断言错误
+    if (_scrollController.hasClients && _scrollController.position.isScrolling) {
+      _scrollController.position.hold(() {});
+    }
     _toolbarAnimationController.dispose();
     _scrollController.dispose();
     // 6.1 新增：清理 TTS 和阅读历史定时器
@@ -880,19 +884,22 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   /// - 上一章：滚动到末尾（显示最后一页/底部）
   /// - 下一章：滚动到顶部（显示第一页/顶部）
   void _scrollToPosition() {
-    if (_pageTurnMode == PageTurnMode.scroll) {
-      // 滚动模式：使用 ScrollController
-      if (_scrollController.hasClients) {
-        if (_shouldJumpToLastPage) {
-          // 上一章：跳转到末尾
-          _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
-        } else {
-          // 下一章：跳转到顶部
-          _scrollController.jumpTo(0);
-        }
+    if (_pageTurnMode != PageTurnMode.scroll) return;
+    // 延迟到下一帧执行，避免与正在进行的 BallisticScrollActivity 冲突
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!_scrollController.hasClients) return;
+      // 先停止任何正在进行的滚动动画
+      if (_scrollController.position.isScrolling) {
+        _scrollController.position.hold(() {});
       }
-    }
-    // 分页模式：通过 _shouldJumpToLastPage 标志，在 _calculatePages 中处理
+      if (_shouldJumpToLastPage) {
+        // 上一章：跳转到末尾
+        _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+      } else {
+        // 下一章：跳转到顶部
+        _scrollController.jumpTo(0);
+      }
+    });
   }
 
   /// 滚动到底部自动加载下一章 - 带防重复触发
@@ -1140,16 +1147,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     // 章节加载完成后，滚动到字符偏移位置
     if (bookmark.charOffset > 0 && _pageTurnMode == PageTurnMode.scroll) {
       WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (_scrollController.hasClients && _currentChapter != null) {
-          final content = _currentChapter!.content;
-          final ratio = bookmark.charOffset / content.length;
-          final targetOffset = ratio * _scrollController.position.maxScrollExtent;
-          _scrollController.animateTo(
-            targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-          );
+        if (!_scrollController.hasClients || _currentChapter == null) return;
+        // 先停止任何正在进行的滚动动画
+        if (_scrollController.position.isScrolling) {
+          _scrollController.position.hold(() {});
         }
+        final content = _currentChapter!.content;
+        final ratio = bookmark.charOffset / content.length;
+        final targetOffset = ratio * _scrollController.position.maxScrollExtent;
+        _scrollController.animateTo(
+          targetOffset.clamp(0.0, _scrollController.position.maxScrollExtent),
+          duration: const Duration(milliseconds: 300),
+          curve: Curves.easeOut,
+        );
       });
     }
   }
