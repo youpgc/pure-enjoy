@@ -18,11 +18,17 @@ class ContentPage {
   final String text;
   final int pageIndex;
   final int totalPages;
+  /// 该页文本在章节内容中的起始偏移量
+  final int startOffset;
+  /// 该页文本在章节内容中的结束偏移量
+  final int endOffset;
 
   ContentPage({
     required this.text,
     required this.pageIndex,
     required this.totalPages,
+    this.startOffset = 0,
+    this.endOffset = 0,
   });
 }
 
@@ -79,6 +85,8 @@ class TextPaginator {
           text: text.substring(start),
           pageIndex: pageIndex,
           totalPages: pageIndex + 1,
+          startOffset: start,
+          endOffset: text.length,
         ));
         break;
       }
@@ -100,6 +108,8 @@ class TextPaginator {
         text: text.substring(start, end),
         pageIndex: pageIndex,
         totalPages: pageIndex + 1, // 临时值，最后更新
+        startOffset: start,
+        endOffset: end,
       ));
 
       start = end;
@@ -113,6 +123,8 @@ class TextPaginator {
         text: pages[i].text,
         pageIndex: i,
         totalPages: total,
+        startOffset: pages[i].startOffset,
+        endOffset: pages[i].endOffset,
       );
     }
 

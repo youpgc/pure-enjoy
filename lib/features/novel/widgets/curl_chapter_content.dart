@@ -14,6 +14,8 @@ class CurlChapterContent extends StatefulWidget {
   final void Function(bool isLastPage) onBoundaryReached;
   /// 屏幕点击回调，由内容层统一处理点击区域逻辑
   final void Function(TapUpDetails details) onTapScreen;
+  /// 长按选择文本回调，传递选中的文本、起始偏移和结束偏移
+  final void Function(String selectedText, int startOffset, int endOffset)? onLongPressSelectText;
   /// 是否跳转到最后一页（上一章时使用）
   final bool jumpToLastPage;
 
@@ -27,6 +29,7 @@ class CurlChapterContent extends StatefulWidget {
     required this.onPageChanged,
     required this.onBoundaryReached,
     required this.onTapScreen,
+    this.onLongPressSelectText,
     this.jumpToLastPage = false,
   });
 
@@ -38,6 +41,7 @@ class CurlChapterContentState extends State<CurlChapterContent> {
   List<ContentPage> _pages = [];
   late SimulationPageController _simulationController;
   bool _isCalculating = true;
+  int _currentPageIndex = 0;
 
   @override
   void initState() {
@@ -85,7 +89,7 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     final width = mediaQuery.size.width;
     // 顶部状态栏高度 = SafeArea top padding + 固定高度 44
     // 底部状态栏高度 = SafeArea bottom padding + 内部内容高度（进度条 ~2 + padding 20 = ~22）
-    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容截断
+    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容被裁剪
     final topStatusBarHeight = mediaQuery.padding.top + 44.0;
     final bottomStatusBarHeight = mediaQuery.padding.bottom + 24.0;
     final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
@@ -143,46 +147,115 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     }
   }
 
+  /// 计算长按位置对应的字符偏移和选中文本
+  void _handleLongPress(LongPressStartDetails details, ContentPage page) {
+    if (widget.onLongPressSelectText == null) return;
+
+    final renderBox = context.findRenderObject() as RenderBox?;
+    if (renderBox == null) return;
+
+    // 将全局坐标转换为局部坐标
+    final localPos = renderBox.globalToLocal(details.globalPosition);
+
+    // 计算文本区域的偏移（考虑 padding 和标题）
+    const horizontalPadding = 20.0;
+    const topPadding = 12.0;
+    final textAreaOffset = Offset(horizontalPadding, topPadding + (page.pageIndex == 0 ? _getTitleHeight() : 0));
+
+    // 点击位置相对于文本区域的坐标
+    final textPos = localPos - textAreaOffset;
+
+    final textStyle = TextStyle(
+      fontSize: widget.fontSize,
+      height: widget.lineHeight,
+      color: widget.background.textColor,
+      letterSpacing: 0.5,
+      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    );
+
+    // 使用 TextPainter 计算字符偏移
+    final textPainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(text: page.text, style: textStyle),
+    );
+    textPainter.layout(maxWidth: renderBox.size.width - horizontalPadding * 2);
+
+    final textPosition = textPainter.getPositionForOffset(textPos);
+    final charOffset = textPosition.offset;
+
+    // 选择点击位置前后各 30 个字符
+    final start = (charOffset - 30).clamp(0, page.text.length);
+    final end = (charOffset + 30).clamp(0, page.text.length);
+    final selectedText = page.text.substring(start, end);
+
+    // 转换为章节级别的偏移
+    final chapterStart = page.startOffset + start;
+    final chapterEnd = page.startOffset + end;
+
+    widget.onLongPressSelectText!(selectedText, chapterStart, chapterEnd);
+  }
+
+  /// 计算标题高度
+  double _getTitleHeight() {
+    final titleStyle = TextStyle(
+      fontSize: widget.fontSize + 4,
+      height: 1.6,
+      fontWeight: FontWeight.bold,
+      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    );
+    final titlePainter = TextPainter(
+      textDirection: TextDirection.ltr,
+      text: TextSpan(text: widget.chapter.title, style: titleStyle),
+    )..layout(maxWidth: MediaQuery.of(context).size.width - 40);
+    final titleLineCount = (titlePainter.computeLineMetrics()).length;
+    return titleLineCount * (widget.fontSize + 4) * 1.6 + 24;
+  }
+
   /// 构建单页内容 Widget
   Widget _buildPageWidget(ContentPage page) {
     const topPadding = 12.0;
     const bottomPadding = 36.0;
-    return Container(
-      color: widget.background.bgColor,
-      padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          if (page.pageIndex == 0)
-            Center(
-              child: Padding(
-                padding: const EdgeInsets.only(bottom: 24),
-                child: Text(
-                  widget.chapter.title,
-                  style: TextStyle(
-                    fontSize: widget.fontSize + 4,
-                    fontWeight: FontWeight.bold,
-                    color: widget.background.textColor,
-                    height: 1.6,
-                    fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+    return GestureDetector(
+      onLongPressStart: widget.onLongPressSelectText != null
+          ? (details) => _handleLongPress(details, page)
+          : null,
+      child: Container(
+        color: widget.background.bgColor,
+        padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            if (page.pageIndex == 0)
+              Center(
+                child: Padding(
+                  padding: const EdgeInsets.only(bottom: 24),
+                  child: Text(
+                    widget.chapter.title,
+                    style: TextStyle(
+                      fontSize: widget.fontSize + 4,
+                      fontWeight: FontWeight.bold,
+                      color: widget.background.textColor,
+                      height: 1.6,
+                      fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+                    ),
+                    textAlign: TextAlign.center,
                   ),
-                  textAlign: TextAlign.center,
+                ),
+              ),
+            Expanded(
+              child: Text(
+                page.text,
+                style: TextStyle(
+                  fontSize: widget.fontSize,
+                  height: widget.lineHeight,
+                  color: widget.background.textColor,
+                  letterSpacing: 0.5,
+                  fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
                 ),
               ),
             ),
-          Expanded(
-            child: Text(
-              page.text,
-              style: TextStyle(
-                fontSize: widget.fontSize,
-                height: widget.lineHeight,
-                color: widget.background.textColor,
-                letterSpacing: 0.5,
-                fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-              ),
-            ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -203,6 +276,7 @@ class CurlChapterContentState extends State<CurlChapterContent> {
         backgroundColor: widget.background.bgColor,
         pages: _pages.map((page) => _buildPageWidget(page)).toList(),
         onPageChanged: (index) {
+          _currentPageIndex = index;
           widget.onPageChanged(index, _pages.length);
         },
       ),

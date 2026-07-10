@@ -1164,32 +1164,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     );
   }
 
-  /// 非滚动模式下长按弹出快捷批注菜单（无文本选择，直接输入批注笔记）
-  void _showQuickAnnotationMenu(BuildContext context) {
-    if (_currentChapter == null) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => ReaderAnnotationPanel(
-        selectedText: '第${_currentChapter!.chapterOrder}章 ${_currentChapter!.title}',
-        startOffset: 0,
-        endOffset: 0,
-        onSave: (selectedText, startOffset, endOffset, note, color) async {
-          Navigator.pop(context);
-          if (note == null || note.isEmpty) return;
-          await _addAnnotation(
-            selectedText: selectedText,
-            startOffset: startOffset,
-            endOffset: endOffset,
-            note: note,
-            color: color,
-          );
-        },
-      ),
-    );
-  }
-
-  /// 6.1 新增：显示批注输入面板（滚动模式：传入选中文本）
+  /// 6.1 新增：显示批注输入面板
   void _showAnnotationInputPanel(String selectedText, int startOffset, int endOffset) {
     showModalBottomSheet(
       context: context,
@@ -1281,10 +1256,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       isScrollControlled: true,
       builder: (context) => ReaderAnnotationListPanel(
         annotations: _annotations,
-        currentChapterId: _currentChapter!.id,
+        onClose: () => Navigator.pop(context),
         onDelete: (annotation) async {
           try {
-            await AnnotationService().removeAnnotation(annotation.id);
+            await AnnotationService().deleteAnnotation(annotation.id);
             setState(() {
               _annotations.removeWhere((a) => a.id == annotation.id);
             });
@@ -1488,10 +1463,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     final dx = details.globalPosition.dx;
 
     if (_pageTurnMode == PageTurnMode.scroll) {
-      // 滚动模式下只有中间区域有操作
-      if (dx >= width * 0.3 && dx <= width * 0.7) {
-        _toggleMenu();
-      }
+      // 滚动模式下点击任意位置唤起/关闭菜单
+      _toggleMenu();
       return;
     }
 
@@ -1607,7 +1580,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         scrollController: _scrollController,
         buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
         onShowAnnotationInput: _showAnnotationInputPanel,
-        onLongPressAddAnnotation: () => _showQuickAnnotationMenu(context),
         getCachedTextStyle: _getCachedTextStyle,
       );
     }
