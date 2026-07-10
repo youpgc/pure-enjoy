@@ -33,6 +33,7 @@ class _LifeScreenState extends State<LifeScreen> {
 
   StreamSubscription<void>? _expenseSubscription;
   StreamSubscription<void>? _weightSubscription;
+  StreamSubscription<void>? _moodSubscription;
 
   @override
   void initState() {
@@ -49,12 +50,16 @@ class _LifeScreenState extends State<LifeScreen> {
     _weightSubscription = EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
       _loadLatestRecords();
     });
+    _moodSubscription = EventBus.instance.on(EventType.moodDiaryUpdated).listen((_) {
+      _loadLatestRecords();
+    });
   }
 
   @override
   void dispose() {
     _expenseSubscription?.cancel();
     _weightSubscription?.cancel();
+    _moodSubscription?.cancel();
     super.dispose();
   }
 

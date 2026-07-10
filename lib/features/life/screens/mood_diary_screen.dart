@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
@@ -190,6 +191,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       if (result.isSuccess) {
         await _loadDiaries();
         OfflineSyncService.instance.syncPending();
+        EventBus.instance.fire(EventType.moodDiaryUpdated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),

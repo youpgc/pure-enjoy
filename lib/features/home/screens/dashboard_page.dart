@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -50,11 +51,41 @@ class _DashboardPageState extends State<DashboardPage> {
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
   String? _checkingHabitId; // 正在打卡的习惯ID，用于loading阻断
 
+  final List<StreamSubscription<void>> _eventSubscriptions = [];
+
   @override
   void initState() {
     super.initState();
     DictService.instance.loadFromNetwork();
     _initLoadData();
+    _listenDataChangeEvents();
+  }
+
+  /// 监听全局数据变更事件，从其他页面返回时自动刷新最新动态
+  void _listenDataChangeEvents() {
+    final types = [
+      EventType.expenseUpdated,
+      EventType.weightRecordUpdated,
+      EventType.moodDiaryUpdated,
+      EventType.noteUpdated,
+      EventType.habitUpdated,
+      EventType.reminderUpdated,
+    ];
+    for (final type in types) {
+      _eventSubscriptions.add(
+        EventBus.instance.on(type).listen((_) {
+          if (mounted) _loadRecentActivities();
+        }),
+      );
+    }
+  }
+
+  @override
+  void dispose() {
+    for (final sub in _eventSubscriptions) {
+      sub.cancel();
+    }
+    super.dispose();
   }
 
   Future<void> _initLoadData() async {
@@ -454,10 +485,11 @@ class _DashboardPageState extends State<DashboardPage> {
       );
       if (result.isSuccess) {
         if (mounted) {
-          Navigator.pop(context);
+          // 先显示提示再关闭弹窗，避免 SnackBar 被弹窗遮挡
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text(successMessage)),
           );
+          Navigator.pop(context);
           onSuccess?.call();
         }
       } else {
@@ -529,7 +561,9 @@ class _DashboardPageState extends State<DashboardPage> {
       context: context,
       isScrollControlled: true,
       builder: (_) => AddNoteSheet(
-        onSave: (note) => _postRecord('notes', note.toJson(), '笔记添加成功'),
+        onSave: (note) => _postRecord('notes', note.toJson(), '笔记添加成功',
+          onSuccess: _loadRecentActivities,
+        ),
       ),
     );
   }

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/offline_sync_service.dart';
@@ -169,6 +170,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
       if (result.isSuccess) {
         await _loadRecords(refresh: true);
         OfflineSyncService.instance.syncPending();
+        EventBus.instance.fire(EventType.weightRecordUpdated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('添加成功')),
@@ -213,6 +215,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
         if (result.isSuccess) {
           await _loadRecords(refresh: true);
           OfflineSyncService.instance.syncPending();
+          EventBus.instance.fire(EventType.weightRecordUpdated);
           if (mounted) {
             ScaffoldMessenger.of(context).showSnackBar(
               const SnackBar(content: Text('删除成功')),
