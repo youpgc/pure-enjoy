@@ -12,6 +12,7 @@ class WelcomeSection extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
         Card(
           child: Padding(
