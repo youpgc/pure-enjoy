@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
-import '../../models/novel_chapter_model.dart';
 import '../reader_enums.dart';
 import '../../screens/novel_detail_screen.dart';
 

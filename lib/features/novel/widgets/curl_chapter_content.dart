@@ -41,7 +41,6 @@ class CurlChapterContentState extends State<CurlChapterContent> {
   List<ContentPage> _pages = [];
   late SimulationPageController _simulationController;
   bool _isCalculating = true;
-  int _currentPageIndex = 0;
 
   @override
   void initState() {
@@ -276,7 +275,6 @@ class CurlChapterContentState extends State<CurlChapterContent> {
         backgroundColor: widget.background.bgColor,
         pages: _pages.map((page) => _buildPageWidget(page)).toList(),
         onPageChanged: (index) {
-          _currentPageIndex = index;
           widget.onPageChanged(index, _pages.length);
         },
       ),

@@ -50,7 +50,6 @@ class PagedChapterContentState extends State<PagedChapterContent> {
   List<ContentPage> _pages = [];
   late PageController _pageController;
   bool _isCalculating = true;
-  int _currentPageIndex = 0;
 
   @override
   void initState() {
@@ -246,7 +245,6 @@ class PagedChapterContentState extends State<PagedChapterContent> {
         physics: const PageScrollPhysics(),
         itemCount: _pages.length,
         onPageChanged: (index) {
-          _currentPageIndex = index;
           widget.onPageChanged(index, _pages.length);
         },
         itemBuilder: (context, index) {

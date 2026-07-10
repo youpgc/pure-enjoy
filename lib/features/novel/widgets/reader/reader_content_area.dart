@@ -1,4 +1,3 @@
-import 'package:flutter/cupertino.dart';
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
 import '../reader_enums.dart';
@@ -202,7 +201,7 @@ class _ScrollTapDetectorState extends State<_ScrollTapDetector> {
               _downTime = null;
               // 轻触（短距离 + 短时间）视为点击，触发菜单
               if (dist < _kMaxTapDistance && duration < _kMaxTapDurationMs) {
-                widget.onTapUp(TapUpDetails(globalPosition: e.position));
+                widget.onTapUp(TapUpDetails(kind: e.kind, globalPosition: e.position));
               }
             },
             onPointerCancel: (_) {

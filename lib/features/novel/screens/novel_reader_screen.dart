@@ -189,7 +189,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     WidgetsBinding.instance.removeObserver(this);
     _scrollController.removeListener(_onScroll);
     // 先停止滚动活动再 dispose，避免 BallisticScrollActivity 断言错误
-    if (_scrollController.hasClients && _scrollController.position.isScrolling) {
+    if (_scrollController.hasClients && _scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
       _scrollController.position.hold(() {});
     }
     _toolbarAnimationController.dispose();
@@ -889,7 +889,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (!_scrollController.hasClients) return;
       // 先停止任何正在进行的滚动动画
-      if (_scrollController.position.isScrolling) {
+      if (_scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
         _scrollController.position.hold(() {});
       }
       if (_shouldJumpToLastPage) {
@@ -1149,7 +1149,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       WidgetsBinding.instance.addPostFrameCallback((_) {
         if (!_scrollController.hasClients || _currentChapter == null) return;
         // 先停止任何正在进行的滚动动画
-        if (_scrollController.position.isScrolling) {
+        if (_scrollController.position.activity != null && _scrollController.position.activity!.isScrolling) {
           _scrollController.position.hold(() {});
         }
         final content = _currentChapter!.content;
@@ -1233,21 +1233,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 6.1 新增：删除批注
-  Future<void> _deleteAnnotation(String annotationId) async {
-    try {
-      await AnnotationService().deleteAnnotation(annotationId);
-      if (mounted) {
-        showSnackBar(context, '批注已删除');
-        await _loadAnnotations();
-      }
-    } catch (e) {
-      if (mounted) {
-        showSnackBar(context, '删除失败');
-      }
-    }
-  }
-
   /// 6.1 新增：显示批注列表（先刷新再展示）
   void _showAnnotationList() async {
     if (_currentChapter == null) return;
@@ -1261,8 +1246,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     await _loadAnnotations();
 
     if (!mounted) return;
+    final currentContext = context;
     showModalBottomSheet(
-      context: context,
+      context: currentContext,
       isScrollControlled: true,
       builder: (context) => ReaderAnnotationListPanel(
         annotations: _annotations,
@@ -1273,9 +1259,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             setState(() {
               _annotations.removeWhere((a) => a.id == annotation.id);
             });
-            if (mounted) showSnackBar(context, '批注已删除');
+            if (mounted) showSnackBar(currentContext, '批注已删除');
           } catch (e) {
-            if (mounted) showSnackBar(context, '删除失败');
+            if (mounted) showSnackBar(currentContext, '删除失败');
           }
         },
       ),

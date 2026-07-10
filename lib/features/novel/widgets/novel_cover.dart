@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'dart:math' as math;
 
 /// 小说封面组件
 ///
@@ -71,7 +70,7 @@ class NovelCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final (startColor, endColor) = _getGradientColors();
 
-    Widget placeholder = ClipRRect(
+    final placeholder = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: Container(
         width: width,
