@@ -375,58 +375,51 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     setState(() => _isLoading = true);
 
     try {
-      // 分批加载章节列表（id,title,chapter_num 轻量查询）
-      const batchSize = 50;
+      // 并行加载：章节列表 + 阅读进度（两者无依赖关系）
+      final userId = _userId;
+      final chaptersFuture = ApiClient.get(
+        'novel_chapters',
+        filters: {'novel_id': 'eq.${widget.novel.id}'},
+        columns: 'id,title,chapter_num',
+        order: 'chapter_num.asc',
+        limit: 10000,
+      );
+      final progressFuture = userId != null
+          ? ApiClient.get(
+              'user_novels',
+              filters: {
+                'user_id': 'eq.$userId',
+                'novel_id': 'eq.${widget.novel.id}',
+              },
+              columns: 'last_chapter',
+            )
+          : Future<ApiResponse?>.value(null);
+
+      // 等待两个请求并行完成
+      final results = await Future.wait<ApiResponse?>([chaptersFuture, progressFuture]);
+      final chaptersResult = results[0]!;
+      final progressResult = results[1];
+
       final allChapters = <NovelChapterModel>[];
-      int offset = 0;
-      bool hasMore = true;
-
-      while (hasMore) {
-        final result = await ApiClient.get(
-          'novel_chapters',
-          filters: {'novel_id': 'eq.${widget.novel.id}'},
-          columns: 'id,title,chapter_num',
-          order: 'chapter_num.asc',
-          limit: batchSize,
-          offset: offset,
+      if (chaptersResult.isSuccess && chaptersResult.data != null) {
+        allChapters.addAll(
+          chaptersResult.data!.map((json) => NovelChapterModel.fromJson(json)),
         );
-
-        if (result.isSuccess && result.data != null) {
-          final batch = result.data!
-              .map((json) => NovelChapterModel.fromJson(json))
-              .toList();
-          allChapters.addAll(batch);
-          hasMore = batch.length >= batchSize;
-          offset += batchSize;
-        } else {
-          hasMore = false;
-        }
       }
 
       allChapters.removeWhere((c) => c.chapterOrder <= 0);
 
-      // 获取阅读进度
-      final userId = _userId;
+      // 解析阅读进度
       int startIndex = 0;
-      if (userId != null) {
+      if (progressResult != null && progressResult.isSuccess) {
         try {
-          final progressResult = await ApiClient.get(
-            'user_novels',
-            filters: {
-              'user_id': 'eq.$userId',
-              'novel_id': 'eq.${widget.novel.id}',
-            },
-            columns: 'last_chapter',
-          );
-          if (progressResult.isSuccess) {
-            final progressData = progressResult.data!;
-            if (progressData.isNotEmpty) {
-              final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
-              for (int i = 0; i < allChapters.length; i++) {
-                if (allChapters[i].chapterOrder >= savedChapter) {
-                  startIndex = i;
-                  break;
-                }
+          final progressData = progressResult.data!;
+          if (progressData.isNotEmpty) {
+            final savedChapter = progressData.first['last_chapter'] as int? ?? 1;
+            for (int i = 0; i < allChapters.length; i++) {
+              if (allChapters[i].chapterOrder >= savedChapter) {
+                startIndex = i;
+                break;
               }
             }
           }
@@ -491,21 +484,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     ChapterCacheService.instance.setProtectedChapter(chapter.id);
 
     try {
-      // 2. 检查本地持久化缓存，同时发起网络请求（并行加载）
-      final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
-      final networkFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {'id': 'eq.${chapter.id}'},
-      );
-
-      // 等待缓存结果
-      final cachedContent = await cacheFuture;
+      // 2. 检查本地缓存是否新鲜（TTL 内跳过网络请求）
+      final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
 
       // 检查是否已切换到其他章节
       if (_loadingChapterId != chapter.id) return;
 
-      if (cachedContent != null) {
-        // 有缓存，先显示缓存内容
+      // 缓存命中且在 TTL 有效期内：直接使用缓存，跳过网络请求
+      if (cachedContent != null && ChapterCacheService.instance.isCacheFresh(chapter.id)) {
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         final cachedChapter = chapter.copyWith(content: normalizedContent);
         final chapterIndex = _chapters.indexWhere((c) => c.id == chapter.id);
@@ -518,13 +504,40 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             _isLoadingChapter = false;
           });
         }
-        // 根据方向决定滚动位置：上一章到末尾，下一章到顶部
         _scrollToPosition();
         _saveProgress();
         _startReadingTimer();
         _checkBookmarkStatus();
         _chapterReadStartTime = DateTime.now();
-        // 继续等待网络请求更新缓存
+        return;
+      }
+
+      // 3. 缓存未命中或已过期：发起网络请求
+      final networkFuture = ApiClient.get(
+        'novel_chapters',
+        filters: {'id': 'eq.${chapter.id}'},
+        columns: 'id,title,content,chapter_num,word_count',
+      );
+
+      if (cachedContent != null) {
+        // 有缓存但已过期：先显示缓存内容，再等待网络更新
+        final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
+        final cachedChapter = chapter.copyWith(content: normalizedContent);
+        final chapterIndex = _chapters.indexWhere((c) => c.id == chapter.id);
+        if (chapterIndex != -1) {
+          _chapters[chapterIndex] = cachedChapter;
+        }
+        if (mounted) {
+          setState(() {
+            _currentChapter = cachedChapter;
+            _isLoadingChapter = false;
+          });
+        }
+        _scrollToPosition();
+        _saveProgress();
+        _startReadingTimer();
+        _checkBookmarkStatus();
+        _chapterReadStartTime = DateTime.now();
       }
 
       // 等待网络请求
@@ -617,6 +630,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final networkFuture = ApiClient.get(
         'novel_chapters',
         filters: {'id': 'eq.${chapter.id}'},
+        columns: 'id,title,content,chapter_num,word_count',
       );
 
       final cachedContent = await cacheFuture;
@@ -773,11 +787,13 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final totalChapters = _chapters.length;
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
-      // 6.1 新增：记录阅读历史
-      await _recordReadingHistory(progress);
+      // 并行执行：记录阅读历史 + 保存阅读进度（两者无依赖关系）
+      final historyFuture = _recordReadingHistory(progress);
 
+      // 保存阅读进度到 user_novels
+      Future<void> progressFuture;
       if (_isInBookshelf && _bookshelfId != null) {
-        await ApiClient.patchByFilter(
+        progressFuture = ApiClient.patchByFilter(
           'user_novels',
           filters: {'id': 'eq.$_bookshelfId'},
           body: {
@@ -789,48 +805,52 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         );
       } else {
         // 等待书架状态检查完成，避免重复创建记录（Bug 3 修复）
-        if (!_bookshelfStatusCompleter.isCompleted) {
-          await _bookshelfStatusCompleter.future;
-        }
-        // 再次检查，可能在等待期间 _checkBookshelfStatus 已完成并设置了书架状态
-        if (_isInBookshelf && _bookshelfId != null) {
-          await ApiClient.patchByFilter(
-            'user_novels',
-            filters: {'id': 'eq.$_bookshelfId'},
-            body: {
-              'last_chapter': chapterNum,
-              'progress': progress,
-              'is_collected': true,
-              'last_read_at': DateTime.now().toUtc().toIso8601String(),
-            },
-          );
-        } else {
-          final result = await ApiClient.post(
-            'user_novels',
-            {
-              'user_id': userId,
-              'novel_id': widget.novel.id,
-              'progress': progress,
-              'last_chapter': chapterNum,
-              'is_collected': true,
-              'last_read_at': DateTime.now().toUtc().toIso8601String(),
-              'created_at': DateTime.now().toUtc().toIso8601String(),
-              'updated_at': DateTime.now().toUtc().toIso8601String(),
-            },
-          );
+        progressFuture = () async {
+          if (!_bookshelfStatusCompleter.isCompleted) {
+            await _bookshelfStatusCompleter.future;
+          }
+          if (_isInBookshelf && _bookshelfId != null) {
+            await ApiClient.patchByFilter(
+              'user_novels',
+              filters: {'id': 'eq.$_bookshelfId'},
+              body: {
+                'last_chapter': chapterNum,
+                'progress': progress,
+                'is_collected': true,
+                'last_read_at': DateTime.now().toUtc().toIso8601String(),
+              },
+            );
+          } else {
+            final result = await ApiClient.post(
+              'user_novels',
+              {
+                'user_id': userId,
+                'novel_id': widget.novel.id,
+                'progress': progress,
+                'last_chapter': chapterNum,
+                'is_collected': true,
+                'last_read_at': DateTime.now().toUtc().toIso8601String(),
+                'created_at': DateTime.now().toUtc().toIso8601String(),
+                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              },
+            );
 
-          if (result.isSuccess) {
-            final data = result.data!;
-            if (data.isNotEmpty && mounted) {
-              setState(() {
-                _isInBookshelf = true;
-                _bookshelfId = data.first['id'].toString();
-                _isCollected = true; // Bug 7 修复：同步收藏状态
-              });
+            if (result.isSuccess) {
+              final data = result.data!;
+              if (data.isNotEmpty && mounted) {
+                setState(() {
+                  _isInBookshelf = true;
+                  _bookshelfId = data.first['id'].toString();
+                  _isCollected = true;
+                });
+              }
             }
           }
-        }
+        }();
       }
+
+      // 等待两个并行任务完成
+      await Future.wait([historyFuture, progressFuture]);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('保存阅读进度失败');
@@ -869,23 +889,23 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     final userId = _userId;
     if (userId == null) return;
 
-    final bookmarked = await BookmarkService().hasBookmark(
-      widget.novel.id,
-      _currentChapter!.id,
-      0, // 简化为章节级别书签
-    );
-    if (mounted) {
-      setState(() => _isBookmarked = bookmarked);
-    }
+    // 并行加载书签列表和批注，避免串行请求延迟
+    final bookmarkFuture = BookmarkService().getBookmarks(widget.novel.id);
+    final annotationFuture = _loadAnnotations();
 
-    // 加载本书所有书签
-    final bookmarks = await BookmarkService().getBookmarks(widget.novel.id);
-    if (mounted) {
-      setState(() => _bookmarks = bookmarks);
-    }
+    final bookmarks = await bookmarkFuture;
+    await annotationFuture;
 
-    // 同时加载当前章节批注
-    await _loadAnnotations();
+    if (mounted) {
+      // 从已加载的书签列表中本地判断当前章节是否有书签，省去一次独立请求
+      final bookmarked = bookmarks.any((b) =>
+        b.chapterId == _currentChapter!.id && b.charOffset == 0
+      );
+      setState(() {
+        _isBookmarked = bookmarked;
+        _bookmarks = bookmarks;
+      });
+    }
   }
 
   /// 6.1 新增：加载当前章节批注

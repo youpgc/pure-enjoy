@@ -283,6 +283,15 @@ class ChapterCacheService extends WidgetsBindingObserver {
     return null;
   }
 
+  /// 检查缓存是否在 TTL 有效期内
+  /// 返回 true 表示缓存仍新鲜，可跳过网络请求
+  static const Duration _cacheTtl = Duration(minutes: 30);
+  bool isCacheFresh(String chapterId) {
+    if (_diskIndex == null || !_diskIndex!.containsKey(chapterId)) return false;
+    final entry = _diskIndex![chapterId]!;
+    return DateTime.now().difference(entry.cachedAt) < _cacheTtl;
+  }
+
   /// 智能加载：三级缓存 + 去重 + 网络回源
   /// 返回 [cachedContent, networkFuture] 元组，允许先展示缓存再等待网络
   Future<String?> fetchWithDeduplication(
