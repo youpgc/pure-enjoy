@@ -9,8 +9,11 @@ class ReaderChapterDrawer extends StatefulWidget {
   final int currentChapterIndex;
   final ReaderBackground background;
   final int catalogPageSize;
+  final bool hasMoreChapters;
+  final bool isLoadingMore;
   final void Function(int globalIndex, NovelChapterModel chapter) onChapterTap;
   final VoidCallback? onCloseDrawer;
+  final VoidCallback? onLoadMore;
 
   const ReaderChapterDrawer({
     super.key,
@@ -18,8 +21,11 @@ class ReaderChapterDrawer extends StatefulWidget {
     required this.currentChapterIndex,
     required this.background,
     required this.catalogPageSize,
+    this.hasMoreChapters = false,
+    this.isLoadingMore = false,
     required this.onChapterTap,
     this.onCloseDrawer,
+    this.onLoadMore,
   });
 
   @override
@@ -103,6 +109,16 @@ class _ReaderChapterDrawerState extends State<ReaderChapterDrawer> {
                 ],
               ),
             ),
+            if (widget.hasMoreChapters && _catalogPage >= totalPages - 1) ...[
+              Center(
+                child: TextButton(
+                  onPressed: widget.isLoadingMore ? null : widget.onLoadMore,
+                  child: widget.isLoadingMore
+                      ? const SizedBox(width: 16, height: 16, child: CircularProgressIndicator(strokeWidth: 2))
+                      : const Text('加载更多'),
+                ),
+              ),
+            ],
             const Divider(height: 1),
             Expanded(
               child: ListView.builder(
