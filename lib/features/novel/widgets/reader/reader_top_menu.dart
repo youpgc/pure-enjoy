@@ -9,16 +9,8 @@ class ReaderTopMenu extends StatelessWidget {
   final Animation<Offset> slideAnimation;
   final ReaderBackground background;
   final NovelModel novel;
-  final NovelChapterModel? currentChapter;
-  final int currentChapterIndex;
-  final int chapterCount;
-  final bool hasStartedReading;
-  final Duration currentReadingDuration;
-  final bool isInBookshelf;
-  final bool isBookmarked;
   final bool isCollected;
-  final VoidCallback onAddToBookshelf;
-  final VoidCallback onToggleBookmark;
+  final VoidCallback onBack;
   final VoidCallback onToggleCollection;
   final VoidCallback onShowTtsPanel;
 
@@ -28,29 +20,11 @@ class ReaderTopMenu extends StatelessWidget {
     required this.slideAnimation,
     required this.background,
     required this.novel,
-    this.currentChapter,
-    required this.currentChapterIndex,
-    required this.chapterCount,
-    required this.hasStartedReading,
-    required this.currentReadingDuration,
-    required this.isInBookshelf,
-    required this.isBookmarked,
     required this.isCollected,
-    required this.onAddToBookshelf,
-    required this.onToggleBookmark,
+    required this.onBack,
     required this.onToggleCollection,
     required this.onShowTtsPanel,
   });
-
-  String _formatReadingDuration(Duration duration) {
-    if (duration.inHours > 0) {
-      return '${duration.inHours}小时${duration.inMinutes.remainder(60)}分钟';
-    } else if (duration.inMinutes > 0) {
-      return '${duration.inMinutes}分钟';
-    } else {
-      return '${duration.inSeconds}秒';
-    }
-  }
 
   void _showDetail(BuildContext context) {
     Navigator.push(
@@ -70,53 +44,32 @@ class ReaderTopMenu extends StatelessWidget {
           child: SafeArea(
             bottom: false,
             child: Padding(
-              padding: const EdgeInsets.fromLTRB(16, 8, 8, 16),
+              padding: const EdgeInsets.fromLTRB(8, 8, 8, 16),
               child: Row(
                 children: [
+                  // 返回按钮
+                  IconButton(
+                    icon: Icon(Icons.arrow_back_ios_new, color: background.textColor, size: 20),
+                    onPressed: onBack,
+                    tooltip: '返回',
+                    padding: EdgeInsets.zero,
+                    constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
+                  ),
+                  const SizedBox(width: 4),
+                  // 小说名（只保留名称，移除章节进度）
                   Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        Text(
-                          novel.title,
-                          style: TextStyle(
-                            fontSize: 14,
-                            fontWeight: FontWeight.w600,
-                            color: background.textColor.withValues(alpha: 0.7),
-                          ),
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                        ),
-                        if (currentChapter != null && chapterCount > 0)
-                          Text(
-                            '${currentChapter!.title} · ${currentChapterIndex + 1}/$chapterCount章${hasStartedReading ? ' · 已读${_formatReadingDuration(currentReadingDuration)}' : ''}',
-                            style: TextStyle(
-                              fontSize: 11,
-                              color: background.textColor.withValues(alpha: 0.6),
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                      ],
+                    child: Text(
+                      novel.title,
+                      style: TextStyle(
+                        fontSize: 14,
+                        fontWeight: FontWeight.w600,
+                        color: background.textColor.withValues(alpha: 0.7),
+                      ),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
-                  IconButton(
-                    icon: Icon(
-                      isInBookshelf ? Icons.library_books : Icons.library_add_outlined,
-                      color: background.textColor,
-                    ),
-                    onPressed: isInBookshelf ? null : onAddToBookshelf,
-                    tooltip: isInBookshelf ? '已在书架' : '加入书架',
-                  ),
-                  IconButton(
-                    icon: Icon(
-                      isBookmarked ? Icons.bookmark : Icons.bookmark_border,
-                      color: isBookmarked ? Theme.of(context).colorScheme.primary : background.textColor,
-                    ),
-                    onPressed: onToggleBookmark,
-                    tooltip: isBookmarked ? '移除书签' : '添加书签',
-                  ),
+                  // 收藏
                   IconButton(
                     icon: Icon(
                       isCollected ? Icons.favorite : Icons.favorite_border,
@@ -125,11 +78,13 @@ class ReaderTopMenu extends StatelessWidget {
                     onPressed: onToggleCollection,
                     tooltip: '收藏',
                   ),
+                  // 听书
                   IconButton(
                     icon: Icon(Icons.headphones_outlined, color: background.textColor),
                     onPressed: onShowTtsPanel,
                     tooltip: '听书',
                   ),
+                  // 详情
                   IconButton(
                     icon: Icon(Icons.info_outline, color: background.textColor),
                     onPressed: () => _showDetail(context),
