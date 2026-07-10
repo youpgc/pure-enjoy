@@ -71,7 +71,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   // 阅读时长统计
   DateTime? _readingStartTime;
-  Duration _totalReadingTime = Duration.zero;
   bool _hasStartedReading = false;
 
   // 阅读设置
@@ -210,7 +209,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   void _pauseReadingTimer() {
     if (_readingStartTime != null && _hasStartedReading) {
-      _totalReadingTime += DateTime.now().difference(_readingStartTime!);
       _readingStartTime = null;
     }
   }
@@ -1098,30 +1096,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         setState(() => _annotations = []);
       }
     }
-  }
-
-  /// 6.1 新增：估算当前阅读字符偏移
-  int _estimateCharOffset() {
-    if (_currentChapter == null) return 0;
-    final content = _currentChapter!.content;
-    if (_pageTurnMode == PageTurnMode.scroll &&
-        _scrollController.hasClients) {
-      final maxScroll = _scrollController.position.maxScrollExtent;
-      if (maxScroll > 0) {
-        final ratio = _scrollController.offset / maxScroll;
-        return (ratio * content.length).toInt().clamp(0, content.length);
-      }
-    }
-    return 0;
-  }
-
-  /// 6.1 新增：获取段落预览文本
-  String _getParagraphPreview(int charOffset) {
-    if (_currentChapter == null) return '';
-    final content = _currentChapter!.content;
-    final start = charOffset.clamp(0, content.length);
-    final end = (start + 50).clamp(0, content.length);
-    return content.substring(start, end);
   }
 
   /// 6.1 新增：显示书签列表
