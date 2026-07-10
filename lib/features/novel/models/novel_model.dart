@@ -112,7 +112,6 @@ class NovelChapterModel {
   final String title;
   final String content;
   final int chapterOrder;
-  final int? chapterNumber;
   final int? wordCount;
   final bool? isFree;
   final DateTime createdAt;
@@ -123,7 +122,6 @@ class NovelChapterModel {
     required this.title,
     required this.content,
     required this.chapterOrder,
-    this.chapterNumber,
     this.wordCount,
     this.isFree,
     required this.createdAt,
@@ -136,7 +134,6 @@ class NovelChapterModel {
       title: json['title'] as String? ?? '无标题',
       content: json['content'] as String? ?? '',
       chapterOrder: json['chapter_num'] as int? ?? 0,
-      chapterNumber: json['chapter_num'] as int?,
       wordCount: json['word_count'] as int?,
       isFree: json['is_free'] as bool?,
       createdAt: json['created_at'] != null
@@ -150,8 +147,7 @@ class NovelChapterModel {
       'novel_id': novelId,
       'title': title,
       'content': content,
-      'chapter_num': chapterNumber ?? chapterOrder,
-      'chapter_number': chapterNumber ?? chapterOrder,
+      'chapter_num': chapterOrder,
       'word_count': wordCount,
       'is_free': isFree,
       'created_at': createdAt.toUtc().toIso8601String(),
@@ -169,7 +165,6 @@ class NovelChapterModel {
     String? title,
     String? content,
     int? chapterOrder,
-    int? chapterNumber,
     int? wordCount,
     bool? isFree,
     DateTime? createdAt,
@@ -180,7 +175,6 @@ class NovelChapterModel {
       title: title ?? this.title,
       content: content ?? this.content,
       chapterOrder: chapterOrder ?? this.chapterOrder,
-      chapterNumber: chapterNumber ?? this.chapterNumber,
       wordCount: wordCount ?? this.wordCount,
       isFree: isFree ?? this.isFree,
       createdAt: createdAt ?? this.createdAt,
