@@ -327,11 +327,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
               ? null
               : SensitiveWordService.instance.checkSystemContentSync(updatedDiary.content!);
           if (contentResult?.isBlocked ?? false) {
-            if (mounted) {
-              showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
-            }
+            if (!context.mounted) return;
+            showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
             return;
           }
+          if (!context.mounted) return;
           Navigator.pop(context);
           _updateMoodDiary(updatedDiary.copyWith(
             content: contentResult?.processedText ?? updatedDiary.content,
@@ -354,11 +354,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
               ? null
               : SensitiveWordService.instance.checkSystemContentSync(newDiary.content!);
           if (contentResult?.isBlocked ?? false) {
-            if (mounted) {
-              showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
-            }
+            if (!context.mounted) return;
+            showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
             return;
           }
+          if (!context.mounted) return;
           Navigator.pop(context);
           _createMoodDiary(newDiary.copyWith(
             content: contentResult?.processedText ?? newDiary.content,

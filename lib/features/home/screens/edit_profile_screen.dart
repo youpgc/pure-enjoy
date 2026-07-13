@@ -2,8 +2,9 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../services/storage_service.dart';
-import '../../../services/app_config.dart';
+import '../../../config.dart';
 import '../../../services/api_client.dart';
+import '../../../services/supabase_service.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
