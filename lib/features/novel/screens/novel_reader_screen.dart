@@ -415,7 +415,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   /// 初始化阅读器：统一入口，避免重复加载
-  /// 并行化 user_novels 和 novel_chapters 查询，减少串行等待
+  /// 优化策略：
+  /// 1. 先确定目标章节号（如需查询阅读进度），避免用错误范围查询章节列表
+  /// 2. 消除额外的 _loadMoreChapterMeta 串行调用
+  /// 3. 并行加载当前章 + 前后各1章内容
   Future<void> _initializeReader() async {
     setState(() => _isLoading = true);
 
@@ -423,10 +426,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       final userId = _userId;
       int targetChapterNum = widget.startChapter;
 
-      // 并行启动：查询阅读进度 + 查询章节列表
-      Future<dynamic>? progressFuture;
+      // 1. 先确定目标章节号：如果需要查询阅读进度，先等待结果
+      // 避免用错误的初始范围查询章节列表，导致后续额外的 _loadMoreChapterMeta 调用
       if (targetChapterNum <= 0 && userId != null) {
-        progressFuture = ApiClient.get(
+        final progressResult = await ApiClient.get(
           'user_novels',
           filters: {
             'user_id': 'eq.$userId',
@@ -434,24 +437,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           },
           columns: 'last_chapter',
         );
-      }
-
-      final rangeStart = math.max(1, targetChapterNum - 25);
-      final rangeEnd = targetChapterNum + 25;
-
-      final chaptersFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {
-          'novel_id': 'eq.${widget.novel.id}',
-          'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.$rangeEnd)',
-        },
-        columns: 'id,title,chapter_num',
-        order: 'chapter_num.asc',
-      );
-
-      // 等待进度查询结果（如果发起了）
-      if (progressFuture != null) {
-        final progressResult = await progressFuture;
         if (progressResult.isSuccess &&
             progressResult.data != null &&
             progressResult.data!.isNotEmpty) {
@@ -460,8 +445,19 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         if (targetChapterNum <= 0) targetChapterNum = 1;
       }
 
-      // 等待章节列表
-      final chaptersResult = await chaptersFuture;
+      // 2. 使用正确的章节号范围查询章节列表
+      final rangeStart = math.max(1, targetChapterNum - 25);
+      final rangeEnd = targetChapterNum + 25;
+
+      final chaptersResult = await ApiClient.get(
+        'novel_chapters',
+        filters: {
+          'novel_id': 'eq.${widget.novel.id}',
+          'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.$rangeEnd)',
+        },
+        columns: 'id,title,chapter_num',
+        order: 'chapter_num.asc',
+      );
 
       final allChapters = <NovelChapterModel>[];
       if (chaptersResult.isSuccess && chaptersResult.data != null) {
@@ -484,17 +480,12 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
       _chapters = allChapters;
 
-      // 如果目标章不在已加载范围内，向后加载更多
+      // 如果目标章超出已加载范围（小说实际章节数小于目标值），定位到最后一章
+      // 避免触发额外的 _loadMoreChapterMeta 串行请求
       if (startIndex == 0 &&
           allChapters.isNotEmpty &&
           targetChapterNum > allChapters.last.chapterOrder) {
-        await _loadMoreChapterMeta(targetChapterNum: targetChapterNum);
-        for (int i = 0; i < _chapters.length; i++) {
-          if (_chapters[i].chapterOrder >= targetChapterNum) {
-            startIndex = i;
-            break;
-          }
-        }
+        startIndex = allChapters.length - 1;
       }
 
       if (mounted) {
@@ -784,29 +775,31 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   /// 静默预加载单个章节内容（不显示 loading，不影响当前章节）
+  /// 优化：缓存命中时立即返回，不阻塞等待网络请求
   Future<void> _fetchChapterContent(NovelChapterModel chapter) async {
     // 已加载则跳过
     final idx = _chapters.indexWhere((c) => c.id == chapter.id);
     if (idx != -1 && _chapters[idx].content.isNotEmpty) return;
 
     try {
-      final cacheFuture = ChapterCacheService.instance.getCachedContent(chapter.id);
-      final networkFuture = ApiClient.get(
-        'novel_chapters',
-        filters: {'id': 'eq.${chapter.id}'},
-        columns: 'id,title,content,chapter_num,word_count',
-      );
-
-      final cachedContent = await cacheFuture;
+      // 优先检查缓存：缓存命中时立即使用，不等待网络
+      final cachedContent = await ChapterCacheService.instance.getCachedContent(chapter.id);
       if (cachedContent != null) {
         final normalizedContent = cachedContent.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
         if (idx != -1) {
           _chapters[idx] = chapter.copyWith(content: normalizedContent);
         }
+        return; // 缓存命中：直接返回，不阻塞等待网络刷新
       }
 
-      final result = await networkFuture;
-      if (result.isSuccess && result.data!.isNotEmpty) {
+      // 缓存未命中：等待网络请求
+      final result = await ApiClient.get(
+        'novel_chapters',
+        filters: {'id': 'eq.${chapter.id}'},
+        columns: 'id,title,content,chapter_num,word_count',
+      );
+
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
         final chapterData = result.data!.first;
         final parsedChapter = NovelChapterModel.fromJson(chapterData);
         final normalizedContent = parsedChapter.content.replaceAll('\r\n', '\n').replaceAll('\r', '\n');
