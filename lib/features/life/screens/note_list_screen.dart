@@ -5,6 +5,7 @@ import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/offline_sync_service.dart';
+import '../../../services/sensitive_word_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -290,11 +291,27 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         builder: (_) => _NoteEditScreen(
           note: note,
           userId: _userId ?? 'local_user',
-          onSave: (newNote) {
+          onSave: (newNote) async {
+            // 系统敏感词检测
+            await SensitiveWordService.instance.initialize();
+            final titleResult = SensitiveWordService.instance.checkSystemContentSync(newNote.title);
+            final contentResult = newNote.content == null || newNote.content!.isEmpty
+                ? null
+                : SensitiveWordService.instance.checkSystemContentSync(newNote.content!);
+            if (titleResult.isBlocked || (contentResult?.isBlocked ?? false)) {
+              if (mounted) {
+                showSnackBar(context, '笔记内容包含敏感信息，请修改后重试', isError: true);
+              }
+              return;
+            }
+            final filteredNote = newNote.copyWith(
+              title: titleResult.processedText,
+              content: contentResult?.processedText ?? newNote.content,
+            );
             if (note != null) {
-              _updateNote(newNote);
+              _updateNote(filteredNote);
             } else {
-              _createNote(newNote);
+              _createNote(filteredNote);
             }
           },
         ),

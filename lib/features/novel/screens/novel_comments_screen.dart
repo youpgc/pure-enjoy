@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/session_manager.dart';
+import '../../../services/sensitive_word_service.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../config.dart';
 import '../models/novel_comment_model.dart';
 import '../widgets/comment_item.dart';
@@ -110,6 +113,18 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
     if (_isSubmitting) return;
     final content = _inputController.text.trim();
     if (content.isEmpty) return;
+
+    // 小说内容敏感词检测
+    await SensitiveWordService.instance.initialize();
+    final checkResult = SensitiveWordService.instance.checkNovelContentSync(content);
+    if (checkResult.isBlocked) {
+      if (mounted) {
+        showSnackBar(context, '评论包含敏感内容，请修改后重试', isError: true);
+      }
+      return;
+    }
+    final filteredContent = checkResult.processedText;
+
     setState(() => _isSubmitting = true);
     try {
       final userId = AuthService.instance.currentUserId ?? '';
@@ -119,7 +134,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
         novelId: widget.novelId,
         userId: userId,
         userNickname: nickname,
-        content: content,
+        content: filteredContent,
         rating: _replyToCommentId == null ? _selectedRating : null,
         parentId: _replyToCommentId,
         replyToUserId: _replyToUserId,

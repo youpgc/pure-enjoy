@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/sensitive_word_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/widgets/widgets.dart';
 
@@ -52,6 +53,19 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       return;
     }
 
+    // 系统敏感词检测
+    await SensitiveWordService.instance.initialize();
+    final titleResult = SensitiveWordService.instance.checkSystemContentSync(_titleController.text.trim());
+    final descResult = _descController.text.trim().isEmpty
+        ? null
+        : SensitiveWordService.instance.checkSystemContentSync(_descController.text.trim());
+    if (titleResult.isBlocked || (descResult?.isBlocked ?? false)) {
+      if (mounted) {
+        showSnackBar(context, '反馈内容包含敏感信息，请修改后重试', isError: true);
+      }
+      return;
+    }
+
     setState(() => _isSubmitting = true);
 
     try {
@@ -60,10 +74,10 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
         {
           'user_id': userId,
           'user_nickname': userNickname,
-          'title': _titleController.text.trim(),
+          'title': titleResult.processedText,
           'description': _descController.text.trim().isEmpty
               ? null
-              : _descController.text.trim(),
+              : descResult!.processedText,
           'category': _category,
           'status': 'pending',
         },

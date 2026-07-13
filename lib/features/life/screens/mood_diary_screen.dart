@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/offline_sync_service.dart';
+import '../../../services/sensitive_word_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -319,9 +320,22 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       builder: (context) => _DiaryForm(
         userId: _userId ?? 'local_user',
         diary: diary,
-        onSave: (updatedDiary) {
+        onSave: (updatedDiary) async {
+          // 系统敏感词检测
+          await SensitiveWordService.instance.initialize();
+          final contentResult = updatedDiary.content == null || updatedDiary.content!.isEmpty
+              ? null
+              : SensitiveWordService.instance.checkSystemContentSync(updatedDiary.content!);
+          if (contentResult?.isBlocked ?? false) {
+            if (mounted) {
+              showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
+            }
+            return;
+          }
           Navigator.pop(context);
-          _updateMoodDiary(updatedDiary);
+          _updateMoodDiary(updatedDiary.copyWith(
+            content: contentResult?.processedText ?? updatedDiary.content,
+          ));
         },
       ),
     );
@@ -333,9 +347,22 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       isScrollControlled: true,
       builder: (context) => _DiaryForm(
         userId: _userId ?? 'local_user',
-        onSave: (newDiary) {
+        onSave: (newDiary) async {
+          // 系统敏感词检测
+          await SensitiveWordService.instance.initialize();
+          final contentResult = newDiary.content == null || newDiary.content!.isEmpty
+              ? null
+              : SensitiveWordService.instance.checkSystemContentSync(newDiary.content!);
+          if (contentResult?.isBlocked ?? false) {
+            if (mounted) {
+              showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
+            }
+            return;
+          }
           Navigator.pop(context);
-          _createMoodDiary(newDiary);
+          _createMoodDiary(newDiary.copyWith(
+            content: contentResult?.processedText ?? newDiary.content,
+          ));
         },
       ),
     );

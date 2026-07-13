@@ -1,8 +1,8 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:image_picker/image_picker.dart';
-import '../../../services/supabase_service.dart';
+import '../../../services/storage_service.dart';
+import '../../../services/app_config.dart';
 import '../../../services/api_client.dart';
 
 /// 编辑个人资料页面
@@ -142,24 +142,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 读取文件字节
       final bytes = await file.readAsBytes();
 
-      // 上传到 Supabase Storage
-      final accessToken = AuthService.instance.accessToken;
-      final uploadResponse = await http.post(
-        Uri.parse('${SupabaseConfig.url}/storage/v1/object/avatars/$fileName'),
-        headers: {
-          'apikey': SupabaseConfig.anonKey,
-          'Authorization': 'Bearer ${accessToken ?? SupabaseConfig.anonKey}',
-          'Content-Type': 'image/$fileExt',
-        },
-        body: bytes,
+      // 使用 StorageService 上传（统一走 HttpClient，禁止直接调用 http）
+      final publicUrl = await StorageService.instance.uploadFile(
+        bucket: AppConfig.avatarsBucket,
+        path: 'avatars/$fileName',
+        bytes: bytes,
+        contentType: 'image/$fileExt',
       );
-
-      if (uploadResponse.statusCode != 200 && uploadResponse.statusCode != 201) {
-        throw Exception('上传失败: HTTP ${uploadResponse.statusCode}');
-      }
-
-      // 获取公开URL
-      final publicUrl = '${SupabaseConfig.url}/storage/v1/object/public/avatars/$fileName';
 
       // 更新用户头像URL
       final updateResult = await ApiClient.patchByFilter(
