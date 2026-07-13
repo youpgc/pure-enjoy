@@ -458,12 +458,13 @@ class _DashboardPageState extends State<DashboardPage> {
       if (dt == null) return '';
       return DateTimeUtils.formatStandard(dt);
     }
+    final createdLocal = created.toLocal();
     if (selectedDate != null) {
       final selected = DateTime.tryParse(selectedDate);
       if (selected != null &&
-          (created.year != selected.year ||
-              created.month != selected.month ||
-              created.day != selected.day)) {
+          (createdLocal.year != selected.year ||
+              createdLocal.month != selected.month ||
+              createdLocal.day != selected.day)) {
         return DateTimeUtils.formatStandard(selected);
       }
     }
@@ -549,7 +550,10 @@ class _DashboardPageState extends State<DashboardPage> {
           'weight_records',
           record.toJson(),
           '体重记录添加成功',
-          onSuccess: _loadRecentActivities,
+          onSuccess: () {
+            _loadRecentActivities();
+            EventBus.instance.fire(EventType.weightRecordUpdated);
+          },
         ),
       ),
     );

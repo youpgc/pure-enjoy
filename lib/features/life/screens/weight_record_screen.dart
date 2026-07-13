@@ -266,6 +266,7 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
       if (result.isSuccess) {
         await _loadRecords(refresh: true);
         OfflineSyncService.instance.syncPending();
+        EventBus.instance.fire(EventType.weightRecordUpdated);
         if (mounted) {
           ScaffoldMessenger.of(context).showSnackBar(
             const SnackBar(content: Text('更新成功')),
