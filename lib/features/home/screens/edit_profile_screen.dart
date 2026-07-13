@@ -154,7 +154,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 更新用户头像URL
       final updateResult = await ApiClient.patchByFilter(
         'users',
-        filters: {'id': 'eq.$_userId'},
+        filters: {'or': '(id.eq.$_userId,auth_id.eq.$_userId)'},
         body: {
           'avatar_url': publicUrl,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
