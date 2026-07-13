@@ -59,7 +59,7 @@ class PointService {
     final result = await ApiClient.get(
       'users',
       filters: {
-        'id': 'eq.$userId',
+        'or': '(id.eq.$userId,auth_id.eq.$userId)',
         'is_deleted': 'eq.false',
       },
       columns: 'consecutive_checkin_days,last_checkin_date,effective_points,available_points,expiring_points,points',
@@ -100,7 +100,7 @@ class PointService {
 
     final result = await ApiClient.patchByFilter(
       'users',
-      filters: {'id': 'eq.$userId'},
+      filters: {'or': '(id.eq.$userId,auth_id.eq.$userId)'},
       body: body,
     );
     if (!result.isSuccess) {
