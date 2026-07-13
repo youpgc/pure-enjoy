@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/skeleton_loading.dart';
 import '../../../novel/models/novel_model.dart';
+import '../../../novel/widgets/novel_cover.dart';
 
 /// 最近阅读区块组件
 ///
@@ -58,7 +59,7 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
                       ),
                     )
                   : SizedBox(
-                      height: 180,
+                      height: 200,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.all(12),
@@ -80,37 +81,12 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
                                 child: Column(
                                   crossAxisAlignment: CrossAxisAlignment.start,
                                   children: [
-                                    ClipRRect(
-                                      borderRadius: BorderRadius.circular(8),
-                                      child: novel.cover != null &&
-                                              novel.cover!.isNotEmpty
-                                          ? Image.network(
-                                              novel.cover!,
-                                              height: 100,
-                                              width: 120,
-                                              fit: BoxFit.cover,
-                                              errorBuilder: (_, __, ___) =>
-                                                  Container(
-                                                height: 100,
-                                                width: 120,
-                                                color: colorScheme
-                                                    .surfaceContainerHighest,
-                                                child: const Icon(
-                                                  Icons.book,
-                                                  size: 40,
-                                                ),
-                                              ),
-                                            )
-                                          : Container(
-                                              height: 100,
-                                              width: 120,
-                                              color: colorScheme
-                                                  .surfaceContainerHighest,
-                                              child: const Icon(
-                                                Icons.book,
-                                                size: 40,
-                                              ),
-                                            ),
+                                    NovelCover(
+                                      coverUrl: novel.cover,
+                                      title: novel.title,
+                                      width: 120,
+                                      height: 160,
+                                      borderRadius: 8,
                                     ),
                                     const SizedBox(height: 8),
                                     Text(
