@@ -117,16 +117,12 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     if (!refresh && !beginLoadMore()) return;
 
     try {
-      final startOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month, 1);
-      final endOfMonth = DateTime(_selectedMonth.year, _selectedMonth.month + 1, 1);
-
       final (limit, offset) = paginationParams;
 
       final result = await ApiClient.get(
         'mood_diaries',
         filters: {
           'user_id': 'eq.$userId',
-          'and': '(date.gte.${startOfMonth.toIso8601String().split('T').first},date.lt.${endOfMonth.toIso8601String().split('T').first})',
         },
         order: 'date.desc',
         limit: limit,
