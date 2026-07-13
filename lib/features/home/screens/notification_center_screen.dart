@@ -124,11 +124,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Future<void> _markAsRead(String id) async {
     try {
-      await ApiClient.patchByFilter(
+      final result = await ApiClient.patchByFilter(
         'notifications',
         filters: {'id': 'eq.$id'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
+      if (!result.isSuccess) {
+        if (kDebugMode) debugPrint('标记已读失败: ${result.error}');
+        return;
+      }
       if (!mounted) return;
       setState(() {
         final idx = _notifications.indexWhere((n) => n['id'] == id);
@@ -156,11 +160,15 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
       
       if (unreadIds.isEmpty) return;
 
-      await ApiClient.patchByFilter(
+      final result = await ApiClient.patchByFilter(
         'notifications',
         filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
+      if (!result.isSuccess) {
+        if (kDebugMode) debugPrint('批量标记已读失败: ${result.error}');
+        return;
+      }
       if (!mounted) return;
       setState(() {
         for (var n in _notifications) {

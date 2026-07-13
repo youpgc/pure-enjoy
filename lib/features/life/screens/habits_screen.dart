@@ -418,11 +418,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   if (schedule != null) {
                     if (schedule.id.isNotEmpty) {
                       // 更新已有提醒计划
-                      await ApiClient.patchByFilter(
+                      final result = await ApiClient.patchByFilter(
                         'reminder_schedules',
                         filters: {'id': 'eq.${schedule.id}'},
                         body: schedule.toJsonForUpdate(),
                       );
+                      if (!result.isSuccess) {
+                        if (kDebugMode) debugPrint('提醒计划更新失败: ${result.error}');
+                      }
                     } else {
                       // 新建提醒计划
                       final newId = const Uuid().v4();

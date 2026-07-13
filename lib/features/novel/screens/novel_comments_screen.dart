@@ -376,11 +376,15 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
 
   Future<void> _likeComment(NovelCommentModel comment) async {
     try {
-      await ApiClient.patchByFilter(
+      final result = await ApiClient.patchByFilter(
         AppConfig.novelCommentsTable,
         filters: {'id': 'eq.${comment.id}'},
         body: {'like_count': comment.likeCount + 1},
       );
+      if (!result.isSuccess) {
+        if (kDebugMode) debugPrint('点赞失败: ${result.error}');
+        return;
+      }
       if (!mounted) return;
       setState(() {
         final index = _comments.indexWhere((c) => c.id == comment.id);

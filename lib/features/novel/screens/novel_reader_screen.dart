@@ -978,16 +978,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       // 保存阅读进度到 user_novels
       Future<void> progressFuture;
       if (_isInBookshelf && _bookshelfId != null) {
-        progressFuture = ApiClient.patchByFilter(
-          'user_novels',
-          filters: {'id': 'eq.$_bookshelfId'},
-          body: {
-            'last_chapter': chapterNum,
-            'progress': progress,
-            'is_collected': true,
-            'last_read_at': DateTime.now().toUtc().toIso8601String(),
-          },
-        );
+        progressFuture = _saveReadingProgress(progress: progress, chapterNum: chapterNum);
       } else {
         // 等待书架状态检查完成，避免重复创建记录（Bug 3 修复）
         progressFuture = () async {
@@ -995,16 +986,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
             await _bookshelfStatusCompleter.future;
           }
           if (_isInBookshelf && _bookshelfId != null) {
-            await ApiClient.patchByFilter(
-              'user_novels',
-              filters: {'id': 'eq.$_bookshelfId'},
-              body: {
-                'last_chapter': chapterNum,
-                'progress': progress,
-                'is_collected': true,
-                'last_read_at': DateTime.now().toUtc().toIso8601String(),
-              },
-            );
+            await _saveReadingProgress(progress: progress, chapterNum: chapterNum);
           } else {
             final result = await ApiClient.post(
               'user_novels',
@@ -1044,6 +1026,26 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   }
 
   /// 6.1 新增：记录阅读历史明细
+  /// 保存阅读进度到 user_novels（检查返回值，失败时静默记录日志）
+  Future<void> _saveReadingProgress({
+    required double progress,
+    required int chapterNum,
+  }) async {
+    final result = await ApiClient.patchByFilter(
+      'user_novels',
+      filters: {'id': 'eq.$_bookshelfId'},
+      body: {
+        'last_chapter': chapterNum,
+        'progress': progress,
+        'is_collected': true,
+        'last_read_at': DateTime.now().toUtc().toIso8601String(),
+      },
+    );
+    if (!result.isSuccess && kDebugMode) {
+      debugPrint('阅读进度保存失败: ${result.error}');
+    }
+  }
+
   Future<void> _recordReadingHistory(double progress) async {
     if (_currentChapter == null) return;
     final userId = _userId;
