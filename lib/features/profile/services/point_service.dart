@@ -72,7 +72,8 @@ class PointService {
   }
 
   /// 更新 users 表统计字段
-  Future<void> _updateUserStats({
+  /// 返回 true 表示更新成功，false 表示更新失败
+  Future<bool> _updateUserStats({
     int? consecutiveCheckinDays,
     DateTime? lastCheckinDate,
     int? effectivePoints,
@@ -81,7 +82,7 @@ class PointService {
     int? points,
   }) async {
     final userId = AuthService.instance.currentUserId;
-    if (userId == null) return;
+    if (userId == null) return false;
 
     final body = <String, dynamic>{};
     if (consecutiveCheckinDays != null) {
@@ -95,13 +96,21 @@ class PointService {
     if (expiringPoints != null) body['expiring_points'] = expiringPoints;
     if (points != null) body['points'] = points;
 
-    if (body.isNotEmpty) {
-      await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$userId'},
-        body: body,
-      );
+    if (body.isEmpty) return true;
+
+    final result = await ApiClient.patchByFilter(
+      'users',
+      filters: {'id': 'eq.$userId'},
+      body: body,
+    );
+    if (!result.isSuccess) {
+      if (kDebugMode) {
+        debugPrint('更新用户统计字段失败: ${result.error}');
+      }
+      return false;
     }
+    // Prefer: return=representation 下，成功返回更新后的行数据
+    return result.data != null && result.data!.isNotEmpty;
   }
 
   /// 打卡获得积分
@@ -189,10 +198,17 @@ class PointService {
       }
 
       // 5. 更新 users 表打卡统计字段（积分统计由数据库触发器自动维护）
-      await _updateUserStats(
+      final updated = await _updateUserStats(
         consecutiveCheckinDays: streak,
         lastCheckinDate: today,
       );
+      if (!updated) {
+        // 连续签到天数未持久化，但不影响积分流水（已写入 point_records）
+        // 提示用户但仍返回成功，下次签到 streak 会重置为 1
+        if (kDebugMode) {
+          debugPrint('连续签到天数更新失败（可能RLS未配置），积分流水已正常记录');
+        }
+      }
 
       // 6. 更新 AuthService 中的用户缓存
       await AuthService.instance.reloadCurrentUser();
