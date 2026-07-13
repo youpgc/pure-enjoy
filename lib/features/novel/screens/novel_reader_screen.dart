@@ -264,6 +264,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
           },
           columns: 'id,title,chapter_num',
           order: 'chapter_num.asc',
+          limit: null, // 取消默认 limit=10
         );
         if (result.isSuccess && result.data != null && mounted) {
           final newChapters = result.data!
@@ -457,6 +458,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         },
         columns: 'id,title,chapter_num',
         order: 'chapter_num.asc',
+        limit: null, // 取消默认 limit=10，按范围查询全部章节
       );
 
       final allChapters = <NovelChapterModel>[];

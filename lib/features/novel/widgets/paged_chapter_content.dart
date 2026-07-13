@@ -152,6 +152,14 @@ class PagedChapterContentState extends State<PagedChapterContent> {
       _isCalculating = false;
     });
 
+    // 通知父组件总页数和当前页码
+    // PageView.jumpToPage(0) 不会触发 onPageChanged（页面从0跳到0无变化），
+    // 导致父组件 _totalPages 始终为默认值1，点击右侧会错误地触发下一章
+    final currentPage = resetPage
+        ? (widget.jumpToLastPage ? pages.length - 1 : 0)
+        : (_pageController.hasClients ? _pageController.page!.round() : 0);
+    widget.onPageChanged(currentPage, pages.length);
+
     // 只有在明确需要重置页签时才跳转（如切换章节）
     // 菜单唤起、字体调整等操作不应重置页签
     if (resetPage) {
