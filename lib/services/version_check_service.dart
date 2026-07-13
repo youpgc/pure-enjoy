@@ -1,3 +1,4 @@
+import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
@@ -6,6 +7,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'package:open_filex/open_filex.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme/app_theme.dart';
 import 'api_client.dart';
 
@@ -21,9 +23,42 @@ class VersionCheckService {
   ValueNotifier<double> downloadProgress = ValueNotifier(0);
   ValueNotifier<String> downloadStatus = ValueNotifier('');
 
+  // 版本检查缓存配置
+  static const String _versionCheckCacheKey = 'version_check_cache';
+  static const Duration _minCheckInterval = Duration(hours: 1);
+
   /// 检查是否需要更新
+  /// 使用 SharedPreferences 缓存检查结果，1 小时内重复调用直接返回缓存
   Future<Map<String, dynamic>?> checkUpdate() async {
     try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheJson = prefs.getString(_versionCheckCacheKey);
+
+      // 读取缓存
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        try {
+          final cache = jsonDecode(cacheJson) as Map<String, dynamic>;
+          final lastCheckTime = DateTime.tryParse(cache['timestamp'] as String? ?? '');
+          final cachedVersionInfo = cache['versionInfo'] as Map<String, dynamic>?;
+
+          if (lastCheckTime != null) {
+            final elapsed = DateTime.now().difference(lastCheckTime);
+            // 强制更新不受缓存限制，始终需要检查
+            final isForce = cachedVersionInfo?['is_force_update'] == true;
+
+            if (elapsed < _minCheckInterval && !isForce) {
+              if (kDebugMode) {
+                debugPrint('📱 使用缓存结果（${elapsed.inMinutes} 分钟前检查过）');
+              }
+              return cachedVersionInfo;
+            }
+          }
+        } catch (e) {
+          // 缓存解析失败，继续走网络请求
+          if (kDebugMode) debugPrint('📱 缓存解析失败，重新检查');
+        }
+      }
+
       final packageInfo = await PackageInfo.fromPlatform();
       final currentVersion = packageInfo.version;
       final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
@@ -57,8 +92,9 @@ class VersionCheckService {
 
       if (kDebugMode) debugPrint('📱 最新版本获取成功');
 
+      Map<String, dynamic>? versionInfo;
       if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
-        return {
+        versionInfo = {
           'version': latestVersionStr,
           'build_number': latestBuildNumber,
           'apk_url': apkUrl,
@@ -68,7 +104,15 @@ class VersionCheckService {
           'release_type': latestVersion['release_type'],
         };
       }
-      return null;
+
+      // 写入缓存（无论是否需要更新都缓存）
+      final cacheData = {
+        'timestamp': DateTime.now().toIso8601String(),
+        'versionInfo': versionInfo,
+      };
+      await prefs.setString(_versionCheckCacheKey, jsonEncode(cacheData));
+
+      return versionInfo;
     } catch (e) {
       if (kDebugMode) debugPrint('📱 检查更新失败');
       return null;
@@ -269,8 +313,8 @@ class VersionCheckService {
         final redirectUrl = response.headers['location'];
         if (redirectUrl != null && redirectUrl.isNotEmpty) {
           if (kDebugMode) debugPrint('📱 跟随重定向');
-          // 关闭当前 response stream 后跟随重定向
-          response.stream.listen((_) {}).cancel();
+          // drain 当前 response stream 释放连接，避免资源泄漏
+          await response.stream.drain<void>();
           return await _downloadFromUrl(redirectUrl, onProgress: onProgress, redirectDepth: redirectDepth + 1);
         }
       }
