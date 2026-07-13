@@ -250,28 +250,28 @@ class AuthApi {
       String account, String type) async {
     try {
       SecureLogger.log('🔐 解析类型: $type, 账号: $account');
-      final filter = type == 'phone'
-          ? 'phone=eq.$account'
-          : 'username=eq.$account';
 
-      final response = await http.get(
-        Uri.parse(
-            '${SupabaseConfig.url}/rest/v1/users?$filter&is_deleted=eq.false&select=email'),
+      // 使用 RPC 调用 resolve_account_to_email 函数（SECURITY DEFINER 绕过 RLS）
+      final response = await http.post(
+        Uri.parse('${SupabaseConfig.url}/rest/v1/rpc/resolve_account_to_email'),
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+          'Content-Type': 'application/json',
         },
+        body: jsonEncode({'account': account}),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body) as List<dynamic>;
-        if (data.isNotEmpty) {
-          return data[0]['email'] as String?;
+        final result = jsonDecode(response.body);
+        // RPC 返回字符串（email）或 null
+        if (result != null && result is String && result.isNotEmpty) {
+          return result;
         }
         return null;
       }
       SecureLogger.warning(
-          '⚠️ 查询用户信息失败: ${response.statusCode}');
+          '⚠️ 查询用户信息失败: ${response.statusCode}, body: ${response.body}');
       return null;
     } catch (e) {
       SecureLogger.warning(
