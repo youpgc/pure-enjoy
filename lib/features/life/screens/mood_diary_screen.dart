@@ -600,7 +600,7 @@ class _DiaryFormState extends State<_DiaryForm> {
           Text('今天心情如何？', style: Theme.of(context).textTheme.bodyLarge),
           const SizedBox(height: 12),
           if (_isDictLoading)
-            const Center(child: CircularProgressIndicator())
+            const Center(child: LoadingWidget())
           else
             Wrap(
               spacing: 8,

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:fl_chart/fl_chart.dart';
 import 'package:intl/intl.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
@@ -146,15 +147,6 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('消费统计'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            tooltip: '选择时间区间',
-            onPressed: () async {
-              await _pickStartMonth();
-            },
-          ),
-        ],
       ),
       body: _buildBody(),
     );
@@ -162,7 +154,7 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: LoadingWidget());
     }
 
     if (_error.isNotEmpty) {

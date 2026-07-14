@@ -114,12 +114,16 @@ class AuthService {
     try {
       await CacheHelper.instance.clearAllUserData();
     } catch (e) {
-      debugPrint('清理缓存失败: $e');
+      if (kDebugMode) {
+        debugPrint('清理缓存失败: $e');
+      }
     }
     try {
       await ChapterCacheService.instance.clearAllCache();
     } catch (e) {
-      debugPrint('清理缓存失败: $e');
+      if (kDebugMode) {
+        debugPrint('清理缓存失败: $e');
+      }
     }
     await _session.clearSession();
   }

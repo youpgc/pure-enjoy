@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 
@@ -250,7 +251,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
 
   Widget _buildBody() {
     if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
+      return const Center(child: LoadingWidget());
     }
     if (_error != null) {
       return Center(
@@ -311,7 +312,7 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
           if (index >= _notifications.length) {
             return const Padding(
               padding: EdgeInsets.all(16),
-              child: Center(child: CircularProgressIndicator()),
+              child: Center(child: LoadingWidget()),
             );
           }
           final item = _notifications[index];

@@ -200,7 +200,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
         children: [
           Expanded(
             child: _isLoading
-                ? const Center(child: CircularProgressIndicator())
+                ? const Center(child: LoadingWidget())
                 : _comments.isEmpty
                     ? Center(
                         child: Column(

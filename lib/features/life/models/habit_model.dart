@@ -128,6 +128,29 @@ class HabitCheckinModel {
     }
     return json;
   }
+
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'checkin_at': checkinAt.toUtc().toIso8601String(),
+      'note': note,
+    };
+  }
+
+  HabitCheckinModel copyWith({
+    String? id,
+    String? habitId,
+    DateTime? checkinAt,
+    String? note,
+    DateTime? createdAt,
+  }) {
+    return HabitCheckinModel(
+      id: id ?? this.id,
+      habitId: habitId ?? this.habitId,
+      checkinAt: checkinAt ?? this.checkinAt,
+      note: note ?? this.note,
+      createdAt: createdAt ?? this.createdAt,
+    );
+  }
 }
 
 /// 习惯颜色选项

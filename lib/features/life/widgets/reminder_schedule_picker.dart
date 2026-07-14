@@ -141,6 +141,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
             spacing: 8,
             runSpacing: 8,
             children: [
+              _buildTypeChip('daily', '每日'),
               _buildTypeChip('weekly', '每周'),
               _buildTypeChip('monthly', '每月'),
               _buildTypeChip('yearly', '每年'),
@@ -199,6 +200,8 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
 
   Widget _buildTypeSpecificOptions() {
     switch (_scheduleType) {
+      case 'daily':
+        return _buildDailySelector();
       case 'weekly':
         return _buildWeekDaySelector();
       case 'monthly':
@@ -210,6 +213,11 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
       default:
         return const SizedBox.shrink();
     }
+  }
+
+  // === 每日选择器 ===
+  Widget _buildDailySelector() {
+    return const SizedBox.shrink();
   }
 
   // === 每周选择器 ===
@@ -348,6 +356,24 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
 
         const SizedBox(height: 16),
 
+        // 日期选择
+        _buildSectionTitle('选择日期'),
+        const SizedBox(height: 8),
+        ListTile(
+          contentPadding: EdgeInsets.zero,
+          leading: const Icon(Icons.calendar_today),
+          title: const Text('选择日期'),
+          subtitle: Text(_getYearDateSubtitle()),
+          trailing: const Icon(Icons.chevron_right),
+          onTap: _pickYearDate,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(8),
+            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
+          ),
+        ),
+
+        const SizedBox(height: 16),
+
         // 年份选择（可选）
         _buildSectionTitle('指定年份（可选）'),
         const SizedBox(height: 8),
@@ -419,6 +445,39 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
           ),
       ],
     );
+  }
+
+  Future<void> _pickYearDate() async {
+    final picked = await AppDatePicker.show(
+      context,
+      type: DateTimeType.date,
+      initialDate: DateTime.now(),
+    );
+    if (picked != null) {
+      setState(() {
+        if (!_months.contains(picked.month)) {
+          _months.add(picked.month);
+          _months.sort();
+        }
+        if (!_monthDays.contains(picked.day)) {
+          _monthDays.add(picked.day);
+          _monthDays.sort();
+        }
+      });
+      _notifyChange();
+    }
+  }
+
+  String _getYearDateSubtitle() {
+    if (_months.isEmpty || _monthDays.isEmpty) return '未选择';
+    final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+    final descs = <String>[];
+    for (final month in _months) {
+      for (final day in _monthDays) {
+        descs.add('${monthNames[month]}${day}日');
+      }
+    }
+    return descs.join('、');
   }
 
   Future<int?> _showYearPickerDialog() async {

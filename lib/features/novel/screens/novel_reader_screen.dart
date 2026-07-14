@@ -110,6 +110,9 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   // 防止重复触发预加载（70% 进度）
   bool _hasTriggeredPreload = false;
 
+  // scroll 模式 overshoot 进度（-1.0 ~ 1.0，负表示向上/上一章，正表示向下/下一章）
+  double _overshootProgress = 0.0;
+
   /// 标记是否需要跳转到最后一页（上一章时）
   bool _shouldJumpToLastPage = false;
 
@@ -587,6 +590,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     _shouldJumpToLastPage = !isNext;
     _hasTriggeredPreload = false;
     _hasTriggeredNextChapter = false;
+    _overshootProgress = 0.0;
 
     setState(() {
       _currentChapterIndex = index;
@@ -910,15 +914,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       }
     }
 
-    if (_hasTriggeredNextChapter) return; // 防止重复触发
-    if (_isLoadingChapter) return;
-
-    if (_scrollController.position.pixels >= _scrollController.position.maxScrollExtent - 50) {
-      if (_currentChapterIndex < _chapters.length - 1 || _hasMoreChapters) {
-        _hasTriggeredNextChapter = true;
-        _nextChapter();
-      }
-    }
+    // 注意：章节切换现在由 overscroll 手势触发（_handleScrollOvershoot），
+    // 不再基于滚动位置自动触发，以便用户能明确控制切换时机。
   }
 
   Future<void> _checkBookshelfStatus() async {
@@ -1402,6 +1399,35 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
+  /// scroll 模式 overshoot 达到阈值时触发章节切换
+  void _handleScrollOvershoot(bool isEnd) {
+    if (_pageTurnMode != PageTurnMode.scroll) return;
+    if (_isLoadingChapter) return;
+
+    if (isEnd) {
+      if (_currentChapterIndex < _chapters.length - 1 || _hasMoreChapters) {
+        _nextChapter();
+      } else {
+        showSnackBar(context, '已经是最后一章了');
+      }
+    } else {
+      if (_currentChapterIndex > 0) {
+        _previousChapter();
+      } else {
+        showSnackBar(context, '已经是第一章了');
+      }
+    }
+  }
+
+  /// 更新 overshoot 进度，用于显示视觉指示器
+  void _handleScrollOvershootProgress(double progress) {
+    if (_pageTurnMode != PageTurnMode.scroll) return;
+    if (_overshootProgress == progress) return;
+    setState(() {
+      _overshootProgress = progress;
+    });
+  }
+
   void _showSettings() {
     showModalBottomSheet(
       context: context,
@@ -1520,6 +1546,40 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
                   ],
                 ),
 
+                // scroll 模式 overshoot 视觉指示器
+                if (_pageTurnMode == PageTurnMode.scroll && _overshootProgress != 0)
+                  Positioned(
+                    top: _overshootProgress < 0 ? 0 : null,
+                    bottom: _overshootProgress > 0 ? 0 : null,
+                    left: 0,
+                    right: 0,
+                    child: Container(
+                      height: 56,
+                      alignment: Alignment.center,
+                      child: Opacity(
+                        opacity: _overshootProgress.abs().clamp(0.0, 1.0),
+                        child: Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            Icon(
+                              _overshootProgress < 0 ? Icons.arrow_upward : Icons.arrow_downward,
+                              color: _background.textColor.withValues(alpha: 0.6),
+                              size: 18,
+                            ),
+                            const SizedBox(width: 8),
+                            Text(
+                              _overshootProgress < 0 ? '释放切换到上一章' : '释放切换到下一章',
+                              style: TextStyle(
+                                color: _background.textColor.withValues(alpha: 0.6),
+                                fontSize: 14,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ),
+
                 // 顶部菜单（菜单显示时才显示，覆盖在内容上方）
                 if (_showMenu)
                   Positioned(
@@ -1570,6 +1630,8 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
         onShowAnnotationInput: _showAnnotationInputPanel,
         getCachedTextStyle: _getCachedTextStyle,
+        onScrollOvershoot: _handleScrollOvershoot,
+        onScrollOvershootProgress: _handleScrollOvershootProgress,
       );
     }
 

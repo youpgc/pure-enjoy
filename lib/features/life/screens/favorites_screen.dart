@@ -413,7 +413,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                       if (index >= _favorites.length) {
                         return const Padding(
                           padding: EdgeInsets.all(16),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(child: LoadingWidget()),
                         );
                       }
                       final favorite = _favorites[index];

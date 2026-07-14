@@ -101,7 +101,9 @@ class _LifeScreenState extends State<LifeScreen> {
         _isLoading = false;
       });
     } catch (e) {
-      debugPrint('加载最新记录失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载最新记录失败: $e');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
       }

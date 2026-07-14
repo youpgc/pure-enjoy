@@ -67,7 +67,7 @@ class MoodDiaryModel {
   }
 
   /// 转换为更新用的 JSON（不包含 user_id）
-  Map<String, dynamic> toUpdateJson() {
+  Map<String, dynamic> toJsonForUpdate() {
     return <String, dynamic>{
       'mood': mood,
       'mood_label': moodScore.toString(),
@@ -75,6 +75,9 @@ class MoodDiaryModel {
       'date': entryDate.toIso8601String().split('T').first,
     };
   }
+
+  /// 旧方法名别名，保持向后兼容
+  Map<String, dynamic> toUpdateJson() => toJsonForUpdate();
 
   MoodDiaryModel copyWith({
     String? id,

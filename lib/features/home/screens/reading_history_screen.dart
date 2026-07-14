@@ -1,8 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../novel/screens/novel_detail_screen.dart';
+import '../../novel/screens/novel_reader_screen.dart';
 import '../../novel/models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 
@@ -83,7 +86,9 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
         }
       }
     } catch (e) {
-      debugPrint('加载阅读历史失败: $e');
+      if (kDebugMode) {
+        debugPrint('加载阅读历史失败: $e');
+      }
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -133,7 +138,9 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
           }
         }
       } catch (e) {
-        debugPrint('清空阅读历史失败: $e');
+        if (kDebugMode) {
+          debugPrint('清空阅读历史失败: $e');
+        }
       }
     }
   }
@@ -153,7 +160,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingWidget())
           : _history.isEmpty
               ? RefreshIndicator(
                   onRefresh: () => _loadHistory(refresh: true),
@@ -250,9 +257,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
           ),
           trailing: const Icon(Icons.chevron_right),
           onTap: () {
-            // 构建 NovelModel 并跳转到详情页
+            final novelId = item['novel_id'] as String?;
+            final lastChapter = (item['last_chapter'] as int?) ?? 0;
+
             final novel = NovelModel(
-              id: item['novel_id'],
+              id: novelId ?? '',
               title: title,
               author: author,
               cover: coverUrl ?? '',
@@ -263,10 +272,26 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
               chapterCount: novelData['chapter_count'] ?? 0,
               createdAt: DateTime.now(),
             );
+
+            // 如果 last_chapter 无效，回退到小说详情页
+            if (lastChapter <= 0 || novelId == null || novelId.isEmpty) {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NovelDetailScreen(novel: novel),
+                ),
+              );
+              return;
+            }
+
+            // 直接跳转到阅读界面并恢复上次阅读进度
             Navigator.push(
               context,
               MaterialPageRoute(
-                builder: (_) => NovelDetailScreen(novel: novel),
+                builder: (_) => NovelReaderScreen(
+                  novel: novel,
+                  startChapter: lastChapter,
+                ),
               ),
             );
           },

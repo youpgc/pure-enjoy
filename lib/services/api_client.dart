@@ -6,8 +6,27 @@ import 'cancel_token.dart';
 
 /// 安全日志工具：仅在开发模式下输出日志，生产环境静默处理
 class _SecureLogger {
-  static void error(String message) {
-    if (kDebugMode) debugPrint(message);
+  static void error(String message, {Object? error}) {
+    if (kDebugMode) {
+      debugPrint(message);
+      if (error != null) debugPrint('  详情: $error');
+    }
+  }
+
+  /// 将异常转换为友好的用户提示语
+  /// 开发环境通过 _SecureLogger.error() 输出原始异常详情
+  static String userFriendlyError(Object e) {
+    final msg = e.toString().toLowerCase();
+    if (msg.contains('timeout') || msg.contains('deadline exceeded')) {
+      return '网络连接超时，请检查网络后重试';
+    }
+    if (msg.contains('socket') || msg.contains('connection refused')) {
+      return '网络连接失败，请检查网络设置';
+    }
+    if (msg.contains('cancel')) {
+      return '请求已取消';
+    }
+    return '网络异常，请稍后重试';
   }
 }
 
@@ -163,8 +182,8 @@ class ApiClient {
     } on RequestCancelledException {
       return ApiResponse.error('请求已取消');
     } catch (e) {
-      _SecureLogger.error('❌ GET 请求失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ GET 请求失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -193,8 +212,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ POST 请求失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ POST 请求失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -219,8 +238,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ PATCH请求失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ PATCH 请求失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -246,8 +265,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ PATCH 请求失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ PATCH 请求失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -266,8 +285,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ DELETE 请求失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ DELETE 请求失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -287,8 +306,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ 批量删除失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ 批量删除失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -311,8 +330,8 @@ class ApiClient {
 
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ 批量删除失败 [$table]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ 批量删除失败 [$table]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -422,8 +441,8 @@ class ApiClient {
       );
       return _handleResponse(response);
     } catch (e) {
-      _SecureLogger.error('❌ RPC 请求失败 [$functionName]');
-      return ApiResponse.error('请求失败: $e');
+      _SecureLogger.error('❌ RPC 请求失败 [$functionName]', error: e);
+      return ApiResponse.error(_SecureLogger.userFriendlyError(e));
     }
   }
 
@@ -453,7 +472,8 @@ class ApiClient {
           statusCode: statusCode,
         );
       } catch (e) {
-        return ApiResponse.error('解析响应失败: $e', statusCode: statusCode);
+        _SecureLogger.error('❌ 响应解析失败', error: e);
+        return ApiResponse.error('数据解析异常', statusCode: statusCode);
       }
     } else if (statusCode == 401) {
       return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
@@ -464,8 +484,9 @@ class ApiClient {
     } else if (statusCode == 429) {
       return ApiResponse.error('请求过于频繁，请稍后再试', statusCode: statusCode);
     } else {
+      _SecureLogger.error('❌ HTTP 错误 [$statusCode]: ${response.body}');
       return ApiResponse.error(
-        '请求失败 (HTTP $statusCode): ${response.body}',
+        '服务器响应异常 (HTTP $statusCode)',
         statusCode: statusCode,
       );
     }

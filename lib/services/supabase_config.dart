@@ -32,16 +32,9 @@ class SecureLogger {
 
 /// Supabase 配置（从环境变量读取）
 class SupabaseConfig {
-  static String get url => Env.get(
-        'SUPABASE_URL',
-        fallback: 'https://mhdrbjpqmzswswoazwjg.supabase.co',
-      );
+  static String get url => Env.get('SUPABASE_URL');
 
-  static String get anonKey => Env.get(
-        'SUPABASE_ANON_KEY',
-        fallback:
-            'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1oZHJianBxbXpzd3N3b2F6d2pnIiwicm9sZSI6ImFub24iLCJpYXQiOjE3Nzg2MjAyMTMsImV4cCI6MjA5NDE5NjIxM30.VCMNj6BaSwiMRhTCXF52Ftbs2-gRgDkVZd8fTTT0g_E',
-      );
+  static String get anonKey => Env.get('SUPABASE_ANON_KEY');
 
   /// 基础请求头（查询用）
   static Map<String, String> get headers => {

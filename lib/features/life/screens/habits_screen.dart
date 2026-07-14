@@ -561,7 +561,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       if (index >= _habits.length) {
                         return const Padding(
                           padding: EdgeInsets.all(16),
-                          child: Center(child: CircularProgressIndicator()),
+                          child: Center(child: LoadingWidget()),
                         );
                       }
                       final habit = _habits[index];

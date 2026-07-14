@@ -17,7 +17,7 @@ class ReminderScheduleModel {
   final String habitId;
   final String userId;
 
-  /// 提醒类型: weekly/monthly/yearly/custom
+  /// 提醒类型: weekly/monthly/yearly/custom/daily
   final String scheduleType;
 
   /// 每周提醒: 1=周一, 7=周日
@@ -151,6 +151,9 @@ class ReminderScheduleModel {
     if (!isEnabled) return false;
 
     switch (scheduleType) {
+      case 'daily':
+        return true;
+
       case 'weekly':
         if (weekDays.isEmpty) return false;
         // Dart DateTime.weekday: 1=周一, 7=周日
@@ -162,7 +165,11 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return false;
-        return months.contains(date.month);
+        if (!months.contains(date.month)) return false;
+        if (monthDays.isNotEmpty) {
+          return monthDays.contains(date.day);
+        }
+        return true;
 
       case 'custom':
         if (dates.isEmpty) return false;
@@ -183,6 +190,9 @@ class ReminderScheduleModel {
     final today = DateTime(now.year, now.month, now.day);
 
     switch (scheduleType) {
+      case 'daily':
+        return today;
+
       case 'weekly':
         if (weekDays.isEmpty) return null;
         // 找到下一个匹配的星期几
@@ -213,13 +223,22 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return null;
-        // 找今年或明年匹配的月份
+        // 找今年或明年匹配的月份和日期
         for (int yearOffset = 0; yearOffset < 2; yearOffset++) {
           final checkYear = now.year + yearOffset;
           for (final month in months) {
-            final checkDate = DateTime(checkYear, month, 1);
-            if (!checkDate.isBefore(today)) {
-              return checkDate;
+            if (monthDays.isNotEmpty) {
+              for (final day in monthDays) {
+                final checkDate = DateTime(checkYear, month, day);
+                if (!checkDate.isBefore(today)) {
+                  return checkDate;
+                }
+              }
+            } else {
+              final checkDate = DateTime(checkYear, month, 1);
+              if (!checkDate.isBefore(today)) {
+                return checkDate;
+              }
             }
           }
         }
@@ -256,6 +275,9 @@ class ReminderScheduleModel {
     final timeStr = time;
 
     switch (scheduleType) {
+      case 'daily':
+        return '每日 $timeStr';
+
       case 'weekly':
         if (weekDays.isEmpty) return '每周 $timeStr';
         final dayNames = ['', '周一', '周二', '周三', '周四', '周五', '周六', '周日'];
@@ -269,6 +291,16 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return '每年 $timeStr';
+        if (monthDays.isNotEmpty) {
+          final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+          final descs = <String>[];
+          for (final month in months) {
+            for (final day in monthDays) {
+              descs.add('${monthNames[month]}${day}日');
+            }
+          }
+          return '每年 ${descs.join('、')} $timeStr';
+        }
         final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
         final ms = months.map((m) => monthNames[m]).join('、');
         return '每年 $ms $timeStr';

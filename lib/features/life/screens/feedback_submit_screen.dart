@@ -109,7 +109,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
         title: const Text('提交反馈'),
       ),
       body: _isDictLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingWidget())
           : SingleChildScrollView(
               padding: const EdgeInsets.all(16),
               child: Form(

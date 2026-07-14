@@ -1,6 +1,7 @@
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/storage_service.dart';
 import '../../../config.dart';
 import '../../../services/api_client.dart';
@@ -357,7 +358,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         ],
       ),
       body: _isLoading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: LoadingWidget())
           : Form(
               key: _formKey,
               child: ListView(

@@ -56,4 +56,38 @@ class PointRecord {
       'status': status,
     };
   }
+
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'amount': amount,
+      'remark': remark,
+      'status': status,
+    };
+  }
+
+  PointRecord copyWith({
+    String? id,
+    String? userId,
+    String? type,
+    int? amount,
+    String? remark,
+    String? operatorName,
+    String? operatorId,
+    DateTime? createdAt,
+    DateTime? expiresAt,
+    String? status,
+  }) {
+    return PointRecord(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      type: type ?? this.type,
+      amount: amount ?? this.amount,
+      remark: remark ?? this.remark,
+      operatorName: operatorName ?? this.operatorName,
+      operatorId: operatorId ?? this.operatorId,
+      createdAt: createdAt ?? this.createdAt,
+      expiresAt: expiresAt ?? this.expiresAt,
+      status: status ?? this.status,
+    );
+  }
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/api_client.dart';
 import '../models/feedback_model.dart';
 import '../../../core/theme/app_theme.dart';
@@ -221,7 +222,7 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
               const Center(
                 child: Padding(
                   padding: EdgeInsets.all(20),
-                  child: CircularProgressIndicator(),
+                  child: LoadingWidget(),
                 ),
               )
             else if (_flowRecords.isEmpty)

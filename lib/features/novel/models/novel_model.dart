@@ -103,6 +103,71 @@ class NovelModel {
     }
     return json;
   }
+
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'title': title,
+      'author': author,
+      'cover_url': cover,
+      'description': description,
+      'category': category,
+      'source': source,
+      'source_url': sourceUrl,
+      'tags': tags,
+      'chapter_count': chapterCount,
+      'word_count': wordCount,
+      'status': status,
+      'is_free': isFree,
+      'price': price,
+      'rating': rating,
+    };
+  }
+
+  NovelModel copyWith({
+    String? id,
+    String? userId,
+    String? title,
+    String? author,
+    String? cover,
+    String? description,
+    String? category,
+    String? source,
+    String? sourceUrl,
+    List<String>? tags,
+    int? chapterCount,
+    int? wordCount,
+    String? status,
+    bool? isFree,
+    double? price,
+    double? rating,
+    int? readCount,
+    int? collectCount,
+    DateTime? createdAt,
+    DateTime? updatedAt,
+  }) {
+    return NovelModel(
+      id: id ?? this.id,
+      userId: userId ?? this.userId,
+      title: title ?? this.title,
+      author: author ?? this.author,
+      cover: cover ?? this.cover,
+      description: description ?? this.description,
+      category: category ?? this.category,
+      source: source ?? this.source,
+      sourceUrl: sourceUrl ?? this.sourceUrl,
+      tags: tags ?? this.tags,
+      chapterCount: chapterCount ?? this.chapterCount,
+      wordCount: wordCount ?? this.wordCount,
+      status: status ?? this.status,
+      isFree: isFree ?? this.isFree,
+      price: price ?? this.price,
+      rating: rating ?? this.rating,
+      readCount: readCount ?? this.readCount,
+      collectCount: collectCount ?? this.collectCount,
+      createdAt: createdAt ?? this.createdAt,
+      updatedAt: updatedAt ?? this.updatedAt,
+    );
+  }
 }
 
 /// 小说章节模型
@@ -157,6 +222,16 @@ class NovelChapterModel {
       json['id'] = id;
     }
     return json;
+  }
+
+  Map<String, dynamic> toJsonForUpdate() {
+    return {
+      'title': title,
+      'content': content,
+      'chapter_num': chapterOrder,
+      'word_count': wordCount,
+      'is_free': isFree,
+    };
   }
 
   NovelChapterModel copyWith({

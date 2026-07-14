@@ -156,9 +156,7 @@ class VersionCheckService {
       return true;
     }
 
-    if (kDebugMode) {
-      debugPrint('📱 无需更新');
-    }
+    if (kDebugMode) debugPrint('📱 无需更新');
     return false;
   }
 
@@ -296,7 +294,9 @@ class VersionCheckService {
           await oldFile.delete();
         }
       } catch (e) {
-        debugPrint('删除旧文件失败: $e');
+        if (kDebugMode) {
+          debugPrint('删除旧文件失败: $e');
+        }
       }
 
       // 使用独立 Client 发送请求，不注入任何额外 headers
