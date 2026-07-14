@@ -32,23 +32,21 @@ class SecureLogger {
 
 /// Supabase 配置（从环境变量读取）
 ///
-/// 优先级：--dart-define > .env 文件 > 开发环境默认值
+/// 优先级：--dart-define > .env 文件 > 内置默认值
 /// Supabase URL 和 anon key 本就是客户端公开信息（受 RLS 保护），
-/// 提供开发环境默认值便于本地开发，生产环境请通过 --dart-define 注入。
+/// 内置默认值保证 release 模式下也能正常工作，生产环境可通过 --dart-define 覆盖。
 class SupabaseConfig {
-  // 开发环境默认值（仅用于本地开发，生产环境请通过 --dart-define 覆盖）
+  // 内置默认值（客户端公开信息，非敏感数据）
   static const String _devDefaultUrl =
       'https://mhdrbjpqmzswswoazwjg.supabase.co';
   static const String _devDefaultAnonKey =
       'sb_publishable_wFx9tlxImVfEpRN4NMkS1g_QOm64aj6';
 
-  static String get url => kDebugMode
-      ? Env.get('SUPABASE_URL', fallback: _devDefaultUrl)
-      : Env.get('SUPABASE_URL');
+  static String get url =>
+      Env.get('SUPABASE_URL', fallback: _devDefaultUrl);
 
-  static String get anonKey => kDebugMode
-      ? Env.get('SUPABASE_ANON_KEY', fallback: _devDefaultAnonKey)
-      : Env.get('SUPABASE_ANON_KEY');
+  static String get anonKey =>
+      Env.get('SUPABASE_ANON_KEY', fallback: _devDefaultAnonKey);
 
   /// 基础请求头（查询用）
   static Map<String, String> get headers => {
