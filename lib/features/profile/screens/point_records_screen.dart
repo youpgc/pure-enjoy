@@ -18,6 +18,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   bool _isCheckingIn = false;
   int _availablePoints = 0;
   bool _hasCheckedInToday = false;
+  int _consecutiveCheckinDays = 0;
 
   @override
   int get pageSize => 20;
@@ -41,14 +42,16 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     _loadRecords();
   }
 
-  /// 加载可用积分和打卡状态
+  /// 加载可用积分、打卡状态和连续签到天数
   Future<void> _loadAvailablePoints() async {
     final points = await PointService.instance.getAvailablePoints();
     final checkedIn = await PointService.instance.hasCheckedInToday();
+    final streak = await PointService.instance.getConsecutiveCheckinDays();
     if (mounted) {
       setState(() {
         _availablePoints = points;
         _hasCheckedInToday = checkedIn;
+        _consecutiveCheckinDays = streak;
       });
     }
   }
@@ -70,6 +73,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     final newRecords = await PointService.instance.getRecords(
       page: offset ~/ limit + 1,
       pageSize: limit,
+      statusFilter: 'active',
     );
 
     if (mounted) {
@@ -130,38 +134,41 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   }
 
   /// 获取类型对应的图标和颜色
-  /// 注意：point_type 字典类型目前未在后台配置，暂使用硬编码映射
+  /// 积分类型映射（与数据库 point_records.type 和后台 POINT_TYPE_MAP 一致）
+  /// 标准类型：checkin / earn / spend / adjust / admin_adjust
+  /// 兼容历史类型：admin_recharge（已废弃，映射到 admin_adjust）
   _PointTypeInfo _getTypeInfo(String type) {
     switch (type) {
       case 'checkin':
         return _PointTypeInfo(
           icon: Icons.check_circle_outline,
-          label: '打卡',
+          label: '签到',
           color: Colors.green,
         );
-      case 'recharge':
+      case 'earn':
         return _PointTypeInfo(
           icon: Icons.add_circle_outline,
-          label: '充值',
-          color: Colors.blue,
+          label: '获得',
+          color: Colors.green,
         );
-      case 'deduct':
+      case 'spend':
         return _PointTypeInfo(
           icon: Icons.remove_circle_outline,
-          label: '抵扣',
-          color: Colors.orange,
+          label: '消费',
+          color: Colors.red,
         );
-      case 'admin_recharge':
+      case 'adjust':
         return _PointTypeInfo(
-          icon: Icons.add_circle_outline,
-          label: '后台充值',
+          icon: Icons.swap_horiz,
+          label: '调整',
           color: Colors.blue,
         );
-      case 'admin_deduct':
+      case 'admin_adjust':
+      case 'admin_recharge': // 兼容历史数据
         return _PointTypeInfo(
-          icon: Icons.remove_circle_outline,
-          label: '后台抵扣',
-          color: Colors.orange,
+          icon: Icons.admin_panel_settings_outlined,
+          label: '管理员调整',
+          color: Colors.purple,
         );
       default:
         return _PointTypeInfo(
@@ -307,7 +314,38 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                 ),
               ),
             ),
-
+            // 连续签到天数（为0时不显示）
+            if (_consecutiveCheckinDays > 0)
+              Padding(
+                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+                child: Container(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 16,
+                    vertical: 12,
+                  ),
+                  decoration: BoxDecoration(
+                    color: colorScheme.primary.withValues(alpha: 0.08),
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(
+                        Icons.local_fire_department,
+                        color: colorScheme.primary,
+                        size: 20,
+                      ),
+                      const SizedBox(width: 8),
+                      Text(
+                        '已连续签到 $_consecutiveCheckinDays 天',
+                        style: TextStyle(
+                          color: colorScheme.primary,
+                          fontWeight: FontWeight.w500,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
             // 积分记录列表
             if (_records.isEmpty && !_isLoading)
               Padding(

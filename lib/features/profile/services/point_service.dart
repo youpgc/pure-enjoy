@@ -8,10 +8,11 @@ import '../models/point_record_model.dart';
 
 /// 积分服务
 ///
-/// 核心变更：
-/// - 连续打卡天数改为读取 users.consecutive_checkin_days / last_checkin_date
-/// - 有效/可用/即将过期积分改为读取 users 表统计字段，不再全量查询 point_records
-/// - 积分变动时同步更新 users 表统计字段
+/// 核心设计：
+/// - 积分查询从 users 表统计字段读取（effective_points / available_points / expiring_points）
+/// - 积分变动（签到、获得、消费）后，App 端主动重算并更新 users 表统计字段
+/// - 不依赖数据库触发器（trg_maintain_user_points 已确认不存在）
+/// - 连续打卡天数从 users.consecutive_checkin_days / last_checkin_date 读取
 class PointService {
   static PointService? _instance;
 
@@ -62,7 +63,8 @@ class PointService {
         ApiClient.userKey(userId): 'eq.$userId',
         'is_deleted': 'eq.false',
       },
-      columns: 'consecutive_checkin_days,last_checkin_date,effective_points,available_points,expiring_points,points',
+      columns:
+          'consecutive_checkin_days,last_checkin_date,effective_points,available_points,expiring_points,points',
       limit: 1,
     );
     if (result.isSuccess && result.data!.isNotEmpty) {
@@ -89,7 +91,8 @@ class PointService {
       body['consecutive_checkin_days'] = consecutiveCheckinDays;
     }
     if (lastCheckinDate != null) {
-      body['last_checkin_date'] = lastCheckinDate.toIso8601String().split('T').first;
+      body['last_checkin_date'] =
+          lastCheckinDate.toIso8601String().split('T').first;
     }
     if (effectivePoints != null) body['effective_points'] = effectivePoints;
     if (availablePoints != null) body['available_points'] = availablePoints;
@@ -109,16 +112,86 @@ class PointService {
       }
       return false;
     }
-    // Prefer: return=representation 下，成功返回更新后的行数据
     return result.data != null && result.data!.isNotEmpty;
+  }
+
+  /// 重算并更新 users 表的积分统计字段
+  ///
+  /// 基于 point_records 表全量重算（仅在积分变动后调用）：
+  /// - effective_points: 所有 status='active' 的积分代数和
+  /// - available_points: effective_points（当前未区分过期，后续可加过期过滤）
+  /// - expiring_points: 30天内即将过期的 active 积分
+  /// - points: 总获得积分（仅正数，不论状态）
+  Future<void> _recalcAndUpdateUserPoints() async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return;
+
+    try {
+      // 查询该用户所有 point_records
+      final result = await ApiClient.get(
+        'point_records',
+        filters: {'user_id': 'eq.$userId'},
+        columns: 'amount,status,expires_at',
+        // 不分页，全量查询（积分记录量级有限）
+      );
+
+      if (!result.isSuccess || result.data == null) return;
+
+      final now = DateTime.now().toUtc();
+      final thirtyDaysLater = now.add(const Duration(days: 30));
+
+      int effectivePoints = 0;
+      int availablePoints = 0;
+      int expiringPoints = 0;
+      int totalPoints = 0;
+
+      for (final record in result.data!) {
+        final amount = (record['amount'] as num?)?.toInt() ?? 0;
+        final status = record['status'] as String? ?? 'active';
+
+        // 总获得积分（仅正数，不论状态）
+        if (amount > 0) {
+          totalPoints += amount;
+        }
+
+        // 仅统计 active 状态
+        if (status == 'active') {
+          effectivePoints += amount;
+          availablePoints += amount;
+
+          // 30天内即将过期
+          final expiresAt = record['expires_at'] as String?;
+          if (expiresAt != null && amount > 0) {
+            final expires = DateTime.parse(expiresAt);
+            if (expires.isBefore(thirtyDaysLater) && expires.isAfter(now)) {
+              expiringPoints += amount;
+            }
+          }
+        }
+      }
+
+      await _updateUserStats(
+        effectivePoints: effectivePoints,
+        availablePoints: availablePoints,
+        expiringPoints: expiringPoints,
+        points: totalPoints,
+      );
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('重算用户积分失败: $e');
+      }
+    }
   }
 
   /// 打卡获得积分
   ///
-  /// 核心逻辑：只插入 point_records 流水 + 更新打卡统计字段。
-  /// users 表的 effective_points / available_points / points 由数据库
-  /// 触发器 trg_maintain_user_points 自动维护，App 端不再手动更新，
-  /// 避免与触发器冲突导致积分重复累加。
+  /// 核心逻辑：
+  /// 1. 检查今天是否已打卡
+  /// 2. 计算连续签到天数
+  /// 3. 计算积分 = min(连续天数, 7)
+  /// 4. 插入 point_records 流水
+  /// 5. 更新 users 表签到统计字段
+  /// 6. 重算 users 表积分统计字段
   Future<Map<String, dynamic>> checkin() async {
     try {
       final userId = AuthService.instance.currentUserId;
@@ -135,7 +208,8 @@ class PointService {
         filters: {
           'user_id': 'eq.$userId',
           'type': 'eq.checkin',
-          'and': '(created_at.gte.${today.toUtc().toIso8601String()},created_at.lt.${tomorrow.toUtc().toIso8601String()})',
+          'and':
+              '(created_at.gte.${today.toUtc().toIso8601String()},created_at.lt.${tomorrow.toUtc().toIso8601String()})',
         },
         columns: 'id',
       );
@@ -172,10 +246,11 @@ class PointService {
       // 3. 计算积分 = min(连续天数, 7)
       final points = streak > 7 ? 7 : streak;
 
-      // 4. 插入 point_records 记录（触发器自动维护 users 统计字段）
+      // 4. 插入 point_records 记录
       final now = DateTime.now();
       final nowIso = now.toUtc().toIso8601String();
-      final expiresAt = now.add(const Duration(days: 180)).toUtc().toIso8601String();
+      final expiresAt =
+          now.add(const Duration(days: 180)).toUtc().toIso8601String();
       final insertResult = await ApiClient.post(
         'point_records',
         {
@@ -197,20 +272,16 @@ class PointService {
         return {'success': false, 'message': '打卡失败: ${insertResult.error}'};
       }
 
-      // 5. 更新 users 表打卡统计字段（积分统计由数据库触发器自动维护）
-      final updated = await _updateUserStats(
+      // 5. 更新 users 表打卡统计字段
+      await _updateUserStats(
         consecutiveCheckinDays: streak,
         lastCheckinDate: today,
       );
-      if (!updated) {
-        // 连续签到天数未持久化，但不影响积分流水（已写入 point_records）
-        // 提示用户但仍返回成功，下次签到 streak 会重置为 1
-        if (kDebugMode) {
-          debugPrint('连续签到天数更新失败（可能RLS未配置），积分流水已正常记录');
-        }
-      }
 
-      // 6. 更新 AuthService 中的用户缓存
+      // 6. 重算 users 表积分统计字段（不依赖触发器）
+      await _recalcAndUpdateUserPoints();
+
+      // 7. 更新 AuthService 中的用户缓存
       await AuthService.instance.reloadCurrentUser();
 
       return {
@@ -228,15 +299,26 @@ class PointService {
   }
 
   /// 分页获取积分记录
-  Future<List<PointRecord>> getRecords({int page = 1, int pageSize = 20}) async {
+  ///
+  /// [statusFilter] 状态过滤，null 表示不过滤（显示所有记录）
+  Future<List<PointRecord>> getRecords({
+    int page = 1,
+    int pageSize = 20,
+    String? statusFilter,
+  }) async {
     try {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return [];
 
       final offset = (page - 1) * pageSize;
+      final filters = <String, String>{'user_id': 'eq.$userId'};
+      if (statusFilter != null) {
+        filters['status'] = 'eq.$statusFilter';
+      }
+
       final result = await ApiClient.get(
         'point_records',
-        filters: {'user_id': 'eq.$userId'},
+        filters: filters,
         order: 'created_at.desc',
         limit: pageSize,
         offset: offset,
@@ -244,9 +326,7 @@ class PointService {
 
       if (result.isSuccess) {
         final records = result.data!;
-        return records
-            .map((json) => PointRecord.fromJson(json))
-            .toList();
+        return records.map((json) => PointRecord.fromJson(json)).toList();
       }
 
       return [];
@@ -258,10 +338,16 @@ class PointService {
     }
   }
 
-  /// 获取用户有效积分总和（直接从 users 表读取）
-  Future<int> fetchTotalPoints() async {
+  /// 获取用户可用积分（有效且未过期的积分）
+  Future<int> getAvailablePoints() async {
     final stats = await _fetchUserStats();
-    return (stats?['effective_points'] as num?)?.toInt() ?? 0;
+    return (stats?['available_points'] as num?)?.toInt() ?? 0;
+  }
+
+  /// 获取连续签到天数
+  Future<int> getConsecutiveCheckinDays() async {
+    final stats = await _fetchUserStats();
+    return (stats?['consecutive_checkin_days'] as num?)?.toInt() ?? 0;
   }
 
   /// 从 AuthService 获取用户总积分（兼容旧代码）
@@ -269,16 +355,10 @@ class PointService {
     return AuthService.instance.currentPoints ?? 0;
   }
 
-  /// 查询30天内即将过期的积分总数（直接从 users 表读取）
+  /// 查询30天内即将过期的积分总数
   Future<int> getExpiringSoonPoints() async {
     final stats = await _fetchUserStats();
     return (stats?['expiring_points'] as num?)?.toInt() ?? 0;
-  }
-
-  /// 查询用户可用积分（直接从 users 表读取）
-  Future<int> getAvailablePoints() async {
-    final stats = await _fetchUserStats();
-    return (stats?['available_points'] as num?)?.toInt() ?? 0;
   }
 
   /// 检查今天是否已打卡
@@ -296,38 +376,56 @@ class PointService {
 
   /// 积分变动时插入 point_records 流水记录（供其他模块调用）
   ///
-  /// 数据库触发器 trg_maintain_user_points 会自动根据 point_records
-  /// 重算 users.effective_points，App 端不再直接修改统计字段。
+  /// 插入后自动重算 users 表积分统计字段。
   ///
   /// [delta] 变动值（正数增加，负数减少）
   /// [type] 变动类型：'earn' | 'consume'
-  Future<void> updatePointsStats({required int delta, required String type}) async {
+  /// [remark] 备注说明
+  Future<void> updatePointsStats({
+    required int delta,
+    required String type,
+    String? remark,
+  }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
 
     String recordType;
-    String remark;
+    String defaultRemark;
     switch (type) {
       case 'earn':
         recordType = 'earn';
-        remark = '获得积分';
+        defaultRemark = '获得积分';
         break;
       case 'consume':
         recordType = 'spend';
-        remark = '消费积分';
+        defaultRemark = '消费积分';
         break;
       default:
         return;
     }
+
+    final now = DateTime.now().toUtc();
+    final expiresAt = delta > 0
+        ? now.add(const Duration(days: 180)).toIso8601String()
+        : null;
 
     await ApiClient.post('point_records', {
       'id': const Uuid().v4(),
       'user_id': userId,
       'type': recordType,
       'amount': delta,
-      'remark': remark,
+      'remark': remark ?? defaultRemark,
       'status': 'active',
-      'created_at': DateTime.now().toUtc().toIso8601String(),
+      'created_at': now.toIso8601String(),
+      if (expiresAt != null) 'expires_at': expiresAt,
     });
+
+    // 重算 users 表积分统计字段
+    await _recalcAndUpdateUserPoints();
+  }
+
+  /// 手动触发积分重算（用于数据修复或初始化场景）
+  Future<void> recalcPoints() async {
+    await _recalcAndUpdateUserPoints();
   }
 }

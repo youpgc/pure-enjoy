@@ -32,7 +32,7 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 从 Supabase 重新加载用户数据
   Future<void> _loadUserData() async {
     await SupabaseService.instance.reloadCurrentUser();
-    final points = await PointService.instance.fetchTotalPoints();
+    final points = await PointService.instance.getAvailablePoints();
     if (mounted) {
       setState(() {
         _totalPoints = points;
