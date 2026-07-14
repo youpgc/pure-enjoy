@@ -26,6 +26,7 @@ class VersionCheckService {
 
   // 版本检查缓存配置
   static const String _versionCheckCacheKey = 'version_check_cache';
+  static const String _dismissedVersionKey = 'dismissed_update_version';
   static const Duration _minCheckInterval = Duration(hours: 1);
 
   /// 检查是否需要更新
@@ -95,6 +96,13 @@ class VersionCheckService {
 
       Map<String, dynamic>? versionInfo;
       if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
+        // 检查用户是否已忽略此版本的更新提示
+        final dismissedVersion = prefs.getString(_dismissedVersionKey);
+        if (!isForceUpdate && dismissedVersion == latestVersionStr) {
+          if (kDebugMode) debugPrint('📱 用户已忽略 v$latestVersionStr 的更新提示');
+          return null;
+        }
+
         versionInfo = {
           'version': latestVersionStr,
           'build_number': latestBuildNumber,
@@ -104,6 +112,14 @@ class VersionCheckService {
           'is_force_update': isForceUpdate,
           'release_type': latestVersion['release_type'],
         };
+      }
+
+      // 有新版本可用时，清除旧的忽略记录（确保用户能看到更新版本号的提示）
+      if (versionInfo != null) {
+        final dismissedVersion = prefs.getString(_dismissedVersionKey);
+        if (dismissedVersion != null && dismissedVersion != versionInfo['version']) {
+          await prefs.remove(_dismissedVersionKey);
+        }
       }
 
       // 写入缓存（无论是否需要更新都缓存）
@@ -159,6 +175,13 @@ class VersionCheckService {
 
     if (kDebugMode) debugPrint('📱 无需更新');
     return false;
+  }
+
+  /// 用户忽略此版本的更新提示（强制更新不可忽略）
+  Future<void> dismissVersion(String version) async {
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setString(_dismissedVersionKey, version);
+    if (kDebugMode) debugPrint('📱 已忽略 v$version 的更新提示');
   }
 
   /// 显示更新对话框（带下载进度）
@@ -585,7 +608,10 @@ class _UpdateDialogState extends State<_UpdateDialog> {
         actions: [
           if (!widget.isForceUpdate && !_isDownloading)
             TextButton(
-              onPressed: () => Navigator.pop(context),
+              onPressed: () {
+                widget.versionService.dismissVersion(widget.version);
+                Navigator.pop(context);
+              },
               child: const Text('稍后更新'),
             ),
           FilledButton(
