@@ -56,6 +56,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
+  CancelToken? _habitsCancelToken;
+
   Future<void> _loadHabits({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
@@ -68,6 +70,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
       });
       return;
     }
+
+    // 防并发：如果已经在加载中（非刷新），直接返回
+    if (!refresh && (_isLoading || _isLoadingMore)) return;
 
     final isFirstPage = _offset == 0;
 

@@ -165,10 +165,19 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return false;
-        if (!months.contains(date.month)) return false;
-        if (monthDays.isNotEmpty) {
-          return monthDays.contains(date.day);
+        // 新逻辑：当 months 和 monthDays 长度一致时，按索引一一配对检查
+        // 例如 [3,9] + [15,20] → 只匹配 3月15日 和 9月20日，而非笛卡尔积
+        if (months.length == monthDays.length) {
+          for (int i = 0; i < months.length; i++) {
+            if (months[i] == date.month && monthDays[i] == date.day) {
+              return true;
+            }
+          }
+          return false;
         }
+        // 兼容旧数据：如果长度不一致，回退到笛卡尔积
+        if (!months.contains(date.month)) return false;
+        if (monthDays.isNotEmpty && !monthDays.contains(date.day)) return false;
         return true;
 
       case 'custom':
@@ -223,7 +232,20 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return null;
-        // 找今年或明年匹配的月份和日期
+        // 新逻辑：当 months 和 monthDays 长度一致时，按索引一一配对
+        if (months.length == monthDays.length) {
+          for (int yearOffset = 0; yearOffset < 2; yearOffset++) {
+            final checkYear = now.year + yearOffset;
+            for (int i = 0; i < months.length; i++) {
+              final checkDate = DateTime(checkYear, months[i], monthDays[i]);
+              if (!checkDate.isBefore(today)) {
+                return checkDate;
+              }
+            }
+          }
+          return null;
+        }
+        // 兼容旧数据：笛卡尔积
         for (int yearOffset = 0; yearOffset < 2; yearOffset++) {
           final checkYear = now.year + yearOffset;
           for (final month in months) {
@@ -291,8 +313,17 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return '每年 $timeStr';
+        final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
+        // 新逻辑：当长度一致时，按索引一一配对显示
+        if (months.length == monthDays.length) {
+          final descs = <String>[];
+          for (int i = 0; i < months.length; i++) {
+            descs.add('${monthNames[months[i]]}${monthDays[i]}日');
+          }
+          return '每年 ${descs.join('、')} $timeStr';
+        }
+        // 兼容旧数据：笛卡尔积
         if (monthDays.isNotEmpty) {
-          final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
           final descs = <String>[];
           for (final month in months) {
             for (final day in monthDays) {
@@ -301,7 +332,6 @@ class ReminderScheduleModel {
           }
           return '每年 ${descs.join('、')} $timeStr';
         }
-        final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
         final ms = months.map((m) => monthNames[m]).join('、');
         return '每年 $ms $timeStr';
 

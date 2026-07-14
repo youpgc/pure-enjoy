@@ -317,60 +317,40 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        _buildSectionTitle('选择月份（可多选）'),
+        _buildSectionTitle('选择每年提醒日期（可多选）'),
         const SizedBox(height: 8),
         Wrap(
           spacing: 8,
           runSpacing: 8,
-          children: List.generate(12, (index) {
-            final month = index + 1;
-            final isSelected = _months.contains(month);
-            return FilterChip(
-              label: Text(_monthLabels[index]),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _months.add(month);
-                    _months.sort();
-                  } else {
-                    _months.remove(month);
-                  }
-                });
-                _notifyChange();
-              },
-            );
-          }),
+          children: [
+            ...List.generate(_months.length, (i) {
+              if (_monthDays.length <= i) return const SizedBox.shrink();
+              final month = _months[i];
+              final day = _monthDays[i];
+              return Chip(
+                label: Text('${month}月${day}日'),
+                deleteIcon: const Icon(Icons.close, size: 18),
+                onDeleted: () => _removeYearDatePair(month, day),
+              );
+            }),
+            ActionChip(
+              avatar: const Icon(Icons.add, size: 18),
+              label: const Text('添加日期'),
+              onPressed: _pickYearDate,
+            ),
+          ],
         ),
         if (_months.isEmpty)
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Text(
-              '请至少选择一个月份',
+              '请至少添加一个日期',
               style: TextStyle(
                 fontSize: 12,
                 color: Theme.of(context).colorScheme.error,
               ),
             ),
           ),
-
-        const SizedBox(height: 16),
-
-        // 日期选择
-        _buildSectionTitle('选择日期'),
-        const SizedBox(height: 8),
-        ListTile(
-          contentPadding: EdgeInsets.zero,
-          leading: const Icon(Icons.calendar_today),
-          title: const Text('选择日期'),
-          subtitle: Text(_getYearDateSubtitle()),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: _pickYearDate,
-          shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
-            side: BorderSide(color: Theme.of(context).colorScheme.outlineVariant),
-          ),
-        ),
 
         const SizedBox(height: 16),
 
@@ -455,26 +435,47 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
     );
     if (picked != null) {
       setState(() {
-        if (!_months.contains(picked.month)) {
-          _months.add(picked.month);
-          _months.sort();
+        // 检查是否已存在该月日配对
+        for (int i = 0; i < _months.length; i++) {
+          if (_months[i] == picked.month && _monthDays.length > i && _monthDays[i] == picked.day) {
+            return; // 已存在，不重复添加
+          }
         }
-        if (!_monthDays.contains(picked.day)) {
-          _monthDays.add(picked.day);
-          _monthDays.sort();
-        }
+        _months.add(picked.month);
+        _monthDays.add(picked.day);
+        // 按月份排序，保持配对关系
+        final pairs = List<MapEntry<int, int>>.generate(
+          _months.length,
+          (i) => MapEntry(_months[i], _monthDays[i]),
+        );
+        pairs.sort((a, b) => a.key.compareTo(b.key));
+        _months = pairs.map((p) => p.key).toList();
+        _monthDays = pairs.map((p) => p.value).toList();
       });
       _notifyChange();
     }
+  }
+
+  void _removeYearDatePair(int month, int day) {
+    setState(() {
+      for (int i = _months.length - 1; i >= 0; i--) {
+        if (_months[i] == month && _monthDays.length > i && _monthDays[i] == day) {
+          _months.removeAt(i);
+          _monthDays.removeAt(i);
+          break;
+        }
+      }
+    });
+    _notifyChange();
   }
 
   String _getYearDateSubtitle() {
     if (_months.isEmpty || _monthDays.isEmpty) return '未选择';
     final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
     final descs = <String>[];
-    for (final month in _months) {
-      for (final day in _monthDays) {
-        descs.add('${monthNames[month]}$day日');
+    for (int i = 0; i < _months.length; i++) {
+      if (_monthDays.length > i) {
+        descs.add('${monthNames[_months[i]]}${_monthDays[i]}日');
       }
     }
     return descs.join('、');

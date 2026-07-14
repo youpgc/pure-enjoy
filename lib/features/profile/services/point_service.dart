@@ -362,16 +362,38 @@ class PointService {
   }
 
   /// 检查今天是否已打卡
-  /// 通过 last_checkin_date 与北京时间今天比较，避免额外网络请求
+  /// 双重验证：先检查 users.last_checkin_date，再查询 point_records 确认
   Future<bool> hasCheckedInToday() async {
-    final stats = await _fetchUserStats();
-    if (stats == null || stats['last_checkin_date'] == null) return false;
-    final lastDateStr = stats['last_checkin_date'] as String;
-    final lastDate = DateTime.parse(lastDateStr);
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return false;
+
     final today = _beijingToday();
-    return lastDate.year == today.year &&
-        lastDate.month == today.month &&
-        lastDate.day == today.day;
+
+    // 方法1：检查 users 表的 last_checkin_date
+    final stats = await _fetchUserStats();
+    if (stats != null && stats['last_checkin_date'] != null) {
+      final lastDateStr = stats['last_checkin_date'] as String;
+      final lastDate = DateTime.parse(lastDateStr);
+      if (lastDate.year == today.year &&
+          lastDate.month == today.month &&
+          lastDate.day == today.day) {
+        return true;
+      }
+    }
+
+    // 方法2：直接查询 point_records 表作为验证
+    final todayStart = DateTime(today.year, today.month, today.day).toUtc().toIso8601String();
+    final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59).toUtc().toIso8601String();
+    final result = await ApiClient.get(
+      'point_records',
+      filters: {
+        'user_id': 'eq.$userId',
+        'type': 'eq.checkin',
+        'created_at': 'gte.$todayStart',
+      },
+      limit: 1,
+    );
+    return result.isSuccess && (result.data ?? []).isNotEmpty;
   }
 
   /// 积分变动时插入 point_records 流水记录（供其他模块调用）

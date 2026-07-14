@@ -187,6 +187,8 @@ class SimulationPageView extends StatefulWidget {
   final List<Widget> pages;
   final SimulationPageController? controller;
   final ValueChanged<int>? onPageChanged;
+  /// 滑动到章节边界时的回调，isLastPage=true 表示最后一页继续向下一页滑动
+  final void Function(bool isLastPage)? onBoundaryReached;
   final Color backgroundColor;
 
   const SimulationPageView({
@@ -194,6 +196,7 @@ class SimulationPageView extends StatefulWidget {
     required this.pages,
     this.controller,
     this.onPageChanged,
+    this.onBoundaryReached,
     this.backgroundColor = Colors.white,
   });
 
@@ -294,6 +297,16 @@ class _SimulationPageViewState extends State<SimulationPageView>
         return;
       } else if (_dragProgress > 0 && _currentPage > 0) {
         _animateToPage(_currentPage - 1, forward: false);
+        return;
+      }
+      // 滑动到章节边界，触发回调
+      if (_dragProgress < 0 && _currentPage >= widget.pages.length - 1) {
+        widget.onBoundaryReached?.call(true);
+        _dragProgress = 0;
+        return;
+      } else if (_dragProgress > 0 && _currentPage <= 0) {
+        widget.onBoundaryReached?.call(false);
+        _dragProgress = 0;
         return;
       }
     }

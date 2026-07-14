@@ -252,17 +252,31 @@ class PagedChapterContentState extends State<PagedChapterContent> {
 
     // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
     // PageView 处理滑动手势，点击通过 behavior + onTapUp 处理
+    // 通过 NotificationListener 监听 OverscrollNotification 检测滑动到边界，触发章节切换
     return GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTapUp: widget.onTapScreen,
-      child: PageView.builder(
-        controller: _pageController,
-        physics: const PageScrollPhysics(),
-        itemCount: _pages.length,
-        onPageChanged: (index) {
-          widget.onPageChanged(index, _pages.length);
+      child: NotificationListener<OverscrollNotification>(
+        onNotification: (notification) {
+          if (_pages.isEmpty) return false;
+          final currentPage = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
+          if (notification.overscroll < 0 && currentPage >= _pages.length - 1) {
+            // 在最后一页继续向左滑动 → 下一章
+            widget.onBoundaryReached(true);
+          } else if (notification.overscroll > 0 && currentPage <= 0) {
+            // 在第一页继续向右滑动 → 上一章
+            widget.onBoundaryReached(false);
+          }
+          return false;
         },
-        itemBuilder: (context, index) {
+        child: PageView.builder(
+          controller: _pageController,
+          physics: const PageScrollPhysics(),
+          itemCount: _pages.length,
+          onPageChanged: (index) {
+            widget.onPageChanged(index, _pages.length);
+          },
+          itemBuilder: (context, index) {
           final page = _pages[index];
           const topPadding = 12.0;
           const bottomPadding = 36.0;
