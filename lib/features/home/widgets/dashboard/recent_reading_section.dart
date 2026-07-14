@@ -85,15 +85,15 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
                                       coverUrl: novel.cover,
                                       title: novel.title,
                                       width: 120,
-                                      height: 160,
+                                      height: 150,
                                       borderRadius: 8,
                                     ),
-                                    const SizedBox(height: 8),
+                                    const SizedBox(height: 6),
                                     Text(
                                       novel.title,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodyMedium
+                                          .bodySmall
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
