@@ -281,6 +281,19 @@ class PointService {
     return (stats?['available_points'] as num?)?.toInt() ?? 0;
   }
 
+  /// 检查今天是否已打卡
+  /// 通过 last_checkin_date 与北京时间今天比较，避免额外网络请求
+  Future<bool> hasCheckedInToday() async {
+    final stats = await _fetchUserStats();
+    if (stats == null || stats['last_checkin_date'] == null) return false;
+    final lastDateStr = stats['last_checkin_date'] as String;
+    final lastDate = DateTime.parse(lastDateStr);
+    final today = _beijingToday();
+    return lastDate.year == today.year &&
+        lastDate.month == today.month &&
+        lastDate.day == today.day;
+  }
+
   /// 积分变动时插入 point_records 流水记录（供其他模块调用）
   ///
   /// 数据库触发器 trg_maintain_user_points 会自动根据 point_records

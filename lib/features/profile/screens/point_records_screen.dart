@@ -17,6 +17,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   bool _isLoading = false;
   bool _isCheckingIn = false;
   int _availablePoints = 0;
+  bool _hasCheckedInToday = false;
 
   @override
   int get pageSize => 20;
@@ -40,11 +41,15 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     _loadRecords();
   }
 
-  /// 加载可用积分
+  /// 加载可用积分和打卡状态
   Future<void> _loadAvailablePoints() async {
     final points = await PointService.instance.getAvailablePoints();
+    final checkedIn = await PointService.instance.hasCheckedInToday();
     if (mounted) {
-      setState(() => _availablePoints = points);
+      setState(() {
+        _availablePoints = points;
+        _hasCheckedInToday = checkedIn;
+      });
     }
   }
 
@@ -271,7 +276,9 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                         ),
                       ),
                       FilledButton.tonal(
-                        onPressed: _isCheckingIn ? null : _handleCheckin,
+                        onPressed: (_hasCheckedInToday || _isCheckingIn)
+                            ? null
+                            : _handleCheckin,
                         child: Row(
                           mainAxisSize: MainAxisSize.min,
                           children: [
@@ -284,9 +291,13 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                                 ),
                               )
                             else ...[
-                              const Icon(Icons.check_circle_outline),
+                              Icon(
+                                _hasCheckedInToday
+                                    ? Icons.check_circle
+                                    : Icons.check_circle_outline,
+                              ),
                               const SizedBox(width: 4),
-                              const Text('打卡'),
+                              Text(_hasCheckedInToday ? '已打卡' : '打卡'),
                             ],
                           ],
                         ),
