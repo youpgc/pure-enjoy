@@ -38,7 +38,7 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
         Card(
           child: widget.isLoading
               ? SizedBox(
-                  height: 180,
+                  height: 230,
                   child: SkeletonLoading.grid(
                     itemCount: 3,
                     crossAxisCount: 3,
@@ -59,7 +59,7 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
                       ),
                     )
                   : SizedBox(
-                      height: 200,
+                      height: 230,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
                         padding: const EdgeInsets.all(12),
@@ -85,15 +85,15 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
                                       coverUrl: novel.cover,
                                       title: novel.title,
                                       width: 120,
-                                      height: 136,
+                                      height: 160,
                                       borderRadius: 8,
                                     ),
-                                    const SizedBox(height: 4),
+                                    const SizedBox(height: 8),
                                     Text(
                                       novel.title,
                                       style: Theme.of(context)
                                           .textTheme
-                                          .bodySmall
+                                          .bodyMedium
                                           ?.copyWith(
                                             fontWeight: FontWeight.bold,
                                           ),
