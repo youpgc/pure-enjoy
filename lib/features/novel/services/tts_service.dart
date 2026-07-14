@@ -286,7 +286,7 @@ class TtsService {
 
     final result = await ApiClient.patchByFilter(
       'users',
-      filters: {'or': '(id.eq.$userId,auth_id.eq.$userId)'},
+      filters: {ApiClient.userKey(userId): 'eq.$userId'},
       body: {
         'tts_speech_rate': _speechRate,
         'tts_timer_minutes': _timerMinutes,
@@ -304,7 +304,7 @@ class TtsService {
     final result = await ApiClient.get(
       'users',
       filters: {
-        'or': '(id.eq.$userId,auth_id.eq.$userId)',
+        ApiClient.userKey(userId): 'eq.$userId',
         'is_deleted': 'eq.false',
       },
       select: 'tts_speech_rate,tts_timer_minutes,tts_playback_mode',

@@ -53,6 +53,21 @@ class ApiResponse {
 class ApiClient {
   static String get _baseUrl => AppConfig.supabaseUrl;
 
+  /// UUID 格式正则（8-4-4-4-12）
+  static final _uuidRegex = RegExp(r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$');
+
+  /// 判断字符串是否为 UUID 格式
+  static bool _isUuid(String value) => _uuidRegex.hasMatch(value);
+
+  /// 构建 users 表的用户 ID 过滤条件
+  /// 管理端创建的用户 ID 为19位自定义格式（如 U1779977270BKK5BK46），存在 public.users.id
+  /// App 端注册的用户 ID 为 UUID（auth.users.id），存储在 public.users.auth_id
+  /// 混合用 or: '(id.eq.XX,auth_id.eq.XX)' 会在 XX 为非 UUID 时，
+  /// 导致 auth_id（UUID 类型）列报类型转换错误
+  ///
+  /// 用法: filters: {ApiClient.userKey(userId): 'eq.$userId'}
+  static String userKey(String userId) => _isUuid(userId) ? 'auth_id' : 'id';
+
   /// 构建请求 URL
   static String _buildUrl(
     String table, {

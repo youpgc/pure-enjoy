@@ -76,7 +76,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       final result = await ApiClient.get(
         'users',
         filters: {
-          'or': '(id.eq.$userId,auth_id.eq.$userId)',
+          ApiClient.userKey(userId): 'eq.$userId',
           'is_deleted': 'eq.false',
         },
       );
