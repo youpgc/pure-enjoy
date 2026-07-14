@@ -26,7 +26,6 @@ class MoodDiaryScreen extends StatefulWidget {
 class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMixin {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
-  DateTime _selectedMonth = DateTime.now();
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -381,22 +380,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           //     );
           //   },
           // ),
-          IconButton(
-            icon: const Icon(Icons.calendar_month),
-            onPressed: () async {
-              final picked = await AppDatePicker.show(
-                context,
-                type: DateTimeType.yearMonth,
-                initialDate: _selectedMonth,
-                minDate: DateTime(2020),
-                maxDate: DateTime.now(),
-              );
-              if (picked != null) {
-                setState(() => _selectedMonth = picked);
-                _loadDiaries(refresh: true);
-              }
-            },
-          ),
         ],
       ),
       body: _isLoading
