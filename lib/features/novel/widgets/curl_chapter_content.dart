@@ -136,10 +136,16 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     // 通知父组件总页数和当前页码
     // SimulationPageView.jumpToPage(0) 不会触发 onPageChanged，
     // 导致父组件 _totalPages 始终为默认值1，点击右侧会错误地触发下一章
+    // 必须放在 addPostFrameCallback 中执行，避免在构建阶段调用父组件 setState()
     final currentPage = resetPage
         ? (widget.jumpToLastPage ? pages.length - 1 : 0)
         : (_simulationController.currentPage ?? 0);
-    widget.onPageChanged(currentPage, pages.length);
+    final totalPages = pages.length;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) {
+        widget.onPageChanged(currentPage, totalPages);
+      }
+    });
 
     // 只有在明确需要重置页签时才跳转（如切换章节）
     // 菜单唤起、字体调整等操作不应重置页签
