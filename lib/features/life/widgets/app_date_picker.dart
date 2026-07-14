@@ -309,6 +309,7 @@ class _PickerSheetState extends State<_PickerSheet> {
   Widget _buildTimePicker() {
     return CupertinoDatePicker(
       mode: CupertinoDatePickerMode.time,
+      use24hFormat: true,
       initialDateTime: widget.initialDate,
       onDateTimeChanged: (value) {
         setState(() {
