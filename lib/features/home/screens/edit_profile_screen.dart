@@ -95,7 +95,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         _showError('加载用户数据失败: ${result.statusCode}');
       }
     } catch (e) {
-      _showError('加载用户数据出错: $e');
+      _showError('加载用户数据失败，请稍后重试');
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
@@ -165,18 +165,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (updateResult.isSuccess) {
         setState(() => _avatarUrl = publicUrl);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('头像更新成功')),
-          );
+          showSnackBar(context, '头像更新成功');
         }
       } else {
         throw Exception('更新头像URL失败: ${updateResult.statusCode}');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('头像上传失败: $e')),
-        );
+        showSnackBar(context, '头像上传失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) {
@@ -312,16 +308,14 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
       if (result.isSuccess) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('保存成功')),
-          );
+          showSnackBar(context, '保存成功');
           Navigator.pop(context, true);
         }
       } else {
         _showError('保存失败: ${result.statusCode}');
       }
     } catch (e) {
-      _showError('保存出错: $e');
+      _showError('保存失败，请稍后重试');
     } finally {
       if (mounted) {
         setState(() => _isSaving = false);
@@ -331,9 +325,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   void _showError(String message) {
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
-      );
+      showSnackBar(context, message, isError: true);
     }
   }
 

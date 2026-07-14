@@ -5,6 +5,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 单个表的同步结果
 enum TableSyncStatus { pending, syncing, success, failed }
@@ -183,9 +184,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
         _isSyncing = false;
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录后再同步数据')),
-        );
+        showSnackBar(context, '请先登录后再同步数据');
       }
       return;
     }
@@ -248,6 +247,7 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
     });
 
     if (mounted) {
+      // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text(

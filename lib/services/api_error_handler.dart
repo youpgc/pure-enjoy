@@ -1,6 +1,8 @@
 import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+// TODO: 目前仍直接 import http 以处理 http.Response 类型，
+// 建议后续统一为 HttpClient 自定义响应类型后移除。
 import 'package:http/http.dart' as http;
 
 /// API 错误处理器

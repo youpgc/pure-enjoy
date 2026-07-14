@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/widgets/widgets.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../life/models/note_model.dart';
 
@@ -33,9 +34,7 @@ class AddNoteSheetState extends State<AddNoteSheet> {
   Future<void> _save() async {
     if (_isSaving) return;
     if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入标题')),
-      );
+      showSnackBar(context, '请输入标题');
       return;
     }
     setState(() => _isSaving = true);

@@ -294,7 +294,7 @@ class PointService {
       if (kDebugMode) {
         debugPrint('打卡失败: $e');
       }
-      return {'success': false, 'message': '打卡失败: $e'};
+      return {'success': false, 'message': '打卡失败，请稍后重试'};
     }
   }
 

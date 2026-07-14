@@ -310,6 +310,24 @@ class HttpClient {
     }
   }
 
+  /// 原始 GET 流式请求（不注入 Supabase 认证头，用于外部资源下载）
+  Future<http.StreamedResponse> getRawStream(
+    String url, {
+    Map<String, String>? headers,
+    Duration? timeout,
+  }) async {
+    final uri = Uri.parse(url);
+    final request = http.Request('GET', uri);
+    request.headers['Accept'] = '*/*';
+    request.headers['User-Agent'] = 'PureEnjoy/1.0';
+    if (headers != null) {
+      request.headers.addAll(headers);
+    }
+    final requestTimeout = timeout ?? HttpClientConfig.timeout;
+    final response = await request.send().timeout(requestTimeout);
+    return response;
+  }
+
   // ==================== 工具方法 ====================
 
   /// 构建完整 URI

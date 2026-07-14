@@ -138,19 +138,14 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         });
         // 如果已有缓存数据，静默失败不提示
         if (_favorites.isEmpty) {
-          _showError('加载收藏失败: $e');
+          _showError('加载收藏失败，请稍后重试');
         }
       }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: Theme.of(context).colorScheme.error,
-      ),
-    );
+    showSnackBar(context, message, isError: true);
   }
 
   Future<void> _openUrl(String? url) async {
@@ -165,7 +160,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
         _showError('无法打开链接');
       }
     } catch (e) {
-      _showError('打开链接失败: $e');
+      _showError('打开链接失败，请稍后重试');
     }
   }
 
@@ -185,7 +180,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
           throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
-        _showError('删除失败: $e');
+        _showError('删除失败，请稍后重试');
       }
     }
   }
@@ -341,7 +336,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   Navigator.pop(context);
                   _loadFavorites(refresh: true);
                 } catch (e) {
-                  _showError('保存失败: $e');
+                  _showError('保存失败，请稍后重试');
                 } finally {
                   if (mounted) setDialogState(() => isSaving = false);
                 }

@@ -193,16 +193,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
         // 如果已有数据，静默失败不提示
         if (_habits.isEmpty) {
-          _showError('加载习惯失败: $e');
+          _showError('加载习惯失败，请稍后重试');
         }
       }
     }
   }
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
-    );
+    showSnackBar(context, message, isError: true);
   }
 
   Future<void> _checkIn(HabitModel habit) async {
@@ -254,6 +252,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
       if (!mounted) return;
       // 显示成功提示
+      // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${habit.name} 打卡成功！'),
@@ -261,22 +260,19 @@ class _HabitsScreenState extends State<HabitsScreen> {
         ),
       );
     } catch (e) {
-      _showError('打卡失败: $e');
+      _showError('打卡失败，请稍后重试');
     }
   }
 
   Future<void> _deleteHabit(String id) async {
-    final confirmed = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这个习惯吗？相关打卡记录也会被删除。');
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认删除',
+      content: '删除后无法恢复，是否继续？',
+    );
 
     if (confirmed == true) {
       try {
-        // 先删除打卡记录
-        await ApiClient.batchDeleteByFilter(
-          'habit_checkins',
-          filters: {'habit_id': 'eq.$id'},
-        );
-
-        // 再删除习惯
         final result = await ApiClient.batchDeleteByFilter(
           'habits',
           filters: {'id': 'eq.$id'},
@@ -288,8 +284,36 @@ class _HabitsScreenState extends State<HabitsScreen> {
           throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
-        _showError('删除失败: $e');
+        _showError('删除失败，请稍后重试');
       }
+    }
+  }
+
+  Future<void> _toggleHabitActive(HabitModel habit) async {
+    final action = habit.isActive ? '暂停' : '恢复';
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认$action',
+      content: '确定要$action「${habit.name}」吗？',
+    );
+
+    if (confirmed != true) return;
+
+    try {
+      final newActive = !habit.isActive;
+      final result = await ApiClient.patchByFilter(
+        'habits',
+        filters: {'id': 'eq.${habit.id}'},
+        body: {'is_active': newActive},
+      );
+
+      if (result.isSuccess) {
+        _loadHabits(refresh: true);
+      } else {
+        throw Exception('HTTP ${result.statusCode}');
+      }
+    } catch (e) {
+      _showError('\$action失败，请稍后重试');
     }
   }
 
@@ -441,7 +465,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                   Navigator.pop(context);
                   _loadHabits(refresh: true);
                 } catch (e) {
-                  _showError('保存失败: $e');
+                  _showError('保存失败，请稍后重试');
                 }
               },
               child: Text(isEditing ? '保存' : '添加'),
@@ -579,6 +603,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         onEdit: () => _showEditDialog(habit: habit),
                         onDelete: () => _deleteHabit(habit.id),
                         onViewHistory: () => _showHistoryDialog(habit),
+                        onToggleActive: () => _toggleHabitActive(habit),
                       );
                     },
                   ),

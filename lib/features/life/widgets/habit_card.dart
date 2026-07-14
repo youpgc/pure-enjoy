@@ -15,6 +15,7 @@ class HabitCard extends StatelessWidget {
   final VoidCallback onEdit;
   final VoidCallback onDelete;
   final VoidCallback onViewHistory;
+  final VoidCallback onToggleActive;
 
   const HabitCard({
     super.key,
@@ -27,6 +28,7 @@ class HabitCard extends StatelessWidget {
     required this.onEdit,
     required this.onDelete,
     required this.onViewHistory,
+    required this.onToggleActive,
   });
 
   @override
@@ -134,6 +136,9 @@ class HabitCard extends StatelessWidget {
                       case 'history':
                         onViewHistory();
                         break;
+                      case 'toggle':
+                        onToggleActive();
+                        break;
                       case 'edit':
                         onEdit();
                         break;
@@ -150,6 +155,22 @@ class HabitCard extends StatelessWidget {
                           Icon(Icons.history, size: 20),
                           SizedBox(width: 8),
                           Text('打卡记录'),
+                        ],
+                      ),
+                    ),
+                    PopupMenuItem(
+                      value: 'toggle',
+                      child: Row(
+                        children: [
+                          Icon(
+                            habit.isActive ? Icons.pause : Icons.play_arrow,
+                            size: 20,
+                            color: habit.isActive
+                                ? Theme.of(context).colorScheme.primary
+                                : AppTheme.success,
+                          ),
+                          const SizedBox(width: 8),
+                          Text(habit.isActive ? '暂停' : '恢复'),
                         ],
                       ),
                     ),

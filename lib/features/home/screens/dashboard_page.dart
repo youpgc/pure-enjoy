@@ -194,6 +194,7 @@ class _DashboardPageState extends State<DashboardPage> {
       await _loadHabitsForCheckin();
 
       if (mounted) {
+        // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('${habit.name} 打卡成功！'),
@@ -203,9 +204,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('打卡失败: $e')),
-        );
+        showSnackBar(context, '打卡失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) setState(() => _checkingHabitId = null);
@@ -487,9 +486,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (result.isSuccess) {
         if (mounted) {
           // 先显示提示再关闭弹窗，避免 SnackBar 被弹窗遮挡
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text(successMessage)),
-          );
+          showSnackBar(context, successMessage);
           Navigator.pop(context);
           onSuccess?.call();
         }
@@ -498,9 +495,7 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('添加失败: $e')),
-        );
+        showSnackBar(context, '添加失败，请稍后重试', isError: true);
       }
     }
   }
@@ -612,18 +607,14 @@ class _DashboardPageState extends State<DashboardPage> {
               }
               if (mounted) {
                 Navigator.pop(context);
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('习惯添加成功')),
-                );
+                showSnackBar(context, '习惯添加成功');
               }
             } else {
               throw Exception(result.errorMessage ?? '请求失败');
             }
           } catch (e) {
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(content: Text('添加失败: $e')),
-              );
+              showSnackBar(context, '添加失败，请稍后重试', isError: true);
             }
           }
         },

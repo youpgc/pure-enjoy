@@ -86,9 +86,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       if (mounted) {
         setState(() => _isLoading = false);
         if (_reminders.isEmpty) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载失败: $e')),
-          );
+          showSnackBar(context, '加载失败，请稍后重试', isError: true);
         }
       }
     }
@@ -115,9 +113,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       } catch (e) {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('添加失败: $e')),
-          );
+          showSnackBar(context, '添加失败，请稍后重试', isError: true);
         }
       }
     }
@@ -145,9 +141,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       } catch (e) {
         setState(() => _isLoading = false);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('更新失败: $e')),
-          );
+          showSnackBar(context, '更新失败，请稍后重试', isError: true);
         }
       }
     }
@@ -169,9 +163,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
         }
       } catch (e) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('删除失败: $e')),
-          );
+          showSnackBar(context, '删除失败，请稍后重试', isError: true);
         }
       }
     }
@@ -192,9 +184,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        showSnackBar(context, '操作失败，请稍后重试');
       }
     }
   }

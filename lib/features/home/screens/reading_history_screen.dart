@@ -132,9 +132,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
         if (result.isSuccess) {
           setState(() => _history = []);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('阅读历史已清空')),
-            );
+            showSnackBar(context, '阅读历史已清空');
           }
         }
       } catch (e) {

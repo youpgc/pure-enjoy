@@ -121,7 +121,7 @@ class _NovelListForAddScreenState extends State<NovelListForAddScreen> with Pagi
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        showSnackBar(context, '加载小说列表出错: $e');
+        showSnackBar(context, '加载小说列表失败，请稍后重试');
       }
     }
   }
@@ -160,7 +160,7 @@ class _NovelListForAddScreenState extends State<NovelListForAddScreen> with Pagi
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '添加出错: $e');
+        showSnackBar(context, '添加失败，请稍后重试');
       }
     } finally {
       setState(() => _addingNovelIds.remove(novelId));

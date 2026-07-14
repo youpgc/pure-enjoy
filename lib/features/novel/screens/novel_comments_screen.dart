@@ -86,17 +86,13 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
       } else {
         if (mounted) {
           setState(() => _isLoading = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('加载评论失败: ${result.errorMessage}')),
-          );
+          showSnackBar(context, '加载评论失败: \${result.errorMessage}', isError: true);
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载评论失败: $e')),
-        );
+        showSnackBar(context, '加载评论失败，请稍后重试', isError: true);
       }
     }
   }
@@ -155,22 +151,18 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
         });
         if (_replyToCommentId == null) await _loadComments(refresh: true);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('评论成功')));
+          showSnackBar(context, '评论成功');
         }
       } else {
         if (mounted) {
           setState(() => _isSubmitting = false);
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('评论失败: ${result.errorMessage}')),
-          );
+          showSnackBar(context, '评论失败: \${result.errorMessage}', isError: true);
         }
       }
     } catch (e) {
       if (mounted) {
         setState(() => _isSubmitting = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('评论失败: $e')));
+        showSnackBar(context, '评论失败，请稍后重试', isError: true);
       }
     }
   }
@@ -424,8 +416,7 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
       });
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('点赞失败: $e')));
+        showSnackBar(context, '点赞失败，请稍后重试', isError: true);
       }
     }
   }

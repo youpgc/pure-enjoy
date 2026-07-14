@@ -91,7 +91,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
       if (mounted) {
         setState(() => _isLoading = false);
         if (_feedbacks.isEmpty) {
-          showSnackBar(context, '加载失败: $e', isError: true);
+          showSnackBar(context, '加载失败，请稍后重试', isError: true);
         }
       }
     }

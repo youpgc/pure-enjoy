@@ -2,7 +2,6 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -10,6 +9,8 @@ import 'package:open_filex/open_filex.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/theme/app_theme.dart';
 import 'api_client.dart';
+import '../core/widgets/widgets.dart';
+import 'http_client.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {
@@ -171,9 +172,7 @@ class VersionCheckService {
     // 防御：没有下载地址时不弹出更新对话框
     if (apkUrl == null || apkUrl.isEmpty) {
       if (kDebugMode) debugPrint('📱 下载地址为空，跳过更新对话框');
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('发现新版本但下载地址暂不可用，请稍后重试')),
-      );
+      showSnackBar(context, '发现新版本但下载地址暂不可用，请稍后重试');
       return;
     }
 
@@ -266,10 +265,6 @@ class VersionCheckService {
       if (kDebugMode) debugPrint('📱 URL 缺少 host');
       return null;
     }
-    // 使用独立的 http.Client 下载，不经过共享 HttpClient
-    // 避免注入 Supabase headers（apikey 等）导致 CDN 拒绝请求
-    // 避免共享 Client 被关闭或超时影响其他 API 请求
-    final client = http.Client();
     try {
       downloadProgress.value = 0;
 
@@ -299,12 +294,11 @@ class VersionCheckService {
         }
       }
 
-      // 使用独立 Client 发送请求，不注入任何额外 headers
-      final request = http.Request('GET', uri);
-      request.headers['Accept'] = '*/*';
-      request.headers['User-Agent'] = 'PureEnjoy/1.0';
-
-      final response = await client.send(request).timeout(const Duration(minutes: 5));
+      // 使用 HttpClient.getRawStream 发送请求（不注入 Supabase 认证头）
+      final response = await HttpClient.instance.getRawStream(
+        apkUrl,
+        timeout: const Duration(minutes: 5),
+      );
 
       if (kDebugMode) debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
@@ -369,9 +363,6 @@ class VersionCheckService {
     } catch (e) {
       if (kDebugMode) debugPrint('📱 下载异常');
       return null;
-    } finally {
-      // 确保关闭独立 Client，不影响共享 HttpClient
-      client.close();
     }
   }
 
@@ -517,9 +508,7 @@ class _UpdateDialogState extends State<_UpdateDialog> {
   Future<void> _startUpdate() async {
     if (widget.apkUrl == null || widget.apkUrl!.isEmpty) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('下载地址无效，请稍后重试')),
-        );
+        showSnackBar(context, '下载地址无效，请稍后重试');
       }
       return;
     }

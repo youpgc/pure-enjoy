@@ -12,6 +12,7 @@ import '../../../services/version_check_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
 import '../widgets/section_header.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 系统设置页面
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -462,15 +463,11 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final chapterCacheCount = await ChapterCacheService.instance.clearAllCache();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('缓存已清除（${keysToRemove.length}项 + $chapterCacheCount个章节文件）')),
-        );
+        showSnackBar(context, '缓存已清除（${keysToRemove.length}项 + $chapterCacheCount个章节文件）');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('清除缓存失败: $e')),
-        );
+        showSnackBar(context, '清除缓存失败，请稍后重试', isError: true);
       }
     }
   }
@@ -507,9 +504,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final userId = auth.currentUserId;
       if (userId == null) {
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('未登录，无法注销')),
-          );
+          showSnackBar(context, '未登录，无法注销');
         }
         return;
       }
@@ -547,17 +542,13 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       await auth.signOut();
 
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('账号已注销，所有数据已删除')),
-        );
+        showSnackBar(context, '账号已注销，所有数据已删除');
         // 返回首页
         Navigator.of(context).popUntil((route) => route.isFirst);
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('注销失败: $e')),
-        );
+        showSnackBar(context, '注销失败，请稍后重试', isError: true);
       }
     }
   }
@@ -623,21 +614,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                       final confirmPassword = confirmPasswordController.text.trim();
 
                       if (oldPassword.isEmpty) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('请输入旧密码')),
-                        );
+                        showSnackBar(context, '请输入旧密码');
                         return;
                       }
                       if (newPassword.length < 6) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('新密码至少6位')),
-                        );
+                        showSnackBar(context, '新密码至少6位');
                         return;
                       }
                       if (newPassword != confirmPassword) {
-                        ScaffoldMessenger.of(context).showSnackBar(
-                          const SnackBar(content: Text('两次输入的新密码不一致')),
-                        );
+                        showSnackBar(context, '两次输入的新密码不一致');
                         return;
                       }
 
@@ -652,10 +637,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         setDialogState(() => isLoading = false);
                         if (result['success'] == true) {
                           Navigator.pop(context);
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(content: Text(result['message'] as String)),
-                          );
+                          showSnackBar(context, result['message'] as String);
                         } else {
+                          // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
                           ScaffoldMessenger.of(context).showSnackBar(
                             SnackBar(
                               content: Text(result['message'] as String),
@@ -689,16 +673,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           VersionCheckService.instance.showUpdateDialog(context, versionInfo);
         } else {
           setState(() => _latestVersion = null);
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('当前已是最新版本')),
-          );
+          showSnackBar(context, '当前已是最新版本');
         }
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('检查更新失败: $e')),
-        );
+        showSnackBar(context, '检查更新失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) {

@@ -519,7 +519,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       if (kDebugMode) debugPrint('初始化阅读器失败: $e');
       if (mounted) {
         setState(() => _isLoading = false);
-        showSnackBar(context, '加载章节失败: $e');
+        showSnackBar(context, '加载章节失败，请稍后重试');
       }
     }
   }
@@ -1313,7 +1313,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '操作失败: $e');
+        showSnackBar(context, '操作失败，请稍后重试');
       }
     }
   }
@@ -1338,7 +1338,7 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '操作失败: $e');
+        showSnackBar(context, '操作失败，请稍后重试');
       }
     }
   }

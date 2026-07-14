@@ -60,9 +60,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('初始化失败: $e')),
-        );
+        showSnackBar(context, '初始化失败，请稍后重试', isError: true);
       }
     }
   }
@@ -101,9 +99,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     if (userId == null) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return;
     }
@@ -170,9 +166,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+        showSnackBar(context, '加载失败，请稍后重试', isError: true);
       }
     }
   }
@@ -189,9 +183,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.moodDiaryUpdated);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('添加成功')),
-          );
+          showSnackBar(context, '添加成功');
         }
       } else {
         await OfflineSyncService.instance.enqueue(
@@ -200,9 +192,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           data: diary.toJson(),
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     } catch (e) {
@@ -212,9 +202,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         data: diary.toJson(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-        );
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
       }
     }
   }
@@ -233,9 +221,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           await _loadDiaries();
           OfflineSyncService.instance.syncPending();
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('删除成功')),
-            );
+            showSnackBar(context, '删除成功');
           }
         } else {
           await OfflineSyncService.instance.enqueue(
@@ -244,9 +230,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
             filters: {'id': 'eq.$id'},
           );
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-            );
+            showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
           }
         }
       } catch (e) {
@@ -256,9 +240,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           filters: {'id': 'eq.$id'},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     }
@@ -276,9 +258,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         await _loadDiaries();
         OfflineSyncService.instance.syncPending();
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
-          );
+          showSnackBar(context, '更新成功');
         }
       } else {
         await OfflineSyncService.instance.enqueue(
@@ -288,9 +268,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           filters: {'id': 'eq.${diary.id}'},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     } catch (e) {
@@ -301,9 +279,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         filters: {'id': 'eq.${diary.id}'},
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-        );
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
       }
     }
   }

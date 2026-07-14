@@ -74,7 +74,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        showSnackBar(context, '初始化失败: $e');
+        showSnackBar(context, '初始化失败，请稍后重试');
       }
     }
   }
@@ -174,7 +174,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        showSnackBar(context, '加载书架出错: $e');
+        showSnackBar(context, '加载书架失败，请稍后重试');
       }
     }
   }
@@ -201,7 +201,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '移除出错: $e');
+        showSnackBar(context, '移除失败，请稍后重试');
       }
     }
   }
@@ -238,7 +238,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '更新状态失败: $e');
+        showSnackBar(context, '更新状态失败，请稍后重试');
       }
     }
   }

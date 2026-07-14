@@ -1,5 +1,6 @@
-import 'package:flutter/material.dart';
+import 'package:flutter/material.dart' hide ErrorWidget;
 import '../../../services/api_client.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 富文本展示页面
 /// 通过 configKey 从 Supabase app_configs 表查询对应配置内容并渲染
@@ -55,7 +56,7 @@ class _RichTextPageState extends State<RichTextPage> {
     } catch (e) {
       if (mounted) {
         setState(() {
-          _error = '加载失败: $e';
+          _error = '加载失败，请稍后重试';
           _loading = false;
         });
       }
@@ -87,7 +88,12 @@ class _RichTextPageState extends State<RichTextPage> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _error != null
-              ? Center(child: Text(_error!))
+              ? Center(
+                  child: ErrorWidget(
+                    message: _error!,
+                    onRetry: _loadContent,
+                  ),
+                )
               : SingleChildScrollView(
                   padding: const EdgeInsets.all(16),
                   child: SelectableText(

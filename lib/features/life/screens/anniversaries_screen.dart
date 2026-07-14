@@ -123,7 +123,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
       if (mounted) {
         setState(() => _isLoading = false);
         if (_anniversaries.isEmpty) {
-          _showError('加载纪念日失败: $e');
+          _showError('加载纪念日失败，请稍后重试');
         }
       }
     }
@@ -167,9 +167,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   Future<SharedPreferences> _getPrefs() => SharedPreferences.getInstance();
 
   void _showError(String message) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(message), backgroundColor: Theme.of(context).colorScheme.error),
-    );
+    showSnackBar(context, message, isError: true);
   }
 
   Future<void> _deleteAnniversary(String id) async {
@@ -198,7 +196,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
           throw Exception('HTTP ${result.statusCode}');
         }
       } catch (e) {
-        _showError('删除失败: $e');
+        _showError('删除失败，请稍后重试');
       }
     }
   }
@@ -424,7 +422,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   Navigator.pop(context);
                   _loadAnniversaries(refresh: true);
                 } catch (e) {
-                  _showError('保存失败: $e');
+                  _showError('保存失败，请稍后重试');
                 }
               },
               child: Text(isEditing ? '保存' : '添加'),
@@ -602,9 +600,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                       final result = DateTime(s.getYear(), s.getMonth(), s.getDay());
                       Navigator.pop(context, result);
                     } catch (_) {
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('无效的农历日期')),
-                      );
+                      showSnackBar(context, '无效的农历日期');
                     }
                   },
                   child: const Text('确定'),

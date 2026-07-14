@@ -5,6 +5,7 @@ import '../../../../services/supabase_service.dart';
 import '../../../life/models/habit_model.dart';
 import '../../../life/models/reminder_schedule_model.dart';
 import '../../../life/widgets/reminder_schedule_picker.dart';
+import '../../../../core/widgets/widgets.dart';
 
 /// 添加习惯底部弹窗
 ///
@@ -36,9 +37,7 @@ class AddHabitSheetState extends State<AddHabitSheet> {
   Future<void> _save() async {
     if (_isSaving) return;
     if (_nameController.text.trim().isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入习惯名称')),
-      );
+      showSnackBar(context, '请输入习惯名称');
       return;
     }
     setState(() => _isSaving = true);

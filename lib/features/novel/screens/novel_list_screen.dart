@@ -73,7 +73,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        showSnackBar(context, '初始化失败: $e');
+        showSnackBar(context, '初始化失败，请稍后重试');
       }
     }
   }
@@ -179,7 +179,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       }
       setState(() => _isLoading = false);
       if (mounted) {
-        showSnackBar(context, '加载失败: $e');
+        showSnackBar(context, '加载失败，请稍后重试');
       }
     }
   }
@@ -246,7 +246,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '添加失败: $e');
+        showSnackBar(context, '添加失败，请稍后重试');
       }
     }
   }

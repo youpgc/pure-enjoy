@@ -8,6 +8,7 @@ import '../../../services/dict_service.dart';
 import '../../profile/screens/point_records_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 个人中心页面
 ///
@@ -157,9 +158,7 @@ class _ProfilePageState extends State<ProfilePage> {
               if (versionInfo != null) {
                 VersionCheckService.instance.showUpdateDialog(context, versionInfo);
               } else {
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(content: Text('当前已是最新版本')),
-                );
+                showSnackBar(context, '当前已是最新版本');
               }
             },
           ),
@@ -204,9 +203,7 @@ class _ProfilePageState extends State<ProfilePage> {
                   }
                 } catch (e) {
                   if (context.mounted) {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(content: Text('退出登录失败: $e')),
-                    );
+                    showSnackBar(context, '退出登录失败，请稍后重试', isError: true);
                   }
                 }
               }

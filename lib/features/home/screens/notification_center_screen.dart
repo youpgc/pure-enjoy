@@ -177,15 +177,11 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         }
       });
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('已全部标为已读')),
-        );
+        showSnackBar(context, '已全部标为已读');
       }
     } catch (e) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('操作失败: $e')),
-        );
+        showSnackBar(context, '操作失败，请稍后重试', isError: true);
       }
     }
   }

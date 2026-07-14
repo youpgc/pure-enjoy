@@ -1,4 +1,6 @@
 import 'dart:convert';
+// TODO: 直接 import http 包用于调用 Supabase Auth REST API，因其需要特殊的 X-Client-Info 等 header，
+// 后续如 HttpClient 支持自定义 header 后可统一迁移。
 import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import 'supabase_config.dart';

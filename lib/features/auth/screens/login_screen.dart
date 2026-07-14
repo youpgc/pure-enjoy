@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../home/screens/home_screen.dart';
 import '../auth_provider.dart';
+import '../../../core/widgets/widgets.dart';
 /// 登录页面
 /// 统一账号（用户名/昵称/邮箱/手机号）+ 密码
 class LoginScreen extends ConsumerStatefulWidget {
@@ -56,7 +57,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('登录出错: $e');
+        _showSnackBar('登录失败，请稍后重试');
       }
     } finally {
       if (mounted) {
@@ -87,7 +88,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('注册出错: $e');
+        _showSnackBar('注册失败，请稍后重试');
       }
     } finally {
       if (mounted) {
@@ -95,6 +96,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       }
     }
   }
+  // TODO: _showSnackBar 使用了自定义 backgroundColor（success），showSnackBar 函数暂不支持，保留原样
   void _showSnackBar(String message, {bool isSuccess = false}) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
@@ -348,4 +350,4 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
       ),
     );
   }
-}
+}

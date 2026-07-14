@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
@@ -115,20 +116,10 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       _loadAvailablePoints();
 
       if (result['success'] == true) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? '打卡成功'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showSnackBar(context, result['message'] ?? '打卡成功');
         _loadRecords(refresh: true);
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(result['message'] ?? '打卡失败'),
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
+        showSnackBar(context, result['message'] ?? '打卡失败');
       }
     }
   }

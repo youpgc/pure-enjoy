@@ -93,7 +93,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '提交失败: $e', isError: true);
+        showSnackBar(context, '提交失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) {

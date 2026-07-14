@@ -386,7 +386,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         }
       } catch (e) {
         if (mounted) {
-          showSnackBar(context, '操作失败: $e');
+          showSnackBar(context, '操作失败，请稍后重试');
         }
       }
     } else {
@@ -422,7 +422,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
         }
       } catch (e) {
         if (mounted) {
-          showSnackBar(context, '操作失败: $e');
+          showSnackBar(context, '操作失败，请稍后重试');
         }
       }
     }
@@ -450,7 +450,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        showSnackBar(context, '操作失败: $e');
+        showSnackBar(context, '操作失败，请稍后重试');
       }
     }
   }

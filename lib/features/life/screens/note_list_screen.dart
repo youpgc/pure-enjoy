@@ -57,9 +57,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('初始化失败: $e')),
-        );
+        showSnackBar(context, '初始化失败，请稍后重试', isError: true);
       }
     }
   }
@@ -82,9 +80,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
     if (userId == null) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('请先登录')),
-        );
+        showSnackBar(context, '请先登录');
       }
       return;
     }
@@ -141,9 +137,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
     } catch (e) {
       setState(() => _isLoading = false);
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('加载失败: $e')),
-        );
+        showSnackBar(context, '加载失败，请稍后重试', isError: true);
       }
     }
   }
@@ -160,9 +154,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('创建成功')),
-          );
+          showSnackBar(context, '创建成功');
         }
       } else {
         await OfflineSyncService.instance.enqueue(
@@ -171,9 +163,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
           data: note.toJson(),
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     } catch (e) {
@@ -183,9 +173,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         data: note.toJson(),
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-        );
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
       }
     }
   }
@@ -203,9 +191,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('更新成功')),
-          );
+          showSnackBar(context, '更新成功');
         }
       } else {
         await OfflineSyncService.instance.enqueue(
@@ -215,9 +201,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
           filters: {'id': 'eq.${note.id}'},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     } catch (e) {
@@ -228,9 +212,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         filters: {'id': 'eq.${note.id}'},
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-        );
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
       }
     }
   }
@@ -254,9 +236,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('删除成功')),
-          );
+          showSnackBar(context, '删除成功');
         }
       } else {
         await OfflineSyncService.instance.enqueue(
@@ -265,9 +245,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
           filters: {'id': 'eq.$id'},
         );
         if (mounted) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-          );
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
         }
       }
     } catch (e) {
@@ -277,9 +255,7 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         filters: {'id': 'eq.$id'},
       );
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('网络异常，已加入离线队列，恢复后自动同步')),
-        );
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
       }
     }
   }
@@ -507,9 +483,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   Future<void> _save() async {
     if (_isSaving) return;
     if (_titleController.text.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('请输入标题')),
-      );
+      showSnackBar(context, '请输入标题');
       return;
     }
 
