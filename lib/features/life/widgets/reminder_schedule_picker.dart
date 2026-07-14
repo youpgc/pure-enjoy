@@ -474,7 +474,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
     final descs = <String>[];
     for (final month in _months) {
       for (final day in _monthDays) {
-        descs.add('${monthNames[month]}${day}日');
+        descs.add('${monthNames[month]}$day日');
       }
     }
     return descs.join('、');

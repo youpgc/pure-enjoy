@@ -296,7 +296,7 @@ class ReminderScheduleModel {
           final descs = <String>[];
           for (final month in months) {
             for (final day in monthDays) {
-              descs.add('${monthNames[month]}${day}日');
+              descs.add('${monthNames[month]}$day日');
             }
           }
           return '每年 ${descs.join('、')} $timeStr';

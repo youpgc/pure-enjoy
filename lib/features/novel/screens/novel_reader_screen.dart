@@ -104,9 +104,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   Timer? _readingHistoryTimer;
   DateTime? _chapterReadStartTime;
 
-  // 防止重复触发下一章
-  bool _hasTriggeredNextChapter = false;
-
   // 防止重复触发预加载（70% 进度）
   bool _hasTriggeredPreload = false;
 
@@ -589,7 +586,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     final isNext = index > _currentChapterIndex;
     _shouldJumpToLastPage = !isNext;
     _hasTriggeredPreload = false;
-    _hasTriggeredNextChapter = false;
     _overshootProgress = 0.0;
 
     setState(() {
@@ -603,7 +599,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   Future<void> _loadChapterContent(NovelChapterModel chapter) async {
     // 记录当前加载的章节ID，用于防止竞态条件（Bug 2 修复）
     _loadingChapterId = chapter.id;
-    _hasTriggeredNextChapter = false;
     // 重置页码信息
     _currentPageIndex = 0;
     _totalPages = 1;

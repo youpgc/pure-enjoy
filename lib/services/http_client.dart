@@ -4,18 +4,18 @@ import 'dart:io';
 import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
-import '../env.dart';
 import 'cancel_token.dart';
 import 'supabase_service.dart';
+import 'supabase_config.dart';
 
-/// 全局 HttpClient 配置（从环境变量读取）
+/// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {
   static const int maxRetries = 3;
   static const Duration timeout = Duration(seconds: 30);
 
-  static String get baseUrl => Env.get('SUPABASE_URL');
+  static String get baseUrl => SupabaseConfig.url;
 
-  static String get anonKey => Env.get('SUPABASE_ANON_KEY');
+  static String get anonKey => SupabaseConfig.anonKey;
 }
 
 /// 请求超时时间预设
