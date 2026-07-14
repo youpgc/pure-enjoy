@@ -6,7 +6,6 @@ import 'package:http/http.dart' as http;
 import 'package:shared_preferences/shared_preferences.dart';
 import 'cancel_token.dart';
 import 'supabase_service.dart';
-import 'supabase_config.dart';
 
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {

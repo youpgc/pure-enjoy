@@ -382,8 +382,9 @@ class PointService {
     }
 
     // 方法2：直接查询 point_records 表作为验证
-    final todayStart = DateTime(today.year, today.month, today.day).toUtc().toIso8601String();
-    final todayEnd = DateTime(today.year, today.month, today.day, 23, 59, 59).toUtc().toIso8601String();
+    final todayStart = DateTime(today.year, today.month, today.day)
+        .toUtc()
+        .toIso8601String();
     final result = await ApiClient.get(
       'point_records',
       filters: {

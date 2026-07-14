@@ -56,8 +56,6 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
-  CancelToken? _habitsCancelToken;
-
   Future<void> _loadHabits({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {

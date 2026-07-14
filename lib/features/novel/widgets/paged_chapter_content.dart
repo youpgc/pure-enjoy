@@ -259,12 +259,13 @@ class PagedChapterContentState extends State<PagedChapterContent> {
       child: NotificationListener<OverscrollNotification>(
         onNotification: (notification) {
           if (_pages.isEmpty) return false;
-          final currentPage = _pageController.hasClients ? _pageController.page?.round() ?? 0 : 0;
-          if (notification.overscroll < 0 && currentPage >= _pages.length - 1) {
-            // 在最后一页继续向左滑动 → 下一章
+          final currentPage = _pageController.hasClients
+              ? _pageController.page?.round() ?? 0
+              : 0;
+          if (notification.overscroll < 0 &&
+              currentPage >= _pages.length - 1) {
             widget.onBoundaryReached(true);
           } else if (notification.overscroll > 0 && currentPage <= 0) {
-            // 在第一页继续向右滑动 → 上一章
             widget.onBoundaryReached(false);
           }
           return false;
@@ -277,53 +278,59 @@ class PagedChapterContentState extends State<PagedChapterContent> {
             widget.onPageChanged(index, _pages.length);
           },
           itemBuilder: (context, index) {
-          final page = _pages[index];
-          const topPadding = 12.0;
-          const bottomPadding = 36.0;
-          return GestureDetector(
-            onLongPressStart: widget.onLongPressSelectText != null
-                ? (details) => _handleLongPress(details, page)
-                : null,
-            child: Container(
-              color: widget.background.bgColor,
-              padding: const EdgeInsets.fromLTRB(20, topPadding, 20, bottomPadding),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  if (index == 0)
-                    Center(
-                      child: Padding(
-                        padding: const EdgeInsets.only(bottom: 24),
-                        child: Text(
-                          widget.chapter.title,
-                          style: TextStyle(
-                            fontSize: widget.fontSize + 4,
-                            fontWeight: FontWeight.bold,
-                            color: widget.background.textColor,
-                            height: 1.6,
-                            fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
+            final page = _pages[index];
+            const topPadding = 12.0;
+            const bottomPadding = 36.0;
+            return GestureDetector(
+              onLongPressStart: widget.onLongPressSelectText != null
+                  ? (details) => _handleLongPress(details, page)
+                  : null,
+              child: Container(
+                color: widget.background.bgColor,
+                padding: const EdgeInsets.fromLTRB(
+                    20, topPadding, 20, bottomPadding),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    if (index == 0)
+                      Center(
+                        child: Padding(
+                          padding: const EdgeInsets.only(bottom: 24),
+                          child: Text(
+                            widget.chapter.title,
+                            style: TextStyle(
+                              fontSize: widget.fontSize + 4,
+                              fontWeight: FontWeight.bold,
+                              color: widget.background.textColor,
+                              height: 1.6,
+                              fontFamily: widget.font.fontFamily == 'system'
+                                  ? null
+                                  : widget.font.fontFamily,
+                            ),
+                            textAlign: TextAlign.center,
                           ),
-                          textAlign: TextAlign.center,
+                        ),
+                      ),
+                    Expanded(
+                      child: Text(
+                        page.text,
+                        style: TextStyle(
+                          fontSize: widget.fontSize,
+                          height: widget.lineHeight,
+                          color: widget.background.textColor,
+                          letterSpacing: 0.5,
+                          fontFamily: widget.font.fontFamily == 'system'
+                              ? null
+                              : widget.font.fontFamily,
                         ),
                       ),
                     ),
-                  Expanded(
-                    child: Text(
-                      page.text,
-                      style: TextStyle(
-                        fontSize: widget.fontSize,
-                        height: widget.lineHeight,
-                        color: widget.background.textColor,
-                        letterSpacing: 0.5,
-                        fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
-                      ),
-                    ),
-                  ),
-                ],
+                  ],
+                ),
               ),
-            ),
-          );
-        },
+            );
+          },
+        ),
       ),
     );
   }

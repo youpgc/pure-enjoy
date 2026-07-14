@@ -289,7 +289,7 @@ class CurlChapterContentState extends State<CurlChapterContent> {
         backgroundColor: widget.background.bgColor,
         pages: _pages.map((page) => _buildPageWidget(page)).toList(),
         onPageChanged: (index) {
-          widget.onPageChanged(index, widget.pages.length);
+          widget.onPageChanged(index, _pages.length);
         },
         onBoundaryReached: widget.onBoundaryReached,
       ),

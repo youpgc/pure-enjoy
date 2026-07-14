@@ -30,10 +30,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
   late bool _isEnabled;
 
   final List<String> _weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-  final List<String> _monthLabels = [
-    '1月', '2月', '3月', '4月', '5月', '6月',
-    '7月', '8月', '9月', '10月', '11月', '12月'
-  ];
+
 
   @override
   void initState() {
@@ -328,7 +325,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
               final month = _months[i];
               final day = _monthDays[i];
               return Chip(
-                label: Text('${month}月${day}日'),
+                label: Text('$month月$day日'),
                 deleteIcon: const Icon(Icons.close, size: 18),
                 onDeleted: () => _removeYearDatePair(month, day),
               );
@@ -467,18 +464,6 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
       }
     });
     _notifyChange();
-  }
-
-  String _getYearDateSubtitle() {
-    if (_months.isEmpty || _monthDays.isEmpty) return '未选择';
-    final monthNames = ['', '1月', '2月', '3月', '4月', '5月', '6月', '7月', '8月', '9月', '10月', '11月', '12月'];
-    final descs = <String>[];
-    for (int i = 0; i < _months.length; i++) {
-      if (_monthDays.length > i) {
-        descs.add('${monthNames[_months[i]]}${_monthDays[i]}日');
-      }
-    }
-    return descs.join('、');
   }
 
   Future<int?> _showYearPickerDialog() async {
