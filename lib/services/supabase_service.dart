@@ -7,6 +7,7 @@ library;
 import 'supabase_config.dart';
 import 'session_manager.dart';
 import 'auth_api.dart';
+import 'api_client.dart';
 import '../utils/cache_helper.dart';
 import 'chapter_cache_service.dart';
 import 'package:flutter/foundation.dart';
@@ -164,9 +165,50 @@ class AuthService {
   }
 
   /// 重新加载当前用户数据
+  ///
+  /// 同时把 public.users 表的积分统计同步进会话缓存，
+  /// 避免 currentPoints 等始终停留在 Auth user_metadata 的旧值
+  /// （积分真实存于 users 表，曾存在两套数据源脱节的隐患）。
   Future<bool> reloadCurrentUser() async {
     final user = await refreshAuthUser();
-    return user != null;
+    if (user == null) return false;
+
+    // 同步 users 表积分统计到会话缓存，使 currentPoints 与事实一致
+    try {
+      final userId = _session.currentUserId;
+      if (userId != null) {
+        final statsRes = await ApiClient.get(
+          'users',
+          filters: {
+            ApiClient.userKey(userId): 'eq.$userId',
+            'is_deleted': 'eq.false',
+          },
+          columns:
+              'points,available_points,effective_points,expiring_points',
+          limit: 1,
+        );
+        if (statsRes.isSuccess &&
+            statsRes.data != null &&
+            statsRes.data!.isNotEmpty) {
+          final row = statsRes.data![0];
+          final metadata = Map<String, dynamic>.from(
+            user['user_metadata'] as Map<dynamic, dynamic>? ?? {},
+          );
+          metadata['points'] = row['points'] ?? metadata['points'];
+          metadata['available_points'] = row['available_points'];
+          metadata['effective_points'] = row['effective_points'];
+          metadata['expiring_points'] = row['expiring_points'];
+          user['user_metadata'] = metadata;
+          await _session.updateAuthUser(user);
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('同步用户积分到会话缓存失败: $e');
+      }
+    }
+
+    return true;
   }
 
   /// 修改密码

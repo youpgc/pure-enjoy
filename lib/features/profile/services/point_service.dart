@@ -118,10 +118,13 @@ class PointService {
   /// 重算并更新 users 表的积分统计字段
   ///
   /// 基于 point_records 表全量重算（仅在积分变动后调用）：
-  /// - effective_points: 所有 status='active' 的积分代数和
-  /// - available_points: effective_points（当前未区分过期，后续可加过期过滤）
-  /// - expiring_points: 30天内即将过期的 active 积分
-  /// - points: 总获得积分（仅正数，不论状态）
+  /// - effective_points: 所有【有效且未过期】的积分代数和（status='active' 且 expires_at>=now）
+  /// - available_points: 与 effective_points 一致（已扣除过期与消费）
+  /// - expiring_points: 30天内即将过期的有效积分
+  /// - points: 总获得积分（仅正数，不论状态、不论是否过期）
+  ///
+  /// 注意：积分有效期 180 天。expires_at 已过但仍为 active 的记录，
+  /// 在此统一翻转为 status='expired'，使其不再计入可用积分，并与 UI「已过期」标签一致。
   Future<void> _recalcAndUpdateUserPoints() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
@@ -144,30 +147,50 @@ class PointService {
       int availablePoints = 0;
       int expiringPoints = 0;
       int totalPoints = 0;
+      bool hasExpired = false;
 
       for (final record in result.data!) {
         final amount = (record['amount'] as num?)?.toInt() ?? 0;
         final status = record['status'] as String? ?? 'active';
+        final expiresAtStr = record['expires_at'] as String?;
+        final expiresAt =
+            expiresAtStr != null ? DateTime.parse(expiresAtStr) : null;
+        final isExpired = expiresAt != null && expiresAt.isBefore(now);
 
-        // 总获得积分（仅正数，不论状态）
+        // 总获得积分（仅正数，不论状态、不论是否过期）
         if (amount > 0) {
           totalPoints += amount;
         }
 
-        // 仅统计 active 状态
-        if (status == 'active') {
+        // 仅统计【有效且未过期】的 active 记录
+        if (status == 'active' && !isExpired) {
           effectivePoints += amount;
           availablePoints += amount;
 
           // 30天内即将过期
-          final expiresAt = record['expires_at'] as String?;
           if (expiresAt != null && amount > 0) {
-            final expires = DateTime.parse(expiresAt);
-            if (expires.isBefore(thirtyDaysLater) && expires.isAfter(now)) {
+            if (expiresAt.isBefore(thirtyDaysLater)) {
               expiringPoints += amount;
             }
           }
+        } else if (status == 'active' && isExpired) {
+          // 已过期但仍标记为 active，需在库中翻转为 expired
+          hasExpired = true;
         }
+      }
+
+      // 将已过期但仍为 active 的记录持久化翻转为 expired，
+      // 使「可用积分」扣减与 UI「已过期」标签一致（一次性批量更新）
+      if (hasExpired) {
+        await ApiClient.patchByFilter(
+          'point_records',
+          filters: {
+            'user_id': 'eq.$userId',
+            'status': 'eq.active',
+            'expires_at': 'lt.${now.toIso8601String()}',
+          },
+          body: {'status': 'expired'},
+        );
       }
 
       await _updateUserStats(
