@@ -34,6 +34,11 @@ class VersionCheckService {
   Future<Map<String, dynamic>?> checkUpdate() async {
     try {
       final prefs = await SharedPreferences.getInstance();
+
+      // 最先检查：用户是否已忽略当前最新版本的更新提示
+      // 此检查必须在缓存检查之前，确保无论缓存命中还是网络请求，dismiss 都生效
+      final dismissedVersion = prefs.getString(_dismissedVersionKey);
+
       final cacheJson = prefs.getString(_versionCheckCacheKey);
 
       // 读取缓存
@@ -49,6 +54,14 @@ class VersionCheckService {
             final isForce = cachedVersionInfo?['is_force_update'] == true;
 
             if (elapsed < _minCheckInterval && !isForce) {
+              // 缓存命中时也要检查 dismiss
+              if (cachedVersionInfo != null && dismissedVersion != null) {
+                final cachedVer = cachedVersionInfo['version'] as String?;
+                if (cachedVer == dismissedVersion) {
+                  if (kDebugMode) debugPrint('📱 用户已忽略缓存中的 v$cachedVer 更新提示');
+                  return null;
+                }
+              }
               if (kDebugMode) {
                 debugPrint('📱 使用缓存结果（${elapsed.inMinutes} 分钟前检查过）');
               }
@@ -96,8 +109,7 @@ class VersionCheckService {
 
       Map<String, dynamic>? versionInfo;
       if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
-        // 检查用户是否已忽略此版本的更新提示
-        final dismissedVersion = prefs.getString(_dismissedVersionKey);
+        // 检查用户是否已忽略此版本的更新提示（网络请求路径也要检查，防止 dismiss 后缓存过期重新弹出）
         if (!isForceUpdate && dismissedVersion == latestVersionStr) {
           if (kDebugMode) debugPrint('📱 用户已忽略 v$latestVersionStr 的更新提示');
           return null;
@@ -112,14 +124,6 @@ class VersionCheckService {
           'is_force_update': isForceUpdate,
           'release_type': latestVersion['release_type'],
         };
-      }
-
-      // 有新版本可用时，清除旧的忽略记录（确保用户能看到更新版本号的提示）
-      if (versionInfo != null) {
-        final dismissedVersion = prefs.getString(_dismissedVersionKey);
-        if (dismissedVersion != null && dismissedVersion != versionInfo['version']) {
-          await prefs.remove(_dismissedVersionKey);
-        }
       }
 
       // 写入缓存（无论是否需要更新都缓存）
