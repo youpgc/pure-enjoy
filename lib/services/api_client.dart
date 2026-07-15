@@ -478,23 +478,7 @@ class ApiClient {
     } else if (statusCode == 401) {
       return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
     } else if (statusCode == 404) {
-      // PostgREST 404 既可能是「0 行匹配」，也可能是语句执行期错误（如触发器引用不存在的表 -> 42P01）。
-      // 透传真实错误信息，便于在 UI / 日志直接看到根因，而不是笼统的「资源不存在」。
-      String msg = '资源不存在';
-      try {
-        final body = jsonDecode(response.body) as Map<String, dynamic>;
-        final code = (body['code'] ?? '').toString();
-        final detail = (body['message'] ?? '').toString();
-        if (detail.isNotEmpty) {
-          msg = code.isNotEmpty ? '[$code] $detail' : detail;
-        }
-        if (kDebugMode) {
-          debugPrint('🔧 [api] 404 响应体: ${response.body}');
-        }
-      } catch (_) {
-        if (kDebugMode) debugPrint('🔧 [api] 404 响应体: ${response.body}');
-      }
-      return ApiResponse.error(msg, statusCode: statusCode);
+      return ApiResponse.error('资源不存在', statusCode: statusCode);
     } else if (statusCode == 409) {
       return ApiResponse.error('数据冲突', statusCode: statusCode);
     } else if (statusCode == 429) {

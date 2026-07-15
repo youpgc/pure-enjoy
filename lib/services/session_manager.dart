@@ -45,15 +45,6 @@ class SessionManager {
   String? get currentUserId =>
       _authUser?['user_metadata']?['app_user_id'] as String? ??
       _authUser?['id'] as String?;
-
-  /// 返回当前用户的 Supabase Auth UUID（auth.users.id / JWT sub）
-  ///
-  /// 用于「自更新」场景（编辑资料、改头像）按 auth_id 过滤，
-  /// 与 RLS 策略 auth_id = auth.uid() 完全对应，
-  /// 可绕开 public.users.id（业务 ID，varchar）与 auth_id（UUID）的双 ID 歧义，
-  /// 避免 PATCH 因过滤列/值不匹配导致 0 行 -> PostgREST 返回 404。
-  String? get currentAuthId => _authUser?['id'] as String?;
-
   String? get currentUserEmail => _authUser?['email'] as String?;
 
   String? get currentUserName {
