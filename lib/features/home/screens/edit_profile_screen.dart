@@ -346,10 +346,13 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Navigator.pop(context, true);
         }
       } else {
+        final realMsg = (result.error != null && result.error!.isNotEmpty)
+            ? result.error!
+            : '未知错误';
         final detail = kDebugMode
             ? ' 候选=${_selfUpdateFilterCandidates()}'
             : '';
-        _showError('保存失败(${result.statusCode})$detail');
+        _showError('保存失败(${result.statusCode})：$realMsg$detail');
       }
     } catch (e) {
       _showError('保存失败，请稍后重试');
