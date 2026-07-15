@@ -1,9 +1,11 @@
 import 'package:intl/intl.dart';
+import 'package:timezone/timezone.dart' as tz;
 
 /// 日期时间工具类
 /// 统一处理 App 内所有时间格式化和排序
 ///
 /// 所有时间展示均固定使用北京时间（UTC+8），不依赖设备时区设置。
+/// 这样无论真机（北京时区）还是模拟器（UTC 时区）都展示一致的北京时间。
 ///
 /// Supabase 表结构中的日期字段类型：
 /// - TIMESTAMPTZ: created_at, updated_at, remind_at — 存储完整时间戳（UTC）
@@ -11,6 +13,9 @@ import 'package:intl/intl.dart';
 class DateTimeUtils {
   /// 北京时区偏移（UTC+8）
   static const Duration _beijingOffset = Duration(hours: 8);
+
+  /// 北京时区定位（用于 tz 转换，避免依赖设备时区）
+  static final tz.Location _beijingLoc = tz.getLocation('Asia/Shanghai');
 
   /// 标准日期时间格式：YYYY-MM-DD HH:mm:ss
   static final DateFormat _standardFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
@@ -23,19 +28,22 @@ class DateTimeUtils {
 
   /// 将 DateTime 转换为北京时间展示
   ///
-  /// - UTC 时间：加 8 小时偏移后转为本地时区 DateTime
-  /// - 本地时间（如 DATE 字段解析的 00:00:00）：直接返回，不再加偏移
+  /// 统一按设备时区偏移换算到北京时间墙钟，保证真机（北京时区）与
+  /// 模拟器（UTC 时区）展示一致，彻底解决模拟器 -8 小时的问题：
+  /// - UTC 时间：用 tz 直接转换到 Asia/Shanghai 墙钟
+  /// - 本地时间（如 DATE 字段 / 无时区后缀的时间戳）：按设备偏移换算到北京墙钟
+  ///   （设备偏移=+8 时等价不变，设备偏移=0 时加 8 小时）
   static DateTime _toBeijingTime(DateTime dt) {
     if (dt.isUtc) {
-      final beijing = dt.add(_beijingOffset);
-      // 转为本地时区 DateTime，使 DateFormat 按本地时区格式化
-      return DateTime(
-        beijing.year, beijing.month, beijing.day,
-        beijing.hour, beijing.minute, beijing.second,
-      );
+      return tz.TZDateTime.from(dt, _beijingLoc);
     }
-    // 本地时间直接返回（如 DATE 字段解析的 DateTime）
-    return dt;
+    // 本地时间：按设备时区偏移换算到北京墙钟
+    final deviceOffset = DateTime.now().timeZoneOffset;
+    final shifted = dt.add(_beijingOffset - deviceOffset);
+    return DateTime(
+      shifted.year, shifted.month, shifted.day,
+      shifted.hour, shifted.minute, shifted.second,
+    );
   }
 
   /// 格式化为标准格式：YYYY-MM-DD HH:mm:ss
@@ -125,5 +133,11 @@ class DateTimeUtils {
   /// 获取当前时间的标准格式字符串（北京时间）
   static String nowStandard() {
     return formatStandard(DateTime.now().toUtc());
+  }
+
+  /// 获取当前北京时间（Asia/Shanghai）
+  /// 用于过期判断、连续天数等业务逻辑，避免使用设备本地时间导致时区偏差
+  static DateTime nowBeijing() {
+    return tz.TZDateTime.now(_beijingLoc);
   }
 }

@@ -19,6 +19,7 @@ class CacheHelper {
   static const String keyFavorites = 'cache_favorites';
   static const String keyReminders = 'cache_reminders';
   static const String keyHabits = 'cache_habits';
+  static const String keyPointStats = 'cache_point_stats';
 
   /// 保存 JSON 列表缓存
   Future<void> saveList(String key, List<dynamic> data) async {
@@ -80,6 +81,7 @@ class CacheHelper {
       keyFavorites,
       keyReminders,
       keyHabits,
+      keyPointStats,
     ];
     for (final key in keysToRemove) {
       await prefs.remove(key);

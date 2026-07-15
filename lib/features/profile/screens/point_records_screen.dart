@@ -17,6 +17,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   final List<PointRecord> _records = [];
   bool _isLoading = false;
   bool _isCheckingIn = false;
+  bool _isLoadingPoints = false;
   int _availablePoints = 0;
   bool _hasCheckedInToday = false;
   int _consecutiveCheckinDays = 0;
@@ -28,6 +29,8 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   void initState() {
     super.initState();
     initPagination();
+    // 先读取本地缓存，立即展示上一次的积分值与连续签到天数，避免闪现 0
+    _loadCachedPoints();
     _loadAvailablePoints();
     _loadRecords(refresh: true);
   }
@@ -43,8 +46,23 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     _loadRecords();
   }
 
-  /// 加载可用积分、打卡状态和连续签到天数
+  /// 读取本地缓存的积分统计，进入页面时立即展示（避免闪现 0）
+  Future<void> _loadCachedPoints() async {
+    final cached = await PointService.instance.getCachedPointsStats();
+    if (mounted) {
+      setState(() {
+        _availablePoints = cached['availablePoints'] as int;
+        _hasCheckedInToday = cached['hasCheckedInToday'] as bool;
+        _consecutiveCheckinDays = cached['consecutiveCheckinDays'] as int;
+      });
+    }
+  }
+
+  /// 加载可用积分、签到状态和连续签到天数
+  ///
+  /// 加载期间显示 loading 指示，完成后将最新值写回本地缓存。
   Future<void> _loadAvailablePoints() async {
+    if (mounted) setState(() => _isLoadingPoints = true);
     final points = await PointService.instance.getAvailablePoints();
     final checkedIn = await PointService.instance.hasCheckedInToday();
     final streak = await PointService.instance.getConsecutiveCheckinDays();
@@ -53,7 +71,14 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
         _availablePoints = points;
         _hasCheckedInToday = checkedIn;
         _consecutiveCheckinDays = streak;
+        _isLoadingPoints = false;
       });
+      // 写回缓存，供下次进入页面立即展示
+      await PointService.instance.cachePointsStats(
+        availablePoints: points,
+        consecutiveCheckinDays: streak,
+        hasCheckedInToday: checkedIn,
+      );
     }
   }
 
@@ -113,14 +138,21 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       setState(() {
         _isCheckingIn = false;
       });
-      _loadAvailablePoints();
 
       if (result['success'] == true) {
-        showSnackBar(context, result['message'] ?? '打卡成功');
+        // 直接用签到结果刷新连续天数与今日已签到状态，立即生效
+        final streak = result['streak'] as int? ?? _consecutiveCheckinDays;
+        setState(() {
+          _consecutiveCheckinDays = streak;
+          _hasCheckedInToday = true;
+        });
+        showSnackBar(context, result['message'] ?? '签到成功');
         _loadRecords(refresh: true);
       } else {
-        showSnackBar(context, result['message'] ?? '打卡失败');
+        showSnackBar(context, result['message'] ?? '签到失败');
       }
+      // 重新拉取最新积分并写回缓存（无论成功失败都刷新）
+      await _loadAvailablePoints();
     }
   }
 
@@ -179,7 +211,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       );
     }
     if (record.expiresAt != null) {
-      final now = DateTime.now();
+      final now = DateTimeUtils.nowBeijing();
       final diff = record.expiresAt!.difference(now);
       if (diff.inDays <= 30 && diff.inDays >= 0) {
         return _ExpiryInfo(
@@ -270,6 +302,17 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                                     color: colorScheme.onSurfaceVariant,
                                   ),
                             ),
+                            if (_isLoadingPoints)
+                              const Padding(
+                                padding: EdgeInsets.only(top: 4),
+                                child: SizedBox(
+                                  width: 14,
+                                  height: 14,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                ),
+                              ),
                           ],
                         ),
                       ),
@@ -295,7 +338,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
                                     : Icons.check_circle_outline,
                               ),
                               const SizedBox(width: 4),
-                              Text(_hasCheckedInToday ? '已打卡' : '打卡'),
+                              Text(_hasCheckedInToday ? '已签到' : '签到'),
                             ],
                           ],
                         ),

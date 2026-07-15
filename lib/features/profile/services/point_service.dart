@@ -4,6 +4,7 @@ import 'package:timezone/data/latest.dart' as tz_data;
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../utils/cache_helper.dart';
 import '../models/point_record_model.dart';
 
 /// 积分服务
@@ -12,7 +13,7 @@ import '../models/point_record_model.dart';
 /// - 积分查询从 users 表统计字段读取（effective_points / available_points / expiring_points）
 /// - 积分变动（签到、获得、消费）后，App 端主动重算并更新 users 表统计字段
 /// - 不依赖数据库触发器（trg_maintain_user_points 已确认不存在）
-/// - 连续打卡天数从 users.consecutive_checkin_days / last_checkin_date 读取
+/// - 连续签到天数从 users.consecutive_checkin_days / last_checkin_date 读取
 class PointService {
   static PointService? _instance;
 
@@ -240,7 +241,7 @@ class PointService {
       if (todayResult.isSuccess) {
         final records = todayResult.data!;
         if (records.isNotEmpty) {
-          return {'success': false, 'message': '今天已打卡'};
+          return {'success': false, 'message': '今天已签到'};
         }
       }
 
@@ -261,7 +262,7 @@ class PointService {
         } else if (lastDate.year == today.year &&
             lastDate.month == today.month &&
             lastDate.day == today.day) {
-          return {'success': false, 'message': '今天已打卡'};
+          return {'success': false, 'message': '今天已签到'};
         }
         // 否则断签，streak 保持为 1（今天首次打卡）
       }
@@ -281,7 +282,7 @@ class PointService {
           'user_id': userId,
           'type': 'checkin',
           'amount': points,
-          'remark': '连续打卡$streak天',
+          'remark': '连续签到$streak天',
           'created_at': nowIso,
           'expires_at': expiresAt,
           'status': 'active',
@@ -292,7 +293,7 @@ class PointService {
         if (kDebugMode) {
           debugPrint('插入积分记录失败: ${insertResult.error}');
         }
-        return {'success': false, 'message': '打卡失败: ${insertResult.error}'};
+        return {'success': false, 'message': '签到失败: ${insertResult.error}'};
       }
 
       // 5. 更新 users 表打卡统计字段
@@ -309,15 +310,15 @@ class PointService {
 
       return {
         'success': true,
-        'message': '打卡成功，获得$points积分',
+        'message': '签到成功，获得$points积分',
         'points': points,
         'streak': streak,
       };
     } catch (e) {
       if (kDebugMode) {
-        debugPrint('打卡失败: $e');
+        debugPrint('签到失败: $e');
       }
-      return {'success': false, 'message': '打卡失败，请稍后重试'};
+      return {'success': false, 'message': '签到失败，请稍后重试'};
     }
   }
 
@@ -473,5 +474,40 @@ class PointService {
   /// 手动触发积分重算（用于数据修复或初始化场景）
   Future<void> recalcPoints() async {
     await _recalcAndUpdateUserPoints();
+  }
+
+  /// 缓存积分统计到本地，供积分页进入时立即展示（避免闪现 0）
+  ///
+  /// [hasCheckedInToday] 今天是否已签到
+  Future<void> cachePointsStats({
+    required int availablePoints,
+    required int consecutiveCheckinDays,
+    required bool hasCheckedInToday,
+  }) async {
+    await CacheHelper.instance.saveMap(CacheHelper.keyPointStats, {
+      'availablePoints': availablePoints,
+      'consecutiveCheckinDays': consecutiveCheckinDays,
+      'hasCheckedInToday': hasCheckedInToday,
+    });
+  }
+
+  /// 读取本地缓存的积分统计
+  ///
+  /// 若未缓存则返回全 0 / false。字段含义同 cachePointsStats。
+  Future<Map<String, dynamic>> getCachedPointsStats() async {
+    final m = await CacheHelper.instance.loadMap(CacheHelper.keyPointStats);
+    if (m == null) {
+      return {
+        'availablePoints': 0,
+        'consecutiveCheckinDays': 0,
+        'hasCheckedInToday': false,
+      };
+    }
+    return {
+      'availablePoints': (m['availablePoints'] as num?)?.toInt() ?? 0,
+      'consecutiveCheckinDays':
+          (m['consecutiveCheckinDays'] as num?)?.toInt() ?? 0,
+      'hasCheckedInToday': m['hasCheckedInToday'] as bool? ?? false,
+    };
   }
 }
