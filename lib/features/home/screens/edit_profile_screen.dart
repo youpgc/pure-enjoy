@@ -1,4 +1,5 @@
 import 'dart:io';
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import '../../../core/widgets/widgets.dart';
@@ -155,7 +156,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       // 更新用户头像URL
       final updateResult = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: _selfUpdateFilters(),
         body: {
           'avatar_url': publicUrl,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -236,6 +237,17 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
+  /// 自更新过滤条件：始终用 auth_id + auth UUID，对应 RLS auth_id = auth.uid()，
+  /// 绕开 users.id（业务ID，varchar）与 auth_id（UUID）双 ID 歧义导致的 0 行匹配 -> 404
+  Map<String, String> _selfUpdateFilters() {
+    final authId = AuthService.instance.currentAuthId;
+    if (authId != null && authId.isNotEmpty) {
+      return {'auth_id': 'eq.$authId'};
+    }
+    // 兜底（已登录必然有 auth UUID，这里仅防御性保留原逻辑）
+    return {ApiClient.userKey(_userId!): 'eq.$_userId'};
+  }
+
   /// 保存用户资料
   Future<void> _saveProfile() async {
     if (_isSaving) return;
@@ -300,11 +312,18 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
+      final selfFilters = _selfUpdateFilters();
+      if (kDebugMode) {
+        debugPrint('🔧 [edit_profile] 自更新过滤: $selfFilters');
+      }
       final result = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: selfFilters,
         body: updateData,
       );
+      if (kDebugMode) {
+        debugPrint('🔧 [edit_profile] 保存结果 statusCode=${result.statusCode}');
+      }
 
       if (result.isSuccess) {
         if (mounted) {

@@ -36,6 +36,7 @@ class AuthService {
   // ==================== 用户信息代理 ====================
 
   String? get currentUserId => _session.currentUserId;
+  String? get currentAuthId => _session.currentAuthId;
   String? get currentUserEmail => _session.currentUserEmail;
   String? get currentUserName => _session.currentUserName;
   String? get currentUserAvatar => _session.currentUserAvatar;
