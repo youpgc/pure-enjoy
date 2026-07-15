@@ -154,14 +154,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       );
 
       // 更新用户头像URL
-      final updateResult = await ApiClient.patchByFilter(
-        'users',
-        filters: _selfUpdateFilters(),
-        body: {
-          'avatar_url': publicUrl,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
-      );
+      final updateResult = await _patchSelf({
+        'avatar_url': publicUrl,
+        'updated_at': DateTime.now().toUtc().toIso8601String(),
+      });
 
       if (updateResult.isSuccess) {
         setState(() => _avatarUrl = publicUrl);
@@ -237,15 +233,45 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  /// 自更新过滤条件：始终用 auth_id + auth UUID，对应 RLS auth_id = auth.uid()，
-  /// 绕开 users.id（业务ID，varchar）与 auth_id（UUID）双 ID 歧义导致的 0 行匹配 -> 404
-  Map<String, String> _selfUpdateFilters() {
+  /// 自更新候选过滤条件（按优先级），覆盖双 ID 架构的两种正确写法：
+  /// 1. auth_id = auth UUID（与 RLS auth_id = auth.uid() 对应，最稳）
+  /// 2. id = 业务 ID（public.users.id 的 U… 值，varchar 列）
+  /// 3. 兜底：沿用页面 _userId（理论上 1/2 已覆盖）
+  /// 这样无论会话里的 currentAuthId 与 public.users.auth_id 是否完全一致，
+  /// 都能命中正确行，避免 PATCH 因「列/值不匹配」0 行 -> PostgREST 404。
+  List<Map<String, String>> _selfUpdateFilterCandidates() {
+    final candidates = <Map<String, String>>[];
     final authId = AuthService.instance.currentAuthId;
     if (authId != null && authId.isNotEmpty) {
-      return {'auth_id': 'eq.$authId'};
+      candidates.add({'auth_id': 'eq.$authId'});
     }
-    // 兜底（已登录必然有 auth UUID，这里仅防御性保留原逻辑）
-    return {ApiClient.userKey(_userId!): 'eq.$_userId'};
+    final bizId = AuthService.instance.currentUserId;
+    if (bizId != null && bizId.isNotEmpty) {
+      candidates.add({ApiClient.userKey(bizId): 'eq.$bizId'});
+    }
+    if (_userId != null && _userId!.isNotEmpty) {
+      candidates.add({ApiClient.userKey(_userId!): 'eq.$_userId'});
+    }
+    return candidates;
+  }
+
+  /// 自更新（编辑资料/改头像）：按候选过滤条件依次尝试，命中即返回。
+  /// 自带调试日志（kDebugMode）打印每次尝试的过滤与最终 statusCode，
+  /// 便于在 404 时直接定位「实际发出的请求」与「服务端返回」。
+  Future<ApiResponse> _patchSelf(Map<String, dynamic> body) async {
+    ApiResponse? result;
+    final candidates = _selfUpdateFilterCandidates();
+    for (final f in candidates) {
+      if (kDebugMode) {
+        debugPrint('🔧 [edit_profile] 尝试过滤: $f');
+      }
+      result = await ApiClient.patchByFilter('users', filters: f, body: body);
+      if (result.isSuccess) break;
+    }
+    if (kDebugMode) {
+      debugPrint('🔧 [edit_profile] 最终 statusCode=${result?.statusCode}');
+    }
+    return result ?? ApiResponse.error('更新失败：无候选过滤条件');
   }
 
   /// 保存用户资料
@@ -312,18 +338,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      final selfFilters = _selfUpdateFilters();
-      if (kDebugMode) {
-        debugPrint('🔧 [edit_profile] 自更新过滤: $selfFilters');
-      }
-      final result = await ApiClient.patchByFilter(
-        'users',
-        filters: selfFilters,
-        body: updateData,
-      );
-      if (kDebugMode) {
-        debugPrint('🔧 [edit_profile] 保存结果 statusCode=${result.statusCode}');
-      }
+      final result = await _patchSelf(updateData);
 
       if (result.isSuccess) {
         if (mounted) {
@@ -331,7 +346,10 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
           Navigator.pop(context, true);
         }
       } else {
-        _showError('保存失败: ${result.statusCode}');
+        final detail = kDebugMode
+            ? ' 候选=${_selfUpdateFilterCandidates()}'
+            : '';
+        _showError('保存失败(${result.statusCode})$detail');
       }
     } catch (e) {
       _showError('保存失败，请稍后重试');
