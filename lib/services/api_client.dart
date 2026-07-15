@@ -478,6 +478,7 @@ class ApiClient {
     } else if (statusCode == 401) {
       return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
     } else if (statusCode == 404) {
+      if (kDebugMode) debugPrint('🔧 [api] 404 响应体: ${response.body}');
       return ApiResponse.error('资源不存在', statusCode: statusCode);
     } else if (statusCode == 409) {
       return ApiResponse.error('数据冲突', statusCode: statusCode);

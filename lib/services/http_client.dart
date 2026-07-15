@@ -117,9 +117,14 @@ class HttpClient {
   /// 获取认证头
   /// 已登录时返回 JWT 头，未登录时返回 Anon Key
   Map<String, String> get _authHeaders {
+    final token = _accessToken ?? HttpClientConfig.anonKey;
+    if (kDebugMode) {
+      final role = _accessToken == null ? 'ANON(anonKey兜底)' : 'USER_JWT(len=${token.length})';
+      debugPrint('🔑 [http] Auth角色=$role');
+    }
     return {
       'apikey': HttpClientConfig.anonKey,
-      'Authorization': 'Bearer ${_accessToken ?? HttpClientConfig.anonKey}',
+      'Authorization': 'Bearer $token',
       'Content-Type': 'application/json',
     };
   }
