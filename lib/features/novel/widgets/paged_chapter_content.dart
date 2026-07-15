@@ -50,6 +50,8 @@ class PagedChapterContentState extends State<PagedChapterContent> {
   List<ContentPage> _pages = [];
   late PageController _pageController;
   bool _isCalculating = true;
+  /// 内容区真实高度，由 build 内的 LayoutBuilder 提供，用于替代 MediaQuery 估算
+  double? _contentHeight;
 
   @override
   void initState() {
@@ -60,7 +62,7 @@ class PagedChapterContentState extends State<PagedChapterContent> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _calculatePages();
+    // 首算改由 build 内的 LayoutBuilder 驱动，需要先拿到真实布局约束才能分页
   }
 
   @override
@@ -68,11 +70,11 @@ class PagedChapterContentState extends State<PagedChapterContent> {
     super.didUpdateWidget(oldWidget);
     // 只有章节切换时才重置页签，字体/行高/背景调整不重置
     if (oldWidget.chapter.id != widget.chapter.id) {
-      _calculatePages(resetPage: true);
+      _scheduleRecalculate(resetPage: true);
     } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
         oldWidget.font != widget.font) {
-      _calculatePages(resetPage: false);
+      _scheduleRecalculate(resetPage: false);
     }
   }
 
@@ -102,15 +104,20 @@ class PagedChapterContentState extends State<PagedChapterContent> {
     }
   }
 
+  /// 通过 addPostFrameCallback 调度重算，避免在 build 阶段直接 setState
+  void _scheduleRecalculate({bool resetPage = true}) {
+    if (_contentHeight == null) return; // 等待 LayoutBuilder 首次提供真实高度
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _calculatePages(resetPage: resetPage);
+    });
+  }
+
   void _calculatePages({bool resetPage = true}) {
-    final mediaQuery = MediaQuery.of(context);
-    final width = mediaQuery.size.width;
-    // 顶部状态栏高度 = SafeArea top padding + 固定高度 44
-    // 底部状态栏高度 = SafeArea bottom padding + 内部内容高度（进度条 ~2 + padding 20 = ~22）
-    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容截断
-    final topStatusBarHeight = mediaQuery.padding.top + 44.0;
-    final bottomStatusBarHeight = mediaQuery.padding.bottom + 24.0;
-    final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
+    if (_contentHeight == null) return; // 真实高度尚未获得，等待 LayoutBuilder 驱动
+    final width = MediaQuery.of(context).size.width;
+    // 使用 LayoutBuilder 提供的真实内容区高度进行分页，
+    // 替代原先基于 MediaQuery 的估算，修复真机安全区更大时底部留白的问题
+    final height = _contentHeight!;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -246,92 +253,107 @@ class PagedChapterContentState extends State<PagedChapterContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isCalculating || _pages.isEmpty) {
-      return const Center(child: LoadingWidget());
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentHeight = constraints.maxHeight;
+        // 首次获得布局约束，或约束发生变化（旋转/安全区变化）时重算分页
+        if (_contentHeight == null ||
+            (_contentHeight! - contentHeight).abs() > 0.5) {
+          _contentHeight = contentHeight;
+          // 延迟到帧后执行，避免在 build 阶段调用 setState
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _calculatePages();
+          });
+        }
 
-    // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
-    // PageView 处理滑动手势，点击通过 behavior + onTapUp 处理
-    // 通过 NotificationListener 监听 OverscrollNotification 检测滑动到边界，触发章节切换
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTapUp: widget.onTapScreen,
-      child: NotificationListener<OverscrollNotification>(
-        onNotification: (notification) {
-          if (_pages.isEmpty) return false;
-          final currentPage = _pageController.hasClients
-              ? _pageController.page?.round() ?? 0
-              : 0;
-          if (notification.overscroll < 0 &&
-              currentPage >= _pages.length - 1) {
-            widget.onBoundaryReached(true);
-          } else if (notification.overscroll > 0 && currentPage <= 0) {
-            widget.onBoundaryReached(false);
-          }
-          return false;
-        },
-        child: PageView.builder(
-          controller: _pageController,
-          physics: const PageScrollPhysics(),
-          itemCount: _pages.length,
-          onPageChanged: (index) {
-            widget.onPageChanged(index, _pages.length);
-          },
-          itemBuilder: (context, index) {
-            final page = _pages[index];
-            const topPadding = 12.0;
-            const bottomPadding = 36.0;
-            return GestureDetector(
-              onLongPressStart: widget.onLongPressSelectText != null
-                  ? (details) => _handleLongPress(details, page)
-                  : null,
-              child: Container(
-                color: widget.background.bgColor,
-                padding: const EdgeInsets.fromLTRB(
-                    20, topPadding, 20, bottomPadding),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (index == 0)
-                      Center(
-                        child: Padding(
-                          padding: const EdgeInsets.only(bottom: 24),
+        if (_isCalculating || _pages.isEmpty) {
+          return const Center(child: LoadingWidget());
+        }
+
+        // 使用 RawGestureDetector + GestureRecognizer 避免手势冲突
+        // PageView 处理滑动手势，点击通过 behavior + onTapUp 处理
+        // 通过 NotificationListener 监听 OverscrollNotification 检测滑动到边界，触发章节切换
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTapScreen,
+          child: NotificationListener<OverscrollNotification>(
+            onNotification: (notification) {
+              if (_pages.isEmpty) return false;
+              final currentPage = _pageController.hasClients
+                  ? _pageController.page?.round() ?? 0
+                  : 0;
+              if (notification.overscroll < 0 &&
+                  currentPage >= _pages.length - 1) {
+                widget.onBoundaryReached(true);
+              } else if (notification.overscroll > 0 && currentPage <= 0) {
+                widget.onBoundaryReached(false);
+              }
+              return false;
+            },
+            child: PageView.builder(
+              controller: _pageController,
+              physics: const PageScrollPhysics(),
+              itemCount: _pages.length,
+              onPageChanged: (index) {
+                widget.onPageChanged(index, _pages.length);
+              },
+              itemBuilder: (context, index) {
+                final page = _pages[index];
+                const topPadding = 12.0;
+                const bottomPadding = 36.0;
+                return GestureDetector(
+                  onLongPressStart: widget.onLongPressSelectText != null
+                      ? (details) => _handleLongPress(details, page)
+                      : null,
+                  child: Container(
+                    color: widget.background.bgColor,
+                    padding: const EdgeInsets.fromLTRB(
+                        20, topPadding, 20, bottomPadding),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        if (index == 0)
+                          Center(
+                            child: Padding(
+                              padding: const EdgeInsets.only(bottom: 24),
+                              child: Text(
+                                widget.chapter.title,
+                                style: TextStyle(
+                                  fontSize: widget.fontSize + 4,
+                                  fontWeight: FontWeight.bold,
+                                  color: widget.background.textColor,
+                                  height: 1.6,
+                                  fontFamily: widget.font.fontFamily == 'system'
+                                      ? null
+                                      : widget.font.fontFamily,
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ),
+                          ),
+                        Expanded(
                           child: Text(
-                            widget.chapter.title,
+                            page.text,
                             style: TextStyle(
-                              fontSize: widget.fontSize + 4,
-                              fontWeight: FontWeight.bold,
+                              fontSize: widget.fontSize,
+                              height: widget.lineHeight,
                               color: widget.background.textColor,
-                              height: 1.6,
+                              letterSpacing: 0.5,
                               fontFamily: widget.font.fontFamily == 'system'
                                   ? null
                                   : widget.font.fontFamily,
                             ),
-                            textAlign: TextAlign.center,
                           ),
                         ),
-                      ),
-                    Expanded(
-                      child: Text(
-                        page.text,
-                        style: TextStyle(
-                          fontSize: widget.fontSize,
-                          height: widget.lineHeight,
-                          color: widget.background.textColor,
-                          letterSpacing: 0.5,
-                          fontFamily: widget.font.fontFamily == 'system'
-                              ? null
-                              : widget.font.fontFamily,
-                        ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),
-              ),
-            );
-          },
-        ),
-      ),
+                  ),
+                );
+              },
+            ),
+          ),
+        );
+      },
     );
   }
 }

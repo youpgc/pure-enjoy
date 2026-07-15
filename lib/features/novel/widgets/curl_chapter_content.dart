@@ -41,6 +41,8 @@ class CurlChapterContentState extends State<CurlChapterContent> {
   List<ContentPage> _pages = [];
   late SimulationPageController _simulationController;
   bool _isCalculating = true;
+  /// 内容区真实高度，由 build 内的 LayoutBuilder 提供，用于替代 MediaQuery 估算
+  double? _contentHeight;
 
   @override
   void initState() {
@@ -51,7 +53,7 @@ class CurlChapterContentState extends State<CurlChapterContent> {
   @override
   void didChangeDependencies() {
     super.didChangeDependencies();
-    _calculatePages();
+    // 首算改由 build 内的 LayoutBuilder 驱动，需要先拿到真实布局约束才能分页
   }
 
   @override
@@ -59,11 +61,11 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     super.didUpdateWidget(oldWidget);
     // 只有章节切换时才重置页签，字体/行高/背景调整不重置
     if (oldWidget.chapter.id != widget.chapter.id) {
-      _calculatePages(resetPage: true);
+      _scheduleRecalculate(resetPage: true);
     } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
         oldWidget.font != widget.font) {
-      _calculatePages(resetPage: false);
+      _scheduleRecalculate(resetPage: false);
     }
   }
 
@@ -83,15 +85,20 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     _simulationController.previousPage();
   }
 
+  /// 通过 addPostFrameCallback 调度重算，避免在 build 阶段直接 setState
+  void _scheduleRecalculate({bool resetPage = true}) {
+    if (_contentHeight == null) return; // 等待 LayoutBuilder 首次提供真实高度
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _calculatePages(resetPage: resetPage);
+    });
+  }
+
   void _calculatePages({bool resetPage = true}) {
-    final mediaQuery = MediaQuery.of(context);
-    final width = mediaQuery.size.width;
-    // 顶部状态栏高度 = SafeArea top padding + 固定高度 44
-    // 底部状态栏高度 = SafeArea bottom padding + 内部内容高度（进度条 ~2 + padding 20 = ~22）
-    // 使用动态计算替代硬编码，避免在有安全区域的设备上出现内容被裁剪
-    final topStatusBarHeight = mediaQuery.padding.top + 44.0;
-    final bottomStatusBarHeight = mediaQuery.padding.bottom + 24.0;
-    final height = mediaQuery.size.height - topStatusBarHeight - bottomStatusBarHeight;
+    if (_contentHeight == null) return; // 真实高度尚未获得，等待 LayoutBuilder 驱动
+    final width = MediaQuery.of(context).size.width;
+    // 使用 LayoutBuilder 提供的真实内容区高度进行分页，
+    // 替代原先基于 MediaQuery 的估算，修复真机安全区更大时底部留白的问题
+    final height = _contentHeight!;
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -275,24 +282,39 @@ class CurlChapterContentState extends State<CurlChapterContent> {
 
   @override
   Widget build(BuildContext context) {
-    if (_isCalculating || _pages.isEmpty) {
-      return const Center(child: LoadingWidget());
-    }
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final contentHeight = constraints.maxHeight;
+        // 首次获得布局约束，或约束发生变化（旋转/安全区变化）时重算分页
+        if (_contentHeight == null ||
+            (_contentHeight! - contentHeight).abs() > 0.5) {
+          _contentHeight = contentHeight;
+          // 延迟到帧后执行，避免在 build 阶段调用 setState
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) _calculatePages();
+          });
+        }
 
-    // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势
-    // onTap 和 onHorizontalDrag 在手势竞技场中可以共存
-    return GestureDetector(
-      behavior: HitTestBehavior.translucent,
-      onTapUp: widget.onTapScreen,
-      child: SimulationPageView(
-        controller: _simulationController,
-        backgroundColor: widget.background.bgColor,
-        pages: _pages.map((page) => _buildPageWidget(page)).toList(),
-        onPageChanged: (index) {
-          widget.onPageChanged(index, _pages.length);
-        },
-        onBoundaryReached: widget.onBoundaryReached,
-      ),
+        if (_isCalculating || _pages.isEmpty) {
+          return const Center(child: LoadingWidget());
+        }
+
+        // GestureDetector 处理点击翻页/菜单，SimulationPageView 处理滑动手势
+        // onTap 和 onHorizontalDrag 在手势竞技场中可以共存
+        return GestureDetector(
+          behavior: HitTestBehavior.translucent,
+          onTapUp: widget.onTapScreen,
+          child: SimulationPageView(
+            controller: _simulationController,
+            backgroundColor: widget.background.bgColor,
+            pages: _pages.map((page) => _buildPageWidget(page)).toList(),
+            onPageChanged: (index) {
+              widget.onPageChanged(index, _pages.length);
+            },
+            onBoundaryReached: widget.onBoundaryReached,
+          ),
+        );
+      },
     );
   }
 }
