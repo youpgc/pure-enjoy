@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/novel_model.dart';
 import 'reader_enums.dart';
@@ -99,6 +100,8 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     // 使用 LayoutBuilder 提供的真实内容区高度进行分页，
     // 替代原先基于 MediaQuery 的估算，修复真机安全区更大时底部留白的问题
     final height = _contentHeight!;
+    // 系统字体缩放，需与渲染 Text 一致，避免真机（如 OPPO 放大字体）底部留白
+    final textScaler = MediaQuery.textScalerOf(context);
 
     final textStyle = TextStyle(
       fontSize: widget.fontSize,
@@ -118,11 +121,13 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     );
     final titlePainter = TextPainter(
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
       text: TextSpan(text: widget.chapter.title, style: titleStyle),
     )..layout(maxWidth: width - 40); // 减去左右 padding 20*2
     final titleLineCount = (titlePainter.computeLineMetrics()).length;
-    // 标题实际高度 = 行数 * 行高 + Padding(bottom: 24)
-    final firstPageExtraHeight = titleLineCount * (widget.fontSize + 4) * 1.6 + 24;
+    // 标题实际高度 = 行数 * 缩放后行高 + Padding(bottom: 24)
+    final firstPageExtraHeight =
+        titleLineCount * textScaler.scale(widget.fontSize + 4) * 1.6 + 24;
 
     final pages = TextPaginator.paginate(
       text: widget.chapter.content,
@@ -133,7 +138,20 @@ class CurlChapterContentState extends State<CurlChapterContent> {
       // padding 必须与渲染 Container 的 padding 一致，否则分页器会多算可用高度导致内容被裁剪
       padding: const EdgeInsets.fromLTRB(20, 12, 20, 36),
       firstPageExtraHeight: firstPageExtraHeight,
+      textScaler: textScaler,
     );
+
+    if (kDebugMode) {
+      // 真机底部留白诊断日志（仅 debug 构建输出）
+      final lineHeightPx = textScaler.scale(widget.fontSize) * widget.lineHeight;
+      debugPrint('[Reader分页-curl] contentH=${height.toStringAsFixed(1)} '
+          'textScaler=${textScaler.scale(widget.fontSize) / widget.fontSize} '
+          'fontSize=${widget.fontSize} lineHeightPx=${lineHeightPx.toStringAsFixed(1)} '
+          'estMaxLines=${((height - 48) / lineHeightPx).floor()} '
+          'pages=${pages.length} '
+          'mqPadBottom=${MediaQuery.of(context).padding.bottom} '
+          'viewPadBottom=${MediaQuery.of(context).viewPadding.bottom}');
+    }
 
     setState(() {
       _pages = pages;
@@ -223,12 +241,14 @@ class CurlChapterContentState extends State<CurlChapterContent> {
       fontWeight: FontWeight.bold,
       fontFamily: widget.font.fontFamily == 'system' ? null : widget.font.fontFamily,
     );
+    final textScaler = MediaQuery.textScalerOf(context);
     final titlePainter = TextPainter(
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
       text: TextSpan(text: widget.chapter.title, style: titleStyle),
     )..layout(maxWidth: MediaQuery.of(context).size.width - 40);
     final titleLineCount = (titlePainter.computeLineMetrics()).length;
-    return titleLineCount * (widget.fontSize + 4) * 1.6 + 24;
+    return titleLineCount * textScaler.scale(widget.fontSize + 4) * 1.6 + 24;
   }
 
   /// 构建单页内容 Widget

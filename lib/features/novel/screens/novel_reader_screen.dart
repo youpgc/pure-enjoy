@@ -69,6 +69,10 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
   int _currentPageIndex = 0;
   int _totalPages = 1;
 
+  /// 边界切章防抖时间戳：OverscrollNotification/仿真翻页边界拖拽会在一次手势中
+  /// 多次回调，缓存命中时切章几乎瞬时完成，若不防抖会连续跳过多个章节
+  DateTime? _lastBoundarySwitchAt;
+
   // 阅读时长统计
   DateTime? _readingStartTime;
   Duration _totalReadingTime = Duration.zero;
@@ -1377,6 +1381,15 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
 
   /// 子组件回调：PageView 到达边界
   void _onPageBoundaryReached(bool isLastPage) {
+    // 防抖：一次滑动手势中边界回调可能连续触发多次，
+    // 700ms 内只处理一次，避免连续切换跳过多个章节
+    final now = DateTime.now();
+    if (_lastBoundarySwitchAt != null &&
+        now.difference(_lastBoundarySwitchAt!).inMilliseconds < 700) {
+      return;
+    }
+    _lastBoundarySwitchAt = now;
+
     if (isLastPage) {
       // 到达最后一页，跳转下一章
       if (_currentChapterIndex < _chapters.length - 1 || _hasMoreChapters) {

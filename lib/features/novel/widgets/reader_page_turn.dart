@@ -36,6 +36,9 @@ class ContentPage {
 class TextPaginator {
   /// 将长文本分页
   /// [firstPageExtraHeight] 首页额外占用的高度（如章节标题），首页可用高度会减去该值
+  /// [textScaler] 系统字体缩放，必须与渲染 Text 使用的缩放一致，
+  /// 否则分页测量（默认 1.0）与真机渲染（如 OPPO 系统字体放大）不一致，
+  /// 导致每页少排/多排行数，出现底部留白或内容被裁剪
   static List<ContentPage> paginate({
     required String text,
     required double width,
@@ -44,6 +47,7 @@ class TextPaginator {
     required double lineHeight,
     EdgeInsets padding = EdgeInsets.zero,
     double firstPageExtraHeight = 0,
+    TextScaler textScaler = TextScaler.noScaling,
   }) {
     if (text.isEmpty) {
       return [ContentPage(text: '', pageIndex: 0, totalPages: 1)];
@@ -57,6 +61,7 @@ class TextPaginator {
     final pages = <ContentPage>[];
     final textPainter = TextPainter(
       textDirection: TextDirection.ltr,
+      textScaler: textScaler,
       text: TextSpan(text: text, style: style),
     );
 
@@ -75,7 +80,8 @@ class TextPaginator {
       // 计算当前页能容纳多少行
       final lineMetrics = textPainter.computeLineMetrics();
       final lineCount = lineMetrics.length;
-      final fontSize = style.fontSize ?? 16.0;
+      // 行高需按系统字体缩放换算，保证与真机渲染一致
+      final fontSize = textScaler.scale(style.fontSize ?? 16.0);
       final lineHeightPx = fontSize * lineHeight;
       final maxLines = lineHeightPx > 0 ? (currentAvailableHeight / lineHeightPx).floor() : 1;
 
@@ -210,6 +216,11 @@ class _SimulationPageViewState extends State<SimulationPageView>
   double _dragProgress = 0.0;
   bool _isDragging = false;
   int _currentPage = 0;
+  /// 边界外拉累计位移（像素），用于在首/末页触发切章
+  double _boundaryDrag = 0.0;
+
+  /// 边界切章的位移阈值（像素）
+  static const double _kBoundaryDragThreshold = 60.0;
 
   int get pageCount => widget.pages.length;
 
@@ -275,12 +286,26 @@ class _SimulationPageViewState extends State<SimulationPageView>
 
     final width = MediaQuery.of(context).size.width;
     final delta = details.delta.dx;
+    final isLast = _currentPage >= widget.pages.length - 1;
+    final isFirst = _currentPage <= 0;
 
     setState(() {
-      if (delta < 0 && _currentPage < widget.pages.length - 1) {
+      if (delta < 0 && !isLast) {
+        // 向后翻（存在下一页）
+        _boundaryDrag = 0;
         _dragProgress = ((_dragProgress * width + delta) / width).clamp(-1.0, 0.0);
-      } else if (delta > 0 && _currentPage > 0) {
+      } else if (delta > 0 && !isFirst) {
+        // 向前翻（存在上一页）
+        _boundaryDrag = 0;
         _dragProgress = ((_dragProgress * width + delta) / width).clamp(0.0, 1.0);
+      } else if (delta < 0 && isLast) {
+        // 最后一页继续向后拉：累计边界位移并给出轻微视觉反馈（用于切下一章）
+        _boundaryDrag += -delta;
+        _dragProgress = -(_boundaryDrag / width * 0.5).clamp(0.0, 0.3);
+      } else if (delta > 0 && isFirst) {
+        // 第一页继续向前拉：累计边界位移（用于切上一章）
+        _boundaryDrag += delta;
+        _dragProgress = (_boundaryDrag / width * 0.5).clamp(0.0, 0.3);
       }
     });
   }
@@ -290,7 +315,25 @@ class _SimulationPageViewState extends State<SimulationPageView>
     _isDragging = false;
 
     final velocity = details.primaryVelocity ?? 0;
+    final isLast = _currentPage >= widget.pages.length - 1;
+    final isFirst = _currentPage <= 0;
 
+    // 1. 边界切章：累计位移达到阈值或快速甩动（向左甩 velocity<0，向右甩 velocity>0）
+    if (isLast && (_boundaryDrag > _kBoundaryDragThreshold || velocity < -300)) {
+      _boundaryDrag = 0;
+      _resetDragProgress();
+      widget.onBoundaryReached?.call(true);
+      return;
+    }
+    if (isFirst && (_boundaryDrag > _kBoundaryDragThreshold || velocity > 300)) {
+      _boundaryDrag = 0;
+      _resetDragProgress();
+      widget.onBoundaryReached?.call(false);
+      return;
+    }
+    _boundaryDrag = 0;
+
+    // 2. 页内翻页
     if (_dragProgress.abs() > 0.25 || velocity.abs() > 300) {
       if (_dragProgress < 0 && _currentPage < widget.pages.length - 1) {
         _animateToPage(_currentPage + 1, forward: true);
@@ -299,25 +342,26 @@ class _SimulationPageViewState extends State<SimulationPageView>
         _animateToPage(_currentPage - 1, forward: false);
         return;
       }
-      // 滑动到章节边界，触发回调
-      if (_dragProgress < 0 && _currentPage >= widget.pages.length - 1) {
-        widget.onBoundaryReached?.call(true);
-        _dragProgress = 0;
-        return;
-      } else if (_dragProgress > 0 && _currentPage <= 0) {
-        widget.onBoundaryReached?.call(false);
-        _dragProgress = 0;
-        return;
-      }
     }
 
-    // 回弹
+    // 3. 回弹
     _animationController.forward(from: 0).then((_) {
+      if (mounted) {
+        setState(() {
+          _dragProgress = 0.0;
+        });
+      }
+      _animationController.reset();
+    });
+  }
+
+  /// 重置拖拽进度（边界切章触发后清理视觉反馈）
+  void _resetDragProgress() {
+    if (_dragProgress != 0) {
       setState(() {
         _dragProgress = 0.0;
       });
-      _animationController.reset();
-    });
+    }
   }
 
   @override

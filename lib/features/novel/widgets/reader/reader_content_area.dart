@@ -248,38 +248,36 @@ class _ScrollModeWrapperState extends State<_ScrollModeWrapper> {
         }
         return false;
       },
-      child: Stack(
-        children: [
-          widget.child,
-          Positioned.fill(
-            child: Listener(
-              behavior: HitTestBehavior.translucent,
-              onPointerDown: (e) {
-                _downPos = e.position;
-                _downTime = DateTime.now().millisecondsSinceEpoch;
-              },
-              onPointerUp: (e) {
-                if (_downPos == null || _downTime == null) return;
-                final dist = (e.position - _downPos!).distance;
-                final duration = DateTime.now().millisecondsSinceEpoch - _downTime!;
-                _downPos = null;
-                _downTime = null;
-                // 轻触（短距离 + 短时间）视为点击，触发菜单
-                if (dist < _kMaxTapDistance && duration < _kMaxTapDurationMs) {
-                  widget.onTapUp(TapUpDetails(kind: e.kind, globalPosition: e.position));
-                } else if (_overshootAccumulated > 0 && _overshootAccumulated < _kOvershootThreshold) {
-                  // 手指释放时 overshoot 未达到阈值，重置
-                  _resetOvershoot();
-                }
-              },
-              onPointerCancel: (_) {
-                _downPos = null;
-                _downTime = null;
-              },
-              child: Container(color: Colors.transparent),
-            ),
-          ),
-        ],
+      // Listener 作为父级包裹滚动视图：仅观察指针事件、不参与手势竞技场，
+      // 因此不会抢占 SingleChildScrollView 的竖直拖拽（修复滚动模式无法上下滑动）。
+      // 原实现用 Positioned.fill + Container(color: transparent) 叠加在最上层，
+      // 但 Container 带颜色会生成 opaque 命中行为的 _RenderColoredBox，
+      // 在 Stack 中优先命中并吞掉全部竖直拖拽，导致内容无法滚动。
+      child: Listener(
+        behavior: HitTestBehavior.translucent,
+        onPointerDown: (e) {
+          _downPos = e.position;
+          _downTime = DateTime.now().millisecondsSinceEpoch;
+        },
+        onPointerUp: (e) {
+          if (_downPos == null || _downTime == null) return;
+          final dist = (e.position - _downPos!).distance;
+          final duration = DateTime.now().millisecondsSinceEpoch - _downTime!;
+          _downPos = null;
+          _downTime = null;
+          // 轻触（短距离 + 短时间）视为点击，触发菜单
+          if (dist < _kMaxTapDistance && duration < _kMaxTapDurationMs) {
+            widget.onTapUp(TapUpDetails(kind: e.kind, globalPosition: e.position));
+          } else if (_overshootAccumulated > 0 && _overshootAccumulated < _kOvershootThreshold) {
+            // 手指释放时 overshoot 未达到阈值，重置
+            _resetOvershoot();
+          }
+        },
+        onPointerCancel: (_) {
+          _downPos = null;
+          _downTime = null;
+        },
+        child: widget.child,
       ),
     );
   }
