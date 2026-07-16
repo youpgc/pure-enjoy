@@ -23,3 +23,6 @@ pubspec.lock
 build/
 .idea/
 android/.gradle/
+
+# APK 安装包（构建产物，不上传仓库）
+*.apk
