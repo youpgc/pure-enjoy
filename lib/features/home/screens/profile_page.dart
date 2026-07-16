@@ -28,11 +28,15 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 当前应用版本号（形如 1.10.11）
   String _appVersion = '';
 
+  /// 是否有可更新的新版本（用于版本号右上角红点提示）
+  bool _hasUpdate = false;
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
     _loadAppVersion();
+    _checkUpdate();
   }
 
   /// 读取当前应用版本号，用于在版本信息右侧展示
@@ -41,6 +45,18 @@ class _ProfilePageState extends State<ProfilePage> {
     if (mounted) {
       setState(() {
         _appVersion = packageInfo.version;
+      });
+    }
+  }
+
+  /// 检查是否有新版本，有则在版本号右上角显示红点
+  /// 复用 VersionCheckService.checkUpdate（含 1 小时缓存），
+  /// 返回非 null 即表示存在可更新且未被忽略的新版本
+  Future<void> _checkUpdate() async {
+    final versionInfo = await VersionCheckService.instance.checkUpdate();
+    if (mounted) {
+      setState(() {
+        _hasUpdate = versionInfo != null;
       });
     }
   }
@@ -170,12 +186,31 @@ class _ProfilePageState extends State<ProfilePage> {
               mainAxisSize: MainAxisSize.min,
               children: [
                 if (_appVersion.isNotEmpty)
-                  Text(
-                    'v$_appVersion',
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  Stack(
+                    clipBehavior: Clip.none,
+                    children: [
+                      Text(
+                        'v$_appVersion',
+                        style: TextStyle(
+                          fontSize: 14,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                      // 有新版本时在版本号右上角显示红点
+                      if (_hasUpdate)
+                        Positioned(
+                          right: -8,
+                          top: -3,
+                          child: Container(
+                            width: 8,
+                            height: 8,
+                            decoration: const BoxDecoration(
+                              color: Colors.red,
+                              shape: BoxShape.circle,
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
                 const Icon(Icons.chevron_right),
               ],
@@ -183,6 +218,12 @@ class _ProfilePageState extends State<ProfilePage> {
             onTap: () async {
               final versionInfo = await VersionCheckService.instance.checkUpdate();
               if (!context.mounted) return;
+              // 点击后同步刷新红点状态（忽略更新或已是最新时红点消失）
+              if (mounted) {
+                setState(() {
+                  _hasUpdate = versionInfo != null;
+                });
+              }
               if (versionInfo != null) {
                 VersionCheckService.instance.showUpdateDialog(context, versionInfo);
               } else {
