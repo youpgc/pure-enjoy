@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/supabase_service.dart';
 import '../../profile/services/point_service.dart';
 import '../../auth/screens/login_screen.dart';
@@ -24,10 +25,24 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   int _totalPoints = 0;
 
+  /// 当前应用版本号（形如 1.10.11）
+  String _appVersion = '';
+
   @override
   void initState() {
     super.initState();
     _loadUserData();
+    _loadAppVersion();
+  }
+
+  /// 读取当前应用版本号，用于在版本信息右侧展示
+  Future<void> _loadAppVersion() async {
+    final packageInfo = await PackageInfo.fromPlatform();
+    if (mounted) {
+      setState(() {
+        _appVersion = packageInfo.version;
+      });
+    }
   }
 
   /// 从 Supabase 重新加载用户数据
@@ -151,7 +166,20 @@ class _ProfilePageState extends State<ProfilePage> {
           ListTile(
             leading: const Icon(Icons.system_update_outlined),
             title: const Text('版本信息'),
-            trailing: const Icon(Icons.chevron_right),
+            trailing: Row(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                if (_appVersion.isNotEmpty)
+                  Text(
+                    'v$_appVersion',
+                    style: TextStyle(
+                      fontSize: 14,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                const Icon(Icons.chevron_right),
+              ],
+            ),
             onTap: () async {
               final versionInfo = await VersionCheckService.instance.checkUpdate();
               if (!context.mounted) return;
