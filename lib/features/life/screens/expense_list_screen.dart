@@ -15,6 +15,8 @@ import '../models/expense_model.dart';
 import 'expense_statistics_screen.dart';
 import '../widgets/expense_form.dart';
 
+part 'expense_list_parts.dart';
+
 /// 支出列表页面 - Supabase 数据同步
 class ExpenseListScreen extends StatefulWidget {
   const ExpenseListScreen({super.key});
@@ -374,38 +376,24 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   }
 
   void _showEditExpenseForm(ExpenseModel expense) {
-    showModalBottomSheet(
+    _showExpenseFormSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => ExpenseForm(
-        userId: _userId ?? 'local_user',
-        expense: expense,
-        onSave: (updatedExpense) {
-          Navigator.pop(context);
-          _updateExpense(updatedExpense);
-        },
-      ),
+      userId: _userId ?? 'local_user',
+      expense: expense,
+      onSave: _updateExpense,
     );
   }
 
   void _showExpenseForm() {
-    showModalBottomSheet(
+    _showExpenseFormSheet(
       context: context,
-      isScrollControlled: true,
-      builder: (context) => ExpenseForm(
-        userId: _userId ?? 'local_user',
-        onSave: (newExpense) {
-          Navigator.pop(context);
-          _addExpense(newExpense);
-        },
-      ),
+      userId: _userId ?? 'local_user',
+      onSave: _addExpense,
     );
   }
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('记账'),
@@ -425,69 +413,19 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
       body: Column(
         children: [
           // 统计卡片（服务端聚合查询，不受分页限制）
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '${_displayedMonth.year}年${_displayedMonth.month.toString().padLeft(2, '0')}月',
-                  style: Theme.of(context).textTheme.titleMedium,
-                ),
-                const SizedBox(height: 8),
-                Row(
-                  children: [
-                    Text(
-                      '总支出: ¥${_totalAmount.toStringAsFixed(2)}',
-                      style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    if (_isLoadingTotal) ...[
-                      const SizedBox(width: 8),
-                      const SizedBox(
-                        width: 16,
-                        height: 16,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      ),
-                    ],
-                  ],
-                ),
-              ],
-            ),
+          _ExpenseStatCard(
+            displayedMonth: _displayedMonth,
+            totalAmount: _totalAmount,
+            isLoadingTotal: _isLoadingTotal,
           ),
 
           // 分类筛选
-          SizedBox(
-            height: 40,
-            child: ListView(
-              scrollDirection: Axis.horizontal,
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              children: [
-                CategoryChip(
-                  label: '全部',
-                  isSelected: _selectedCategory == 'all',
-                  onTap: () {
-                    setState(() => _selectedCategory = 'all');
-                    _loadExpenses(refresh: true);
-                  },
-                ),
-                ...DictService.instance.getItemsSync('expense_category').map((cat) => CategoryChip(
-                  label: cat.label,
-                  isSelected: _selectedCategory == cat.code,
-                  onTap: () {
-                    setState(() => _selectedCategory = cat.code);
-                    _loadExpenses(refresh: true);
-                  },
-                )),
-              ],
-            ),
+          _ExpenseCategoryFilter(
+            selectedCategory: _selectedCategory,
+            onSelected: (category) {
+              setState(() => _selectedCategory = category);
+              _loadExpenses(refresh: true);
+            },
           ),
           const SizedBox(height: 8),
 
@@ -496,18 +434,8 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
             child: _isLoading
                 ? const LoadingWidget()
                 : _expenses.isEmpty
-                    ? RefreshIndicator(
+                    ? _ExpenseEmptyState(
                         onRefresh: () => _loadExpenses(refresh: true),
-                        child: const CustomScrollView(
-                          slivers: [
-                            SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: Center(
-                                child: EmptyWidget(icon: Icons.receipt_long_outlined, message: '暂无记录'),
-                              ),
-                            ),
-                          ],
-                        ),
                       )
                     : RefreshIndicator(
                         onRefresh: () => _loadExpenses(refresh: true),
@@ -537,31 +465,12 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
                                 ? expense.createdAt!
                                 : expense.date;
 
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: const Icon(Icons.receipt),
-                                title: Text(categoryLabel),
-                                subtitle: Text(
-                                  '${DateTimeUtils.formatStandard(displayDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
-                                ),
-                                trailing: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      '¥${expense.amount.toStringAsFixed(2)}',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        color: colorScheme.error,
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    EditDeletePopupMenu(
-                                      onEdit: () => _showEditExpenseForm(expense),
-                                      onDelete: () => _deleteExpense(expense.id),
-                                    ),
-                                  ],
-                                ),
-                              ),
+                            return _ExpenseListItem(
+                              expense: expense,
+                              categoryLabel: categoryLabel,
+                              displayDate: displayDate,
+                              onEdit: () => _showEditExpenseForm(expense),
+                              onDelete: () => _deleteExpense(expense.id),
                             );
                           },
                         ),
@@ -576,4 +485,3 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     );
   }
 }
-

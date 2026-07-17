@@ -12,6 +12,8 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/note_model.dart';
 
+part 'note_list_parts.dart';
+
 /// 笔记列表页面 - Supabase 数据同步
 class NoteListScreen extends StatefulWidget {
   const NoteListScreen({super.key});
@@ -297,8 +299,6 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('笔记'),
@@ -306,27 +306,16 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
       body: Column(
         children: [
           // 搜索框
-          Padding(
-            padding: const EdgeInsets.all(16),
-            child: TextField(
-              onChanged: (value) {
-                _searchQuery = value;
-                _loadNotes(refresh: true);
-              },
-              decoration: InputDecoration(
-                hintText: '搜索笔记...',
-                prefixIcon: const Icon(Icons.search),
-                suffixIcon: _searchQuery.isNotEmpty
-                    ? IconButton(
-                        icon: const Icon(Icons.clear),
-                        onPressed: () {
-                          _searchQuery = '';
-                          _loadNotes(refresh: true);
-                        },
-                      )
-                    : null,
-              ),
-            ),
+          _NoteSearchBar(
+            searchQuery: _searchQuery,
+            onChanged: (value) {
+              _searchQuery = value;
+              _loadNotes(refresh: true);
+            },
+            onClear: () {
+              _searchQuery = '';
+              _loadNotes(refresh: true);
+            },
           ),
 
           // 笔记列表
@@ -334,16 +323,8 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
             child: _isLoading
                 ? const LoadingWidget()
                 : _notes.isEmpty
-                    ? RefreshIndicator(
+                    ? _NoteEmptyState(
                         onRefresh: () => _loadNotes(refresh: true),
-                        child: const CustomScrollView(
-                          slivers: [
-                            SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: EmptyWidget(icon: Icons.note_alt_outlined, message: '暂无笔记'),
-                            ),
-                          ],
-                        ),
                       )
                     : RefreshIndicator(
                         onRefresh: () => _loadNotes(refresh: true),
@@ -365,67 +346,10 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
                             final note = _notes[index];
 
-                            return Card(
-                              clipBehavior: Clip.antiAlias,
-                              child: InkWell(
-                                onTap: () => _showNoteForm(note),
-                                onLongPress: () => _showDeleteConfirm(context, note.id, note.title),
-                                child: Stack(
-                                  children: [
-                                    Padding(
-                                      padding: const EdgeInsets.all(12),
-                                      child: Column(
-                                        crossAxisAlignment: CrossAxisAlignment.start,
-                                        children: [
-                                          Text(
-                                            note.title,
-                                            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                              fontWeight: FontWeight.bold,
-                                            ),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                          ),
-                                          const SizedBox(height: 8),
-                                          Expanded(
-                                            child: Text(
-                                              note.content ?? '',
-                                              style: Theme.of(context).textTheme.bodySmall,
-                                              overflow: TextOverflow.fade,
-                                            ),
-                                          ),
-                                          if (note.isPinned)
-                                            Container(
-                                              width: 4,
-                                              height: double.infinity,
-                                              decoration: BoxDecoration(
-                                                color: colorScheme.primary,
-                                                borderRadius: BorderRadius.circular(2),
-                                              ),
-                                            ),
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            DateTimeUtils.formatStandard(note.createdAt),
-                                            style: TextStyle(
-                                              fontSize: 10,
-                                              color: colorScheme.outline.withValues(alpha: 0.7),
-                                            ),
-                                          ),
-                                        ],
-                                      ),
-                                    ),
-                                    if (note.isPinned)
-                                      Positioned(
-                                        top: 8,
-                                        right: 8,
-                                        child: Icon(
-                                          Icons.push_pin,
-                                          size: 16,
-                                          color: colorScheme.primary,
-                                        ),
-                                      ),
-                                  ],
-                                ),
-                              ),
+                            return _NoteGridItem(
+                              note: note,
+                              onTap: () => _showNoteForm(note),
+                              onLongPress: () => _showDeleteConfirm(context, note.id, note.title),
                             );
                           },
                         ),

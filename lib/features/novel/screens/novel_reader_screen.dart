@@ -19,10 +19,11 @@ import '../widgets/reader_page_turn.dart';
 import '../widgets/paged_chapter_content.dart';
 import '../widgets/curl_chapter_content.dart';
 import '../widgets/reader_enums.dart';
-import '../widgets/tts_panel.dart';
 import '../widgets/reader_settings_panel.dart';
 import '../widgets/reader/reader_widgets.dart';
 import '../../../core/widgets/widgets.dart';
+import 'reader_chapter_drawer.dart';
+import 'reader_panels.dart';
 
 
 /// 小说阅读器页面
@@ -239,53 +240,36 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     return _totalReadingTime;
   }
 
-  Widget _buildChapterDrawer() {
-    return ReaderChapterDrawer(
-      chapters: _chapters,
-      currentChapterIndex: _currentChapterIndex,
-      background: _background,
-      totalChapterCount: _totalChapterCount,
-      hasMoreChapters: _hasMoreChapters,
-      isLoadingMore: _isLoadingMoreMeta,
-      onCloseDrawer: () => _scaffoldKey.currentState?.closeDrawer(),
-      onChapterTap: (globalIndex, chapter) {
-        _shouldJumpToLastPage = false;
-        setState(() => _currentChapterIndex = globalIndex);
-        _loadChapterContent(chapter);
-      },
-      onLoadMore: () => _loadMoreChapterMeta(),
-      onRefresh: _chapters.isNotEmpty && _chapters.first.chapterOrder > 1 ? () async {
-        // 下拉刷新：加载前面未加载的章节（插入到列表头部）
-        final firstOrder = _chapters.first.chapterOrder;
-        final rangeStart = math.max(1, firstOrder - 50);
-        final rangeEnd = firstOrder - 1;
+  /// 下拉刷新：加载前面未加载的章节（插入到列表头部）
+  Future<void> _refreshChapterMeta() async {
+    final firstOrder = _chapters.first.chapterOrder;
+    final rangeStart = math.max(1, firstOrder - 50);
+    final rangeEnd = firstOrder - 1;
 
-        final result = await ApiClient.get(
-          'novel_chapters',
-          filters: {
-            'novel_id': 'eq.${widget.novel.id}',
-            'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.$rangeEnd)',
-          },
-          columns: 'id,title,chapter_num',
-          order: 'chapter_num.asc',
-          limit: null, // 取消默认 limit=10
-        );
-        if (result.isSuccess && result.data != null && mounted) {
-          final newChapters = result.data!
-              .map((json) => NovelChapterModel.fromJson(json))
-              .toList();
-          newChapters.removeWhere((c) => c.chapterOrder <= 0);
-          if (newChapters.isNotEmpty) {
-            setState(() {
-              // 插入到列表头部
-              _chapters.insertAll(0, newChapters);
-              // 更新当前章节索引（因为前面插入了新章节）
-              _currentChapterIndex += newChapters.length;
-            });
-          }
-        }
-      } : null,
+    final result = await ApiClient.get(
+      'novel_chapters',
+      filters: {
+        'novel_id': 'eq.${widget.novel.id}',
+        'and': '(chapter_num.gte.$rangeStart,chapter_num.lte.$rangeEnd)',
+      },
+      columns: 'id,title,chapter_num',
+      order: 'chapter_num.asc',
+      limit: null, // 取消默认 limit=10
     );
+    if (result.isSuccess && result.data != null && mounted) {
+      final newChapters = result.data!
+          .map((json) => NovelChapterModel.fromJson(json))
+          .toList();
+      newChapters.removeWhere((c) => c.chapterOrder <= 0);
+      if (newChapters.isNotEmpty) {
+        setState(() {
+          // 插入到列表头部
+          _chapters.insertAll(0, newChapters);
+          // 更新当前章节索引（因为前面插入了新章节）
+          _currentChapterIndex += newChapters.length;
+        });
+      }
+    }
   }
 
   Widget _buildBottomStatusBar() {
@@ -356,7 +340,14 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       isCollected: _isCollected,
       onBack: () => Navigator.pop(context),
       onToggleCollection: _toggleCollection,
-      onShowTtsPanel: _showTtsPanel,
+      onShowTtsPanel: () => showReaderTtsPanel(
+        context,
+        isPlaying: _isTtsPlaying,
+        onPlayStateChanged: (playing) => setState(() => _isTtsPlaying = playing),
+        novelId: widget.novel.id,
+        chapterId: _currentChapter?.id ?? '',
+        chapterContent: _currentChapter?.content ?? '',
+      ),
     );
   }
 
@@ -371,8 +362,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       onPreviousChapter: _previousChapter,
       onNextChapter: _nextChapter,
       onOpenDrawer: () => _scaffoldKey.currentState?.openDrawer(),
-      onShowBookmarkList: _showBookmarkList,
-      onShowAnnotationList: _showAnnotationList,
+      onShowBookmarkList: () => showReaderBookmarkList(
+        context,
+        bookmarks: _bookmarks,
+        currentChapter: _currentChapter,
+        onBookmarkTap: _jumpToBookmark,
+      ),
+      onShowAnnotationList: () => showReaderAnnotationList(
+        context,
+        annotations: _annotations,
+        onDelete: _deleteAnnotation,
+      ),
       onShowSettings: _showSettings,
       onToggleDayNight: () {
         setState(() {
@@ -1108,22 +1108,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 6.1 新增：显示书签列表
-  void _showBookmarkList() {
-    showModalBottomSheet(
-      context: context,
-      builder: (context) => ReaderBookmarkPanel(
-        bookmarks: _bookmarks,
-        currentChapter: _currentChapter,
-        onClose: () => Navigator.pop(context),
-        onBookmarkTap: (bm) {
-          Navigator.pop(context);
-          _jumpToBookmark(bm);
-        },
-      ),
-    );
-  }
-
   /// 6.1 新增：跳转到书签位置（支持字符偏移）
   void _jumpToBookmark(NovelBookmark bookmark) {
     // 安全查找：按 chapterOrder 匹配，避免数组越界
@@ -1160,28 +1144,6 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       baseStyle: baseStyle,
       chapterId: _currentChapter?.id ?? '',
       fontStyleHash: _fontStyleHash,
-    );
-  }
-
-  /// 6.1 新增：显示批注输入面板
-  void _showAnnotationInputPanel(String selectedText, int startOffset, int endOffset) {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => ReaderAnnotationPanel(
-        selectedText: selectedText,
-        startOffset: startOffset,
-        endOffset: endOffset,
-        onSave: (selectedText, startOffset, endOffset, note, color) async {
-          await _addAnnotation(
-            selectedText: selectedText,
-            startOffset: startOffset,
-            endOffset: endOffset,
-            note: note,
-            color: color,
-          );
-        },
-      ),
     );
   }
 
@@ -1222,56 +1184,17 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
     }
   }
 
-  /// 6.1 新增：显示批注列表（先刷新再展示）
-  void _showAnnotationList() async {
-    if (_currentChapter == null) return;
-    final userId = _userId;
-    final currentContext = context;
-    if (userId == null) {
-      showSnackBar(currentContext, '请先登录');
-      return;
+  /// 6.1 新增：删除批注
+  Future<void> _deleteAnnotation(NovelAnnotation annotation) async {
+    try {
+      await AnnotationService().deleteAnnotation(annotation.id);
+      setState(() {
+        _annotations.removeWhere((a) => a.id == annotation.id);
+      });
+      if (mounted) showSnackBar(context, '批注已删除'); // ignore: use_build_context_synchronously
+    } catch (e) {
+      if (mounted) showSnackBar(context, '删除失败'); // ignore: use_build_context_synchronously
     }
-
-    // 先刷新批注数据
-    await _loadAnnotations();
-
-    if (!mounted) return;
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => ReaderAnnotationListPanel(
-        annotations: _annotations,
-        onClose: () => Navigator.pop(context),
-        onDelete: (annotation) async {
-          try {
-            await AnnotationService().deleteAnnotation(annotation.id);
-            setState(() {
-              _annotations.removeWhere((a) => a.id == annotation.id);
-            });
-            if (mounted) showSnackBar(context, '批注已删除'); // ignore: use_build_context_synchronously
-          } catch (e) {
-            if (mounted) showSnackBar(context, '删除失败'); // ignore: use_build_context_synchronously
-          }
-        },
-      ),
-    );
-  }
-
-  /// 6.1 新增：显示TTS控制面板
-  void _showTtsPanel() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => TtsPanel(
-        isPlaying: _isTtsPlaying,
-        onPlayStateChanged: (playing) {
-          setState(() => _isTtsPlaying = playing);
-        },
-        novelId: widget.novel.id,
-        chapterId: _currentChapter?.id ?? '',
-        chapterContent: _currentChapter?.content ?? '',
-      ),
-    );
   }
 
   Future<void> _addToBookshelf() async {
@@ -1532,7 +1455,24 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
       key: _scaffoldKey,
       backgroundColor: _background.bgColor,
       appBar: null, // 始终不显示 AppBar
-      drawer: _buildChapterDrawer(),
+      drawer: ReaderChapterDrawerWidget(
+        chapters: _chapters,
+        currentChapterIndex: _currentChapterIndex,
+        background: _background,
+        totalChapterCount: _totalChapterCount,
+        hasMoreChapters: _hasMoreChapters,
+        isLoadingMore: _isLoadingMoreMeta,
+        onCloseDrawer: () => _scaffoldKey.currentState?.closeDrawer(),
+        onChapterTap: (globalIndex, chapter) {
+          _shouldJumpToLastPage = false;
+          setState(() => _currentChapterIndex = globalIndex);
+          _loadChapterContent(chapter);
+        },
+        onLoadMore: () => _loadMoreChapterMeta(),
+        onRefresh: _chapters.isNotEmpty && _chapters.first.chapterOrder > 1
+            ? _refreshChapterMeta
+            : null,
+      ),
       body: _isLoading
           ? const Center(child: LoadingWidget())
           : Stack(
@@ -1636,7 +1576,21 @@ class _NovelReaderScreenState extends State<NovelReaderScreen>
         shouldJumpToLastPage: _shouldJumpToLastPage,
         scrollController: _scrollController,
         buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
-        onShowAnnotationInput: _showAnnotationInputPanel,
+        onShowAnnotationInput: (selectedText, startOffset, endOffset) =>
+            showReaderAnnotationInput(
+          context,
+          selectedText,
+          startOffset,
+          endOffset,
+          onSave: (selectedText, startOffset, endOffset, note, color) =>
+              _addAnnotation(
+            selectedText: selectedText,
+            startOffset: startOffset,
+            endOffset: endOffset,
+            note: note,
+            color: color,
+          ),
+        ),
         getCachedTextStyle: _getCachedTextStyle,
         onScrollOvershoot: _handleScrollOvershoot,
         onScrollOvershootProgress: _handleScrollOvershootProgress,

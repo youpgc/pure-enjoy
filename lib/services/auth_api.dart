@@ -1,14 +1,16 @@
 import 'dart:convert';
-// TODO: 直接 import http 包用于调用 Supabase Auth REST API，因其需要特殊的 X-Client-Info 等 header，
-// 后续如 HttpClient 支持自定义 header 后可统一迁移。
-import 'package:http/http.dart' as http;
 import '../constants/app_constants.dart';
 import 'supabase_config.dart';
+import 'http_client.dart';
 
 /// 纯认证 API：负责与 Supabase Auth 端点的所有通信
 ///
 /// 不包含任何会话管理逻辑，仅返回结果。
 /// 调用方（AuthService）负责将结果保存到 SessionManager。
+///
+/// 所有 HTTP 请求统一经 [HttpClient.rawRequest] 发送，复用重试与超时能力，
+/// 且 401 时返回原始响应交由本类解析错误体（登录失败返回 SupabaseAuthResponse
+/// 而非抛异常）。
 class AuthApi {
   static AuthApi? _instance;
   AuthApi._();
@@ -57,10 +59,12 @@ class AuthApi {
       SecureLogger.log('🔐 URL: $_authUrl/token?grant_type=password');
       SecureLogger.log('🔐 Email: $email');
 
-      final response = await http.post(
-        Uri.parse('$_authUrl/token?grant_type=password'),
+      final response = await HttpClient.instance.rawRequest(
+        '$_authUrl/token?grant_type=password',
+        method: 'POST',
         headers: _anonHeaders,
-        body: jsonEncode({'email': email, 'password': password}),
+        body: {'email': email, 'password': password},
+        timeout: RequestTimeout.simple,
       );
 
       SecureLogger.log('🔐 响应码: ${response.statusCode}');
@@ -92,7 +96,7 @@ class AuthApi {
         email = account;
       } else {
         SecureLogger.log('🔐 开始解析账号: $account (类型: $accountType)');
-      final resolved = await _resolveAccountToEmail(account, accountType);
+        final resolved = await _resolveAccountToEmail(account, accountType);
         if (resolved == null) {
           SecureLogger.log('❌ 未找到账号对应用户');
           return SupabaseAuthResponse(error: '未找到该账号对应的用户');
@@ -134,10 +138,11 @@ class AuthApi {
         }
       }
 
-      final response = await http.post(
-        Uri.parse('$_authUrl/signup'),
+      final response = await HttpClient.instance.rawRequest(
+        '$_authUrl/signup',
+        method: 'POST',
         headers: _anonHeaders,
-        body: jsonEncode({
+        body: {
           'email': email,
           'password': password,
           'data': {
@@ -145,7 +150,8 @@ class AuthApi {
             if (phone != null) 'phone': phone,
             'role': roleUser,
           },
-        }),
+        },
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {
@@ -163,10 +169,12 @@ class AuthApi {
     required String refreshToken,
   }) async {
     try {
-      final response = await http.post(
-        Uri.parse('$_authUrl/token?grant_type=refresh_token'),
+      final response = await HttpClient.instance.rawRequest(
+        '$_authUrl/token?grant_type=refresh_token',
+        method: 'POST',
         headers: _anonHeaders,
-        body: jsonEncode({'refresh_token': refreshToken}),
+        body: {'refresh_token': refreshToken},
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {
@@ -185,12 +193,14 @@ class AuthApi {
     required String accessToken,
   }) async {
     try {
-      final response = await http.get(
-        Uri.parse('$_authUrl/user'),
+      final response = await HttpClient.instance.rawRequest(
+        '$_authUrl/user',
+        method: 'GET',
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer $accessToken',
         },
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {
@@ -210,14 +220,16 @@ class AuthApi {
     required String newPassword,
   }) async {
     try {
-      final response = await http.put(
-        Uri.parse('$_authUrl/user'),
+      final response = await HttpClient.instance.rawRequest(
+        '$_authUrl/user',
+        method: 'PUT',
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer $accessToken',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'password': newPassword}),
+        body: {'password': newPassword},
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {
@@ -254,14 +266,16 @@ class AuthApi {
       SecureLogger.log('🔐 解析类型: $type, 账号: $account');
 
       // 使用 RPC 调用 resolve_account_to_email 函数（SECURITY DEFINER 绕过 RLS）
-      final response = await http.post(
-        Uri.parse('${SupabaseConfig.url}/rest/v1/rpc/resolve_account_to_email'),
+      final response = await HttpClient.instance.rawRequest(
+        '${SupabaseConfig.url}/rest/v1/rpc/resolve_account_to_email',
+        method: 'POST',
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
           'Content-Type': 'application/json',
         },
-        body: jsonEncode({'account': account}),
+        body: {'account': account},
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {
@@ -287,14 +301,14 @@ class AuthApi {
   /// 检查 users 表中指定字段是否已存在（用于注册校验）
   Future<bool> _checkFieldExists(String field, String value) async {
     try {
-      final response = await http.get(
-        Uri.parse(
-          '${SupabaseConfig.url}/rest/v1/users?$field=eq.${Uri.encodeComponent(value)}&is_deleted=eq.false&select=id',
-        ),
+      final response = await HttpClient.instance.rawRequest(
+        '${SupabaseConfig.url}/rest/v1/users?$field=eq.${Uri.encodeComponent(value)}&is_deleted=eq.false&select=id',
+        method: 'GET',
         headers: {
           'apikey': SupabaseConfig.anonKey,
           'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
         },
+        timeout: RequestTimeout.simple,
       );
 
       if (response.statusCode == 200) {

@@ -1,18 +1,21 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../services/chapter_cache_service.dart';
-import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
-import '../widgets/novel_cover.dart';
-import '../../../constants/app_constants.dart';
 import 'novel_reader_screen.dart';
 import 'novel_comments_screen.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../../core/widgets/stat_item.dart';
+import '../widgets/novel_detail_header.dart';
+import '../widgets/novel_detail_stat_row.dart';
+import '../widgets/novel_detail_actions.dart';
+import '../widgets/novel_detail_description.dart';
+import '../widgets/novel_detail_comment_entry.dart';
+import '../widgets/novel_detail_chapter_header.dart';
+import '../widgets/novel_detail_chapter_list.dart';
+import 'novel_detail_dialogs.dart';
+import 'novel_detail_helpers.dart';
 
 /// 小说详情页面
 class NovelDetailScreen extends StatefulWidget {
@@ -98,24 +101,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
       return;
     }
     try {
-      // 检查是否已有评分
-      final existing = await ApiClient.get('novel_ratings',
-          filters: {'user_id': 'eq.$userId', 'novel_id': 'eq.${widget.novel.id}'},
-          columns: 'id',
-          limit: 1);
-
-      if (existing.isSuccess && existing.data != null && existing.data!.isNotEmpty) {
-        // 更新
-        final id = existing.data!.first['id'] as String;
-        await ApiClient.patch('novel_ratings', {'rating': rating}, id: id);
-      } else {
-        // 新增
-        await ApiClient.post('novel_ratings', {
-          'user_id': userId,
-          'novel_id': widget.novel.id,
-          'rating': rating,
-        });
-      }
+      await upsertNovelRating(userId, widget.novel.id, rating);
       if (mounted) {
         setState(() => _userRating = rating);
         showSnackBar(context, '评分成功');
@@ -171,26 +157,13 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   /// 加载章节列表第一页
   Future<void> _loadChapters() async {
     try {
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {
-          'novel_id': 'eq.${widget.novel.id}',
-          'chapter_num': 'gte.1',
-        },
-        columns: 'id,title,chapter_num,word_count',
-        order: 'chapter_num.asc',
-        limit: _chapterPageSize,
-        offset: 0,
-      );
-
-      if (result.isSuccess) {
-        final data = result.data!;
-        final chapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+      final page = await fetchNovelChapterPage(widget.novel.id, _chapterPageSize, 0);
+      if (page.isSuccess) {
         if (mounted) {
           setState(() {
-            _chapters = chapters;
+            _chapters = page.chapters;
             _isLoadingChapters = false;
-            _hasMoreChapters = data.length >= _chapterPageSize;
+            _hasMoreChapters = page.hasMore;
             _currentChapterPage = 1;
           });
         }
@@ -202,91 +175,22 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     }
   }
 
-  /// 显示评分对话框
-  void _showRatingDialog(BuildContext context) {
-    double tempRating = _userRating ?? 0;
-    showDialog(
-      context: context,
-      builder: (dialogContext) => StatefulBuilder(
-        builder: (context, setDialogState) => AlertDialog(
-          title: const Text('为这本小说评分'),
-          content: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Text(
-                widget.novel.title,
-                style: Theme.of(context).textTheme.bodyMedium,
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
-              ),
-              const SizedBox(height: 16),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: List.generate(5, (i) {
-                  return IconButton(
-                    iconSize: 36,
-                    icon: Icon(
-                      i < tempRating.round() ? Icons.star : Icons.star_border,
-                      color: i < tempRating.round() ? Colors.amber : null,
-                    ),
-                    onPressed: () {
-                      setDialogState(() => tempRating = (i + 1).toDouble());
-                    },
-                  );
-                }),
-              ),
-              const SizedBox(height: 8),
-              Text(
-                tempRating > 0 ? '${tempRating.toStringAsFixed(1)} 分' : '请选择评分',
-                style: Theme.of(context).textTheme.bodySmall,
-              ),
-            ],
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: tempRating > 0
-                  ? () {
-                      Navigator.pop(dialogContext);
-                      _submitRating(tempRating);
-                    }
-                  : null,
-              child: const Text('提交'),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-
   /// 触底加载更多章节
   Future<void> _loadMoreChapters() async {
     if (_isLoadingMoreChapters || !_hasMoreChapters) return;
     setState(() => _isLoadingMoreChapters = true);
 
     try {
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {
-          'novel_id': 'eq.${widget.novel.id}',
-          'chapter_num': 'gte.1',
-        },
-        columns: 'id,title,chapter_num,word_count',
-        order: 'chapter_num.asc',
-        limit: _chapterPageSize,
-        offset: _currentChapterPage * _chapterPageSize,
+      final page = await fetchNovelChapterPage(
+        widget.novel.id,
+        _chapterPageSize,
+        _currentChapterPage * _chapterPageSize,
       );
-
-      if (result.isSuccess) {
-        final data = result.data!;
-        final newChapters = data.map((json) => NovelChapterModel.fromJson(json)).toList();
+      if (page.isSuccess) {
         if (mounted) {
           setState(() {
-            _chapters.addAll(newChapters);
-            _hasMoreChapters = data.length >= _chapterPageSize;
+            _chapters.addAll(page.chapters);
+            _hasMoreChapters = page.hasMore;
             _currentChapterPage++;
             _isLoadingMoreChapters = false;
           });
@@ -297,40 +201,6 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     } catch (e) {
       if (mounted) setState(() => _isLoadingMoreChapters = false);
     }
-  }
-
-  /// 全量加载章节（用于弹窗"查看全部"）
-  Future<List<NovelChapterModel>> _loadAllChapters() async {
-    const batchSize = 50;
-    final allChapters = <NovelChapterModel>[];
-    int offset = 0;
-    bool hasMore = true;
-
-    while (hasMore) {
-      final result = await ApiClient.get(
-        'novel_chapters',
-        filters: {
-          'novel_id': 'eq.${widget.novel.id}',
-          'chapter_num': 'gte.1',
-        },
-        columns: 'id,title,chapter_num,word_count',
-        order: 'chapter_num.asc',
-        limit: batchSize,
-        offset: offset,
-      );
-
-      if (result.isSuccess) {
-        final data = result.data!;
-        final batch = data.map((json) => NovelChapterModel.fromJson(json)).toList();
-        allChapters.addAll(batch);
-        hasMore = data.length >= batchSize;
-        offset += batchSize;
-      } else {
-        hasMore = false;
-      }
-    }
-
-    return allChapters;
   }
 
   /// 加入/移出书架
@@ -345,27 +215,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
 
     if (_isInBookshelf && _bookshelfId != null) {
       // 移出书架 - 二次确认
-      final confirm = await showDialog<bool>(
-        context: context,
-        builder: (context) => AlertDialog(
-          title: const Text('确认移除'),
-          content: const Text('确定要将这本小说从书架移除吗？阅读进度将不会保留。'),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(context, false),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () => Navigator.pop(context, true),
-              style: FilledButton.styleFrom(
-                backgroundColor: Theme.of(context).colorScheme.error,
-              ),
-              child: const Text('移除'),
-            ),
-          ],
-        ),
-      );
-
+      final confirm = await showRemoveFromBookshelfDialog(context);
       if (confirm != true) return;
 
       try {
@@ -560,561 +410,85 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
     );
   }
 
-  /// 显示章节目录（弹窗内独立全量加载）
-  void _showChapterList() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setModalState) {
-          List<NovelChapterModel> allChapters = [];
-          bool isLoading = true;
-
-          // 异步加载全部章节
-          _loadAllChapters().then((chapters) {
-            if (mounted) {
-              setModalState(() {
-                allChapters = chapters;
-                isLoading = false;
-              });
-              // 同时更新详情页的 _chapters（避免后续重复加载）
-              if (_chapters.length < chapters.length) {
-                setState(() {
-                  _chapters = chapters;
-                  _hasMoreChapters = false;
-                });
-              }
-            }
-          });
-
-          return DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            maxChildSize: 0.9,
-            minChildSize: 0.3,
-            expand: false,
-            builder: (context, scrollController) => Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Row(
-                    children: [
-                      Text(
-                        '章节目录',
-                        style: Theme.of(context).textTheme.titleLarge,
-                      ),
-                      const Spacer(),
-                      Text(
-                        isLoading ? '加载中...' : '共 ${allChapters.length} 章',
-                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                          color: Theme.of(context).colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-                const Divider(height: 1),
-                Expanded(
-                  child: isLoading
-                      ? const Center(child: LoadingWidget())
-                      : allChapters.isEmpty
-                          ? const Center(child: Text('暂无章节'))
-                          : ListView.builder(
-                              controller: scrollController,
-                              itemCount: allChapters.length,
-                              itemBuilder: (context, index) {
-                                final chapter = allChapters[index];
-                                final isCurrent = chapter.chapterOrder == _currentChapter;
-
-                                return ListTile(
-                                  dense: true,
-                                  title: Text(
-                                    chapter.title,
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      color: isCurrent
-                                          ? Theme.of(context).colorScheme.primary
-                                          : null,
-                                      fontWeight: isCurrent ? FontWeight.bold : null,
-                                    ),
-                                  ),
-                                  trailing: isCurrent
-                                      ? Icon(
-                                          Icons.play_arrow,
-                                          color: Theme.of(context).colorScheme.primary,
-                                          size: 20,
-                                        )
-                                      : Text(
-                                          '${chapter.wordCount ?? ""}字',
-                                          style: TextStyle(
-                                            fontSize: 12,
-                                            color: Theme.of(context).colorScheme.onSurfaceVariant,
-                                          ),
-                                        ),
-                                  onTap: () {
-                                    Navigator.pop(context);
-                                    _jumpToChapter(chapter.chapterOrder);
-                                  },
-                                );
-                              },
-                            ),
-                ),
-              ],
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  /// 格式化字数
-  String _formatWordCount(int? wordCount) {
-    if (wordCount == null) return '未知';
-    return FormatUtils.formatWordCount(wordCount);
-  }
-
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
     final novel = widget.novel;
 
     return Scaffold(
       body: CustomScrollView(
         controller: _scrollController,
         slivers: [
-          // 顶部应用栏 + 封面
-          SliverAppBar(
-            expandedHeight: 280,
-            pinned: true,
-            flexibleSpace: FlexibleSpaceBar(
-              background: Stack(
-                fit: StackFit.expand,
-                children: [
-                  // 背景封面（模糊效果）
-                  NovelCover(
-                    coverUrl: novel.cover,
-                    title: novel.title,
-                    width: double.infinity,
-                    height: double.infinity,
-                    borderRadius: 0,
-                  ),
-                  // 渐变遮罩
-                  Container(
-                    decoration: BoxDecoration(
-                      gradient: LinearGradient(
-                        begin: Alignment.topCenter,
-                        end: Alignment.bottomCenter,
-                        colors: [
-                          Colors.transparent,
-                          Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                          colorScheme.surface,
-                        ],
-                        stops: const [0.0, 0.5, 1.0],
-                      ),
-                    ),
-                  ),
-                  // 小说信息
-                  Positioned(
-                    left: 20,
-                    right: 20,
-                    bottom: 20,
-                    child: Row(
-                      crossAxisAlignment: CrossAxisAlignment.end,
-                      children: [
-                        // 封面缩略图
-                        NovelCover(
-                          coverUrl: novel.cover,
-                          title: novel.title,
-                          width: 90,
-                          height: 120,
-                          borderRadius: 8,
-                        ),
-                        const SizedBox(width: 16),
-                        // 标题和作者
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Text(
-                                novel.title,
-                                style: const TextStyle(
-                                  fontSize: 20,
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.white,
-                                ),
-                                maxLines: 2,
-                                overflow: TextOverflow.ellipsis,
-                              ),
-                              const SizedBox(height: 6),
-                              Text(
-                                novel.author ?? '佚名',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.white.withValues(alpha: 0.9),
-                                ),
-                              ),
-                              const SizedBox(height: 4),
-                              if (novel.category != null)
-                                Container(
-                                  padding: const EdgeInsets.symmetric(
-                                    horizontal: 8,
-                                    vertical: 2,
-                                  ),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary,
-                                    borderRadius: BorderRadius.circular(4),
-                                  ),
-                                  child: Text(
-                                    DictService.instance.getLabelOrDefault(
-                                      dictNovelCategory,
-                                      novel.category!,
-                                      defaultValue: novel.category!,
-                                    ),
-                                    style: const TextStyle(
-                                      fontSize: 11,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
+          NovelDetailHeader(novel: novel),
+          NovelDetailStatRow(
+            novel: novel,
+            userRating: _userRating,
+            onRateTap: () => showNovelRatingDialog(
+              context,
+              novelTitle: novel.title,
+              onSubmit: _submitRating,
             ),
           ),
-
-          // 统计信息
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
-              child: Row(
-                children: [
-                  StatItem(
-                    label: '字数',
-                    value: _formatWordCount(novel.wordCount),
-                  ),
-                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  StatItem(
-                    label: '章节',
-                    value: '${novel.chapterCount} 章',
-                  ),
-                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  StatItem(
-                    label: '状态',
-                    value: DictService.instance.getLabelOrDefault(dictNovelStatus, novel.status ?? '', defaultValue: novel.status == novelStatusCompleted ? '已完结' : '连载中'),
-                  ),
-                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  StatItem(
-                    label: '评分',
-                    value: novel.rating != null ? '${novel.rating}' : '--',
-                  ),
-                  Container(width: 1, height: 32, color: colorScheme.outlineVariant),
-                  InkWell(
-                    onTap: () {
-                      _showRatingDialog(context);
-                    },
-                    borderRadius: BorderRadius.circular(8),
-                    child: Padding(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Row(
-                            mainAxisSize: MainAxisSize.min,
-                            children: List.generate(5, (i) {
-                              final filled = i < (_userRating?.round() ?? 0);
-                              return Icon(
-                                filled ? Icons.star : Icons.star_border,
-                                size: 18,
-                                color: filled ? Colors.amber : colorScheme.outline,
-                              );
-                            }),
-                          ),
-                          const SizedBox(height: 2),
-                          Text(
-                            _userRating != null ? '我的评分: ${_userRating!.toStringAsFixed(1)}' : '点击评分',
-                            style: TextStyle(fontSize: 10, color: colorScheme.outline),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
+          NovelDetailActions(
+            isInBookshelf: _isInBookshelf,
+            isLoadingShelf: _isLoadingShelf,
+            currentChapter: _currentChapter,
+            isDownloading: _isDownloading,
+            cachedChapterCount: _cachedChapterCount,
+            chaptersLength: _chapters.length,
+            isCollected: _isCollected,
+            onStartReading: _startReading,
+            onToggleBookshelf: _toggleBookshelf,
+            onDownload: _downloadAllChapters,
+            onClear: _clearCache,
+            onToggleCollect: _toggleCollect,
           ),
-
-          // 操作按钮
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  // 开始阅读按钮
-                  Expanded(
-                    child: FilledButton.icon(
-                      onPressed: _startReading,
-                      icon: const Icon(Icons.menu_book),
-                      label: Text(
-                        _isInBookshelf && _currentChapter > 1
-                            ? '继续阅读 第$_currentChapter章'
-                            : '开始阅读',
-                      ),
-                      style: FilledButton.styleFrom(
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 书架按钮
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: _isLoadingShelf
-                        ? const Center(child: LoadingWidget(size: 24))
-                        : OutlinedButton(
-                            onPressed: _toggleBookshelf,
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(48, 48),
-                            ),
-                            child: Icon(
-                              _isInBookshelf
-                                  ? Icons.library_books
-                                  : Icons.library_add_outlined,
-                              color: _isInBookshelf ? colorScheme.primary : null,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 缓存下载按钮
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: _isDownloading
-                        ? const Center(child: LoadingWidget(size: 24))
-                        : OutlinedButton(
-                            onPressed: _cachedChapterCount > 0 && _cachedChapterCount >= _chapters.length
-                                ? _clearCache
-                                : _downloadAllChapters,
-                            style: OutlinedButton.styleFrom(
-                              padding: EdgeInsets.zero,
-                              minimumSize: const Size(48, 48),
-                            ),
-                            child: Icon(
-                              _cachedChapterCount > 0
-                                  ? Icons.download_done
-                                  : Icons.download_outlined,
-                              color: _cachedChapterCount > 0 ? AppTheme.success : null,
-                            ),
-                          ),
-                  ),
-                  const SizedBox(width: 12),
-                  // 收藏按钮
-                  SizedBox(
-                    width: 48,
-                    height: 48,
-                    child: OutlinedButton(
-                      onPressed: _isInBookshelf ? _toggleCollect : null,
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(48, 48),
-                      ),
-                      child: Icon(
-                        _isCollected
-                            ? Icons.favorite
-                            : Icons.favorite_border,
-                        color: _isCollected ? Theme.of(context).colorScheme.error : null,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // 小说简介
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    '简介',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 8),
-                  Text(
-                    novel.description ?? '暂无简介',
-                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                      height: 1.6,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
+          NovelDetailDescription(novel: novel),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // 评论区入口
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: InkWell(
-                onTap: () {
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (_) => NovelCommentsScreen(
-                        novelId: novel.id,
-                        novelTitle: novel.title,
-                      ),
-                    ),
-                  );
-                },
-                borderRadius: BorderRadius.circular(12),
-                child: Container(
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.3),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(Icons.comment_bank_outlined,
-                          color: colorScheme.primary),
-                      const SizedBox(width: 12),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '评论区',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .titleMedium,
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              '查看读者评论，分享你的读后感',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodySmall
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      Icon(Icons.chevron_right,
-                          color: colorScheme.onSurfaceVariant),
-                    ],
+          NovelDetailCommentEntry(
+            novelId: novel.id,
+            novelTitle: novel.title,
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => NovelCommentsScreen(
+                    novelId: novel.id,
+                    novelTitle: novel.title,
                   ),
                 ),
-              ),
-            ),
+              );
+            },
           ),
-
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-
-          // 章节目录
-          SliverToBoxAdapter(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: Row(
-                children: [
-                  Text(
-                    '章节目录',
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const Spacer(),
-                  if (!_isLoadingChapters)
-                    Text(
-                      '共 ${widget.novel.chapterCount} 章',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  const SizedBox(width: 8),
-                  GestureDetector(
-                    onTap: _showChapterList,
-                    child: Text(
-                      '查看全部',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: colorScheme.primary,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-
-          // 章节列表（分页加载，默认10条/页，触底加载更多）
-          SliverList(
-            delegate: SliverChildBuilderDelegate(
-              (context, index) {
-                if (_isLoadingChapters) {
-                  return const ListTile(
-                    dense: true,
-                    title: Center(child: LoadingWidget()),
-                  );
+          NovelDetailChapterHeader(
+            isLoadingChapters: _isLoadingChapters,
+            chapterCount: widget.novel.chapterCount,
+            onShowAll: () => showNovelChapterListSheet(
+              context,
+              loadAllChapters: () => loadAllNovelChapters(widget.novel.id),
+              currentChapter: _currentChapter,
+              onJump: _jumpToChapter,
+              onChaptersLoaded: (chapters) {
+                // 同时更新详情页的 _chapters（避免后续重复加载）
+                if (_chapters.length < chapters.length) {
+                  setState(() {
+                    _chapters = chapters;
+                    _hasMoreChapters = false;
+                  });
                 }
-
-                // 加载更多指示器
-                if (index == _chapters.length) {
-                  if (_isLoadingMoreChapters) {
-                    return const ListTile(
-                      dense: true,
-                      title: Center(child: LoadingWidget()),
-                    );
-                  }
-                  return const SizedBox.shrink();
-                }
-
-                if (index > _chapters.length) return null;
-
-                final chapter = _chapters[index];
-                final isCurrent = chapter.chapterOrder == _currentChapter;
-
-                return ListTile(
-                  dense: true,
-                  title: Text(
-                    chapter.title,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: isCurrent ? colorScheme.primary : null,
-                      fontWeight: isCurrent ? FontWeight.bold : null,
-                    ),
-                  ),
-                  trailing: isCurrent
-                      ? Icon(
-                          Icons.play_arrow,
-                          color: colorScheme.primary,
-                          size: 20,
-                        )
-                      : null,
-                  onTap: () => _jumpToChapter(chapter.chapterOrder),
-                );
               },
-              childCount: _isLoadingChapters ? 1 : _chapters.length + (_hasMoreChapters ? 1 : 0),
             ),
           ),
-
-          // 底部间距
+          const SliverToBoxAdapter(child: SizedBox(height: 8)),
+          NovelDetailChapterList(
+            chapters: _chapters,
+            currentChapter: _currentChapter,
+            hasMoreChapters: _hasMoreChapters,
+            isLoadingChapters: _isLoadingChapters,
+            isLoadingMoreChapters: _isLoadingMoreChapters,
+            onJump: _jumpToChapter,
+          ),
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),

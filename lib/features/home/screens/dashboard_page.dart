@@ -9,7 +9,6 @@ import '../../../core/widgets/widgets.dart';
 import '../../../services/api_client.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/supabase_service.dart';
-import '../../../utils/date_time_utils.dart';
 import '../../life/models/habit_model.dart';
 import '../../life/models/reminder_model.dart';
 import '../../life/screens/reminders_screen.dart';
@@ -17,7 +16,9 @@ import '../../novel/models/novel_model.dart';
 import '../../novel/screens/novel_reader_screen.dart';
 import 'notification_center_screen.dart';
 import 'sheets/sheets.dart';
+import 'dashboard_helpers.dart';
 import '../widgets/dashboard/dashboard_widgets.dart';
+import 'dashboard_activity_helpers.dart';
 
 /// 首页仪表板页面
 ///
@@ -114,8 +115,7 @@ class _DashboardPageState extends State<DashboardPage> {
           limit: 3);
 
       if (result.isSuccess) {
-        final List data = result.data as List;
-        final habits = data.map((e) => HabitModel.fromJson(e as Map<String, dynamic>)).toList();
+        final habits = parseHabits(result.data as List);
 
         // 批量加载所有习惯的打卡记录
         final history = <String, List<HabitCheckinModel>>{};
@@ -127,18 +127,10 @@ class _DashboardPageState extends State<DashboardPage> {
               order: 'checkin_at.desc',
               limit: 3);
 
-          if (checkinsResult.isSuccess) {
-            final List checkinsData = checkinsResult.data as List;
-            for (final checkin in checkinsData) {
-              final model = HabitCheckinModel.fromJson(checkin as Map<String, dynamic>);
-              final habitId = model.habitId;
-              history.putIfAbsent(habitId, () => []).add(model);
-            }
-          }
-          // 确保所有习惯都有条目
-          for (final habit in habits) {
-            history.putIfAbsent(habit.id, () => []);
-          }
+          final checkinsData = checkinsResult.isSuccess
+              ? checkinsResult.data as List
+              : <dynamic>[];
+          history.addAll(buildCheckinHistory(checkinsData, habits));
         }
 
         if (mounted) {
@@ -156,18 +148,7 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// 获取今日待打卡的习惯列表
-  List<HabitModel> get _pendingHabits {
-    final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
-    return _habits.where((habit) {
-      final checkins = _checkinHistory[habit.id] ?? [];
-      return !checkins.any((c) {
-        final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
-        return dateStr == todayStr;
-      });
-    }).toList();
-  }
+  List<HabitModel> get _pendingHabits => computePendingHabits(_habits, _checkinHistory);
 
   /// 一键打卡
   Future<void> _quickCheckIn(HabitModel habit) async {
@@ -268,14 +249,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (diaryResult.isSuccess) {
         final list = diaryResult.data as List;
         if (list.isNotEmpty) {
-          final item = list[0] as Map<String, dynamic>;
-          activities.add({
-            'icon': Icons.edit_note,
-            'title': '心情日记',
-            'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
-            'time': _formatDisplayDate(item['created_at'], item['entry_date']),
-            'created_at_raw': item['created_at'] as String? ?? '',
-          });
+          activities.add(buildDiaryActivity(list[0] as Map<String, dynamic>));
         }
       }
 
@@ -284,19 +258,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (expenseResult.isSuccess) {
         final list = expenseResult.data as List;
         if (list.isNotEmpty) {
-          final item = list[0] as Map<String, dynamic>;
-          final categoryLabel = DictService.instance.getLabelOrDefault(
-            'expense_category',
-            item['category'] as String? ?? '',
-            defaultValue: item['category'] as String? ?? '其他',
-          );
-          activities.add({
-            'icon': Icons.attach_money,
-            'title': '支出记录',
-            'subtitle': '$categoryLabel ¥${item['amount'] ?? 0}',
-            'time': _formatDisplayDate(item['created_at'], item['date']),
-            'created_at_raw': item['created_at'] as String? ?? '',
-          });
+          activities.add(buildExpenseActivity(list[0] as Map<String, dynamic>));
         }
       }
 
@@ -305,14 +267,7 @@ class _DashboardPageState extends State<DashboardPage> {
       if (weightResult.isSuccess) {
         final list = weightResult.data as List;
         if (list.isNotEmpty) {
-          final item = list[0] as Map<String, dynamic>;
-          activities.add({
-            'icon': Icons.monitor_weight,
-            'title': '体重记录',
-            'subtitle': '${item['weight'] ?? 0} kg',
-            'time': _formatDisplayDate(item['created_at'], item['date']),
-            'created_at_raw': item['created_at'] as String? ?? '',
-          });
+          activities.add(buildWeightActivity(list[0] as Map<String, dynamic>));
         }
       }
 
@@ -411,29 +366,9 @@ class _DashboardPageState extends State<DashboardPage> {
           select: 'id,title,author,cover_url,category,chapter_count',
           limit: novelIds.length);
 
-      final novels = <Map<String, dynamic>>[];
-      if (novelsResult.isSuccess && novelsResult.data != null) {
-        for (final novelData in novelsResult.data!) {
-          final novelId = novelData['id']?.toString() ?? '';
-          final progressItem = progressMap[novelId];
-          if (progressItem != null) {
-            novels.add({
-              'novel': NovelModel.fromJson(novelData),
-              'lastChapter': progressItem['last_chapter'] as int? ?? 1,
-              'progress': progressItem['progress'] as num? ?? 0.0,
-            });
-          }
-        }
-      }
-
-      // 按阅读时间排序（因为 novels 查询不保证顺序）
-      novels.sort((a, b) {
-        final idA = (a['novel'] as NovelModel).id;
-        final idB = (b['novel'] as NovelModel).id;
-        final idxA = novelIds.indexOf(idA);
-        final idxB = novelIds.indexOf(idB);
-        return idxA.compareTo(idxB);
-      });
+      final novels = novelsResult.isSuccess && novelsResult.data != null
+          ? buildRecentNovelList(novelsResult.data!, progressMap, novelIds)
+          : <Map<String, dynamic>>[];
 
       if (mounted) {
         setState(() {
@@ -447,28 +382,6 @@ class _DashboardPageState extends State<DashboardPage> {
       }
       if (mounted) setState(() => _isLoadingNovels = false);
     }
-  }
-
-  /// 格式化时间显示（优先创建时间，非同一天则展示选择日期）
-  String _formatDisplayDate(String? createdAt, String? selectedDate) {
-    if (createdAt == null && selectedDate == null) return '';
-    final created = createdAt != null ? DateTime.tryParse(createdAt) : null;
-    if (created == null) {
-      final dt = selectedDate != null ? DateTime.tryParse(selectedDate) : null;
-      if (dt == null) return '';
-      return DateTimeUtils.formatStandard(dt);
-    }
-    final createdLocal = created.toLocal();
-    if (selectedDate != null) {
-      final selected = DateTime.tryParse(selectedDate);
-      if (selected != null &&
-          (createdLocal.year != selected.year ||
-              createdLocal.month != selected.month ||
-              createdLocal.day != selected.day)) {
-        return DateTimeUtils.formatStandard(selected);
-      }
-    }
-    return DateTimeUtils.formatStandard(created);
   }
 
   /// 通用保存记录并刷新
@@ -501,162 +414,105 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 显示添加心情日记弹窗
-  void _showAddMoodSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddMoodSheet(
-        onSave: (diary) => _postRecord(
-          'mood_diaries',
-          diary.toJson(),
-          '日记添加成功',
-          onSuccess: _loadRecentActivities,
-        ),
-      ),
-    );
-  }
-
-  /// 显示添加支出弹窗
-  void _showAddExpenseSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddExpenseSheet(
-        onSave: (expense) => _postRecord(
-          'expenses',
-          expense.toJson(),
-          '支出添加成功',
-          onSuccess: () {
-            _loadRecentActivities();
-            EventBus.instance.fire(EventType.expenseUpdated);
-          },
-        ),
-      ),
-    );
-  }
-
-  /// 显示添加体重弹窗
-  void _showAddWeightSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddWeightSheet(
-        onSave: (record) => _postRecord(
-          'weight_records',
-          record.toJson(),
-          '体重记录添加成功',
-          onSuccess: () {
-            _loadRecentActivities();
-            EventBus.instance.fire(EventType.weightRecordUpdated);
-          },
-        ),
-      ),
-    );
-  }
-
-  /// 显示添加笔记弹窗
-  void _showAddNoteSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddNoteSheet(
-        onSave: (note) => _postRecord('notes', note.toJson(), '笔记添加成功',
-          onSuccess: _loadRecentActivities,
-        ),
-      ),
-    );
-  }
-
-  /// 显示添加提醒弹窗
-  void _showAddReminderSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddReminderSheet(
-        onSave: (reminder) => _postRecord(
-          'reminders',
-          reminder.toJson(),
-          '提醒添加成功',
-          onSuccess: _loadPendingReminders,
-        ),
-      ),
-    );
-  }
-
-  /// 显示添加习惯弹窗
-  void _showAddHabitSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (_) => AddHabitSheet(
-        onSave: (habit, reminderSchedule) async {
-          try {
-            final result = await ApiClient.post(
-              'habits',
-              habit.toJson(),
-              returnRepresentation: false,
-            );
-            if (result.isSuccess) {
-              // 保存提醒计划
-              if (reminderSchedule != null) {
-                await ApiClient.post(
-                  'reminder_schedules',
-                  reminderSchedule.copyWith(habitId: habit.id).toJson(),
-                  returnRepresentation: false,
-                );
-              }
-              if (mounted) {
-                Navigator.pop(context);
-                showSnackBar(context, '习惯添加成功');
-              }
-            } else {
-              throw Exception(result.errorMessage ?? '请求失败');
-            }
-          } catch (e) {
-            if (mounted) {
-              showSnackBar(context, '添加失败，请稍后重试', isError: true);
-            }
-          }
-        },
-      ),
-    );
-  }
-
   /// 工具点击处理
   void _onToolTap(ToolItem tool) {
     switch (tool.id) {
       case 'diary':
-        _showAddMoodSheet();
+        showAddMoodSheet(
+          context,
+          onSave: (diary) => _postRecord(
+            'mood_diaries',
+            diary.toJson(),
+            '日记添加成功',
+            onSuccess: _loadRecentActivities,
+          ),
+        );
         break;
       case 'expense':
-        _showAddExpenseSheet();
+        showAddExpenseSheet(
+          context,
+          onSave: (expense) => _postRecord(
+            'expenses',
+            expense.toJson(),
+            '支出添加成功',
+            onSuccess: () {
+              _loadRecentActivities();
+              EventBus.instance.fire(EventType.expenseUpdated);
+            },
+          ),
+        );
         break;
       case 'weight':
-        _showAddWeightSheet();
+        showAddWeightSheet(
+          context,
+          onSave: (record) => _postRecord(
+            'weight_records',
+            record.toJson(),
+            '体重记录添加成功',
+            onSuccess: () {
+              _loadRecentActivities();
+              EventBus.instance.fire(EventType.weightRecordUpdated);
+            },
+          ),
+        );
         break;
       case 'note':
-        _showAddNoteSheet();
+        showAddNoteSheet(
+          context,
+          onSave: (note) => _postRecord(
+            'notes',
+            note.toJson(),
+            '笔记添加成功',
+            onSuccess: _loadRecentActivities,
+          ),
+        );
         break;
       case 'reminder':
-        _showAddReminderSheet();
+        showAddReminderSheet(
+          context,
+          onSave: (reminder) => _postRecord(
+            'reminders',
+            reminder.toJson(),
+            '提醒添加成功',
+            onSuccess: _loadPendingReminders,
+          ),
+        );
         break;
       case 'habit':
-        _showAddHabitSheet();
+        showAddHabitSheet(
+          context,
+          onSave: (habit, reminderSchedule) async {
+            try {
+              final result = await ApiClient.post(
+                'habits',
+                habit.toJson(),
+                returnRepresentation: false,
+              );
+              if (result.isSuccess) {
+                // 保存提醒计划
+                if (reminderSchedule != null) {
+                  await ApiClient.post(
+                    'reminder_schedules',
+                    reminderSchedule.copyWith(habitId: habit.id).toJson(),
+                    returnRepresentation: false,
+                  );
+                }
+                if (mounted) {
+                  Navigator.pop(context);
+                  showSnackBar(context, '习惯添加成功');
+                }
+              } else {
+                throw Exception(result.errorMessage ?? '请求失败');
+              }
+            } catch (e) {
+              if (mounted) {
+                showSnackBar(context, '添加失败，请稍后重试', isError: true);
+              }
+            }
+          },
+        );
         break;
     }
-  }
-
-  /// 显示工具配置弹窗
-  void _showToolConfigSheet() {
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      builder: (context) => ToolConfigSheet(
-        visibleIds: _visibleToolIds,
-        onSave: _saveToolConfig,
-      ),
-    );
   }
 
   /// 跳转到提醒详情
@@ -723,7 +579,11 @@ class _DashboardPageState extends State<DashboardPage> {
             ),
             QuickToolsSection(
               visibleTools: visibleTools,
-              onConfigTap: _showToolConfigSheet,
+              onConfigTap: () => showToolConfigSheet(
+                context,
+                visibleIds: _visibleToolIds,
+                onSave: _saveToolConfig,
+              ),
               onToolTap: _onToolTap,
             ),
             RecentReadingSection(

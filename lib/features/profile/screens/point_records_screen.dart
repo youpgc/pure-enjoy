@@ -4,6 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
+import 'point_record_info.dart';
 
 /// 积分记录页面
 class PointRecordsScreen extends StatefulWidget {
@@ -160,41 +161,41 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   /// 积分类型映射（与数据库 point_records.type 和后台 POINT_TYPE_MAP 一致）
   /// 标准类型：checkin / earn / spend / adjust / admin_adjust
   /// 兼容历史类型：admin_recharge（已废弃，映射到 admin_adjust）
-  _PointTypeInfo _getTypeInfo(String type) {
+  PointTypeInfo _getTypeInfo(String type) {
     switch (type) {
       case 'checkin':
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.check_circle_outline,
           label: '签到',
           color: Colors.green,
         );
       case 'earn':
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.add_circle_outline,
           label: '获得',
           color: Colors.green,
         );
       case 'spend':
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.remove_circle_outline,
           label: '消费',
           color: Colors.red,
         );
       case 'adjust':
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.swap_horiz,
           label: '调整',
           color: Colors.blue,
         );
       case 'admin_adjust':
       case 'admin_recharge': // 兼容历史数据
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.admin_panel_settings_outlined,
           label: '管理员调整',
           color: Colors.purple,
         );
       default:
-        return _PointTypeInfo(
+        return PointTypeInfo(
           icon: Icons.help_outline,
           label: type,
           color: Colors.grey,
@@ -203,9 +204,9 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   }
 
   /// 获取过期状态标签信息
-  _ExpiryInfo _getExpiryInfo(PointRecord record) {
+  ExpiryInfo _getExpiryInfo(PointRecord record) {
     if (record.status == 'expired') {
-      return _ExpiryInfo(
+      return ExpiryInfo(
         label: '已过期',
         color: Colors.grey,
       );
@@ -214,13 +215,13 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       final now = DateTimeUtils.nowBeijing();
       final diff = record.expiresAt!.difference(now);
       if (diff.inDays <= 30 && diff.inDays >= 0) {
-        return _ExpiryInfo(
+        return ExpiryInfo(
           label: '即将过期',
           color: Colors.orange,
         );
       }
     }
-    return _ExpiryInfo(
+    return ExpiryInfo(
       label: '有效',
       color: Colors.green,
     );
@@ -486,26 +487,3 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   }
 }
 
-/// 积分类型信息
-class _PointTypeInfo {
-  final IconData icon;
-  final String label;
-  final Color color;
-
-  _PointTypeInfo({
-    required this.icon,
-    required this.label,
-    required this.color,
-  });
-}
-
-/// 过期状态信息
-class _ExpiryInfo {
-  final String label;
-  final Color color;
-
-  _ExpiryInfo({
-    required this.label,
-    required this.color,
-  });
-}

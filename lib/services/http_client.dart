@@ -327,6 +327,50 @@ class HttpClient {
     return response;
   }
 
+  /// 原始请求（全 URL，不注入 /rest/v1 前缀，不合并认证头）
+  ///
+  /// 用于 Supabase Auth 端点（/auth/v1/*）等需要完整自定义 URL 与自定义
+  /// 请求头的场景。复用统一重试与超时能力；[handle401] 固定为 false，
+  /// 即 401 时返回原始响应交由调用方解析错误体，而非抛 401 异常
+  /// （登录失败必须返回 SupabaseAuthResponse 而非抛异常）。
+  Future<http.Response> rawRequest(
+    String url, {
+    String method = 'GET',
+    Map<String, String>? headers,
+    Object? body,
+    Duration? timeout,
+  }) async {
+    final encodedBody =
+        body is String ? body : (body != null ? jsonEncode(body) : null);
+    return _requestWithRetry(
+      () => _sendRaw(method, url, headers, encodedBody),
+      timeout: timeout,
+      handle401: false,
+    );
+  }
+
+  /// 按 method 分发原始请求
+  Future<http.Response> _sendRaw(
+    String method,
+    String url,
+    Map<String, String>? headers,
+    String? body,
+  ) {
+    final uri = Uri.parse(url);
+    switch (method.toUpperCase()) {
+      case 'POST':
+        return http.post(uri, headers: headers, body: body);
+      case 'PUT':
+        return http.put(uri, headers: headers, body: body);
+      case 'PATCH':
+        return http.patch(uri, headers: headers, body: body);
+      case 'DELETE':
+        return http.delete(uri, headers: headers);
+      default:
+        return http.get(uri, headers: headers);
+    }
+  }
+
   // ==================== 工具方法 ====================
 
   /// 构建完整 URI
@@ -352,6 +396,7 @@ class HttpClient {
     int maxRetries = HttpClientConfig.maxRetries,
     Duration? timeout,
     CancelToken? cancelToken,
+    bool handle401 = true,
   }) async {
     http.Response? response;
     Exception? lastError;
@@ -373,6 +418,10 @@ class HttpClient {
 
         // 处理 401：尝试刷新 Token，失败才清空
         if (response.statusCode == 401) {
+          if (!handle401) {
+            // 调用方自行处理 401（如认证端点需返回错误响应而非抛异常）
+            return response;
+          }
           final refreshed = await _tryRefreshToken();
           if (refreshed) {
             continue; // Token 已刷新，重试当前请求

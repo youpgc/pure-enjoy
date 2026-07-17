@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/reminder_schedule_model.dart';
 import 'app_date_picker.dart';
+import 'reminder_schedule_picker_utils.dart';
 
 /// 习惯提醒计划选择器
 /// 支持按周、按月、按年、自定义日期组合提醒
@@ -370,7 +371,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
               avatar: const Icon(Icons.add, size: 18),
               label: const Text('添加年份'),
               onPressed: () async {
-                final year = await _showYearPickerDialog();
+                final year = await showYearPickerDialog(context);
                 if (year != null && !_years.contains(year)) {
                   setState(() {
                     _years.add(year);
@@ -466,51 +467,4 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
     _notifyChange();
   }
 
-  Future<int?> _showYearPickerDialog() async {
-    final currentYear = DateTime.now().year;
-    int selectedYear = currentYear;
-
-    return showDialog<int>(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('选择年份'),
-        content: StatefulBuilder(
-          builder: (context, setDialogState) {
-            return Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
-                  children: [
-                    IconButton(
-                      icon: const Icon(Icons.chevron_left),
-                      onPressed: () => setDialogState(() => selectedYear--),
-                    ),
-                    Text(
-                      '$selectedYear',
-                      style: Theme.of(context).textTheme.headlineSmall,
-                    ),
-                    IconButton(
-                      icon: const Icon(Icons.chevron_right),
-                      onPressed: () => setDialogState(() => selectedYear++),
-                    ),
-                  ],
-                ),
-              ],
-            );
-          },
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context, selectedYear),
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
 }

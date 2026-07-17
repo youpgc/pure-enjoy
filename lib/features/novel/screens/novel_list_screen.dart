@@ -4,16 +4,17 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../utils/cache_helper.dart';
-import '../../../utils/format_utils.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
-import '../widgets/novel_cover.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
 import 'ranking_screen.dart';
 import 'recommendation_screen.dart';
+import '../widgets/novel_card.dart';
+import '../widgets/novel_recommendation_card.dart';
+import 'novel_search_dialog.dart';
 
 import '../../../core/widgets/widgets.dart';
 
@@ -277,34 +278,10 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
 
   /// 显示搜索对话框
   void _showSearchDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('搜索小说'),
-        content: TextField(
-          controller: _searchController,
-          autofocus: true,
-          decoration: const InputDecoration(
-            hintText: '输入小说名或作者名',
-            prefixIcon: Icon(Icons.search),
-          ),
-          onChanged: _onSearchChanged,
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              _searchController.clear();
-              _onSearchChanged('');
-              Navigator.pop(context);
-            },
-            child: const Text('清除'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('搜索'),
-          ),
-        ],
-      ),
+    showNovelSearchDialog(
+      context,
+      controller: _searchController,
+      onSearchChanged: _onSearchChanged,
     );
   }
 
@@ -379,7 +356,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                         itemCount: _readingNovels.length,
                         itemBuilder: (context, index) {
                           final novel = _readingNovels[index];
-                          return _NovelCard(
+                          return NovelCard(
                             novel: novel,
                             onTap: () => _openNovelDetail(novel),
                           );
@@ -391,64 +368,15 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
 
                   // 猜你喜欢入口
                   if (_searchQuery.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 16),
-                      child: Card(
-                        clipBehavior: Clip.antiAlias,
-                        child: InkWell(
-                          onTap: () {
-                            Navigator.push(
-                              context,
-                              MaterialPageRoute(
-                                builder: (_) => const RecommendationScreen(),
-                              ),
-                            );
-                          },
-                          child: Padding(
-                            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-                            child: Row(
-                              children: [
-                                Container(
-                                  padding: const EdgeInsets.all(8),
-                                  decoration: BoxDecoration(
-                                    color: colorScheme.primary.withValues(alpha: 0.1),
-                                    borderRadius: BorderRadius.circular(8),
-                                  ),
-                                  child: Icon(
-                                    Icons.recommend,
-                                    color: colorScheme.primary,
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: Column(
-                                    crossAxisAlignment: CrossAxisAlignment.start,
-                                    children: [
-                                      Text(
-                                        '猜你喜欢',
-                                        style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                                          fontWeight: FontWeight.bold,
-                                        ),
-                                      ),
-                                      const SizedBox(height: 2),
-                                      Text(
-                                        '基于你的阅读偏好智能推荐',
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: colorScheme.onSurfaceVariant,
-                                        ),
-                                      ),
-                                    ],
-                                  ),
-                                ),
-                                Icon(
-                                  Icons.chevron_right,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                              ],
-                            ),
+                    NovelRecommendationCard(
+                      onTap: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (_) => const RecommendationScreen(),
                           ),
-                        ),
-                      ),
+                        );
+                      },
                     ),
 
                   // 分类筛选
@@ -548,7 +476,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                               itemBuilder: (context, index) {
                                 final novel = _novels[index];
                                 final isInBookshelf = bookshelfIds.contains(novel.id);
-                                return _NovelCard(
+                                return NovelCard(
                                   novel: novel,
                                   onTap: () => _openNovelDetail(novel),
                                   onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
@@ -566,153 +494,3 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
   }
 }
 
-class _NovelCard extends StatelessWidget {
-  final NovelModel novel;
-  final VoidCallback onTap;
-  final VoidCallback? onAddToBookshelf;
-  final bool isInBookshelf;
-
-  const _NovelCard({
-    required this.novel,
-    required this.onTap,
-    this.onAddToBookshelf,
-    this.isInBookshelf = false,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 封面
-            Expanded(
-              flex: 3,
-              child: Stack(
-                children: [
-                  NovelCover(
-                    coverUrl: novel.cover,
-                    title: novel.title,
-                    width: double.infinity,
-                    height: double.infinity,
-                    borderRadius: 0,
-                  ),
-                  if (onAddToBookshelf != null)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Material(
-                        color: colorScheme.primary,
-                        borderRadius: BorderRadius.circular(16),
-                        child: InkWell(
-                          onTap: onAddToBookshelf,
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(4),
-                            child: Icon(
-                              Icons.add,
-                              size: 16,
-                              color: colorScheme.onPrimary,
-                            ),
-                          ),
-                        ),
-                      ),
-                    ),
-                  if (isInBookshelf)
-                    Positioned(
-                      top: 4,
-                      right: 4,
-                      child: Container(
-                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                        decoration: BoxDecoration(
-                          color: colorScheme.primary,
-                          borderRadius: BorderRadius.circular(4),
-                        ),
-                        child: Text(
-                          '已加入',
-                          style: TextStyle(
-                            fontSize: 10,
-                            color: colorScheme.onPrimary,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            ),
-            // 信息
-            Expanded(
-              flex: 2,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      novel.title,
-                      style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                      ),
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      novel.author ?? '佚名',
-                      style: Theme.of(context).textTheme.bodySmall,
-                      maxLines: 1,
-                    ),
-                    const Spacer(),
-                    Row(
-                      children: [
-                        if (novel.category != null)
-                          Text(
-                            DictService.instance.getLabelOrDefault(
-                              dictNovelCategory,
-                              novel.category!,
-                              defaultValue: novel.category!,
-                            ),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                            ),
-                          )
-                        else
-                          Text(
-                            '${novel.chapterCount} 章',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        if (novel.wordCount != null && novel.wordCount! > 0) ...[
-                          const SizedBox(width: 4),
-                          Text(
-                            '·',
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                          const SizedBox(width: 4),
-                          Text(
-                            FormatUtils.formatWordCount(novel.wordCount!),
-                            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                              color: colorScheme.onSurfaceVariant,
-                            ),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}

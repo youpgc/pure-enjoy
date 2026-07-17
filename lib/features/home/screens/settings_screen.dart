@@ -11,8 +11,10 @@ import 'rich_text_page.dart';
 import '../../../services/version_check_service.dart';
 import '../../../services/supabase_service.dart';
 import '../../life/screens/feedback_list_screen.dart';
-import '../widgets/section_header.dart';
 import '../../../core/widgets/widgets.dart';
+import 'settings_list.dart';
+import 'settings_dialogs.dart';
+import 'settings_helpers.dart';
 
 /// 系统设置页面
 class SettingsScreen extends ConsumerStatefulWidget {
@@ -98,263 +100,112 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     }
   }
 
-  /// fontScale -> 字体大小名称映射
-  String _scaleToFontSize(double scale) {
-    if (scale <= 0.88) return '小';
-    if (scale <= 1.05) return '中';
-    if (scale <= 1.2) return '大';
-    return '特大';
-  }
-
-  /// 阅读背景名称映射
-  String _bgToName(ReaderBackgroundTheme bg) {
-    if (bg == ReaderBackgroundTheme.defaultWhite) return '默认';
-    if (bg == ReaderBackgroundTheme.warmYellow) return '暖黄';
-    if (bg == ReaderBackgroundTheme.darkGray) return '深色';
-    if (bg == ReaderBackgroundTheme.pureBlack) return '纯黑';
-    if (bg == ReaderBackgroundTheme.lightGreen) return '护眼绿';
-    if (bg == ReaderBackgroundTheme.lightBlue) return '淡蓝';
-    if (bg == ReaderBackgroundTheme.lightPink) return '淡粉';
-    if (bg == ReaderBackgroundTheme.brown) return '牛皮纸';
-    return bg.label;
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
         title: const Text('系统设置'),
       ),
-      body: ListView(
-        children: [
-          // 阅读设置
-          const SectionHeader(title: '阅读设置'),
-          SwitchListTile(
-            secondary: const Icon(Icons.nightlight_outlined),
-            title: const Text('深色模式'),
-            subtitle: const Text('切换深色/浅色主题'),
-            value: _isDarkMode,
-            onChanged: (val) {
-              setState(() => _isDarkMode = val);
-              ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.text_fields),
-            title: const Text('字体大小'),
-            subtitle: Text(_scaleToFontSize(_fontScale)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showFontSizeDialog(),
-          ),
-          ListTile(
-            leading: const Icon(Icons.palette_outlined),
-            title: const Text('阅读背景'),
-            subtitle: Text(_bgToName(_readerBg)),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showReadingBgDialog(),
-          ),
-
-          // 同步设置
-          const SectionHeader(title: '同步设置'),
-          SwitchListTile(
-            secondary: const Icon(Icons.sync),
-            title: const Text('自动同步'),
-            subtitle: const Text('连接网络时自动同步数据'),
-            value: _autoSync,
-            onChanged: (val) {
-              setState(() => _autoSync = val);
-              _saveBoolSetting(_autoSyncKey, val);
-            },
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.wifi),
-            title: const Text('仅WiFi同步'),
-            subtitle: const Text('移动网络下不同步数据'),
-            value: _wifiOnly,
-            onChanged: (val) {
-              setState(() => _wifiOnly = val);
-              _saveBoolSetting(_wifiOnlyKey, val);
-            },
-          ),
-          // 数据同步入口暂不使用
-          // ListTile(
-          //   leading: const Icon(Icons.cloud_sync_outlined),
-          //   title: const Text('数据同步'),
-          //   subtitle: const Text('手动同步数据到云端'),
-          //   trailing: const Icon(Icons.chevron_right),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (_) => const DataSyncScreen()),
-          //     );
-          //   },
-          // ),
-
-          // 通知设置
-          const SectionHeader(title: '通知设置'),
-          SwitchListTile(
-            secondary: const Icon(Icons.notifications_outlined),
-            title: const Text('推送通知'),
-            subtitle: const Text('接收系统推送通知'),
-            value: _pushNotification,
-            onChanged: (val) {
-              setState(() => _pushNotification = val);
-              _saveBoolSetting(_pushNotifKey, val);
-            },
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.alarm),
-            title: const Text('每日提醒'),
-            subtitle: const Text('每天提醒记录体重和心情'),
-            value: _dailyReminder,
-            onChanged: (val) {
-              setState(() => _dailyReminder = val);
-              _saveBoolSetting(_dailyReminderKey, val);
-            },
-          ),
-          SwitchListTile(
-            secondary: const Icon(Icons.cake_outlined),
-            title: const Text('纪念日提醒'),
-            subtitle: const Text('纪念日到期前提醒'),
-            value: _anniversaryReminder,
-            onChanged: (val) {
-              setState(() => _anniversaryReminder = val);
-              _saveBoolSetting(_anniversaryReminderKey, val);
-            },
-          ),
-
-          // 数据管理
-          const SectionHeader(title: '数据管理'),
-          ListTile(
-            leading: const Icon(Icons.cleaning_services_outlined),
-            title: const Text('清除缓存'),
-            subtitle: const Text('清除本地缓存数据'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showClearCacheDialog(),
-          ),
-          ListTile(
-            leading: const Icon(Icons.lock_outline),
-            title: const Text('修改密码'),
-            subtitle: const Text('修改登录密码'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () => _showChangePasswordDialog(),
-          ),
-          ListTile(
-            leading: Icon(Icons.delete_forever_outlined, color: Theme.of(context).colorScheme.error),
-            title: Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-            subtitle: const Text('永久删除账号及所有数据'),
-            trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
-            onTap: () => _showDeleteAccountDialog(),
-          ),
-
-          // 关于与法律
-          const SectionHeader(title: '关于与法律'),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('关于纯享'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RichTextPage(
-                    configKey: 'about',
-                    title: '关于纯享',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.privacy_tip_outlined),
-            title: const Text('隐私政策'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RichTextPage(
-                    configKey: 'privacy_policy',
-                    title: '隐私政策',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.description_outlined),
-            title: const Text('用户协议'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RichTextPage(
-                    configKey: 'user_agreement',
-                    title: '用户协议',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.help_outline),
-            title: const Text('帮助中心'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const RichTextPage(
-                    configKey: 'help_center',
-                    title: '帮助中心',
-                  ),
-                ),
-              );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.feedback_outlined),
-            title: const Text('问题反馈'),
-            subtitle: const Text('提交问题与建议'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (_) => const FeedbackListScreen(),
-                ),
-              );
-            },
-          ),
-          // 版本信息
-          const SectionHeader(title: '版本'),
-          ListTile(
-            leading: const Icon(Icons.system_update_outlined),
-            title: const Text('检查更新'),
-            subtitle: Text(_isCheckingUpdate
-                ? '检查中...'
-                : _latestVersion != null
-                    ? '发现新版本: $_latestVersion'
-                    : _currentVersion.isEmpty
-                        ? '加载中...'
-                        : '当前版本: $_currentVersion'),
-            trailing: _isCheckingUpdate
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Icon(Icons.chevron_right),
-            onTap: _isCheckingUpdate ? null : () => _checkUpdate(),
-          ),
-        ],
+      body: SettingsList(
+        isDarkMode: _isDarkMode,
+        fontScale: _fontScale,
+        readerBg: _readerBg,
+        autoSync: _autoSync,
+        wifiOnly: _wifiOnly,
+        pushNotification: _pushNotification,
+        dailyReminder: _dailyReminder,
+        anniversaryReminder: _anniversaryReminder,
+        currentVersion: _currentVersion,
+        isCheckingUpdate: _isCheckingUpdate,
+        latestVersion: _latestVersion,
+        onDarkModeChanged: (val) {
+          setState(() => _isDarkMode = val);
+          ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
+        },
+        onFontSizeTap: _showFontSizeDialog,
+        onReadingBgTap: _showReadingBgDialog,
+        onAutoSyncChanged: (val) {
+          setState(() => _autoSync = val);
+          _saveBoolSetting(_autoSyncKey, val);
+        },
+        onWifiOnlyChanged: (val) {
+          setState(() => _wifiOnly = val);
+          _saveBoolSetting(_wifiOnlyKey, val);
+        },
+        onPushNotifChanged: (val) {
+          setState(() => _pushNotification = val);
+          _saveBoolSetting(_pushNotifKey, val);
+        },
+        onDailyReminderChanged: (val) {
+          setState(() => _dailyReminder = val);
+          _saveBoolSetting(_dailyReminderKey, val);
+        },
+        onAnniversaryReminderChanged: (val) {
+          setState(() => _anniversaryReminder = val);
+          _saveBoolSetting(_anniversaryReminderKey, val);
+        },
+        onClearCacheTap: () => showClearCacheDialog(context, _clearCache),
+        onChangePasswordTap: _showChangePasswordDialog,
+        onDeleteAccountTap: () => showDeleteAccountDialog(context, _deleteAccount),
+        onAboutTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RichTextPage(
+                configKey: 'about',
+                title: '关于纯享',
+              ),
+            ),
+          );
+        },
+        onPrivacyTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RichTextPage(
+                configKey: 'privacy_policy',
+                title: '隐私政策',
+              ),
+            ),
+          );
+        },
+        onAgreementTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RichTextPage(
+                configKey: 'user_agreement',
+                title: '用户协议',
+              ),
+            ),
+          );
+        },
+        onHelpTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const RichTextPage(
+                configKey: 'help_center',
+                title: '帮助中心',
+              ),
+            ),
+          );
+        },
+        onFeedbackTap: () {
+          Navigator.push(
+            context,
+            MaterialPageRoute(
+              builder: (_) => const FeedbackListScreen(),
+            ),
+          );
+        },
+        onCheckUpdateTap: _checkUpdate,
       ),
     );
   }
 
   void _showFontSizeDialog() {
-    final currentSize = _scaleToFontSize(_fontScale);
+    final currentSize = scaleToFontSize(_fontScale);
     showDialog(
       context: context,
       builder: (dialogContext) => SimpleDialog(
@@ -422,29 +273,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showClearCacheDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('清除缓存'),
-        content: const Text('确定要清除本地缓存数据吗？不会影响云端数据。'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () async {
-              Navigator.pop(context);
-              await _clearCache();
-            },
-            child: const Text('确定'),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -470,32 +298,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         showSnackBar(context, '清除缓存失败，请稍后重试', isError: true);
       }
     }
-  }
-
-  void _showDeleteAccountDialog() {
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('注销账号', style: TextStyle(color: Theme.of(context).colorScheme.error)),
-        content: const Text(
-          '警告：此操作将永久删除您的账号及所有相关数据，包括消费记录、体重记录、心情日记、笔记、收藏等。此操作不可恢复！\n\n请确认您已备份重要数据。',
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(context).colorScheme.error),
-            onPressed: () async {
-              Navigator.pop(context);
-              await _deleteAccount();
-            },
-            child: const Text('确认注销'),
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _deleteAccount() async {

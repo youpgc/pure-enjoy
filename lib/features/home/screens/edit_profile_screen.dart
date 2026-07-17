@@ -6,6 +6,7 @@ import '../../../services/storage_service.dart';
 import '../../../config.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
+import 'edit_profile_widgets.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
@@ -331,8 +332,6 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('编辑资料'),
@@ -357,74 +356,35 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                 padding: const EdgeInsets.all(16),
                 children: [
                   // 头像区域
-                  Center(
-                    child: Column(
-                      children: [
-                        Stack(
-                          children: [
-                            CircleAvatar(
-                              radius: 50,
-                              backgroundColor: colorScheme.primaryContainer,
-                              backgroundImage: _avatarUrl != null
-                                  ? NetworkImage(_avatarUrl!)
-                                  : null,
-                              child: _avatarUrl == null
-                                  ? Icon(
-                                      Icons.person,
-                                      size: 50,
-                                      color: colorScheme.onPrimaryContainer,
-                                    )
-                                  : null,
-                            ),
-                            if (_isUploadingAvatar)
-                              Positioned.fill(
-                                child: CircleAvatar(
-                                  radius: 50,
-                                  backgroundColor: Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.5),
-                                  child: const SizedBox(
-                                    width: 24,
-                                    height: 24,
-                                    child: CircularProgressIndicator(
-                                      strokeWidth: 2,
-                                      color: Colors.white,
-                                    ),
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                        const SizedBox(height: 8),
-                        TextButton(
-                          onPressed: _isUploadingAvatar ? null : _pickAndUploadAvatar,
-                          child: const Text('更换头像'),
-                        ),
-                      ],
-                    ),
+                  ProfileAvatarSection(
+                    avatarUrl: _avatarUrl,
+                    isUploading: _isUploadingAvatar,
+                    onPick: _pickAndUploadAvatar,
                   ),
                   const SizedBox(height: 24),
 
                   // 基本信息
-                  _buildSectionTitle('基本信息'),
-                  _buildTextField(
+                  const ProfileSectionTitle('基本信息'),
+                  ProfileTextField(
                     controller: _nicknameController,
                     label: '昵称',
                     hint: '请输入昵称',
                     icon: Icons.person_outline,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _usernameController,
                     label: '用户名',
                     hint: '请输入用户名',
                     icon: Icons.account_circle_outlined,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _emailController,
                     label: '邮箱',
                     hint: '请输入邮箱',
                     icon: Icons.email_outlined,
                     keyboardType: TextInputType.emailAddress,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _phoneController,
                     label: '手机号',
                     hint: '请输入手机号',
@@ -435,8 +395,8 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 16),
 
                   // 个人简介
-                  _buildSectionTitle('个人简介'),
-                  _buildTextField(
+                  const ProfileSectionTitle('个人简介'),
+                  ProfileTextField(
                     controller: _bioController,
                     label: '个性签名',
                     hint: '介绍一下自己',
@@ -447,23 +407,23 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 16),
 
                   // 个人信息
-                  _buildSectionTitle('个人信息'),
-                  _buildGenderSelector(),
-                  _buildDatePickerField(
+                  const ProfileSectionTitle('个人信息'),
+                  ProfileGenderSelector(gender: _gender, onTap: _selectGender),
+                  ProfileDateField(
                     controller: _birthdayController,
                     label: '生日',
                     hint: '选择生日',
                     icon: Icons.cake_outlined,
                     onTap: _selectBirthday,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _heightController,
                     label: '身高',
                     hint: '请输入身高（cm）',
                     icon: Icons.height_outlined,
                     keyboardType: const TextInputType.numberWithOptions(decimal: true),
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _locationController,
                     label: '所在地',
                     hint: '请输入所在城市',
@@ -473,20 +433,20 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   const SizedBox(height: 16),
 
                   // 职业信息
-                  _buildSectionTitle('职业信息'),
-                  _buildTextField(
+                  const ProfileSectionTitle('职业信息'),
+                  ProfileTextField(
                     controller: _occupationController,
                     label: '职业',
                     hint: '请输入职业',
                     icon: Icons.work_outline,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _companyController,
                     label: '公司/组织',
                     hint: '请输入公司或组织名称',
                     icon: Icons.business_outlined,
                   ),
-                  _buildTextField(
+                  ProfileTextField(
                     controller: _websiteController,
                     label: '个人网站',
                     hint: 'https://example.com',
@@ -499,86 +459,4 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
     );
   }
 
-  Widget _buildSectionTitle(String title) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: Text(
-        title,
-        style: Theme.of(context).textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.bold,
-            ),
-      ),
-    );
-  }
-
-  Widget _buildTextField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    TextInputType? keyboardType,
-    int maxLines = 1,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextFormField(
-        controller: controller,
-        keyboardType: keyboardType,
-        maxLines: maxLines,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixIcon: Icon(icon),
-          border: const OutlineInputBorder(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildDatePickerField({
-    required TextEditingController controller,
-    required String label,
-    required String hint,
-    required IconData icon,
-    required VoidCallback onTap,
-  }) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: TextFormField(
-        controller: controller,
-        readOnly: true,
-        onTap: onTap,
-        decoration: InputDecoration(
-          labelText: label,
-          hintText: hint,
-          prefixIcon: Icon(icon),
-          suffixIcon: const Icon(Icons.arrow_drop_down),
-          border: const OutlineInputBorder(),
-        ),
-      ),
-    );
-  }
-
-  Widget _buildGenderSelector() {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: InkWell(
-        onTap: _selectGender,
-        child: InputDecorator(
-          decoration: const InputDecoration(
-            labelText: '性别',
-            prefixIcon: Icon(Icons.people_outline),
-            suffixIcon: Icon(Icons.arrow_drop_down),
-            border: OutlineInputBorder(),
-          ),
-          child: Text(
-            _gender ?? '保密',
-            style: TextStyle(
-              color: _gender == null ? Theme.of(context).colorScheme.onSurfaceVariant : null,
-            ),
-          ),
-        ),
-      ),
-    );
-  }
 }
