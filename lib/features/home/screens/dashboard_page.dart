@@ -19,6 +19,7 @@ import 'sheets/sheets.dart';
 import 'dashboard_helpers.dart';
 import '../widgets/dashboard/dashboard_widgets.dart';
 import 'dashboard_activity_helpers.dart';
+import 'dashboard_tool_handlers.dart';
 
 /// 首页仪表板页面
 ///
@@ -384,135 +385,16 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 通用保存记录并刷新
-  Future<void> _postRecord(
-    String table,
-    Map<String, dynamic> data,
-    String successMessage, {
-    VoidCallback? onSuccess,
-  }) async {
-    try {
-      final result = await ApiClient.post(
-        table,
-        data,
-        returnRepresentation: false,
-      );
-      if (result.isSuccess) {
-        if (mounted) {
-          // 先显示提示再关闭弹窗，避免 SnackBar 被弹窗遮挡
-          showSnackBar(context, successMessage);
-          Navigator.pop(context);
-          onSuccess?.call();
-        }
-      } else {
-        throw Exception(result.errorMessage ?? '请求失败');
-      }
-    } catch (e) {
-      if (mounted) {
-        showSnackBar(context, '添加失败，请稍后重试', isError: true);
-      }
-    }
-  }
-
-  /// 工具点击处理
+  /// 工具点击处理（分发逻辑抽至 dashboard_tool_handlers.dart，行为不变）
   void _onToolTap(ToolItem tool) {
-    switch (tool.id) {
-      case 'diary':
-        showAddMoodSheet(
-          context,
-          onSave: (diary) => _postRecord(
-            'mood_diaries',
-            diary.toJson(),
-            '日记添加成功',
-            onSuccess: _loadRecentActivities,
-          ),
-        );
-        break;
-      case 'expense':
-        showAddExpenseSheet(
-          context,
-          onSave: (expense) => _postRecord(
-            'expenses',
-            expense.toJson(),
-            '支出添加成功',
-            onSuccess: () {
-              _loadRecentActivities();
-              EventBus.instance.fire(EventType.expenseUpdated);
-            },
-          ),
-        );
-        break;
-      case 'weight':
-        showAddWeightSheet(
-          context,
-          onSave: (record) => _postRecord(
-            'weight_records',
-            record.toJson(),
-            '体重记录添加成功',
-            onSuccess: () {
-              _loadRecentActivities();
-              EventBus.instance.fire(EventType.weightRecordUpdated);
-            },
-          ),
-        );
-        break;
-      case 'note':
-        showAddNoteSheet(
-          context,
-          onSave: (note) => _postRecord(
-            'notes',
-            note.toJson(),
-            '笔记添加成功',
-            onSuccess: _loadRecentActivities,
-          ),
-        );
-        break;
-      case 'reminder':
-        showAddReminderSheet(
-          context,
-          onSave: (reminder) => _postRecord(
-            'reminders',
-            reminder.toJson(),
-            '提醒添加成功',
-            onSuccess: _loadPendingReminders,
-          ),
-        );
-        break;
-      case 'habit':
-        showAddHabitSheet(
-          context,
-          onSave: (habit, reminderSchedule) async {
-            try {
-              final result = await ApiClient.post(
-                'habits',
-                habit.toJson(),
-                returnRepresentation: false,
-              );
-              if (result.isSuccess) {
-                // 保存提醒计划
-                if (reminderSchedule != null) {
-                  await ApiClient.post(
-                    'reminder_schedules',
-                    reminderSchedule.copyWith(habitId: habit.id).toJson(),
-                    returnRepresentation: false,
-                  );
-                }
-                if (mounted) {
-                  Navigator.pop(context);
-                  showSnackBar(context, '习惯添加成功');
-                }
-              } else {
-                throw Exception(result.errorMessage ?? '请求失败');
-              }
-            } catch (e) {
-              if (mounted) {
-                showSnackBar(context, '添加失败，请稍后重试', isError: true);
-              }
-            }
-          },
-        );
-        break;
-    }
+    dashboardHandleToolTap(
+      context,
+      tool,
+      reloadActivities: _loadRecentActivities,
+      reloadReminders: _loadPendingReminders,
+      fireExpense: () => EventBus.instance.fire(EventType.expenseUpdated),
+      fireWeight: () => EventBus.instance.fire(EventType.weightRecordUpdated),
+    );
   }
 
   /// 跳转到提醒详情
