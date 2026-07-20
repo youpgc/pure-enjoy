@@ -7,6 +7,7 @@ import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../novel/screens/novel_detail_screen.dart';
 import '../../novel/screens/novel_reader_screen.dart';
 import '../../novel/models/novel_model.dart';
+import '../../novel/widgets/novel_cover.dart';
 import '../../../constants/app_constants.dart';
 
 /// 阅读历史页面
@@ -223,33 +224,18 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
         final item = _history[index];
         final novelData = item['novels'] as Map<String, dynamic>? ?? {};
         final title = novelData['title'] ?? '未知小说';
-        final coverUrl = novelData['cover_url'];
+        final coverUrl = novelData['cover_url'] as String?;
         final author = novelData['author'] ?? '';
         final lastChapter = item['last_chapter'] ?? 0;
 
         return ListTile(
-          leading: coverUrl != null
-              ? ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: Image.network(
-                    coverUrl,
-                    width: 50,
-                    height: 70,
-                    fit: BoxFit.cover,
-                    errorBuilder: (_, __, ___) => Container(
-                      width: 50,
-                      height: 70,
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                      child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                    ),
-                  ),
-                )
-              : Container(
-                  width: 50,
-                  height: 70,
-                  color: Theme.of(context).colorScheme.onSurfaceVariant,
-                  child: Icon(Icons.book, color: Theme.of(context).colorScheme.onSurfaceVariant),
-                ),
+          leading: NovelCover(
+            coverUrl: coverUrl,
+            title: title,
+            width: 56,
+            height: 76,
+            borderRadius: 6,
+          ),
           title: Text(title),
           subtitle: Text(
             '$author · 读到第$lastChapter章',
