@@ -2,6 +2,12 @@ import 'package:flutter/material.dart' hide ErrorWidget;
 import '../../../services/api_client.dart';
 import '../../../core/widgets/widgets.dart';
 
+/// app_configs 进程内缓存：配置（用户协议/隐私政策等）几乎不变，
+/// 按 configKey 缓存 30 分钟，避免每次进页都打 Supabase。
+final Map<String, String> _appConfigCache = {};
+final Map<String, DateTime> _appConfigCacheTime = {};
+const Duration _appConfigCacheTtl = Duration(minutes: 30);
+
 /// 富文本展示页面
 /// 通过 configKey 从 Supabase app_configs 表查询对应配置内容并渲染
 class RichTextPage extends StatefulWidget {
@@ -26,6 +32,21 @@ class _RichTextPageState extends State<RichTextPage> {
   }
 
   Future<void> _loadContent() async {
+    // 命中进程内缓存（30 分钟内）直接复用，省一次 Supabase 往返
+    final cachedContent = _appConfigCache[widget.configKey];
+    final cachedAt = _appConfigCacheTime[widget.configKey];
+    if (cachedContent != null &&
+        cachedAt != null &&
+        DateTime.now().difference(cachedAt) < _appConfigCacheTtl) {
+      if (mounted) {
+        setState(() {
+          _content = cachedContent;
+          _loading = false;
+        });
+      }
+      return;
+    }
+
     try {
       final result = await ApiClient.get(
         'app_configs',
@@ -37,8 +58,11 @@ class _RichTextPageState extends State<RichTextPage> {
       if (result.isSuccess) {
         final data = result.data!;
         if (data.isNotEmpty) {
+          final content = data[0]['content'] ?? '';
+          _appConfigCache[widget.configKey] = content;
+          _appConfigCacheTime[widget.configKey] = DateTime.now();
           setState(() {
-            _content = data[0]['content'] ?? '';
+            _content = content;
             _loading = false;
           });
         } else {
