@@ -60,9 +60,12 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
 
       final (limit, offset) = paginationParams;
 
+      // 嵌套查询：一次请求获取 user_novels + novels 详情（FK: user_novels.novel_id → novels.id）
       final result = await ApiClient.get(
         'user_novels',
         filters: {'user_id': 'eq.$userId'},
+        columns:
+            'id,novel_id,progress,last_chapter,last_read_at,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)',
         order: 'last_read_at.desc',
         limit: limit,
         offset: offset,
