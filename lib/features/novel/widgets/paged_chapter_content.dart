@@ -192,16 +192,16 @@ class PagedChapterContentState extends State<PagedChapterContent> {
       }
     });
 
-    // 只有在明确需要重置页签时才跳转（如切换章节）
-    // 菜单唤起、字体调整等操作不应重置页签
+    // 切换章节（resetPage）时，用目标页作为 PageController 的初始页重建控制器，
+    // 让 PageView 首帧即渲染正确页，避免先以初始页0（章节开头）渲染一帧、
+    // 再在帧后 jumpToPage 导致的“闪现章节开头”问题（回到上一章时尤为明显）。
+    // 字体/行高/背景调整等非 resetPage 场景不重建控制器，保留当前页码。
     if (resetPage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted && _pageController.hasClients) {
-          // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
-          final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
-          _pageController.jumpToPage(targetPage);
-        }
-      });
+      final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
+      if (mounted) {
+        _pageController.dispose();
+        _pageController = PageController(initialPage: targetPage);
+      }
     }
   }
 

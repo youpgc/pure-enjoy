@@ -62,6 +62,9 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     super.didUpdateWidget(oldWidget);
     // 只有章节切换时才重置页签，字体/行高/背景调整不重置
     if (oldWidget.chapter.id != widget.chapter.id) {
+      // 先进入重算态（显示 LoadingWidget），待分页算完再以 correct initialPage
+      // 挂载 SimulationPageView，避免先渲染第0页（章节开头）再跳转造成的闪现
+      setState(() => _isCalculating = true);
       _scheduleRecalculate(resetPage: true);
     } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
@@ -172,17 +175,11 @@ class CurlChapterContentState extends State<CurlChapterContent> {
       }
     });
 
-    // 只有在明确需要重置页签时才跳转（如切换章节）
-    // 菜单唤起、字体调整等操作不应重置页签
-    if (resetPage) {
-      WidgetsBinding.instance.addPostFrameCallback((_) {
-        if (mounted) {
-          // 根据 jumpToLastPage 决定跳转到第一页还是最后一页
-          final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
-          _simulationController.jumpToPage(targetPage);
-        }
-      });
-    }
+    // 切换章节（resetPage）时，首帧定位已由 SimulationPageView 的 initialPage 处理
+    // （在 _isCalculating 重算态结束后挂载，首帧即目标页，不再先渲染第0页再跳转）。
+    // 字体/行高/背景调整等非 resetPage 场景不重置页码。
+    // 注：原先此处用帧后 jumpToPage 会导致“闪现章节开头”，已移除；
+    // _isCalculating 已在上方主 setState 中置 false。
   }
 
   /// 计算长按位置对应的字符偏移和选中文本
@@ -327,6 +324,11 @@ class CurlChapterContentState extends State<CurlChapterContent> {
           child: SimulationPageView(
             controller: _simulationController,
             backgroundColor: widget.background.bgColor,
+            // 切章重算结束后才挂载本组件（_isCalculating 已置 false），
+            // 此时 _pages 为新章节且 jumpToLastPage 已更新，initialPage 即正确目标页
+            initialPage: widget.jumpToLastPage
+                ? (_pages.isEmpty ? 0 : _pages.length - 1)
+                : 0,
             pages: _pages.map((page) => _buildPageWidget(page)).toList(),
             onPageChanged: (index) {
               widget.onPageChanged(index, _pages.length);

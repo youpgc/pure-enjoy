@@ -196,6 +196,8 @@ class SimulationPageView extends StatefulWidget {
   /// 滑动到章节边界时的回调，isLastPage=true 表示最后一页继续向下一页滑动
   final void Function(bool isLastPage)? onBoundaryReached;
   final Color backgroundColor;
+  /// 首帧初始页码（切到上一章时定位末页，避免首帧闪现章节开头）
+  final int initialPage;
 
   const SimulationPageView({
     super.key,
@@ -204,6 +206,7 @@ class SimulationPageView extends StatefulWidget {
     this.onPageChanged,
     this.onBoundaryReached,
     this.backgroundColor = Colors.white,
+    this.initialPage = 0,
   });
 
   @override
@@ -231,6 +234,10 @@ class _SimulationPageViewState extends State<SimulationPageView>
       vsync: this,
       duration: const Duration(milliseconds: 350),
     );
+    // 以 initialPage 作为首帧页码，避免先渲染第0页（章节开头）再跳转导致的闪现
+    _currentPage = widget.initialPage < widget.pages.length
+        ? widget.initialPage
+        : 0;
     widget.controller?._attach(this);
   }
 
