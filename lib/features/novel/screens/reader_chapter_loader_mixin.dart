@@ -54,6 +54,11 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
   int _currentPageIndex = 0;
   int _totalPages = 1;
 
+  /// 入口恢复用的页内位置（来自 user_novels.last_page）。
+  /// 仅在进入阅读器、加载首章时生效；_goToChapter 导航后重置为 0，
+  /// 避免“下一章/上一章”误用旧页内位置。
+  int _restorePage = 0;
+
   /// 边界切章防抖时间戳：OverscrollNotification/仿真翻页边界拖拽会在一次手势中
   /// 多次回调，缓存命中时切章几乎瞬时完成，若不防抖会连续跳过多个章节
   DateTime? _lastBoundarySwitchAt;
@@ -424,12 +429,19 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
             'user_id': 'eq.$userId',
             'novel_id': 'eq.${widget.novel.id}',
           },
-          columns: 'last_chapter',
+          columns: 'last_chapter,last_page',
+          // 按最近阅读时间倒序取最新一行，防御重复行(data.first 取到旧行导致定位很早以前)
+          // nullslast：避免 last_read_at 为 NULL 的行被优先取到（DESC 默认 NULLS FIRST）
+          order: 'last_read_at.desc.nullslast',
+          limit: 1,
         );
         if (progressResult.isSuccess &&
             progressResult.data != null &&
             progressResult.data!.isNotEmpty) {
-          targetChapterNum = progressResult.data!.first['last_chapter'] as int? ?? 1;
+          final row = progressResult.data!.first;
+          targetChapterNum = row['last_chapter'] as int? ?? 1;
+          // 记录页内位置，供首章显示时恢复到该页（导航后由 _goToChapter 重置为 0）
+          _restorePage = (row['last_page'] as int? ?? 0).clamp(0, 1000000);
         }
         if (targetChapterNum <= 0) targetChapterNum = 1;
       }
@@ -578,6 +590,8 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
 
     setState(() {
       _currentChapterIndex = index;
+      // 导航切章不再复用入口恢复页，避免误定位到旧页内位置
+      _restorePage = 0;
     });
 
     _loadChapterContent(_chapters[index]);
@@ -963,28 +977,55 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
           if (_isInBookshelf && _bookshelfId != null) {
             await _saveReadingProgress(progress: progress, chapterNum: chapterNum);
           } else {
-            final result = await ApiClient.post(
+            // 二次确认是否已有记录：阅读时自动建行与“加入书架”建行存在竞态，
+            // 可能已存在 (user_id, novel_id) 行。若已存在则复用并 PATCH，
+            // 避免重复创建导致入口读 data.first 取到旧行（定位到很早以前）。
+            final existing = await ApiClient.get(
               'user_novels',
-              {
-                'user_id': userId,
-                'novel_id': widget.novel.id,
-                'progress': progress,
-                'last_chapter': chapterNum,
-                'is_collected': true,
-                'last_read_at': DateTime.now().toUtc().toIso8601String(),
-                'created_at': DateTime.now().toUtc().toIso8601String(),
-                'updated_at': DateTime.now().toUtc().toIso8601String(),
+              filters: {
+                'user_id': 'eq.$userId',
+                'novel_id': 'eq.${widget.novel.id}',
               },
+              columns: 'id',
+              order: 'last_read_at.desc.nullslast',
+              limit: 1,
             );
-
-            if (result.isSuccess) {
-              final data = result.data!;
-              if (data.isNotEmpty && mounted) {
+            if (existing.isSuccess &&
+                existing.data != null &&
+                existing.data!.isNotEmpty) {
+              final id = existing.data!.first['id'].toString();
+              if (mounted) {
                 setState(() {
                   _isInBookshelf = true;
-                  _bookshelfId = data.first['id'].toString();
-                  _isCollected = true;
+                  _bookshelfId = id;
                 });
+              }
+              await _saveReadingProgress(progress: progress, chapterNum: chapterNum);
+            } else {
+              final result = await ApiClient.post(
+                'user_novels',
+                {
+                  'user_id': userId,
+                  'novel_id': widget.novel.id,
+                  'progress': progress,
+                  'last_chapter': chapterNum,
+                  'last_page': _currentPageIndex,
+                  'is_collected': true,
+                  'last_read_at': DateTime.now().toUtc().toIso8601String(),
+                  'created_at': DateTime.now().toUtc().toIso8601String(),
+                  'updated_at': DateTime.now().toUtc().toIso8601String(),
+                },
+              );
+
+              if (result.isSuccess) {
+                final data = result.data!;
+                if (data.isNotEmpty && mounted) {
+                  setState(() {
+                    _isInBookshelf = true;
+                    _bookshelfId = data.first['id'].toString();
+                    _isCollected = true;
+                  });
+                }
               }
             }
           }
@@ -1012,6 +1053,7 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
       body: {
         'last_chapter': chapterNum,
         'progress': progress,
+        'last_page': _currentPageIndex,
         'is_collected': true,
         'last_read_at': DateTime.now().toUtc().toIso8601String(),
       },
@@ -1558,6 +1600,7 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
         onBoundaryReached: _onPageBoundaryReached,
         onTapScreen: _handleScreenTap,
         shouldJumpToLastPage: _shouldJumpToLastPage,
+        startPage: _restorePage,
         scrollController: _scrollController,
         buildAnnotatedTextSpan: _buildAnnotatedTextSpan,
         onShowAnnotationInput: (selectedText, startOffset, endOffset) =>

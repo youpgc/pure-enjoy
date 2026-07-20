@@ -28,6 +28,9 @@ class PagedChapterContent extends StatefulWidget {
   /// 是否跳转到最后一页（上一章时使用）
   final bool jumpToLastPage;
 
+  /// 入口恢复用的页内位置（仅首章首显生效；导航后调用方会传 0）
+  final int startPage;
+
   const PagedChapterContent({
     super.key,
     required this.chapter,
@@ -41,6 +44,7 @@ class PagedChapterContent extends StatefulWidget {
     required this.onTapScreen,
     this.onLongPressSelectText,
     this.jumpToLastPage = false,
+    this.startPage = 0,
   });
 
   @override
@@ -184,13 +188,20 @@ class PagedChapterContentState extends State<PagedChapterContent> {
       _isCalculating = false;
     });
 
+    // 目标页：回到上一章=末页；下一章/首章=首页，入口首章用恢复的页内位置(startPage)
+    final int resetTargetPage = widget.jumpToLastPage
+        ? (pages.isNotEmpty ? pages.length - 1 : 0)
+        : (widget.startPage > 0 && widget.startPage < pages.length
+            ? widget.startPage
+            : 0);
+
     // 通知父组件总页数和当前页码
     // PageView.jumpToPage(0) 不会触发 onPageChanged（页面从0跳到0无变化），
     // 导致父组件 _totalPages 始终为默认值1，点击右侧会错误地触发下一章
     // 必须放在 addPostFrameCallback 中执行，避免在 didChangeDependencies 构建阶段
     // 调用父组件 setState() 触发 setState() or markNeedsBuild() called during build
     final currentPage = resetPage
-        ? (widget.jumpToLastPage ? pages.length - 1 : 0)
+        ? resetTargetPage
         : (_pageController.hasClients ? _pageController.page!.round() : 0);
     final totalPages = pages.length;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -204,10 +215,9 @@ class PagedChapterContentState extends State<PagedChapterContent> {
     // 再在帧后 jumpToPage 导致的“闪现章节开头”问题（回到上一章时尤为明显）。
     // 字体/行高/背景调整等非 resetPage 场景不重建控制器，保留当前页码。
     if (resetPage) {
-      final targetPage = widget.jumpToLastPage ? pages.length - 1 : 0;
       if (mounted) {
         _pageController.dispose();
-        _pageController = PageController(initialPage: targetPage);
+        _pageController = PageController(initialPage: resetTargetPage);
       }
     }
   }

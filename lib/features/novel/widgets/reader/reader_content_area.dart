@@ -20,6 +20,8 @@ class ReaderContentArea extends StatelessWidget {
   final void Function(bool isLastPage) onBoundaryReached;
   final void Function(TapUpDetails) onTapScreen;
   final bool shouldJumpToLastPage;
+  /// 入口恢复用的页内位置（仅首章首显生效，导航后由调用方置 0）
+  final int startPage;
   final ScrollController scrollController;
   final TextSpan Function(String content, TextStyle baseStyle) buildAnnotatedTextSpan;
   final void Function(TextSelection?)? onSelectionChanged;
@@ -42,6 +44,7 @@ class ReaderContentArea extends StatelessWidget {
     required this.onBoundaryReached,
     required this.onTapScreen,
     required this.shouldJumpToLastPage,
+    this.startPage = 0,
     required this.scrollController,
     required this.buildAnnotatedTextSpan,
     this.onSelectionChanged,
@@ -148,6 +151,7 @@ class ReaderContentArea extends StatelessWidget {
         onTapScreen: onTapScreen,
         onLongPressSelectText: onShowAnnotationInput,
         jumpToLastPage: shouldJumpToLastPage,
+        startPage: startPage,
       );
     }
 
@@ -165,6 +169,7 @@ class ReaderContentArea extends StatelessWidget {
       onTapScreen: onTapScreen,
       onLongPressSelectText: onShowAnnotationInput,
       jumpToLastPage: shouldJumpToLastPage,
+      startPage: startPage,
     );
   }
 }

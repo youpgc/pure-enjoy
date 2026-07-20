@@ -19,6 +19,8 @@ class CurlChapterContent extends StatefulWidget {
   final void Function(String selectedText, int startOffset, int endOffset)? onLongPressSelectText;
   /// 是否跳转到最后一页（上一章时使用）
   final bool jumpToLastPage;
+  /// 入口恢复用的页内位置（仅首章首显生效；导航后调用方会传 0）
+  final int startPage;
 
   const CurlChapterContent({
     super.key,
@@ -32,6 +34,7 @@ class CurlChapterContent extends StatefulWidget {
     required this.onTapScreen,
     this.onLongPressSelectText,
     this.jumpToLastPage = false,
+    this.startPage = 0,
   });
 
   @override
@@ -165,9 +168,12 @@ class CurlChapterContentState extends State<CurlChapterContent> {
     // SimulationPageView.jumpToPage(0) 不会触发 onPageChanged，
     // 导致父组件 _totalPages 始终为默认值1，点击右侧会错误地触发下一章
     // 必须放在 addPostFrameCallback 中执行，避免在构建阶段调用父组件 setState()
-    final currentPage = resetPage
-        ? (widget.jumpToLastPage ? pages.length - 1 : 0)
-        : (_simulationController.currentPage ?? 0);
+    final resetTargetPage = widget.jumpToLastPage
+        ? (pages.isNotEmpty ? pages.length - 1 : 0)
+        : (widget.startPage > 0 && widget.startPage < pages.length
+            ? widget.startPage
+            : 0);
+    final currentPage = resetPage ? resetTargetPage : (_simulationController.currentPage ?? 0);
     final totalPages = pages.length;
     WidgetsBinding.instance.addPostFrameCallback((_) {
       if (mounted) {
@@ -328,7 +334,9 @@ class CurlChapterContentState extends State<CurlChapterContent> {
             // 此时 _pages 为新章节且 jumpToLastPage 已更新，initialPage 即正确目标页
             initialPage: widget.jumpToLastPage
                 ? (_pages.isEmpty ? 0 : _pages.length - 1)
-                : 0,
+                : (widget.startPage > 0 && widget.startPage < _pages.length
+                    ? widget.startPage
+                    : 0),
             pages: _pages.map((page) => _buildPageWidget(page)).toList(),
             onPageChanged: (index) {
               widget.onPageChanged(index, _pages.length);
