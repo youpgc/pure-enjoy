@@ -71,6 +71,13 @@ class PagedChapterContentState extends State<PagedChapterContent> {
     super.didUpdateWidget(oldWidget);
     // 只有章节切换时才重置页签，字体/行高/背景调整不重置
     if (oldWidget.chapter.id != widget.chapter.id) {
+      // 切章期间先进入重算态：PageView 随 LoadingWidget 卸载，避免首帧复用
+      // 旧 ScrollPosition（其 pixels 仍停在上一章的绝对页码偏移），否则切到
+      // 下一章会直接以「上一章的页码位置」定位（页数更多则串页、更少则被钳到末页），
+      // 表现为「跳到未知章节位置」。重算完成后 PageView 以新 initialPage 重新挂载，
+      // 首帧即目标页（上一章=末页 / 下一章=首页），不再闪现开头也不再串页。
+      // 与 CurlChapterContent（仿真模式）的切章处理保持一致。
+      setState(() => _isCalculating = true);
       _scheduleRecalculate(resetPage: true);
     } else if (oldWidget.fontSize != widget.fontSize ||
         oldWidget.lineHeight != widget.lineHeight ||
