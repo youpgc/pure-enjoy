@@ -101,11 +101,13 @@ class PointService {
 
     try {
       // 查询该用户所有 point_records
+      // 注意：必须显式传 limit: null，否则 ApiClient.get 默认 limit=10，
+      // 仅聚合前 10 条记录，导致 available_points / points 被少算（BUG 根因）。
       final result = await ApiClient.get(
         'point_records',
         filters: {'user_id': 'eq.$userId'},
         columns: 'amount,status,expires_at',
-        // 不分页，全量查询（积分记录量级有限）
+        limit: null, // 全量查询（积分记录量级有限），不可省略
       );
 
       if (!result.isSuccess || result.data == null) return;
