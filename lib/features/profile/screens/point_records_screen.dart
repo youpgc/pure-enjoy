@@ -4,6 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
+import '../services/point_service_utils.dart';
 import 'point_record_info.dart';
 
 /// 积分记录页面
@@ -74,11 +75,11 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
         _consecutiveCheckinDays = streak;
         _isLoadingPoints = false;
       });
-      // 写回缓存，供下次进入页面立即展示
+      // 写回缓存，供下次进入页面立即展示（存北京日期键，由 lastCheckinDate 与今日比较得出签到状态）
       await PointService.instance.cachePointsStats(
         availablePoints: points,
         consecutiveCheckinDays: streak,
-        hasCheckedInToday: checkedIn,
+        lastCheckinDate: checkedIn ? beijingDateKey(DateTime.now()) : null,
       );
     }
   }
