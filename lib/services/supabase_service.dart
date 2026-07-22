@@ -184,7 +184,7 @@ class AuthService {
             'is_deleted': 'eq.false',
           },
           columns:
-              'points,available_points,effective_points,expiring_points',
+              'points,available_points,effective_points,expiring_points,avatar_url',
           limit: 1,
         );
         if (statsRes.isSuccess &&
@@ -198,6 +198,8 @@ class AuthService {
           metadata['available_points'] = row['available_points'];
           metadata['effective_points'] = row['effective_points'];
           metadata['expiring_points'] = row['expiring_points'];
+          // 同步头像URL（public.users.avatar_url），修复"我的"页头像已上传却不渲染
+          metadata['avatar_url'] = row['avatar_url'] ?? metadata['avatar_url'];
           user['user_metadata'] = metadata;
           await _session.updateAuthUser(user);
         }
