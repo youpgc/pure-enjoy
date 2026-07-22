@@ -12,6 +12,8 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.6
+  # 头像等网络图片磁盘缓存（按 URL 命中/失效，进入页面静默渲染缓存）
+  cached_network_image: ^3.4.0
   # 使用 HTTP 客户端直接访问 Supabase REST API
   http: ^1.1.0
   # Supabase Flutter SDK（用于获取 JWT access token）

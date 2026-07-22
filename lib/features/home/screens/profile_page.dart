@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/supabase_service.dart';
 import '../../profile/services/point_service.dart';
@@ -342,28 +343,25 @@ class _ProfilePageState extends State<ProfilePage> {
         radius: 32,
         backgroundColor: colorScheme.primaryContainer,
         child: ClipOval(
-          child: Image.network(
-            avatarUrl,
+          child: CachedNetworkImage(
+            imageUrl: avatarUrl,
             width: 64,
             height: 64,
             fit: BoxFit.cover,
-            cacheWidth: 128,
-            cacheHeight: 128,
-            loadingBuilder: (context, child, loadingProgress) {
-              if (loadingProgress == null) return child;
-              return Icon(
-                Icons.person,
-                size: 32,
-                color: colorScheme.onPrimaryContainer,
-              );
-            },
-            errorBuilder: (context, error, stackTrace) {
-              return Icon(
-                Icons.person,
-                size: 32,
-                color: colorScheme.onPrimaryContainer,
-              );
-            },
+            // 内存解码尺寸（磁盘缓存始终保留原始文件，按 URL 命中/失效）
+            memCacheWidth: 128,
+            memCacheHeight: 128,
+            // 缓存命中时静默渲染；仅在首次下载/网络缺失时短暂显示默认图标
+            placeholder: (context, url) => Icon(
+              Icons.person,
+              size: 32,
+              color: colorScheme.onPrimaryContainer,
+            ),
+            errorWidget: (context, url, error) => Icon(
+              Icons.person,
+              size: 32,
+              color: colorScheme.onPrimaryContainer,
+            ),
           ),
         ),
       );
