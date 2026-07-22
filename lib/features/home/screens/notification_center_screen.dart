@@ -79,10 +79,12 @@ class _NotificationCenterScreenState extends State<NotificationCenterScreen> {
         }
         return;
       }
-      // 查询当前用户的通知 + 系统通知（user_id 为 null）
+      // 合并「本人通知」与「系统广播通知（user_id 为 null）」：
+      // 后台 Notifications.tsx 发全局通知时 user_id 留空，App 端此前仅查 user_id=eq.$userId，
+      // 导致系统/公告类通知用户永远收不到，闭环断裂。用 or 过滤把两类一并拉取。
       final result = await ApiClient.get(
         'notifications',
-        filters: {'user_id': 'eq.$userId'},
+        filters: {'or': '(user_id.eq.$userId,user_id.is.null)'},
         order: 'created_at.desc',
         limit: _limit,
         offset: _offset,
