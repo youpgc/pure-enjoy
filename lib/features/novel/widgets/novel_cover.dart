@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// 小说封面组件
 ///
@@ -114,14 +115,11 @@ class NovelCover extends StatelessWidget {
     final content = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
       child: hasUrl
-          ? Image.network(
-              coverUrl!,
+          ? CachedNetworkImage(
+              imageUrl: coverUrl!,
               fit: BoxFit.cover,
-              loadingBuilder: (context, child, loadingProgress) {
-                if (loadingProgress == null) return child;
-                return placeholder;
-              },
-              errorBuilder: (_, __, ___) => placeholder,
+              placeholder: (context, url) => placeholder,
+              errorWidget: (_, __, ___) => placeholder,
             )
           : placeholder,
     );

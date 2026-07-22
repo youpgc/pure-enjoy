@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 import '../models/novel_comment_model.dart';
 
 /// 单条评论组件
@@ -43,7 +44,7 @@ class CommentItem extends StatelessWidget {
             radius: isReply ? 14 : 18,
             backgroundColor: theme.colorScheme.primaryContainer,
             backgroundImage: comment.userAvatar != null
-                ? NetworkImage(comment.userAvatar!)
+                ? CachedNetworkImageProvider(comment.userAvatar!)
                 : null,
             child: comment.userAvatar == null
                 ? Text(

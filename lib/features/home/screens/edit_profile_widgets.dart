@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// 编辑资料 - 区块标题
 class ProfileSectionTitle extends StatelessWidget {
@@ -156,7 +157,7 @@ class ProfileAvatarSection extends StatelessWidget {
                 radius: 50,
                 backgroundColor: colorScheme.primaryContainer,
                 backgroundImage: avatarUrl != null
-                    ? NetworkImage(avatarUrl!)
+                    ? CachedNetworkImageProvider(avatarUrl!)
                     : null,
                 child: avatarUrl == null
                     ? Icon(

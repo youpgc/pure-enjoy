@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:cached_network_image/cached_network_image.dart';
 
 /// 分类筛选标签
 class CategoryChip extends StatelessWidget {
@@ -54,12 +55,13 @@ class NovelCoverImage extends StatelessWidget {
     if (coverUrl != null && coverUrl!.isNotEmpty) {
       return ClipRRect(
         borderRadius: BorderRadius.circular(4),
-        child: Image.network(
-          coverUrl!,
+        child: CachedNetworkImage(
+          imageUrl: coverUrl!,
           width: width,
           height: height,
           fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => placeholder,
+          placeholder: (context, url) => placeholder,
+          errorWidget: (_, __, ___) => placeholder,
         ),
       );
     }
