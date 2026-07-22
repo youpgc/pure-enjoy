@@ -1011,6 +1011,7 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
                   'last_chapter': chapterNum,
                   'last_page': _currentPageIndex,
                   'is_collected': true,
+                  'reading_status': progress >= 1.0 ? 'finished' : 'reading',
                   'last_read_at': DateTime.now().toUtc().toIso8601String(),
                   'created_at': DateTime.now().toUtc().toIso8601String(),
                   'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -1055,6 +1056,7 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
         'progress': progress,
         'last_page': _currentPageIndex,
         'is_collected': true,
+        'reading_status': progress >= 1.0 ? 'finished' : 'reading',
         'last_read_at': DateTime.now().toUtc().toIso8601String(),
       },
     );
