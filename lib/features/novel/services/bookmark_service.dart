@@ -138,49 +138,4 @@ class BookmarkService {
     }
   }
 
-  /// 更新自动阅读进度（写入 user_novels 表）
-  Future<bool> saveAutoProgress({
-    required String novelId,
-    required String? chapterId,
-    required int chapterOrder,
-    int charOffset = 0,
-    double progress = 0.0,
-  }) async {
-    final userId = _userId;
-    if (userId == null) return false;
-
-    // 先查询是否已有记录
-    final existing = await ApiClient.get(
-      'user_novels',
-      filters: {
-        'user_id': 'eq.$userId',
-        'novel_id': 'eq.$novelId',
-      },
-      limit: 1,
-    );
-
-    final body = {
-      'last_chapter': chapterOrder,
-      'last_char_offset': charOffset,
-      'progress': progress,
-      'reading_status': progress >= 1.0 ? 'finished' : 'reading',
-      'last_read_at': DateTime.now().toUtc().toIso8601String(),
-    };
-
-    if (existing.isSuccess &&
-        existing.data != null &&
-        existing.data!.isNotEmpty) {
-      // 更新现有记录
-      final recordId = existing.data!.first['id'] as String;
-      final result = await ApiClient.patch('user_novels', body, id: recordId);
-      return result.isSuccess;
-    } else {
-      // 创建新记录
-      body['user_id'] = userId;
-      body['novel_id'] = novelId;
-      body['created_at'] = DateTime.now().toUtc().toIso8601String();
-      final result = await ApiClient.post('user_novels', body);
-      return result.isSuccess;
-    }
-  }
 }
