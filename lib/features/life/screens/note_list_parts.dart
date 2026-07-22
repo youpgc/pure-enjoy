@@ -92,7 +92,8 @@ class _NoteGridItem extends StatelessWidget {
                     child: Text(
                       note.content ?? '',
                       style: Theme.of(context).textTheme.bodySmall,
-                      overflow: TextOverflow.fade,
+                      maxLines: 4,
+                      overflow: TextOverflow.ellipsis,
                     ),
                   ),
                   if (note.isPinned)

@@ -480,6 +480,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 maxLines: null,
                 expands: true,
                 textAlign: TextAlign.start,
+                textAlignVertical: TextAlignVertical.top,
                 decoration: const InputDecoration(
                   hintText: '写点什么...',
                   border: InputBorder.none,
