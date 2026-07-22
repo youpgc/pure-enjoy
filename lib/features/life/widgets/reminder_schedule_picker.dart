@@ -37,7 +37,7 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
   void initState() {
     super.initState();
     final s = widget.initialSchedule;
-    _scheduleType = s?.scheduleType ?? 'weekly';
+    _scheduleType = s?.scheduleType ?? 'daily';
     _weekDays = List<int>.from(s?.weekDays ?? []);
     _monthDays = List<int>.from(s?.monthDays ?? []);
     _months = List<int>.from(s?.months ?? []);
