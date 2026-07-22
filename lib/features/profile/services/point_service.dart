@@ -12,7 +12,7 @@ import '../models/point_record_model.dart';
 /// - 积分查询从 users 表统计字段读取（effective_points / available_points / expiring_points）
 /// - 积分变动（签到、获得、消费）后，App 端主动重算并更新 users 表统计字段
 /// - 不依赖数据库触发器（trg_maintain_user_points 已确认不存在）
-/// - 连续签到天数从 users.consecutive_checkin_days / last_checkin_date 读取
+/// - 连续签到天数由 calcConsecutiveStreak 从 point_records 反推（users.consecutive_checkin_days 仅作展示缓存，不参与计算，详见 §4.5）
 class PointService {
   static PointService? _instance;
 
