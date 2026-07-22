@@ -298,6 +298,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
         if (result.isSuccess) {
           _loadHabits(refresh: true);
+          if (mounted) {
+            showSnackBar(context, '删除成功');
+          }
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }

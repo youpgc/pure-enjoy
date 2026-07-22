@@ -193,6 +193,9 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
         if (result.isSuccess) {
           _loadAnniversaries(refresh: true);
+          if (mounted) {
+            showSnackBar(context, '删除成功');
+          }
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }

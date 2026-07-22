@@ -310,10 +310,12 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
             searchQuery: _searchQuery,
             onChanged: (value) {
               _searchQuery = value;
+              setState(() => _isLoading = true);
               _loadNotes(refresh: true);
             },
             onClear: () {
               _searchQuery = '';
+              setState(() => _isLoading = true);
               _loadNotes(refresh: true);
             },
           ),

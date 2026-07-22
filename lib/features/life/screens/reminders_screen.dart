@@ -158,6 +158,9 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
         if (result.isSuccess) {
           _loadReminders();
+          if (mounted) {
+            showSnackBar(context, '删除成功');
+          }
         } else {
           throw Exception('HTTP ${result.statusCode}');
         }
@@ -204,6 +207,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
             selected: {_filter},
             onSelectionChanged: (set) {
               setState(() => _filter = set.first);
+              setState(() => _isLoading = true);
               _loadReminders();
             },
           ),

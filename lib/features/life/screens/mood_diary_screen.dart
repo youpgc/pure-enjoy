@@ -178,7 +178,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       );
 
       if (result.isSuccess) {
-        await _loadDiaries();
+        await _loadDiaries(refresh: true);
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.moodDiaryUpdated);
         if (mounted) {
@@ -217,7 +217,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         );
 
         if (result.isSuccess) {
-          await _loadDiaries();
+          await _loadDiaries(refresh: true);
           OfflineSyncService.instance.syncPending();
           if (mounted) {
             showSnackBar(context, '删除成功');
@@ -254,7 +254,7 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
       );
 
       if (result.isSuccess) {
-        await _loadDiaries();
+        await _loadDiaries(refresh: true);
         OfflineSyncService.instance.syncPending();
         if (mounted) {
           showSnackBar(context, '更新成功');
