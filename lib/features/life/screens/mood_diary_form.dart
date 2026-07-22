@@ -36,19 +36,25 @@ class DiaryFormState extends State<DiaryForm> {
   @override
   void initState() {
     super.initState();
+    // 同步初始化 late 字段，避免首次 build（早于 _initDict 异步完成）时
+    // 访问未初始化的 _contentController / _selectedDate 触发 LateInitializationError
+    final diary = widget.diary;
+    _contentController = TextEditingController(text: diary?.content ?? '');
+    _selectedDate = diary?.entryDate ?? DateTime.now();
+    _selectedMoodCode = diary?.mood ?? '';
     _initDict();
   }
 
   Future<void> _initDict() async {
     await DictService.instance.initialize();
-    final diary = widget.diary;
-    _contentController = TextEditingController(text: diary?.content ?? '');
-    _selectedMoodCode = diary?.mood ?? DictService.instance.getDefaultCode('mood_type');
-    if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
-      _selectedMoodCode = _moodCodes.first;
-    }
-    _selectedDate = diary?.entryDate ?? DateTime.now();
     if (mounted) {
+      // 仅在尚未选定（新增且字典未就绪）时回退到默认/首个心情码
+      if (_selectedMoodCode.isEmpty) {
+        _selectedMoodCode = DictService.instance.getDefaultCode('mood_type');
+        if (_selectedMoodCode.isEmpty && _moodCodes.isNotEmpty) {
+          _selectedMoodCode = _moodCodes.first;
+        }
+      }
       setState(() => _isDictLoading = false);
     }
     // 监听字典刷新
