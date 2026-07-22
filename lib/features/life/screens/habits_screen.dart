@@ -399,26 +399,33 @@ class _HabitsScreenState extends State<HabitsScreen> {
       appBar: AppBar(
         title: const Text('习惯打卡'),
         actions: [
-          PopupMenuButton<bool?>(
+          PopupMenuButton<String>(
             icon: const Icon(Icons.filter_list),
             tooltip: '筛选',
             onSelected: (value) {
+              // 注意：菜单项 value 不能用 null —— Flutter 的 PopupMenuButton
+              // 在 showMenu 返回 null 时会误判为"用户取消菜单"而不调用 onSelected，
+              // 导致「全部」选项永远不触发刷新。故用非 null 哨兵值再映射回 bool?。
               setState(() {
-                _filterStatus = value;
+                _filterStatus = switch (value) {
+                  'active' => true,
+                  'paused' => false,
+                  _ => null,
+                };
               });
               _loadHabits(refresh: true);
             },
             itemBuilder: (context) => [
               const PopupMenuItem(
-                value: null,
+                value: 'all',
                 child: Text('全部'),
               ),
               const PopupMenuItem(
-                value: true,
+                value: 'active',
                 child: Text('进行中'),
               ),
               const PopupMenuItem(
-                value: false,
+                value: 'paused',
                 child: Text('已暂停'),
               ),
             ],
