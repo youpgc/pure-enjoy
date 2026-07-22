@@ -20,6 +20,8 @@ import 'dashboard_helpers.dart';
 import '../widgets/dashboard/dashboard_widgets.dart';
 import 'dashboard_activity_helpers.dart';
 import 'dashboard_tool_handlers.dart';
+import '../services/announcement_service.dart';
+import '../widgets/announcement_banner.dart';
 
 /// 首页仪表板页面
 ///
@@ -41,6 +43,10 @@ class DashboardPage extends StatefulWidget {
 class _DashboardPageState extends State<DashboardPage> {
   bool _isLoadingActivities = true;
   List<Map<String, dynamic>> _recentActivities = [];
+
+  // 公告横幅
+  bool _isLoadingAnnouncements = true;
+  List<Announcement> _announcements = [];
 
   List<ReminderModel> _pendingReminders = [];
 
@@ -98,6 +104,7 @@ class _DashboardPageState extends State<DashboardPage> {
       _loadRecentNovels(),
       _loadToolConfig(),
       _loadHabitsForCheckin(),
+      _loadAnnouncements(),
     ]);
   }
 
@@ -191,6 +198,21 @@ class _DashboardPageState extends State<DashboardPage> {
       }
     } finally {
       if (mounted) setState(() => _checkingHabitId = null);
+    }
+  }
+
+  /// 加载首页生效公告（后台发布 → 此处展示）
+  Future<void> _loadAnnouncements() async {
+    try {
+      final list = await AnnouncementService.fetchActive();
+      if (mounted) {
+        setState(() {
+          _announcements = list;
+          _isLoadingAnnouncements = false;
+        });
+      }
+    } catch (e) {
+      if (mounted) setState(() => _isLoadingAnnouncements = false);
     }
   }
 
@@ -443,11 +465,17 @@ class _DashboardPageState extends State<DashboardPage> {
             _loadRecentActivities(),
             _loadPendingReminders(),
             _loadRecentNovels(),
+            _loadAnnouncements(),
           ]);
         },
         child: ListView(
           padding: const EdgeInsets.all(16),
           children: [
+            AnnouncementBanner(
+              announcements: _announcements,
+              isLoading: _isLoadingAnnouncements,
+              onViewAll: _loadAnnouncements,
+            ),
             const WelcomeSection(),
             TodoReminderSection(
               reminders: _pendingReminders,
