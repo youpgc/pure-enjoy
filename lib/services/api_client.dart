@@ -280,6 +280,7 @@ class ApiClient {
       final url = '$_baseUrl/rest/v1/$table?id=eq.$id';
       final response = await HttpClient.instance.delete(
         url,
+        headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
       );
 
@@ -301,6 +302,7 @@ class ApiClient {
       final url = '$_baseUrl/rest/v1/$table?id=in.($idList)';
       final response = await HttpClient.instance.delete(
         url,
+        headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
       );
 
@@ -325,6 +327,7 @@ class ApiClient {
       );
       final response = await HttpClient.instance.delete(
         url,
+        headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
       );
 
