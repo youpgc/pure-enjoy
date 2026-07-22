@@ -5,6 +5,8 @@ import '../models/novel_model.dart';
 import '../services/ranking_service.dart';
 import '../widgets/novel_cover.dart';
 import 'novel_detail_screen.dart';
+import '../../../services/api_client.dart';
+import '../../../services/supabase_service.dart';
 
 /// 排行榜页面
 class RankingScreen extends StatefulWidget {
@@ -263,6 +265,59 @@ class _RankingScreenState extends State<RankingScreen>
     );
   }
 
+  /// 加入书架：真正写入 user_novels（与 NovelDetailScreen 闭环一致）
+  /// 先查是否已存在避免重复行，再插入
+  Future<void> _addToBookshelf(RankingItem item) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) {
+      if (mounted) showSnackBar(context, '请先登录');
+      return;
+    }
+    try {
+      // 防重复加入：先查是否已在书架
+      final exist = await ApiClient.get(
+        'user_novels',
+        filters: {
+          'user_id': 'eq.$userId',
+          'novel_id': 'eq.${item.novelId}',
+        },
+        select: 'id',
+        limit: 1,
+      );
+      if (mounted &&
+          exist.isSuccess &&
+          exist.data != null &&
+          (exist.data as List).isNotEmpty) {
+        showSnackBar(context, '已在书架');
+        return;
+      }
+
+      final result = await ApiClient.post(
+        'user_novels',
+        {
+          'user_id': userId,
+          'novel_id': item.novelId,
+          'progress': 0,
+          'last_chapter': 0,
+          'is_collected': true,
+          'last_read_at': DateTime.now().toUtc().toIso8601String(),
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+          'updated_at': DateTime.now().toUtc().toIso8601String(),
+        },
+      );
+      if (!mounted) return;
+      if (result.isSuccess) {
+        showSnackBar(context, '已加入书架');
+      } else {
+        showSnackBar(context, '加入书架失败，请稍后重试', isError: true);
+      }
+    } catch (e) {
+      if (mounted) {
+        showSnackBar(context, '加入书架失败，请稍后重试', isError: true);
+      }
+    }
+  }
+
   void _onItemLongPress(RankingItem item) {
     showModalBottomSheet(
       context: context,
@@ -275,8 +330,7 @@ class _RankingScreenState extends State<RankingScreen>
               title: const Text('加入书架'),
               onTap: () {
                 Navigator.pop(context);
-                // TODO: 调用书架服务添加
-                showSnackBar(context, '已加入书架');
+                _addToBookshelf(item);
               },
             ),
             ListTile(
