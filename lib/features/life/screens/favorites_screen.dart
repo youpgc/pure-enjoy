@@ -25,7 +25,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
-  String? _selectedCategory;
   int _offset = 0;
   final int _limit = 10;
   final ScrollController _scrollController = ScrollController();
@@ -96,10 +95,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
       final filters = <String, String>{
         'user_id': 'eq.$userId',
       };
-
-      if (_selectedCategory != null) {
-        filters['category'] = 'eq.$_selectedCategory';
-      }
 
       final result = await ApiClient.get(
         'user_favorites',
@@ -205,7 +200,9 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     await showDialog(
       context: context,
       builder: (_) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
+        builder: (dialogContext, setDialogState) {
+          final catItems = DictService.instance.getItemsSync('favorite_category');
+          return AlertDialog(
           title: Text(isEditing ? '编辑收藏' : '添加收藏'),
           content: SingleChildScrollView(
             child: Column(
@@ -238,9 +235,10 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: category,
+                  initialValue: catItems.any((i) => i.code == category) ? category : null,
+                  hint: const Text('请选择分类'),
                   decoration: const InputDecoration(labelText: '分类'),
-                  items: DictService.instance.getItemsSync('favorite_category').map((item) {
+                  items: catItems.map((item) {
                     return DropdownMenuItem(
                       value: item.code,
                       child: Text(item.label),
@@ -348,7 +346,8 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
                   : Text(isEditing ? '保存' : '添加'),
             ),
           ],
-        ),
+        );
+      },
       ),
     );
   }
@@ -358,26 +357,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> {
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的收藏'),
-        actions: [
-          PopupMenuButton<String?>(
-            icon: const Icon(Icons.filter_list),
-            tooltip: '筛选',
-            onSelected: (value) {
-              setState(() => _selectedCategory = value);
-              _loadFavorites(refresh: true);
-            },
-            itemBuilder: (context) => [
-              const PopupMenuItem(
-                value: null,
-                child: Text('全部'),
-              ),
-              ...DictService.instance.getItemsSync('favorite_category').map((item) => PopupMenuItem(
-                value: item.code,
-                child: Text(item.label),
-              )),
-            ],
-          ),
-        ],
       ),
       body: _isLoading
           ? const LoadingWidget()
