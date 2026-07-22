@@ -8,9 +8,13 @@ import 'supabase_config.dart';
 import 'session_manager.dart';
 import 'auth_api.dart';
 import 'api_client.dart';
+import 'http_client.dart';
 import '../utils/cache_helper.dart';
 import 'chapter_cache_service.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import 'dart:io';
+import 'package:package_info_plus/package_info_plus.dart';
 
 // 重新导出，保持向后兼容
 export 'supabase_config.dart';
@@ -78,6 +82,7 @@ class AuthService {
     final result = await _auth.signInWithEmail(
         email: email, password: password);
     await _saveAuthResult(result);
+    _reportLogin(success: result.success, account: email);
     return result;
   }
 
@@ -89,7 +94,73 @@ class AuthService {
     final result = await _auth.signInWithAccount(
         account: account, password: password);
     await _saveAuthResult(result);
+    _reportLogin(success: result.success, account: account);
     return result;
+  }
+
+  // ==================== 登录日志埋点 ====================
+  // 记录一次 App 登录事件（成功/失败）。best-effort，不阻塞登录主流程。
+  // 真实客户端 IP 由服务端 record_login RPC 从 request.headers 提取；
+  // 登录地点由前端 GeoIP 解析（best-effort，失败传 null）。
+  static String? _cachedAppVersion;
+
+  static Future<String> get _appVersion async {
+    if (_cachedAppVersion != null) return _cachedAppVersion!;
+    try {
+      final info = await PackageInfo.fromPlatform();
+      _cachedAppVersion = info.version;
+    } catch (_) {
+      _cachedAppVersion = 'unknown';
+    }
+    return _cachedAppVersion!;
+  }
+
+  /// 触发一次登录日志记录（fire-and-forget）
+  void _reportLogin({required bool success, String? account}) {
+    _doReportLogin(success, account).catchError((_) {});
+  }
+
+  Future<void> _doReportLogin(bool success, String? account) async {
+    String? location;
+    try {
+      final geo = await HttpClient.instance.rawRequest(
+        'https://ipapi.co/json/',
+        method: 'GET',
+        headers: {'User-Agent': 'PureEnjoy'},
+        timeout: RequestTimeout.simple,
+      );
+      if (geo.statusCode == 200) {
+        final j = jsonDecode(geo.body) as Map<String, dynamic>;
+        final parts = <String>[
+          if (j['country_name'] != null) j['country_name'].toString(),
+          if (j['region'] != null) j['region'].toString(),
+          if (j['city'] != null) j['city'].toString(),
+        ];
+        final loc = parts.join(' ').trim();
+        location = loc.isEmpty ? null : loc;
+      }
+    } catch (_) {
+      location = null;
+    }
+
+    final ua = 'PureEnjoy/${await _appVersion} (${Platform.operatingSystem})';
+    await HttpClient.instance.rawRequest(
+      '${SupabaseConfig.url}/rest/v1/rpc/record_login',
+      method: 'POST',
+      headers: {
+        'apikey': SupabaseConfig.anonKey,
+        'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+        'Content-Type': 'application/json',
+      },
+      body: {
+        'p_source': 'app',
+        'p_status': success ? 'success' : 'failed',
+        'p_user_agent': ua,
+        'p_location': location,
+        'p_username': account,
+      },
+      timeout: RequestTimeout.simple,
+    );
   }
 
   /// 注册
