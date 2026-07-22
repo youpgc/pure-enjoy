@@ -1214,6 +1214,12 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
 
   /// 6.1 新增：删除批注
   Future<void> _deleteAnnotation(NovelAnnotation annotation) async {
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认删除',
+      content: '确定要删除这条批注吗？',
+    );
+    if (!confirmed) return;
     try {
       await AnnotationService().deleteAnnotation(annotation.id);
       setState(() {
