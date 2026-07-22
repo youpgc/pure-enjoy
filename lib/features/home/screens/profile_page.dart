@@ -11,6 +11,7 @@ import '../../profile/screens/point_records_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'about_legal_screen.dart';
+import '../../life/screens/feedback_list_screen.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 个人中心页面
@@ -242,6 +243,20 @@ class _ProfilePageState extends State<ProfilePage> {
               } else {
                 showSnackBar(context, '当前已是最新版本');
               }
+            },
+          ),
+
+          // 问题反馈：与「版本信息」同级的独立入口
+          ListTile(
+            leading: const Icon(Icons.feedback_outlined),
+            title: const Text('问题反馈'),
+            subtitle: const Text('提交问题与建议'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const FeedbackListScreen()),
+              );
             },
           ),
 
