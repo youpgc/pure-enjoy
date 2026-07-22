@@ -31,6 +31,8 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
   List<NovelModel> _allNovels = [];
   List<Map<String, dynamic>> _userNovels = [];
   bool _isLoading = true;
+  /// 是否首次加载（仅首次显示整页骨架屏；切换标签/刷新时保留列表，仅顶部细进度条提示）
+  bool _isFirstLoad = true;
   String _selectedCategory = 'all';
   String _selectedStatus = 'all';
   String _searchQuery = '';
@@ -164,6 +166,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         }
         _userNovels = userNovels;
         _isLoading = false;
+        _isFirstLoad = false;
         onPaginationDataLoaded(novels.length);
       });
 
@@ -178,7 +181,10 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       if (!refresh) {
         onPaginationDataLoaded(0); // Bug 12 修复：释放分页锁，防止加载更多失败后卡死
       }
-      setState(() => _isLoading = false);
+      setState(() {
+        _isLoading = false;
+        _isFirstLoad = false;
+      });
       if (mounted) {
         showSnackBar(context, '加载失败，请稍后重试');
       }
@@ -310,14 +316,20 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
           ),
         ],
       ),
-      body: _isLoading
+      body: _isFirstLoad && _isLoading
           ? SkeletonLoading.grid(itemCount: 6, crossAxisCount: 3)
-          : RefreshIndicator(
-              onRefresh: () => _loadNovels(refresh: true),
-              child: ListView(
-                controller: scrollController,
-                padding: const EdgeInsets.all(16),
-                children: [
+          : Column(
+              children: [
+                // 切换标签/刷新时保留列表，仅顶部细进度条提示请求中（避免整页骨架闪烁）
+                if (_isLoading && !_isFirstLoad)
+                  const LinearProgressIndicator(minHeight: 2),
+                Expanded(
+                  child: RefreshIndicator(
+                    onRefresh: () => _loadNovels(refresh: true),
+                    child: ListView(
+                      controller: scrollController,
+                      padding: const EdgeInsets.all(16),
+                      children: [
                   // 搜索提示
                   if (_searchQuery.isNotEmpty)
                     Padding(
@@ -490,6 +502,9 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                 ],
               ),
             ),
+          ),
+        ],
+      ),
     );
   }
 }
