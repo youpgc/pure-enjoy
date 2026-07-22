@@ -3,14 +3,9 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../core/theme/theme_provider.dart';
-import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/api_client.dart';
 import '../../../services/chapter_cache_service.dart';
-import 'rich_text_page.dart';
-
-import '../../../services/version_check_service.dart';
 import '../../../services/supabase_service.dart';
-import '../../life/screens/feedback_list_screen.dart';
 import '../../../core/widgets/widgets.dart';
 import 'settings_list.dart';
 import 'settings_dialogs.dart';
@@ -37,11 +32,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _dailyReminder = false;
   bool _anniversaryReminder = true;
 
-  // 版本信息
-  String _currentVersion = '';
-  bool _isCheckingUpdate = false;
-  String? _latestVersion;
-
   // SharedPreferences keys
   static const _autoSyncKey = 'setting_auto_sync';
   static const _wifiOnlyKey = 'setting_wifi_only';
@@ -53,7 +43,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   void initState() {
     super.initState();
     _loadSettings();
-    _loadVersion();
   }
 
   void _loadSettings() {
@@ -82,13 +71,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await prefs.setBool(key, value);
   }
 
-  Future<void> _loadVersion() async {
-    final info = await PackageInfo.fromPlatform();
-    if (mounted) {
-      setState(() => _currentVersion = '${info.version}+${info.buildNumber}');
-    }
-  }
-
   /// 字体大小 -> fontScale 映射
   double _fontSizeToScale(String size) {
     switch (size) {
@@ -115,9 +97,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         pushNotification: _pushNotification,
         dailyReminder: _dailyReminder,
         anniversaryReminder: _anniversaryReminder,
-        currentVersion: _currentVersion,
-        isCheckingUpdate: _isCheckingUpdate,
-        latestVersion: _latestVersion,
         onDarkModeChanged: (val) {
           setState(() => _isDarkMode = val);
           ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
@@ -147,59 +126,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onClearCacheTap: () => showClearCacheDialog(context, _clearCache),
         onChangePasswordTap: _showChangePasswordDialog,
         onDeleteAccountTap: () => showDeleteAccountDialog(context, _deleteAccount),
-        onAboutTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RichTextPage(
-                configKey: 'about',
-                title: '关于纯享',
-              ),
-            ),
-          );
-        },
-        onPrivacyTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RichTextPage(
-                configKey: 'privacy_policy',
-                title: '隐私政策',
-              ),
-            ),
-          );
-        },
-        onAgreementTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RichTextPage(
-                configKey: 'user_agreement',
-                title: '用户协议',
-              ),
-            ),
-          );
-        },
-        onHelpTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const RichTextPage(
-                configKey: 'help_center',
-                title: '帮助中心',
-              ),
-            ),
-          );
-        },
-        onFeedbackTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(
-              builder: (_) => const FeedbackListScreen(),
-            ),
-          );
-        },
-        onCheckUpdateTap: _checkUpdate,
       ),
     );
   }
@@ -463,30 +389,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         ),
       ),
     );
-  }
-
-  Future<void> _checkUpdate() async {
-    setState(() => _isCheckingUpdate = true);
-    try {
-      final versionInfo = await VersionCheckService.instance.checkUpdate();
-      if (mounted) {
-        if (versionInfo != null) {
-          setState(() => _latestVersion = versionInfo['version'] as String?);
-          VersionCheckService.instance.showUpdateDialog(context, versionInfo);
-        } else {
-          setState(() => _latestVersion = null);
-          showSnackBar(context, '当前已是最新版本');
-        }
-      }
-    } catch (e) {
-      if (mounted) {
-        showSnackBar(context, '检查更新失败，请稍后重试', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isCheckingUpdate = false);
-      }
-    }
   }
 }
 

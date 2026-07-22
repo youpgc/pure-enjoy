@@ -10,6 +10,7 @@ import '../../../services/dict_service.dart';
 import '../../profile/screens/point_records_screen.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
+import 'about_legal_screen.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 个人中心页面
@@ -175,6 +176,17 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
+              );
+            },
+          ),
+          ListTile(
+            leading: const Icon(Icons.info_outline),
+            title: const Text('关于与法律'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const AboutLegalScreen()),
               );
             },
           ),

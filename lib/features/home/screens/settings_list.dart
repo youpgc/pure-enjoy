@@ -13,9 +13,6 @@ class SettingsList extends StatelessWidget {
   final bool pushNotification;
   final bool dailyReminder;
   final bool anniversaryReminder;
-  final String currentVersion;
-  final bool isCheckingUpdate;
-  final String? latestVersion;
 
   final ValueChanged<bool> onDarkModeChanged;
   final VoidCallback onFontSizeTap;
@@ -28,12 +25,6 @@ class SettingsList extends StatelessWidget {
   final VoidCallback onClearCacheTap;
   final VoidCallback onChangePasswordTap;
   final VoidCallback onDeleteAccountTap;
-  final VoidCallback onAboutTap;
-  final VoidCallback onPrivacyTap;
-  final VoidCallback onAgreementTap;
-  final VoidCallback onHelpTap;
-  final VoidCallback onFeedbackTap;
-  final VoidCallback onCheckUpdateTap;
 
   const SettingsList({
     super.key,
@@ -45,9 +36,6 @@ class SettingsList extends StatelessWidget {
     required this.pushNotification,
     required this.dailyReminder,
     required this.anniversaryReminder,
-    required this.currentVersion,
-    required this.isCheckingUpdate,
-    required this.latestVersion,
     required this.onDarkModeChanged,
     required this.onFontSizeTap,
     required this.onReadingBgTap,
@@ -59,12 +47,6 @@ class SettingsList extends StatelessWidget {
     required this.onClearCacheTap,
     required this.onChangePasswordTap,
     required this.onDeleteAccountTap,
-    required this.onAboutTap,
-    required this.onPrivacyTap,
-    required this.onAgreementTap,
-    required this.onHelpTap,
-    required this.onFeedbackTap,
-    required this.onCheckUpdateTap,
   });
 
   @override
@@ -158,61 +140,6 @@ class SettingsList extends StatelessWidget {
           subtitle: const Text('永久删除账号及所有数据'),
           trailing: Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.error),
           onTap: onDeleteAccountTap,
-        ),
-
-        // 关于与法律
-        const SectionHeader(title: '关于与法律'),
-        ListTile(
-          leading: const Icon(Icons.info_outline),
-          title: const Text('关于纯享'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onAboutTap,
-        ),
-        ListTile(
-          leading: const Icon(Icons.privacy_tip_outlined),
-          title: const Text('隐私政策'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onPrivacyTap,
-        ),
-        ListTile(
-          leading: const Icon(Icons.description_outlined),
-          title: const Text('用户协议'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onAgreementTap,
-        ),
-        ListTile(
-          leading: const Icon(Icons.help_outline),
-          title: const Text('帮助中心'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onHelpTap,
-        ),
-        ListTile(
-          leading: const Icon(Icons.feedback_outlined),
-          title: const Text('问题反馈'),
-          subtitle: const Text('提交问题与建议'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onFeedbackTap,
-        ),
-        // 版本信息
-        const SectionHeader(title: '版本'),
-        ListTile(
-          leading: const Icon(Icons.system_update_outlined),
-          title: const Text('检查更新'),
-          subtitle: Text(isCheckingUpdate
-              ? '检查中...'
-              : latestVersion != null
-                  ? '发现新版本: $latestVersion'
-                  : currentVersion.isEmpty
-                      ? '加载中...'
-                      : '当前版本: $currentVersion'),
-          trailing: isCheckingUpdate
-              ? const SizedBox(
-                  width: 20,
-                  height: 20,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : const Icon(Icons.chevron_right),
-          onTap: isCheckingUpdate ? null : onCheckUpdateTap,
         ),
       ],
     );
