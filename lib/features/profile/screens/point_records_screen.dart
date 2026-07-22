@@ -161,7 +161,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   /// 获取类型对应的图标和颜色
   /// 积分类型映射（与数据库 point_records.type 和后台 POINT_TYPE_MAP 一致）
   /// 标准类型：checkin / earn / spend / adjust / admin_adjust
-  /// 兼容历史类型：admin_recharge（已废弃，映射到 admin_adjust）
+  /// 兼容历史类型：admin_recharge（后台 POINT_TYPE_MAP 未单列，仅本端兼容映射到 admin_adjust）
   PointTypeInfo _getTypeInfo(String type) {
     switch (type) {
       case 'checkin':
