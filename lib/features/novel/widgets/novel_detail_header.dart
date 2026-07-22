@@ -22,25 +22,27 @@ class NovelDetailHeader extends StatelessWidget {
           fit: StackFit.expand,
           children: [
             // 背景封面（模糊效果）
-            NovelCover(
-              coverUrl: novel.cover,
-              title: novel.title,
-              width: double.infinity,
-              height: double.infinity,
-              borderRadius: 0,
+            Positioned.fill(
+              child: NovelCover(
+                coverUrl: novel.cover,
+                title: novel.title,
+                borderRadius: 0,
+              ),
             ),
             // 渐变遮罩
-            Container(
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topCenter,
-                  end: Alignment.bottomCenter,
-                  colors: [
-                    Colors.transparent,
-                    Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
-                    colorScheme.surface,
-                  ],
-                  stops: const [0.0, 0.5, 1.0],
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.transparent,
+                      Theme.of(context).colorScheme.onSurface.withValues(alpha: 0.3),
+                      colorScheme.surface,
+                    ],
+                    stops: const [0.0, 0.5, 1.0],
+                  ),
                 ),
               ),
             ),

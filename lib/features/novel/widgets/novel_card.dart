@@ -36,12 +36,12 @@ class NovelCard extends StatelessWidget {
               flex: 3,
               child: Stack(
                 children: [
-                  NovelCover(
-                    coverUrl: novel.cover,
-                    title: novel.title,
-                    width: double.infinity,
-                    height: double.infinity,
-                    borderRadius: 0,
+                  Positioned.fill(
+                    child: NovelCover(
+                      coverUrl: novel.cover,
+                      title: novel.title,
+                      borderRadius: 0,
+                    ),
                   ),
                   if (onAddToBookshelf != null)
                     Positioned(

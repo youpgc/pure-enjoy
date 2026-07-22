@@ -7,16 +7,21 @@ import 'package:flutter/material.dart';
 class NovelCover extends StatelessWidget {
   final String? coverUrl;
   final String title;
-  final double width;
-  final double height;
+
+  /// 封面尺寸。
+  /// - 两者都指定：按给定尺寸渲染（SizedBox 包裹）。
+  /// - 两者都为 null：填充模式，由父级用 Positioned.fill / SizedBox.expand 约束，
+  ///   此时【禁止】传 double.infinity（会被 Container 转成无穷约束导致布局崩溃）。
+  final double? width;
+  final double? height;
   final double borderRadius;
 
   const NovelCover({
     super.key,
     this.coverUrl,
     required this.title,
-    required this.width,
-    required this.height,
+    this.width,
+    this.height,
     this.borderRadius = 6,
   });
 
@@ -70,64 +75,62 @@ class NovelCover extends StatelessWidget {
   Widget build(BuildContext context) {
     final (startColor, endColor) = _getGradientColors();
 
-    final placeholder = ClipRRect(
-      borderRadius: BorderRadius.circular(borderRadius),
-      child: Container(
-        width: width,
-        height: height,
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [startColor, endColor],
-          ),
+    final placeholder = Container(
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [startColor, endColor],
         ),
-        child: Padding(
-          padding: const EdgeInsets.all(8),
-          child: Center(
-            child: Text(
-              title.isNotEmpty ? title : '未知',
-              textAlign: TextAlign.center,
-              maxLines: 3,
-              overflow: TextOverflow.ellipsis,
-              style: const TextStyle(
-                color: Colors.white,
-                fontSize: 13,
-                fontWeight: FontWeight.w600,
-                height: 1.4,
-                shadows: [
-                  Shadow(
-                    blurRadius: 4,
-                    color: Colors.black26,
-                    offset: Offset(0, 1),
-                  ),
-                ],
-              ),
+      ),
+      child: Padding(
+        padding: const EdgeInsets.all(8),
+        child: Center(
+          child: Text(
+            title.isNotEmpty ? title : '未知',
+            textAlign: TextAlign.center,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 13,
+              fontWeight: FontWeight.w600,
+              height: 1.4,
+              shadows: [
+                Shadow(
+                  blurRadius: 4,
+                  color: Colors.black26,
+                  offset: Offset(0, 1),
+                ),
+              ],
             ),
           ),
         ),
       ),
     );
 
-    if (coverUrl == null || coverUrl!.isEmpty) {
-      return placeholder;
-    }
+    final hasUrl = coverUrl != null && coverUrl!.isNotEmpty;
 
-    return ClipRRect(
+    final content = ClipRRect(
       borderRadius: BorderRadius.circular(borderRadius),
-      child: SizedBox(
-        width: width,
-        height: height,
-        child: Image.network(
-          coverUrl!,
-          fit: BoxFit.cover,
-          loadingBuilder: (context, child, loadingProgress) {
-            if (loadingProgress == null) return child;
-            return placeholder;
-          },
-          errorBuilder: (_, __, ___) => placeholder,
-        ),
-      ),
+      child: hasUrl
+          ? Image.network(
+              coverUrl!,
+              fit: BoxFit.cover,
+              loadingBuilder: (context, child, loadingProgress) {
+                if (loadingProgress == null) return child;
+                return placeholder;
+              },
+              errorBuilder: (_, __, ___) => placeholder,
+            )
+          : placeholder,
     );
+
+    // 填充模式：width/height 均未指定时由父级（Positioned.fill / SizedBox.expand）约束；
+    // 两者都指定时按给定尺寸渲染。
+    if (width != null && height != null) {
+      return SizedBox(width: width, height: height, child: content);
+    }
+    return content;
   }
 }
