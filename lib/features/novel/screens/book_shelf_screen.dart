@@ -67,17 +67,23 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
 
   /// 初始化加载：先读缓存，再静默刷新
   Future<void> _initLoad() async {
+    bool cacheShown = false;
     try {
       await _loadCache();
+      // 缓存已渲染则记录，便于刷新失败时静默处理（优先缓存显示）
+      if (mounted && _bookshelfItems.isNotEmpty) cacheShown = true;
       await _loadBookshelf(refresh: true);
-    } catch (e) {
+    } catch (e, s) {
       if (kDebugMode) {
-        debugPrint('❌ BookShelfScreen _initLoad 异常: ');
-        debugPrint('堆栈信息: ');
+        debugPrint('❌ BookShelfScreen _initLoad 异常: $e');
+        debugPrint('堆栈信息: $s');
       }
       if (mounted) {
         setState(() => _isLoading = false);
-        showSnackBar(context, '初始化失败，请稍后重试');
+        // 优先缓存显示：若缓存已渲染，刷新失败静默保留缓存，不再弹错误条
+        if (!cacheShown) {
+          showSnackBar(context, '初始化失败，请稍后重试');
+        }
       }
     }
   }
@@ -89,7 +95,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     final cached = await CacheHelper.instance.loadList(CacheHelper.keyBookshelf);
     if (cached.isNotEmpty && mounted) {
       setState(() {
-        _bookshelfItems = cached.cast<Map<String, dynamic>>();
+        // whereType 丢弃畸形/旧格式缓存项，避免"旧缓存+新读取"强转崩溃
+        _bookshelfItems = cached.whereType<Map<String, dynamic>>().toList();
         _isLoading = false;
       });
     }
