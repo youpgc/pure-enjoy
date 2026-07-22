@@ -28,6 +28,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
   bool _hasMore = true;
   /// 是否已至少成功加载过一次（用于并发守卫，避免拦截首次加载）
   bool _hasLoadedOnce = false;
+  /// 请求序号：每次进入 _loadHabits 自增，用于丢弃过期/乱序的响应，
+  /// 避免切换筛选时先发的旧请求后返回，覆盖最新的「全部」结果
+  int _loadSeq = 0;
   bool? _filterStatus;
   int _offset = 0;
   final int _limit = 10;
@@ -69,6 +72,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
       });
       return;
     }
+
+    // 标记本次请求为最新，旧请求返回时据此丢弃，避免乱序覆盖
+    final seq = ++_loadSeq;
 
     // 防并发：如果已经在加载中（非刷新且已加载过一次），直接返回
     // 注意：不能用 _isLoading 判断首次加载，因其初始即为 true，
@@ -175,6 +181,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
       }
 
       if (mounted) {
+        // 已被更新的请求取代（如切换筛选），丢弃本次结果，避免覆盖最新数据
+        if (seq != _loadSeq) return;
         setState(() {
           if (refresh || isFirstPage) {
             _habits = items;
@@ -193,6 +201,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
       }
     } catch (e) {
+      // 已过期（被更新的请求取代），交给更新的请求处理，不再处理本次异常
+      if (seq != _loadSeq) return;
       if (mounted) {
         setState(() {
           _isLoading = false;
