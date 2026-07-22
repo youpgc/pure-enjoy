@@ -62,7 +62,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     try {
       await DictService.instance.initialize();
       await _loadCache();
-      await _loadExpenses();
+      // 静默刷新须走整页刷新（refresh:true），否则 beginLoadMore 会从第 2 页开始取数，
+      // 导致按 date.desc 排在最顶部的最新记录（第 1 页）永远不被重新拉取。
+      await _loadExpenses(refresh: true);
       // 数据加载后，将显示月份更新为第一条数据的月份
       if (mounted && _expenses.isNotEmpty) {
         final firstMonth = DateTime(_expenses.first.date.year, _expenses.first.date.month);
