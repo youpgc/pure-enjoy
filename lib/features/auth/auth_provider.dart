@@ -113,7 +113,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-/// 统一账号登录（邮箱/手机号/用户名/昵称 + 密码）
+/// 统一账号登录（邮箱 / 手机号 / 用户名 + 密码）
+/// 注：昵称(nickname)可重复，不能作为登录标识；登录标识仅 email/phone/username。
   Future<bool> signInWithAccount({
     required String account,
     required String password,
