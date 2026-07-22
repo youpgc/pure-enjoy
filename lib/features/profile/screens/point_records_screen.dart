@@ -53,9 +53,9 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     final cached = await PointService.instance.getCachedPointsStats();
     if (mounted) {
       setState(() {
-        _availablePoints = cached['availablePoints'] as int;
-        _hasCheckedInToday = cached['hasCheckedInToday'] as bool;
-        _consecutiveCheckinDays = cached['consecutiveCheckinDays'] as int;
+        _availablePoints = (cached['availablePoints'] as int?) ?? 0;
+        _hasCheckedInToday = (cached['hasCheckedInToday'] as bool?) ?? false;
+        _consecutiveCheckinDays = (cached['consecutiveCheckinDays'] as int?) ?? 0;
       });
     }
   }
