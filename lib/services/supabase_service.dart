@@ -120,28 +120,46 @@ class AuthService {
     _doReportLogin(success, account).catchError((_) {});
   }
 
-  Future<void> _doReportLogin(bool success, String? account) async {
-    String? location;
-    try {
-      final geo = await HttpClient.instance.rawRequest(
-        'https://ipapi.co/json/',
-        method: 'GET',
-        headers: {'User-Agent': 'PureEnjoy'},
-        timeout: RequestTimeout.simple,
-      );
-      if (geo.statusCode == 200) {
-        final j = jsonDecode(geo.body) as Map<String, dynamic>;
-        final parts = <String>[
-          if (j['country_name'] != null) j['country_name'].toString(),
-          if (j['region'] != null) j['region'].toString(),
-          if (j['city'] != null) j['city'].toString(),
-        ];
-        final loc = parts.join(' ').trim();
-        location = loc.isEmpty ? null : loc;
+  /// 解析登录地点（best-effort）：依次尝试多个免费 GeoIP 接口，任一成功即返回。
+  /// 因国内访问海外接口可能不稳定，采用主用 + 兜底策略；任一失败静默跳过。
+  static const List<Map<String, dynamic>> _geoProviders = [
+    {
+      'url': 'https://ipapi.co/json/',
+      'fields': ['country_name', 'region', 'city'],
+    },
+    {
+      'url': 'https://api.ip.sb/geoip/',
+      'fields': ['country', 'region', 'city'],
+    },
+  ];
+
+  Future<String?> _resolveLocation() async {
+    for (final p in _geoProviders) {
+      try {
+        final geo = await HttpClient.instance.rawRequest(
+          p['url'] as String,
+          method: 'GET',
+          headers: {'User-Agent': 'PureEnjoy'},
+          timeout: RequestTimeout.simple,
+        );
+        if (geo.statusCode == 200) {
+          final j = jsonDecode(geo.body) as Map<String, dynamic>;
+          final parts = <String>[
+            for (final f in (p['fields'] as List<String>))
+              if (j[f] != null) j[f].toString(),
+          ];
+          final loc = parts.join(' ').trim();
+          if (loc.isNotEmpty) return loc;
+        }
+      } catch (_) {
+        // 尝试下一个兜底接口
       }
-    } catch (_) {
-      location = null;
     }
+    return null;
+  }
+
+  Future<void> _doReportLogin(bool success, String? account) async {
+    final location = await _resolveLocation();
 
     final ua = 'PureEnjoy/${await _appVersion} (${Platform.operatingSystem})';
     await HttpClient.instance.rawRequest(
