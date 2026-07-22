@@ -26,6 +26,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
+  /// 是否已至少成功加载过一次（用于并发守卫，避免拦截首次加载）
+  bool _hasLoadedOnce = false;
   bool? _filterStatus;
   int _offset = 0;
   final int _limit = 10;
@@ -68,8 +70,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
       return;
     }
 
-    // 防并发：如果已经在加载中（非刷新），直接返回
-    if (!refresh && (_isLoading || _isLoadingMore)) return;
+    // 防并发：如果已经在加载中（非刷新且已加载过一次），直接返回
+    // 注意：不能用 _isLoading 判断首次加载，因其初始即为 true，
+    // 否则会和"首次加载"互相死锁导致永久 loading。
+    if (!refresh && _hasLoadedOnce && (_isLoading || _isLoadingMore)) return;
 
     final isFirstPage = _offset == 0;
 
@@ -185,6 +189,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           _hasMore = items.length >= _limit;
           _isLoading = false;
           _isLoadingMore = false;
+          _hasLoadedOnce = true;
         });
       }
     } catch (e) {
@@ -192,6 +197,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
         setState(() {
           _isLoading = false;
           _isLoadingMore = false;
+          _hasLoadedOnce = true;
         });
         // 如果已有数据，静默失败不提示
         if (_habits.isEmpty) {
