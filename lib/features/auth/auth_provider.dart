@@ -51,14 +51,26 @@ class AuthNotifier extends StateNotifier<AuthState> {
     _init();
   }
 
+  /// 角色三档回退：user_metadata.role → app_metadata.role → roleUser
+  /// 登录/注册/刷新路径统一调用，避免漏掉 app_metadata 中间档导致
+  /// 「登录态有角色、刷新后无角色」类不一致（纯享 auth 技能铁律②③）
+  String _resolveRole(Map<String, dynamic>? user) {
+    if (user == null) return roleUser;
+    final userMeta = user['user_metadata'];
+    final appMeta = user['app_metadata'];
+    final userRole = userMeta is Map ? userMeta['role'] : null;
+    final appRole = appMeta is Map ? appMeta['role'] : null;
+    if (userRole is String && userRole.isNotEmpty) return userRole;
+    if (appRole is String && appRole.isNotEmpty) return appRole;
+    return roleUser;
+  }
+
   /// 初始化：检查当前登录状态
   void _init() {
     final service = SupabaseService.instance;
     if (service.isLoggedIn) {
       final user = service.currentUser;
-      final role = user?['user_metadata']?['role'] as String? ??
-          user?['app_metadata']?['role'] as String? ??
-          roleUser;
+      final role = _resolveRole(user);
       state = AuthState(
         isAuthenticated: true,
         userId: service.currentUserId,
@@ -84,7 +96,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
-        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
+        final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -117,7 +129,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
-        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
+        final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -152,7 +164,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
-        final role = user?['user_metadata']?['role'] as String? ?? roleUser;
+        final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
           userId: response.userId,
@@ -179,7 +191,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> refreshUser() async {
     final user = await SupabaseService.instance.refreshUser();
     if (user != null) {
-      final role = user['user_metadata']?['role'] as String? ?? roleUser;
+      final role = _resolveRole(user);
       state = AuthState(
         isAuthenticated: true,
         userId: user['id'] as String?,
