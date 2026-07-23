@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/supabase_service.dart';
 import '../../profile/services/point_service.dart';
@@ -8,6 +7,7 @@ import 'reading_history_screen.dart';
 import '../../../services/version_check_service.dart';
 import '../../../services/dict_service.dart';
 import '../../profile/screens/point_records_screen.dart';
+import '../avatar_render.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
 import 'about_legal_screen.dart';
@@ -363,44 +363,28 @@ class _ProfilePageState extends State<ProfilePage> {
   }
 
   /// 构建用户头像
+  /// 与“修改资料”页(ProfileAvatarSection)保持一致：使用 CircleAvatar.backgroundImage +
+  /// resolveAvatar（网络为主，[cached_network_image] 磁盘缓存），由 CircleAvatar 内置椭圆裁剪并以
+  /// cover 适配，避免拉伸；背景色由 DiceBear 服务端 backgroundColor 渲染，本地仅作缓存。
   Widget _buildAvatar(ColorScheme colorScheme, SupabaseService supabaseService) {
     final avatarUrl = supabaseService.currentUserAvatar;
-    if (avatarUrl != null && avatarUrl.isNotEmpty) {
+    if (avatarUrl == null || avatarUrl.isEmpty) {
       return CircleAvatar(
         radius: 32,
         backgroundColor: colorScheme.primaryContainer,
-        child: ClipOval(
-          child: CachedNetworkImage(
-            imageUrl: avatarUrl,
-            width: 64,
-            height: 64,
-            fit: BoxFit.cover,
-            // 内存解码尺寸（磁盘缓存始终保留原始文件，按 URL 命中/失效）
-            memCacheWidth: 128,
-            memCacheHeight: 128,
-            // 缓存命中时静默渲染；仅在首次下载/网络缺失时短暂显示默认图标
-            placeholder: (context, url) => Icon(
-              Icons.person,
-              size: 32,
-              color: colorScheme.onPrimaryContainer,
-            ),
-            errorWidget: (context, url, error) => Icon(
-              Icons.person,
-              size: 32,
-              color: colorScheme.onPrimaryContainer,
-            ),
-          ),
+        child: Icon(
+          Icons.person,
+          size: 32,
+          color: colorScheme.onPrimaryContainer,
         ),
       );
     }
+    final resolved = resolveAvatar(avatarUrl);
+    final tint = resolved.bg != null ? avatarHexToColor(resolved.bg!) : null;
     return CircleAvatar(
       radius: 32,
-      backgroundColor: colorScheme.primaryContainer,
-      child: Icon(
-        Icons.person,
-        size: 32,
-        color: colorScheme.onPrimaryContainer,
-      ),
+      backgroundColor: tint ?? colorScheme.primaryContainer,
+      backgroundImage: resolved.image,
     );
   }
 }

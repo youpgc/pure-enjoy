@@ -12,7 +12,7 @@ dependencies:
   flutter_localizations:
     sdk: flutter
   cupertino_icons: ^1.0.6
-  # 头像等网络图片磁盘缓存（按 URL 命中/失效，进入页面静默渲染缓存）
+  # 头像等网络图片磁盘缓存（方案A：网络为主，按 URL 命中/离线可看已加载过的头像）
   cached_network_image: ^3.4.0
   # 使用 HTTP 客户端直接访问 Supabase REST API
   http: ^1.1.0
@@ -67,6 +67,7 @@ dependencies:
   path: ^1.8.0
   # 网络状态监听
   connectivity_plus: ^5.0.0
+  crop_your_image: ^2.0.0
 
 dev_dependencies:
   flutter_test:

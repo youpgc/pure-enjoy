@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
+import '../avatar_render.dart';
 
 /// 编辑资料 - 区块标题
 class ProfileSectionTitle extends StatelessWidget {
@@ -136,36 +136,94 @@ class ProfileGenderSelector extends StatelessWidget {
 class ProfileAvatarSection extends StatelessWidget {
   final String? avatarUrl;
   final bool isUploading;
-  final VoidCallback onPick;
+  final VoidCallback onPickUpload;
+  final VoidCallback onPickPreset;
+  final VoidCallback onPickUploadHistory;
+  final VoidCallback onPickPresetHistory;
 
   const ProfileAvatarSection({
     super.key,
     required this.avatarUrl,
     required this.isUploading,
-    required this.onPick,
+    required this.onPickUpload,
+    required this.onPickPreset,
+    required this.onPickUploadHistory,
+    required this.onPickPresetHistory,
   });
+
+  void _showOptions(BuildContext context) {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.photo_library_outlined),
+              title: const Text('从相册上传'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onPickUpload();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history_outlined),
+              title: const Text('历史上传头像'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onPickUploadHistory();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.face_outlined),
+              title: const Text('选择预设头像'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onPickPreset();
+              },
+            ),
+            ListTile(
+              leading: const Icon(Icons.history_outlined),
+              title: const Text('历史预设头像'),
+              onTap: () {
+                Navigator.pop(ctx);
+                onPickPresetHistory();
+              },
+            ),
+          ],
+        ),
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final resolved = resolveAvatar(avatarUrl);
+    final tint = resolved.bg != null ? avatarHexToColor(resolved.bg!) : null;
     return Center(
       child: Column(
         children: [
           Stack(
             children: [
-              CircleAvatar(
-                radius: 50,
-                backgroundColor: colorScheme.primaryContainer,
-                backgroundImage: avatarUrl != null
-                    ? CachedNetworkImageProvider(avatarUrl!)
-                    : null,
+              GestureDetector(
+                onTap: isUploading ? null : () => _showOptions(context),
                 child: avatarUrl == null
-                    ? Icon(
-                        Icons.person,
-                        size: 50,
-                        color: colorScheme.onPrimaryContainer,
+                    ? CircleAvatar(
+                        radius: 50,
+                        backgroundColor: tint ?? colorScheme.primaryContainer,
+                        child: Icon(
+                          Icons.person,
+                          size: 50,
+                          color: colorScheme.onPrimaryContainer,
+                        ),
                       )
-                    : null,
+                    : cachedAvatarCircle(
+                        url: avatarUrl!,
+                        radius: 50,
+                        tint: tint ?? colorScheme.primaryContainer,
+                        colorScheme: colorScheme,
+                      ),
               ),
               if (isUploading)
                 Positioned.fill(
@@ -186,7 +244,7 @@ class ProfileAvatarSection extends StatelessWidget {
           ),
           const SizedBox(height: 8),
           TextButton(
-            onPressed: isUploading ? null : onPick,
+            onPressed: isUploading ? null : () => _showOptions(context),
             child: const Text('更换头像'),
           ),
         ],
