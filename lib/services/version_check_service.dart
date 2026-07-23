@@ -41,6 +41,12 @@ class VersionCheckService {
 
       final cacheJson = prefs.getString(_versionCheckCacheKey);
 
+      // 提前读取当前已安装版本：缓存命中时需用它复核版本是否真的需要更新，
+      // 避免内部更新重启后旧缓存把已装上的版本误报为待更新版本。
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
+      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+
       // 读取缓存
       if (cacheJson != null && cacheJson.isNotEmpty) {
         try {
@@ -62,6 +68,19 @@ class VersionCheckService {
                   return null;
                 }
               }
+              // 【修复】内部更新重启后，当前已安装版本可能已追平缓存中的最新版本，
+              // 需用当前版本复核：若已是最新则清除陈旧缓存并返回 null，避免误报更新。
+              if (cachedVersionInfo != null) {
+                final cachedVer = cachedVersionInfo['version'] as String? ?? '';
+                final cachedBuild = cachedVersionInfo['build_number'] as int? ?? 0;
+                if (!_shouldUpdate(currentVersion, currentBuildNumber, cachedVer, cachedBuild)) {
+                  if (kDebugMode) {
+                    debugPrint('📱 当前已安装版本 v$currentVersion 已是最新，缓存为旧数据，清除并跳过更新提示');
+                  }
+                  await prefs.remove(_versionCheckCacheKey);
+                  return null;
+                }
+              }
               if (kDebugMode) {
                 debugPrint('📱 使用缓存结果（${elapsed.inMinutes} 分钟前检查过）');
               }
@@ -73,10 +92,6 @@ class VersionCheckService {
           if (kDebugMode) debugPrint('📱 缓存解析失败，重新检查');
         }
       }
-
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version;
-      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
 
       if (kDebugMode) debugPrint('📱 当前版本检查');
 
