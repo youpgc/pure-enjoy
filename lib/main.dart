@@ -12,6 +12,7 @@ import 'features/home/screens/home_screen.dart';
 import 'features/auth/screens/login_screen.dart';
 import 'features/auth/auth_provider.dart';
 import 'services/supabase_service.dart';
+import 'services/error_reporter.dart';
 import 'services/dict_service.dart';
 import 'services/notification_service.dart';
 import 'services/offline_sync_service.dart';
@@ -22,6 +23,9 @@ final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
+
+  // 接管全局未处理异常，上报到后台 error_logs（App 端错误观测）
+  ErrorReporter.init();
 
   // 加载环境变量（优先从 --dart-define 读取，其次从 .env 文件加载）
   try {
