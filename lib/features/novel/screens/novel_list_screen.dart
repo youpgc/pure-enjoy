@@ -365,6 +365,9 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                       height: 180,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
+                        // 横向列表需为每项提供有限宽度，否则 NovelCard 内的 Expanded/Stack
+                        // 因父级宽度无限而布局崩溃（A Stack requires bounded constraints）
+                        itemExtent: 140,
                         itemCount: _readingNovels.length,
                         itemBuilder: (context, index) {
                           final novel = _readingNovels[index];

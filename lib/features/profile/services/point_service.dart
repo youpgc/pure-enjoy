@@ -180,24 +180,29 @@ class PointService {
 
   /// 打卡获得积分
   ///
-  /// 核心逻辑：
-  /// 1. 检查今天是否已打卡
-  /// 2. 计算连续签到天数
-  /// 3. 计算积分 = min(连续天数, 7)
-  /// 4. 插入 point_records 流水
-  /// 5. 更新 users 表签到统计字段
-  /// 6. 重算 users 表积分统计字段
+  /// 关键路径（必须等待，直接决定接口返回结果，目标 <600ms）：
+  ///   1. 校验登录
+  ///   2. 查今天是否已打卡（北京自然日窗口，防重复）
+  ///   3. 反推连续签到天数（决定本次积分与展示，逻辑只信 point_records）
+  ///   4. 插入 point_records 流水（核心落库）
+  ///
+  /// 非关键路径（fire-and-forget，不阻塞接口响应，详见 [_fireAndForget]）：
+  ///   - 回写 users 展示字段（连续天数 / 最近签到日期）
+  ///   - 全量重算 users 积分展示列
+  ///   - 刷新 AuthService 用户缓存
+  ///   这些维护逻辑与本次签到结果无依赖，推迟到响应之后由事件循环异步执行，
+  ///   使接口耗时仅含「查重 + 算连续 + 插流水」三步。
   Future<Map<String, dynamic>> checkin() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) {
-        return {'success': false, 'message': '未登录'};
-      }
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) {
+      return {'success': false, 'message': '未登录'};
+    }
 
+    try {
       final today = beijingToday();
       final tomorrow = beijingTomorrow();
 
-      // 1. 查询用户今天是否已打卡
+      // 1. 查今天是否已打卡（北京自然日窗口）
       final todayResult = await ApiClient.get(
         'point_records',
         filters: {
@@ -216,14 +221,13 @@ class PointService {
         }
       }
 
-      // 2. 基于 point_records 签到流水推算连续签到天数
-      //    （不再依赖 users 统计字段，规避写入失败与历史坏数据的影响）
+      // 2. 反推连续签到天数（逻辑计算只信 point_records，规避 users 展示列写入失败）
       final streak = await calcConsecutiveStreak(userId, today);
 
       // 3. 计算积分 = min(连续天数, 7)
       final points = streak > 7 ? 7 : streak;
 
-      // 4. 插入 point_records 记录
+      // 4. 插入 point_records 流水（核心落库）
       final now = DateTime.now();
       final nowIso = now.toUtc().toIso8601String();
       final expiresAt =
@@ -243,23 +247,24 @@ class PointService {
       );
 
       if (!insertResult.isSuccess) {
+        // 唯一索引冲突：理论上已被步骤1拦截，此处兜底视为「今日已签到」，
+        // 避免用户看到硬失败（北京时区唯一索引修复后，冲突即代表真实重复）。
+        if (insertResult.statusCode == 409) {
+          return {'success': false, 'message': '今天已签到'};
+        }
         if (kDebugMode) {
           debugPrint('插入积分记录失败: ${insertResult.error}');
         }
         return {'success': false, 'message': '签到失败: ${insertResult.error}'};
       }
 
-      // 5. 更新 users 表打卡统计字段
-      await _updateUserStats(
+      // 5-7（非关键）：回写展示字段 + 重算积分 + 刷新缓存，全部异步，不阻塞返回
+      _fireAndForget(_updateUserStats(
         consecutiveCheckinDays: streak,
         lastCheckinDate: today,
-      );
-
-      // 6. 重算 users 表积分统计字段（不依赖触发器）
-      await _recalcAndUpdateUserPoints();
-
-      // 7. 更新 AuthService 中的用户缓存
-      await AuthService.instance.reloadCurrentUser();
+      ));
+      _fireAndForget(_recalcAndUpdateUserPoints());
+      _fireAndForget(AuthService.instance.reloadCurrentUser());
 
       return {
         'success': true,
@@ -273,6 +278,16 @@ class PointService {
       }
       return {'success': false, 'message': '签到失败，请稍后重试'};
     }
+  }
+
+  /// 异步执行非关键维护逻辑（如签到后的统计回写 / 重算 / 缓存刷新），
+  /// 吞掉异常，确保不影响主流程与接口响应耗时。
+  void _fireAndForget(Future future) {
+    future.catchError((e, st) {
+      if (kDebugMode) {
+        debugPrint('后台积分维护任务失败（已忽略）: $e');
+      }
+    });
   }
 
   /// 分页获取积分记录
