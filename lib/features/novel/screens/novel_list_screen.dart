@@ -127,7 +127,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
       final novelsFuture = ApiClient.get(
         'novels',
         filters: filters,
-        order: 'created_at.desc',
+        order: 'created_at.desc,id.asc',
         limit: limit,
         offset: offset,
       );
@@ -156,19 +156,28 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         userNovels = shelfResult.data!.cast<Map<String, dynamic>>();
       }
 
+      // 合并 + 按 id 去重：批量导入导致 created_at 相同、offset 分页顺序漂移会产生重复，
+      // 加 id.asc tie-break（见 order 参数）让分页稳定，此处再去重作为双保险。
+      final List<NovelModel> merged = refresh
+          ? _dedupeById(novels)
+          : _dedupeById([..._allNovels, ...novels]);
+      final int newCount = merged.length - (refresh ? 0 : _allNovels.length);
+
       setState(() {
-        if (refresh) {
-          _allNovels = novels;
-          _novels = novels;
-        } else {
-          _allNovels.addAll(novels);
-          _novels.addAll(novels);
-        }
+        _allNovels = merged;
+        // 搜索态下按关键词过滤，否则展示全集（loadMore 时保持 _novels 与 _allNovels 一致）
+        _novels = _searchQuery.isEmpty
+            ? merged
+            : merged.where((n) {
+                final q = _searchQuery.toLowerCase();
+                return n.title.toLowerCase().contains(q) ||
+                    (n.author?.toLowerCase().contains(q) ?? false);
+              }).toList();
         _userNovels = userNovels;
         _isLoading = false;
         _isFirstLoad = false;
-        onPaginationDataLoaded(novels.length);
       });
+      onPaginationDataLoaded(newCount);
 
       // 只在 refresh 时写入缓存
       if (refresh) {
@@ -189,6 +198,18 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         showSnackBar(context, '加载失败，请稍后重试');
       }
     }
+  }
+
+  /// 按 id 去重，保留首次出现的元素
+  /// 用于防御 offset 分页顺序漂移 / 缓存与网络数据叠加导致的列表重复
+  List<NovelModel> _dedupeById(List<NovelModel> list) {
+    final seen = <String>{};
+    final result = <NovelModel>[];
+    for (final n in list) {
+      if (!seen.add(n.id)) continue;
+      result.add(n);
+    }
+    return result;
   }
 
   /// 切换分类
