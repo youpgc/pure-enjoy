@@ -114,6 +114,18 @@ class HttpClient {
     }
   }
 
+  /// 清空 ETag 缓存（内存 + 持久化）
+  /// 切换账号时调用：避免命中 304 后向新用户返回旧用户的缓存响应体
+  Future<void> clearEtagCache() async {
+    _etagCache.clear();
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove(_etagPrefsKey);
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 清空 ETag 缓存失败: $e');
+    }
+  }
+
   /// 获取认证头
   /// 已登录时返回 JWT 头，未登录时返回 Anon Key
   Map<String, String> get _authHeaders {

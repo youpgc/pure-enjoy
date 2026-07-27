@@ -11,6 +11,7 @@ import 'api_client.dart';
 import 'http_client.dart';
 import '../utils/cache_helper.dart';
 import 'chapter_cache_service.dart';
+import '../features/novel/services/annotation_local_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -213,6 +214,22 @@ class AuthService {
     } catch (e) {
       if (kDebugMode) {
         debugPrint('清理缓存失败: $e');
+      }
+    }
+    // 清空本地批注库，防止切换账号后旧账号批注残留/被误同步
+    try {
+      await AnnotationLocalService().clearAll();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('清理批注库失败: $e');
+      }
+    }
+    // 清空 ETag 缓存，避免命中 304 后向新用户返回旧用户的缓存响应体
+    try {
+      await HttpClient.instance.clearEtagCache();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('清理 ETag 缓存失败: $e');
       }
     }
     await _session.clearSession();

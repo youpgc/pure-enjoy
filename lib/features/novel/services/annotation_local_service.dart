@@ -121,36 +121,43 @@ class AnnotationLocalService {
     return db.insert('novel_annotations_local', map);
   }
 
-  /// 根据 novelId 查询本地批注（排除已删除）
-  Future<List<NovelAnnotation>> getAnnotationsByNovel(String novelId) async {
+  /// 根据 novelId 查询本地批注（按用户隔离，排除已删除）
+  Future<List<NovelAnnotation>> getAnnotationsByNovel(
+    String novelId,
+    String userId,
+  ) async {
     final db = await database;
     final rows = await db.query(
       'novel_annotations_local',
-      where: 'novel_id = ? AND is_deleted = 0',
-      whereArgs: [novelId],
+      where: 'novel_id = ? AND user_id = ? AND is_deleted = 0',
+      whereArgs: [novelId, userId],
       orderBy: 'chapter_order ASC, start_offset ASC',
     );
     return rows.map(_fromLocalMap).toList();
   }
 
-  /// 根据 chapterId 查询本地批注
-  Future<List<NovelAnnotation>> getAnnotationsByChapter(String chapterId) async {
+  /// 根据 chapterId 查询本地批注（按用户隔离）
+  Future<List<NovelAnnotation>> getAnnotationsByChapter(
+    String chapterId,
+    String userId,
+  ) async {
     final db = await database;
     final rows = await db.query(
       'novel_annotations_local',
-      where: 'chapter_id = ? AND is_deleted = 0',
-      whereArgs: [chapterId],
+      where: 'chapter_id = ? AND user_id = ? AND is_deleted = 0',
+      whereArgs: [chapterId, userId],
       orderBy: 'start_offset ASC',
     );
     return rows.map(_fromLocalMap).toList();
   }
 
-  /// 获取所有待同步的记录
-  Future<List<NovelAnnotation>> getPendingAnnotations() async {
+  /// 获取当前用户待同步的记录（按用户隔离，避免跨账号误同步）
+  Future<List<NovelAnnotation>> getPendingAnnotations(String userId) async {
     final db = await database;
     final rows = await db.query(
       'novel_annotations_local',
-      where: "sync_status = 'pending'",
+      where: "sync_status = 'pending' AND user_id = ?",
+      whereArgs: [userId],
       orderBy: 'created_at ASC',
     );
     return rows.map(_fromLocalMap).toList();
@@ -247,6 +254,12 @@ class AnnotationLocalService {
       'novel_annotations_local',
       where: "is_deleted = 1 AND sync_status = 'synced'",
     );
+  }
+
+  /// 清空全部本地批注（切换账号时调用，防止跨账号数据残留）
+  Future<void> clearAll() async {
+    final db = await database;
+    await db.delete('novel_annotations_local');
   }
 
   /// 以云端数据为准，合并到本地

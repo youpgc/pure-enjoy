@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../../features/auth/auth_provider.dart';
 
 /// 主题配色方案 - 基于Logo的橙黄渐变色系
 enum AppColorScheme {
@@ -36,11 +37,26 @@ enum ReaderBackgroundTheme {
 }
 
 /// 主题提供者 - 管理主题模式、配色、字体大小、阅读背景
+///
+/// 按用户隔离：登录用户的设置存储键带业务 userId 后缀（如 theme_mode_U178...），
+/// 未登录（游客）使用原始键。切换账号时由 themeProvider 依赖
+/// currentUserIdProvider 自动重建实例并加载对应用户设置，防止跨账号继承。
 class ThemeProvider extends ChangeNotifier {
-  static const String _themeKey = 'theme_mode';
-  static const String _colorSchemeKey = 'color_scheme';
-  static const String _fontScaleKey = 'font_scale';
-  static const String _readerBgKey = 'reader_bg';
+  static const String _themeKeyBase = 'theme_mode';
+  static const String _colorSchemeKeyBase = 'color_scheme';
+  static const String _fontScaleKeyBase = 'font_scale';
+  static const String _readerBgKeyBase = 'reader_bg';
+
+  /// 当前用户业务 ID（null = 未登录/游客）
+  final String? _userId;
+
+  /// 存储键加用户后缀（游客沿用原始键，兼容历史数据）
+  String _key(String base) => _userId == null ? base : '${base}_$_userId';
+
+  String get _themeKey => _key(_themeKeyBase);
+  String get _colorSchemeKey => _key(_colorSchemeKeyBase);
+  String get _fontScaleKey => _key(_fontScaleKeyBase);
+  String get _readerBgKey => _key(_readerBgKeyBase);
 
   // 主题模式
   ThemeMode _themeMode = ThemeMode.system;
@@ -59,7 +75,7 @@ class ThemeProvider extends ChangeNotifier {
   ReaderBackgroundTheme _readerBg = ReaderBackgroundTheme.defaultWhite;
   ReaderBackgroundTheme get readerBg => _readerBg;
 
-  ThemeProvider() {
+  ThemeProvider({String? userId}) : _userId = userId {
     _loadSettings();
   }
 
@@ -145,4 +161,9 @@ class ThemeProvider extends ChangeNotifier {
 }
 
 /// 主题 Provider（Riverpod）
-final themeProvider = ChangeNotifierProvider<ThemeProvider>((ref) => ThemeProvider());
+/// 依赖 currentUserIdProvider：登录/登出/切换账号时自动重建，
+/// 加载对应用户的主题/字号/阅读背景设置（防跨账号继承）。
+final themeProvider = ChangeNotifierProvider<ThemeProvider>((ref) {
+  final userId = ref.watch(currentUserIdProvider);
+  return ThemeProvider(userId: userId);
+});

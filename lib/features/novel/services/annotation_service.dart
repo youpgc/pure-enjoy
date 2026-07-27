@@ -27,8 +27,8 @@ class AnnotationService {
     final userId = _userId;
     if (userId == null) return [];
 
-    // 1. 先读取本地缓存
-    final localList = await _local.getAnnotationsByNovel(novelId);
+    // 1. 先读取本地缓存（按当前用户隔离）
+    final localList = await _local.getAnnotationsByNovel(novelId, userId);
 
     // 2. 在线时拉取云端并合并
     if (await _isOnline) {
@@ -72,7 +72,7 @@ class AnnotationService {
     final userId = _userId;
     if (userId == null) return [];
 
-    final localList = await _local.getAnnotationsByChapter(chapterId);
+    final localList = await _local.getAnnotationsByChapter(chapterId, userId);
 
     if (await _isOnline) {
       try {
@@ -275,7 +275,7 @@ class AnnotationService {
     }
 
     // 本地兜底查询
-    final localList = await _local.getAnnotationsByChapter(chapterId);
+    final localList = await _local.getAnnotationsByChapter(chapterId, userId);
     try {
       return localList.firstWhere(
         (a) => a.startOffset == startOffset && a.endOffset == endOffset && !a.isDeleted,
@@ -288,9 +288,10 @@ class AnnotationService {
   /// 同步所有 pending 状态的本地批注到云端
   /// 返回：成功同步的数量
   Future<int> syncPendingAnnotations() async {
-    if (!await _isOnline) return 0;
+    final userId = _userId;
+    if (userId == null || !await _isOnline) return 0;
 
-    final pending = await _local.getPendingAnnotations();
+    final pending = await _local.getPendingAnnotations(userId);
     if (pending.isEmpty) return 0;
 
     int successCount = 0;
@@ -371,12 +372,15 @@ class AnnotationService {
     return successCount;
   }
 
-  /// 获取同步失败的批注列表（供 UI 提示用户）
+  /// 获取同步失败的批注列表（供 UI 提示用户，按当前用户隔离）
   Future<List<NovelAnnotation>> getFailedAnnotations() async {
+    final userId = _userId;
+    if (userId == null) return [];
     final db = await _local.database;
     final rows = await db.query(
       'novel_annotations_local',
-      where: "sync_status = 'failed' AND is_deleted = 0",
+      where: "sync_status = 'failed' AND is_deleted = 0 AND user_id = ?",
+      whereArgs: [userId],
       orderBy: 'created_at DESC',
     );
     return rows.map((m) {

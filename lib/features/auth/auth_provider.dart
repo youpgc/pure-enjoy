@@ -99,7 +99,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
-          userId: response.userId,
+          userId: SupabaseService.instance.currentUserId,
           email: response.email,
           role: role,
         );
@@ -133,7 +133,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
-          userId: response.userId,
+          userId: SupabaseService.instance.currentUserId,
           email: response.email,
           role: role,
         );
@@ -168,7 +168,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
         final role = _resolveRole(user);
         state = AuthState(
           isAuthenticated: true,
-          userId: response.userId,
+          userId: SupabaseService.instance.currentUserId,
           email: response.email,
           role: role,
         );
@@ -195,7 +195,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
       final role = _resolveRole(user);
       state = AuthState(
         isAuthenticated: true,
-        userId: user['id'] as String?,
+        userId: SupabaseService.instance.currentUserId,
         email: user['email'] as String?,
         role: role,
       );
