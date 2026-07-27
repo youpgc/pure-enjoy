@@ -35,6 +35,8 @@ dependencies:
   flutter_dotenv: ^5.1.0
   # URL 启动器
   url_launcher: ^6.2.2
+  # 应用内 WebView（聚合阅读：打开来源页，不存正文）
+  webview_flutter: ^4.10.0
   # 文件路径
   path_provider: ^2.1.2
   # 文件分享

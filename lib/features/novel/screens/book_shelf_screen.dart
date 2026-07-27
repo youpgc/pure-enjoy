@@ -7,7 +7,7 @@ import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
-import 'novel_reader_screen.dart';
+import '../services/novel_launch_service.dart';
 import 'novel_detail_screen.dart';
 import 'novel_list_screen.dart';
 import '../../auth/screens/login_screen.dart';
@@ -294,21 +294,18 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   }
 
   /// 继续阅读 - 跳转到上次阅读的章节
-  void _continueReading(Map<String, dynamic> item) {
+  Future<void> _continueReading(Map<String, dynamic> item) async {
     final novelData = item['novels'] as Map<String, dynamic>?;
     if (novelData == null) return;
 
     final novel = _parseNovel(novelData);
     final lastChapter = item['last_chapter'] as int? ?? 1;
 
-    Navigator.push(
+    // 聚合小说按来源路由到外部（原生 App / WebView）
+    await NovelLaunchService.instance.launch(
       context,
-      MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(
-          novel: novel,
-          startChapter: lastChapter,
-        ),
-      ),
+      novel,
+      startChapter: lastChapter,
     );
   }
 

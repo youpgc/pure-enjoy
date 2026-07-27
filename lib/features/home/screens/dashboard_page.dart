@@ -13,7 +13,7 @@ import '../../life/models/habit_model.dart';
 import '../../life/models/reminder_model.dart';
 import '../../life/screens/reminders_screen.dart';
 import '../../novel/models/novel_model.dart';
-import '../../novel/screens/novel_reader_screen.dart';
+import '../../novel/services/novel_launch_service.dart';
 import 'notification_center_screen.dart';
 import 'sheets/sheets.dart';
 import 'dashboard_helpers.dart';
@@ -428,16 +428,14 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// 继续阅读小说
-  void _continueReading(NovelModel novel, int lastChapter) {
-    Navigator.push(
+  Future<void> _continueReading(NovelModel novel, int lastChapter) async {
+    // 聚合小说按来源路由到外部；返回（内置阅读器/WebView 出栈）后刷新最近阅读
+    await NovelLaunchService.instance.launch(
       context,
-      MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(
-          novel: novel,
-          startChapter: lastChapter,
-        ),
-      ),
-    ).then((_) => _loadRecentNovels());
+      novel,
+      startChapter: lastChapter,
+    );
+    _loadRecentNovels();
   }
 
   @override

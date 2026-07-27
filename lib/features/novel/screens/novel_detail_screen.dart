@@ -4,7 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../models/novel_model.dart';
-import 'novel_reader_screen.dart';
+import '../services/novel_launch_service.dart';
 import 'novel_comments_screen.dart';
 import '../../../core/widgets/widgets.dart';
 import '../widgets/novel_detail_header.dart';
@@ -385,28 +385,22 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   }
 
   /// 开始阅读
-  void _startReading() {
-    Navigator.push(
+  Future<void> _startReading() async {
+    // 聚合小说按来源路由到外部（原生 App / WebView）
+    await NovelLaunchService.instance.launch(
       context,
-      MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(
-          novel: widget.novel,
-          startChapter: _isInBookshelf ? _currentChapter : 1,
-        ),
-      ),
+      widget.novel,
+      startChapter: _isInBookshelf ? _currentChapter : 1,
     );
   }
 
   /// 跳转到指定章节
-  void _jumpToChapter(int chapterNum) {
-    Navigator.push(
+  Future<void> _jumpToChapter(int chapterNum) async {
+    // 聚合小说按来源路由到外部
+    await NovelLaunchService.instance.launch(
       context,
-      MaterialPageRoute(
-        builder: (_) => NovelReaderScreen(
-          novel: widget.novel,
-          startChapter: chapterNum,
-        ),
-      ),
+      widget.novel,
+      startChapter: chapterNum,
     );
   }
 

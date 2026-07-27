@@ -5,8 +5,8 @@ import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../novel/screens/novel_detail_screen.dart';
-import '../../novel/screens/novel_reader_screen.dart';
 import '../../novel/models/novel_model.dart';
+import '../../novel/services/novel_launch_service.dart';
 import '../../novel/widgets/novel_cover.dart';
 import '../../../constants/app_constants.dart';
 
@@ -243,7 +243,7 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
             overflow: TextOverflow.ellipsis,
           ),
           trailing: const Icon(Icons.chevron_right),
-          onTap: () {
+          onTap: () async {
             final novelId = item['novel_id'] as String?;
             final lastChapter = (item['last_chapter'] as int?) ?? 0;
 
@@ -271,15 +271,11 @@ class _ReadingHistoryScreenState extends State<ReadingHistoryScreen> with Pagina
               return;
             }
 
-            // 直接跳转到阅读界面并恢复上次阅读进度
-            Navigator.push(
+            // 直接跳转阅读（聚合小说按来源路由到外部）
+            await NovelLaunchService.instance.launch(
               context,
-              MaterialPageRoute(
-                builder: (_) => NovelReaderScreen(
-                  novel: novel,
-                  startChapter: lastChapter,
-                ),
-              ),
+              novel,
+              startChapter: lastChapter,
             );
           },
         );
