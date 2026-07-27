@@ -12,6 +12,7 @@ import 'http_client.dart';
 import '../utils/cache_helper.dart';
 import 'chapter_cache_service.dart';
 import '../features/novel/services/annotation_local_service.dart';
+import '../features/novel/services/annotation_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -216,9 +217,22 @@ class AuthService {
         debugPrint('清理缓存失败: $e');
       }
     }
-    // 清空本地批注库，防止切换账号后旧账号批注残留/被误同步
+    // 切换账号前，先尝试把旧用户的离线待同步批注上传，避免本地编辑丢失
+    final oldUserId = SessionManager.instance.currentUserId;
     try {
-      await AnnotationLocalService().clearAll();
+      if (oldUserId != null) {
+        await AnnotationService().syncPendingAnnotations();
+      }
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('同步待上传批注失败(忽略): $e');
+      }
+    }
+    // 清空旧用户本地批注，防止切换账号后旧账号批注残留/被误同步
+    try {
+      if (oldUserId != null) {
+        await AnnotationLocalService().clearAllForUser(oldUserId);
+      }
     } catch (e) {
       if (kDebugMode) {
         debugPrint('清理批注库失败: $e');

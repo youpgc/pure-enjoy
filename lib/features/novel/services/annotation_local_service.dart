@@ -256,10 +256,14 @@ class AnnotationLocalService {
     );
   }
 
-  /// 清空全部本地批注（切换账号时调用，防止跨账号数据残留）
-  Future<void> clearAll() async {
+  /// 按用户清空本地批注（切换账号时调用，仅清旧账号数据，避免误删其他账号）
+  Future<void> clearAllForUser(String userId) async {
     final db = await database;
-    await db.delete('novel_annotations_local');
+    await db.delete(
+      'novel_annotations_local',
+      where: 'user_id = ?',
+      whereArgs: [userId],
+    );
   }
 
   /// 以云端数据为准，合并到本地
