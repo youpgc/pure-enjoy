@@ -3,6 +3,7 @@ import '../../../constants/app_constants.dart';
 import '../../../services/dict_service.dart';
 import '../models/novel_model.dart';
 import '../widgets/novel_cover.dart';
+import '../widgets/novel_source_badge.dart';
 
 /// 小说详情头部（封面 + 标题 + 作者 + 分类）
 class NovelDetailHeader extends StatelessWidget {
@@ -110,6 +111,8 @@ class NovelDetailHeader extends StatelessWidget {
                               ),
                             ),
                           ),
+                        const SizedBox(height: 6),
+                        NovelSourceBadge(novel: novel),
                       ],
                     ),
                   ),

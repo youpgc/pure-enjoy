@@ -53,6 +53,17 @@ class NovelModel {
     this.updatedAt,
   });
 
+  /// 是否聚合小说（带外部来源链接、不存正文）
+  bool get isAggregated => sourceUrl != null && sourceUrl!.isNotEmpty;
+
+  /// 来源展示名（用于合规标注）
+  String get sourceDisplayName {
+    final s = (source ?? '').toLowerCase();
+    if (s.contains('zongheng') || s.contains('纵横')) return '纵横';
+    if (source != null && source!.isNotEmpty) return source!;
+    return '外部来源';
+  }
+
   factory NovelModel.fromJson(Map<String, dynamic> json) {
     return NovelModel(
       id: json['id']?.toString() ?? '',

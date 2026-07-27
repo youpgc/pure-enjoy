@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
+import '../../../services/api_client.dart';
 import '../models/novel_model.dart';
 import '../screens/novel_reader_screen.dart';
 import '../screens/novel_webview_screen.dart';
@@ -34,6 +35,9 @@ class NovelLaunchService {
       await _openInternalReader(context, novel, startChapter);
       return;
     }
+
+    // 聚合小说：阅读计数（合规指标），不阻塞跳转
+    _incrementReadCount(novel); // ignore: unawaited_futures
 
     // 聚合小说：按来源选择 deeplink / WebView
     final target = _resolveExternalTarget(novel);
@@ -119,6 +123,17 @@ class NovelLaunchService {
       // 忽略异常，交由 WebView 兜底
     }
     return false;
+  }
+
+  /// 聚合小说阅读计数（合规指标）：跳转原平台时 read_count +1。
+  Future<void> _incrementReadCount(NovelModel novel) async {
+    if (novel.id.isEmpty) return;
+    final next = (novel.readCount ?? 0) + 1;
+    try {
+      await ApiClient.patch('novels', {'read_count': next}, id: novel.id);
+    } catch (_) {
+      // 计数失败不影响阅读跳转
+    }
   }
 }
 

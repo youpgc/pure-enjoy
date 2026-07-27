@@ -4,6 +4,7 @@ import '../../../services/dict_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
 import '../widgets/novel_cover.dart';
+import '../widgets/novel_source_badge.dart';
 
 /// 小说卡片（书架/列表通用）
 class NovelCard extends StatelessWidget {
@@ -82,6 +83,12 @@ class NovelCard extends StatelessWidget {
                           ),
                         ),
                       ),
+                    ),
+                  if (novel.isAggregated)
+                    Positioned(
+                      top: 4,
+                      left: 4,
+                      child: NovelSourceBadge(novel: novel, compact: true),
                     ),
                 ],
               ),

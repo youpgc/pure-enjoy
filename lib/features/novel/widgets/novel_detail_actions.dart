@@ -11,6 +11,7 @@ class NovelDetailActions extends StatelessWidget {
   final int cachedChapterCount;
   final int chaptersLength;
   final bool isCollected;
+  final bool isAggregated;
   final VoidCallback onStartReading;
   final VoidCallback onToggleBookshelf;
   final VoidCallback onDownload;
@@ -26,6 +27,7 @@ class NovelDetailActions extends StatelessWidget {
     required this.cachedChapterCount,
     required this.chaptersLength,
     required this.isCollected,
+    required this.isAggregated,
     required this.onStartReading,
     required this.onToggleBookshelf,
     required this.onDownload,
@@ -79,29 +81,32 @@ class NovelDetailActions extends StatelessWidget {
                     ),
             ),
             const SizedBox(width: 12),
-            // 缓存下载按钮
-            SizedBox(
-              width: 48,
-              height: 48,
-              child: isDownloading
-                  ? const Center(child: LoadingWidget(size: 24))
-                  : OutlinedButton(
-                      onPressed: cachedChapterCount > 0 &&
-                              cachedChapterCount >= chaptersLength
-                          ? onClear
-                          : onDownload,
-                      style: OutlinedButton.styleFrom(
-                        padding: EdgeInsets.zero,
-                        minimumSize: const Size(48, 48),
+            // 缓存下载按钮（聚合小说无本地正文，隐藏以避免冒充自有内容）
+            if (!isAggregated) ...[
+              const SizedBox(width: 12),
+              SizedBox(
+                width: 48,
+                height: 48,
+                child: isDownloading
+                    ? const Center(child: LoadingWidget(size: 24))
+                    : OutlinedButton(
+                        onPressed: cachedChapterCount > 0 &&
+                                cachedChapterCount >= chaptersLength
+                            ? onClear
+                            : onDownload,
+                        style: OutlinedButton.styleFrom(
+                          padding: EdgeInsets.zero,
+                          minimumSize: const Size(48, 48),
+                        ),
+                        child: Icon(
+                          cachedChapterCount > 0
+                              ? Icons.download_done
+                              : Icons.download_outlined,
+                          color: cachedChapterCount > 0 ? AppTheme.success : null,
+                        ),
                       ),
-                      child: Icon(
-                        cachedChapterCount > 0
-                            ? Icons.download_done
-                            : Icons.download_outlined,
-                        color: cachedChapterCount > 0 ? AppTheme.success : null,
-                      ),
-                    ),
-            ),
+              ),
+            ],
             const SizedBox(width: 12),
             // 收藏按钮
             SizedBox(

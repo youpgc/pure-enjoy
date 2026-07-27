@@ -14,6 +14,7 @@ import '../widgets/novel_detail_description.dart';
 import '../widgets/novel_detail_comment_entry.dart';
 import '../widgets/novel_detail_chapter_header.dart';
 import '../widgets/novel_detail_chapter_list.dart';
+import '../widgets/novel_aggregation_notice.dart';
 import 'novel_detail_dialogs.dart';
 import 'novel_detail_helpers.dart';
 
@@ -435,7 +436,9 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             onDownload: _downloadAllChapters,
             onClear: _clearCache,
             onToggleCollect: _toggleCollect,
+            isAggregated: widget.novel.isAggregated,
           ),
+          SliverToBoxAdapter(child: NovelAggregationNotice(novel: novel)),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
           NovelDetailDescription(novel: novel),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
