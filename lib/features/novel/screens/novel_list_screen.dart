@@ -13,6 +13,7 @@ import 'novel_detail_screen.dart';
 import 'ranking_screen.dart';
 import 'recommendation_screen.dart';
 import '../widgets/novel_card.dart';
+import '../widgets/continue_reading_card.dart';
 import '../widgets/novel_recommendation_card.dart';
 import 'novel_search_dialog.dart';
 
@@ -386,13 +387,15 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
                       height: 180,
                       child: ListView.builder(
                         scrollDirection: Axis.horizontal,
-                        // 横向列表需为每项提供有限宽度，否则 NovelCard 内的 Expanded/Stack
-                        // 因父级宽度无限而布局崩溃（A Stack requires bounded constraints）
+                        // 横向列表需为每项提供有限宽度，否则卡片内的 Expanded/Stack
+                        // 因父级宽度无限而布局崩溃（A Stack requires bounded constraints）。
+                        // 高度 180 由 SizedBox 约束；卡片用 ContinueReadingCard，
+                        // 仅封面 Expanded、信息区自然高度，大字体下也不会垂直溢出。
                         itemExtent: 140,
                         itemCount: _readingNovels.length,
                         itemBuilder: (context, index) {
                           final novel = _readingNovels[index];
-                          return NovelCard(
+                          return ContinueReadingCard(
                             novel: novel,
                             onTap: () => _openNovelDetail(novel),
                           );
