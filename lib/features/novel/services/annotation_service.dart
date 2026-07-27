@@ -410,13 +410,18 @@ class AnnotationService {
     }).toList();
   }
 
-  /// 辅助：根据 ID 查找本地记录
+  /// 辅助：根据 ID 查找本地记录（按当前用户隔离，防止跨账号命中）
   Future<NovelAnnotation?> _getLocalById(String id) async {
     final db = await _local.database;
+    final userId = _userId;
     final rows = await db.query(
       'novel_annotations_local',
-      where: 'id = ? OR local_id = ?',
-      whereArgs: [id, int.tryParse(id) ?? 0],
+      where: userId == null
+          ? 'id = ? OR local_id = ?'
+          : '(id = ? OR local_id = ?) AND user_id = ?',
+      whereArgs: userId == null
+          ? [id, int.tryParse(id) ?? 0]
+          : [id, int.tryParse(id) ?? 0, userId],
       limit: 1,
     );
     if (rows.isEmpty) return null;

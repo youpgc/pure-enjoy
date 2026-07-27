@@ -39,7 +39,8 @@ enum ReaderBackgroundTheme {
 /// 主题提供者 - 管理主题模式、配色、字体大小、阅读背景
 ///
 /// 按用户隔离：登录用户的设置存储键带业务 userId 后缀（如 theme_mode_U178...），
-/// 未登录（游客）使用原始键。切换账号时由 themeProvider 依赖
+/// 未登录（游客）使用显式 '_guest' 后缀键，避免与升级前旧版共享键（如 'theme_mode'）
+/// 同名导致误读其他账号的历史脏数据。切换账号时由 themeProvider 依赖
 /// currentUserIdProvider 自动重建实例并加载对应用户设置，防止跨账号继承。
 class ThemeProvider extends ChangeNotifier {
   static const String _themeKeyBase = 'theme_mode';
@@ -50,8 +51,10 @@ class ThemeProvider extends ChangeNotifier {
   /// 当前用户业务 ID（null = 未登录/游客）
   final String? _userId;
 
-  /// 存储键加用户后缀（游客沿用原始键，兼容历史数据）
-  String _key(String base) => _userId == null ? base : '${base}_$_userId';
+  /// 存储键加用户后缀：登录用户带业务 userId（如 theme_mode_U178...），
+  /// 游客使用显式 '_guest' 后缀，避免与升级前旧版共享键（如 'theme_mode'）同名
+  /// 导致误读其他账号的历史脏数据。
+  String _key(String base) => _userId == null ? '${base}_guest' : '${base}_$_userId';
 
   String get _themeKey => _key(_themeKeyBase);
   String get _colorSchemeKey => _key(_colorSchemeKeyBase);
