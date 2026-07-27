@@ -94,6 +94,18 @@ class CacheHelper {
       await prefs.remove(key);
     }
 
+    // 清除按用户隔离的视图缓存（sync_cache_* / cached_anniversaries_* 前缀），
+    // 防止切换账号后残留旧账号数据（键含 userId，无法用固定列表枚举，故按前缀清扫）
+    final syncKeys = allKeys.where((k) => k.startsWith('sync_cache_'));
+    for (final key in syncKeys) {
+      await prefs.remove(key);
+    }
+    final anniversaryKeys =
+        allKeys.where((k) => k.startsWith('cached_anniversaries_'));
+    for (final key in anniversaryKeys) {
+      await prefs.remove(key);
+    }
+
     // 清除离线同步队列
     await prefs.remove('offline_sync_queue');
   }

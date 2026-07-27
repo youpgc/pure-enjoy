@@ -118,10 +118,12 @@ class _DataSyncScreenState extends State<DataSyncScreen> {
       if (result.isSuccess) {
         final data = result.data!;
 
-        // 将数据缓存到 SharedPreferences
+        // 将数据缓存到 SharedPreferences（按用户隔离：键加 userId 前缀，
+        // 防止切换账号后新账号读到旧账号整表业务数据；signOut 时由
+        // CacheHelper.clearAllUserData 按 'sync_cache_' 前缀统一清扫）
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString(
-          'sync_cache_${current.tableName}',
+          'sync_cache_${userId}_${current.tableName}',
           jsonEncode(data),
         );
 

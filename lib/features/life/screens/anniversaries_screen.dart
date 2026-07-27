@@ -32,7 +32,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   String? get _userId => AuthService.instance.currentUserId;
   String? get _userNickname => AuthService.instance.currentUserName;
 
-  String get _cacheKey => 'cached_anniversaries_${widget.filterType}';
+  // 按用户隔离：键加 userId 前缀，防止切换账号后旧账号纪念日被新账号加载
+  // （同类 annotation_local_service 泄露修复；未登录用 'guest' 占位键）
+  String get _cacheKey =>
+      'cached_anniversaries_${_userId ?? 'guest'}_${widget.filterType}';
 
   @override
   void initState() {
