@@ -182,6 +182,9 @@ class HttpClient {
           () => _client.get(uri, headers: requestHeaders),
           timeout: timeout,
           cancelToken: cancelToken,
+          logMethod: 'GET',
+          logUrl: url,
+          logParams: queryParams,
         );
 
         // 处理 304 Not Modified：返回缓存内容
@@ -208,6 +211,9 @@ class HttpClient {
       () => _client.get(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
+      logMethod: 'GET',
+      logUrl: url,
+      logParams: queryParams,
     );
 
     // 处理 200 OK：保存 ETag 缓存（仅当 useETag 启用时）
@@ -244,6 +250,9 @@ class HttpClient {
       ),
       timeout: timeout,
       cancelToken: cancelToken,
+      logMethod: 'POST',
+      logUrl: uri.toString(),
+      logParams: body,
     );
   }
 
@@ -265,6 +274,9 @@ class HttpClient {
       ),
       timeout: timeout,
       cancelToken: cancelToken,
+      logMethod: 'PUT',
+      logUrl: uri.toString(),
+      logParams: body,
     );
   }
 
@@ -286,6 +298,9 @@ class HttpClient {
       ),
       timeout: timeout,
       cancelToken: cancelToken,
+      logMethod: 'PATCH',
+      logUrl: uri.toString(),
+      logParams: body,
     );
   }
 
@@ -302,6 +317,9 @@ class HttpClient {
       () => _client.delete(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
+      logMethod: 'DELETE',
+      logUrl: uri.toString(),
+      logParams: queryParams,
     );
   }
 
@@ -364,6 +382,9 @@ class HttpClient {
       () => _sendRaw(method, url, headers, encodedBody),
       timeout: timeout,
       handle401: false,
+      logMethod: method,
+      logUrl: url,
+      logParams: body,
     );
   }
 
@@ -391,6 +412,71 @@ class HttpClient {
 
   // ==================== 工具方法 ====================
 
+  /// 是否敏感字段（日志脱敏，避免泄露密码/令牌等凭据）
+  static bool _isSensitiveKey(String key) {
+    final k = key.toLowerCase();
+    return k.contains('password') ||
+        k.contains('token') ||
+        k == 'authorization' ||
+        k.contains('secret') ||
+        k.contains('otp') ||
+        k == 'code' ||
+        k.contains('credential');
+  }
+
+  /// 将请求入参转为可打印字符串，并对敏感字段脱敏
+  String _describeParams(Object? params) {
+    if (params == null) return '';
+    if (params is Map) {
+      final redacted = <String, dynamic>{};
+      params.forEach((k, v) {
+        final key = k.toString();
+        redacted[key] = _isSensitiveKey(key) ? '******' : v;
+      });
+      try {
+        return jsonEncode(redacted);
+      } catch (_) {
+        return redacted.toString();
+      }
+    }
+    if (params is String) {
+      try {
+        final decoded = jsonDecode(params);
+        if (decoded is Map) {
+          final redacted = <String, dynamic>{};
+          decoded.forEach((k, v) {
+            final key = k.toString();
+            redacted[key] = _isSensitiveKey(key) ? '******' : v;
+          });
+          return jsonEncode(redacted);
+        }
+      } catch (_) {}
+      return params;
+    }
+    return params.toString();
+  }
+
+  /// 统一请求日志：打印 方法 + 地址 + 入参 + 耗时 + 状态码/错误
+  /// 仅在 debug 模式输出，避免生产包泄露请求细节与用户数据
+  void _logRequest({
+    required String? method,
+    required String? url,
+    required Object? params,
+    required Duration duration,
+    int? statusCode,
+    Object? error,
+  }) {
+    if (!kDebugMode) return;
+    final sb = StringBuffer();
+    sb.write('🌐 [HTTP] ${method ?? '?'} ${url ?? ''}');
+    final paramStr = _describeParams(params);
+    if (paramStr.isNotEmpty) sb.write('\n   入参: $paramStr');
+    sb.write('\n   耗时: ${duration.inMilliseconds}ms');
+    if (statusCode != null) sb.write(' | 状态码: $statusCode');
+    if (error != null) sb.write(' | 错误: $error');
+    debugPrint(sb.toString());
+  }
+
   /// 构建完整 URI
   Uri _buildUri(String path, Map<String, dynamic>? queryParams) {
     String url = path;
@@ -415,14 +501,26 @@ class HttpClient {
     Duration? timeout,
     CancelToken? cancelToken,
     bool handle401 = true,
+    String? logMethod,
+    String? logUrl,
+    Object? logParams,
   }) async {
     http.Response? response;
     Exception? lastError;
     final requestTimeout = timeout ?? HttpClientConfig.timeout;
+    final sw = Stopwatch()..start();
 
     for (int attempt = 1; attempt <= maxRetries; attempt++) {
       // 请求前检查是否已取消
       if (cancelToken?.isCancelled == true) {
+        sw.stop();
+        _logRequest(
+          method: logMethod,
+          url: logUrl,
+          params: logParams,
+          duration: sw.elapsed,
+          error: '请求已取消',
+        );
         throw RequestCancelledException();
       }
 
@@ -431,6 +529,14 @@ class HttpClient {
 
         // 响应后检查是否已取消（防止旧响应覆盖新数据）
         if (cancelToken?.isCancelled == true) {
+          sw.stop();
+          _logRequest(
+            method: logMethod,
+            url: logUrl,
+            params: logParams,
+            duration: sw.elapsed,
+            error: '请求已取消',
+          );
           throw RequestCancelledException();
         }
 
@@ -438,6 +544,14 @@ class HttpClient {
         if (response.statusCode == 401) {
           if (!handle401) {
             // 调用方自行处理 401（如认证端点需返回错误响应而非抛异常）
+            sw.stop();
+            _logRequest(
+              method: logMethod,
+              url: logUrl,
+              params: logParams,
+              duration: sw.elapsed,
+              statusCode: response.statusCode,
+            );
             return response;
           }
           final refreshed = await _tryRefreshToken();
@@ -445,9 +559,26 @@ class HttpClient {
             continue; // Token 已刷新，重试当前请求
           }
           _accessToken = null;
+          sw.stop();
+          _logRequest(
+            method: logMethod,
+            url: logUrl,
+            params: logParams,
+            duration: sw.elapsed,
+            statusCode: 401,
+            error: '401 未授权',
+          );
           throw const HttpException('401_UNAUTHORIZED');
         }
 
+        sw.stop();
+        _logRequest(
+          method: logMethod,
+          url: logUrl,
+          params: logParams,
+          duration: sw.elapsed,
+          statusCode: response.statusCode,
+        );
         return response;
       } on RequestCancelledException {
         rethrow; // 取消异常不重试，直接抛出
@@ -469,6 +600,15 @@ class HttpClient {
       }
     }
 
+    sw.stop();
+    _logRequest(
+      method: logMethod,
+      url: logUrl,
+      params: logParams,
+      duration: sw.elapsed,
+      statusCode: response?.statusCode,
+      error: lastError,
+    );
     throw lastError ?? Exception('请求失败，已重试 $maxRetries 次');
   }
 
