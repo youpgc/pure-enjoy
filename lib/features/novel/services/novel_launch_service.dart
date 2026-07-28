@@ -2,9 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/session_manager.dart';
 import '../models/novel_model.dart';
 import '../screens/novel_reader_screen.dart';
 import '../screens/novel_webview_screen.dart';
+import 'reading_history_service.dart';
 
 /// 小说跳转路由服务（聚合阅读核心：阶段 1 路由层）。
 ///
@@ -36,8 +38,9 @@ class NovelLaunchService {
       return;
     }
 
-    // 聚合小说：阅读计数（合规指标），不阻塞跳转
-    _incrementReadCount(novel); // ignore: unawaited_futures
+    // 聚合小说：合规行为记录（计数 + 阅读历史 + 书架时间戳），不阻塞跳转。
+    // 立场：仅记录「用户从本 App 跳出过」这一事实，不采集原平台内行为。
+    _recordExternalReading(novel); // ignore: unawaited_futures
 
     // 聚合小说：按来源选择 deeplink / WebView
     final target = _resolveExternalTarget(novel);
@@ -125,14 +128,56 @@ class NovelLaunchService {
     return false;
   }
 
-  /// 聚合小说阅读计数（合规指标）：跳转原平台时 read_count +1。
-  Future<void> _incrementReadCount(NovelModel novel) async {
+  /// 聚合小说外部阅读记录（合规指标）：跳转原平台时记三件事，任一失败不阻塞。
+  ///
+  /// ① `read_count` 原子自增 —— 走 security definer RPC
+  ///    `fn_increment_novel_read_count`（客户端无 novels UPDATE 权限，
+  ///    直接 PATCH 会被 RLS 静默拦截且有并发丢失）；
+  /// ② `reading_history` 写一条「外部阅读」明细（chapter_order=0 表示
+  ///    外部平台阅读、无章节语义），喂排行/推荐的行为输入；
+  /// ③ `user_novels.last_read_at` 刷新（仅已在书架时），支撑「继续阅读」排序。
+  Future<void> _recordExternalReading(NovelModel novel) async {
     if (novel.id.isEmpty) return;
-    final next = (novel.readCount ?? 0) + 1;
+    // ① 阅读计数（RPC 原子自增）
     try {
-      await ApiClient.patch('novels', {'read_count': next}, id: novel.id);
+      await ApiClient.rpc(
+        'fn_increment_novel_read_count',
+        params: {'p_novel_id': novel.id},
+      );
     } catch (_) {
       // 计数失败不影响阅读跳转
+    }
+    // ② 阅读历史明细（chapter_order=0 = 外部阅读，无章节/进度语义）
+    try {
+      await ReadingHistoryService().recordReading(
+        novelId: novel.id,
+        chapterId: null,
+        chapterOrder: 0,
+        readDurationSeconds: 0,
+        progress: 0,
+      );
+    } catch (_) {
+      // 历史写入失败不影响阅读跳转
+    }
+    // ③ 书架时间戳（仅已在书架的书，避免误建书架记录）
+    try {
+      final userId = SessionManager.instance.currentUserId;
+      if (userId == null) return;
+      final shelf = await ApiClient.get(
+        'user_novels',
+        filters: {'user_id': 'eq.$userId', 'novel_id': 'eq.${novel.id}'},
+        columns: 'id',
+        limit: 1,
+      );
+      if (shelf.isSuccess && shelf.data != null && shelf.data!.isNotEmpty) {
+        await ApiClient.patch(
+          'user_novels',
+          {'last_read_at': DateTime.now().toUtc().toIso8601String()},
+          id: shelf.data!.first['id'].toString(),
+        );
+      }
+    } catch (_) {
+      // 时间戳失败不影响阅读跳转
     }
   }
 }

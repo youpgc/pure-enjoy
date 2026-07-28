@@ -53,10 +53,16 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
   void initState() {
     super.initState();
     _checkBookshelfStatus();
-    _loadChapters();
-    _updateCacheStatus();
+    // 聚合小说无本地章节（novel_chapters 0 行），跳过章节/缓存请求
+    if (!widget.novel.isAggregated) {
+      _loadChapters();
+      _updateCacheStatus();
+      _scrollController.addListener(_onScroll);
+    } else {
+      _isLoadingChapters = false;
+      _hasMoreChapters = false;
+    }
     _loadUserRating();
-    _scrollController.addListener(_onScroll);
   }
 
   @override
@@ -458,34 +464,38 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
             },
           ),
           const SliverToBoxAdapter(child: SizedBox(height: 24)),
-          NovelDetailChapterHeader(
-            isLoadingChapters: _isLoadingChapters,
-            chapterCount: widget.novel.chapterCount,
-            onShowAll: () => showNovelChapterListSheet(
-              context,
-              loadAllChapters: () => loadAllNovelChapters(widget.novel.id),
-              currentChapter: _currentChapter,
-              onJump: _jumpToChapter,
-              onChaptersLoaded: (chapters) {
-                // 同时更新详情页的 _chapters（避免后续重复加载）
-                if (_chapters.length < chapters.length) {
-                  setState(() {
-                    _chapters = chapters;
-                    _hasMoreChapters = false;
-                  });
-                }
-              },
+          // 聚合小说不渲染章节区：正文在原平台，本地 novel_chapters 无数据，
+          // 渲染只会出现「共 N 章 + 空列表」的语义错位
+          if (!novel.isAggregated) ...[
+            NovelDetailChapterHeader(
+              isLoadingChapters: _isLoadingChapters,
+              chapterCount: widget.novel.chapterCount,
+              onShowAll: () => showNovelChapterListSheet(
+                context,
+                loadAllChapters: () => loadAllNovelChapters(widget.novel.id),
+                currentChapter: _currentChapter,
+                onJump: _jumpToChapter,
+                onChaptersLoaded: (chapters) {
+                  // 同时更新详情页的 _chapters（避免后续重复加载）
+                  if (_chapters.length < chapters.length) {
+                    setState(() {
+                      _chapters = chapters;
+                      _hasMoreChapters = false;
+                    });
+                  }
+                },
+              ),
             ),
-          ),
-          const SliverToBoxAdapter(child: SizedBox(height: 8)),
-          NovelDetailChapterList(
-            chapters: _chapters,
-            currentChapter: _currentChapter,
-            hasMoreChapters: _hasMoreChapters,
-            isLoadingChapters: _isLoadingChapters,
-            isLoadingMoreChapters: _isLoadingMoreChapters,
-            onJump: _jumpToChapter,
-          ),
+            const SliverToBoxAdapter(child: SizedBox(height: 8)),
+            NovelDetailChapterList(
+              chapters: _chapters,
+              currentChapter: _currentChapter,
+              hasMoreChapters: _hasMoreChapters,
+              isLoadingChapters: _isLoadingChapters,
+              isLoadingMoreChapters: _isLoadingMoreChapters,
+              onJump: _jumpToChapter,
+            ),
+          ],
           const SliverToBoxAdapter(child: SizedBox(height: 80)),
         ],
       ),

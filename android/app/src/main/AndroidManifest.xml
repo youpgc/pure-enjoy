@@ -16,6 +16,21 @@
     <uses-permission android:name="android.permission.USE_EXACT_ALARM"/>
     <!-- 开机启动权限（恢复定时通知） -->
     <uses-permission android:name="android.permission.RECEIVE_BOOT_COMPLETED"/>
+    <!-- 包可见性声明（Android 11+）：聚合阅读 deeplink 唤起来源 App 必需，
+         否则 canLaunchUrl 恒返回 false（url_launcher 依赖 queryIntentActivities） -->
+    <queries>
+        <!-- 纵横中文网 App（zongheng:// scheme + 包名） -->
+        <package android:name="com.zongheng.reader"/>
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="zongheng"/>
+        </intent>
+        <!-- 系统浏览器兜底（WebView 失败后 launchUrl 外部打开） -->
+        <intent>
+            <action android:name="android.intent.action.VIEW"/>
+            <data android:scheme="https"/>
+        </intent>
+    </queries>
     <application
         android:label="纯享"
         android:name="${applicationName}"

@@ -50,9 +50,12 @@ class NovelDetailActions extends StatelessWidget {
                 onPressed: onStartReading,
                 icon: const Icon(Icons.menu_book),
                 label: Text(
-                  isInBookshelf && currentChapter > 1
-                      ? '继续阅读 第$currentChapter章'
-                      : '开始阅读',
+                  // 聚合小说：进度由原平台持有，不展示章节号（避免语义欺骗）
+                  isAggregated
+                      ? '去原平台阅读'
+                      : (isInBookshelf && currentChapter > 1
+                          ? '继续阅读 第$currentChapter章'
+                          : '开始阅读'),
                 ),
                 style: FilledButton.styleFrom(
                   padding: const EdgeInsets.symmetric(vertical: 14),
@@ -80,7 +83,6 @@ class NovelDetailActions extends StatelessWidget {
                       ),
                     ),
             ),
-            const SizedBox(width: 12),
             // 缓存下载按钮（聚合小说无本地正文，隐藏以避免冒充自有内容）
             if (!isAggregated) ...[
               const SizedBox(width: 12),
