@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
+import 'dart:async';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
@@ -12,6 +13,7 @@ import 'novel_detail_screen.dart';
 import 'novel_list_screen.dart';
 import '../../auth/screens/login_screen.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/utils/event_bus.dart';
 import 'novel_list_for_add_screen.dart';
 import '../widgets/bookshelf_item.dart';
 import 'bookshelf_helpers.dart';
@@ -33,6 +35,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   List<Map<String, dynamic>> _bookshelfItems = [];
   bool _isLoading = true;
   String _filterStatus = 'all'; // all, reading, completed
+  StreamSubscription<void>? _bookshelfSub;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -51,11 +54,17 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
   void initState() {
     super.initState();
     initPagination();
+    // 书架在首页 IndexedStack 中常驻，initState 仅首次执行；
+    // 订阅书架变更事件，从书城/排行/阅读器等任意入口加架后自动刷新。
+    _bookshelfSub = EventBus.instance.on(EventType.bookshelfUpdated).listen((_) {
+      if (mounted) _loadBookshelf(refresh: true);
+    });
     _initLoad();
   }
 
   @override
   void dispose() {
+    _bookshelfSub?.cancel();
     disposePagination();
     super.dispose();
   }
@@ -130,7 +139,7 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
           'user_id': 'eq.$userId',
           'is_collected': 'eq.true',
         },
-        columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description)',
+        columns: 'id,novel_id,progress,last_chapter,last_read_at,is_collected,novels(id,title,author,cover_url,category,status,chapter_count,word_count,description,source,source_url)',
         order: 'last_read_at.desc.nullslast',
         limit: limit,
         offset: offset,
@@ -336,6 +345,8 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
       author: novelData['author'] as String?,
       cover: novelData['cover_url'] as String?,
       category: novelData['category'] as String?,
+      source: novelData['source'] as String?,
+      sourceUrl: novelData['source_url'] as String?,
       status: novelData['status'] as String?,
       chapterCount: novelData['chapter_count'] as int? ?? 0,
       wordCount: novelData['word_count'] as int?,

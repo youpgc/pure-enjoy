@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
@@ -271,6 +272,7 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
         await _loadNovels(refresh: true);
         if (mounted) {
           showSnackBar(context, '已添加到书架');
+          EventBus.instance.fire(EventType.bookshelfUpdated);
         }
       }
     } catch (e) {

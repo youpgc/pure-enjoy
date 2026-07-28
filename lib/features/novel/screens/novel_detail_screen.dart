@@ -7,6 +7,7 @@ import '../models/novel_model.dart';
 import '../services/novel_launch_service.dart';
 import 'novel_comments_screen.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/utils/event_bus.dart';
 import '../widgets/novel_detail_header.dart';
 import '../widgets/novel_detail_stat_row.dart';
 import '../widgets/novel_detail_actions.dart';
@@ -274,6 +275,7 @@ class _NovelDetailScreenState extends State<NovelDetailScreen> {
           }
           if (mounted) {
             showSnackBar(context, '已加入书架');
+            EventBus.instance.fire(EventType.bookshelfUpdated);
             Navigator.pop(context, true);
           }
         }

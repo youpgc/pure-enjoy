@@ -3,6 +3,7 @@ import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/utils/event_bus.dart';
 import 'novel_search_delegate.dart';
 import '../widgets/novel_list_item.dart';
 
@@ -152,6 +153,7 @@ class _NovelListForAddScreenState extends State<NovelListForAddScreen> with Pagi
         setState(() => _addedNovelIds.add(novelId));
         if (mounted) {
           showSnackBar(context, '已添加到书架');
+          EventBus.instance.fire(EventType.bookshelfUpdated);
         }
       } else {
         if (mounted) {

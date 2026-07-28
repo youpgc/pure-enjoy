@@ -6,6 +6,7 @@ import '../services/ranking_service.dart';
 import '../widgets/novel_cover.dart';
 import 'novel_detail_screen.dart';
 import '../../../services/api_client.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';
 
 /// 排行榜页面
@@ -308,6 +309,7 @@ class _RankingScreenState extends State<RankingScreen>
       if (!mounted) return;
       if (result.isSuccess) {
         showSnackBar(context, '已加入书架');
+        EventBus.instance.fire(EventType.bookshelfUpdated);
       } else {
         showSnackBar(context, '加入书架失败，请稍后重试', isError: true);
       }

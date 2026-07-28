@@ -10,6 +10,7 @@ import 'package:battery_plus/battery_plus.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../services/api_client.dart';
+import '../../../core/utils/event_bus.dart';
 import '../models/novel_model.dart';
 import '../services/bookmark_service.dart';
 import '../services/reading_history_service.dart';
@@ -1265,6 +1266,7 @@ mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserv
         }
         if (mounted) {
           showSnackBar(context, '已加入书架');
+          EventBus.instance.fire(EventType.bookshelfUpdated);
         }
       }
     } catch (e) {
