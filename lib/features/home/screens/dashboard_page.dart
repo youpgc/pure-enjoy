@@ -384,9 +384,12 @@ class _DashboardPageState extends State<DashboardPage> {
       }
 
       // 第二步：查询 novels 详情
+      // 注意：必须包含 source,source_url，否则聚合书 NovelModel.sourceUrl 为空
+      // → isAggregated 误判为 false → launch 误开内置阅读器（0 章空白）。
+      // 同书架 Bug② 同源。
       final novelsResult = await ApiClient.get('novels',
           filters: {'id': 'in.(${novelIds.join(",")})'},
-          select: 'id,title,author,cover_url,category,chapter_count',
+          select: 'id,title,author,cover_url,category,chapter_count,source,source_url',
           limit: novelIds.length);
 
       final novels = novelsResult.isSuccess && novelsResult.data != null
