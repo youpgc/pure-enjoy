@@ -166,7 +166,8 @@ class _DashboardPageState extends State<DashboardPage> {
       ]);
     }
 
-    final (rows, _) = await RequestCache.getList(_kCacheHabits, fetcher);
+    final (rows, _) = await RequestCache.getList(_kCacheHabits, fetcher,
+        ttl: _kHomeLongTtl);
     if (!mounted) return;
     final plain =
         rows.isNotEmpty ? rows[0] : {'habits': <dynamic>[], 'checkins': <dynamic>[]};
