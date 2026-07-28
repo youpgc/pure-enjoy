@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -69,6 +70,37 @@ class DictService {
     }
 
     _initialized = true;
+  }
+
+  /// 缓存优先加载（首页开屏调用）
+  ///
+  /// 流程：
+  /// 1. 先读本地缓存到内存（若存在则瞬间完成，可秒开）
+  /// 2. [onCacheReady] 回调触发首帧渲染（显示缓存中的字典标签）
+  /// 3. 仅当缓存为空或已超过 [ttl] 时才后台静默刷新，不打断首屏
+  ///
+  /// 采用与版本检查一致的「本地时间戳」策略：缓存新鲜（默认 1h 内）则
+  /// 完全跳过网络请求；首次启动或过期才拉取最新字典。字典属参考型数据，
+  /// 变更极少，缓存优先安全且能显著减少开屏请求。
+  Future<void> loadCacheFirst({
+    VoidCallback? onCacheReady,
+    Duration ttl = const Duration(hours: 1),
+  }) async {
+    await initialize(); // 读本地缓存到内存（瞬间，若有）
+    onCacheReady?.call(); // 首帧：渲染缓存（首次启动时为空的占位）
+
+    final prefs = await SharedPreferences.getInstance();
+    final lastSync = prefs.getInt(_lastSyncTimeKey);
+    final now = DateTime.now().millisecondsSinceEpoch;
+    final fresh = lastSync != null && now - lastSync < ttl.inMilliseconds;
+    if (fresh) {
+      if (kDebugMode) debugPrint('⏭️ 字典缓存未过期（${ttl.inMinutes}min 内），跳过网络请求');
+      return; // 新鲜：完全不打网络
+    }
+
+    // 首次启动或缓存过期 → 后台静默刷新；完成后再次回调渲染最新字典
+    if (kDebugMode) debugPrint('🔄 字典缓存为空或已过期，后台静默刷新');
+    unawaited(silentRefresh().then((_) => onCacheReady?.call()));
   }
 
   /// 从网络加载全部字典数据（首页调用）

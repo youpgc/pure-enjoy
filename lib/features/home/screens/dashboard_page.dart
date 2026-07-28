@@ -75,7 +75,12 @@ class _DashboardPageState extends State<DashboardPage> {
   @override
   void initState() {
     super.initState();
-    DictService.instance.loadFromNetwork();
+    // 字典缓存优先：先读本地缓存秒开，仅首次启动/缓存过期才后台刷新
+    DictService.instance.loadCacheFirst(
+      onCacheReady: () {
+        if (mounted) setState(() {});
+      },
+    );
     _initLoadData();
     _listenDataChangeEvents();
   }
