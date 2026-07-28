@@ -9,6 +9,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../services/api_client.dart';
 import '../../../services/dict_service.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/request_cache.dart';
 import '../../life/models/habit_model.dart';
 import '../../life/models/reminder_model.dart';
 import '../../life/screens/reminders_screen.dart';
@@ -31,6 +32,12 @@ import '../widgets/announcement_banner.dart';
 
 
 const String _prefsKeyTools = 'dashboard_visible_tools';
+
+/// 首页各区块本地缓存键（stale-while-revalidate，秒开用）
+const String _kCacheRecentNovels = 'cache_home_recent_novels';
+const String _kCacheHabits = 'cache_home_habits';
+const String _kCacheActivities = 'cache_home_activities';
+const String _kCacheReminders = 'cache_home_reminders';
 
 /// 首页仪表板
 class DashboardPage extends StatefulWidget {
@@ -72,21 +79,28 @@ class _DashboardPageState extends State<DashboardPage> {
 
   /// 监听全局数据变更事件，从其他页面返回时自动刷新最新动态
   void _listenDataChangeEvents() {
-    final types = [
-      EventType.expenseUpdated,
-      EventType.weightRecordUpdated,
-      EventType.moodDiaryUpdated,
-      EventType.noteUpdated,
-      EventType.habitUpdated,
-      EventType.reminderUpdated,
-    ];
-    for (final type in types) {
+    final handlers = <EventType, VoidCallback>{
+      EventType.expenseUpdated: _loadRecentActivities,
+      EventType.weightRecordUpdated: _loadRecentActivities,
+      EventType.moodDiaryUpdated: _loadRecentActivities,
+      EventType.noteUpdated: _loadRecentActivities,
+      EventType.habitUpdated: _loadRecentActivities,
+      EventType.reminderUpdated: _loadRecentActivities,
+      EventType.bookshelfUpdated: _onBookshelfChanged,
+    };
+    handlers.forEach((type, handler) {
       _eventSubscriptions.add(
         EventBus.instance.on(type).listen((_) {
-          if (mounted) _loadRecentActivities();
+          if (mounted) handler();
         }),
       );
-    }
+    });
+  }
+
+  /// 书架变化：使最近阅读缓存失效并刷新（保证加/删书后首页即时更新）
+  void _onBookshelfChanged() {
+    unawaited(RequestCache.invalidate(_kCacheRecentNovels));
+    _loadRecentNovels();
   }
 
   @override
@@ -109,50 +123,49 @@ class _DashboardPageState extends State<DashboardPage> {
   }
 
   /// 加载习惯数据（用于首页快捷打卡）
+  /// 加载习惯数据（用于首页快捷打卡，带本地缓存）
   Future<void> _loadHabitsForCheckin() async {
     final userId = AuthService.instance.currentUserId;
-    if (userId == null) {
-      return;
-    }
+    if (userId == null) return;
 
-    try {
+    Future<ApiResponse> fetcher() async {
       final result = await ApiClient.get('habits',
           filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
           select: '*',
           order: 'created_at.desc',
           limit: 3);
-
-      if (result.isSuccess) {
-        final habits = parseHabits(result.data as List);
-
-        // 批量加载所有习惯的打卡记录
-        final history = <String, List<HabitCheckinModel>>{};
-        if (habits.isNotEmpty) {
-          final habitIds = habits.map((h) => h.id).toList();
-          final checkinsResult = await ApiClient.get('habit_checkins',
-              filters: {'habit_id': 'in.(${habitIds.join(",")})'},
-              select: '*',
-              order: 'checkin_at.desc',
-              limit: 3);
-
-          final checkinsData = checkinsResult.isSuccess
-              ? checkinsResult.data as List
-              : <dynamic>[];
-          history.addAll(buildCheckinHistory(checkinsData, habits));
-        }
-
-        if (mounted) {
-          setState(() {
-            _habits = habits;
-            _checkinHistory = history;
-          });
+      if (!result.isSuccess) return ApiResponse.success([]);
+      final habitsData = result.data as List;
+      final checkinsData = <dynamic>[];
+      if (habitsData.isNotEmpty) {
+        final habitIds = habitsData.map((h) => h['id'].toString()).toList();
+        final checkinsResult = await ApiClient.get('habit_checkins',
+            filters: {'habit_id': 'in.(${habitIds.join(",")})'},
+            select: '*',
+            order: 'checkin_at.desc',
+            limit: 3);
+        if (checkinsResult.isSuccess && checkinsResult.data != null) {
+          checkinsData.addAll(checkinsResult.data!);
         }
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('加载习惯数据失败');
-      }
+      // 合并为可缓存 plain JSON（单一元素 list）
+      return ApiResponse.success([
+        {'habits': habitsData, 'checkins': checkinsData}
+      ]);
     }
+
+    final (rows, _) = await RequestCache.getList(_kCacheHabits, fetcher);
+    if (!mounted) return;
+    final plain =
+        rows.isNotEmpty ? rows[0] : {'habits': <dynamic>[], 'checkins': <dynamic>[]};
+    final habitsData = (plain['habits'] as List?) ?? <dynamic>[];
+    final checkinsData = (plain['checkins'] as List?) ?? <dynamic>[];
+    final habits = parseHabits(habitsData);
+    final history = buildCheckinHistory(checkinsData, habits);
+    setState(() {
+      _habits = habits;
+      _checkinHistory = history;
+    });
   }
 
   /// 获取今日待打卡的习惯列表
@@ -180,7 +193,8 @@ class _DashboardPageState extends State<DashboardPage> {
         throw Exception('打卡失败: HTTP ${checkinResult.statusCode}');
       }
 
-      // 刷新习惯数据
+      // 刷新习惯数据（先使缓存失效，保证打卡后即时刷新）
+      unawaited(RequestCache.invalidate(_kCacheHabits));
       await _loadHabitsForCheckin();
 
       if (mounted) {
@@ -235,16 +249,15 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) setState(() => _visibleToolIds = ids);
   }
 
-  /// 从 Supabase 加载最近活动记录
+  /// 从 Supabase 加载最近活动记录（带本地缓存）
   Future<void> _loadRecentActivities() async {
-    try {
-      final userId = SupabaseService.instance.currentUserId;
-      if (userId == null) {
-        if (mounted) setState(() => _isLoadingActivities = false);
-        return;
-      }
+    final userId = SupabaseService.instance.currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _isLoadingActivities = false);
+      return;
+    }
 
-      // 并行查询 expenses、mood_diaries、weight_records 各最新一条
+    Future<ApiResponse> fetcher() async {
       final futures = [
         ApiClient.get('expenses',
             filters: {'user_id': 'eq.$userId'},
@@ -262,12 +275,8 @@ class _DashboardPageState extends State<DashboardPage> {
             order: 'created_at.desc',
             limit: 1),
       ];
-
       final results = await Future.wait(futures);
-
       final activities = <Map<String, dynamic>>[];
-
-      // 解析心情日记
       final diaryResult = results[1];
       if (diaryResult.isSuccess) {
         final list = diaryResult.data as List;
@@ -275,8 +284,6 @@ class _DashboardPageState extends State<DashboardPage> {
           activities.add(buildDiaryActivity(list[0] as Map<String, dynamic>));
         }
       }
-
-      // 解析支出记录
       final expenseResult = results[0];
       if (expenseResult.isSuccess) {
         final list = expenseResult.data as List;
@@ -284,8 +291,6 @@ class _DashboardPageState extends State<DashboardPage> {
           activities.add(buildExpenseActivity(list[0] as Map<String, dynamic>));
         }
       }
-
-      // 解析体重记录
       final weightResult = results[2];
       if (weightResult.isSuccess) {
         final list = weightResult.data as List;
@@ -293,67 +298,49 @@ class _DashboardPageState extends State<DashboardPage> {
           activities.add(buildWeightActivity(list[0] as Map<String, dynamic>));
         }
       }
-
-      if (mounted) {
-        setState(() {
-          _recentActivities = activities;
-          _isLoadingActivities = false;
-        });
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('加载最近活动失败');
-      }
-      if (mounted) {
-        setState(() => _isLoadingActivities = false);
-      }
+      return ApiResponse.success(activities);
     }
+
+    final (rows, _) = await RequestCache.getList(_kCacheActivities, fetcher);
+    if (!mounted) return;
+    setState(() {
+      _recentActivities = rows;
+      _isLoadingActivities = false;
+    });
   }
 
-  /// 加载待办提醒
+  /// 加载待办提醒（带本地缓存）
   Future<void> _loadPendingReminders() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) {
-        return;
-      }
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return;
 
+    final (rows, _) = await RequestCache.getList(_kCacheReminders, () async {
       final result = await ApiClient.get('reminders',
           filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
           select: '*',
           order: 'remind_at.asc',
           limit: 3);
-
-      if (result.isSuccess) {
-        final List data = result.data as List;
-        final reminders = data.map((e) => ReminderModel.fromJson(e as Map<String, dynamic>)).toList();
-        if (mounted) {
-          setState(() {
-            _pendingReminders = reminders;
-          });
-        }
-      } else {
-        throw Exception(result.errorMessage);
-      }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('加载提醒失败');
-      }
-    }
+      return result; // data 已是 plain JSON，可直接缓存
+    });
+    if (!mounted) return;
+    final reminders = rows.map((e) => ReminderModel.fromJson(e)).toList();
+    setState(() {
+      _pendingReminders = reminders;
+    });
   }
 
-  /// 加载最近阅读的小说
-  /// 分两步查询：先查 user_novels 获取阅读记录，再查 novels 获取详情
-  /// 避免嵌套查询因外键关系或RLS导致解析失败
+  /// 加载最近阅读的小说（带本地缓存：先秒开，后台静默刷新）
+  /// 仍分两步查询（保持原 RLS/外键兼容），但整体结果经 RequestCache 缓存为 plain JSON
   Future<void> _loadRecentNovels() async {
-    try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) {
-        if (mounted) setState(() => _isLoadingNovels = false);
-        return;
-      }
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) {
+      if (mounted) setState(() => _isLoadingNovels = false);
+      return;
+    }
 
-      // 第一步：查询用户有阅读记录的小说（不限制 is_collected）
+    // fetcher 返回 plain JSON（可缓存），读取时再转 NovelModel
+    Future<ApiResponse> fetcher() async {
+      // 第一步：用户阅读记录
       final progressResult = await ApiClient.get('user_novels',
           filters: {'user_id': 'eq.$userId'},
           select: 'novel_id,last_chapter,progress,last_read_at',
@@ -363,11 +350,9 @@ class _DashboardPageState extends State<DashboardPage> {
       if (!progressResult.isSuccess ||
           progressResult.data == null ||
           progressResult.data!.isEmpty) {
-        if (mounted) setState(() => _isLoadingNovels = false);
-        return;
+        return ApiResponse.success([]);
       }
 
-      // 收集 novel_id 列表
       final novelIds = <String>[];
       final progressMap = <String, Map<String, dynamic>>{};
       for (final item in progressResult.data!) {
@@ -377,37 +362,45 @@ class _DashboardPageState extends State<DashboardPage> {
           progressMap[novelId] = item;
         }
       }
+      if (novelIds.isEmpty) return ApiResponse.success([]);
 
-      if (novelIds.isEmpty) {
-        if (mounted) setState(() => _isLoadingNovels = false);
-        return;
-      }
-
-      // 第二步：查询 novels 详情
-      // 注意：必须包含 source,source_url，否则聚合书 NovelModel.sourceUrl 为空
-      // → isAggregated 误判为 false → launch 误开内置阅读器（0 章空白）。
-      // 同书架 Bug② 同源。
+      // 第二步：小说详情（含 source/source_url，聚合书路由必需）
       final novelsResult = await ApiClient.get('novels',
           filters: {'id': 'in.(${novelIds.join(",")})'},
           select: 'id,title,author,cover_url,category,chapter_count,source,source_url',
           limit: novelIds.length);
 
-      final novels = novelsResult.isSuccess && novelsResult.data != null
-          ? buildRecentNovelList(novelsResult.data!, progressMap, novelIds)
-          : <Map<String, dynamic>>[];
-
-      if (mounted) {
-        setState(() {
-          _recentNovels = novels;
-          _isLoadingNovels = false;
-        });
+      final novels = <Map<String, dynamic>>[];
+      if (novelsResult.isSuccess && novelsResult.data != null) {
+        for (final nd in novelsResult.data!) {
+          final id = nd['id']?.toString() ?? '';
+          final p = progressMap[id];
+          if (p != null) {
+            novels.add({
+              'novel': nd,
+              'lastChapter': p['last_chapter'] as int? ?? 1,
+              'progress': p['progress'] as num? ?? 0.0,
+            });
+          }
+        }
       }
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('加载最近阅读失败: $e');
-      }
-      if (mounted) setState(() => _isLoadingNovels = false);
+      return ApiResponse.success(novels);
     }
+
+    final (rows, _) = await RequestCache.getList(_kCacheRecentNovels, fetcher);
+    if (!mounted) return;
+    final novels = rows.map((m) {
+      final novelJson = m['novel'] as Map<String, dynamic>? ?? {};
+      return {
+        'novel': NovelModel.fromJson(novelJson),
+        'lastChapter': m['lastChapter'] as int? ?? 1,
+        'progress': m['progress'] as num? ?? 0.0,
+      };
+    }).toList();
+    setState(() {
+      _recentNovels = novels;
+      _isLoadingNovels = false;
+    });
   }
 
   /// 工具点击处理（分发逻辑抽至 dashboard_tool_handlers.dart，行为不变）
@@ -438,6 +431,7 @@ class _DashboardPageState extends State<DashboardPage> {
       novel,
       startChapter: lastChapter,
     );
+    unawaited(RequestCache.invalidate(_kCacheRecentNovels));
     _loadRecentNovels();
   }
 

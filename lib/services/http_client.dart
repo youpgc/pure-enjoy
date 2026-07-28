@@ -59,6 +59,11 @@ class HttpClient {
     return _instance!;
   }
 
+  /// 常驻 HTTP Client：复用 TCP/TLS 连接（keep-alive），避免每次请求重建连接
+  /// 这是降低海外 Supabase 跨境 RTT 累积延迟的关键——
+  /// dart http 包顶层 http.get/post(...) 每次会新建 Client 并在返回后关闭，不跨请求复用连接
+  final http.Client _client = http.Client();
+
   /// 当前 JWT Access Token
   String? _accessToken;
 
@@ -133,6 +138,7 @@ class HttpClient {
       'apikey': HttpClientConfig.anonKey,
       'Authorization': 'Bearer ${_accessToken ?? HttpClientConfig.anonKey}',
       'Content-Type': 'application/json',
+      'Accept-Encoding': 'gzip',
     };
   }
 
@@ -173,7 +179,7 @@ class HttpClient {
       // 有 ETag 缓存时：先尝试带 If-None-Match 请求
       try {
         response = await _requestWithRetry(
-          () => http.get(uri, headers: requestHeaders),
+          () => _client.get(uri, headers: requestHeaders),
           timeout: timeout,
           cancelToken: cancelToken,
         );
@@ -199,7 +205,7 @@ class HttpClient {
 
     // 普通请求（无 ETag 或 ETag 未命中）
     response = await _requestWithRetry(
-      () => http.get(uri, headers: _mergeHeaders(headers)),
+      () => _client.get(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
     );
@@ -231,7 +237,7 @@ class HttpClient {
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
-      () => http.post(
+      () => _client.post(
         uri,
         headers: _mergeHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
@@ -252,7 +258,7 @@ class HttpClient {
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
-      () => http.put(
+      () => _client.put(
         uri,
         headers: _mergeHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
@@ -273,7 +279,7 @@ class HttpClient {
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
-      () => http.patch(
+      () => _client.patch(
         uri,
         headers: _mergeHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
@@ -293,7 +299,7 @@ class HttpClient {
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
-      () => http.delete(uri, headers: _mergeHeaders(headers)),
+      () => _client.delete(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
     );
@@ -371,15 +377,15 @@ class HttpClient {
     final uri = Uri.parse(url);
     switch (method.toUpperCase()) {
       case 'POST':
-        return http.post(uri, headers: headers, body: body);
+        return _client.post(uri, headers: headers, body: body);
       case 'PUT':
-        return http.put(uri, headers: headers, body: body);
+        return _client.put(uri, headers: headers, body: body);
       case 'PATCH':
-        return http.patch(uri, headers: headers, body: body);
+        return _client.patch(uri, headers: headers, body: body);
       case 'DELETE':
-        return http.delete(uri, headers: headers);
+        return _client.delete(uri, headers: headers);
       default:
-        return http.get(uri, headers: headers);
+        return _client.get(uri, headers: headers);
     }
   }
 
