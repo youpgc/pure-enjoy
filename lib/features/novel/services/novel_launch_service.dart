@@ -78,6 +78,7 @@ class NovelLaunchService {
         builder: (_) => NovelWebViewScreen(
           url: novel.sourceUrl!,
           title: novel.title,
+          sourceName: novel.sourceDisplayName,
         ),
       ),
     );

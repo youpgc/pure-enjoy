@@ -14,7 +14,15 @@ class NovelWebViewScreen extends StatefulWidget {
   /// 顶栏标题（取小说书名）
   final String title;
 
-  const NovelWebViewScreen({super.key, required this.url, required this.title});
+  /// 来源展示名（合规标注，如「纵横」「飞卢」），为空则不显示
+  final String? sourceName;
+
+  const NovelWebViewScreen({
+    super.key,
+    required this.url,
+    required this.title,
+    this.sourceName,
+  });
 
   @override
   State<NovelWebViewScreen> createState() => _NovelWebViewScreenState();
@@ -24,12 +32,21 @@ class _NovelWebViewScreenState extends State<NovelWebViewScreen> {
   late final WebViewController _controller;
   bool _isLoading = true;
   bool _hasError = false;
+  // 顶部合规信息条是否仍展示（用户可手动收起）
+  late bool _showSourceNotice;
+
+  // 移动端 UA：让原站渲染移动阅读版式，体验更接近原生阅读器（零风险、纯前端）
+  static const String _mobileUserAgent =
+      'Mozilla/5.0 (Linux; Android 13; Pixel 7) AppleWebKit/537.36 '
+      '(KHTML, like Gecko) Chrome/120.0.0.0 Mobile Safari/537.36';
 
   @override
   void initState() {
     super.initState();
+    _showSourceNotice = widget.sourceName != null && widget.sourceName!.isNotEmpty;
     _controller = WebViewController()
       ..setJavaScriptMode(JavaScriptMode.unrestricted)
+      ..setUserAgent(_mobileUserAgent)
       ..setNavigationDelegate(
         NavigationDelegate(
           onPageStarted: (_) => setState(() {
@@ -58,7 +75,17 @@ class _NovelWebViewScreenState extends State<NovelWebViewScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text(widget.title),
+        title: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text(widget.title, maxLines: 1, overflow: TextOverflow.ellipsis),
+            if (widget.sourceName != null && widget.sourceName!.isNotEmpty)
+              Text(
+                '来源：${widget.sourceName}',
+                style: const TextStyle(fontSize: 11, fontWeight: FontWeight.normal),
+              ),
+          ],
+        ),
         actions: [
           IconButton(
             icon: const Icon(Icons.refresh),
@@ -72,26 +99,66 @@ class _NovelWebViewScreenState extends State<NovelWebViewScreen> {
           ),
         ],
       ),
-      body: Stack(
+      body: Column(
         children: [
-          if (_hasError)
-            Center(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
+          // 顶部合规信息条：明确内容来自原平台、纯享仅作跳转（可收起）
+          if (_showSourceNotice && !_hasError)
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              color: Theme.of(context).colorScheme.secondaryContainer,
+              child: Row(
                 children: [
-                  const Text('页面加载失败，可重试或在浏览器打开'),
-                  const SizedBox(height: 12),
-                  ElevatedButton(
-                    onPressed: () => _controller.reload(),
-                    child: const Text('重试'),
+                  Icon(
+                    Icons.info_outline,
+                    size: 16,
+                    color: Theme.of(context).colorScheme.onSecondaryContainer,
+                  ),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '内容由「${widget.sourceName}」提供，纯享不存储正文，请在原平台阅读或登录。',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: Theme.of(context).colorScheme.onSecondaryContainer,
+                      ),
+                    ),
+                  ),
+                  InkWell(
+                    onTap: () => setState(() => _showSourceNotice = false),
+                    child: Icon(
+                      Icons.close,
+                      size: 16,
+                      color: Theme.of(context).colorScheme.onSecondaryContainer,
+                    ),
                   ),
                 ],
               ),
-            )
-          else
-            WebViewWidget(controller: _controller),
-          if (_isLoading && !_hasError)
-            const Center(child: CircularProgressIndicator()),
+            ),
+          Expanded(
+            child: Stack(
+              children: [
+                if (_hasError)
+                  Center(
+                    child: Column(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Text('页面加载失败，可重试或在浏览器打开'),
+                        const SizedBox(height: 12),
+                        ElevatedButton(
+                          onPressed: () => _controller.reload(),
+                          child: const Text('重试'),
+                        ),
+                      ],
+                    ),
+                  )
+                else
+                  WebViewWidget(controller: _controller),
+                if (_isLoading && !_hasError)
+                  const Center(child: CircularProgressIndicator()),
+              ],
+            ),
+          ),
         ],
       ),
     );
