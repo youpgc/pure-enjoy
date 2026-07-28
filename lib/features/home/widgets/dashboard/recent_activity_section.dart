@@ -32,7 +32,7 @@ class _RecentActivitySectionState extends State<RecentActivitySection> {
         ),
         const SizedBox(height: 12),
         Card(
-          child: widget.isLoading
+          child: widget.isLoading && widget.activities.isEmpty
               ? Padding(
                   padding: const EdgeInsets.all(16),
                   child: Column(

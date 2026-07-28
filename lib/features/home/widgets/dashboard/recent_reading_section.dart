@@ -36,7 +36,7 @@ class _RecentReadingSectionState extends State<RecentReadingSection> {
         ),
         const SizedBox(height: 12),
         Card(
-          child: widget.isLoading
+          child: widget.isLoading && widget.novels.isEmpty
               ? SizedBox(
                   height: 230,
                   child: SkeletonLoading.grid(

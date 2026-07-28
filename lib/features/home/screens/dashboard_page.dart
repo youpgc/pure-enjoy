@@ -38,6 +38,10 @@ const String _kCacheRecentNovels = 'cache_home_recent_novels';
 const String _kCacheHabits = 'cache_home_habits';
 const String _kCacheActivities = 'cache_home_activities';
 
+/// 首页「低变数据」缓存新鲜度：最近阅读/最近活动读多写少，1h 内视为新鲜直接秒开
+/// （与 DictService / 版本检查同策略）。写操作经事件 invalidate / forceRefresh 保证强一致。
+const Duration _kHomeLongTtl = Duration(hours: 1);
+
 /// 首页仪表板
 class DashboardPage extends StatefulWidget {
   const DashboardPage({super.key});
@@ -88,11 +92,11 @@ class _DashboardPageState extends State<DashboardPage> {
   /// 监听全局数据变更事件，从其他页面返回时自动刷新最新动态
   void _listenDataChangeEvents() {
     final handlers = <EventType, VoidCallback>{
-      EventType.expenseUpdated: _loadRecentActivities,
-      EventType.weightRecordUpdated: _loadRecentActivities,
-      EventType.moodDiaryUpdated: _loadRecentActivities,
-      EventType.noteUpdated: _loadRecentActivities,
-      EventType.habitUpdated: _loadRecentActivities,
+      EventType.expenseUpdated: () => _loadRecentActivities(force: true),
+      EventType.weightRecordUpdated: () => _loadRecentActivities(force: true),
+      EventType.moodDiaryUpdated: () => _loadRecentActivities(force: true),
+      EventType.noteUpdated: () => _loadRecentActivities(force: true),
+      EventType.habitUpdated: () => _loadRecentActivities(force: true),
       EventType.reminderUpdated: () => _loadPendingReminders(force: true),
       EventType.bookshelfUpdated: _onBookshelfChanged,
     };
@@ -108,7 +112,7 @@ class _DashboardPageState extends State<DashboardPage> {
   /// 书架变化：使最近阅读缓存失效并刷新（保证加/删书后首页即时更新）
   void _onBookshelfChanged() {
     unawaited(RequestCache.invalidate(_kCacheRecentNovels));
-    _loadRecentNovels();
+    _loadRecentNovels(force: true);
   }
 
   @override
@@ -257,8 +261,9 @@ class _DashboardPageState extends State<DashboardPage> {
     if (mounted) setState(() => _visibleToolIds = ids);
   }
 
-  /// 从 Supabase 加载最近活动记录（带本地缓存）
-  Future<void> _loadRecentActivities() async {
+  /// 从 Supabase 加载最近活动记录（带本地缓存：先秒开，后台静默刷新）
+  /// [force] 为 true 时跳过缓存直接拉最新（事件回程/下拉刷新用，保证写后强一致）
+  Future<void> _loadRecentActivities({bool force = false}) async {
     final userId = SupabaseService.instance.currentUserId;
     if (userId == null) {
       if (mounted) setState(() => _isLoadingActivities = false);
@@ -300,7 +305,12 @@ class _DashboardPageState extends State<DashboardPage> {
     }
 
     try {
-      final (rows, _) = await RequestCache.getList(_kCacheActivities, fetcher);
+      final (rows, _) = await RequestCache.getList(
+        _kCacheActivities,
+        fetcher,
+        ttl: _kHomeLongTtl,
+        forceRefresh: force,
+      );
       if (!mounted) return;
       final activities = <Map<String, dynamic>>[];
       for (final r in rows) {
@@ -353,7 +363,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
   /// 加载最近阅读的小说（带本地缓存：先秒开，后台静默刷新）
   /// 仍分两步查询（保持原 RLS/外键兼容），但整体结果经 RequestCache 缓存为 plain JSON
-  Future<void> _loadRecentNovels() async {
+  /// [force] 为 true 时跳过缓存直接拉最新（事件回程/下拉刷新用，保证加删书后强一致）
+  Future<void> _loadRecentNovels({bool force = false}) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) {
       if (mounted) setState(() => _isLoadingNovels = false);
@@ -409,7 +420,12 @@ class _DashboardPageState extends State<DashboardPage> {
       return ApiResponse.success(novels);
     }
 
-    final (rows, _) = await RequestCache.getList(_kCacheRecentNovels, fetcher);
+    final (rows, _) = await RequestCache.getList(
+      _kCacheRecentNovels,
+      fetcher,
+      ttl: _kHomeLongTtl,
+      forceRefresh: force,
+    );
     if (!mounted) return;
     final novels = rows.map((m) {
       final novelJson = m['novel'] as Map<String, dynamic>? ?? {};
@@ -479,9 +495,9 @@ class _DashboardPageState extends State<DashboardPage> {
       body: RefreshIndicator(
         onRefresh: () async {
           await Future.wait([
-            _loadRecentActivities(),
+            _loadRecentActivities(force: true),
             _loadPendingReminders(force: true),
-            _loadRecentNovels(),
+            _loadRecentNovels(force: true),
             _loadAnnouncements(),
           ]);
         },
