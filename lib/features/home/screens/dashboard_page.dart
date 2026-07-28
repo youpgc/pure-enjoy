@@ -37,7 +37,6 @@ const String _prefsKeyTools = 'dashboard_visible_tools';
 const String _kCacheRecentNovels = 'cache_home_recent_novels';
 const String _kCacheHabits = 'cache_home_habits';
 const String _kCacheActivities = 'cache_home_activities';
-const String _kCacheReminders = 'cache_home_reminders';
 
 /// 首页仪表板
 class DashboardPage extends StatefulWidget {
@@ -56,6 +55,10 @@ class _DashboardPageState extends State<DashboardPage> {
   List<Announcement> _announcements = [];
 
   List<ReminderModel> _pendingReminders = [];
+
+  // 提醒加载：实时获取；10s 内重复调用（快速切 tab）不重复请求
+  DateTime? _remindersLastFetched;
+  static const Duration _remindersThrottle = Duration(seconds: 10);
 
   bool _isLoadingNovels = true;
   List<Map<String, dynamic>> _recentNovels = [];
@@ -85,7 +88,7 @@ class _DashboardPageState extends State<DashboardPage> {
       EventType.moodDiaryUpdated: _loadRecentActivities,
       EventType.noteUpdated: _loadRecentActivities,
       EventType.habitUpdated: _loadRecentActivities,
-      EventType.reminderUpdated: _loadRecentActivities,
+      EventType.reminderUpdated: () => _loadPendingReminders(force: true),
       EventType.bookshelfUpdated: _onBookshelfChanged,
     };
     handlers.forEach((type, handler) {
@@ -316,24 +319,31 @@ class _DashboardPageState extends State<DashboardPage> {
     }
   }
 
-  /// 加载待办提醒（带本地缓存）
-  Future<void> _loadPendingReminders() async {
+  /// 加载待办提醒（实时获取；10s 内重复调用仅复用，避免快速切 tab 重复请求）
+  Future<void> _loadPendingReminders({bool force = false}) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
 
-    final (rows, _) = await RequestCache.getList(_kCacheReminders, () async {
-      final result = await ApiClient.get('reminders',
-          filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
-          select: '*',
-          order: 'remind_at.asc',
-          limit: 3);
-      return result; // data 已是 plain JSON，可直接缓存
-    });
+    // 极短缓存：10s 内已拉取过且非强制刷新 → 直接复用，不重复请求
+    final now = DateTime.now();
+    if (!force &&
+        _remindersLastFetched != null &&
+        now.difference(_remindersLastFetched!) < _remindersThrottle) {
+      return;
+    }
+
+    final result = await ApiClient.get('reminders',
+        filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
+        select: '*',
+        order: 'remind_at.asc',
+        limit: 3);
     if (!mounted) return;
-    final reminders = rows.map((e) => ReminderModel.fromJson(e)).toList();
-    setState(() {
-      _pendingReminders = reminders;
-    });
+    // 请求失败保持上一轮数据，避免界面闪烁
+    if (!result.isSuccess || result.data == null) return;
+
+    _remindersLastFetched = DateTime.now();
+    final reminders = (result.data as List).map((e) => ReminderModel.fromJson(e)).toList();
+    setState(() => _pendingReminders = reminders);
   }
 
   /// 加载最近阅读的小说（带本地缓存：先秒开，后台静默刷新）
@@ -427,7 +437,7 @@ class _DashboardPageState extends State<DashboardPage> {
     Navigator.push(
       context,
       MaterialPageRoute(builder: (_) => const RemindersScreen()),
-    ).then((_) => _loadPendingReminders());
+    ).then((_) => _loadPendingReminders(force: true));
   }
 
   /// 继续阅读小说
@@ -456,7 +466,7 @@ class _DashboardPageState extends State<DashboardPage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(builder: (_) => const NotificationCenterScreen()),
-              ).then((_) => _loadPendingReminders());
+              ).then((_) => _loadPendingReminders(force: true));
             },
           ),
         ],
@@ -465,7 +475,7 @@ class _DashboardPageState extends State<DashboardPage> {
         onRefresh: () async {
           await Future.wait([
             _loadRecentActivities(),
-            _loadPendingReminders(),
+            _loadPendingReminders(force: true),
             _loadRecentNovels(),
             _loadAnnouncements(),
           ]);
