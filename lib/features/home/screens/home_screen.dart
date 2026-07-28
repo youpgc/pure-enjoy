@@ -16,12 +16,30 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> {
   int _currentIndex = 0;
 
-  final List<Widget> _pages = const [
-    DashboardPage(),
-    LifeScreen(),
-    BookShelfScreen(),
-    ProfilePage(),
+  /// 懒加载容器：默认只构建首页(索引0)，其余 tab 首次点击时才构建并常驻。
+  /// 这样开屏仅触发当前展示页的请求，切到其它 tab 时才发起对应接口（按需加载）。
+  final List<Widget> _pages = <Widget>[
+    const DashboardPage(), // 首页为默认 landing，开屏即构建
+    const SizedBox.shrink(),
+    const SizedBox.shrink(),
+    const SizedBox.shrink(),
   ];
+
+  /// 按索引创建对应 tab 页（仅首次进入时调用，构造即触发该页 initState 发起请求）
+  Widget _createPage(int index) {
+    switch (index) {
+      case 0:
+        return const DashboardPage();
+      case 1:
+        return const LifeScreen();
+      case 2:
+        return const BookShelfScreen();
+      case 3:
+        return const ProfilePage();
+      default:
+        return const SizedBox.shrink();
+    }
+  }
 
   @override
   void initState() {
@@ -38,6 +56,14 @@ class _HomeScreenState extends State<HomeScreen> {
     }
   }
 
+  /// tab 切换：未构建过的页首次进入才构建（按需加载），已构建的保留状态
+  void _onDestinationSelected(int index) {
+    if (_pages[index] is SizedBox) {
+      _pages[index] = _createPage(index);
+    }
+    setState(() => _currentIndex = index);
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -47,9 +73,7 @@ class _HomeScreenState extends State<HomeScreen> {
       ),
       bottomNavigationBar: NavigationBar(
         selectedIndex: _currentIndex,
-        onDestinationSelected: (index) {
-          setState(() => _currentIndex = index);
-        },
+        onDestinationSelected: _onDestinationSelected,
         destinations: const [
           NavigationDestination(
             icon: Icon(Icons.home_outlined),
