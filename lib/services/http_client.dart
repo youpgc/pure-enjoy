@@ -456,8 +456,18 @@ class HttpClient {
     return params.toString();
   }
 
-  /// 统一请求日志：打印 方法 + 地址 + 入参 + 耗时 + 状态码/错误
-  /// 仅在 debug 模式输出，避免生产包泄露请求细节与用户数据
+  /// 日志分隔线（隔断不同请求，避免混在一起难以辨认）
+  static const String _logDivider =
+      '════════════════════════════════════════════════';
+
+  /// 截断过长的字符串（响应体可能很大，避免刷屏）
+  String _truncate(String s, [int max = 800]) {
+    if (s.length <= max) return s;
+    return '${s.substring(0, max)} …(已截断，原长 ${s.length} 字符)';
+  }
+
+  /// 统一请求日志：打印 方法 + 地址 + 入参 + 耗时 + 状态码/错误 + 响应体
+  /// 用分隔线包裹，每条请求独立成块；仅在 debug 模式输出
   void _logRequest({
     required String? method,
     required String? url,
@@ -465,15 +475,22 @@ class HttpClient {
     required Duration duration,
     int? statusCode,
     Object? error,
+    String? responseBody,
   }) {
     if (!kDebugMode) return;
     final sb = StringBuffer();
-    sb.write('🌐 [HTTP] ${method ?? '?'} ${url ?? ''}');
+    sb.writeln(_logDivider);
+    sb.writeln('🌐 [HTTP] ${method ?? '?'} ${url ?? ''}');
     final paramStr = _describeParams(params);
-    if (paramStr.isNotEmpty) sb.write('\n   入参: $paramStr');
-    sb.write('\n   耗时: ${duration.inMilliseconds}ms');
+    if (paramStr.isNotEmpty) sb.writeln('   入参: $paramStr');
+    sb.write('   耗时: ${duration.inMilliseconds}ms');
     if (statusCode != null) sb.write(' | 状态码: $statusCode');
     if (error != null) sb.write(' | 错误: $error');
+    sb.writeln();
+    if (responseBody != null && responseBody.isNotEmpty) {
+      sb.writeln('   响应: ${_truncate(responseBody)}');
+    }
+    sb.writeln(_logDivider);
     debugPrint(sb.toString());
   }
 
@@ -551,6 +568,7 @@ class HttpClient {
               params: logParams,
               duration: sw.elapsed,
               statusCode: response.statusCode,
+              responseBody: response.body,
             );
             return response;
           }
@@ -578,6 +596,7 @@ class HttpClient {
           params: logParams,
           duration: sw.elapsed,
           statusCode: response.statusCode,
+          responseBody: response.body,
         );
         return response;
       } on RequestCancelledException {
@@ -608,6 +627,7 @@ class HttpClient {
       duration: sw.elapsed,
       statusCode: response?.statusCode,
       error: lastError,
+      responseBody: response?.body,
     );
     throw lastError ?? Exception('请求失败，已重试 $maxRetries 次');
   }
