@@ -143,6 +143,7 @@ class AuthService {
           method: 'GET',
           headers: {'User-Agent': 'PureEnjoy'},
           timeout: RequestTimeout.simple,
+          note: '定位当前省市(IP地理解析)',
         );
         if (geo.statusCode == 200) {
           final j = jsonDecode(geo.body) as Map<String, dynamic>;
@@ -180,6 +181,7 @@ class AuthService {
         'p_username': account,
       },
       timeout: RequestTimeout.simple,
+      note: '上报登录记录(RPC)',
     );
   }
 

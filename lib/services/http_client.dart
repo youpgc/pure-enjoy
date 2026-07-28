@@ -161,6 +161,7 @@ class HttpClient {
     Duration? timeout,
     CancelToken? cancelToken,
     bool useETag = false,
+    String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
     final url = uri.toString();
@@ -185,6 +186,7 @@ class HttpClient {
           logMethod: 'GET',
           logUrl: url,
           logParams: queryParams,
+          logNote: note,
         );
 
         // 处理 304 Not Modified：返回缓存内容
@@ -214,6 +216,7 @@ class HttpClient {
       logMethod: 'GET',
       logUrl: url,
       logParams: queryParams,
+      logNote: note,
     );
 
     // 处理 200 OK：保存 ETag 缓存（仅当 useETag 启用时）
@@ -240,6 +243,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
+    String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -253,6 +257,7 @@ class HttpClient {
       logMethod: 'POST',
       logUrl: uri.toString(),
       logParams: body,
+      logNote: note,
     );
   }
 
@@ -264,6 +269,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
+    String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -277,6 +283,7 @@ class HttpClient {
       logMethod: 'PUT',
       logUrl: uri.toString(),
       logParams: body,
+      logNote: note,
     );
   }
 
@@ -288,6 +295,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
+    String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -301,6 +309,7 @@ class HttpClient {
       logMethod: 'PATCH',
       logUrl: uri.toString(),
       logParams: body,
+      logNote: note,
     );
   }
 
@@ -311,6 +320,7 @@ class HttpClient {
     Map<String, dynamic>? queryParams,
     Duration? timeout,
     CancelToken? cancelToken,
+    String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
     return _requestWithRetry(
@@ -320,6 +330,7 @@ class HttpClient {
       logMethod: 'DELETE',
       logUrl: uri.toString(),
       logParams: queryParams,
+      logNote: note,
     );
   }
 
@@ -375,6 +386,7 @@ class HttpClient {
     Map<String, String>? headers,
     Object? body,
     Duration? timeout,
+    String? note,
   }) async {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
@@ -385,6 +397,7 @@ class HttpClient {
       logMethod: method,
       logUrl: url,
       logParams: body,
+      logNote: note,
     );
   }
 
@@ -476,10 +489,14 @@ class HttpClient {
     int? statusCode,
     Object? error,
     String? responseBody,
+    String? note,
   }) {
     if (!kDebugMode) return;
     final sb = StringBuffer();
     sb.writeln(_logDivider);
+    if (note != null && note.isNotEmpty) {
+      sb.writeln('📝 备注: $note');
+    }
     sb.writeln('🌐 [HTTP] ${method ?? '?'} ${url ?? ''}');
     final paramStr = _describeParams(params);
     if (paramStr.isNotEmpty) sb.writeln('   入参: $paramStr');
@@ -521,6 +538,7 @@ class HttpClient {
     String? logMethod,
     String? logUrl,
     Object? logParams,
+    String? logNote,
   }) async {
     http.Response? response;
     Exception? lastError;
@@ -537,6 +555,7 @@ class HttpClient {
           params: logParams,
           duration: sw.elapsed,
           error: '请求已取消',
+          note: logNote,
         );
         throw RequestCancelledException();
       }
@@ -553,6 +572,7 @@ class HttpClient {
             params: logParams,
             duration: sw.elapsed,
             error: '请求已取消',
+            note: logNote,
           );
           throw RequestCancelledException();
         }
@@ -569,6 +589,7 @@ class HttpClient {
               duration: sw.elapsed,
               statusCode: response.statusCode,
               responseBody: response.body,
+              note: logNote,
             );
             return response;
           }
@@ -585,6 +606,7 @@ class HttpClient {
             duration: sw.elapsed,
             statusCode: 401,
             error: '401 未授权',
+            note: logNote,
           );
           throw const HttpException('401_UNAUTHORIZED');
         }
@@ -597,6 +619,7 @@ class HttpClient {
           duration: sw.elapsed,
           statusCode: response.statusCode,
           responseBody: response.body,
+          note: logNote,
         );
         return response;
       } on RequestCancelledException {
@@ -628,6 +651,7 @@ class HttpClient {
       statusCode: response?.statusCode,
       error: lastError,
       responseBody: response?.body,
+      note: logNote,
     );
     throw lastError ?? Exception('请求失败，已重试 $maxRetries 次');
   }

@@ -159,6 +159,7 @@ class ApiClient {
     String? searchFields,
     Duration? timeout,
     CancelToken? cancelToken,
+    String? note,
   }) async {
     try {
       final url = _buildUrl(
@@ -176,6 +177,7 @@ class ApiClient {
         url,
         timeout: timeout ?? RequestTimeout.list,
         cancelToken: cancelToken,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -195,6 +197,7 @@ class ApiClient {
     Map<String, dynamic>? body, // 兼容旧代码
     bool returnRepresentation = true, // 兼容旧代码
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = '$_baseUrl/rest/v1/$table';
@@ -208,6 +211,7 @@ class ApiClient {
         headers: headers.isNotEmpty ? headers : null,
         body: payload,
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -225,6 +229,7 @@ class ApiClient {
     Map<String, dynamic>? body, // 兼容旧代码
     required String id,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = '$_baseUrl/rest/v1/$table?id=eq.$id';
@@ -234,6 +239,7 @@ class ApiClient {
         headers: {'Prefer': 'return=representation'},
         body: payload,
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -249,6 +255,7 @@ class ApiClient {
     required Map<String, String> filters,
     required Map<String, dynamic> body,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = _buildUrl(
@@ -261,6 +268,7 @@ class ApiClient {
         headers: {'Prefer': 'return=representation'},
         body: body,
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -275,6 +283,7 @@ class ApiClient {
     String table, {
     required String id,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = '$_baseUrl/rest/v1/$table?id=eq.$id';
@@ -282,6 +291,7 @@ class ApiClient {
         url,
         headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -296,6 +306,7 @@ class ApiClient {
     String table, {
     required List<String> ids,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final idList = ids.map((id) => '"$id"').join(',');
@@ -304,6 +315,7 @@ class ApiClient {
         url,
         headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -318,6 +330,7 @@ class ApiClient {
     String table, {
     required Map<String, String> filters,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = _buildUrl(
@@ -329,6 +342,7 @@ class ApiClient {
         url,
         headers: {'Prefer': 'return=representation'},
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       return _handleResponse(response);
@@ -346,6 +360,7 @@ class ApiClient {
     required String column,
     Map<String, String>? filters,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final queryParts = <String>[
@@ -367,6 +382,7 @@ class ApiClient {
       final response = await HttpClient.instance.get(
         url,
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       if (response.statusCode >= 200 && response.statusCode < 300) {
@@ -395,6 +411,7 @@ class ApiClient {
     String table, {
     Map<String, String>? filters,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final queryParts = <String>[];
@@ -413,6 +430,7 @@ class ApiClient {
           'Range': '0-0',
         },
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? table,
       );
 
       final contentRange = response.headers['content-range'];
@@ -434,6 +452,7 @@ class ApiClient {
     String functionName, {
     Map<String, dynamic>? params,
     Duration? timeout,
+    String? note,
   }) async {
     try {
       final url = '$_baseUrl/rest/v1/rpc/$functionName';
@@ -441,6 +460,7 @@ class ApiClient {
         url,
         body: params ?? {},
         timeout: timeout ?? RequestTimeout.simple,
+        note: note ?? 'rpc/$functionName',
       );
       return _handleResponse(response);
     } catch (e) {

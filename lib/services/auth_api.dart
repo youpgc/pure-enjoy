@@ -65,6 +65,7 @@ class AuthApi {
         headers: _anonHeaders,
         body: {'email': email, 'password': password},
         timeout: RequestTimeout.simple,
+        note: '账号密码登录',
       );
 
       SecureLogger.log('🔐 响应码: ${response.statusCode}');
@@ -153,6 +154,7 @@ class AuthApi {
           },
         },
         timeout: RequestTimeout.simple,
+        note: '注册新账号',
       );
 
       if (response.statusCode == 200) {
@@ -176,6 +178,7 @@ class AuthApi {
         headers: _anonHeaders,
         body: {'refresh_token': refreshToken},
         timeout: RequestTimeout.simple,
+        note: '刷新访问令牌',
       );
 
       if (response.statusCode == 200) {
@@ -202,6 +205,7 @@ class AuthApi {
           'Authorization': 'Bearer $accessToken',
         },
         timeout: RequestTimeout.simple,
+        note: '获取当前用户信息',
       );
 
       if (response.statusCode == 200) {
@@ -231,6 +235,7 @@ class AuthApi {
         },
         body: {'password': newPassword},
         timeout: RequestTimeout.simple,
+        note: '修改密码',
       );
 
       if (response.statusCode == 200) {
@@ -277,6 +282,7 @@ class AuthApi {
         },
         body: {'account': account},
         timeout: RequestTimeout.simple,
+        note: '解析账号到邮箱(RPC)',
       );
 
       if (response.statusCode == 200) {
@@ -310,6 +316,7 @@ class AuthApi {
           'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
         },
         timeout: RequestTimeout.simple,
+        note: '校验字段唯一性(注册)',
       );
 
       if (response.statusCode == 200) {
