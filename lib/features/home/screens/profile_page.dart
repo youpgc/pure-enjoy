@@ -28,7 +28,7 @@ class ProfilePage extends StatefulWidget {
 class _ProfilePageState extends State<ProfilePage> {
   int _totalPoints = 0;
 
-  /// 当前应用版本号（形如 1.10.11）
+  /// 当前应用版本号（形如 1.10.11，手机安装版本）
   String _appVersion = '';
 
   /// 是否有可更新的新版本（用于版本号右上角红点提示）
@@ -52,11 +52,11 @@ class _ProfilePageState extends State<ProfilePage> {
     }
   }
 
-  /// 检查是否有新版本，有则在版本号右上角显示红点
-  /// 复用 VersionCheckService.checkUpdate（含 1 小时缓存），
-  /// 返回非 null 即表示存在可更新且未被忽略的新版本
+  /// 检查是否有新版本，有则在版本号右上角显示红点。
+  /// 使用 getLatestVersionInfo（不受「稍后更新」影响），
+  /// 这样即便用户点过「稍后更新」，版本信息仍展示最新版本并允许手动更新。
   Future<void> _checkUpdate() async {
-    final versionInfo = await VersionCheckService.instance.checkUpdate();
+    final versionInfo = await VersionCheckService.instance.getLatestVersionInfo();
     if (mounted) {
       setState(() {
         _hasUpdate = versionInfo != null;
@@ -230,9 +230,10 @@ class _ProfilePageState extends State<ProfilePage> {
               ],
             ),
             onTap: () async {
-              final versionInfo = await VersionCheckService.instance.checkUpdate();
+              // 走不受「稍后更新」影响的手动检查通道，确保即便已忽略也能更新
+              final versionInfo = await VersionCheckService.instance.getLatestVersionInfo();
               if (!context.mounted) return;
-              // 点击后同步刷新红点状态（忽略更新或已是最新时红点消失）
+              // 刷新红点状态
               if (mounted) {
                 setState(() {
                   _hasUpdate = versionInfo != null;

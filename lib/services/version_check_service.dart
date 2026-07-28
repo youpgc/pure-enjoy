@@ -196,11 +196,96 @@ class VersionCheckService {
     return false;
   }
 
-  /// 用户忽略此版本的更新提示（强制更新不可忽略）
+  /// 用户忽略此版本的更新提示（强制更新不可忽略）。
+  /// 仅对该版本号生效；期间发布更新的版本仍会立即提示。
   Future<void> dismissVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_dismissedVersionKey, version);
     if (kDebugMode) debugPrint('📱 已忽略 v$version 的更新提示');
+  }
+
+  /// 获取最新版本信息（不受「稍后更新」ignore 状态影响）。
+  ///
+  /// 用于「我的」页面展示可用版本、以及点击版本信息时手动触发更新。
+  /// - 不修改 dismiss 状态，也不抑制自动弹窗（自动弹窗仍由 [checkUpdate] 控制）。
+  /// - 与 [checkUpdate] 共享 1 小时缓存；即使该版本已被「稍后更新」忽略，
+  ///   缓存中仍保留其最新版本信息，这里直接返回，从而允许手动更新。
+  /// - 返回 null 表示当前已是最新或网络/数据不可用。
+  Future<Map<String, dynamic>?> getLatestVersionInfo() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final cacheJson = prefs.getString(_versionCheckCacheKey);
+      final packageInfo = await PackageInfo.fromPlatform();
+      final currentVersion = packageInfo.version;
+      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
+
+      // 优先复用 1 小时内的新鲜缓存（与 checkUpdate 共享）
+      if (cacheJson != null && cacheJson.isNotEmpty) {
+        try {
+          final cache = jsonDecode(cacheJson) as Map<String, dynamic>;
+          final lastCheckTime = DateTime.tryParse(cache['timestamp'] as String? ?? '');
+          final cachedVersionInfo = cache['versionInfo'] as Map<String, dynamic>?;
+          if (lastCheckTime != null) {
+            final elapsed = DateTime.now().difference(lastCheckTime);
+            if (elapsed < _minCheckInterval) {
+              // 缓存明确为最新版本信息（即便已被忽略也保留）→ 直接返回
+              if (cachedVersionInfo != null) {
+                if (kDebugMode) {
+                  debugPrint('📱 [手动] 使用缓存最新版本 v${cachedVersionInfo['version']}');
+                }
+                return cachedVersionInfo;
+              }
+              return null; // 缓存明确为无更新
+            }
+          }
+        } catch (e) {
+          if (kDebugMode) debugPrint('📱 [手动] 缓存解析失败，重新检查');
+        }
+      }
+
+      // 缓存失效 → 走网络
+      final result = await ApiClient.get(
+        'app_versions',
+        filters: {'status': 'eq.released'},
+        order: 'created_at.desc',
+        limit: 1,
+      );
+      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
+        if (kDebugMode) debugPrint('📱 [手动] 未获取到最新版本或请求失败');
+        return null;
+      }
+
+      final latestVersion = result.data!.first;
+      final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
+      final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
+      final apkUrl = latestVersion['apk_url'] as String?;
+
+      // 防御：没有下载地址时不提示更新（数据不完整）
+      if (apkUrl == null || apkUrl.isEmpty) {
+        if (kDebugMode) debugPrint('📱 [手动] 最新版本缺少下载地址');
+        return null;
+      }
+
+      // 已是最新则不返回
+      if (!_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
+        if (kDebugMode) debugPrint('📱 [手动] 当前已是最新');
+        return null;
+      }
+
+      if (kDebugMode) debugPrint('📱 [手动] 最新版本获取成功 v$latestVersionStr');
+      return {
+        'version': latestVersionStr,
+        'build_number': latestBuildNumber,
+        'apk_url': apkUrl,
+        'github_url': latestVersion['github_url'],
+        'release_notes': latestVersion['release_notes'],
+        'is_force_update': latestVersion['release_type'] == 'force',
+        'release_type': latestVersion['release_type'],
+      };
+    } catch (e) {
+      if (kDebugMode) debugPrint('📱 [手动] 获取最新版本失败');
+      return null;
+    }
   }
 
   /// 显示更新对话框（带下载进度）
