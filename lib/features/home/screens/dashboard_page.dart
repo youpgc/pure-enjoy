@@ -257,6 +257,8 @@ class _DashboardPageState extends State<DashboardPage> {
       return;
     }
 
+    // fetcher 只缓存原始 plain JSON（Supabase 返回），不缓存 IconData 等非序列化对象；
+    // 读取时再 buildXxxActivity 生成含图标的渲染条目。否则 jsonEncode 缓存会抛异常。
     Future<ApiResponse> fetcher() async {
       final futures = [
         ApiClient.get('expenses',
@@ -276,37 +278,42 @@ class _DashboardPageState extends State<DashboardPage> {
             limit: 1),
       ];
       final results = await Future.wait(futures);
-      final activities = <Map<String, dynamic>>[];
-      final diaryResult = results[1];
-      if (diaryResult.isSuccess) {
-        final list = diaryResult.data as List;
-        if (list.isNotEmpty) {
-          activities.add(buildDiaryActivity(list[0] as Map<String, dynamic>));
+      final raw = <Map<String, dynamic>>[];
+      const sources = ['expense', 'mood', 'weight'];
+      for (var i = 0; i < results.length; i++) {
+        final r = results[i];
+        if (r.isSuccess && r.data != null && r.data!.isNotEmpty) {
+          final item = Map<String, dynamic>.from(r.data![0]);
+          item['__source'] = sources[i];
+          raw.add(item);
         }
       }
-      final expenseResult = results[0];
-      if (expenseResult.isSuccess) {
-        final list = expenseResult.data as List;
-        if (list.isNotEmpty) {
-          activities.add(buildExpenseActivity(list[0] as Map<String, dynamic>));
-        }
-      }
-      final weightResult = results[2];
-      if (weightResult.isSuccess) {
-        final list = weightResult.data as List;
-        if (list.isNotEmpty) {
-          activities.add(buildWeightActivity(list[0] as Map<String, dynamic>));
-        }
-      }
-      return ApiResponse.success(activities);
+      return ApiResponse.success(raw);
     }
 
-    final (rows, _) = await RequestCache.getList(_kCacheActivities, fetcher);
-    if (!mounted) return;
-    setState(() {
-      _recentActivities = rows;
-      _isLoadingActivities = false;
-    });
+    try {
+      final (rows, _) = await RequestCache.getList(_kCacheActivities, fetcher);
+      if (!mounted) return;
+      final activities = <Map<String, dynamic>>[];
+      for (final r in rows) {
+        final source = r['__source'] as String?;
+        final item = Map<String, dynamic>.from(r)..remove('__source');
+        if (source == 'mood') {
+          activities.add(buildDiaryActivity(item));
+        } else if (source == 'expense') {
+          activities.add(buildExpenseActivity(item));
+        } else if (source == 'weight') {
+          activities.add(buildWeightActivity(item));
+        }
+      }
+      setState(() {
+        _recentActivities = activities;
+        _isLoadingActivities = false;
+      });
+    } catch (e) {
+      if (kDebugMode) debugPrint('❌ 加载最近活动失败: $e');
+      if (mounted) setState(() => _isLoadingActivities = false);
+    }
   }
 
   /// 加载待办提醒（带本地缓存）
