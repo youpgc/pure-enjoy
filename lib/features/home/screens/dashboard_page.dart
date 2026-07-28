@@ -143,7 +143,8 @@ class _DashboardPageState extends State<DashboardPage> {
     Future<ApiResponse> fetcher() async {
       final result = await ApiClient.get('habits',
           filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
-          select: '*',
+          select:
+              'id,user_id,name,description,target_days,current_streak,longest_streak,is_active,created_at',
           order: 'created_at.desc',
           limit: 3);
       if (!result.isSuccess) return ApiResponse.success([]);
@@ -153,7 +154,7 @@ class _DashboardPageState extends State<DashboardPage> {
         final habitIds = habitsData.map((h) => h['id'].toString()).toList();
         final checkinsResult = await ApiClient.get('habit_checkins',
             filters: {'habit_id': 'in.(${habitIds.join(",")})'},
-            select: '*',
+            select: 'id,habit_id,user_id,checkin_at,note,created_at',
             order: 'checkin_at.desc',
             limit: 3);
         if (checkinsResult.isSuccess && checkinsResult.data != null) {
@@ -350,7 +351,8 @@ class _DashboardPageState extends State<DashboardPage> {
 
     final result = await ApiClient.get('reminders',
         filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
-        select: '*',
+        select:
+            'id,user_id,title,description,remind_at,is_completed,is_repeated,repeat_type,created_at',
         order: 'remind_at.asc',
         limit: 3);
     if (!mounted) return;

@@ -4,6 +4,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../../../services/api_client.dart';
 import '../../../services/session_manager.dart';
 import '../models/novel_model.dart';
+import '../source_config.dart';
 import '../screens/novel_reader_screen.dart';
 import '../screens/novel_webview_screen.dart';
 import 'reading_history_service.dart';
@@ -90,7 +91,7 @@ class NovelLaunchService {
     final url = novel.sourceUrl!;
 
     // 纵横：已知有原生 App，尝试 scheme 唤起；失败回退 WebView
-    if (source.contains('zongheng') || source.contains('纵横')) {
+    if (NovelSourceConfig.isZongheng(source)) {
       final bookId = _extractZonghengBookId(url);
       if (bookId != null) {
         return _ExternalTarget(

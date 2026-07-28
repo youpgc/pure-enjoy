@@ -7,6 +7,8 @@ export 'novel_recommendation_model.dart';
 export 'novel_tts_model.dart';
 export 'novel_ranking_model.dart';
 
+import '../source_config.dart';
+
 /// 小说模型
 class NovelModel {
   final String id;
@@ -56,13 +58,8 @@ class NovelModel {
   /// 是否聚合小说（带外部来源链接、不存正文）
   bool get isAggregated => sourceUrl != null && sourceUrl!.isNotEmpty;
 
-  /// 来源展示名（用于合规标注）
-  String get sourceDisplayName {
-    final s = (source ?? '').toLowerCase();
-    if (s.contains('zongheng') || s.contains('纵横')) return '纵横';
-    if (source != null && source!.isNotEmpty) return source!;
-    return '外部来源';
-  }
+  /// 来源展示名（用于合规标注），委托共享 SourceConfig 保持跨端一致
+  String get sourceDisplayName => NovelSourceConfig.displayName(source);
 
   factory NovelModel.fromJson(Map<String, dynamic> json) {
     return NovelModel(
