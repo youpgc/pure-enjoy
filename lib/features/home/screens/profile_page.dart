@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../services/supabase_service.dart';
+import '../../../services/api_client.dart';
 import '../../profile/services/point_service.dart';
 import '../../auth/screens/login_screen.dart';
 import 'reading_history_screen.dart';
@@ -34,9 +36,15 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 是否有可更新的新版本（用于版本号右上角红点提示）
   bool _hasUpdate = false;
 
+  /// 头像 URL：直接从 users 表读取（与「编辑资料」页同源），
+  /// 不依赖 auth user_metadata 的异步同步，避免「我的」页经常显示默认头像。
+  String? _avatarUrl;
+
   @override
   void initState() {
     super.initState();
+    // 先用会话内已有头像值，避免首帧空白；随后 _loadUserData 会从 users 表校正
+    _avatarUrl = SupabaseService.instance.currentUserAvatar;
     _loadUserData();
     _loadAppVersion();
     _checkUpdate();
@@ -68,9 +76,35 @@ class _ProfilePageState extends State<ProfilePage> {
   Future<void> _loadUserData() async {
     await SupabaseService.instance.reloadCurrentUser();
     final points = await PointService.instance.getAvailablePoints();
+
+    // 直接读取 users 表 avatar_url（与「编辑资料」页同源），确保头像可靠显示，
+    // 不依赖 auth user_metadata 的异步同步（该同步偶发未及时完成，导致显示默认头像）。
+    String? avatarUrl = SupabaseService.instance.currentUserAvatar;
+    try {
+      final userId = SupabaseService.instance.currentUserId;
+      if (userId != null) {
+        final res = await ApiClient.get(
+          'users',
+          filters: {
+            ApiClient.userKey(userId): 'eq.$userId',
+            'is_deleted': 'eq.false',
+          },
+          columns: 'avatar_url',
+          limit: 1,
+        );
+        if (res.isSuccess && res.data != null && res.data!.isNotEmpty) {
+          final v = res.data![0]['avatar_url'];
+          if (v != null && v is String && v.isNotEmpty) avatarUrl = v;
+        }
+      }
+    } catch (e) {
+      if (kDebugMode) debugPrint('读取用户头像失败: $e');
+    }
+
     if (mounted) {
       setState(() {
         _totalPoints = points;
+        _avatarUrl = avatarUrl;
       });
     }
   }
@@ -104,7 +138,7 @@ class _ProfilePageState extends State<ProfilePage> {
               padding: const EdgeInsets.all(20),
               child: Row(
                 children: [
-                  _buildAvatar(colorScheme, supabaseService),
+                  _buildAvatar(colorScheme),
                   const SizedBox(width: 16),
                   Expanded(
                     child: Column(
@@ -367,8 +401,8 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 与“修改资料”页(ProfileAvatarSection)保持一致：使用 CircleAvatar.backgroundImage +
   /// resolveAvatar（网络为主，[cached_network_image] 磁盘缓存），由 CircleAvatar 内置椭圆裁剪并以
   /// cover 适配，避免拉伸；背景色由 DiceBear 服务端 backgroundColor 渲染，本地仅作缓存。
-  Widget _buildAvatar(ColorScheme colorScheme, SupabaseService supabaseService) {
-    final avatarUrl = supabaseService.currentUserAvatar;
+  Widget _buildAvatar(ColorScheme colorScheme) {
+    final avatarUrl = _avatarUrl;
     if (avatarUrl == null || avatarUrl.isEmpty) {
       return CircleAvatar(
         radius: 32,
