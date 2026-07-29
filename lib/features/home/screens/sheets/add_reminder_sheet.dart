@@ -3,6 +3,8 @@ import 'package:uuid/uuid.dart';
 
 import '../../../../services/supabase_service.dart';
 import '../../../life/models/reminder_model.dart';
+import '../../../life/models/remind_offset.dart';
+import '../../../life/widgets/remind_offset_selector.dart';
 import '../../../../utils/date_time_utils.dart';
 
 /// 添加提醒底部弹窗
@@ -22,6 +24,8 @@ class AddReminderSheetState extends State<AddReminderSheet> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+  bool _remindEnabled = false;
+  List<RemindOffset> _remindOffsets = [];
   bool _isSaving = false;
 
   @override
@@ -42,6 +46,8 @@ class AddReminderSheetState extends State<AddReminderSheet> {
         title: _titleController.text,
         description: _descController.text.isEmpty ? null : _descController.text,
         remindAt: _remindAt,
+        remindEnabled: _remindEnabled,
+        remindOffsets: _remindOffsets,
       );
 
       widget.onSave(reminder);
@@ -105,6 +111,18 @@ class AddReminderSheetState extends State<AddReminderSheet> {
                     date.year, date.month, date.day,
                     time.hour, time.minute,
                   );
+                });
+              },
+            ),
+            const SizedBox(height: 16),
+            RemindOffsetSelector(
+              baseTime: _remindAt,
+              initialEnabled: _remindEnabled,
+              initialOffsets: _remindOffsets,
+              onChanged: (settings) {
+                setState(() {
+                  _remindEnabled = settings.enabled;
+                  _remindOffsets = settings.offsets;
                 });
               },
             ),

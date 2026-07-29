@@ -8,6 +8,8 @@ import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../widgets/common_widgets.dart';
 import '../models/reminder_model.dart';
+import '../models/remind_offset.dart';
+import '../widgets/remind_offset_selector.dart';
 import '../widgets/app_date_picker.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
@@ -324,6 +326,8 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
+  bool _remindEnabled = false;
+  List<RemindOffset> _remindOffsets = [];
 
   @override
   void initState() {
@@ -332,6 +336,8 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
       _titleController.text = widget.reminder!.title;
       _descController.text = widget.reminder!.description ?? '';
       _remindAt = widget.reminder!.remindAt;
+      _remindEnabled = widget.reminder!.remindEnabled;
+      _remindOffsets = List.from(widget.reminder!.remindOffsets);
     }
   }
 
@@ -388,6 +394,17 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                   });
                 },
               ),
+              RemindOffsetSelector(
+                baseTime: _remindAt,
+                initialEnabled: _remindEnabled,
+                initialOffsets: _remindOffsets,
+                onChanged: (settings) {
+                  setState(() {
+                    _remindEnabled = settings.enabled;
+                    _remindOffsets = settings.offsets;
+                  });
+                },
+              ),
             ],
           ),
         ),
@@ -408,6 +425,8 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 description: _descController.text.isEmpty ? null : _descController.text,
                 remindAt: _remindAt,
                 isCompleted: widget.reminder?.isCompleted ?? false,
+                remindEnabled: _remindEnabled,
+                remindOffsets: _remindOffsets,
               );
               Navigator.pop(context, reminder);
             }

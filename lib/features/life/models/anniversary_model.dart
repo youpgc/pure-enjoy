@@ -1,5 +1,6 @@
 import 'package:lunar/lunar.dart';
 import '../../../utils/date_time_utils.dart';
+import './remind_offset.dart';
 
 /// 纪念日模型 - 对应 Supabase user_anniversaries 表
 /// 字段: id(TEXT), user_id(TEXT), user_nickname(TEXT?), title(TEXT), date(DateTime),
@@ -16,7 +17,9 @@ class AnniversaryModel {
   final String? description;
   final bool repeatYearly;
   final bool remindEnabled;
-  final int? remindDaysBefore;
+  final List<RemindOffset> remindOffsets;
+  /// 提醒当天触发时刻（HH:mm），用于推算各提前档位的真实时间
+  final String remindTime;
   final bool isLunar;
   final DateTime? createdAt;
 
@@ -30,7 +33,8 @@ class AnniversaryModel {
     this.description,
     this.repeatYearly = true,
     this.remindEnabled = false,
-    this.remindDaysBefore,
+    this.remindOffsets = const [],
+    this.remindTime = '09:00',
     this.isLunar = false,
     this.createdAt,
   });
@@ -46,7 +50,12 @@ class AnniversaryModel {
       description: json['description'] as String?,
       repeatYearly: json['repeat_yearly'] as bool? ?? true,
       remindEnabled: json['remind_enabled'] as bool? ?? false,
-      remindDaysBefore: json['remind_days_before'] as int?,
+      remindOffsets: (json['remind_offsets'] as List?)
+              ?.map((e) =>
+                  RemindOffset.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
+      remindTime: (json['remind_time'] as String?) ?? '09:00',
       isLunar: json['is_lunar'] as bool? ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.parse(json['created_at'] as String)
@@ -64,7 +73,8 @@ class AnniversaryModel {
       'description': description,
       'repeat_yearly': repeatYearly,
       'remind_enabled': remindEnabled,
-      'remind_days_before': remindDaysBefore,
+      'remind_offsets': remindOffsets.map((e) => e.toJson()).toList(),
+      'remind_time': remindTime,
       'is_lunar': isLunar,
     };
     if (id.isNotEmpty) {
@@ -82,7 +92,8 @@ class AnniversaryModel {
       'description': description,
       'repeat_yearly': repeatYearly,
       'remind_enabled': remindEnabled,
-      'remind_days_before': remindDaysBefore,
+      'remind_offsets': remindOffsets.map((e) => e.toJson()).toList(),
+      'remind_time': remindTime,
       'is_lunar': isLunar,
     };
   }
@@ -97,7 +108,8 @@ class AnniversaryModel {
     String? description,
     bool? repeatYearly,
     bool? remindEnabled,
-    int? remindDaysBefore,
+    List<RemindOffset>? remindOffsets,
+    String? remindTime,
     bool? isLunar,
     DateTime? createdAt,
   }) {
@@ -111,7 +123,8 @@ class AnniversaryModel {
       description: description ?? this.description,
       repeatYearly: repeatYearly ?? this.repeatYearly,
       remindEnabled: remindEnabled ?? this.remindEnabled,
-      remindDaysBefore: remindDaysBefore ?? this.remindDaysBefore,
+      remindOffsets: remindOffsets ?? this.remindOffsets,
+      remindTime: remindTime ?? this.remindTime,
       isLunar: isLunar ?? this.isLunar,
       createdAt: createdAt ?? this.createdAt,
     );

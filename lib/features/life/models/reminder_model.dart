@@ -1,5 +1,9 @@
+import './remind_offset.dart';
+
 /// 提醒事项模型 - 对应 Supabase reminders 表
-/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), description(TEXT), remind_at(TIMESTAMPTZ), is_completed(BOOLEAN), is_repeated(BOOLEAN), repeat_type(VARCHAR), created_at, updated_at
+/// 字段: id(UUID), user_id(VARCHAR), title(VARCHAR), description(TEXT), remind_at(TIMESTAMPTZ),
+///       is_completed(BOOLEAN), is_repeated(BOOLEAN), repeat_type(VARCHAR),
+///       remind_enabled(BOOLEAN), remind_offsets(JSONB), created_at, updated_at
 class ReminderModel {
   final String id;
   final String userId;
@@ -7,6 +11,8 @@ class ReminderModel {
   final String? description;
   final DateTime remindAt;
   final bool isCompleted;
+  final bool remindEnabled;
+  final List<RemindOffset> remindOffsets;
   final bool? isRepeated;
   final String? repeatType;
   final DateTime? createdAt;
@@ -18,6 +24,8 @@ class ReminderModel {
     this.description,
     required this.remindAt,
     this.isCompleted = false,
+    this.remindEnabled = false,
+    this.remindOffsets = const [],
     this.isRepeated,
     this.repeatType,
     this.createdAt,
@@ -31,6 +39,12 @@ class ReminderModel {
       description: json['description'] as String?,
       remindAt: DateTime.parse(json['remind_at'] as String),
       isCompleted: json['is_completed'] as bool? ?? false,
+      remindEnabled: json['remind_enabled'] as bool? ?? false,
+      remindOffsets: (json['remind_offsets'] as List?)
+              ?.map((e) =>
+                  RemindOffset.fromJson(Map<String, dynamic>.from(e)))
+              .toList() ??
+          const [],
       isRepeated: json['is_repeated'] as bool?,
       repeatType: json['repeat_type'] as String?,
       createdAt: json['created_at'] != null ? DateTime.parse(json['created_at'] as String) : null,
@@ -44,6 +58,8 @@ class ReminderModel {
       'description': description,
       'remind_at': remindAt.toUtc().toIso8601String(),
       'is_completed': isCompleted,
+      'remind_enabled': remindEnabled,
+      'remind_offsets': remindOffsets.map((e) => e.toJson()).toList(),
       'is_repeated': isRepeated,
       'repeat_type': repeatType,
     };
@@ -59,6 +75,8 @@ class ReminderModel {
       'description': description,
       'remind_at': remindAt.toUtc().toIso8601String(),
       'is_completed': isCompleted,
+      'remind_enabled': remindEnabled,
+      'remind_offsets': remindOffsets.map((e) => e.toJson()).toList(),
       'is_repeated': isRepeated,
       'repeat_type': repeatType,
     };
@@ -71,6 +89,8 @@ class ReminderModel {
     String? description,
     DateTime? remindAt,
     bool? isCompleted,
+    bool? remindEnabled,
+    List<RemindOffset>? remindOffsets,
     bool? isRepeated,
     String? repeatType,
     DateTime? createdAt,
@@ -82,6 +102,8 @@ class ReminderModel {
       description: description ?? this.description,
       remindAt: remindAt ?? this.remindAt,
       isCompleted: isCompleted ?? this.isCompleted,
+      remindEnabled: remindEnabled ?? this.remindEnabled,
+      remindOffsets: remindOffsets ?? this.remindOffsets,
       isRepeated: isRepeated ?? this.isRepeated,
       repeatType: repeatType ?? this.repeatType,
       createdAt: createdAt ?? this.createdAt,

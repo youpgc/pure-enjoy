@@ -9,6 +9,7 @@ import './supabase_service.dart';
 import '../features/life/models/reminder_schedule_model.dart';
 import '../features/life/models/reminder_model.dart';
 import '../features/life/models/anniversary_model.dart';
+import '../features/life/models/remind_offset.dart';
 import '../main.dart' show navigatorKey;
 
 /// 本地通知服务
@@ -439,40 +440,67 @@ class NotificationService {
 
   // ========== 待办事项提醒 ==========
 
-  /// 通知 ID 前缀（与待办 ID 哈希组合，保证每待办唯一）
-  static const int _reminderNotificationBaseId = 4000;
+  /// 多偏移提醒的 ID 分配：模块块基址 + (hash % 9000) * 步长(10) + 偏移序号(0..7)，
+  /// 保证同模块每事项唯一且 < 2^31；整段含 (步长+2) 个 ID 用于「全部取消」。
+  static const int _reminderBlockBase = 40000;
+  static const int _anniversaryBlockBase = 30000;
+  static const int _offsetStride = 10;
+  static const int _maxOffsets = 8;
 
-  /// 根据提醒事项设置本地横幅通知。
-  /// [reminder] 待办事项（含 id / remindAt / isCompleted / title）；
-  /// 已完成或时间已过则取消已设定的提醒。
-  Future<void> scheduleReminderNotification(ReminderModel reminder) async {
-    if (!_initialized) await initialize();
-    final id = _reminderNotificationBaseId + reminder.id.hashCode.abs();
+  int _reminderBlock(String itemId, int moduleBase) =>
+      moduleBase + (itemId.hashCode.abs() % 9000) * _offsetStride;
 
-    // 已完成或时间已过 → 取消已设定的提醒
-    if (reminder.isCompleted || !reminder.remindAt.isAfter(DateTime.now())) {
-      await cancelNotification(id);
-      return;
-    }
+  int _reminderOffsetId(String itemId, int moduleBase, int index) =>
+      _reminderBlock(itemId, moduleBase) + index;
 
-    final tzTime = tz.TZDateTime.from(reminder.remindAt, tz.local);
-    await _scheduleZoned(
-      id: id,
-      title: '提醒事项',
-      body: reminder.title,
-      scheduledDate: tzTime,
-      payload: 'reminder:${reminder.id}',
-    );
-
-    if (kDebugMode) {
-      debugPrint('🔔 待办提醒已设置: ${reminder.title} @ $tzTime');
+  /// 取消某事项的整段提醒（覆盖其所有偏移 ID），用于开关关闭/删除/重设
+  Future<void> _cancelReminderBlock(String itemId, int moduleBase) async {
+    final base = _reminderBlock(itemId, moduleBase);
+    for (int i = 0; i <= _offsetStride + 1; i++) {
+      await cancelNotification(base + i);
     }
   }
 
-  /// 取消待办事项提醒
+  /// 根据提醒事项设置本地横幅通知（支持多个提前偏移）。
+  /// [reminder] 待办事项（含 id / remindAt / remindEnabled / remindOffsets / isCompleted / title）；
+  /// 关闭提醒 / 已完成 / 时间已过 → 取消整段已设定的提醒。
+  Future<void> scheduleReminderNotification(ReminderModel reminder) async {
+    if (!_initialized) await initialize();
+
+    if (!reminder.remindEnabled ||
+        reminder.isCompleted ||
+        !reminder.remindAt.isAfter(DateTime.now())) {
+      await _cancelReminderBlock(reminder.id, _reminderBlockBase);
+      return;
+    }
+
+    final now = DateTime.now();
+    var scheduled = 0;
+    for (var i = 0;
+        i < reminder.remindOffsets.length && i < _maxOffsets;
+        i++) {
+      final offset = reminder.remindOffsets[i];
+      final target = offset.resolve(reminder.remindAt);
+      if (!target.isAfter(now)) continue; // 已过时刻不调度
+      final id = _reminderOffsetId(reminder.id, _reminderBlockBase, i);
+      await _scheduleZoned(
+        id: id,
+        title: '提醒事项',
+        body: reminder.title,
+        scheduledDate: tz.TZDateTime.from(target, tz.local),
+        payload: 'reminder:${reminder.id}',
+      );
+      scheduled++;
+    }
+
+    if (kDebugMode && scheduled > 0) {
+      debugPrint('🔔 待办提醒已设置 $scheduled 个: ${reminder.title}');
+    }
+  }
+
+  /// 取消待办事项提醒（整段偏移）
   Future<void> cancelReminderNotification(String id) async {
-    final nid = _reminderNotificationBaseId + id.hashCode.abs();
-    await cancelNotification(nid);
+    await _cancelReminderBlock(id, _reminderBlockBase);
   }
 
   /// 启动后从云端拉取未完成的未来待办并重新挂接，保证跨重启持续生效。
@@ -489,7 +517,7 @@ class NotificationService {
       final now = DateTime.now();
       for (final r in result.data!) {
         final model = ReminderModel.fromJson(r);
-        if (model.remindAt.isAfter(now)) {
+        if (model.remindEnabled && model.remindAt.isAfter(now)) {
           await scheduleReminderNotification(model);
         }
       }
@@ -500,70 +528,79 @@ class NotificationService {
 
   // ========== 纪念日 / 生日提醒 ==========
 
-  /// 通知 ID 前缀（与纪念日 ID 哈希组合，保证唯一）
-  static const int _anniversaryNotificationBaseId = 3000;
-
-  /// 设置纪念日/生日提醒（每年重复，支持提前 N 天）。
-  /// [a] 纪念日模型（含 date / remind_enabled / remind_days_before / repeat_yearly / type）。
-  /// 未开启提醒时自动取消已设定的提醒。
+  /// 设置纪念日/生日提醒（支持多提前偏移，yearly 时每年重复）。
+  /// [a] 纪念日模型（含 date / remind_enabled / remind_offsets / remind_time / repeat_yearly / type）。
+  /// 未开启提醒时自动取消整段已设定的提醒。
   Future<void> scheduleAnniversaryReminder(AnniversaryModel a) async {
     if (!_initialized) await initialize();
-    final id = _anniversaryNotificationBaseId + a.id.hashCode.abs();
 
-    // 未开启提醒 → 取消已设定的提醒
     if (!a.remindEnabled) {
-      await cancelNotification(id);
+      await _cancelReminderBlock(a.id, _anniversaryBlockBase);
       return;
     }
 
-    // 提醒触发日 = 纪念日(公历月/日) - 提前天数，固定 09:00
-    final base = DateTime(a.date.year, a.date.month, a.date.day);
-    final remind = base.subtract(Duration(days: a.remindDaysBefore ?? 0));
-    final next = _anniversaryNextDateTime(remind.month, remind.day, 9, 0);
-    if (next == null) {
-      await cancelNotification(id);
-      return;
+    // 解析当天触发时刻（HH:mm），与下一个纪念日(公历月/日)组合为基准时刻
+    var hour = 9;
+    var minute = 0;
+    final parts = a.remindTime.split(':');
+    if (parts.length == 2) {
+      hour = int.tryParse(parts[0]) ?? 9;
+      minute = int.tryParse(parts[1]) ?? 0;
+    }
+    final next = a.nextDate;
+    final base = DateTime(next.year, next.month, next.day, hour, minute);
+
+    var scheduled = 0;
+    for (var i = 0; i < a.remindOffsets.length && i < _maxOffsets; i++) {
+      final offset = a.remindOffsets[i];
+      // 推算出的时刻若已过去（如今年已过的提前档），顺延到下一年对应月/日
+      var target = offset.resolve(base);
+      if (target.isBefore(DateTime.now())) {
+        target = DateTime(
+          target.year + 1,
+          target.month,
+          target.day,
+          target.hour,
+          target.minute,
+        );
+      }
+      final id = _reminderOffsetId(a.id, _anniversaryBlockBase, i);
+      final isBirthday = a.type == 'birthday';
+      await _scheduleZoned(
+        id: id,
+        title: isBirthday ? '🎂 ${a.title}的生日' : '🎉 ${a.title}',
+        body: _anniversaryBody(a, offset, isBirthday),
+        scheduledDate: tz.TZDateTime.from(target, tz.local),
+        payload: 'anniversary:${a.id}',
+        matchDateTimeComponents:
+            a.repeatYearly ? DateTimeComponents.dayOfMonthAndTime : null,
+      );
+      scheduled++;
     }
 
-    final isBirthday = a.type == 'birthday';
-    final title =
-        isBirthday ? '🎂 ${a.title}的生日' : '🎉 ${a.title}';
-    final body = isBirthday
-        ? '今天是${a.title}的生日，记得送上祝福！'
-        : (a.remindDaysBefore != null && a.remindDaysBefore! > 0
-            ? '还有 ${a.remindDaysBefore} 天就是「${a.title}」，提前准备一下～'
-            : '今天是「${a.title}」，记得庆祝一下！');
-
-    await _scheduleZoned(
-      id: id,
-      title: title,
-      body: body,
-      scheduledDate: next,
-      payload: 'anniversary:${a.id}',
-      matchDateTimeComponents:
-          a.repeatYearly ? DateTimeComponents.dayOfMonthAndTime : null,
-    );
-
-    if (kDebugMode) {
-      debugPrint('🔔 纪念日提醒已设置: ${a.title} @ $next (每年重复: ${a.repeatYearly})');
+    if (kDebugMode && scheduled > 0) {
+      debugPrint('🔔 纪念日提醒已设置 $scheduled 个: ${a.title}');
     }
   }
 
-  /// 计算今年/明年该月日 09:00 的时区时间（用于每年重复的纪念日提醒）。
-  tz.TZDateTime? _anniversaryNextDateTime(
-      int month, int day, int hour, int minute) {
-    final now = tz.TZDateTime.now(tz.local);
-    tz.TZDateTime candidate(int year) =>
-        tz.TZDateTime(tz.local, year, month, day, hour, minute);
-    final thisYear = candidate(now.year);
-    if (!thisYear.isBefore(now)) return thisYear;
-    return candidate(now.year + 1);
+  String _anniversaryBody(
+      AnniversaryModel a, RemindOffset offset, bool isBirthday) {
+    switch (offset.unit) {
+      case 'minute':
+        return '还有 ${offset.value} 分钟就是「${a.title}」啦，提前准备一下～';
+      case 'day':
+        return '还有 ${offset.value} 天就是「${a.title}」，提前准备一下～';
+      case 'same':
+      default:
+        return isBirthday
+            ? '今天是${a.title}的生日，记得送上祝福！'
+            : '今天是「${a.title}」，记得庆祝一下！';
+    }
   }
 
-  /// 取消纪念日/生日提醒
+  /// 取消纪念日/生日提醒（整段偏移）
   Future<void> cancelAnniversaryReminder(String anniversaryId) async {
-    final id = _anniversaryNotificationBaseId + anniversaryId.hashCode.abs();
-    await cancelNotification(id);
+    await _cancelReminderBlock(anniversaryId, _anniversaryBlockBase);
   }
 
   /// 启动后从云端拉取已开启提醒的纪念日并重新挂接，保证跨重启持续生效。

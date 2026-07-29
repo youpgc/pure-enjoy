@@ -10,6 +10,8 @@ import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
+import '../models/remind_offset.dart';
+import '../widgets/remind_offset_selector.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/anniversary_card.dart';
 import './anniversary_helpers.dart';
@@ -221,7 +223,13 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
     DateTime selectedDate = anniversary?.date ?? DateTime.now();
     bool repeatYearly = anniversary?.repeatYearly ?? true;
     bool remindEnabled = anniversary?.remindEnabled ?? false;
-    int? remindDaysBefore = anniversary?.remindDaysBefore ?? 0;
+    List<RemindOffset> remindOffsets =
+        List.from(anniversary?.remindOffsets ?? const <RemindOffset>[]);
+    final rt = (anniversary?.remindTime ?? '09:00').split(':');
+    TimeOfDay remindTime = TimeOfDay(
+      hour: int.tryParse(rt[0]) ?? 9,
+      minute: int.tryParse(rt.length > 1 ? rt[1] : '0') ?? 0,
+    );
     bool isLunar = anniversary?.isLunar ?? false;
 
     final isBirthday = widget.filterType == 'birthday';
@@ -318,44 +326,40 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                 ),
                 const Divider(),
 
-                // 是否开启提醒
-                SwitchListTile(
-                  title: const Text('开启提醒'),
-                  subtitle: Text(remindEnabled ? '已开启' : '关闭'),
-                  contentPadding: EdgeInsets.zero,
-                  value: remindEnabled,
-                  onChanged: (value) {
-                    setDialogState(() => remindEnabled = value);
+                // 提醒设置：开关 + 多选提前时间（含 hh:mm）+ 当天提醒时刻
+                RemindOffsetSelector(
+                  baseTime: DateTime(
+                    selectedDate.year,
+                    selectedDate.month,
+                    selectedDate.day,
+                    remindTime.hour,
+                    remindTime.minute,
+                  ),
+                  initialEnabled: remindEnabled,
+                  initialOffsets: remindOffsets,
+                  onChanged: (settings) {
+                    setDialogState(() {
+                      remindEnabled = settings.enabled;
+                      remindOffsets = settings.offsets;
+                    });
                   },
                 ),
-
-                // 提前提醒天数
-                if (remindEnabled) ...[
-                  const SizedBox(height: 8),
-                  const Text('提前提醒', style: TextStyle(fontSize: 12)),
-                  const SizedBox(height: 4),
-                  DropdownButtonFormField<int>(
-                    initialValue: remindDaysBefore,
-                    decoration: const InputDecoration(
-                      border: OutlineInputBorder(),
-                      contentPadding: EdgeInsets.symmetric(
-                        horizontal: 12,
-                        vertical: 8,
-                      ),
-                    ),
-                    items: const [
-                      DropdownMenuItem(value: 0, child: Text('当天')),
-                      DropdownMenuItem(value: 1, child: Text('提前1天')),
-                      DropdownMenuItem(value: 3, child: Text('提前3天')),
-                      DropdownMenuItem(value: 7, child: Text('提前7天')),
-                      DropdownMenuItem(value: 14, child: Text('提前14天')),
-                      DropdownMenuItem(value: 30, child: Text('提前30天')),
-                    ],
-                    onChanged: (value) {
-                      setDialogState(() => remindDaysBefore = value);
-                    },
-                  ),
-                ],
+                const SizedBox(height: 8),
+                ListTile(
+                  contentPadding: EdgeInsets.zero,
+                  title: const Text('当天提醒时刻'),
+                  subtitle: Text(remindTime.format(dialogContext)),
+                  trailing: const Icon(Icons.access_time),
+                  onTap: () async {
+                    final picked = await showTimePicker(
+                      context: dialogContext,
+                      initialTime: remindTime,
+                    );
+                    if (picked != null) {
+                      setDialogState(() => remindTime = picked);
+                    }
+                  },
+                ),
               ],
             ),
           ),
@@ -396,8 +400,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                                 : descController.text.trim(),
                         'repeat_yearly': repeatYearly,
                         'remind_enabled': remindEnabled,
-                        'remind_days_before':
-                            remindEnabled ? remindDaysBefore : null,
+                        'remind_offsets':
+                            remindOffsets.map((e) => e.toJson()).toList(),
+                        'remind_time':
+                            '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
                         'is_lunar': isLunar,
                       },
                     );
@@ -420,8 +426,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                                 : descController.text.trim(),
                         'repeat_yearly': repeatYearly,
                         'remind_enabled': remindEnabled,
-                        'remind_days_before':
-                            remindEnabled ? remindDaysBefore : null,
+                        'remind_offsets':
+                            remindOffsets.map((e) => e.toJson()).toList(),
+                        'remind_time':
+                            '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
                         'is_lunar': isLunar,
                       },
                     );
@@ -431,21 +439,24 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   }
 
                   // 纪念日提醒：开启则挂接横幅，关闭则取消已设定的提醒
-                  final annModel = AnniversaryModel.fromJson({
-                    'id': annId,
-                    'user_id': userId,
-                    'user_nickname': nickname,
-                    'title': nameController.text.trim(),
-                    'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
-                    'type': selectedType,
-                    'description': descController.text.trim().isEmpty
+                  final annModel = AnniversaryModel(
+                    id: annId,
+                    userId: userId,
+                    userNickname: nickname,
+                    title: nameController.text.trim(),
+                    date: DateTime(selectedDate.year, selectedDate.month,
+                        selectedDate.day, 12),
+                    type: selectedType,
+                    description: descController.text.trim().isEmpty
                         ? null
                         : descController.text.trim(),
-                    'repeat_yearly': repeatYearly,
-                    'remind_enabled': remindEnabled,
-                    'remind_days_before': remindEnabled ? remindDaysBefore : null,
-                    'is_lunar': isLunar,
-                  });
+                    repeatYearly: repeatYearly,
+                    remindEnabled: remindEnabled,
+                    remindOffsets: remindOffsets,
+                    remindTime:
+                        '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
+                    isLunar: isLunar,
+                  );
                   if (remindEnabled) {
                     await NotificationService.instance.scheduleAnniversaryReminder(annModel);
                   } else {
