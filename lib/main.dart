@@ -17,6 +17,10 @@ import './services/dict_service.dart';
 import './services/notification_service.dart';
 import './services/offline_sync_service.dart';
 import './services/chapter_cache_service.dart';
+import './features/home/screens/notification_center_screen.dart';
+import './features/life/screens/habits_screen.dart';
+import './features/life/screens/reminders_screen.dart';
+import './features/life/screens/anniversaries_screen.dart';
 
 /// 全局 NavigatorKey，用于通知点击跳转
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();
@@ -83,6 +87,9 @@ void _lazyInitializeServices() {
   NotificationService.instance.armRemindersFromRemote().catchError((e) {
     if (kDebugMode) debugPrint('重挂待办提醒失败: $e');
   });
+  NotificationService.instance.armAnniversariesFromRemote().catchError((e) {
+    if (kDebugMode) debugPrint('重挂纪念日提醒失败: $e');
+  });
 
   // 离线同步服务：启动时同步待处理队列
   OfflineSyncService.instance.initialize().catchError((e) {
@@ -113,6 +120,12 @@ class PureEnjoyApp extends ConsumerWidget {
       darkTheme: AppTheme.darkTheme(theme.colorScheme.seedColor),
       themeMode: theme.themeMode,
       home: const AuthWrapper(),
+      routes: {
+        '/notifications': (context) => const NotificationCenterScreen(),
+        '/habits': (context) => const HabitsScreen(),
+        '/reminders': (context) => const RemindersScreen(),
+        '/anniversaries': (context) => const AnniversariesScreen(),
+      },
       // 中文本地化配置
       localizationsDelegates: const [
         GlobalMaterialLocalizations.delegate,

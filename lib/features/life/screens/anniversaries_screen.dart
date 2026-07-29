@@ -5,6 +5,7 @@ import 'package:uuid/uuid.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/notification_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../utils/date_time_utils.dart';
@@ -195,6 +196,8 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
         );
 
         if (result.isSuccess) {
+          // 删除后取消对应的本地横幅提醒
+          NotificationService.instance.cancelAnniversaryReminder(id);
           _loadAnniversaries(refresh: true);
           if (mounted) {
             showSnackBar(context, '删除成功');
@@ -374,6 +377,8 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   return;
                 }
                 final nickname = _userNickname;
+                // 统一提醒 ID（编辑用原 ID，新建生成），供保存后挂接横幅
+                final annId = isEditing ? anniversary.id : const Uuid().v4();
 
                 try {
                   if (isEditing) {
@@ -400,11 +405,10 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                       throw Exception('HTTP ${result.statusCode}');
                     }
                   } else {
-                    final anniversaryId = const Uuid().v4();
                     final result = await ApiClient.post(
                       'user_anniversaries',
                       {
-                        'id': anniversaryId,
+                        'id': annId,
                         'user_id': userId,
                         'user_nickname': nickname,
                         'title': nameController.text.trim(),
@@ -425,6 +429,29 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                       throw Exception('HTTP ${result.statusCode}');
                     }
                   }
+
+                  // 纪念日提醒：开启则挂接横幅，关闭则取消已设定的提醒
+                  final annModel = AnniversaryModel.fromJson({
+                    'id': annId,
+                    'user_id': userId,
+                    'user_nickname': nickname,
+                    'title': nameController.text.trim(),
+                    'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
+                    'type': selectedType,
+                    'description': descController.text.trim().isEmpty
+                        ? null
+                        : descController.text.trim(),
+                    'repeat_yearly': repeatYearly,
+                    'remind_enabled': remindEnabled,
+                    'remind_days_before': remindEnabled ? remindDaysBefore : null,
+                    'is_lunar': isLunar,
+                  });
+                  if (remindEnabled) {
+                    await NotificationService.instance.scheduleAnniversaryReminder(annModel);
+                  } else {
+                    NotificationService.instance.cancelAnniversaryReminder(annId);
+                  }
+
                   if (!mounted) return;
                   Navigator.pop(context);
                   _loadAnniversaries(refresh: true);
