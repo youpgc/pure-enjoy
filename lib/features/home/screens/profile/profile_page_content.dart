@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../services/dict_service.dart';
 import '../../avatar_render.dart';
-import '../reading_history_screen.dart';
+// [小说模块暂时停用] import '../reading_history_screen.dart';
 import '../about_legal_screen.dart';
 import '../../../life/screens/feedback_list_screen.dart';
 
@@ -82,17 +82,18 @@ class ProfilePageContent extends StatelessWidget {
               ),
             ),
           ),
-          ListTile(
-            leading: const Icon(Icons.history_outlined),
-            title: const Text('阅读历史'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
-              );
-            },
-          ),
+          // [小说模块暂时停用] 阅读历史入口
+          // ListTile(
+          //   leading: const Icon(Icons.history_outlined),
+          //   title: const Text('阅读历史'),
+          //   trailing: const Icon(Icons.chevron_right),
+          //   onTap: () {
+          //     Navigator.push(
+          //       context,
+          //       MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
+          //     );
+          //   },
+          // ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于与法律'),
