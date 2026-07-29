@@ -4,9 +4,9 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/widgets/widgets.dart';
-import 'api_client.dart';
-import 'apk_installer.dart';
-import 'update_dialog.dart';
+import './api_client.dart';
+import './apk_installer.dart';
+import './update_dialog.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
 class VersionCheckService {

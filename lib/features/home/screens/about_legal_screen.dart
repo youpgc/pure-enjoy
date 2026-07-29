@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'rich_text_page.dart';
+import './rich_text_page.dart';
 
 /// 关于与法律
 ///

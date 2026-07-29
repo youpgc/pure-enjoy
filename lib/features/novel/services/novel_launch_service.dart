@@ -7,7 +7,7 @@ import '../models/novel_model.dart';
 import '../source_config.dart';
 import '../screens/novel_reader_screen.dart';
 import '../screens/novel_webview_screen.dart';
-import 'reading_history_service.dart';
+import './reading_history_service.dart';
 
 /// 小说跳转路由服务（聚合阅读核心：阶段 1 路由层）。
 ///

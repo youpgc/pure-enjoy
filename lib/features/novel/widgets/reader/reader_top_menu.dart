@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
 import '../reader_enums.dart';
-import '../../screens/novel_detail_screen.dart';
+import '../../screens/novel_detail/novel_detail_screen.dart';
 
 /// 小说阅读器顶部菜单（菜单显示时才显示，层级高）
 class ReaderTopMenu extends StatelessWidget {

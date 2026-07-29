@@ -6,7 +6,7 @@ import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
 
-import 'http_client.dart';
+import './http_client.dart';
 
 /// APK 下载与安装子系统
 ///

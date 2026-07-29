@@ -4,7 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../models/novel_model.dart';
 import '../services/ranking_service.dart';
 import '../widgets/novel_cover.dart';
-import 'novel_detail_screen.dart';
+import './novel_detail/novel_detail_screen.dart';
 import '../../../services/api_client.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';

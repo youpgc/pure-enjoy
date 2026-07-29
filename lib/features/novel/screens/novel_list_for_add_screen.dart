@@ -4,7 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/utils/event_bus.dart';
-import 'novel_search_delegate.dart';
+import './novel_search_delegate.dart';
 import '../widgets/novel_list_item.dart';
 
 /// 用于从书架添加小说的列表页

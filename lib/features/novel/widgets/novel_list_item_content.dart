@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/widgets.dart';
-import 'novel_cover.dart';
+import './novel_cover.dart';
 
 /// {@template novel_list_item_content}
 /// [NovelListItem] 的主体内容（从超长 build 抽取，便于维护）。

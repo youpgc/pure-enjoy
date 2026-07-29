@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'novel_cover.dart';
+import './novel_cover.dart';
 
 /// 根据 progress 计算阅读状态
 String _getReadingStatus(double? progress) {

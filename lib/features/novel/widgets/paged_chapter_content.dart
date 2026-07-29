@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import '../models/novel_model.dart';
-import 'reader_enums.dart';
-import 'reader_page_turn.dart';
+import './reader_enums.dart';
+import './reader_page_turn.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// 分页章节内容组件（slide/cover 模式）

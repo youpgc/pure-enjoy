@@ -1,7 +1,7 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'http_client.dart';
+import './http_client.dart';
 
 /// 会话管理器：负责 Token 的内存缓存与本地持久化
 ///

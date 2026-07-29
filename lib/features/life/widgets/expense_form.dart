@@ -3,7 +3,7 @@ import 'package:uuid/uuid.dart';
 import '../../../services/dict_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/expense_model.dart';
-import '../widgets/app_date_picker.dart';
+import './app_date_picker.dart';
 
 /// 支出表单组件（底部弹窗用）
 class ExpenseForm extends StatefulWidget {

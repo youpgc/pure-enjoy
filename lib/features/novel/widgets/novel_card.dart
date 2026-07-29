@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/novel_model.dart';
-import 'novel_card_content.dart';
+import './novel_card_content.dart';
 
 /// 小说卡片（书架/列表通用）
 class NovelCard extends StatelessWidget {

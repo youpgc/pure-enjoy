@@ -1,4 +1,4 @@
-import 'services/supabase_config.dart';
+import './services/supabase_config.dart';
 
 /// 应用配置文件
 class AppConfig {

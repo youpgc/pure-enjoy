@@ -23,9 +23,9 @@ import '../widgets/reader_enums.dart';
 import '../widgets/reader_settings_panel.dart';
 import '../widgets/reader/reader_widgets.dart';
 import '../../../core/widgets/widgets.dart';
-import 'reader_chapter_drawer.dart';
-import 'reader_panels.dart';
-import 'novel_reader_screen.dart';
+import './reader_chapter_drawer.dart';
+import './reader_panels.dart';
+import './novel_reader_screen.dart';
 
 mixin ReaderChapterLoaderMixin on State<NovelReaderScreen>, WidgetsBindingObserver, SingleTickerProviderStateMixin<NovelReaderScreen> {
   final _scrollController = ScrollController();

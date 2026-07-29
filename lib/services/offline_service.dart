@@ -3,8 +3,8 @@ import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../features/novel/models/novel_model.dart';
-import 'api_client.dart';
-import 'chapter_cache_service.dart';
+import './api_client.dart';
+import './chapter_cache_service.dart';
 
 /// 离线阅读服务
 /// 管理小说的离线下载、下载进度跟踪、无网络阅读支持

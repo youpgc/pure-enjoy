@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../models/novel_model.dart';
-import 'reader_text_utils.dart';
+import './reader_text_utils.dart';
 
 /// 带批注高亮的文本 Span 构建器
 /// 缓存同章节、同字体样式下的构建结果以避免重复计算

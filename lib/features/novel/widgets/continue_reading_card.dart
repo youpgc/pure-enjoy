@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import '../../../constants/app_constants.dart';
 import '../../../services/dict_service.dart';
 import '../models/novel_model.dart';
-import '../widgets/novel_cover.dart';
-import '../widgets/novel_source_badge.dart';
+import './novel_cover.dart';
+import './novel_source_badge.dart';
 
 /// 继续阅读横向卡片（高度自约束，避免 RenderFlex 垂直溢出）。
 ///

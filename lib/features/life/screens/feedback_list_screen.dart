@@ -6,8 +6,8 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/feedback_model.dart';
-import 'feedback_submit_screen.dart';
-import 'feedback_detail_screen.dart';
+import './feedback_submit_screen.dart';
+import './feedback_detail/feedback_detail_screen.dart';
 
 /// 问题反馈列表页面
 class FeedbackListScreen extends StatefulWidget {

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/anniversary_model.dart';
-import 'anniversary_card_content.dart';
+import './anniversary_card_content.dart';
 
 /// 纪念日卡片组件
 class AnniversaryCard extends StatelessWidget {

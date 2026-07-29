@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'filter_chip.dart';
+import './filter_chip.dart';
 
 /// 书架状态筛选栏
 class BookshelfFilterBar extends StatelessWidget {

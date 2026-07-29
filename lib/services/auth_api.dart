@@ -1,7 +1,7 @@
 import 'dart:convert';
 import '../constants/app_constants.dart';
-import 'supabase_config.dart';
-import 'http_client.dart';
+import './supabase_config.dart';
+import './http_client.dart';
 
 /// 纯认证 API：负责与 Supabase Auth 端点的所有通信
 ///

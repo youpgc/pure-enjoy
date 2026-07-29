@@ -3,11 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import 'cancel_token.dart';
-import 'supabase_service.dart';
-import 'http_logger.dart';
-import 'etag_cache.dart';
-import 'http_raw.dart';
+import './cancel_token.dart';
+import './supabase_service.dart';
+import './http_logger.dart';
+import './etag_cache.dart';
+import './http_raw.dart';
 
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {

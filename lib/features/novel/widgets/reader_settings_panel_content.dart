@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
-import 'reader_enums.dart';
-import 'reader_page_turn.dart';
+import './reader_enums.dart';
+import './reader_page_turn.dart';
 
 /// {@template reader_settings_panel_content}
 /// [ReaderSettingsPanel] 的主体内容（从超长 build 抽取，便于维护）。

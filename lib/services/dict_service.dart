@@ -2,13 +2,13 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'api_client.dart';
+import './api_client.dart';
 import '../constants/app_constants.dart';
-import 'dict_models.dart';
+import './dict_models.dart';
 
 /// 兼容导出：DictItem/DictType 已抽到 dict_models.dart，
 /// 原仅 import dict_service.dart 的调用方（含 test）无需改动即可访问。
-export 'dict_models.dart';
+export './dict_models.dart';
 
 /// 字典服务
 /// 首页获取全部字典数据，本地缓存，后台静默更新

@@ -6,7 +6,7 @@ import 'package:flutter/foundation.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:connectivity_plus/connectivity_plus.dart';
-import 'cache_entry.dart';
+import './cache_entry.dart';
 
 /// ============================================================
 /// 章节三级缓存服务（L1 内存 + L2 磁盘 + L3 网络）

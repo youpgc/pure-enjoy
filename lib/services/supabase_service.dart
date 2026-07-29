@@ -4,13 +4,13 @@
 /// 所有外部代码通过 AuthService.instance 访问，保持向后兼容。
 library;
 
-import 'supabase_config.dart';
-import 'session_manager.dart';
-import 'auth_api.dart';
-import 'api_client.dart';
-import 'http_client.dart';
+import './supabase_config.dart';
+import './session_manager.dart';
+import './auth_api.dart';
+import './api_client.dart';
+import './http_client.dart';
 import '../utils/cache_helper.dart';
-import 'chapter_cache_service.dart';
+import './chapter_cache_service.dart';
 import '../features/novel/services/annotation_local_service.dart';
 import '../features/novel/services/annotation_service.dart';
 import 'package:flutter/foundation.dart';
@@ -19,7 +19,7 @@ import 'dart:io';
 import 'package:package_info_plus/package_info_plus.dart';
 
 // 重新导出，保持向后兼容
-export 'supabase_config.dart';
+export './supabase_config.dart';
 
 // 为了兼容旧代码，保留别名
 typedef SupabaseService = AuthService;

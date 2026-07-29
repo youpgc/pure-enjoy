@@ -1,5 +1,5 @@
 import 'package:flutter/foundation.dart';
-import 'api_client.dart';
+import './api_client.dart';
 
 /// 敏感词模型
 class SensitiveWordModel {

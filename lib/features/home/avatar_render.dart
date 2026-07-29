@@ -11,7 +11,7 @@ library;
 
 import 'package:flutter/material.dart';
 import 'package:cached_network_image/cached_network_image.dart';
-import 'avatar_presets.dart';
+import './avatar_presets.dart';
 
 /// 头像 hex 背景色 -> Color
 Color avatarHexToColor(String hex) =>

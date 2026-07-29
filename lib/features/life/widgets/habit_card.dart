@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
-import 'habit_card_content.dart';
+import './habit_card_content.dart';
 
 /// 习惯卡片组件
 class HabitCard extends StatelessWidget {

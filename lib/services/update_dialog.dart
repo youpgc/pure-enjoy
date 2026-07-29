@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../core/theme/app_theme.dart';
 import '../core/widgets/widgets.dart';
-import 'version_check_service.dart';
+import './version_check_service.dart';
 
 /// 更新对话框组件
 ///

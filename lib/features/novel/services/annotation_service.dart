@@ -3,7 +3,7 @@ import 'package:connectivity_plus/connectivity_plus.dart';
 import '../../../services/api_client.dart';
 import '../../../services/session_manager.dart';
 import '../models/novel_model.dart';
-import 'annotation_local_service.dart';
+import './annotation_local_service.dart';
 
 /// 批注/笔记服务（支持离线同步）
 /// 管理小说阅读过程中的高亮批注，网络异常时自动降级到本地 SQLite

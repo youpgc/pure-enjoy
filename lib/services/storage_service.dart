@@ -2,7 +2,7 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
-import 'http_client.dart';
+import './http_client.dart';
 
 /// 存储文件对象
 class FileObject {

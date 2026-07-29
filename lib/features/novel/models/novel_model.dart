@@ -1,11 +1,11 @@
-export 'novel_chapter_model.dart';
-export 'novel_reading_progress_model.dart';
-export 'novel_bookmark_model.dart';
-export 'novel_annotation_model.dart';
-export 'novel_history_model.dart';
-export 'novel_recommendation_model.dart';
-export 'novel_tts_model.dart';
-export 'novel_ranking_model.dart';
+export './novel_chapter_model.dart';
+export './novel_reading_progress_model.dart';
+export './novel_bookmark_model.dart';
+export './novel_annotation_model.dart';
+export './novel_history_model.dart';
+export './novel_recommendation_model.dart';
+export './novel_tts_model.dart';
+export './novel_ranking_model.dart';
 
 import '../source_config.dart';
 

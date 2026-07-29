@@ -3,7 +3,7 @@ import '../../../constants/app_constants.dart';
 import '../../../core/widgets/stat_item.dart';
 import '../../../services/dict_service.dart';
 import '../models/novel_model.dart';
-import 'novel_detail_helpers.dart';
+import './novel_detail_helpers.dart';
 
 /// 小说详情统计信息行（字数/章节/状态/评分）
 class NovelDetailStatRow extends StatelessWidget {

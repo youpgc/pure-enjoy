@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'bookshelf_item_content.dart';
+import './bookshelf_item_content.dart';
 
 /// 书架列表项
 class BookshelfItem extends StatelessWidget {

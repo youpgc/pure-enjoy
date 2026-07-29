@@ -4,7 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../novel/screens/novel_detail_screen.dart';
+import '../../novel/screens/novel_detail/novel_detail_screen.dart';
 import '../../novel/models/novel_model.dart';
 import '../../novel/services/novel_launch_service.dart';
 import '../../novel/widgets/novel_cover.dart';

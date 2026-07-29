@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
-import 'point_service_utils.dart';
+import './point_service_utils.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../utils/cache_helper.dart';

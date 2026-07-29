@@ -3,8 +3,8 @@ import '../../../constants/app_constants.dart';
 import '../../../services/dict_service.dart';
 import '../../../utils/format_utils.dart';
 import '../models/novel_model.dart';
-import '../widgets/novel_cover.dart';
-import '../widgets/novel_source_badge.dart';
+import './novel_cover.dart';
+import './novel_source_badge.dart';
 
 /// {@template novel_card_content}
 /// [NovelCard] 的主体内容（从超长 build 抽取，便于维护）。

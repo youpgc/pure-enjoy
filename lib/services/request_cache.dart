@@ -2,7 +2,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../utils/cache_helper.dart';
-import 'api_client.dart';
+import './api_client.dart';
 
 /// 请求缓存层（stale-while-revalidate）
 ///

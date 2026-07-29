@@ -6,17 +6,17 @@ import 'package:flutter/services.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
 import 'package:flutter_localizations/flutter_localizations.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'core/theme/app_theme.dart';
-import 'core/theme/theme_provider.dart';
-import 'features/home/screens/home_screen.dart';
-import 'features/auth/screens/login_screen.dart';
-import 'features/auth/auth_provider.dart';
-import 'services/supabase_service.dart';
-import 'services/error_reporter.dart';
-import 'services/dict_service.dart';
-import 'services/notification_service.dart';
-import 'services/offline_sync_service.dart';
-import 'services/chapter_cache_service.dart';
+import './core/theme/app_theme.dart';
+import './core/theme/theme_provider.dart';
+import './features/home/screens/home_screen.dart';
+import './features/auth/screens/login_screen.dart';
+import './features/auth/auth_provider.dart';
+import './services/supabase_service.dart';
+import './services/error_reporter.dart';
+import './services/dict_service.dart';
+import './services/notification_service.dart';
+import './services/offline_sync_service.dart';
+import './services/chapter_cache_service.dart';
 
 /// 全局 NavigatorKey，用于通知点击跳转
 final GlobalKey<NavigatorState> navigatorKey = GlobalKey<NavigatorState>();

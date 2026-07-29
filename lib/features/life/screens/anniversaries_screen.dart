@@ -11,8 +11,8 @@ import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
 import '../widgets/app_date_picker.dart';
 import '../widgets/anniversary_card.dart';
-import 'anniversary_helpers.dart';
-import 'anniversary_lunar_picker.dart';
+import './anniversary_helpers.dart';
+import './anniversary_lunar_picker.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
 class AnniversariesScreen extends StatefulWidget {

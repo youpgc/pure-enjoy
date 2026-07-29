@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
-import 'reader_enums.dart';
-import 'reader_page_turn.dart';
-import 'reader_settings_panel_content.dart';
+import './reader_enums.dart';
+import './reader_page_turn.dart';
+import './reader_settings_panel_content.dart';
 
 /// 阅读设置面板
 ///

@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../services/tts_service.dart';
-import 'tts_panel_content.dart';
+import './tts_panel_content.dart';
 
 /// TTS（听书）控制面板
 ///

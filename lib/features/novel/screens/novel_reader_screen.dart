@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import '../models/novel_model.dart';
-import 'reader_chapter_loader_mixin.dart';
+import './reader_chapter_loader_mixin.dart';
 
 /// 小说阅读器页面
 class NovelReaderScreen extends StatefulWidget {

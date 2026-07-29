@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import 'novel_list_item_content.dart';
+import './novel_list_item_content.dart';
 
 /// 小说列表项组件
 class NovelListItem extends StatelessWidget {
