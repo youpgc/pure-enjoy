@@ -1,21 +1,8 @@
 part of 'avatar_history_page.dart';
 
-/// 历史头像网格可视高度：最多展示 [_kHistoryRows] 行（行×列），超出由网格内部滚动。
-const double _kHistoryCellSpacing = 18;
-const int _kHistoryColumns = 4;
-const int _kHistoryRows = 3;
-
-double _avatarHistoryGridHeight(BuildContext context, int count) {
-  if (count <= 0) return 0;
-  final w = MediaQuery.of(context).size.width;
-  final cellW = (w - 32 - (_kHistoryColumns - 1) * _kHistoryCellSpacing) / _kHistoryColumns;
-  var rows = (count / _kHistoryColumns).ceil();
-  if (rows > _kHistoryRows) rows = _kHistoryRows;
-  return rows * cellW + (rows - 1) * _kHistoryCellSpacing + 16 + 24; // 纵向 padding 16+24
-}
-
-/// [AvatarHistoryView] 的主体逻辑（从超长的 [_AvatarHistoryViewState] 整体抽到本 part，
-/// 与 [avatar_history_page] 同库，私有成员可见、行为完全不变）。
+/// [AvatarHistoryView] 的主体逻辑。纯展示型 builder 已抽到
+/// [avatar_history_grid] / [avatar_history_tone] 两个 part 文件（均为显式传参的
+/// StatelessWidget，行为完全不变）；本文件只保留状态字段与状态变更方法。
 class _AvatarHistoryViewState extends State<_AvatarHistoryView> {
   List<AvatarHistoryItem> _items = const [];
   bool _loading = true;
@@ -98,49 +85,39 @@ class _AvatarHistoryViewState extends State<_AvatarHistoryView> {
       body: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildTitle(colorScheme),
+          _AvatarHistoryTitle(title: widget.title, colorScheme: colorScheme),
           if (_loading)
             const Padding(
               padding: EdgeInsets.all(16),
               child: Center(child: CircularProgressIndicator()),
             )
           else if (_items.isEmpty)
-            _buildEmpty(colorScheme)
+            _AvatarHistoryEmpty(type: widget.type, colorScheme: colorScheme)
           else
-            _buildGridSection(colorScheme),
+            _AvatarHistoryGrid(
+              items: _items,
+              manageMode: _manageMode,
+              selectedId: _selectedId,
+              colorScheme: colorScheme,
+              onSelect: _onSelectItem,
+              onDelete: _deleteItem,
+            ),
           const SizedBox(height: 8),
           if (widget.toneEnabled)
             _buildToneSection(colorScheme)
           else
-            _buildUploadPreviewRow(colorScheme),
+            _AvatarHistoryUploadPreview(
+              selectedUrl: _selectedUrl,
+              manageMode: _manageMode,
+              colorScheme: colorScheme,
+              onConfirm: _selectedUrl == null ? null : _confirm,
+              confirmLabel: widget.confirmLabel,
+            ),
           const SizedBox(height: 12),
         ],
       ),
     );
   }
-
-  Widget _buildTitle(ColorScheme colorScheme) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-        child: Text(
-          widget.title,
-          style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurfaceVariant,
-              ),
-        ),
-      );
-
-  Widget _buildEmpty(ColorScheme colorScheme) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 8, 16, 8),
-        child: Text(
-          widget.type == 'upload'
-              ? '还没有上传头像历史，上传过的头像会自动出现在这里。'
-              : '还没有历史头像，去「选择预设头像」用过的头像会自动出现在这里。',
-          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                color: colorScheme.onSurfaceVariant,
-              ),
-        ),
-      );
 
   /// 选中一条记录：拆出风格/种子/背景色，回显色调（仅 toneEnabled）
   void _applySelection(AvatarHistoryItem item) {
@@ -262,391 +239,43 @@ class _AvatarHistoryViewState extends State<_AvatarHistoryView> {
     }
   }
 
-  /// 历史头像网格（最多 [_kHistoryRows]×[_kHistoryColumns]，超出滚动）；位于标题与下方之间
-  Widget _buildGridSection(ColorScheme colorScheme) => SizedBox(
-        height: _avatarHistoryGridHeight(context, _items.length),
-        child: GridView.builder(
-          padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: _kHistoryColumns,
-            mainAxisSpacing: _kHistoryCellSpacing,
-            crossAxisSpacing: _kHistoryCellSpacing,
-            childAspectRatio: 1,
-          ),
-          itemCount: _items.length,
-          itemBuilder: (_, index) {
-            final item = _items[index];
-            final selected = !_manageMode && item.id == _selectedId;
-            // 按记录自身背景色渲染（透明风格也能正确显示底色），无背景则回退主题色
-            final itemBg =
-                item.backgroundColor ?? parseDiceBearUrl(item.avatarUrl)?.bg;
-            final tintColor = itemBg != null
-                ? avatarHexToColor(itemBg)
-                : colorScheme.primaryContainer;
-            return GestureDetector(
-              key: ValueKey<String>(item.id),
-              onTap: _manageMode ? null : () => _onSelectItem(item),
-              child: Stack(
-                alignment: Alignment.center,
-                children: [
-                  Container(
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: selected
-                          ? colorScheme.primary.withValues(alpha: 0.18)
-                          : null,
-                      border: Border.all(
-                        color: selected
-                            ? colorScheme.primary
-                            : Colors.transparent,
-                        width: selected ? 3 : 0,
-                      ),
-                    ),
-                    child: cachedAvatarCircle(
-                      url: item.avatarUrl,
-                      radius: 31,
-                      tint: tintColor,
-                      colorScheme: colorScheme,
-                    ),
-                  ),
-                  if (selected)
-                    Positioned(
-                      right: 0,
-                      top: 0,
-                      child: Container(
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: colorScheme.primary,
-                          border: Border.all(
-                            color: Colors.white,
-                            width: 2,
-                          ),
-                        ),
-                        padding: const EdgeInsets.all(2),
-                        child: const Icon(
-                          Icons.check,
-                          size: 14,
-                          color: Colors.white,
-                        ),
-                      ),
-                    ),
-                  if (_manageMode)
-                    Positioned(
-                      right: 0,
-                      bottom: 0,
-                      child: GestureDetector(
-                        onTap: () => _deleteItem(item),
-                        child: Container(
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            color: Colors.white,
-                            border: Border.all(
-                              color: Colors.grey.shade300,
-                              width: 1,
-                            ),
-                          ),
-                          padding: const EdgeInsets.all(3),
-                          child: Icon(
-                            Icons.delete_outline,
-                            size: 14,
-                            color: colorScheme.error,
-                          ),
-                        ),
-                      ),
-                    ),
-                ],
-              ),
-            );
-          },
-        ),
-      );
-
   /// 预设头像：主色调编辑 + 背景色预览 + 最终效果预览（组合子模块）
   Widget _buildToneSection(ColorScheme colorScheme) => Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildToneSwatches(colorScheme),
+          _AvatarHistoryToneSwatches(
+            presetActive: _presetActive,
+            activePresetHex: _activePresetHex,
+            colorScheme: colorScheme,
+            onSelectTone: _selectTone,
+          ),
           const SizedBox(height: 20),
-          _buildToneSliderRow(colorScheme),
-          _buildTonePreviewRow(colorScheme),
+          _AvatarHistoryToneSlider(
+            h: _h,
+            colorScheme: colorScheme,
+            onHueChanged: (v) {
+              _h = v;
+              _onRgbChanged();
+            },
+            onRgbEnd: _onRgbEnd,
+          ),
+          _AvatarHistoryTonePreviewRow(
+            backgroundColor: _backgroundColor,
+            currentColor: _currentColor,
+            currentHex: _currentHex,
+            manageMode: _manageMode,
+            selectedUrl: _selectedUrl,
+            colorScheme: colorScheme,
+            onConfirm: _selectedUrl == null ? null : _confirm,
+            confirmLabel: widget.confirmLabel,
+          ),
           const SizedBox(height: 16),
-          _buildFinalPreview(colorScheme),
-        ],
-      );
-
-  /// 主色调色板（复用预设页逻辑，作用于选中的历史头像）
-  Widget _buildToneSwatches(ColorScheme colorScheme) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text(
-              '主色调',
-              style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-            ),
-            const SizedBox(height: 12),
-            Wrap(
-              spacing: 12,
-              runSpacing: 12,
-              crossAxisAlignment: WrapCrossAlignment.center,
-              children: [
-                _toneSwatch(null, '无', colorScheme),
-                for (final hex in kAvatarBgPresets) _toneSwatch(hex, null, colorScheme),
-              ],
-            ),
-          ],
-        ),
-      );
-
-  /// 自定义色调滑动条（拖动实时预览，松手生效）
-  Widget _buildToneSliderRow(ColorScheme colorScheme) => Padding(
-        padding: const EdgeInsets.fromLTRB(16, 0, 16, 4),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Text(
-                  '自定义色调',
-                  style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                        fontWeight: FontWeight.bold,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                ),
-                const Spacer(),
-                Text(
-                  '拖动实时预览，松手生效',
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 4),
-            _colorSlider(
-              label: '色调',
-              activeColor: HSVColor.fromAHSV(1.0, _h, 1, 1).toColor(),
-              value: _h,
-              min: 0,
-              max: 360,
-              unit: '°',
-              onChanged: (v) {
-                _h = v;
-                _onRgbChanged();
-              },
-              onEnd: _onRgbEnd,
-            ),
-          ],
-        ),
-      );
-
-  /// 最终效果预览（水平居中展示应用当前色调后的头像）
-  Widget _buildFinalPreview(ColorScheme colorScheme) {
-    final hasBg = _backgroundColor != null;
-    return Center(
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          _selectedUrl == null
-              ? Container(
-                  width: 96,
-                  height: 96,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: colorScheme.surface,
-                    border: Border.all(color: Colors.grey.shade300),
-                  ),
-                  child: Icon(
-                    Icons.person,
-                    size: 48,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                )
-              : cachedAvatarCircle(
-                  url: _selectedUrl!,
-                  radius: 48,
-                  tint: hasBg ? _currentColor : colorScheme.primaryContainer,
-                  colorScheme: colorScheme,
-                ),
-          const SizedBox(height: 8),
-          Text(
-            '最终效果',
-            style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                ),
+          _AvatarHistoryFinalPreview(
+            backgroundColor: _backgroundColor,
+            currentColor: _currentColor,
+            selectedUrl: _selectedUrl,
+            colorScheme: colorScheme,
           ),
         ],
-      ),
-    );
-  }
-
-  /// 单条 HSV 滑动条（与预设页一致）
-  Widget _colorSlider({
-    required String label,
-    required Color activeColor,
-    required double value,
-    required double min,
-    required double max,
-    required ValueChanged<double> onChanged,
-    required VoidCallback onEnd,
-    String? unit,
-  }) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 40,
-          child: Text(label, style: const TextStyle(fontWeight: FontWeight.w600)),
-        ),
-        Expanded(
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            divisions: (max - min).round(),
-            activeColor: activeColor,
-            label: unit != null ? '${value.round()}$unit' : '${value.round()}',
-            onChanged: onChanged,
-            onChangeEnd: (_) => onEnd(),
-          ),
-        ),
-        SizedBox(
-          width: 48,
-          child: Text(
-            unit != null ? '${value.round()}$unit' : '${value.round()}',
-            textAlign: TextAlign.end,
-            style: const TextStyle(fontFamily: 'monospace'),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 主色调色板小圆点（[hex] 为 null 表示透明「无」）
-  Widget _toneSwatch(String? hex, String? label, ColorScheme colorScheme) {
-    final selected = _presetActive && (hex == _activePresetHex);
-    final Widget child;
-    if (hex == null) {
-      child = Icon(
-        Icons.block,
-        size: 16,
-        color: selected ? colorScheme.primary : colorScheme.onSurfaceVariant,
       );
-    } else {
-      child = const SizedBox.shrink();
-    }
-    return GestureDetector(
-      onTap: () => _selectTone(hex),
-      child: Tooltip(
-        message: label ?? '#$hex',
-        child: Container(
-          width: 30,
-          height: 30,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: hex != null ? avatarHexToColor(hex) : colorScheme.surface,
-            border: Border.all(
-              color: selected ? colorScheme.primary : Colors.grey.shade300,
-              width: selected ? 3 : 1.5,
-            ),
-          ),
-          child: child,
-        ),
-      ),
-    );
-  }
-
-  /// 预览色块（当前背景色调）+ 保存按钮
-  Widget _buildTonePreviewRow(ColorScheme colorScheme) {
-    final hasBg = _backgroundColor != null;
-    final bgSwatch = Container(
-      width: 40,
-      height: 40,
-      decoration: BoxDecoration(
-        shape: BoxShape.circle,
-        color: hasBg ? _currentColor : colorScheme.surface,
-        border: Border.all(color: Colors.grey.shade300),
-      ),
-      child: hasBg
-          ? null
-          : Center(
-              child: Icon(
-                Icons.block,
-                size: 18,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-    );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          bgSwatch,
-          const SizedBox(width: 12),
-          Text(
-            hasBg ? '#$_currentHex' : '无背景',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const Spacer(),
-          if (!_manageMode)
-            TextButton(
-              // 合并「确认 + 保存修改」：回传当前预览（含色调）由编辑页套用为当前头像并写入历史
-              onPressed: _selectedUrl == null ? null : _confirm,
-              child: Text(widget.confirmLabel),
-            ),
-        ],
-      ),
-    );
-  }
-
-  /// 上传头像：仅预览当前选中头像（无色调编辑）
-  Widget _buildUploadPreviewRow(ColorScheme colorScheme) {
-    final preview = _selectedUrl == null
-        ? Container(
-            width: 40,
-            height: 40,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: colorScheme.surface,
-              border: Border.all(color: Colors.grey.shade300),
-            ),
-            child: Icon(
-              Icons.person,
-              size: 20,
-              color: colorScheme.onSurfaceVariant,
-            ),
-          )
-        : SizedBox(
-            width: 40,
-            height: 40,
-            child: cachedAvatarCircle(
-              url: _selectedUrl!,
-              radius: 20,
-              tint: colorScheme.primaryContainer,
-              colorScheme: colorScheme,
-            ),
-          );
-    return Padding(
-      padding: const EdgeInsets.fromLTRB(16, 12, 16, 4),
-      child: Row(
-        children: [
-          preview,
-          const SizedBox(width: 12),
-          Text(
-            '当前预览',
-            style: Theme.of(context).textTheme.bodyMedium,
-          ),
-          const Spacer(),
-          if (!_manageMode)
-            TextButton(
-              // 回传当前选中的上传头像，由编辑页套用为当前头像并写入历史
-              onPressed: _selectedUrl == null ? null : _confirm,
-              child: Text(widget.confirmLabel),
-            ),
-        ],
-      ),
-    );
-  }
 }

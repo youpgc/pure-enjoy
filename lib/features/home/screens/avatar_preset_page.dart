@@ -2,6 +2,8 @@ import 'package:flutter/material.dart';
 import '../avatar_presets.dart';
 import '../avatar_render.dart';
 part 'avatar_preset_page_parts.dart';
+part 'avatar_preset_grid.dart';
+part 'avatar_preset_tone.dart';
 
 /// 编辑资料 - 预设头像选择页面
 /// 支持：风格自选（[kAvatarStyles]）、7 个主色调 + 单条「色调」滑动条自定义背景色、

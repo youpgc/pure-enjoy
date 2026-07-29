@@ -4,6 +4,8 @@ import '../avatar_render.dart';
 import '../avatar_history_service.dart';
 import '../../../core/widgets/widgets.dart';
 part 'avatar_history_page_parts.dart';
+part 'avatar_history_grid.dart';
+part 'avatar_history_tone.dart';
 
 /// 预设头像历史（DiceBear，支持色调编辑）
 /// 点「保存修改」即把当前预览（可能已改色调）恢复为当前头像，并回传给编辑页套用为
