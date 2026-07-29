@@ -13,8 +13,8 @@ import '../../../../services/request_cache.dart';
 import '../../../life/models/habit_model.dart';
 import '../../../life/models/reminder_model.dart';
 import '../../../life/screens/reminders_screen.dart';
-import '../../../novel/models/novel_model.dart';
-import '../../../novel/services/novel_launch_service.dart';
+// import '../../../novel/models/novel_model.dart'; // [小说模块暂时停用]
+// import '../../../novel/services/novel_launch_service.dart'; // [小说模块暂时停用]
 import '../notification_center_screen.dart';
 import '../sheets/sheets.dart';
 import './dashboard_helpers.dart';

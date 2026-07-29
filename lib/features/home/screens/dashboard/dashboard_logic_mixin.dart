@@ -3,7 +3,7 @@ part of './dashboard_page.dart';
 const String _prefsKeyTools = 'dashboard_visible_tools';
 
 /// 首页各区块本地缓存键（stale-while-revalidate，秒开用）
-const String _kCacheRecentNovels = 'cache_home_recent_novels';
+// [小说模块暂时停用] const String _kCacheRecentNovels = 'cache_home_recent_novels';
 const String _kCacheHabits = 'cache_home_habits';
 const String _kCacheActivities = 'cache_home_activities';
 
@@ -29,8 +29,8 @@ mixin _DashboardLogic on State<DashboardPage> {
   DateTime? _remindersLastFetched;
   static const Duration _remindersThrottle = Duration(seconds: 10);
 
-  bool _isLoadingNovels = true;
-  List<Map<String, dynamic>> _recentNovels = [];
+  // [小说模块暂时停用] bool _isLoadingNovels = true;
+  // [小说模块暂时停用] List<Map<String, dynamic>> _recentNovels = [];
 
   List<String> _visibleToolIds = [];
 
@@ -268,6 +268,7 @@ mixin _DashboardLogic on State<DashboardPage> {
     setState(() => _pendingReminders = reminders);
   }
 
+  /* [小说模块暂时停用]
   /// 加载最近阅读的小说（带本地缓存：先秒开，后台静默刷新）
   /// 仍分两步查询（保持原 RLS/外键兼容），但整体结果经 RequestCache 缓存为 plain JSON
   /// [force] 为 true 时跳过缓存直接拉最新（事件回程/下拉刷新用，保证加删书后强一致）
@@ -347,4 +348,5 @@ mixin _DashboardLogic on State<DashboardPage> {
       _isLoadingNovels = false;
     });
   }
+   */
 }
