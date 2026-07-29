@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../widgets/section_header.dart';
-import './settings_helpers.dart';
+// [小说模块暂时停用] import './settings_helpers.dart';
 
 /// 系统设置列表（纯展示，状态由父级管理）
 class SettingsList extends StatelessWidget {
@@ -53,29 +53,29 @@ class SettingsList extends StatelessWidget {
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        // 阅读设置
-        const SectionHeader(title: '阅读设置'),
-        SwitchListTile(
-          secondary: const Icon(Icons.nightlight_outlined),
-          title: const Text('深色模式'),
-          subtitle: const Text('切换深色/浅色主题'),
-          value: isDarkMode,
-          onChanged: onDarkModeChanged,
-        ),
-        ListTile(
-          leading: const Icon(Icons.text_fields),
-          title: const Text('字体大小'),
-          subtitle: Text(scaleToFontSize(fontScale)),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onFontSizeTap,
-        ),
-        ListTile(
-          leading: const Icon(Icons.palette_outlined),
-          title: const Text('阅读背景'),
-          subtitle: Text(bgToName(readerBg)),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onReadingBgTap,
-        ),
+        // [小说模块暂时停用] 阅读设置分区
+        // const SectionHeader(title: '阅读设置'),
+        // SwitchListTile(
+        //   secondary: const Icon(Icons.nightlight_outlined),
+        //   title: const Text('深色模式'),
+        //   subtitle: const Text('切换深色/浅色主题'),
+        //   value: isDarkMode,
+        //   onChanged: onDarkModeChanged,
+        // ),
+        // ListTile(
+        //   leading: const Icon(Icons.text_fields),
+        //   title: const Text('字体大小'),
+        //   subtitle: Text(scaleToFontSize(fontScale)),
+        //   trailing: const Icon(Icons.chevron_right),
+        //   onTap: onFontSizeTap,
+        // ),
+        // ListTile(
+        //   leading: const Icon(Icons.palette_outlined),
+        //   title: const Text('阅读背景'),
+        //   subtitle: Text(bgToName(readerBg)),
+        //   trailing: const Icon(Icons.chevron_right),
+        //   onTap: onReadingBgTap,
+        // ),
 
         // 同步设置
         const SectionHeader(title: '同步设置'),
