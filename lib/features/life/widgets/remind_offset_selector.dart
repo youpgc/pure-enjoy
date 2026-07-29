@@ -1,8 +1,13 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import '../models/remind_offset.dart';
 
-/// 提醒设置选择器：提醒总开关 + 多选提前时间（每项标注真实 hh:mm）+ 自定义提前天数。
+/// 提醒设置选择器：提醒总开关 + 提前时间列表勾选（每项标注真实触发时间）+ 自定义提前天数。
+///
+/// 交互规则：
+/// - 预设档位以列表勾选（Checkbox）形式展示，可多选；
+/// - 「自定义提前天数」与预设列表互斥：启用自定义会清空预设勾选，勾选预设会关闭自定义。
 ///
 /// [baseTime] 目标触发基准时刻（纪念日=日期@当天时刻，待办=remindAt），用于计算各档真实时间并展示。
 /// 通过 [onChanged] 输出 [RemindSettings]，由调用方写入数据模型。
@@ -26,15 +31,29 @@ class RemindOffsetSelector extends StatefulWidget {
 
 class _RemindOffsetSelectorState extends State<RemindOffsetSelector> {
   late bool _enabled;
-  late List<RemindOffset> _selected;
-  final List<RemindOffset> _customOffsets = [];
+  final List<RemindOffset> _selectedPresets = [];
+  bool _customEnabled = false;
+  int? _customDays;
   final _customController = TextEditingController();
 
   @override
   void initState() {
     super.initState();
     _enabled = widget.initialEnabled;
-    _selected = List.from(widget.initialOffsets);
+    // 拆分初始值：预设档位进入勾选列表；非预设的「提前N天」视为自定义（互斥，仅取第一个）
+    for (final offset in widget.initialOffsets) {
+      if (RemindOffset.presets.contains(offset)) {
+        _selectedPresets.add(offset);
+      } else if (offset.unit == 'day' && _customDays == null) {
+        _customDays = offset.value;
+      }
+    }
+    if (_customDays != null) {
+      // 互斥：存在自定义值时以自定义为准，清空预设勾选
+      _customEnabled = true;
+      _selectedPresets.clear();
+      _customController.text = '$_customDays';
+    }
   }
 
   @override
@@ -43,10 +62,17 @@ class _RemindOffsetSelectorState extends State<RemindOffsetSelector> {
     super.dispose();
   }
 
+  /// 汇总当前设置并回调（自定义与预设互斥，只输出其一）
   void _emit() {
-    widget.onChanged(
-      RemindSettings(enabled: _enabled, offsets: List.from(_selected)),
-    );
+    final List<RemindOffset> offsets;
+    if (_customEnabled) {
+      offsets = (_customDays != null && _customDays! > 0)
+          ? [RemindOffset('day', _customDays!)]
+          : <RemindOffset>[];
+    } else {
+      offsets = List<RemindOffset>.from(_selectedPresets);
+    }
+    widget.onChanged(RemindSettings(enabled: _enabled, offsets: offsets));
   }
 
   String _format(DateTime dt) {
@@ -57,20 +83,34 @@ class _RemindOffsetSelectorState extends State<RemindOffsetSelector> {
     return '$m-$d $hh:$mm';
   }
 
-  void _toggle(RemindOffset offset, bool selected) {
+  void _togglePreset(RemindOffset offset, bool selected) {
     setState(() {
       if (selected) {
-        if (!_selected.contains(offset)) _selected.add(offset);
+        // 互斥：勾选预设档时关闭自定义
+        _customEnabled = false;
+        if (!_selectedPresets.contains(offset)) _selectedPresets.add(offset);
       } else {
-        _selected.remove(offset);
+        _selectedPresets.remove(offset);
       }
+    });
+    _emit();
+  }
+
+  void _toggleCustom(bool selected) {
+    setState(() {
+      _customEnabled = selected;
+      // 互斥：启用自定义时清空预设勾选
+      if (selected) _selectedPresets.clear();
     });
     _emit();
   }
 
   @override
   Widget build(BuildContext context) {
-    final all = {...RemindOffset.presets, ..._customOffsets}.toList();
+    final hintStyle = TextStyle(
+      fontSize: 12,
+      color: Theme.of(context).colorScheme.outline,
+    );
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -86,55 +126,59 @@ class _RemindOffsetSelectorState extends State<RemindOffsetSelector> {
           },
         ),
         if (_enabled) ...[
-          const SizedBox(height: 8),
-          const Text('提前提醒时间（可多选）', style: TextStyle(fontSize: 12)),
-          const SizedBox(height: 8),
-          Wrap(
-            spacing: 8,
-            runSpacing: 8,
-            children: all.map((offset) {
-              final resolved = offset.resolve(widget.baseTime);
-              final label = '${offset.unitLabel} · ${_format(resolved)}';
-              return FilterChip(
-                label: Text(label),
-                selected: _selected.contains(offset),
-                onSelected: (s) => _toggle(offset, s),
-              );
-            }).toList(),
+          const SizedBox(height: 4),
+          const Text('提前提醒时间（可多选，与自定义互斥）',
+              style: TextStyle(fontSize: 12)),
+          // 预设档位列表勾选
+          ...RemindOffset.presets.map((offset) {
+            final resolved = offset.resolve(widget.baseTime);
+            return CheckboxListTile(
+              dense: true,
+              contentPadding: EdgeInsets.zero,
+              controlAffinity: ListTileControlAffinity.leading,
+              title: Text(offset.unitLabel),
+              secondary: Text(_format(resolved), style: hintStyle),
+              value: _selectedPresets.contains(offset),
+              onChanged: (v) => _togglePreset(offset, v ?? false),
+            );
+          }),
+          // 自定义提前天数（与预设互斥）
+          CheckboxListTile(
+            dense: true,
+            contentPadding: EdgeInsets.zero,
+            controlAffinity: ListTileControlAffinity.leading,
+            title: const Text('自定义提前天数'),
+            secondary: (_customEnabled && _customDays != null && _customDays! > 0)
+                ? Text(
+                    _format(
+                      RemindOffset('day', _customDays!)
+                          .resolve(widget.baseTime),
+                    ),
+                    style: hintStyle,
+                  )
+                : null,
+            value: _customEnabled,
+            onChanged: (v) => _toggleCustom(v ?? false),
           ),
-          const SizedBox(height: 12),
-          Row(
-            children: [
-              Expanded(
-                child: TextField(
-                  controller: _customController,
-                  keyboardType: TextInputType.number,
-                  decoration: const InputDecoration(
-                    labelText: '自定义提前天数',
-                    hintText: '如 2',
-                    isDense: true,
-                  ),
+          if (_customEnabled)
+            Padding(
+              padding: const EdgeInsets.only(left: 44, bottom: 8),
+              child: TextField(
+                controller: _customController,
+                keyboardType: TextInputType.number,
+                inputFormatters: [FilteringTextInputFormatter.digitsOnly],
+                decoration: const InputDecoration(
+                  labelText: '提前天数',
+                  hintText: '如 2',
+                  suffixText: '天',
+                  isDense: true,
                 ),
-              ),
-              const SizedBox(width: 8),
-              FilledButton.tonal(
-                onPressed: () {
-                  final n = int.tryParse(_customController.text);
-                  if (n == null || n <= 0) return;
-                  final offset = RemindOffset('day', n);
-                  if (!_customOffsets.contains(offset)) {
-                    setState(() => _customOffsets.add(offset));
-                  }
-                  if (!_selected.contains(offset)) {
-                    _selected.add(offset);
-                  }
-                  _customController.clear();
+                onChanged: (text) {
+                  setState(() => _customDays = int.tryParse(text));
                   _emit();
                 },
-                child: const Text('添加'),
               ),
-            ],
-          ),
+            ),
         ],
       ],
     );
