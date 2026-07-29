@@ -9,6 +9,7 @@ import '../../../core/widgets/widgets.dart';
 import '../../../config.dart';
 import '../models/novel_comment_model.dart';
 import '../widgets/comment_item.dart';
+import 'novel_comments_screen_content.dart';
 
 /// 小说评论列表页面
 class NovelCommentsScreen extends StatefulWidget {
@@ -248,134 +249,25 @@ class _NovelCommentsScreenState extends State<NovelCommentsScreen> {
                         ),
                       ),
           ),
-          _buildInputBar(theme),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildInputBar(ThemeData theme) {
-    return Container(
-      decoration: BoxDecoration(
-        color: theme.colorScheme.surface,
-        border: Border(
-            top: BorderSide(color: theme.dividerColor.withValues(alpha: 0.3))),
-      ),
-      padding: EdgeInsets.only(
-          left: 12,
-          right: 12,
-          top: 8,
-          bottom: 8 + MediaQuery.of(context).padding.bottom),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          if (_replyToNickname != null)
-            Container(
-              padding:
-                  const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-              margin: const EdgeInsets.only(bottom: 6),
-              decoration: BoxDecoration(
-                color: theme.colorScheme.primaryContainer.withValues(alpha: 0.3),
-                borderRadius: BorderRadius.circular(4),
-              ),
-              child: Row(children: [
-                Text('回复 @_replyToNickname',
-                    style: TextStyle(
-                        fontSize: 12, color: theme.colorScheme.primary)),
-                const Spacer(),
-                InkWell(
-                    onTap: _cancelReply,
-                    child: Icon(Icons.close,
-                        size: 16,
-                        color: theme.colorScheme.onSurfaceVariant)),
-              ]),
-            ),
-          if (_replyToCommentId == null && _selectedRating != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 6),
-              child: Row(children: [
-                const Text('评分: ', style: TextStyle(fontSize: 13)),
-                ...List.generate(5, (index) {
-                  final starIndex = index + 1;
-                  return GestureDetector(
-                    onTap: () => setState(() {
-                      _selectedRating = _selectedRating == starIndex
-                          ? null
-                          : starIndex;
-                    }),
-                    child: Icon(
-                      starIndex <= (_selectedRating ?? 0)
-                          ? Icons.star
-                          : Icons.star_border,
-                      size: 20,
-                      color: Colors.amber,
-                    ),
-                  );
-                }),
-                const Spacer(),
-                InkWell(
-                    onTap: () => setState(() => _selectedRating = null),
-                    child: Text('取消评分',
-                        style: TextStyle(
-                            fontSize: 12,
-                            color: theme.colorScheme.onSurfaceVariant))),
-              ]),
-            ),
-          Row(children: [
-            if (_replyToCommentId == null)
-              IconButton(
-                icon: Icon(
-                  _selectedRating != null
-                      ? Icons.star
-                      : Icons.star_outline,
-                  color: _selectedRating != null
-                      ? Colors.amber
-                      : theme.colorScheme.onSurfaceVariant,
-                ),
-                onPressed: () => setState(() {
-                  _selectedRating = _selectedRating == null
-                      ? 5
-                      : (_selectedRating == 5
-                          ? null
-                          : (_selectedRating! + 1));
-                }),
-                tooltip: '评分',
-              ),
-            Expanded(
-              child: TextField(
-                controller: _inputController,
-                decoration: InputDecoration(
-                  hintText: _replyToNickname != null
-                      ? '回复 @_replyToNickname...'
-                      : '写下你的评论...',
-                  border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(20),
-                      borderSide: BorderSide.none),
-                  filled: true,
-                  fillColor: theme.colorScheme.surfaceContainerHighest
-                      .withValues(alpha: 0.5),
-                  contentPadding: const EdgeInsets.symmetric(
-                      horizontal: 16, vertical: 8),
-                  isDense: true,
-                ),
-                maxLines: 3,
-                minLines: 1,
-                textInputAction: TextInputAction.send,
-                onSubmitted: (_) => _submitComment(),
-              ),
-            ),
-            const SizedBox(width: 8),
-            IconButton(
-              icon: _isSubmitting
-                  ? const SizedBox(
-                      width: 20,
-                      height: 20,
-                      child:
-                          CircularProgressIndicator(strokeWidth: 2))
-                  : Icon(Icons.send, color: theme.colorScheme.primary),
-              onPressed: _isSubmitting ? null : _submitComment,
-            ),
-          ]),
+          CommentInputBar(
+            controller: _inputController,
+            isSubmitting: _isSubmitting,
+            replyToNickname: _replyToNickname,
+            selectedRating: _selectedRating,
+            isReplying: _replyToCommentId != null,
+            onCancelReply: _cancelReply,
+            onRatingButtonTap: () => setState(() {
+              _selectedRating = _selectedRating == null
+                  ? 5
+                  : (_selectedRating == 5 ? null : (_selectedRating! + 1));
+            }),
+            onStarTap: (starIndex) => setState(() {
+              _selectedRating =
+                  _selectedRating == starIndex ? null : starIndex;
+            }),
+            onRatingClear: () => setState(() => _selectedRating = null),
+            onSubmit: _submitComment,
+          ),
         ],
       ),
     );

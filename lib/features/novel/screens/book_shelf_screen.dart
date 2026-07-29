@@ -6,7 +6,6 @@ import '../../../services/api_client.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import '../services/novel_launch_service.dart';
 import 'novel_detail_screen.dart';
@@ -15,13 +14,10 @@ import '../../auth/screens/login_screen.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/utils/event_bus.dart';
 import 'novel_list_for_add_screen.dart';
-import '../widgets/bookshelf_item.dart';
 import 'bookshelf_helpers.dart';
 import 'bookshelf_action_sheet.dart';
 import 'bookshelf_remove_dialog.dart';
-import '../widgets/bookshelf_login_view.dart';
-import '../widgets/bookshelf_empty_view.dart';
-import '../widgets/bookshelf_filter_bar.dart';
+import 'book_shelf_screen_content.dart';
 
 /// 书架页面 - 显示用户已加入书架的小说列表
 class BookShelfScreen extends StatefulWidget {
@@ -357,135 +353,57 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('我的书架'),
-        actions: [
-          // 进入小说库按钮
-          IconButton(
-            icon: const Icon(Icons.library_books_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const NovelListScreen()),
-              );
-            },
-            tooltip: '小说库',
+    return BookShelfScreenContent(
+      userId: _userId,
+      isLoading: _isLoading,
+      bookshelfItems: _bookshelfItems,
+      filteredItems: _filteredItems,
+      filterStatus: _filterStatus,
+      scrollController: scrollController,
+      loadMoreIndicator: buildLoadMoreIndicator(),
+      getStatusText: _getStatusText,
+      getStatusColor: _getStatusColor,
+      formatLastRead: formatBookshelfLastRead,
+      formatWordCount: formatBookshelfWordCount,
+      onRefresh: () => _loadBookshelf(refresh: true),
+      onLogin: () {
+        // 返回到登录页
+        Navigator.of(context).pushAndRemoveUntil(
+          MaterialPageRoute(
+            builder: (_) => const LoginScreen(),
           ),
-          if (_userId != null)
-            IconButton(
-              icon: const Icon(Icons.add),
-              onPressed: () {
-                // 跳转到小说列表页面
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const NovelListForAddScreen()),
-                ).then((_) {
-                  if (mounted) _loadBookshelf(refresh: true);
-                });
-              },
-              tooltip: '添加小说',
-            ),
-        ],
+          (route) => false,
+        );
+      },
+      onOpenLibrary: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NovelListScreen()),
+        );
+      },
+      onAddNovel: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const NovelListForAddScreen()),
+        ).then((_) {
+          if (mounted) _loadBookshelf(refresh: true);
+        });
+      },
+      onFilterChanged: (status) => setState(() => _filterStatus = status),
+      onContinueReading: (item) => _continueReading(item),
+      onOpenDetail: (item) => _openNovelDetail(item),
+      onItemLongPress: (item) => showBookshelfActionSheet(
+        context,
+        item,
+        onContinueReading: () => _continueReading(item),
+        onOpenDetail: () => _openNovelDetail(item),
+        onUpdateReadingStatus: (status) =>
+            _updateReadingStatus(item['id'].toString(), status),
+        onConfirmRemove: (userNovelId) => showBookshelfRemoveDialog(
+          context,
+          onRemove: () => _removeFromBookshelf(userNovelId),
+        ),
       ),
-      body: _userId == null
-          ? BookshelfLoginView(
-              onLogin: () {
-                // 返回到登录页
-                Navigator.of(context).pushAndRemoveUntil(
-                  MaterialPageRoute(
-                    builder: (_) => const LoginScreen(),
-                  ),
-                  (route) => false,
-                );
-              },
-            )
-          : _isLoading
-              ? SkeletonLoading.list(itemCount: 6, showAvatar: false)
-              : _bookshelfItems.isEmpty
-                  ? BookshelfEmptyView(
-                      onRefresh: () => _loadBookshelf(refresh: true),
-                      onAdd: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const NovelListForAddScreen(),
-                          ),
-                        );
-                      },
-                    )
-                  : RefreshIndicator(
-                      onRefresh: () => _loadBookshelf(refresh: true),
-                      child: Column(
-                        children: [
-                          // 状态筛选栏
-                          BookshelfFilterBar(
-                            items: _bookshelfItems,
-                            filterStatus: _filterStatus,
-                            onFilterChanged: (status) =>
-                                setState(() => _filterStatus = status),
-                          ),
-                          // 书架列表
-                          Expanded(
-                            child: _filteredItems.isEmpty
-                                ? ListView(
-                                    children: [
-                                      SizedBox(
-                                        height: 300,
-                                        child: Center(
-                                          child: Text(
-                                            '该分类下暂无小说',
-                                            style: TextStyle(
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ],
-                                  )
-                                : ListView.separated(
-                                    controller: scrollController,
-                                    physics: const AlwaysScrollableScrollPhysics(),
-                                    itemCount: _filteredItems.length + 1,
-                                    separatorBuilder: (_, __) =>
-                                        const Divider(height: 1),
-                                    itemBuilder: (context, index) {
-                                      if (index == _filteredItems.length) {
-                                        return buildLoadMoreIndicator();
-                                      }
-                                      final item = _filteredItems[index];
-                                      return BookshelfItem(
-                                        item: item,
-                                        colorScheme: colorScheme,
-                                        getStatusText: _getStatusText,
-                                        getStatusColor: _getStatusColor,
-                                        formatLastRead: formatBookshelfLastRead,
-                                        formatWordCount: formatBookshelfWordCount,
-                                        onTap: () => _continueReading(item),
-                                        onLongPress: () =>
-                                            showBookshelfActionSheet(
-                                          context,
-                                          item,
-                                          onContinueReading: () => _continueReading(item),
-                                          onOpenDetail: () => _openNovelDetail(item),
-                                          onUpdateReadingStatus: (status) =>
-                                            _updateReadingStatus(
-                                                item['id'].toString(), status),
-                                          onConfirmRemove: (userNovelId) =>
-                                            showBookshelfRemoveDialog(
-                                          context,
-                                          onRemove: () => _removeFromBookshelf(userNovelId),
-                                        ),
-                                        ),
-                                      );
-                                    },
-                                  ),
-                          ),
-                        ],
-                      ),
-                    ),
     );
   }
 }

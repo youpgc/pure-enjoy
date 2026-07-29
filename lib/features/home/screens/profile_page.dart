@@ -5,16 +5,12 @@ import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../profile/services/point_service.dart';
 import '../../auth/screens/login_screen.dart';
-import 'reading_history_screen.dart';
 import '../../../services/version_check_service.dart';
-import '../../../services/dict_service.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../profile/screens/point_records_screen.dart';
-import '../avatar_render.dart';
 import 'edit_profile_screen.dart';
 import 'settings_screen.dart';
-import 'about_legal_screen.dart';
-import '../../life/screens/feedback_list_screen.dart';
-import '../../../core/widgets/widgets.dart';
+import 'profile_page_content.dart';
 
 /// 个人中心页面
 ///
@@ -112,314 +108,88 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   Widget build(BuildContext context) {
     final supabaseService = SupabaseService.instance;
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('我的'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.settings_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const SettingsScreen()),
-              ).then((_) => _loadUserData());
-            },
-          ),
-        ],
-      ),
-      body: ListView(
-        children: [
-          // 用户信息卡片
-          Card(
-            margin: const EdgeInsets.all(16),
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: Row(
-                children: [
-                  _buildAvatar(colorScheme),
-                  const SizedBox(width: 16),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          supabaseService.currentUserName ?? '用户',
-                          style: Theme.of(context).textTheme.titleLarge,
-                        ),
-                        const SizedBox(height: 4),
-                        Text(
-                          supabaseService.currentUserEmail ?? '',
-                          style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                  IconButton(
-                    icon: const Icon(Icons.edit_outlined),
-                    onPressed: () async {
-                      final result = await Navigator.push(
-                        context,
-                        MaterialPageRoute(
-                          builder: (_) => const EditProfileScreen(),
-                        ),
-                      );
-                      if (result == true) {
-                        _loadUserData();
-                      }
-                    },
-                  ),
-                ],
+    return ProfilePageContent(
+      currentUserName: supabaseService.currentUserName,
+      currentUserEmail: supabaseService.currentUserEmail,
+      currentRole: supabaseService.currentRole,
+      currentMemberLevel: supabaseService.currentMemberLevel,
+      totalPoints: _totalPoints,
+      appVersion: _appVersion,
+      hasUpdate: _hasUpdate,
+      avatarUrl: _avatarUrl,
+      onSettingsTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const SettingsScreen()),
+        ).then((_) => _loadUserData());
+      },
+      onEditProfile: () async {
+        final result = await Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const EditProfileScreen()),
+        );
+        if (result == true) {
+          _loadUserData();
+        }
+      },
+      onPointsTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const PointRecordsScreen()),
+        ).then((_) => _loadUserData());
+      },
+      onVersionTap: () async {
+        // 走不受「稍后更新」影响的手动检查通道，确保即便已忽略也能更新
+        final versionInfo =
+            await VersionCheckService.instance.getLatestVersionInfo();
+        if (!context.mounted) return;
+        // 刷新红点状态
+        if (mounted) {
+          setState(() {
+            _hasUpdate = versionInfo != null;
+          });
+        }
+        if (versionInfo != null) {
+          VersionCheckService.instance.showUpdateDialog(context, versionInfo);
+        } else {
+          showSnackBar(context, '当前已是最新版本');
+        }
+      },
+      onSignOut: () async {
+        final confirm = await showDialog<bool>(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text('确认退出'),
+            content: const Text('确定要退出登录吗？'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: const Text('取消'),
               ),
-            ),
-          ),
-
-          // 用户信息展示列
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 16),
-            child: Row(
-              children: [
-                _buildStatItem(Icons.stars_outlined, '角色', _getRoleLabel(supabaseService.currentRole), onTap: () {}),
-                _buildStatItem(Icons.workspace_premium_outlined, '会员', _getMemberLevelLabel(supabaseService.currentMemberLevel), onTap: () {}),
-                _buildStatItem(Icons.monetization_on_outlined, '积分', '$_totalPoints', onTap: () {
-                  Navigator.push(context, MaterialPageRoute(builder: (_) => const PointRecordsScreen())).then((_) => _loadUserData());
-                }),
-              ],
-            ),
-          ),
-
-          // 功能列表 - 个人中心
-          Padding(
-            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
-            child: Text(
-              '个人中心',
-              style: TextStyle(
-                fontSize: 14,
-                fontWeight: FontWeight.bold,
-                color: colorScheme.onSurfaceVariant,
+              FilledButton(
+                onPressed: () => Navigator.pop(context, true),
+                child: const Text('确定'),
               ),
-            ),
+            ],
           ),
-          ListTile(
-            leading: const Icon(Icons.history_outlined),
-            title: const Text('阅读历史'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
+        );
+
+        if (confirm == true) {
+          try {
+            await supabaseService.signOut();
+            if (context.mounted) {
+              Navigator.of(context).pushAndRemoveUntil(
+                MaterialPageRoute(builder: (_) => const LoginScreen()),
+                (route) => false,
               );
-            },
-          ),
-          ListTile(
-            leading: const Icon(Icons.info_outline),
-            title: const Text('关于与法律'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const AboutLegalScreen()),
-              );
-            },
-          ),
-
-          // 版本信息
-          ListTile(
-            leading: const Icon(Icons.system_update_outlined),
-            title: const Text('版本信息'),
-            trailing: Row(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                if (_appVersion.isNotEmpty)
-                  Stack(
-                    clipBehavior: Clip.none,
-                    children: [
-                      Text(
-                        'v$_appVersion',
-                        style: TextStyle(
-                          fontSize: 14,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                      // 有新版本时在版本号右上角显示红点
-                      if (_hasUpdate)
-                        Positioned(
-                          right: -8,
-                          top: -3,
-                          child: Container(
-                            width: 8,
-                            height: 8,
-                            decoration: const BoxDecoration(
-                              color: Colors.red,
-                              shape: BoxShape.circle,
-                            ),
-                          ),
-                        ),
-                    ],
-                  ),
-                const Icon(Icons.chevron_right),
-              ],
-            ),
-            onTap: () async {
-              // 走不受「稍后更新」影响的手动检查通道，确保即便已忽略也能更新
-              final versionInfo = await VersionCheckService.instance.getLatestVersionInfo();
-              if (!context.mounted) return;
-              // 刷新红点状态
-              if (mounted) {
-                setState(() {
-                  _hasUpdate = versionInfo != null;
-                });
-              }
-              if (versionInfo != null) {
-                VersionCheckService.instance.showUpdateDialog(context, versionInfo);
-              } else {
-                showSnackBar(context, '当前已是最新版本');
-              }
-            },
-          ),
-
-          // 问题反馈：与「版本信息」同级的独立入口
-          ListTile(
-            leading: const Icon(Icons.feedback_outlined),
-            title: const Text('问题反馈'),
-            subtitle: const Text('提交问题与建议'),
-            trailing: const Icon(Icons.chevron_right),
-            onTap: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const FeedbackListScreen()),
-              );
-            },
-          ),
-
-          const Divider(),
-          ListTile(
-            leading: Icon(
-              Icons.logout,
-              color: colorScheme.error,
-            ),
-            title: Text(
-              '退出登录',
-              style: TextStyle(color: colorScheme.error),
-            ),
-            onTap: () async {
-              final confirm = await showDialog<bool>(
-                context: context,
-                builder: (context) => AlertDialog(
-                  title: const Text('确认退出'),
-                  content: const Text('确定要退出登录吗？'),
-                  actions: [
-                    TextButton(
-                      onPressed: () => Navigator.pop(context, false),
-                      child: const Text('取消'),
-                    ),
-                    FilledButton(
-                      onPressed: () => Navigator.pop(context, true),
-                      child: const Text('确定'),
-                    ),
-                  ],
-                ),
-              );
-
-              if (confirm == true) {
-                try {
-                  await supabaseService.signOut();
-                  if (context.mounted) {
-                    Navigator.of(context).pushAndRemoveUntil(
-                      MaterialPageRoute(builder: (_) => const LoginScreen()),
-                      (route) => false,
-                    );
-                  }
-                } catch (e) {
-                  if (context.mounted) {
-                    showSnackBar(context, '退出登录失败，请稍后重试', isError: true);
-                  }
-                }
-              }
-            },
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 构建统计项
-  Widget _buildStatItem(IconData icon, String label, String value, {required VoidCallback onTap}) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Card(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Column(
-                children: [
-                  Icon(icon, size: 20, color: colorScheme.primary),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                      fontWeight: FontWeight.bold,
-                    ),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 获取角色标签
-  String _getRoleLabel(String? role) {
-    if (role == null || role.isEmpty) return '普通用户';
-    return DictService.instance.getLabelOrDefault('user_role', role, defaultValue: '普通用户');
-  }
-
-  /// 获取会员等级标签
-  String _getMemberLevelLabel(String? level) {
-    if (level == null || level.isEmpty) return '普通会员';
-    return DictService.instance.getLabelOrDefault('member_level', level, defaultValue: '普通会员');
-  }
-
-  /// 构建用户头像
-  /// 与“修改资料”页(ProfileAvatarSection)保持一致：使用 CircleAvatar.backgroundImage +
-  /// resolveAvatar（网络为主，[cached_network_image] 磁盘缓存），由 CircleAvatar 内置椭圆裁剪并以
-  /// cover 适配，避免拉伸；背景色由 DiceBear 服务端 backgroundColor 渲染，本地仅作缓存。
-  Widget _buildAvatar(ColorScheme colorScheme) {
-    final avatarUrl = _avatarUrl;
-    if (avatarUrl == null || avatarUrl.isEmpty) {
-      return CircleAvatar(
-        radius: 32,
-        backgroundColor: colorScheme.primaryContainer,
-        child: Icon(
-          Icons.person,
-          size: 32,
-          color: colorScheme.onPrimaryContainer,
-        ),
-      );
-    }
-    final resolved = resolveAvatar(avatarUrl);
-    final tint = resolved.bg != null ? avatarHexToColor(resolved.bg!) : null;
-    return CircleAvatar(
-      radius: 32,
-      backgroundColor: tint ?? colorScheme.primaryContainer,
-      backgroundImage: resolved.image,
+            }
+          } catch (e) {
+            if (context.mounted) {
+              showSnackBar(context, '退出登录失败，请稍后重试', isError: true);
+            }
+          }
+        }
+      },
     );
   }
 }

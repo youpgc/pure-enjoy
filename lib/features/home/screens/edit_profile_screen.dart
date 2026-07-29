@@ -7,11 +7,11 @@ import '../../../config.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import 'avatar_crop_screen.dart';
-import 'edit_profile_widgets.dart';
 import 'avatar_preset_page.dart';
 import 'avatar_history_page.dart';
 import '../avatar_presets.dart';
 import '../avatar_history_service.dart';
+import 'edit_profile_screen_content.dart';
 
 /// 编辑个人资料页面
 class EditProfileScreen extends StatefulWidget {
@@ -447,134 +447,31 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('编辑资料'),
-        actions: [
-          TextButton(
-            onPressed: _isSaving ? null : _saveProfile,
-            child: _isSaving
-                ? const SizedBox(
-                    width: 20,
-                    height: 20,
-                    child: CircularProgressIndicator(strokeWidth: 2),
-                  )
-                : const Text('保存'),
-          ),
-        ],
-      ),
-      body: _isLoading
-          ? const Center(child: LoadingWidget())
-          : Form(
-              key: _formKey,
-              child: ListView(
-                padding: const EdgeInsets.all(16),
-                children: [
-                  // 头像区域
-                  ProfileAvatarSection(
-                    avatarUrl: _avatarUrl,
-                    isUploading: _isUploadingAvatar,
-                    onPickUpload: _pickUploadAvatar,
-                    onPickPreset: _pickPresetAvatar,
-                    onPickUploadHistory: _pickUploadHistory,
-                    onPickPresetHistory: _pickPresetHistory,
-                  ),
-                  const SizedBox(height: 24),
-
-                  // 基本信息
-                  const ProfileSectionTitle('基本信息'),
-                  ProfileTextField(
-                    controller: _nicknameController,
-                    label: '昵称',
-                    hint: '请输入昵称',
-                    icon: Icons.person_outline,
-                  ),
-                  ProfileTextField(
-                    controller: _usernameController,
-                    label: '用户名',
-                    hint: '请输入用户名',
-                    icon: Icons.account_circle_outlined,
-                  ),
-                  ProfileTextField(
-                    controller: _emailController,
-                    label: '邮箱',
-                    hint: '请输入邮箱',
-                    icon: Icons.email_outlined,
-                    keyboardType: TextInputType.emailAddress,
-                  ),
-                  ProfileTextField(
-                    controller: _phoneController,
-                    label: '手机号',
-                    hint: '请输入手机号',
-                    icon: Icons.phone_outlined,
-                    keyboardType: TextInputType.phone,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 个人简介
-                  const ProfileSectionTitle('个人简介'),
-                  ProfileTextField(
-                    controller: _bioController,
-                    label: '个性签名',
-                    hint: '介绍一下自己',
-                    icon: Icons.edit_note_outlined,
-                    maxLines: 3,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 个人信息
-                  const ProfileSectionTitle('个人信息'),
-                  ProfileGenderSelector(gender: _gender, onTap: _selectGender),
-                  ProfileDateField(
-                    controller: _birthdayController,
-                    label: '生日',
-                    hint: '选择生日',
-                    icon: Icons.cake_outlined,
-                    onTap: _selectBirthday,
-                  ),
-                  ProfileTextField(
-                    controller: _heightController,
-                    label: '身高',
-                    hint: '请输入身高（cm）',
-                    icon: Icons.height_outlined,
-                    keyboardType: const TextInputType.numberWithOptions(decimal: true),
-                  ),
-                  ProfileTextField(
-                    controller: _locationController,
-                    label: '所在地',
-                    hint: '请输入所在城市',
-                    icon: Icons.location_on_outlined,
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  // 职业信息
-                  const ProfileSectionTitle('职业信息'),
-                  ProfileTextField(
-                    controller: _occupationController,
-                    label: '职业',
-                    hint: '请输入职业',
-                    icon: Icons.work_outline,
-                  ),
-                  ProfileTextField(
-                    controller: _companyController,
-                    label: '公司/组织',
-                    hint: '请输入公司或组织名称',
-                    icon: Icons.business_outlined,
-                  ),
-                  ProfileTextField(
-                    controller: _websiteController,
-                    label: '个人网站',
-                    hint: 'https://example.com',
-                    icon: Icons.link_outlined,
-                    keyboardType: TextInputType.url,
-                  ),
-                ],
-              ),
-            ),
+    return EditProfileContent(
+      formKey: _formKey,
+      isLoading: _isLoading,
+      isSaving: _isSaving,
+      avatarUrl: _avatarUrl,
+      isUploadingAvatar: _isUploadingAvatar,
+      gender: _gender,
+      nicknameController: _nicknameController,
+      usernameController: _usernameController,
+      emailController: _emailController,
+      phoneController: _phoneController,
+      bioController: _bioController,
+      heightController: _heightController,
+      locationController: _locationController,
+      occupationController: _occupationController,
+      companyController: _companyController,
+      websiteController: _websiteController,
+      birthdayController: _birthdayController,
+      onSaveProfile: _saveProfile,
+      onPickUpload: _pickUploadAvatar,
+      onPickPreset: _pickPresetAvatar,
+      onPickUploadHistory: _pickUploadHistory,
+      onPickPresetHistory: _pickPresetHistory,
+      onSelectGender: _selectGender,
+      onSelectBirthday: _selectBirthday,
     );
   }
-
 }

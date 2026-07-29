@@ -6,13 +6,12 @@ import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/offline_sync_service.dart';
 import '../../../services/sensitive_word_service.dart';
-import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../../widgets/common_widgets.dart';
 import '../models/mood_diary_model.dart';
 import 'mood_diary_form.dart';
+import 'mood_diary_content.dart';
 
 /// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
@@ -357,108 +356,15 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
           // ),
         ],
       ),
-      body: _isLoading
-          ? const LoadingWidget()
-          : _diaries.isEmpty
-              ? RefreshIndicator(
-                  onRefresh: () => _loadDiaries(refresh: true),
-                  child: const CustomScrollView(
-                    slivers: [
-                      SliverFillRemaining(
-                        hasScrollBody: false,
-                        child: EmptyWidget(icon: Icons.mood_outlined, message: '暂无日记，点击右下角按钮添加'),
-                      ),
-                    ],
-                  ),
-                )
-              : RefreshIndicator(
-                  onRefresh: () => _loadDiaries(refresh: true),
-                  child: ListView.builder(
-                    controller: scrollController,
-                    physics: const AlwaysScrollableScrollPhysics(),
-                    padding: const EdgeInsets.all(16),
-                    itemCount: _diaries.length + 1,
-                    itemBuilder: (context, index) {
-                      if (index == _diaries.length) {
-                        return buildLoadMoreIndicator();
-                      }
-                      final diary = _diaries[index];
-                      final moodLabel = DictService.instance.getLabelOrDefault(
-                        'mood_type',
-                        diary.mood,
-                        defaultValue: diary.mood,
-                      );
-                      final moodEmoji = DictService.instance.getEmoji(
-                        'mood_type',
-                        diary.mood,
-                      );
-                      final displayDate = diary.createdAt != null &&
-                              diary.createdAt!.year == diary.entryDate.year &&
-                              diary.createdAt!.month == diary.entryDate.month &&
-                              diary.createdAt!.day == diary.entryDate.day
-                          ? diary.createdAt!
-                          : diary.entryDate;
-
-                      return Card(
-                        margin: const EdgeInsets.only(bottom: 12),
-                        child: InkWell(
-                          onTap: () => _showEditDiaryForm(diary),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Padding(
-                            padding: const EdgeInsets.all(16),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Row(
-                                  children: [
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(
-                                        horizontal: 12,
-                                        vertical: 6,
-                                      ),
-                                      decoration: BoxDecoration(
-                                        color: Theme.of(context).colorScheme.primaryContainer,
-                                        borderRadius: BorderRadius.circular(20),
-                                      ),
-                                      child: Row(
-                                        mainAxisSize: MainAxisSize.min,
-                                        children: [
-                                          Text(
-                                            moodEmoji.isNotEmpty ? moodEmoji : '😊',
-                                            style: const TextStyle(fontSize: 16),
-                                          ),
-                                          const SizedBox(width: 4),
-                                          Text(moodLabel),
-                                        ],
-                                      ),
-                                    ),
-                                    const Spacer(),
-                                    Text(
-                                      DateTimeUtils.formatStandard(displayDate),
-                                      style: Theme.of(context).textTheme.bodySmall,
-                                    ),
-                                    EditDeletePopupMenu(
-                                      onEdit: () => _showEditDiaryForm(diary),
-                                      onDelete: () => _deleteMoodDiary(diary.id),
-                                    ),
-                                  ],
-                                ),
-                                if (diary.content != null && diary.content!.isNotEmpty) ...[
-                                  const SizedBox(height: 12),
-                                  Text(
-                                    diary.content!,
-                                    maxLines: 3,
-                                    overflow: TextOverflow.ellipsis,
-                                  ),
-                                ],
-                              ],
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-                ),
+      body: MoodDiaryContent(
+        diaries: _diaries,
+        isLoading: _isLoading,
+        scrollController: scrollController,
+        onRefresh: () => _loadDiaries(refresh: true),
+        onShowEditForm: _showEditDiaryForm,
+        onDelete: _deleteMoodDiary,
+        buildLoadMoreIndicator: buildLoadMoreIndicator,
+      ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showDiaryForm(),
         child: const Icon(Icons.add),

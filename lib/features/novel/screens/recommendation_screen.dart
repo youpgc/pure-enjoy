@@ -4,9 +4,9 @@ import '../../../services/supabase_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/novel_model.dart';
 import '../services/recommendation_service.dart';
-import '../widgets/novel_cover.dart';
 import 'novel_detail_screen.dart';
 import '../../../constants/app_constants.dart';
+import 'recommendation_screen_content.dart';
 
 /// 猜你喜欢 - 智能推荐页面
 class RecommendationScreen extends StatefulWidget {
@@ -192,7 +192,7 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                         itemCount: _recommendations.length,
                         itemBuilder: (context, index) {
                           final novel = _recommendations[index];
-                          return _RecommendationCard(
+                          return RecommendationCardContent(
                             novel: novel,
                             reasonChip: _buildReasonChip(novel),
                             onTap: () => _openNovelDetail(novel),
@@ -203,146 +203,4 @@ class _RecommendationScreenState extends State<RecommendationScreen> {
                     ),
     );
   }
-}
-
-/// 推荐卡片组件
-class _RecommendationCard extends StatelessWidget {
-  final NovelModel novel;
-  final Widget reasonChip;
-  final VoidCallback onTap;
-  final VoidCallback onNotInterested;
-
-  const _RecommendationCard({
-    required this.novel,
-    required this.reasonChip,
-    required this.onTap,
-    required this.onNotInterested,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      clipBehavior: Clip.antiAlias,
-      child: InkWell(
-        onTap: onTap,
-        onLongPress: () {
-          // 长按显示不感兴趣选项
-          showModalBottomSheet(
-            context: context,
-            builder: (context) => SafeArea(
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  ListTile(
-                    leading: const Icon(Icons.block),
-                    title: const Text('不感兴趣'),
-                    subtitle: Text('减少「${novel.category ?? '此类'}」推荐'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      onNotInterested();
-                    },
-                  ),
-                  ListTile(
-                    leading: const Icon(Icons.visibility_off),
-                    title: const Text('屏蔽此小说'),
-                    onTap: () {
-                      Navigator.pop(context);
-                      onNotInterested();
-                    },
-                  ),
-                  const Divider(),
-                  ListTile(
-                    leading: Icon(Icons.close, color: colorScheme.onSurfaceVariant),
-                    title: Text('取消', style: TextStyle(color: colorScheme.onSurfaceVariant)),
-                    onTap: () => Navigator.pop(context),
-                  ),
-                ],
-              ),
-            ),
-          );
-        },
-        child: Padding(
-          padding: const EdgeInsets.all(12),
-          child: Row(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              // 封面
-              NovelCover(
-                coverUrl: novel.cover,
-                title: novel.title,
-                width: 80,
-                height: 110,
-                borderRadius: 4,
-              ),
-              const SizedBox(width: 12),
-              // 信息
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Row(
-                      children: [
-                        Expanded(
-                          child: Text(
-                            novel.title,
-                            style: Theme.of(context).textTheme.titleSmall?.copyWith(
-                              fontWeight: FontWeight.bold,
-                            ),
-                            maxLines: 1,
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
-                        const SizedBox(width: 8),
-                        reasonChip,
-                      ],
-                    ),
-                    const SizedBox(height: 4),
-                    Text(
-                      novel.author ?? '佚名',
-                      style: Theme.of(context).textTheme.bodySmall,
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      novel.description ?? '',
-                      style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 8),
-                    Row(
-                      children: [
-                        if (novel.category != null)
-                          Text(
-                            novel.category!,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.primary,
-                            ),
-                          ),
-                        const Spacer(),
-                        if (novel.rating != null) ...[
-                          const Icon(Icons.star, size: 14, color: Colors.amber),
-                          const SizedBox(width: 2),
-                          Text(
-                            novel.rating!.toStringAsFixed(1),
-                            style: const TextStyle(fontSize: 12),
-                          ),
-                        ],
-                      ],
-                    ),
-                  ],
-                ),
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
 }

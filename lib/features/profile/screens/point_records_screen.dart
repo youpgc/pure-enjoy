@@ -1,11 +1,10 @@
 import 'package:flutter/material.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../../utils/date_time_utils.dart';
 import '../models/point_record_model.dart';
 import '../services/point_service.dart';
 import '../services/point_service_utils.dart';
-import 'point_record_info.dart';
+import '../../home/screens/point_records_screen_content.dart';
 
 /// 积分记录页面
 class PointRecordsScreen extends StatefulWidget {
@@ -158,76 +157,6 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     }
   }
 
-  /// 获取类型对应的图标和颜色
-  /// 积分类型映射（与数据库 point_records.type 和后台 POINT_TYPE_MAP 一致）
-  /// 标准类型：checkin / earn / spend / adjust / admin_adjust
-  /// 兼容历史类型：admin_recharge（后台 POINT_TYPE_MAP 未单列，仅本端兼容映射到 admin_adjust）
-  PointTypeInfo _getTypeInfo(String type) {
-    switch (type) {
-      case 'checkin':
-        return PointTypeInfo(
-          icon: Icons.check_circle_outline,
-          label: '签到',
-          color: Colors.green,
-        );
-      case 'earn':
-        return PointTypeInfo(
-          icon: Icons.add_circle_outline,
-          label: '获得',
-          color: Colors.green,
-        );
-      case 'spend':
-        return PointTypeInfo(
-          icon: Icons.remove_circle_outline,
-          label: '消费',
-          color: Colors.red,
-        );
-      case 'adjust':
-        return PointTypeInfo(
-          icon: Icons.swap_horiz,
-          label: '调整',
-          color: Colors.blue,
-        );
-      case 'admin_adjust':
-      case 'admin_recharge': // 兼容历史数据
-        return PointTypeInfo(
-          icon: Icons.admin_panel_settings_outlined,
-          label: '管理员调整',
-          color: Colors.purple,
-        );
-      default:
-        return PointTypeInfo(
-          icon: Icons.help_outline,
-          label: type,
-          color: Colors.grey,
-        );
-    }
-  }
-
-  /// 获取过期状态标签信息
-  ExpiryInfo _getExpiryInfo(PointRecord record) {
-    if (record.status == 'expired') {
-      return ExpiryInfo(
-        label: '已过期',
-        color: Colors.grey,
-      );
-    }
-    if (record.expiresAt != null) {
-      final now = DateTimeUtils.nowBeijing();
-      final diff = record.expiresAt!.difference(now);
-      if (diff.inDays <= 30 && diff.inDays >= 0) {
-        return ExpiryInfo(
-          label: '即将过期',
-          color: Colors.orange,
-        );
-      }
-    }
-    return ExpiryInfo(
-      label: '有效',
-      color: Colors.green,
-    );
-  }
-
   /// 显示积分规则说明
   void _showRulesDialog() {
     showDialog(
@@ -252,239 +181,22 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('积分记录'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.help_outline),
-            onPressed: _showRulesDialog,
-          ),
-        ],
-      ),
-      body: RefreshIndicator(
-        onRefresh: () async {
-          await _loadAvailablePoints();
-          await _loadRecords(refresh: true);
-        },
-        child: ListView(
-          controller: scrollController,
-          children: [
-            // 总积分卡片
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Card(
-                child: Padding(
-                  padding: const EdgeInsets.all(24),
-                  child: Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              '$_availablePoints',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .displayMedium
-                                  ?.copyWith(
-                                    fontWeight: FontWeight.bold,
-                                    color: colorScheme.primary,
-                                  ),
-                            ),
-                            const SizedBox(height: 4),
-                            Text(
-                              '可用积分',
-                              style: Theme.of(context)
-                                  .textTheme
-                                  .bodyMedium
-                                  ?.copyWith(
-                                    color: colorScheme.onSurfaceVariant,
-                                  ),
-                            ),
-                            if (_isLoadingPoints)
-                              const Padding(
-                                padding: EdgeInsets.only(top: 4),
-                                child: SizedBox(
-                                  width: 14,
-                                  height: 14,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                ),
-                              ),
-                          ],
-                        ),
-                      ),
-                      FilledButton.tonal(
-                        onPressed: (_hasCheckedInToday || _isCheckingIn)
-                            ? null
-                            : _handleCheckin,
-                        child: Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            if (_isCheckingIn)
-                              const SizedBox(
-                                width: 16,
-                                height: 16,
-                                child: CircularProgressIndicator(
-                                  strokeWidth: 2,
-                                ),
-                              )
-                            else ...[
-                              Icon(
-                                _hasCheckedInToday
-                                    ? Icons.check_circle
-                                    : Icons.check_circle_outline,
-                              ),
-                              const SizedBox(width: 4),
-                              Text(_hasCheckedInToday ? '已签到' : '签到'),
-                            ],
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ),
-            // 连续签到天数（为0时不显示）
-            if (_consecutiveCheckinDays > 0)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
-                child: Container(
-                  padding: const EdgeInsets.symmetric(
-                    horizontal: 16,
-                    vertical: 12,
-                  ),
-                  decoration: BoxDecoration(
-                    color: colorScheme.primary.withValues(alpha: 0.08),
-                    borderRadius: BorderRadius.circular(12),
-                  ),
-                  child: Row(
-                    children: [
-                      Icon(
-                        Icons.local_fire_department,
-                        color: colorScheme.primary,
-                        size: 20,
-                      ),
-                      const SizedBox(width: 8),
-                      Text(
-                        '已连续签到 $_consecutiveCheckinDays 天',
-                        style: TextStyle(
-                          color: colorScheme.primary,
-                          fontWeight: FontWeight.w500,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            // 积分记录列表
-            if (_records.isEmpty && !_isLoading)
-              Padding(
-                padding: const EdgeInsets.symmetric(vertical: 64),
-                child: Center(
-                  child: Column(
-                    children: [
-                      Icon(
-                        Icons.monetization_on_outlined,
-                        size: 48,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.5),
-                      ),
-                      const SizedBox(height: 8),
-                      Text(
-                        '暂无积分记录',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-
-            ..._records.map((record) {
-              final typeInfo = _getTypeInfo(record.type);
-              final isPositive = record.amount > 0;
-              final expiryInfo = _getExpiryInfo(record);
-              return ListTile(
-                leading: CircleAvatar(
-                  backgroundColor: typeInfo.color.withValues(alpha: 0.1),
-                  child: Icon(
-                    typeInfo.icon,
-                    color: typeInfo.color,
-                    size: 20,
-                  ),
-                ),
-                title: Row(
-                  children: [
-                    Text(typeInfo.label),
-                    const SizedBox(width: 8),
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                      decoration: BoxDecoration(
-                        color: expiryInfo.color.withValues(alpha: 0.1),
-                        borderRadius: BorderRadius.circular(4),
-                      ),
-                      child: Text(
-                        expiryInfo.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: expiryInfo.color,
-                        ),
-                      ),
-                    ),
-                    const Spacer(),
-                    Text(
-                      isPositive
-                          ? '+${record.amount}'
-                          : '${record.amount}',
-                      style: TextStyle(
-                        fontWeight: FontWeight.bold,
-                        color: isPositive ? Colors.green : Colors.red,
-                      ),
-                    ),
-                  ],
-                ),
-                subtitle: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    if (record.remark != null && record.remark!.isNotEmpty)
-                      Text(
-                        record.remark!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
-                      ),
-                    Text(
-                      DateTimeUtils.formatStandard(record.createdAt),
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              );
-            }),
-
-            // 加载更多指示器
-            if (_isLoading && _records.isNotEmpty)
-              const Padding(
-                padding: EdgeInsets.all(16),
-                child: Center(
-                  child: CircularProgressIndicator(),
-                ),
-              ),
-            buildLoadMoreIndicator(),
-          ],
-        ),
-      ),
+    return PointRecordsContent(
+      availablePoints: _availablePoints,
+      isLoadingPoints: _isLoadingPoints,
+      hasCheckedInToday: _hasCheckedInToday,
+      isCheckingIn: _isCheckingIn,
+      consecutiveCheckinDays: _consecutiveCheckinDays,
+      records: _records,
+      isLoading: _isLoading,
+      scrollController: scrollController,
+      loadMoreIndicator: buildLoadMoreIndicator(),
+      onShowRules: _showRulesDialog,
+      onRefresh: () async {
+        await _loadAvailablePoints();
+        await _loadRecords(refresh: true);
+      },
+      onCheckin: _handleCheckin,
     );
   }
 }
-

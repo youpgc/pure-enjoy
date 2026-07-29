@@ -5,20 +5,15 @@ import '../../../services/dict_service.dart';
 import '../../../services/api_client.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../utils/cache_helper.dart';
-import '../../../widgets/common_widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../../core/widgets/skeleton_loading.dart';
 import '../models/novel_model.dart';
 import '../../../constants/app_constants.dart';
 import 'novel_detail_screen.dart';
 import 'ranking_screen.dart';
 import 'recommendation_screen.dart';
-import '../widgets/novel_card.dart';
-import '../widgets/continue_reading_card.dart';
-import '../widgets/novel_recommendation_card.dart';
 import 'novel_search_dialog.dart';
-
 import '../../../core/widgets/widgets.dart';
+import 'novel_list_screen_content.dart';
 
 /// 小说列表页面
 class NovelListScreen extends StatefulWidget {
@@ -317,224 +312,42 @@ class _NovelListScreenState extends State<NovelListScreen> with PaginatedListMix
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('小说'),
-        actions: [
-          IconButton(
-            icon: const Icon(Icons.emoji_events_outlined),
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const RankingScreen()),
-              );
-            },
-            tooltip: '排行榜',
-          ),
-          IconButton(
-            icon: const Icon(Icons.search),
-            onPressed: _showSearchDialog,
-            tooltip: '搜索',
-          ),
-        ],
-      ),
-      body: _isFirstLoad && _isLoading
-          ? SkeletonLoading.grid(itemCount: 6, crossAxisCount: 3)
-          : Column(
-              children: [
-                // 切换标签/刷新时保留列表，仅顶部细进度条提示请求中（避免整页骨架闪烁）
-                if (_isLoading && !_isFirstLoad)
-                  const LinearProgressIndicator(minHeight: 2),
-                Expanded(
-                  child: RefreshIndicator(
-                    onRefresh: () => _loadNovels(refresh: true),
-                    child: ListView(
-                      controller: scrollController,
-                      padding: const EdgeInsets.all(16),
-                      children: [
-                  // 搜索提示
-                  if (_searchQuery.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(bottom: 12),
-                      child: Row(
-                        children: [
-                          Icon(Icons.search, size: 16, color: colorScheme.onSurfaceVariant),
-                          const SizedBox(width: 4),
-                          Text(
-                            '搜索: "$_searchQuery" (${_novels.length} 结果)',
-                            style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
-                          ),
-                          const Spacer(),
-                          GestureDetector(
-                            onTap: () {
-                              _searchController.clear();
-                              _onSearchChanged('');
-                            },
-                            child: Icon(Icons.close, size: 16, color: colorScheme.onSurfaceVariant),
-                          ),
-                        ],
-                      ),
-                    ),
-
-                  // 阅读中的小说
-                  if (_readingNovels.isNotEmpty && _searchQuery.isEmpty) ...[
-                    Text(
-                      '继续阅读',
-                      style: Theme.of(context).textTheme.titleMedium,
-                    ),
-                    const SizedBox(height: 12),
-                    SizedBox(
-                      height: 180,
-                      child: ListView.builder(
-                        scrollDirection: Axis.horizontal,
-                        // 横向列表需为每项提供有限宽度，否则卡片内的 Expanded/Stack
-                        // 因父级宽度无限而布局崩溃（A Stack requires bounded constraints）。
-                        // 高度 180 由 SizedBox 约束；卡片用 ContinueReadingCard，
-                        // 仅封面 Expanded、信息区自然高度，大字体下也不会垂直溢出。
-                        itemExtent: 140,
-                        itemCount: _readingNovels.length,
-                        itemBuilder: (context, index) {
-                          final novel = _readingNovels[index];
-                          return ContinueReadingCard(
-                            novel: novel,
-                            onTap: () => _openNovelDetail(novel),
-                          );
-                        },
-                      ),
-                    ),
-                    const SizedBox(height: 24),
-                  ],
-
-                  // 猜你喜欢入口
-                  if (_searchQuery.isEmpty)
-                    NovelRecommendationCard(
-                      onTap: () {
-                        Navigator.push(
-                          context,
-                          MaterialPageRoute(
-                            builder: (_) => const RecommendationScreen(),
-                          ),
-                        );
-                      },
-                    ),
-
-                  // 分类筛选
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _categories.length,
-                      itemBuilder: (context, index) {
-                        final category = _categories[index];
-                        final label = category == 'all'
-                            ? '全部'
-                            : DictService.instance.getLabelOrDefault(
-                                dictNovelCategory,
-                                category,
-                                defaultValue: category,
-                              );
-                        return CategoryChip(
-                          label: label,
-                          isSelected: _selectedCategory == category,
-                          onTap: () => _onCategoryChanged(category),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 8),
-
-                  // 状态筛选
-                  SizedBox(
-                    height: 40,
-                    child: ListView.builder(
-                      scrollDirection: Axis.horizontal,
-                      itemCount: _statuses.length,
-                      itemBuilder: (context, index) {
-                        final status = _statuses[index];
-                        final label = status == 'all'
-                            ? '全部'
-                            : DictService.instance.getLabelOrDefault(
-                                dictNovelStatus,
-                                status,
-                                defaultValue: status,
-                              );
-                        return CategoryChip(
-                          label: label,
-                          isSelected: _selectedStatus == status,
-                          onTap: () => _onStatusChanged(status),
-                        );
-                      },
-                    ),
-                  ),
-                  const SizedBox(height: 16),
-
-                  // 小说列表
-                  Text(
-                    _selectedCategory == 'all' ? '全部小说' : DictService.instance.getLabelOrDefault(
-                        dictNovelCategory,
-                        _selectedCategory,
-                        defaultValue: _selectedCategory,
-                      ),
-                    style: Theme.of(context).textTheme.titleMedium,
-                  ),
-                  const SizedBox(height: 12),
-                  _novels.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: const EdgeInsets.all(32),
-                            child: Column(
-                              children: [
-                                Icon(
-                                  Icons.menu_book_outlined,
-                                  size: 64,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
-                                const SizedBox(height: 16),
-                                Text(
-                                  _searchQuery.isNotEmpty ? '没有找到匹配的小说' : '暂无小说',
-                                  style: TextStyle(color: colorScheme.onSurfaceVariant),
-                                ),
-                              ],
-                            ),
-                          ),
-                        )
-                      : Builder(
-                          builder: (context) {
-                            // Bug 11 修复：提升到 GridView 外部计算一次，避免每个 item 都重新计算 O(n*m)
-                            final bookshelfIds = _userNovels.map((un) => un['novel_id'].toString()).toSet();
-                            return GridView.builder(
-                              shrinkWrap: true,
-                              physics: const NeverScrollableScrollPhysics(),
-                              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                                crossAxisCount: 2,
-                                childAspectRatio: 0.7,
-                                crossAxisSpacing: 12,
-                                mainAxisSpacing: 12,
-                              ),
-                              itemCount: _novels.length,
-                              itemBuilder: (context, index) {
-                                final novel = _novels[index];
-                                final isInBookshelf = bookshelfIds.contains(novel.id);
-                                return NovelCard(
-                                  novel: novel,
-                                  onTap: () => _openNovelDetail(novel),
-                                  onAddToBookshelf: isInBookshelf ? null : () => _addToBookshelf(novel),
-                                  isInBookshelf: isInBookshelf,
-                                );
-                              },
-                            );
-                          },
-                        ),
-                  buildLoadMoreIndicator(),
-                ],
-              ),
-            ),
-          ),
-        ],
-      ),
+    return NovelListScreenContent(
+      isFirstLoad: _isFirstLoad,
+      isLoading: _isLoading,
+      searchQuery: _searchQuery,
+      novels: _novels,
+      readingNovels: _readingNovels,
+      userNovels: _userNovels,
+      categories: _categories,
+      statuses: _statuses,
+      selectedCategory: _selectedCategory,
+      selectedStatus: _selectedStatus,
+      scrollController: scrollController,
+      loadMoreIndicator: buildLoadMoreIndicator(),
+      onRefresh: () => _loadNovels(refresh: true),
+      onSearchChanged: _onSearchChanged,
+      onClearSearch: () {
+        _searchController.clear();
+        _onSearchChanged('');
+      },
+      onCategoryChanged: _onCategoryChanged,
+      onStatusChanged: _onStatusChanged,
+      onShowSearchDialog: _showSearchDialog,
+      onOpenNovelDetail: _openNovelDetail,
+      onAddToBookshelf: _addToBookshelf,
+      onOpenRanking: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RankingScreen()),
+        );
+      },
+      onOpenRecommendation: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const RecommendationScreen()),
+        );
+      },
     );
   }
 }
-

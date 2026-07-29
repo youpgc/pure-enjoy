@@ -1,11 +1,13 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
-import 'package:flutter/foundation.dart';
 import 'package:http/http.dart' as http;
-import 'package:shared_preferences/shared_preferences.dart';
+import 'package:flutter/foundation.dart';
 import 'cancel_token.dart';
 import 'supabase_service.dart';
+import 'http_logger.dart';
+import 'etag_cache.dart';
+import 'http_raw.dart';
 
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {
@@ -22,29 +24,6 @@ class RequestTimeout {
   static const Duration list = Duration(seconds: 30);
   static const Duration simple = Duration(seconds: 15);
   static const Duration file = Duration(seconds: 60);
-}
-
-/// ETag 缓存条目
-class _ETagEntry {
-  final String etag;
-  final String body;
-  final DateTime cachedAt;
-
-  _ETagEntry({required this.etag, required this.body, required this.cachedAt});
-
-  Map<String, dynamic> toJson() => {
-        'etag': etag,
-        'body': body,
-        'cachedAt': cachedAt.toIso8601String(),
-      };
-
-  factory _ETagEntry.fromJson(Map<String, dynamic> json) {
-    return _ETagEntry(
-      etag: json['etag'] as String,
-      body: json['body'] as String,
-      cachedAt: DateTime.parse(json['cachedAt'] as String),
-    );
-  }
 }
 
 /// 统一的 HTTP 客户端
@@ -67,13 +46,8 @@ class HttpClient {
   /// 当前 JWT Access Token
   String? _accessToken;
 
-  /// ETag 缓存：URL -> 缓存条目
-  final Map<String, _ETagEntry> _etagCache = {};
-
-  /// ETag 缓存是否已加载
-  bool _etagLoaded = false;
-
-  static const String _etagPrefsKey = 'http_etag_cache_v1';
+  /// ETag 缓存：URL -> 缓存条目（逻辑已抽取至 [EtagCache]，行为一致）
+  final EtagCache _etagCache = EtagCache();
 
   /// 设置 JWT Access Token
   /// 登录成功后调用，后续请求将自动携带 Authorization: Bearer <token>
@@ -81,55 +55,12 @@ class HttpClient {
     _accessToken = token;
   }
 
-  /// 加载持久化的 ETag 缓存
-  Future<void> _loadETagCache() async {
-    if (_etagLoaded) return;
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final jsonStr = prefs.getString(_etagPrefsKey);
-      if (jsonStr != null && jsonStr.isNotEmpty) {
-        final Map<String, dynamic> decoded = jsonDecode(jsonStr);
-        _etagCache.clear();
-        for (final entry in decoded.entries) {
-          try {
-            final cacheEntry = _ETagEntry.fromJson(Map<String, dynamic>.from(entry.value));
-            // 只加载30天内的缓存
-            if (DateTime.now().difference(cacheEntry.cachedAt) < const Duration(days: 30)) {
-              _etagCache[entry.key] = cacheEntry;
-            }
-          } catch (_) {}
-        }
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 加载 ETag 缓存失败: $e');
-    }
-    _etagLoaded = true;
-  }
-
-  /// 保存 ETag 缓存到磁盘
-  Future<void> _saveETagCache() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final Map<String, dynamic> encoded = _etagCache.map(
-        (k, v) => MapEntry(k, v.toJson()),
-      );
-      await prefs.setString(_etagPrefsKey, jsonEncode(encoded));
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 保存 ETag 缓存失败: $e');
-    }
-  }
+  /// 加载持久化的 ETag 缓存（委托 [EtagCache]）
+  Future<void> _loadETagCache() async => _etagCache.ensureLoaded();
 
   /// 清空 ETag 缓存（内存 + 持久化）
   /// 切换账号时调用：避免命中 304 后向新用户返回旧用户的缓存响应体
-  Future<void> clearEtagCache() async {
-    _etagCache.clear();
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      await prefs.remove(_etagPrefsKey);
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 清空 ETag 缓存失败: $e');
-    }
-  }
+  Future<void> clearEtagCache() async => _etagCache.clear();
 
   /// 获取认证头
   /// 已登录时返回 JWT 头，未登录时返回 Anon Key
@@ -171,12 +102,12 @@ class HttpClient {
 
     // 构建请求头（如有 ETag 则带上 If-None-Match）
     final requestHeaders = _mergeHeaders(headers);
-    if (useETag && _etagCache.containsKey(url)) {
-      requestHeaders['If-None-Match'] = _etagCache[url]!.etag;
+    if (useETag && _etagCache.contains(url)) {
+      requestHeaders['If-None-Match'] = _etagCache.get(url)!.etag;
     }
 
     http.Response response;
-    if (useETag && _etagCache.containsKey(url)) {
+    if (useETag && _etagCache.contains(url)) {
       // 有 ETag 缓存时：先尝试带 If-None-Match 请求
       try {
         response = await _requestWithRetry(
@@ -191,7 +122,7 @@ class HttpClient {
 
         // 处理 304 Not Modified：返回缓存内容
         if (response.statusCode == 304) {
-          final cached = _etagCache[url];
+          final cached = _etagCache.get(url);
           if (cached != null) {
             if (kDebugMode) debugPrint('📦 ETag 304 缓存命中: $path');
             return http.Response(
@@ -223,12 +154,8 @@ class HttpClient {
     if (useETag && response.statusCode == 200) {
       final etag = response.headers['etag'];
       if (etag != null && etag.isNotEmpty) {
-        _etagCache[url] = _ETagEntry(
-          etag: etag,
-          body: response.body,
-          cachedAt: DateTime.now(),
-        );
-        unawaited(_saveETagCache());
+        _etagCache.store(url, etag, response.body);
+        unawaited(_etagCache.save());
       }
     }
 
@@ -391,7 +318,7 @@ class HttpClient {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
     return _requestWithRetry(
-      () => _sendRaw(method, url, headers, encodedBody),
+      () => sendRawRequest(_client, method, url, headers, encodedBody),
       timeout: timeout,
       handle401: false,
       logMethod: method,
@@ -399,116 +326,6 @@ class HttpClient {
       logParams: body,
       logNote: note,
     );
-  }
-
-  /// 按 method 分发原始请求
-  Future<http.Response> _sendRaw(
-    String method,
-    String url,
-    Map<String, String>? headers,
-    String? body,
-  ) {
-    final uri = Uri.parse(url);
-    switch (method.toUpperCase()) {
-      case 'POST':
-        return _client.post(uri, headers: headers, body: body);
-      case 'PUT':
-        return _client.put(uri, headers: headers, body: body);
-      case 'PATCH':
-        return _client.patch(uri, headers: headers, body: body);
-      case 'DELETE':
-        return _client.delete(uri, headers: headers);
-      default:
-        return _client.get(uri, headers: headers);
-    }
-  }
-
-  // ==================== 工具方法 ====================
-
-  /// 是否敏感字段（日志脱敏，避免泄露密码/令牌等凭据）
-  static bool _isSensitiveKey(String key) {
-    final k = key.toLowerCase();
-    return k.contains('password') ||
-        k.contains('token') ||
-        k == 'authorization' ||
-        k.contains('secret') ||
-        k.contains('otp') ||
-        k == 'code' ||
-        k.contains('credential');
-  }
-
-  /// 将请求入参转为可打印字符串，并对敏感字段脱敏
-  String _describeParams(Object? params) {
-    if (params == null) return '';
-    if (params is Map) {
-      final redacted = <String, dynamic>{};
-      params.forEach((k, v) {
-        final key = k.toString();
-        redacted[key] = _isSensitiveKey(key) ? '******' : v;
-      });
-      try {
-        return jsonEncode(redacted);
-      } catch (_) {
-        return redacted.toString();
-      }
-    }
-    if (params is String) {
-      try {
-        final decoded = jsonDecode(params);
-        if (decoded is Map) {
-          final redacted = <String, dynamic>{};
-          decoded.forEach((k, v) {
-            final key = k.toString();
-            redacted[key] = _isSensitiveKey(key) ? '******' : v;
-          });
-          return jsonEncode(redacted);
-        }
-      } catch (_) {}
-      return params;
-    }
-    return params.toString();
-  }
-
-  /// 日志分隔线（隔断不同请求，避免混在一起难以辨认）
-  static const String _logDivider =
-      '════════════════════════════════════════════════';
-
-  /// 截断过长的字符串（响应体可能很大，避免刷屏）
-  String _truncate(String s, [int max = 800]) {
-    if (s.length <= max) return s;
-    return '${s.substring(0, max)} …(已截断，原长 ${s.length} 字符)';
-  }
-
-  /// 统一请求日志：打印 方法 + 地址 + 入参 + 耗时 + 状态码/错误 + 响应体
-  /// 用分隔线包裹，每条请求独立成块；仅在 debug 模式输出
-  void _logRequest({
-    required String? method,
-    required String? url,
-    required Object? params,
-    required Duration duration,
-    int? statusCode,
-    Object? error,
-    String? responseBody,
-    String? note,
-  }) {
-    if (!kDebugMode) return;
-    final sb = StringBuffer();
-    sb.writeln(_logDivider);
-    if (note != null && note.isNotEmpty) {
-      sb.writeln('📝 备注: $note');
-    }
-    sb.writeln('🌐 [HTTP] ${method ?? '?'} ${url ?? ''}');
-    final paramStr = _describeParams(params);
-    if (paramStr.isNotEmpty) sb.writeln('   入参: $paramStr');
-    sb.write('   耗时: ${duration.inMilliseconds}ms');
-    if (statusCode != null) sb.write(' | 状态码: $statusCode');
-    if (error != null) sb.write(' | 错误: $error');
-    sb.writeln();
-    if (responseBody != null && responseBody.isNotEmpty) {
-      sb.writeln('   响应: ${_truncate(responseBody)}');
-    }
-    sb.writeln(_logDivider);
-    debugPrint(sb.toString());
   }
 
   /// 构建完整 URI
@@ -549,7 +366,7 @@ class HttpClient {
       // 请求前检查是否已取消
       if (cancelToken?.isCancelled == true) {
         sw.stop();
-        _logRequest(
+        logRequest(
           method: logMethod,
           url: logUrl,
           params: logParams,
@@ -566,7 +383,7 @@ class HttpClient {
         // 响应后检查是否已取消（防止旧响应覆盖新数据）
         if (cancelToken?.isCancelled == true) {
           sw.stop();
-          _logRequest(
+          logRequest(
             method: logMethod,
             url: logUrl,
             params: logParams,
@@ -582,7 +399,7 @@ class HttpClient {
           if (!handle401) {
             // 调用方自行处理 401（如认证端点需返回错误响应而非抛异常）
             sw.stop();
-            _logRequest(
+            logRequest(
               method: logMethod,
               url: logUrl,
               params: logParams,
@@ -599,7 +416,7 @@ class HttpClient {
           }
           _accessToken = null;
           sw.stop();
-          _logRequest(
+          logRequest(
             method: logMethod,
             url: logUrl,
             params: logParams,
@@ -612,7 +429,7 @@ class HttpClient {
         }
 
         sw.stop();
-        _logRequest(
+        logRequest(
           method: logMethod,
           url: logUrl,
           params: logParams,
@@ -643,7 +460,7 @@ class HttpClient {
     }
 
     sw.stop();
-    _logRequest(
+    logRequest(
       method: logMethod,
       url: logUrl,
       params: logParams,

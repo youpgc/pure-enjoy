@@ -4,14 +4,13 @@ import '../../../core/utils/event_bus.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/offline_sync_service.dart';
-import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../../widgets/common_widgets.dart';
 import '../models/weight_record_model.dart';
 import 'weight_statistics_screen.dart';
 import 'weight_record_form.dart';
+import 'weight_record_content.dart';
 
 /// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
@@ -320,8 +319,6 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
 
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('体重记录'),
@@ -338,153 +335,17 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
           ),
         ],
       ),
-      body: Column(
-        children: [
-          // 当前体重卡片
-          Container(
-            width: double.infinity,
-            padding: const EdgeInsets.all(20),
-            margin: const EdgeInsets.all(16),
-            decoration: BoxDecoration(
-              color: colorScheme.primaryContainer,
-              borderRadius: BorderRadius.circular(16),
-            ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '当前体重',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  _latestWeight != null
-                      ? '${_latestWeight!.toStringAsFixed(2)} kg'
-                      : '-- kg',
-                  style: Theme.of(context).textTheme.displaySmall?.copyWith(
-                    fontWeight: FontWeight.bold,
-                    color: colorScheme.primary,
-                  ),
-                ),
-                if (_weightChange != null) ...[
-                  const SizedBox(height: 8),
-                  Row(
-                    children: [
-                      Icon(
-                        _weightChange! > 0 ? Icons.arrow_upward : Icons.arrow_downward,
-                        size: 16,
-                        color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                      ),
-                      const SizedBox(width: 4),
-                      Text(
-                        '${_weightChange!.abs().toStringAsFixed(2)} kg',
-                        style: TextStyle(
-                          color: _weightChange! > 0 ? colorScheme.error : colorScheme.primary,
-                        ),
-                      ),
-                    ],
-                  ),
-                ],
-              ],
-            ),
-          ),
-
-          // 记录列表
-          Expanded(
-            child: _isLoading
-                ? const LoadingWidget()
-                : _records.isEmpty
-                    ? RefreshIndicator(
-                        onRefresh: () => _loadRecords(refresh: true),
-                        child: const CustomScrollView(
-                          slivers: [
-                            SliverFillRemaining(
-                              hasScrollBody: false,
-                              child: Center(
-                                child: EmptyWidget(icon: Icons.monitor_weight_outlined, message: '暂无记录'),
-                              ),
-                            ),
-                          ],
-                        ),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadRecords(refresh: true),
-                        child: ListView.builder(
-                          controller: scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemCount: _records.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == _records.length) {
-                              return buildLoadMoreIndicator();
-                            }
-
-                            final record = _records[index];
-                            // date 与 created_at 日期相同时展示 created_at（含真实时分秒），不同时展示 date
-                            // 注意：createdAt 为 UTC，需先转本地时区再比较日期
-                            final createdAtLocal = record.createdAt?.toLocal();
-                            final isSameDate = createdAtLocal != null &&
-                                record.date.year == createdAtLocal.year &&
-                                record.date.month == createdAtLocal.month &&
-                                record.date.day == createdAtLocal.day;
-                            final displayDate = (isSameDate && record.createdAt != null)
-                                ? record.createdAt!
-                                : record.date;
-                            return Card(
-                              margin: const EdgeInsets.only(bottom: 8),
-                              child: ListTile(
-                                leading: const Icon(Icons.monitor_weight),
-                                title: Row(
-                                  children: [
-                                    Text(
-                                      '${record.weight.toStringAsFixed(2)} kg',
-                                      style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                                        fontWeight: FontWeight.bold,
-                                      ),
-                                    ),
-                                    if (record.bodyFat != null) ...[
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                    if (record.bmi != null) ...[
-                                      const SizedBox(width: 12),
-                                      Text(
-                                        'BMI ${record.bmi!.toStringAsFixed(1)}',
-                                        style: Theme.of(context).textTheme.bodySmall,
-                                      ),
-                                    ],
-                                  ],
-                                ),
-                                subtitle: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  children: [
-                                    Text(DateTimeUtils.formatStandard(displayDate)),
-                                    if (record.note != null && record.note!.isNotEmpty)
-                                      Text(
-                                        record.note!,
-                                        style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                                          color: Theme.of(context).colorScheme.outline,
-                                          fontStyle: FontStyle.italic,
-                                        ),
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                      ),
-                                  ],
-                                ),
-                                trailing: EditDeletePopupMenu(
-                                  onEdit: () => _showEditRecordForm(record),
-                                  onDelete: () => _deleteWeightRecord(record.id),
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
+      body: WeightRecordContent(
+        records: _records,
+        isLoading: _isLoading,
+        latestWeight: _latestWeight,
+        previousWeight: _previousWeight,
+        weightChange: _weightChange,
+        scrollController: scrollController,
+        onRefresh: () => _loadRecords(refresh: true),
+        onShowEditForm: _showEditRecordForm,
+        onDelete: _deleteWeightRecord,
+        buildLoadMoreIndicator: buildLoadMoreIndicator,
       ),
       floatingActionButton: FloatingActionButton(
         onPressed: () => _showRecordForm(),
