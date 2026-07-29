@@ -1,38 +1,40 @@
 part of 'reader_controller.dart';
 
-extension _ReaderControllerProgress on ReaderController {
+class ReaderProgressModule {
+  final ReaderController _c;
+  ReaderProgressModule(this._c);
 
   void _pauseReadingTimer() {
-    if (_readingStartTime != null && _hasStartedReading) {
-      _totalReadingTime += DateTime.now().difference(_readingStartTime!);
-      _readingStartTime = null;
+    if (_c._readingStartTime != null && _c._hasStartedReading) {
+      _c._totalReadingTime += DateTime.now().difference(_c._readingStartTime!);
+      _c._readingStartTime = null;
     }
   }
 
   void _resumeReadingTimer() {
-    if (_hasStartedReading) {
-      _readingStartTime = DateTime.now();
+    if (_c._hasStartedReading) {
+      _c._readingStartTime = DateTime.now();
     }
   }
 
   void _startReadingTimer() {
-    if (!_hasStartedReading) {
-      _hasStartedReading = true;
-      _readingStartTime = DateTime.now();
+    if (!_c._hasStartedReading) {
+      _c._hasStartedReading = true;
+      _c._readingStartTime = DateTime.now();
     }
   }
 
   Duration get _currentReadingDuration {
-    if (_readingStartTime != null) {
-      return _totalReadingTime + DateTime.now().difference(_readingStartTime!);
+    if (_c._readingStartTime != null) {
+      return _c._totalReadingTime + DateTime.now().difference(_c._readingStartTime!);
     }
-    return _totalReadingTime;
+    return _c._totalReadingTime;
   }
 
   Future<void> _checkBookshelfStatus() async {
-    final userId = _userId;
+    final userId = _c._userId;
     if (userId == null) {
-      if (!_bookshelfStatusCompleter.isCompleted) _bookshelfStatusCompleter.complete();
+      if (!_c._bookshelfStatusCompleter.isCompleted) _c._bookshelfStatusCompleter.complete();
       return;
     }
 
@@ -41,18 +43,18 @@ extension _ReaderControllerProgress on ReaderController {
         'user_novels',
         filters: {
           'user_id': 'eq.$userId',
-          'novel_id': 'eq.${novel.id}',
+          'novel_id': 'eq.${_c.novel.id}',
         },
         columns: 'id,is_collected',
       );
 
       if (result.isSuccess) {
         final data = result.data!;
-        if (data.isNotEmpty && !_disposed) {
-          _setState(() {
-            _isInBookshelf = true;
-            _bookshelfId = data.first['id'].toString();
-            _isCollected = data.first['is_collected'] as bool? ?? false;
+        if (data.isNotEmpty && !_c._disposed) {
+          _c._setState(() {
+            _c._isInBookshelf = true;
+            _c._bookshelfId = data.first['id'].toString();
+            _c._isCollected = data.first['is_collected'] as bool? ?? false;
           });
         }
       }
@@ -61,18 +63,18 @@ extension _ReaderControllerProgress on ReaderController {
         debugPrint('检查书架状态失败');
       }
     } finally {
-      if (!_bookshelfStatusCompleter.isCompleted) _bookshelfStatusCompleter.complete();
+      if (!_c._bookshelfStatusCompleter.isCompleted) _c._bookshelfStatusCompleter.complete();
     }
   }
 
   Future<void> _saveProgress() async {
-    if (_currentChapter == null) return;
-    final userId = _userId;
+    if (_c._currentChapter == null) return;
+    final userId = _c._userId;
     if (userId == null) return;
 
     try {
-      final chapterNum = _currentChapter!.chapterOrder;
-      final totalChapters = _totalChapterCount;
+      final chapterNum = _c._currentChapter!.chapterOrder;
+      final totalChapters = _c.meta._totalChapterCount;
       final progress = totalChapters > 0 ? chapterNum / totalChapters : 0.0;
 
       // 并行执行：记录阅读历史 + 保存阅读进度（两者无依赖关系）
@@ -80,15 +82,15 @@ extension _ReaderControllerProgress on ReaderController {
 
       // 保存阅读进度到 user_novels
       Future<void> progressFuture;
-      if (_isInBookshelf && _bookshelfId != null) {
+      if (_c._isInBookshelf && _c._bookshelfId != null) {
         progressFuture = _saveReadingProgress(progress: progress, chapterNum: chapterNum);
       } else {
         // 等待书架状态检查完成，避免重复创建记录（Bug 3 修复）
         progressFuture = () async {
-          if (!_bookshelfStatusCompleter.isCompleted) {
-            await _bookshelfStatusCompleter.future;
+          if (!_c._bookshelfStatusCompleter.isCompleted) {
+            await _c._bookshelfStatusCompleter.future;
           }
-          if (_isInBookshelf && _bookshelfId != null) {
+          if (_c._isInBookshelf && _c._bookshelfId != null) {
             await _saveReadingProgress(progress: progress, chapterNum: chapterNum);
           } else {
             // 二次确认是否已有记录：阅读时自动建行与“加入书架”建行存在竞态，
@@ -98,7 +100,7 @@ extension _ReaderControllerProgress on ReaderController {
               'user_novels',
               filters: {
                 'user_id': 'eq.$userId',
-                'novel_id': 'eq.${novel.id}',
+                'novel_id': 'eq.${_c.novel.id}',
               },
               columns: 'id',
               order: 'last_read_at.desc.nullslast',
@@ -108,10 +110,10 @@ extension _ReaderControllerProgress on ReaderController {
                 existing.data != null &&
                 existing.data!.isNotEmpty) {
               final id = existing.data!.first['id'].toString();
-              if (!_disposed) {
-                _setState(() {
-                  _isInBookshelf = true;
-                  _bookshelfId = id;
+              if (!_c._disposed) {
+                _c._setState(() {
+                  _c._isInBookshelf = true;
+                  _c._bookshelfId = id;
                 });
               }
               await _saveReadingProgress(progress: progress, chapterNum: chapterNum);
@@ -120,10 +122,10 @@ extension _ReaderControllerProgress on ReaderController {
                 'user_novels',
                 {
                   'user_id': userId,
-                  'novel_id': novel.id,
+                  'novel_id': _c.novel.id,
                   'progress': progress,
                   'last_chapter': chapterNum,
-                  'last_page': _currentPageIndex,
+                  'last_page': _c._currentPageIndex,
                   'is_collected': true,
                   'reading_status': progress >= 1.0 ? 'finished' : 'reading',
                   'last_read_at': DateTime.now().toUtc().toIso8601String(),
@@ -134,11 +136,11 @@ extension _ReaderControllerProgress on ReaderController {
 
               if (result.isSuccess) {
                 final data = result.data!;
-                if (data.isNotEmpty && !_disposed) {
-                  _setState(() {
-                    _isInBookshelf = true;
-                    _bookshelfId = data.first['id'].toString();
-                    _isCollected = true;
+                if (data.isNotEmpty && !_c._disposed) {
+                  _c._setState(() {
+                    _c._isInBookshelf = true;
+                    _c._bookshelfId = data.first['id'].toString();
+                    _c._isCollected = true;
                   });
                 }
               }
@@ -162,11 +164,11 @@ extension _ReaderControllerProgress on ReaderController {
   }) async {
     final result = await ApiClient.patchByFilter(
       'user_novels',
-      filters: {'id': 'eq.$_bookshelfId'},
+      filters: {'id': 'eq.${_c._bookshelfId}'},
       body: {
         'last_chapter': chapterNum,
         'progress': progress,
-        'last_page': _currentPageIndex,
+        'last_page': _c._currentPageIndex,
         'is_collected': true,
         'reading_status': progress >= 1.0 ? 'finished' : 'reading',
         'last_read_at': DateTime.now().toUtc().toIso8601String(),
@@ -178,34 +180,34 @@ extension _ReaderControllerProgress on ReaderController {
   }
 
   Future<void> _recordReadingHistory(double progress) async {
-    if (_currentChapter == null) return;
-    final userId = _userId;
+    if (_c._currentChapter == null) return;
+    final userId = _c._userId;
     if (userId == null) return;
 
     final now = DateTime.now();
-    final readDuration = _chapterReadStartTime != null
-        ? now.difference(_chapterReadStartTime!).inSeconds
+    final readDuration = _c._chapterReadStartTime != null
+        ? now.difference(_c._chapterReadStartTime!).inSeconds
         : 0;
 
     // 至少阅读了5秒才记录
     if (readDuration < 5) return;
 
     await ReadingHistoryService().recordReading(
-      novelId: novel.id,
-      chapterId: _currentChapter!.id,
-      chapterOrder: _currentChapter!.chapterOrder,
+      novelId: _c.novel.id,
+      chapterId: _c._currentChapter!.id,
+      chapterOrder: _c._currentChapter!.chapterOrder,
       readDurationSeconds: readDuration,
       progress: progress,
     );
 
-    _chapterReadStartTime = now;
+    _c._chapterReadStartTime = now;
   }
 
   Future<void> _addToBookshelf() async {
-    final userId = _userId;
+    final userId = _c._userId;
     if (userId == null) {
-      if (!_disposed) {
-        _safeSnack( '请先登录');
+      if (!_c._disposed) {
+        _c._safeSnack( '请先登录');
       }
       return;
     }
@@ -215,9 +217,9 @@ extension _ReaderControllerProgress on ReaderController {
         'user_novels',
         {
           'user_id': userId,
-          'novel_id': novel.id,
+          'novel_id': _c.novel.id,
           'progress': 0,
-          'last_chapter': _currentChapter?.chapterOrder ?? 1,
+          'last_chapter': _c._currentChapter?.chapterOrder ?? 1,
           'is_collected': true,
           'last_read_at': DateTime.now().toUtc().toIso8601String(),
           'created_at': DateTime.now().toUtc().toIso8601String(),
@@ -227,26 +229,26 @@ extension _ReaderControllerProgress on ReaderController {
 
       if (result.isSuccess) {
         final data = result.data!;
-        if (data.isNotEmpty && !_disposed) {
-          _setState(() {
-            _isInBookshelf = true;
-            _bookshelfId = data.first['id'].toString();
+        if (data.isNotEmpty && !_c._disposed) {
+          _c._setState(() {
+            _c._isInBookshelf = true;
+            _c._bookshelfId = data.first['id'].toString();
           });
         }
-        if (!_disposed) {
-          _safeSnack( '已加入书架');
+        if (!_c._disposed) {
+          _c._safeSnack( '已加入书架');
           EventBus.instance.fire(EventType.bookshelfUpdated);
         }
       }
     } catch (e) {
-      if (!_disposed) {
-        _safeSnack( '操作失败，请稍后重试');
+      if (!_c._disposed) {
+        _c._safeSnack( '操作失败，请稍后重试');
       }
     }
   }
 
   Future<void> _toggleCollection() async {
-    if (_bookshelfId == null) {
+    if (_c._bookshelfId == null) {
       await _addToBookshelf();
       return;
     }
@@ -254,18 +256,18 @@ extension _ReaderControllerProgress on ReaderController {
     try {
       final result = await ApiClient.patchByFilter(
         'user_novels',
-        filters: {'id': 'eq.$_bookshelfId'},
-        body: {'is_collected': !_isCollected},
+        filters: {'id': 'eq.${_c._bookshelfId}'},
+        body: {'is_collected': !_c._isCollected},
       );
 
       if (result.isSuccess) {
-        if (!_disposed) {
-          _setState(() => _isCollected = !_isCollected);
+        if (!_c._disposed) {
+          _c._setState(() => _c._isCollected = !_c._isCollected);
         }
       }
     } catch (e) {
-      if (!_disposed) {
-        _safeSnack( '操作失败，请稍后重试');
+      if (!_c._disposed) {
+        _c._safeSnack( '操作失败，请稍后重试');
       }
     }
   }

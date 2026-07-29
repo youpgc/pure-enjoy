@@ -34,11 +34,17 @@ part 'reader_controller_settings.dart';
 part 'reader_controller_navigation.dart';
 part 'reader_controller_ui.dart';
 
-/// 阅读器控制器：承载原 ReaderChapterLoaderMixin 的全部状态与方法。
+/// 阅读器控制器（门面）：持有全部共享状态与生命周期，行为委托给独立模块类。
 ///
-/// 拆分策略：字段与生命周期留在本类；业务方法按职责拆到同库 `part` 文件的
-/// `extension` 中（同库内 extension 可访问本类的私有 `_` 字段）。
-/// UI 构建（`build`/`_build*`）在 `reader_controller_ui.dart`。
+/// 架构：门面 + 模块协作者。共享 `_` 字段留在本类；行为按职责拆到同库 `part`
+/// 文件中的独立模块类（各持 `_c` 指回本门面，同库内可访问私有字段）：
+/// - ReaderMetaModule       章节元数据分页加载/刷新（reader_controller_meta.dart）
+/// - ReaderContentModule    章节内容加载/预加载/滚动（reader_controller_content.dart）
+/// - ReaderProgressModule   进度保存/阅读计时/书架收藏（reader_controller_progress.dart）
+/// - ReaderAnnotationsModule 书签/划线标注（reader_controller_annotations.dart）
+/// - ReaderSettingsModule   字号/行距/背景/字体设置（reader_controller_settings.dart）
+/// - ReaderNavigationModule 翻页边界/章节切换（reader_controller_navigation.dart）
+/// - ReaderUiModule         UI 构建 build/_build*（reader_controller_ui.dart）
 ///
 /// 刷新机制：方法内的 `setState(...)` 已重命名为 `_setState(...)`，由 State 在
 /// `bindState` 时注入 `(fn) => setState(fn)`，从而无需 `ChangeNotifier` 即可触发重建。
@@ -99,7 +105,6 @@ class ReaderController with WidgetsBindingObserver {
   List<NovelAnnotation> _annotations = [];
   bool _isTtsPlaying = false;
 
-  Timer? _readingHistoryTimer;
   DateTime? _chapterReadStartTime;
 
   bool _hasTriggeredPreload = false;
@@ -122,6 +127,15 @@ class ReaderController with WidgetsBindingObserver {
 
   final Completer<void> _bookshelfStatusCompleter = Completer<void>();
 
+  // 模块协作者：各自承载一类职责（行为模块化，共享状态留在本门面）
+  late final ReaderMetaModule meta;
+  late final ReaderContentModule content;
+  late final ReaderProgressModule progress;
+  late final ReaderAnnotationsModule annotations;
+  late final ReaderSettingsModule settings;
+  late final ReaderNavigationModule navigation;
+  late final ReaderUiModule ui;
+
   String? get _userId => AuthService.instance.currentUserId;
 
   ReaderController({
@@ -129,6 +143,13 @@ class ReaderController with WidgetsBindingObserver {
     required this.startChapter,
     required AnimationController toolbarAnimationController,
   }) : _toolbarAnimationController = toolbarAnimationController {
+    meta = ReaderMetaModule(this);
+    content = ReaderContentModule(this);
+    progress = ReaderProgressModule(this);
+    annotations = ReaderAnnotationsModule(this);
+    settings = ReaderSettingsModule(this);
+    navigation = ReaderNavigationModule(this);
+    ui = ReaderUiModule(this);
     _topToolbarSlideAnimation = Tween<Offset>(
       begin: const Offset(0, -1),
       end: Offset.zero,
@@ -152,7 +173,7 @@ class ReaderController with WidgetsBindingObserver {
     ));
 
     _annotatedTextBuilder = ReaderAnnotatedTextBuilder(annotations: _annotations);
-    _scrollController.addListener(_onScroll);
+    _scrollController.addListener(content._onScroll);
     WidgetsBinding.instance.addObserver(this);
   }
 
@@ -166,6 +187,9 @@ class ReaderController with WidgetsBindingObserver {
     _context = null;
   }
 
+  /// 对外公开的构建入口（由薄 State 委托调用）
+  Widget build(BuildContext context) => ui.build(context);
+
   void _safeSnack(String message) {
     final ctx = _context;
     if (ctx != null && !_disposed) showSnackBar(ctx, message);
@@ -175,17 +199,17 @@ class ReaderController with WidgetsBindingObserver {
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.paused ||
         state == AppLifecycleState.detached) {
-      _saveProgress();
-      _pauseReadingTimer();
+      progress._saveProgress();
+      progress._pauseReadingTimer();
     } else if (state == AppLifecycleState.resumed) {
-      _resumeReadingTimer();
+      progress._resumeReadingTimer();
     }
   }
 
   Future<void> init() async {
-    _loadSettings();
-    _initializeReader();
-    _checkBookshelfStatus();
+    settings._loadSettings();
+    meta._initializeReader();
+    progress._checkBookshelfStatus();
     _battery.batteryLevel.then((level) {
       if (!_disposed) _setState(() => _batteryLevel = level);
     });
@@ -195,10 +219,9 @@ class ReaderController with WidgetsBindingObserver {
   void dispose() {
     _disposed = true;
     WidgetsBinding.instance.removeObserver(this);
-    _scrollController.removeListener(_onScroll);
+    _scrollController.removeListener(content._onScroll);
     _scrollController.dispose();
     TtsService().dispose();
-    _readingHistoryTimer?.cancel();
     // 退出阅读器时恢复系统 UI（与 init 中的 immersiveSticky 配对）
     SystemChrome.setEnabledSystemUIMode(SystemUiMode.edgeToEdge);
   }
