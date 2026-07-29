@@ -46,6 +46,10 @@ class HttpClient {
   /// 当前 JWT Access Token
   String? _accessToken;
 
+  /// 刷新单飞锁：同一时刻只允许一个真实刷新请求，其余并发 401 复用其结果。
+  /// 防止「刷新风暴」——冷启动/会话恢复时大量并发请求同时 401，每个都打一次刷新接口。
+  Completer<bool>? _refreshCompleter;
+
   /// ETag 缓存：URL -> 缓存条目（逻辑已抽取至 [EtagCache]，行为一致）
   final EtagCache _etagCache = EtagCache();
 
@@ -474,17 +478,29 @@ class HttpClient {
   }
 
   /// 尝试刷新 Token，成功则更新 _accessToken 并返回 true
+  ///
+  /// 并发安全（单飞）：多个请求因 401 同时进入时，只有第一个真正调用刷新接口，
+  /// 其余请求复用同一个 [_refreshCompleter] 的结果，从而把 N 次刷新请求合并为 1 次。
   Future<bool> _tryRefreshToken() async {
+    // 已有刷新在飞，直接复用其结果，避免重复打刷新接口
+    if (_refreshCompleter != null) {
+      return _refreshCompleter!.future;
+    }
+    final completer = Completer<bool>();
+    _refreshCompleter = completer;
     try {
       final success = await SupabaseService.instance.refreshToken();
       if (success) {
         _accessToken = SupabaseService.instance.accessToken;
-        return _accessToken != null;
       }
-      return false;
+      completer.complete(success && _accessToken != null);
     } catch (e) {
-      return false;
+      completer.complete(false);
+    } finally {
+      // 释放锁，允许后续真正需要时再次刷新
+      _refreshCompleter = null;
     }
+    return completer.future;
   }
 
 }
