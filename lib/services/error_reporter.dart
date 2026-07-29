@@ -1,12 +1,8 @@
 import 'dart:async';
-import 'dart:convert';
-import 'dart:io';
-import 'dart:ui';
 
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import './api_client.dart';
 import './http_client.dart';
 import './session_manager.dart';
 import './supabase_config.dart';
