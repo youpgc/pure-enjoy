@@ -76,6 +76,14 @@ void _lazyInitializeServices() {
     }
   });
 
+  // 启动后重挂已启用的习惯提醒与未来待办提醒（跨重启/更新持续生效）
+  NotificationService.instance.armHabitRemindersFromRemote().catchError((e) {
+    if (kDebugMode) debugPrint('重挂习惯提醒失败: $e');
+  });
+  NotificationService.instance.armRemindersFromRemote().catchError((e) {
+    if (kDebugMode) debugPrint('重挂待办提醒失败: $e');
+  });
+
   // 离线同步服务：启动时同步待处理队列
   OfflineSyncService.instance.initialize().catchError((e) {
     if (kDebugMode) {

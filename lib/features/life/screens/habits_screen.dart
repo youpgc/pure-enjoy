@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/notification_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
@@ -297,6 +298,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
         );
 
         if (result.isSuccess) {
+          // 删除习惯时同步取消其本地横幅提醒
+          await NotificationService.instance.cancelHabitReminder(id);
           _loadHabits(refresh: true);
           if (mounted) {
             showSnackBar(context, '删除成功');
@@ -329,6 +332,18 @@ class _HabitsScreenState extends State<HabitsScreen> {
       );
 
       if (result.isSuccess) {
+        // 暂停时取消提醒，恢复时按原计划重挂
+        if (!newActive) {
+          await NotificationService.instance.cancelHabitReminder(habit.id);
+        } else {
+          final sched = _reminderSchedules[habit.id];
+          if (sched != null) {
+            await NotificationService.instance.scheduleHabitReminder(
+              schedule: sched,
+              habitName: habit.name,
+            );
+          }
+        }
         _loadHabits(refresh: true);
       } else {
         throw Exception('HTTP ${result.statusCode}');

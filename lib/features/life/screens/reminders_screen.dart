@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/notification_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
@@ -106,6 +107,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
         );
 
         if (apiResult.isSuccess) {
+          // 挂接本地横幅提醒（result 已含 id 与 remindAt）
+          await NotificationService.instance.scheduleReminderNotification(result);
           _loadReminders();
         } else {
           throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
@@ -134,6 +137,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
         );
 
         if (apiResult.isSuccess) {
+          // 重新挂接本地横幅提醒（时间可能已变更，同名 id 覆盖旧调度）
+          await NotificationService.instance.scheduleReminderNotification(result);
           _loadReminders();
         } else {
           throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
@@ -157,6 +162,8 @@ class _RemindersScreenState extends State<RemindersScreen> {
         );
 
         if (result.isSuccess) {
+          // 删除时同步取消本地横幅提醒
+          await NotificationService.instance.cancelReminderNotification(id);
           _loadReminders();
           if (mounted) {
             showSnackBar(context, '删除成功');
@@ -181,6 +188,12 @@ class _RemindersScreenState extends State<RemindersScreen> {
       );
 
       if (result.isSuccess) {
+        // 刚标记完成 → 取消横幅；取消完成 → 重新挂接（若仍为未来时间）
+        if (!reminder.isCompleted) {
+          await NotificationService.instance.cancelReminderNotification(reminder.id);
+        } else {
+          await NotificationService.instance.scheduleReminderNotification(reminder);
+        }
         _loadReminders();
       } else {
         throw Exception('HTTP ${result.statusCode}');

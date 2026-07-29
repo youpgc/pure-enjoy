@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../../core/widgets/widgets.dart';
 import '../../../../services/api_client.dart';
+import '../../../../services/notification_service.dart';
 import './dashboard_helpers.dart';
 import '../sheets/sheets.dart';
 import '../sheets/tool_config_sheet.dart';
@@ -112,7 +115,11 @@ void dashboardHandleToolTap(
           'reminders',
           reminder.toJson(),
           '提醒添加成功',
-          onSuccess: reloadReminders,
+          onSuccess: () {
+            reloadReminders();
+            // 挂接本地横幅提醒
+            unawaited(NotificationService.instance.scheduleReminderNotification(reminder));
+          },
         ),
       );
       break;
@@ -129,10 +136,16 @@ void dashboardHandleToolTap(
             if (result.isSuccess) {
               // 保存提醒计划
               if (reminderSchedule != null) {
+                final saved = reminderSchedule.copyWith(habitId: habit.id);
                 await ApiClient.post(
                   'reminder_schedules',
-                  reminderSchedule.copyWith(habitId: habit.id).toJson(),
+                  saved.toJson(),
                   returnRepresentation: false,
+                );
+                // 设置本地提醒横幅
+                await NotificationService.instance.scheduleHabitReminder(
+                  schedule: saved,
+                  habitName: habit.name,
                 );
               }
               if (context.mounted) {

@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../services/api_client.dart';
+import '../../../services/notification_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
@@ -132,7 +133,7 @@ Future<void> showHabitEditDialog({
                   }
                 }
 
-                // 保存提醒计划
+                // 保存提醒计划 + 本地横幅提醒
                 final schedule = reminderSchedule?.copyWith(
                   habitId: habitId,
                   userId: userId,
@@ -155,6 +156,21 @@ Future<void> showHabitEditDialog({
                       'reminder_schedules',
                       schedule.copyWith(id: newId).toJson(),
                     );
+                  }
+                  // 挂接本地横幅提醒
+                  await NotificationService.instance.scheduleHabitReminder(
+                    schedule: schedule,
+                    habitName: nameController.text.trim(),
+                  );
+                } else if (isEditing) {
+                  // 编辑时清空了提醒：删除原计划并取消本地通知
+                  final original = reminderSchedules[habit.id];
+                  if (original != null) {
+                    await ApiClient.batchDeleteByFilter(
+                      'reminder_schedules',
+                      filters: {'id': 'eq.${original.id}'},
+                    );
+                    await NotificationService.instance.cancelHabitReminder(habit.id);
                   }
                 }
 
