@@ -6,6 +6,7 @@ import '../../../life/models/reminder_model.dart';
 import '../../../life/models/remind_offset.dart';
 import '../../../life/widgets/remind_offset_selector.dart';
 import '../../../../utils/date_time_utils.dart';
+import '../../../life/widgets/app_date_picker.dart';
 
 /// 添加提醒底部弹窗
 ///
@@ -100,9 +101,10 @@ class AddReminderSheetState extends State<AddReminderSheet> {
                 );
                 if (date == null) return;
                 if (!mounted) return;
-                final time = await showTimePicker(
-                  context: this.context,
-                  initialTime: TimeOfDay.fromDateTime(_remindAt),
+                final time = await AppDatePicker.show(
+                  this.context,
+                  type: DateTimeType.time,
+                  initialDate: _remindAt,
                 );
                 if (time == null) return;
                 if (!mounted) return;

@@ -351,12 +351,13 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
                   subtitle: Text(remindTime.format(dialogContext)),
                   trailing: const Icon(Icons.access_time),
                   onTap: () async {
-                    final picked = await showTimePicker(
-                      context: dialogContext,
-                      initialTime: remindTime,
+                    final picked = await AppDatePicker.show(
+                      dialogContext,
+                      type: DateTimeType.time,
+                      initialDate: DateTime(1970, 1, 1, remindTime.hour, remindTime.minute),
                     );
                     if (picked != null) {
-                      setDialogState(() => remindTime = picked);
+                      setDialogState(() => remindTime = TimeOfDay(hour: picked.hour, minute: picked.minute));
                     }
                   },
                 ),
