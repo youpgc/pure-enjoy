@@ -10,7 +10,7 @@ Map<String, dynamic> buildDiaryActivity(Map<String, dynamic> item) {
     'icon': Icons.edit_note,
     'title': '心情日记',
     'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
-    'time': formatDashboardDisplayDate(item['created_at'], item['entry_date']),
+    'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };
 }

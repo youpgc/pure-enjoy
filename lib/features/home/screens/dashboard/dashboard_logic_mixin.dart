@@ -187,7 +187,7 @@ mixin _DashboardLogic on State<DashboardPage> {
             limit: 1),
         ApiClient.get('mood_diaries',
             filters: {'user_id': 'eq.$userId'},
-            select: 'content,mood,created_at,entry_date',
+            select: 'content,mood,created_at,date',
             order: 'created_at.desc',
             limit: 1),
         ApiClient.get('weight_records',
