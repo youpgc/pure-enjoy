@@ -372,30 +372,37 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 subtitle: Text(DateTimeUtils.formatStandard(_remindAt)),
                 trailing: const Icon(Icons.chevron_right),
                 onTap: () async {
+                  // 选择器统一按北京墙钟交互（与展示口径一致，避免模拟器 UTC 时区偏 8 小时）
+                  final bjNow =
+                      DateTimeUtils.toBeijingWallClock(DateTime.now());
+                  final bjInitial =
+                      DateTimeUtils.toBeijingWallClock(_remindAt);
                   final date = await AppDatePicker.show(
                     context,
                     type: DateTimeType.date,
-                    initialDate: _remindAt,
-                    minDate: DateTime.now(),
-                    maxDate: DateTime.now().add(const Duration(days: 365)),
+                    initialDate: bjInitial,
+                    minDate: bjNow,
+                    maxDate: bjNow.add(const Duration(days: 365)),
                   );
                   if (date == null) return;
                   final time = await AppDatePicker.show(
                     context, // ignore: use_build_context_synchronously
                     type: DateTimeType.time,
-                    initialDate: _remindAt,
+                    initialDate: bjInitial,
                   );
                   if (time == null || !mounted) return;
                   setState(() {
-                    _remindAt = DateTime(
+                    // 北京墙钟还原为设备时刻后写回（存储/调度瞬时值不变）
+                    _remindAt = DateTimeUtils.fromBeijingWallClock(DateTime(
                       date.year, date.month, date.day,
                       time.hour, time.minute,
-                    );
+                    ));
                   });
                 },
               ),
               RemindOffsetSelector(
-                baseTime: _remindAt,
+                // 标签展示用北京墙钟口径（与提醒时间展示一致）
+                baseTime: DateTimeUtils.toBeijingWallClock(_remindAt),
                 initialEnabled: _remindEnabled,
                 initialOffsets: _remindOffsets,
                 onChanged: (settings) {

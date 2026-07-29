@@ -53,6 +53,17 @@ class DateTimeUtils {
     return _standardFormat.format(_toBeijingTime(dateTime));
   }
 
+  /// 将时刻换算为北京墙钟（公开版，用于选择器初始值等交互场景，
+  /// 保证模拟器 UTC 时区下选择器展示与 formatStandard 一致）
+  static DateTime toBeijingWallClock(DateTime dt) => _toBeijingTime(dt);
+
+  /// 将「北京墙钟」还原为设备本地时刻（toBeijingWallClock 的逆运算）。
+  /// 用于选择器按北京墙钟交互后，把结果写回业务字段（存储/调度用设备时刻，瞬时值不变）。
+  static DateTime fromBeijingWallClock(DateTime beijingWall) {
+    final deviceOffset = DateTime.now().timeZoneOffset;
+    return beijingWall.subtract(_beijingOffset - deviceOffset);
+  }
+
   /// 格式化为日期：YYYY-MM-DD
   /// 用于显示 date 字段（仅日期）
   static String formatDate(DateTime? dateTime) {

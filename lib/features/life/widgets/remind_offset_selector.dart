@@ -10,6 +10,8 @@ import '../models/remind_offset.dart';
 /// - 「自定义提前天数」与预设列表互斥：启用自定义会清空预设勾选，勾选预设会关闭自定义。
 ///
 /// [baseTime] 目标触发基准时刻（纪念日=日期@当天时刻，待办=remindAt），用于计算各档真实时间并展示。
+/// 注意：标签时间按墙钟原样展示，调用方须传入**北京墙钟**口径
+/// （待办用 DateTimeUtils.toBeijingWallClock(remindAt)；纪念日的日期+时刻本身即北京墙钟意图）。
 /// 通过 [onChanged] 输出 [RemindSettings]，由调用方写入数据模型。
 class RemindOffsetSelector extends StatefulWidget {
   final DateTime baseTime;
@@ -75,6 +77,7 @@ class _RemindOffsetSelectorState extends State<RemindOffsetSelector> {
     widget.onChanged(RemindSettings(enabled: _enabled, offsets: offsets));
   }
 
+  /// 标签时间按墙钟原样展示（调用方需传入北京墙钟口径的 baseTime）
   String _format(DateTime dt) {
     final m = dt.month.toString().padLeft(2, '0');
     final d = dt.day.toString().padLeft(2, '0');
