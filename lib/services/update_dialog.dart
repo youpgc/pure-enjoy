@@ -13,6 +13,7 @@ class UpdateDialog extends StatefulWidget {
   final bool isForceUpdate;
   final String? apkUrl;
   final String? fallbackUrl;
+  final String? checksum;
   final VersionCheckService versionService;
 
   const UpdateDialog({
@@ -22,6 +23,7 @@ class UpdateDialog extends StatefulWidget {
     required this.isForceUpdate,
     required this.apkUrl,
     this.fallbackUrl,
+    this.checksum,
     required this.versionService,
   });
 
@@ -78,6 +80,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       context,
       widget.apkUrl!,
       fallbackUrl: widget.fallbackUrl,
+      checksum: widget.checksum,
     );
 
     if (mounted) {

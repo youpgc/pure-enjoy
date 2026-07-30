@@ -2,6 +2,7 @@ import 'dart:io';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
+import 'package:crypto/crypto.dart';
 import 'package:open_filex/open_filex.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -248,15 +249,23 @@ class ApkInstaller {
   }
 
   /// 完整的下载并安装流程
-  /// [apkUrl] 主下载源（Gitee），[fallbackUrl] 备用下载源（GitHub）
+  /// [apkUrl] 主下载源（Gitee），[fallbackUrl] 备用下载源（GitHub），
+  /// [checksum] 期望的文件摘要（sha256/md5 小写十六进制）；非空时下载后做完整性校验，
+  /// 不一致则拒绝安装（防 APK 被篡改/下载损坏）。
   Future<void> downloadAndInstall(
     BuildContext context,
     String apkUrl, {
     String? fallbackUrl,
+    String? checksum,
   }) async {
     try {
       if (kDebugMode) debugPrint('📱 开始下载并安装流程');
       if (kDebugMode) debugPrint('📱 APK URL 已设置');
+
+      // 重置下载进度/状态（downloadProgress/downloadStatus 是单例 ValueNotifier，
+      // 上次失败/完成若未重置会残留到下一次弹窗，这里每次入口先归零）
+      downloadProgress.value = 0;
+      downloadStatus.value = '准备下载...';
 
       // 1. 下载APK（优先主源，失败回退备用源）
       final filePath = await downloadApk(apkUrl, fallbackUrl: fallbackUrl);
@@ -282,6 +291,20 @@ class ApkInstaller {
         if (kDebugMode) debugPrint('📱 错误：文件大小为0');
         downloadStatus.value = '下载文件无效（大小为0）';
         return;
+      }
+
+      // 1.5 完整性校验（后台提供了 checksum 时才校验）
+      if (checksum != null && checksum.isNotEmpty) {
+        final bytes = await File(filePath).readAsBytes();
+        final expected = checksum.toLowerCase();
+        final actualSha = sha256.convert(bytes).toString().toLowerCase();
+        final actualMd5 = md5.convert(bytes).toString().toLowerCase();
+        if (actualSha != expected && actualMd5 != expected) {
+          downloadStatus.value = '校验失败：文件完整性校验不通过';
+          if (kDebugMode) debugPrint('📱 校验失败: 期望 $expected，实际 sha256=$actualSha');
+          return;
+        }
+        downloadStatus.value = '校验通过，准备安装...';
       }
 
       // 2. 安装APK

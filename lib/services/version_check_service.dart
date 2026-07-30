@@ -101,7 +101,7 @@ class VersionCheckService {
 
       final result = await ApiClient.get(
         'app_versions',
-        filters: {'status': 'eq.released'},
+        filters: {'status': 'eq.released', 'platform': 'eq.android'},
         order: 'created_at.desc',
         limit: 1,
       );
@@ -115,7 +115,7 @@ class VersionCheckService {
       // 统一版本号格式：去掉 v 前缀
       final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
       final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
-      final isForceUpdate = latestVersion['release_type'] == 'force';
+      final isForceUpdate = latestVersion['is_force_update'] == true;
       final apkUrl = latestVersion['apk_url'] as String?;
 
       // 防御：没有下载地址时不提示更新（数据不完整）
@@ -134,15 +134,16 @@ class VersionCheckService {
           return null;
         }
 
-        versionInfo = {
-          'version': latestVersionStr,
-          'build_number': latestBuildNumber,
-          'apk_url': apkUrl,
-          'github_url': latestVersion['github_url'],
-          'release_notes': latestVersion['release_notes'],
-          'is_force_update': isForceUpdate,
-          'release_type': latestVersion['release_type'],
-        };
+      versionInfo = {
+        'version': latestVersionStr,
+        'build_number': latestBuildNumber,
+        'apk_url': apkUrl,
+        'github_url': latestVersion['github_url'],
+        'release_notes': latestVersion['release_notes'],
+        'is_force_update': isForceUpdate,
+        'release_type': latestVersion['release_type'],
+        'checksum': latestVersion['checksum'],
+      };
       }
 
       // 写入缓存（无论是否需要更新都缓存）
@@ -250,7 +251,7 @@ class VersionCheckService {
       // 缓存失效 → 走网络
       final result = await ApiClient.get(
         'app_versions',
-        filters: {'status': 'eq.released'},
+        filters: {'status': 'eq.released', 'platform': 'eq.android'},
         order: 'created_at.desc',
         limit: 1,
       );
@@ -283,8 +284,9 @@ class VersionCheckService {
         'apk_url': apkUrl,
         'github_url': latestVersion['github_url'],
         'release_notes': latestVersion['release_notes'],
-        'is_force_update': latestVersion['release_type'] == 'force',
+        'is_force_update': latestVersion['is_force_update'] == true,
         'release_type': latestVersion['release_type'],
+        'checksum': latestVersion['checksum'],
       };
     } catch (e) {
       if (kDebugMode) debugPrint('📱 [手动] 获取最新版本失败');
@@ -299,6 +301,7 @@ class VersionCheckService {
     final fallbackUrl = versionInfo['github_url'] as String?;
     final releaseNotes = versionInfo['release_notes'] as String? ?? '';
     final version = versionInfo['version'] as String? ?? '';
+    final checksum = versionInfo['checksum'] as String?;
 
     // 防御：没有下载地址时不弹出更新对话框
     if (apkUrl == null || apkUrl.isEmpty) {
@@ -316,6 +319,7 @@ class VersionCheckService {
         isForceUpdate: isForceUpdate,
         apkUrl: apkUrl,
         fallbackUrl: fallbackUrl,
+        checksum: checksum,
         versionService: this,
       ),
     );
@@ -327,10 +331,12 @@ class VersionCheckService {
     BuildContext context,
     String apkUrl, {
     String? fallbackUrl,
+    String? checksum,
   }) =>
       _installer.downloadAndInstall(
         context,
         apkUrl,
         fallbackUrl: fallbackUrl,
+        checksum: checksum,
       );
 }
