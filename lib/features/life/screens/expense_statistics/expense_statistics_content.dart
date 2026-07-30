@@ -173,7 +173,9 @@ class _ExpenseEmptyState extends StatelessWidget {
 }
 
 /// 已加载数据的主区域。
-class _ExpenseStatisticsLoaded extends StatelessWidget {
+///
+/// 改为 StatefulWidget 以承载「选中分类」交互态（饼图扇区与分类列表双向联动）。
+class _ExpenseStatisticsLoaded extends StatefulWidget {
   const _ExpenseStatisticsLoaded({
     required this.expenses,
     required this.startMonth,
@@ -191,11 +193,25 @@ class _ExpenseStatisticsLoaded extends StatelessWidget {
   final VoidCallback onPickEndMonth;
 
   @override
+  State<_ExpenseStatisticsLoaded> createState() => _ExpenseStatisticsLoadedState();
+}
+
+class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
+  /// 当前选中的分类下标；null 表示未选中（展示总额）。
+  int? _selectedIndex;
+
+  void _toggleSelect(int index) {
+    setState(() {
+      _selectedIndex = _selectedIndex == index ? null : index;
+    });
+  }
+
+  @override
   Widget build(BuildContext context) {
     // 按分类统计
     final categoryMap = <String, double>{};
     double total = 0;
-    for (var expense in expenses) {
+    for (var expense in widget.expenses) {
       final category = expense['category'] ?? '其他';
       final amount = (expense['amount'] ?? 0).toDouble();
       categoryMap[category] = (categoryMap[category] ?? 0) + amount;
@@ -222,23 +238,45 @@ class _ExpenseStatisticsLoaded extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           _ExpenseRangeHeader(
-            rangeText: rangeText,
-            startMonth: startMonth,
-            endMonth: endMonth,
-            onPickStartMonth: onPickStartMonth,
-            onPickEndMonth: onPickEndMonth,
+            rangeText: widget.rangeText,
+            startMonth: widget.startMonth,
+            endMonth: widget.endMonth,
+            onPickStartMonth: widget.onPickStartMonth,
+            onPickEndMonth: widget.onPickEndMonth,
           ),
           const SizedBox(height: 16),
-          _ExpenseTotalCard(total: total, count: expenses.length),
+          _ExpenseTotalCard(total: total, count: widget.expenses.length),
           const SizedBox(height: 24),
           Text(
             '消费分类',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
-          _ExpensePieChart(categories: categories, colors: colors, total: total),
+          _ExpensePieChart(
+            categories: categories,
+            colors: colors,
+            total: total,
+            selectedIndex: _selectedIndex,
+            onTouched: _toggleSelect,
+          ),
+          Padding(
+            padding: const EdgeInsets.only(top: 8),
+            child: Center(
+              child: Text(
+                '轻触扇区或分类可查看明细',
+                style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+              ),
+            ),
+          ),
           const SizedBox(height: 16),
-          _ExpenseCategoryList(categories: categories, colors: colors),
+          _ExpenseCategoryList(
+            categories: categories,
+            colors: colors,
+            selectedIndex: _selectedIndex,
+            onTap: _toggleSelect,
+          ),
         ],
       ),
     );
@@ -282,57 +320,157 @@ class _ExpenseTotalCard extends StatelessWidget {
   }
 }
 
-/// 分类饼图。
-class _ExpensePieChart extends StatelessWidget {
-  const _ExpensePieChart({
-    required this.categories,
-    required this.colors,
-    required this.total,
+/// 圆环中心信息（选中分类明细 / 未选中时展示总额）。
+class _PieCenterInfo extends StatelessWidget {
+  const _PieCenterInfo({
+    required this.label,
+    required this.amount,
+    this.percentage,
   });
 
-  final List<MapEntry<String, double>> categories;
-  final List<Color> colors;
-  final double total;
+  final String label;
+  final double amount;
+  final double? percentage;
 
   @override
   Widget build(BuildContext context) {
+    final textColor = Theme.of(context).colorScheme.onSurface;
     return SizedBox(
-      height: 200,
-      child: PieChart(
-        PieChartData(
-          sections: categories.asMap().entries.map((entry) {
-            final index = entry.key;
-            final category = entry.value;
-            final percentage = total > 0 ? (category.value / total * 100) : 0;
-            return PieChartSectionData(
-              value: category.value,
-              title: '${percentage.toStringAsFixed(1)}%',
-              color: colors[index % colors.length],
-              radius: 80,
-              titleStyle: const TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.bold,
-                color: Colors.white,
-              ),
-            );
-          }).toList(),
-          sectionsSpace: 2,
-          centerSpaceRadius: 40,
-        ),
+      width: 104,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                  color: textColor.withValues(alpha: 0.7),
+                ),
+            textAlign: TextAlign.center,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+          ),
+          const SizedBox(height: 4),
+          Text(
+            '¥${amount.toStringAsFixed(2)}',
+            style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.bold,
+                  color: textColor,
+                ),
+            textAlign: TextAlign.center,
+          ),
+          if (percentage != null)
+            Text(
+              '${percentage!.toStringAsFixed(1)}%',
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: textColor.withValues(alpha: 0.6),
+                  ),
+              textAlign: TextAlign.center,
+            ),
+        ],
       ),
     );
   }
 }
 
-/// 分类列表。
-class _ExpenseCategoryList extends StatelessWidget {
-  const _ExpenseCategoryList({
+/// 分类饼图（可交互：点击扇区选中，与分类列表双向联动）。
+class _ExpensePieChart extends StatelessWidget {
+  const _ExpensePieChart({
     required this.categories,
     required this.colors,
+    required this.total,
+    required this.selectedIndex,
+    required this.onTouched,
   });
 
   final List<MapEntry<String, double>> categories;
   final List<Color> colors;
+  final double total;
+  final int? selectedIndex;
+  final ValueChanged<int> onTouched;
+
+  @override
+  Widget build(BuildContext context) {
+    final selected = selectedIndex != null && selectedIndex! < categories.length
+        ? categories[selectedIndex!]
+        : null;
+
+    final centerChild = selected != null
+        ? _PieCenterInfo(
+            label: DictService.instance.getLabelOrDefault(
+              'expense_category',
+              selected.key,
+              defaultValue: selected.key,
+            ),
+            amount: selected.value,
+            percentage: total > 0 ? selected.value / total * 100 : 0,
+          )
+        : _PieCenterInfo(
+            label: '总支出',
+            amount: total,
+          );
+
+    return SizedBox(
+      height: 220,
+      child: Stack(
+        alignment: Alignment.center,
+        children: [
+          PieChart(
+            PieChartData(
+              sections: categories.asMap().entries.map((entry) {
+                final index = entry.key;
+                final category = entry.value;
+                final percentage = total > 0 ? (category.value / total * 100) : 0.0;
+                final isSelected = selectedIndex == index;
+                final radius = isSelected
+                    ? 98.0
+                    : (selectedIndex == null ? 80.0 : 68.0);
+                return PieChartSectionData(
+                  value: category.value,
+                  title: '${percentage.toStringAsFixed(1)}%',
+                  color: colors[index % colors.length],
+                  radius: radius,
+                  titleStyle: const TextStyle(
+                    fontSize: 12,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.white,
+                  ),
+                );
+              }).toList(),
+              sectionsSpace: 2,
+              centerSpaceRadius: 58,
+              pieTouchData: PieTouchData(
+                touchCallback: (event, response) {
+                  if (!event.isInterestedForInteractions) return;
+                  if (event is FlTapUpEvent) {
+                    final idx = response?.touchedSection?.touchedSectionIndex;
+                    if (idx != null && idx >= 0 && idx < categories.length) {
+                      onTouched(idx);
+                    }
+                  }
+                },
+              ),
+            ),
+          ),
+          centerChild,
+        ],
+      ),
+    );
+  }
+}
+
+/// 分类列表（可点击，与饼图选中态双向联动）。
+class _ExpenseCategoryList extends StatelessWidget {
+  const _ExpenseCategoryList({
+    required this.categories,
+    required this.colors,
+    required this.selectedIndex,
+    required this.onTap,
+  });
+
+  final List<MapEntry<String, double>> categories;
+  final List<Color> colors;
+  final int? selectedIndex;
+  final ValueChanged<int> onTap;
 
   @override
   Widget build(BuildContext context) {
@@ -340,12 +478,17 @@ class _ExpenseCategoryList extends StatelessWidget {
       children: categories.asMap().entries.map((entry) {
         final index = entry.key;
         final category = entry.value;
+        final isSelected = selectedIndex == index;
         final categoryLabel = DictService.instance.getLabelOrDefault(
           'expense_category',
           category.key,
           defaultValue: category.key,
         );
         return ListTile(
+          selected: isSelected,
+          selectedColor: Theme.of(context).colorScheme.onSurface,
+          selectedTileColor:
+              colors[index % colors.length].withValues(alpha: 0.12),
           leading: CircleAvatar(
             backgroundColor: colors[index % colors.length],
             radius: 12,
@@ -355,6 +498,7 @@ class _ExpenseCategoryList extends StatelessWidget {
             '¥${category.value.toStringAsFixed(2)}',
             style: const TextStyle(fontWeight: FontWeight.bold),
           ),
+          onTap: () => onTap(index),
         );
       }).toList(),
     );
