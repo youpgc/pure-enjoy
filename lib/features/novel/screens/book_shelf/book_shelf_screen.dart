@@ -194,14 +194,15 @@ class _BookShelfScreenState extends State<BookShelfScreen> with PaginatedListMix
     }
   }
 
-  /// 从书架移除小说
+  /// 从书架移除小说（仅清 is_collected，保留阅读进度，与 _toggleCollect 行为一致）
   Future<void> _removeFromBookshelf(String userNovelId) async {
     if (!_checkAuth()) return;
 
     try {
-      final result = await ApiClient.batchDeleteByFilter(
+      final result = await ApiClient.patchByFilter(
         'user_novels',
         filters: {'id': 'eq.$userNovelId'},
+        body: {'is_collected': false},
       );
 
       if (result.isSuccess) {

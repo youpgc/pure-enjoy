@@ -7,6 +7,8 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/services.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:battery_plus/battery_plus.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../../core/theme/theme_provider.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/chapter_cache_service.dart';
 import '../../../services/api_client.dart';
@@ -92,8 +94,8 @@ class ReaderController with WidgetsBindingObserver {
   static const List<double> _lineHeights = [1.4, 1.6, 1.8, 2.0, 2.2];
   int _lineHeightIndex = 2; // 默认 1.8
   double get _lineHeight => _lineHeights[_lineHeightIndex];
-  ReaderBackground _background = ReaderBackground.yellow;
-  ReaderBackground _lastDayBackground = ReaderBackground.yellow;
+  ReaderBackground _background = ReaderBackground.defaultWhite;
+  ReaderBackground _lastDayBackground = ReaderBackground.defaultWhite;
   ReaderFont _font = ReaderFont.serif;
   PageTurnMode _pageTurnMode = PageTurnMode.scroll;
 

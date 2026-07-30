@@ -106,10 +106,10 @@ class ReaderBottomToolbar extends StatelessWidget {
                         onTap: onShowSettings,
                       ),
                       ReaderToolbarButton(
-                        icon: background == ReaderBackground.dark
+                        icon: background == ReaderBackground.pureBlack
                             ? Icons.light_mode_outlined
                             : Icons.dark_mode_outlined,
-                        label: background == ReaderBackground.dark ? '日间' : '夜间',
+                        label: background == ReaderBackground.pureBlack ? '日间' : '夜间',
                         textColor: background.textColor,
                         onTap: onToggleDayNight,
                       ),

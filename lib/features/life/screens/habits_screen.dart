@@ -225,14 +225,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Future<void> _checkIn(HabitModel habit) async {
     try {
       final today = DateTime.now();
-      final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
 
       // 检查今天是否已经打卡
       final checkins = _checkinHistory[habit.id] ?? [];
-      final alreadyChecked = checkins.any((c) {
-        final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
-        return dateStr == todayStr;
-      });
+      final alreadyChecked = checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
 
       if (alreadyChecked) {
         _showError('今天已经打卡了');
@@ -398,13 +394,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
   bool _isCheckedInToday(String habitId) {
     final today = DateTime.now();
-    final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
-
     final checkins = _checkinHistory[habitId] ?? [];
-    return checkins.any((c) {
-      final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
-      return dateStr == todayStr;
-    });
+    return checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
   }
 
   int _getTotalCheckins(String habitId) {

@@ -86,11 +86,11 @@ class ReaderUiModule {
       onShowSettings: _showSettings,
       onToggleDayNight: () {
         _c._setState(() {
-          if (_c._background == ReaderBackground.dark) {
+          if (_c._background == ReaderBackground.pureBlack) {
             _c._background = _c._lastDayBackground;
           } else {
             _c._lastDayBackground = _c._background;
-            _c._background = ReaderBackground.dark;
+            _c._background = ReaderBackground.pureBlack;
           }
         });
         _c.settings._saveSettings();
@@ -134,7 +134,7 @@ class ReaderUiModule {
           onBackgroundChanged: (bg) {
             setModalState(() => _c._background = bg);
             _c._setState(() {});
-            if (bg != ReaderBackground.dark) {
+            if (bg != ReaderBackground.pureBlack) {
               _c._lastDayBackground = bg;
             }
           },

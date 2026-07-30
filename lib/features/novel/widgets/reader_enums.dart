@@ -1,17 +1,7 @@
-import 'package:flutter/material.dart';
+import '../../../core/theme/theme_provider.dart';
 
-/// 阅读器背景主题枚举
-enum ReaderBackground {
-  white('白色', Colors.white, Colors.black87),
-  yellow('护眼黄', Color(0xFFF5F0E6), Color(0xFF333333)),
-  dark('深色', Color(0xFF1A1A2E), Color(0xFFE0E0E0)),
-  gray('灰色', Color(0xFFE8E8E8), Color(0xFF333333));
-
-  const ReaderBackground(this.label, this.bgColor, this.textColor);
-  final String label;
-  final Color bgColor;
-  final Color textColor;
-}
+/// 阅读器背景主题枚举（复用主题模块的 ReaderBackgroundTheme，确保主题设置页的背景选择生效）
+typedef ReaderBackground = ReaderBackgroundTheme;
 
 /// 阅读器字体选择枚举
 enum ReaderFont {
