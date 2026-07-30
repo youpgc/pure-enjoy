@@ -11,6 +11,7 @@ import '../features/life/models/reminder_model.dart';
 import '../features/life/models/anniversary_model.dart';
 import '../features/life/models/remind_offset.dart';
 import '../main.dart' show navigatorKey;
+import '../utils/date_time_utils.dart';
 
 /// 本地通知服务
 /// 支持即时通知、定时通知、每日重复通知
@@ -27,7 +28,9 @@ class NotificationService {
   bool _initialized = false;
 
   // 通知渠道配置
-  static const String _channelId = 'pure_enjoy_channel';
+  // v2 说明：Android 渠道 importance 在首次创建后不可提升，旧渠道若曾以较低
+  // 重要级创建会导致横幅（heads-up）不弹。启用新 ID 并显式以 max 创建，确保横幅。
+  static const String _channelId = 'pure_enjoy_channel_v2';
   static const String _channelName = '纯享通知';
   static const String _channelDescription = '纯享应用的通知渠道';
 
@@ -62,6 +65,18 @@ class NotificationService {
       onDidReceiveNotificationResponse: _onNotificationTapped,
     );
 
+    // 显式创建高优通知渠道（importance 只认首次创建值，必须显式 max 才能保证横幅弹出）
+    final androidPlugin = _plugin.resolvePlatformSpecificImplementation<
+        AndroidFlutterLocalNotificationsPlugin>();
+    await androidPlugin?.createNotificationChannel(
+      const AndroidNotificationChannel(
+        _channelId,
+        _channelName,
+        description: _channelDescription,
+        importance: Importance.max,
+      ),
+    );
+
     // 请求通知权限
     await _requestPermission();
 
@@ -79,6 +94,12 @@ class NotificationService {
       final granted = await androidPlugin.requestNotificationsPermission();
       if (kDebugMode) {
         debugPrint('📱 通知权限: ${granted == true ? "已授权" : "未授权"}');
+      }
+      // 主动申请精确闹钟权限（Android 12+ 默认不授予；无精确权限时调度会
+      // 降级为不精确模式，系统合批延迟可达 10~15 分钟，短提前量提醒会错过）
+      final exactGranted = await androidPlugin.requestExactAlarmsPermission();
+      if (kDebugMode) {
+        debugPrint('⏰ 精确闹钟权限: ${exactGranted == true ? "已授权" : "未授权"}');
       }
       return granted == true;
     }
@@ -314,6 +335,7 @@ class NotificationService {
       ),
       iOS: DarwinNotificationDetails(),
     );
+    var mode = 'exact';
     try {
       await _plugin.zonedSchedule(
         id,
@@ -327,6 +349,7 @@ class NotificationService {
       );
     } catch (_) {
       if (kDebugMode) debugPrint('⚠️ 精确闹钟不可用，降级为不精确模式');
+      mode = 'inexact';
       await _plugin.zonedSchedule(
         id,
         title,
@@ -336,6 +359,15 @@ class NotificationService {
         payload: payload,
         androidScheduleMode: AndroidScheduleMode.inexactAllowWhileIdle,
         matchDateTimeComponents: matchDateTimeComponents,
+      );
+    }
+    // 诊断日志：调度模式 + 目标北京时间 + 当前待触发通知总数（📝 排查横幅不弹时看此行）
+    if (kDebugMode) {
+      final pending = await _plugin.pendingNotificationRequests();
+      debugPrint(
+        '🔔 已调度[$mode] id=$id @ '
+        '${DateTimeUtils.formatStandard(scheduledDate.toUtc())}（北京）'
+        '，pending=${pending.length}',
       );
     }
   }
