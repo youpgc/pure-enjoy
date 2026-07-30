@@ -22,6 +22,15 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
     _listenDataChangeEvents();
   }
 
+  /// 习惯变更（打卡/增删改/暂停恢复）→ 首页「最近活动」与「今日打卡」区块都需刷新。
+  /// 注意：「今日打卡」由 [_loadHabitsForCheckin] 经 RequestCache(ttl=1h) 缓存，
+  /// 必须先 invalidate 再 reload，否则读到旧缓存、打卡后仍显示待打卡。
+  void _onHabitUpdated() {
+    _loadRecentActivities(force: true);
+    unawaited(RequestCache.invalidate(_kCacheHabits)
+        .then((_) => _loadHabitsForCheckin()));
+  }
+
   /// 监听全局数据变更事件，从其他页面返回时自动刷新最新动态
   void _listenDataChangeEvents() {
     final handlers = <EventType, VoidCallback>{
@@ -29,7 +38,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
       EventType.weightRecordUpdated: () => _loadRecentActivities(force: true),
       EventType.moodDiaryUpdated: () => _loadRecentActivities(force: true),
       EventType.noteUpdated: () => _loadRecentActivities(force: true),
-      EventType.habitUpdated: () => _loadRecentActivities(force: true),
+      EventType.habitUpdated: _onHabitUpdated,
       EventType.reminderUpdated: () => _loadPendingReminders(force: true),
       // [小说模块暂时停用] EventType.bookshelfUpdated: _onBookshelfChanged,
     };
