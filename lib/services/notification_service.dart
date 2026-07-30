@@ -27,6 +27,11 @@ class NotificationService {
 
   bool _initialized = false;
 
+  /// 北京时区 Location。调度一律用它构造时刻，不依赖 tz.local：
+  /// tz.local 需 initialize() 里 setLocalLocation 才生效，热重载不重跑
+  /// initialize（单例 _initialized 保留），会退回默认 UTC 导致晚 8 小时。
+  static tz.Location get _bj => tz.getLocation('Asia/Shanghai');
+
   // 通知渠道配置
   // v2 说明：Android 渠道 importance 在首次创建后不可提升，旧渠道若曾以较低
   // 重要级创建会导致横幅（heads-up）不弹。启用新 ID 并显式以 max 创建，确保横幅。
@@ -227,7 +232,7 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    final tzDateTime = tz.TZDateTime.from(scheduledTime, tz.local);
+    final tzDateTime = tz.TZDateTime.from(scheduledTime, _bj);
 
     await _plugin.zonedSchedule(
       id ?? _generateId,
@@ -270,9 +275,9 @@ class NotificationService {
       iOS: iosDetails,
     );
 
-    final now = tz.TZDateTime.now(tz.local);
+    final now = tz.TZDateTime.now(_bj);
     var scheduledDate = tz.TZDateTime(
-      tz.local,
+      _bj,
       now.year,
       now.month,
       now.day,
@@ -424,11 +429,11 @@ class NotificationService {
     final parts = schedule.time.split(':');
     final hour = int.tryParse(parts[0]) ?? 8;
     final minute = parts.length > 1 ? int.tryParse(parts[1]) ?? 0 : 0;
-    final now = tz.TZDateTime.now(tz.local);
+    final now = tz.TZDateTime.now(_bj);
     for (int i = 0; i < 400; i++) {
       final day = DateTime(now.year, now.month, now.day).add(Duration(days: i));
       if (!schedule.shouldRemindToday(day)) continue;
-      final dt = tz.TZDateTime(tz.local, day.year, day.month, day.day, hour, minute);
+      final dt = tz.TZDateTime(_bj, day.year, day.month, day.day, hour, minute);
       if (!dt.isBefore(now)) return dt;
     }
     return null;
@@ -522,7 +527,7 @@ class NotificationService {
         id: id,
         title: '提醒事项',
         body: reminder.title,
-        scheduledDate: tz.TZDateTime.from(target, tz.local),
+        scheduledDate: tz.TZDateTime.from(target, _bj),
         payload: 'reminder:${reminder.id}',
       );
       scheduled++;
@@ -583,10 +588,10 @@ class NotificationService {
       minute = int.tryParse(parts[1]) ?? 0;
     }
     final next = a.nextDate;
-    // 基准时刻按北京墙钟构造（tz.local 已固定 Asia/Shanghai）。
+    // 基准时刻按北京墙钟构造（_bj 固定 Asia/Shanghai，不依赖 tz.local）。
     // 若用 DateTime() 设备墙钟构造，UTC 模拟器上会晚 8 小时触发。
     final DateTime base =
-        tz.TZDateTime(tz.local, next.year, next.month, next.day, hour, minute);
+        tz.TZDateTime(_bj, next.year, next.month, next.day, hour, minute);
 
     var scheduled = 0;
     for (var i = 0; i < a.remindOffsets.length && i < _maxOffsets; i++) {
@@ -596,7 +601,7 @@ class NotificationService {
       if (target.isBefore(DateTime.now())) {
         // 顺延同样用北京墙钟构造（target 为 TZDateTime，字段即北京墙钟值）
         target = tz.TZDateTime(
-          tz.local,
+          _bj,
           target.year + 1,
           target.month,
           target.day,
@@ -610,7 +615,7 @@ class NotificationService {
         id: id,
         title: isBirthday ? '🎂 ${a.title}的生日' : '🎉 ${a.title}',
         body: _anniversaryBody(a, offset, isBirthday),
-        scheduledDate: tz.TZDateTime.from(target, tz.local),
+        scheduledDate: tz.TZDateTime.from(target, _bj),
         payload: 'anniversary:${a.id}',
         matchDateTimeComponents:
             a.repeatYearly ? DateTimeComponents.dayOfMonthAndTime : null,

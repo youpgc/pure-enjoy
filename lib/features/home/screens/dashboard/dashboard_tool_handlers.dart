@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:uuid/uuid.dart';
 
 import '../../../../core/widgets/widgets.dart';
 import '../../../../services/api_client.dart';
@@ -134,9 +135,17 @@ void dashboardHandleToolTap(
               returnRepresentation: false,
             );
             if (result.isSuccess) {
-              // 保存提醒计划
+              // 保存提醒计划（补齐 id/user_id，空串会触发 PostgREST 22P02 uuid 解析失败）
               if (reminderSchedule != null) {
-                final saved = reminderSchedule.copyWith(habitId: habit.id);
+                final saved = reminderSchedule.copyWith(
+                  id: reminderSchedule.id.isEmpty
+                      ? const Uuid().v4()
+                      : reminderSchedule.id,
+                  habitId: habit.id,
+                  userId: reminderSchedule.userId.isEmpty
+                      ? habit.userId
+                      : reminderSchedule.userId,
+                );
                 await ApiClient.post(
                   'reminder_schedules',
                   saved.toJson(),
