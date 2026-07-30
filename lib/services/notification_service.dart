@@ -481,7 +481,8 @@ class NotificationService {
   // ========== 待办事项提醒 ==========
 
   /// 多偏移提醒的 ID 分配：模块块基址 + (hash % 9000) * 步长(10) + 偏移序号(0..7)，
-  /// 保证同模块每事项唯一且 < 2^31；整段含 (步长+2) 个 ID 用于「全部取消」。
+  /// 保证同模块每事项唯一且 < 2^31；「全部取消」只覆盖本块内 ID（0..步长-1），
+  /// 严禁越过步长（会误取消相邻 hash 块事项的通知）。
   static const int _reminderBlockBase = 40000;
   static const int _anniversaryBlockBase = 30000;
   static const int _offsetStride = 10;
@@ -496,7 +497,7 @@ class NotificationService {
   /// 取消某事项的整段提醒（覆盖其所有偏移 ID），用于开关关闭/删除/重设
   Future<void> _cancelReminderBlock(String itemId, int moduleBase) async {
     final base = _reminderBlock(itemId, moduleBase);
-    for (int i = 0; i <= _offsetStride + 1; i++) {
+    for (int i = 0; i < _offsetStride; i++) {
       await cancelNotification(base + i);
     }
   }
@@ -513,6 +514,9 @@ class NotificationService {
       await _cancelReminderBlock(reminder.id, _reminderBlockBase);
       return;
     }
+
+    // 重挂前先取消整段旧调度，避免编辑后减少偏移档时旧通知残留
+    await _cancelReminderBlock(reminder.id, _reminderBlockBase);
 
     final now = DateTime.now();
     var scheduled = 0;
@@ -579,6 +583,9 @@ class NotificationService {
       return;
     }
 
+    // 重挂前先取消整段旧调度，避免编辑后减少偏移档时旧通知残留
+    await _cancelReminderBlock(a.id, _anniversaryBlockBase);
+
     // 解析当天触发时刻（HH:mm），与下一个纪念日(公历月/日)组合为基准时刻
     var hour = 9;
     var minute = 0;
@@ -617,8 +624,10 @@ class NotificationService {
         body: _anniversaryBody(a, offset, isBirthday),
         scheduledDate: tz.TZDateTime.from(target, _bj),
         payload: 'anniversary:${a.id}',
+        // 年复用 dateAndTime（匹配 月+日+时刻，每年一次）。
+        // 注意 dayOfMonthAndTime 是「每月」同日重复，误用会导致每月都弹。
         matchDateTimeComponents:
-            a.repeatYearly ? DateTimeComponents.dayOfMonthAndTime : null,
+            a.repeatYearly ? DateTimeComponents.dateAndTime : null,
       );
       scheduled++;
     }

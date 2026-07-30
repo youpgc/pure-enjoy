@@ -1,5 +1,8 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 import '../../constants/app_constants.dart';
 
@@ -65,6 +68,21 @@ class AuthNotifier extends StateNotifier<AuthState> {
     return roleUser;
   }
 
+  /// 登录/注册成功后重挂当前账号的本地横幅提醒。
+  /// 冷启动时 main 的 arm* 若在未登录态执行会直接空转，
+  /// 登录成功必须补挂，否则历史提醒要等下次冷启动才生效。
+  void _armLocalReminders() {
+    unawaited(NotificationService.instance
+        .armHabitRemindersFromRemote()
+        .catchError((_) {}));
+    unawaited(NotificationService.instance
+        .armRemindersFromRemote()
+        .catchError((_) {}));
+    unawaited(NotificationService.instance
+        .armAnniversariesFromRemote()
+        .catchError((_) {}));
+  }
+
   /// 初始化：检查当前登录状态
   void _init() {
     final service = SupabaseService.instance;
@@ -103,6 +121,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: response.email,
           role: role,
         );
+        _armLocalReminders();
         return true;
       }
       state = state.copyWith(error: response.error ?? '登录失败');
@@ -137,6 +156,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: response.email,
           role: role,
         );
+        _armLocalReminders();
         return true;
       }
       state = state.copyWith(error: response.error ?? '登录失败');
@@ -172,6 +192,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
           email: response.email,
           role: role,
         );
+        _armLocalReminders();
         return true;
       }
       state = state.copyWith(error: response.error ?? '注册失败');

@@ -13,6 +13,7 @@ import '../utils/cache_helper.dart';
 import './chapter_cache_service.dart';
 import '../features/novel/services/annotation_local_service.dart';
 import '../features/novel/services/annotation_service.dart';
+import './notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
 import 'dart:io';
@@ -246,6 +247,14 @@ class AuthService {
     } catch (e) {
       if (kDebugMode) {
         debugPrint('清理 ETag 缓存失败: $e');
+      }
+    }
+    // 取消旧账号所有已调度的本地横幅提醒，防止换账号后旧提醒继续弹
+    try {
+      await NotificationService.instance.cancelAllNotifications();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('清理本地提醒失败: $e');
       }
     }
     await _session.clearSession();
