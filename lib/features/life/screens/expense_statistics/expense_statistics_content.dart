@@ -3,6 +3,7 @@ import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../services/dict_service.dart';
+import '../expense_list/expense_list_screen.dart';
 
 /// {@template expense_statistics_content}
 /// [ExpenseStatisticsScreen] 的主体内容（从超长 _buildBody 抽取，便于维护）。
@@ -197,13 +198,21 @@ class _ExpenseStatisticsLoaded extends StatefulWidget {
 }
 
 class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
-  /// 当前选中的分类下标；null 表示未选中（展示总额）。
+  /// 当前选中的分类下标；用于跳转前的视觉高亮（返回统计页后仍可见）。
   int? _selectedIndex;
 
-  void _toggleSelect(int index) {
-    setState(() {
-      _selectedIndex = _selectedIndex == index ? null : index;
-    });
+  /// 点击分类：高亮并跳转到该分类在统计区间内的消费记录列表。
+  void _openCategoryRecords(int index, String categoryKey) {
+    setState(() => _selectedIndex = index);
+    Navigator.of(context).push(
+      MaterialPageRoute(
+        builder: (_) => ExpenseListScreen(
+          initialCategory: categoryKey,
+          initialStartMonth: widget.startMonth,
+          initialEndMonth: widget.endMonth,
+        ),
+      ),
+    );
   }
 
   @override
@@ -257,13 +266,13 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
             colors: colors,
             total: total,
             selectedIndex: _selectedIndex,
-            onTouched: _toggleSelect,
+            onTouched: (i) => _openCategoryRecords(i, categories[i].key),
           ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Center(
               child: Text(
-                '轻触扇区或分类可查看明细',
+                '轻触扇区或分类查看对应消费记录',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -275,7 +284,7 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
             categories: categories,
             colors: colors,
             selectedIndex: _selectedIndex,
-            onTap: _toggleSelect,
+            onTap: (i) => _openCategoryRecords(i, categories[i].key),
           ),
         ],
       ),

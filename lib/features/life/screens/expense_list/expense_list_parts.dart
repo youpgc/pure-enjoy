@@ -89,6 +89,39 @@ class _ExpenseCategoryFilter extends StatelessWidget {
   }
 }
 
+/// 统计页跳转带入的筛选区间提示条
+class _ExpenseRangeBar extends StatelessWidget {
+  final String hint;
+  final VoidCallback onClear;
+
+  const _ExpenseRangeBar({required this.hint, required this.onClear});
+
+  @override
+  Widget build(BuildContext context) {
+    final scheme = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+        decoration: BoxDecoration(
+          color: scheme.surfaceContainerHighest,
+          borderRadius: BorderRadius.circular(12),
+        ),
+        child: Row(
+          children: [
+            Icon(Icons.filter_alt_outlined, size: 16, color: scheme.onSurfaceVariant),
+            const SizedBox(width: 8),
+            Expanded(
+              child: Text(hint, style: Theme.of(context).textTheme.bodySmall),
+            ),
+            TextButton(onPressed: onClear, child: const Text('清除')),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
 /// 支出列表空状态
 class _ExpenseEmptyState extends StatelessWidget {
   final Future<void> Function() onRefresh;
