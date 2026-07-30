@@ -44,6 +44,9 @@ class NotificationService {
 
     // 初始化时区数据
     tz_data.initializeTimeZones();
+    // 项目铁律：时间口径固定北京。timezone 包不感知设备时区，tz.local 默认为 UTC，
+    // 不显式设置会导致按墙钟构造的调度（习惯打卡/每日通知）真机+模拟器均固定晚 8 小时。
+    tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
 
     // Android 初始化设置
     const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
@@ -580,7 +583,10 @@ class NotificationService {
       minute = int.tryParse(parts[1]) ?? 0;
     }
     final next = a.nextDate;
-    final base = DateTime(next.year, next.month, next.day, hour, minute);
+    // 基准时刻按北京墙钟构造（tz.local 已固定 Asia/Shanghai）。
+    // 若用 DateTime() 设备墙钟构造，UTC 模拟器上会晚 8 小时触发。
+    final DateTime base =
+        tz.TZDateTime(tz.local, next.year, next.month, next.day, hour, minute);
 
     var scheduled = 0;
     for (var i = 0; i < a.remindOffsets.length && i < _maxOffsets; i++) {
@@ -588,7 +594,9 @@ class NotificationService {
       // 推算出的时刻若已过去（如今年已过的提前档），顺延到下一年对应月/日
       var target = offset.resolve(base);
       if (target.isBefore(DateTime.now())) {
-        target = DateTime(
+        // 顺延同样用北京墙钟构造（target 为 TZDateTime，字段即北京墙钟值）
+        target = tz.TZDateTime(
+          tz.local,
           target.year + 1,
           target.month,
           target.day,
