@@ -11,6 +11,7 @@ import '../models/reminder_model.dart';
 import '../models/remind_offset.dart';
 import '../widgets/remind_offset_selector.dart';
 import '../widgets/app_date_picker.dart';
+import '../../../core/utils/event_bus.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
 class RemindersScreen extends StatefulWidget {
@@ -112,6 +113,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           // 挂接本地横幅提醒（result 已含 id 与 remindAt）
           await NotificationService.instance.scheduleReminderNotification(result);
           _loadReminders();
+          EventBus.instance.fire(EventType.reminderUpdated);
         } else {
           throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
         }
@@ -142,6 +144,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           // 重新挂接本地横幅提醒（时间可能已变更，同名 id 覆盖旧调度）
           await NotificationService.instance.scheduleReminderNotification(result);
           _loadReminders();
+          EventBus.instance.fire(EventType.reminderUpdated);
         } else {
           throw Exception('HTTP ${apiResult.statusCode}: ${apiResult.errorMessage}');
         }
@@ -167,6 +170,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           // 删除时同步取消本地横幅提醒
           await NotificationService.instance.cancelReminderNotification(id);
           _loadReminders();
+          EventBus.instance.fire(EventType.reminderUpdated);
           if (mounted) {
             showSnackBar(context, '删除成功');
           }
@@ -197,6 +201,7 @@ class _RemindersScreenState extends State<RemindersScreen> {
           await NotificationService.instance.scheduleReminderNotification(reminder);
         }
         _loadReminders();
+        EventBus.instance.fire(EventType.reminderUpdated);
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }

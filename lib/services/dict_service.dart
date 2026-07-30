@@ -323,6 +323,7 @@ class DictService {
       await prefs.setString(_cacheKey, jsonEncode(cacheData));
       await prefs.setInt(_cacheTimestampKey, DateTime.now().millisecondsSinceEpoch);
       await prefs.setInt(_cacheVersionKey, _cacheVersion);
+      _refreshNotifier.value++; // 通知已开表单：字典缓存已更新
     } catch (e) {
       if (kDebugMode) debugPrint('❌ 字典服务保存本地缓存失败');
     }
@@ -403,6 +404,7 @@ class DictService {
   void clearCache() {
     _cache.clear();
     _typeIdMap.clear();
+    _refreshNotifier.value++; // 通知已开表单：字典缓存已清空
     if (kDebugMode) debugPrint('🗑️ 字典缓存已清空');
   }
 
@@ -450,8 +452,11 @@ class DictService {
     }
   }
 
-  /// 兼容旧代码：refreshNotifier（空实现，旧代码用它触发刷新）
-  ValueNotifier<int> get refreshNotifier => ValueNotifier<int>(0);
+  /// 字典缓存更新通知器（单例共享，缓存变更时自增，供已开表单即时刷新）
+  /// 旧实现每次访问 new 一个实例，导致 addListener/removeListener 作用在互不相干的实例上、
+  /// 监听方永远收不到通知；改为单例共享后可正常触发。
+  static final ValueNotifier<int> _refreshNotifier = ValueNotifier<int>(0);
+  ValueNotifier<int> get refreshNotifier => _refreshNotifier;
 
   /// 兼容旧代码：通过属性访问 moodType
   static List<DictItem> get moodType => _instance._cache['mood_type'] ?? [];

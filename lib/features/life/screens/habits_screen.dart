@@ -11,6 +11,7 @@ import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
 import '../widgets/habit_card.dart';
 import './habit_edit_dialog.dart';
+import '../../../core/utils/event_bus.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
@@ -264,6 +265,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       }
 
       await _loadHabits(refresh: true);
+      EventBus.instance.fire(EventType.habitUpdated);
 
       if (!mounted) return;
       // 显示成功提示
@@ -297,6 +299,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           // 删除习惯时同步取消其本地横幅提醒
           await NotificationService.instance.cancelHabitReminder(id);
           _loadHabits(refresh: true);
+          EventBus.instance.fire(EventType.habitUpdated);
           if (mounted) {
             showSnackBar(context, '删除成功');
           }
@@ -341,6 +344,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           }
         }
         _loadHabits(refresh: true);
+        EventBus.instance.fire(EventType.habitUpdated);
       } else {
         throw Exception('HTTP ${result.statusCode}');
       }
@@ -355,7 +359,10 @@ class _HabitsScreenState extends State<HabitsScreen> {
       habit: habit,
       reminderSchedules: _reminderSchedules,
       currentUserId: _userId,
-      onSaved: () => _loadHabits(refresh: true),
+      onSaved: () {
+        _loadHabits(refresh: true);
+        EventBus.instance.fire(EventType.habitUpdated);
+      },
     );
   }
 

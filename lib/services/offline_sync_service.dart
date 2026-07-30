@@ -1,6 +1,8 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'dart:async';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import './api_client.dart';
 
 /// 离线操作类型
@@ -18,9 +20,37 @@ class OfflineSyncService {
 
   bool _isSyncing = false;
 
-  /// 初始化：启动时尝试同步待处理队列
+  final Connectivity _connectivity = Connectivity();
+  StreamSubscription<ConnectivityResult>? _connectivitySub;
+  bool _listenerRegistered = false;
+  bool _wasOffline = false;
+
+  /// 初始化：启动时尝试同步待处理队列，并注册网络恢复监听
   Future<void> initialize() async {
     await syncPending();
+    _registerConnectivityListener();
+  }
+
+  /// 注册网络状态监听：网络从离线恢复时自动补发离线队列，
+  /// 消除「离线写成功入队但永不补发（直到重启或手动触发）」的弱一致。
+  void _registerConnectivityListener() {
+    if (_listenerRegistered) return;
+    _listenerRegistered = true;
+    _connectivitySub = _connectivity.onConnectivityChanged.listen((result) {
+      final online = result != ConnectivityResult.none;
+      if (online && _wasOffline) {
+        if (kDebugMode) debugPrint('📡 网络恢复，自动补发离线队列');
+        syncPending();
+      }
+      _wasOffline = !online;
+    });
+  }
+
+  /// 释放网络监听（应用退出时调用）
+  Future<void> dispose() async {
+    await _connectivitySub?.cancel();
+    _connectivitySub = null;
+    _listenerRegistered = false;
   }
 
   /// 将失败的操作加入离线队列
