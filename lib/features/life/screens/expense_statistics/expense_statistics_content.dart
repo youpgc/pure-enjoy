@@ -1,8 +1,7 @@
 import 'package:flutter/material.dart';
-import 'package:fl_chart/fl_chart.dart';
 import '../../../../core/widgets/widgets.dart';
-import '../../../../core/theme/app_theme.dart';
 import '../../../../services/dict_service.dart';
+import './expense_statistics_widgets.dart';
 import '../expense_list/expense_list_screen.dart';
 
 /// {@template expense_statistics_content}
@@ -41,7 +40,7 @@ class ExpenseStatisticsContent extends StatelessWidget {
       return Center(child: Text(error));
     }
     if (expenses.isEmpty) {
-      return _ExpenseEmptyState(
+      return ExpenseEmptyState(
         rangeText: rangeText,
         startMonth: startMonth,
         endMonth: endMonth,
@@ -56,119 +55,6 @@ class ExpenseStatisticsContent extends StatelessWidget {
       rangeText: rangeText,
       onPickStartMonth: onPickStartMonth,
       onPickEndMonth: onPickEndMonth,
-    );
-  }
-}
-
-/// 时间区间标题与选择按钮（有/无数据共用）。
-class _ExpenseRangeHeader extends StatelessWidget {
-  const _ExpenseRangeHeader({
-    required this.rangeText,
-    required this.startMonth,
-    required this.endMonth,
-    required this.onPickStartMonth,
-    required this.onPickEndMonth,
-  });
-
-  final String rangeText;
-  final DateTime startMonth;
-  final DateTime endMonth;
-  final VoidCallback onPickStartMonth;
-  final VoidCallback onPickEndMonth;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        children: [
-          Text(
-            rangeText,
-            style: Theme.of(context).textTheme.titleMedium,
-          ),
-          const SizedBox(height: 8),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onPickStartMonth,
-                icon: const Icon(Icons.date_range, size: 16),
-                label: Text(
-                  '${startMonth.year}-${startMonth.month.toString().padLeft(2, '0')}',
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('至'),
-              ),
-              OutlinedButton.icon(
-                onPressed: onPickEndMonth,
-                icon: const Icon(Icons.date_range, size: 16),
-                label: Text(
-                  '${endMonth.year}-${endMonth.month.toString().padLeft(2, '0')}',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 空数据占位（含区间选择）。
-class _ExpenseEmptyState extends StatelessWidget {
-  const _ExpenseEmptyState({
-    required this.rangeText,
-    required this.startMonth,
-    required this.endMonth,
-    required this.onPickStartMonth,
-    required this.onPickEndMonth,
-  });
-
-  final String rangeText;
-  final DateTime startMonth;
-  final DateTime endMonth;
-  final VoidCallback onPickStartMonth;
-  final VoidCallback onPickEndMonth;
-
-  @override
-  Widget build(BuildContext context) {
-    return Center(
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          const Icon(Icons.receipt_long_outlined, size: 64, color: Colors.grey),
-          const SizedBox(height: 16),
-          Text(
-            '$rangeText暂无消费记录',
-            style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Colors.grey),
-          ),
-          const SizedBox(height: 24),
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              OutlinedButton.icon(
-                onPressed: onPickStartMonth,
-                icon: const Icon(Icons.date_range),
-                label: Text(
-                  '${startMonth.year}-${startMonth.month.toString().padLeft(2, '0')}',
-                ),
-              ),
-              const Padding(
-                padding: EdgeInsets.symmetric(horizontal: 8),
-                child: Text('至'),
-              ),
-              OutlinedButton.icon(
-                onPressed: onPickEndMonth,
-                icon: const Icon(Icons.date_range),
-                label: Text(
-                  '${endMonth.year}-${endMonth.month.toString().padLeft(2, '0')}',
-                ),
-              ),
-            ],
-          ),
-        ],
-      ),
     );
   }
 }
@@ -198,12 +84,17 @@ class _ExpenseStatisticsLoaded extends StatefulWidget {
 }
 
 class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
-  /// 当前选中的分类下标；用于跳转前的视觉高亮（返回统计页后仍可见）。
+  /// 当前选中的分类下标；null 表示未选中（展示总额）。
   int? _selectedIndex;
 
-  /// 点击分类：高亮并跳转到该分类在统计区间内的消费记录列表。
+  /// 点击扇区/分类：仅切换选中态（放大 + 中心明细 + 列表高亮），再次点击取消。
+  /// 跳转由下方「查看对应消费记录」按钮触发，避免选中态被跳转吞掉（闭环修复 缺口2）。
+  void _toggleSelect(int index) {
+    setState(() => _selectedIndex = _selectedIndex == index ? null : index);
+  }
+
+  /// 跳转至该分类在统计区间内的消费记录列表。
   void _openCategoryRecords(int index, String categoryKey) {
-    setState(() => _selectedIndex = index);
     Navigator.of(context).push(
       MaterialPageRoute(
         builder: (_) => ExpenseListScreen(
@@ -233,20 +124,32 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
     final colors = [
       Theme.of(context).colorScheme.primary,
       Theme.of(context).colorScheme.secondary,
-      AppTheme.success,
-      Theme.of(context).colorScheme.primary,
       Theme.of(context).colorScheme.error,
       Theme.of(context).colorScheme.tertiary,
+      Theme.of(context).colorScheme.primary,
       Theme.of(context).colorScheme.secondary,
+      Theme.of(context).colorScheme.error,
       Theme.of(context).colorScheme.primary,
     ];
+
+    final hasSelection =
+        _selectedIndex != null && _selectedIndex! < categories.length;
+    final selectedKey =
+        hasSelection ? categories[_selectedIndex!].key : null;
+    final selectedLabel = hasSelection && selectedKey != null
+        ? DictService.instance.getLabelOrDefault(
+            'expense_category',
+            selectedKey,
+            defaultValue: selectedKey,
+          )
+        : null;
 
     return SingleChildScrollView(
       padding: const EdgeInsets.all(16),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _ExpenseRangeHeader(
+          ExpenseRangeHeader(
             rangeText: widget.rangeText,
             startMonth: widget.startMonth,
             endMonth: widget.endMonth,
@@ -254,25 +157,25 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
             onPickEndMonth: widget.onPickEndMonth,
           ),
           const SizedBox(height: 16),
-          _ExpenseTotalCard(total: total, count: widget.expenses.length),
+          ExpenseTotalCard(total: total, count: widget.expenses.length),
           const SizedBox(height: 24),
           Text(
             '消费分类',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 16),
-          _ExpensePieChart(
+          ExpensePieChart(
             categories: categories,
             colors: colors,
             total: total,
             selectedIndex: _selectedIndex,
-            onTouched: (i) => _openCategoryRecords(i, categories[i].key),
+            onTouched: _toggleSelect,
           ),
           Padding(
             padding: const EdgeInsets.only(top: 8),
             child: Center(
               child: Text(
-                '轻触扇区或分类查看对应消费记录',
+                '轻触扇区或分类查看明细，选中后点下方按钮跳转对应消费记录',
                 style: Theme.of(context).textTheme.bodySmall?.copyWith(
                       color: Theme.of(context).colorScheme.onSurfaceVariant,
                     ),
@@ -280,236 +183,26 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
             ),
           ),
           const SizedBox(height: 16),
-          _ExpenseCategoryList(
+          ExpenseCategoryList(
             categories: categories,
             colors: colors,
             selectedIndex: _selectedIndex,
-            onTap: (i) => _openCategoryRecords(i, categories[i].key),
+            onTap: _toggleSelect,
           ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 总消费卡片。
-class _ExpenseTotalCard extends StatelessWidget {
-  const _ExpenseTotalCard({required this.total, required this.count});
-
-  final double total;
-  final int count;
-
-  @override
-  Widget build(BuildContext context) {
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
-          children: [
-            Text(
-              '总消费',
-              style: Theme.of(context).textTheme.titleMedium,
-            ),
-            const SizedBox(height: 8),
-            Text(
-              '¥${total.toStringAsFixed(2)}',
-              style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
-                    fontWeight: FontWeight.bold,
-                  ),
-            ),
-            Text(
-              '$count 笔消费',
-              style: Theme.of(context).textTheme.bodySmall,
-            ),
-          ],
-        ),
-      ),
-    );
-  }
-}
-
-/// 圆环中心信息（选中分类明细 / 未选中时展示总额）。
-class _PieCenterInfo extends StatelessWidget {
-  const _PieCenterInfo({
-    required this.label,
-    required this.amount,
-    this.percentage,
-  });
-
-  final String label;
-  final double amount;
-  final double? percentage;
-
-  @override
-  Widget build(BuildContext context) {
-    final textColor = Theme.of(context).colorScheme.onSurface;
-    return SizedBox(
-      width: 104,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Text(
-            label,
-            style: Theme.of(context).textTheme.labelMedium?.copyWith(
-                  color: textColor.withValues(alpha: 0.7),
+          if (hasSelection && selectedLabel != null)
+            Padding(
+              padding: const EdgeInsets.only(top: 12),
+              child: Center(
+                child: FilledButton.icon(
+                  icon: const Icon(Icons.arrow_forward),
+                  label: Text('查看$selectedLabel对应消费记录'),
+                  onPressed: () =>
+                      _openCategoryRecords(_selectedIndex!, selectedKey!),
                 ),
-            textAlign: TextAlign.center,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-          const SizedBox(height: 4),
-          Text(
-            '¥${amount.toStringAsFixed(2)}',
-            style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                  fontWeight: FontWeight.bold,
-                  color: textColor,
-                ),
-            textAlign: TextAlign.center,
-          ),
-          if (percentage != null)
-            Text(
-              '${percentage!.toStringAsFixed(1)}%',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: textColor.withValues(alpha: 0.6),
-                  ),
-              textAlign: TextAlign.center,
-            ),
-        ],
-      ),
-    );
-  }
-}
-
-/// 分类饼图（可交互：点击扇区选中，与分类列表双向联动）。
-class _ExpensePieChart extends StatelessWidget {
-  const _ExpensePieChart({
-    required this.categories,
-    required this.colors,
-    required this.total,
-    required this.selectedIndex,
-    required this.onTouched,
-  });
-
-  final List<MapEntry<String, double>> categories;
-  final List<Color> colors;
-  final double total;
-  final int? selectedIndex;
-  final ValueChanged<int> onTouched;
-
-  @override
-  Widget build(BuildContext context) {
-    final selected = selectedIndex != null && selectedIndex! < categories.length
-        ? categories[selectedIndex!]
-        : null;
-
-    final centerChild = selected != null
-        ? _PieCenterInfo(
-            label: DictService.instance.getLabelOrDefault(
-              'expense_category',
-              selected.key,
-              defaultValue: selected.key,
-            ),
-            amount: selected.value,
-            percentage: total > 0 ? selected.value / total * 100 : 0,
-          )
-        : _PieCenterInfo(
-            label: '总支出',
-            amount: total,
-          );
-
-    return SizedBox(
-      height: 220,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          PieChart(
-            PieChartData(
-              sections: categories.asMap().entries.map((entry) {
-                final index = entry.key;
-                final category = entry.value;
-                final percentage = total > 0 ? (category.value / total * 100) : 0.0;
-                final isSelected = selectedIndex == index;
-                final radius = isSelected
-                    ? 98.0
-                    : (selectedIndex == null ? 80.0 : 68.0);
-                return PieChartSectionData(
-                  value: category.value,
-                  title: '${percentage.toStringAsFixed(1)}%',
-                  color: colors[index % colors.length],
-                  radius: radius,
-                  titleStyle: const TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.bold,
-                    color: Colors.white,
-                  ),
-                );
-              }).toList(),
-              sectionsSpace: 2,
-              centerSpaceRadius: 58,
-              pieTouchData: PieTouchData(
-                touchCallback: (event, response) {
-                  if (!event.isInterestedForInteractions) return;
-                  if (event is FlTapUpEvent) {
-                    final idx = response?.touchedSection?.touchedSectionIndex;
-                    if (idx != null && idx >= 0 && idx < categories.length) {
-                      onTouched(idx);
-                    }
-                  }
-                },
               ),
             ),
-          ),
-          centerChild,
         ],
       ),
-    );
-  }
-}
-
-/// 分类列表（可点击，与饼图选中态双向联动）。
-class _ExpenseCategoryList extends StatelessWidget {
-  const _ExpenseCategoryList({
-    required this.categories,
-    required this.colors,
-    required this.selectedIndex,
-    required this.onTap,
-  });
-
-  final List<MapEntry<String, double>> categories;
-  final List<Color> colors;
-  final int? selectedIndex;
-  final ValueChanged<int> onTap;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: categories.asMap().entries.map((entry) {
-        final index = entry.key;
-        final category = entry.value;
-        final isSelected = selectedIndex == index;
-        final categoryLabel = DictService.instance.getLabelOrDefault(
-          'expense_category',
-          category.key,
-          defaultValue: category.key,
-        );
-        return ListTile(
-          selected: isSelected,
-          selectedColor: Theme.of(context).colorScheme.onSurface,
-          selectedTileColor:
-              colors[index % colors.length].withValues(alpha: 0.12),
-          leading: CircleAvatar(
-            backgroundColor: colors[index % colors.length],
-            radius: 12,
-          ),
-          title: Text(categoryLabel),
-          trailing: Text(
-            '¥${category.value.toStringAsFixed(2)}',
-            style: const TextStyle(fontWeight: FontWeight.bold),
-          ),
-          onTap: () => onTap(index),
-        );
-      }).toList(),
     );
   }
 }

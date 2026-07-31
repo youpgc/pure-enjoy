@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/api_client.dart';
+import '../../../../core/utils/event_bus.dart';
 import '../../widgets/app_date_picker.dart';
 import './expense_statistics_content.dart';
 
@@ -19,13 +21,24 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
   String _error = '';
   DateTime _startMonth = DateTime.now();
   DateTime _endMonth = DateTime.now();
+  StreamSubscription<void>? _expenseSub;
 
   @override
   void initState() {
     super.initState();
     _startMonth = DateTime.now();
     _endMonth = DateTime.now();
+    // 闭环修复：从统计页跳转到列表并编辑/删除记录后，列表会 fire(expenseUpdated)，
+    // 统计页在路由栈底层需监听该事件以刷新饼图（否则返回后仍为旧聚合）。
+    _expenseSub =
+        EventBus.instance.on(EventType.expenseUpdated).listen((_) => _loadData());
     _loadData();
+  }
+
+  @override
+  void dispose() {
+    _expenseSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {

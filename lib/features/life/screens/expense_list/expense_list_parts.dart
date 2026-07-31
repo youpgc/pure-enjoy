@@ -5,11 +5,13 @@ class _ExpenseStatCard extends StatelessWidget {
   final DateTime displayedMonth;
   final double totalAmount;
   final bool isLoadingTotal;
+  final String? overrideLabel;
 
   const _ExpenseStatCard({
     required this.displayedMonth,
     required this.totalAmount,
     required this.isLoadingTotal,
+    this.overrideLabel,
   });
 
   @override
@@ -27,7 +29,8 @@ class _ExpenseStatCard extends StatelessWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Text(
-            '${displayedMonth.year}年${displayedMonth.month.toString().padLeft(2, '0')}月',
+            overrideLabel ??
+                '${displayedMonth.year}年${displayedMonth.month.toString().padLeft(2, '0')}月',
             style: Theme.of(context).textTheme.titleMedium,
           ),
           const SizedBox(height: 8),
@@ -213,4 +216,159 @@ void _showExpenseFormSheet({
       },
     ),
   );
+}
+
+/// 记账 CRUD 动作抽取为 mixin，避免 [_ExpenseListScreenState] 超 500 行（膨胀修复）。
+///
+/// 约束 `on _ExpenseListScreenState`：可直接调用其 [_loadExpenses] / [_userId] 等成员。
+mixin _ExpenseListActionsMixin on _ExpenseListActionsHost {
+  Future<void> _addExpense(ExpenseModel expense) async {
+    try {
+      final result = await ApiClient.post(
+        'expenses',
+        expense.toJson(),
+      );
+
+      if (result.isSuccess) {
+        await _loadExpenses(refresh: true);
+        EventBus.instance.fire(EventType.expenseUpdated);
+        OfflineSyncService.instance.syncPending();
+        if (mounted) {
+          showSnackBar(context, '添加成功');
+        }
+      } else {
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.create,
+          table: 'expenses',
+          data: expense.toJson(),
+        );
+        if (mounted) {
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+        }
+      }
+    } catch (e) {
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.create,
+        table: 'expenses',
+        data: expense.toJson(),
+      );
+      if (mounted) {
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+      }
+    }
+  }
+
+  Future<void> _deleteExpense(String id) async {
+    final confirm = await showConfirmDialog(
+      context,
+      title: '确认删除',
+      content: '确定要删除这条记录吗？',
+    );
+
+    if (confirm == true) {
+      try {
+        final result = await ApiClient.batchDeleteByFilter(
+          'expenses',
+          filters: {'id': 'eq.$id'},
+        );
+
+        if (result.isSuccess) {
+          await _loadExpenses(refresh: true);
+          EventBus.instance.fire(EventType.expenseUpdated);
+          OfflineSyncService.instance.syncPending();
+          if (mounted) {
+            showSnackBar(context, '删除成功');
+          }
+        } else {
+          await OfflineSyncService.instance.enqueue(
+            action: OfflineAction.delete,
+            table: 'expenses',
+            filters: {'id': 'eq.$id'},
+          );
+          if (mounted) {
+            showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+          }
+        }
+      } catch (e) {
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.delete,
+          table: 'expenses',
+          filters: {'id': 'eq.$id'},
+        );
+        if (mounted) {
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+        }
+      }
+    }
+  }
+
+  Future<void> _updateExpense(ExpenseModel expense) async {
+    try {
+      final body = {
+        'amount': expense.amount,
+        'category': expense.category,
+        'description': expense.description,
+        'note': expense.note,
+        'date': expense.date.toIso8601String().split('T').first,
+      };
+      final result = await ApiClient.patchByFilter(
+        'expenses',
+        filters: {'id': 'eq.${expense.id}'},
+        body: body,
+      );
+
+      if (result.isSuccess) {
+        await _loadExpenses(refresh: true);
+        EventBus.instance.fire(EventType.expenseUpdated);
+        OfflineSyncService.instance.syncPending();
+        if (mounted) {
+          showSnackBar(context, '更新成功');
+        }
+      } else {
+        await OfflineSyncService.instance.enqueue(
+          action: OfflineAction.update,
+          table: 'expenses',
+          data: body,
+          filters: {'id': 'eq.${expense.id}'},
+        );
+        if (mounted) {
+          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+        }
+      }
+    } catch (e) {
+      final body = {
+        'amount': expense.amount,
+        'category': expense.category,
+        'description': expense.description,
+        'note': expense.note,
+        'date': expense.date.toIso8601String().split('T').first,
+      };
+      await OfflineSyncService.instance.enqueue(
+        action: OfflineAction.update,
+        table: 'expenses',
+        data: body,
+        filters: {'id': 'eq.${expense.id}'},
+      );
+      if (mounted) {
+        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
+      }
+    }
+  }
+
+  void _showEditExpenseForm(ExpenseModel expense) {
+    _showExpenseFormSheet(
+      context: context,
+      userId: _userId ?? 'local_user',
+      expense: expense,
+      onSave: _updateExpense,
+    );
+  }
+
+  void _showExpenseForm() {
+    _showExpenseFormSheet(
+      context: context,
+      userId: _userId ?? 'local_user',
+      onSave: _addExpense,
+    );
+  }
 }

@@ -38,7 +38,15 @@ class ExpenseListScreen extends StatefulWidget {
   State<ExpenseListScreen> createState() => _ExpenseListScreenState();
 }
 
-class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedListMixin {
+/// 抽象宿主类：声明 CRUD mixin 需要调用的成员，避免 mixin 自引用约束导致整条
+/// `with` 子句失效（膨胀修复）。
+abstract class _ExpenseListActionsHost extends State<ExpenseListScreen> {
+  Future<void> _loadExpenses({bool refresh = false});
+  String? get _userId;
+}
+
+class _ExpenseListScreenState extends _ExpenseListActionsHost
+    with PaginatedListMixin, _ExpenseListActionsMixin {
   List<ExpenseModel> _expenses = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
@@ -49,6 +57,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
   bool _isLoadingTotal = false;
   Timer? _monthUpdateDebounce;
 
+  @override
   String? get _userId => AuthService.instance.currentUserId;
 
   /// 统计页跳转带入的筛选区间提示文案
@@ -191,6 +200,7 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     }
   }
 
+  @override
   Future<void> _loadExpenses({bool refresh = false}) async {
     final userId = _userId;
     if (userId == null) {
@@ -298,150 +308,25 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
     }
   }
 
-  Future<void> _addExpense(ExpenseModel expense) async {
-    try {
-      final result = await ApiClient.post(
-        'expenses',
-        expense.toJson(),
-      );
-
-      if (result.isSuccess) {
-        await _loadExpenses(refresh: true);
-        EventBus.instance.fire(EventType.expenseUpdated);
-        OfflineSyncService.instance.syncPending();
-        if (mounted) {
-          showSnackBar(context, '添加成功');
-        }
-      } else {
-        await OfflineSyncService.instance.enqueue(
-          action: OfflineAction.create,
-          table: 'expenses',
-          data: expense.toJson(),
-        );
-        if (mounted) {
-          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-        }
-      }
-    } catch (e) {
-      await OfflineSyncService.instance.enqueue(
-        action: OfflineAction.create,
-        table: 'expenses',
-        data: expense.toJson(),
-      );
-      if (mounted) {
-        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-      }
+  /// 顶部统计卡片标题：区间生效时显示区间文案，否则显示当前视窗月份。
+  String get _headlineLabel {
+    if (_rangeStart != null && _rangeEnd != null) {
+      return '${_rangeStart!.year}年${_rangeStart!.month}月 - ${_rangeEnd!.year}年${_rangeEnd!.month}月';
+    } else if (_rangeStart != null) {
+      return '${_rangeStart!.year}年${_rangeStart!.month}月起';
+    } else if (_rangeEnd != null) {
+      return '至${_rangeEnd!.year}年${_rangeEnd!.month}月';
     }
+    return '${_displayedMonth.year}年${_displayedMonth.month.toString().padLeft(2, '0')}月';
   }
 
-  Future<void> _deleteExpense(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
-
-    if (confirm == true) {
-      try {
-        final result = await ApiClient.batchDeleteByFilter(
-          'expenses',
-          filters: {'id': 'eq.$id'},
-        );
-
-        if (result.isSuccess) {
-          await _loadExpenses(refresh: true);
-          EventBus.instance.fire(EventType.expenseUpdated);
-          OfflineSyncService.instance.syncPending();
-          if (mounted) {
-            showSnackBar(context, '删除成功');
-          }
-        } else {
-          await OfflineSyncService.instance.enqueue(
-            action: OfflineAction.delete,
-            table: 'expenses',
-            filters: {'id': 'eq.$id'},
-          );
-          if (mounted) {
-            showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-          }
-        }
-      } catch (e) {
-        await OfflineSyncService.instance.enqueue(
-          action: OfflineAction.delete,
-          table: 'expenses',
-          filters: {'id': 'eq.$id'},
-        );
-        if (mounted) {
-          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-        }
-      }
+  /// 顶部统计卡片金额：区间生效时显示区间内已加载记录的合计（与统计页本地聚合口径一致），
+  /// 否则显示服务端 RPC 的当月合计（_totalAmount）。
+  double get _headlineTotal {
+    if (_rangeStart != null || _rangeEnd != null) {
+      return _expenses.fold(0.0, (sum, e) => sum + e.amount);
     }
-  }
-
-  Future<void> _updateExpense(ExpenseModel expense) async {
-    try {
-      final body = {
-        'amount': expense.amount,
-        'category': expense.category,
-        'description': expense.description,
-        'note': expense.note,
-        'date': expense.date.toIso8601String().split('T').first,
-      };
-      final result = await ApiClient.patchByFilter(
-        'expenses',
-        filters: {'id': 'eq.${expense.id}'},
-        body: body,
-      );
-
-      if (result.isSuccess) {
-        await _loadExpenses(refresh: true);
-        EventBus.instance.fire(EventType.expenseUpdated);
-        OfflineSyncService.instance.syncPending();
-        if (mounted) {
-          showSnackBar(context, '更新成功');
-        }
-      } else {
-        await OfflineSyncService.instance.enqueue(
-          action: OfflineAction.update,
-          table: 'expenses',
-          data: body,
-          filters: {'id': 'eq.${expense.id}'},
-        );
-        if (mounted) {
-          showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-        }
-      }
-    } catch (e) {
-      final body = {
-        'amount': expense.amount,
-        'category': expense.category,
-        'description': expense.description,
-        'note': expense.note,
-        'date': expense.date.toIso8601String().split('T').first,
-      };
-      await OfflineSyncService.instance.enqueue(
-        action: OfflineAction.update,
-        table: 'expenses',
-        data: body,
-        filters: {'id': 'eq.${expense.id}'},
-      );
-      if (mounted) {
-        showSnackBar(context, '网络异常，已加入离线队列，恢复后自动同步');
-      }
-    }
-  }
-
-  void _showEditExpenseForm(ExpenseModel expense) {
-    _showExpenseFormSheet(
-      context: context,
-      userId: _userId ?? 'local_user',
-      expense: expense,
-      onSave: _updateExpense,
-    );
-  }
-
-  void _showExpenseForm() {
-    _showExpenseFormSheet(
-      context: context,
-      userId: _userId ?? 'local_user',
-      onSave: _addExpense,
-    );
+    return _totalAmount;
   }
 
   @override
@@ -467,8 +352,9 @@ class _ExpenseListScreenState extends State<ExpenseListScreen> with PaginatedLis
           // 统计卡片（服务端聚合查询，不受分页限制）
           _ExpenseStatCard(
             displayedMonth: _displayedMonth,
-            totalAmount: _totalAmount,
-            isLoadingTotal: _isLoadingTotal,
+            totalAmount: _headlineTotal,
+            isLoadingTotal: _rangeStart != null ? false : _isLoadingTotal,
+            overrideLabel: _rangeStart != null ? _headlineLabel : null,
           ),
 
           // 统计页跳转带入的筛选区间提示（可清除，清除后恢复不限日期）
