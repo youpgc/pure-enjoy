@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../services/dict_service.dart';
 import '../../../life/models/habit_model.dart';
-import '../../../novel/models/novel_model.dart';
 import './dashboard_helpers.dart';
 
 /// 由心情日记记录构建最近活动条目
@@ -42,35 +41,6 @@ Map<String, dynamic> buildWeightActivity(Map<String, dynamic> item) {
   };
 }
 
-/// 解析最近阅读小说列表并按阅读时间排序
-List<Map<String, dynamic>> buildRecentNovelList(
-  List<dynamic> novelsData,
-  Map<String, Map<String, dynamic>> progressMap,
-  List<String> novelIds,
-) {
-  final novels = <Map<String, dynamic>>[];
-  for (final novelData in novelsData) {
-    final novelId = novelData['id']?.toString() ?? '';
-    final progressItem = progressMap[novelId];
-    if (progressItem != null) {
-      novels.add({
-        'novel': NovelModel.fromJson(novelData),
-        'lastChapter': progressItem['last_chapter'] as int? ?? 1,
-        'progress': progressItem['progress'] as num? ?? 0.0,
-      });
-    }
-  }
-
-  novels.sort((a, b) {
-    final idA = (a['novel'] as NovelModel).id;
-    final idB = (b['novel'] as NovelModel).id;
-    final idxA = novelIds.indexOf(idA);
-    final idxB = novelIds.indexOf(idB);
-    return idxA.compareTo(idxB);
-  });
-
-  return novels;
-}
 
 /// 解析习惯列表（用于首页快捷打卡）
 List<HabitModel> parseHabits(List<dynamic> data) {
