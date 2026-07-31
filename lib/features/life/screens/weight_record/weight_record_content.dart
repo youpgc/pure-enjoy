@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/common_widgets.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../models/weight_record_model.dart';
@@ -81,7 +82,9 @@ class _WeightCurrentCard extends StatelessWidget {
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,

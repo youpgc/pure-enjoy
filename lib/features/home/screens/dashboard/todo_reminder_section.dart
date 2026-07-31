@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../life/models/reminder_model.dart';
 
@@ -31,7 +32,9 @@ class TodoReminderSection extends StatelessWidget {
             padding: const EdgeInsets.only(bottom: 8),
             child: InkWell(
               onTap: () => onTap(reminder),
-              borderRadius: BorderRadius.circular(12),
+              borderRadius: BorderRadius.circular(
+                UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+              ),
               child: Card(
                 color: isOverdue
                     ? colorScheme.errorContainer

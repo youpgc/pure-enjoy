@@ -23,7 +23,9 @@ class _ExpenseStatCard extends StatelessWidget {
       margin: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: colorScheme.primaryContainer,
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -108,7 +110,9 @@ class _ExpenseRangeBar extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
         decoration: BoxDecoration(
           color: scheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+          ),
         ),
         child: Row(
           children: [

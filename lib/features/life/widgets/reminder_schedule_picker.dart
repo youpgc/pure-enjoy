@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/reminder_schedule_model.dart';
 import './app_date_picker.dart';
 import './reminder_schedule_picker_utils.dart';
@@ -159,7 +160,9 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
             trailing: const Icon(Icons.chevron_right),
             onTap: _pickTime,
             shape: RoundedRectangleBorder(
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+              ),
               side: BorderSide(color: theme.colorScheme.outlineVariant),
             ),
           ),

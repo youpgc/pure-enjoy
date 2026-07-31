@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../services/dict_service.dart';
 import '../../avatar_render.dart';
 // [小说模块暂时停用] import '../reading_history_screen.dart';
@@ -245,7 +246,9 @@ class ProfileStatsRow extends StatelessWidget {
         child: Card(
           child: InkWell(
             onTap: onTap,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+            ),
             child: Padding(
               padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
               child: Column(

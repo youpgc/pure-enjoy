@@ -115,7 +115,9 @@ class HabitCardHeader extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             color: habitColor.withValues(alpha: 0.2),
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+            ),
           ),
           child: Icon(Icons.track_changes, color: habitColor),
         ),

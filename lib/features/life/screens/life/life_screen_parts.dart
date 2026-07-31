@@ -115,7 +115,9 @@ class _LatestRecordCard extends StatelessWidget {
       elevation: 2,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -225,7 +227,9 @@ class _LifeFeatureCard extends StatelessWidget {
       elevation: 2,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

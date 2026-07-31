@@ -231,7 +231,9 @@ class FontSizeSection extends StatelessWidget {
                   padding: const EdgeInsets.all(12),
                   decoration: BoxDecoration(
                     color: Theme.of(context).colorScheme.surfaceContainerHighest,
-                    borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(
+                      UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+                    ),
                   ),
                   child: Text(
                     '预览文本：纯享，记录生活每一天',
@@ -340,7 +342,12 @@ class UiStyleSection extends StatelessWidget {
             child: Wrap(
               spacing: 12,
               runSpacing: 12,
-              children: UiStyle.values.map((style) {
+              children: const [
+                UiStyle.sharpMinimal, // 圆角 4
+                UiStyle.minimalFlat, // 圆角 8
+                UiStyle.elegantAiry, // 圆角 12
+                UiStyle.pillModern, // 圆角 18
+              ].map((style) {
                 final token = UiStyleToken.of(style);
                 final isSelected = tp.uiStyle == style;
                 return GestureDetector(

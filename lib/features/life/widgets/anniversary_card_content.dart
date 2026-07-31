@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 import '../models/anniversary_model.dart';
 
 /// {@template anniversary_card_content}
@@ -86,7 +87,9 @@ class AnniversaryCardHeader extends StatelessWidget {
           height: 48,
           decoration: BoxDecoration(
             color: cardColor,
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(
+              UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+            ),
           ),
           child: Icon(
             isBirthday ? Icons.cake : Icons.celebration,

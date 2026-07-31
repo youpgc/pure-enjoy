@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import './point_record_info.dart';
 import '../../models/point_record_model.dart';
 import '../../../../utils/date_time_utils.dart';
@@ -273,7 +274,9 @@ class PointRecordsStreakBanner extends StatelessWidget {
         padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
         decoration: BoxDecoration(
           color: colorScheme.primary.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(
+            UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+          ),
         ),
         child: Row(
           children: [

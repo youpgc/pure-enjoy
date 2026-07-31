@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../core/theme/app_theme.dart';
 
 /// 工具卡片组件
 ///
@@ -22,7 +23,9 @@ class ToolCard extends StatelessWidget {
     return Card(
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

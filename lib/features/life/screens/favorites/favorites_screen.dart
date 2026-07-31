@@ -6,6 +6,7 @@ import '../../../../services/api_client.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../../utils/cache_helper.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/common_widgets.dart';
 import '../../../../services/dict_service.dart';
 import '../../models/favorite_model.dart';

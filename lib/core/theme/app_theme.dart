@@ -76,8 +76,31 @@ class UiStyleToken {
   static UiStyleToken of(UiStyle style) => tokens[style]!;
 }
 
+/// 将当前 UI 风格注入 Flutter ThemeData，供任意 widget 通过 [AppTheme.uiStyleOf]
+/// 读取，从而让装饰卡等硬编码圆角也能跟随风格切换（无需把 widget 改成 ConsumerWidget）。
+class UiStyleTheme extends ThemeExtension<UiStyleTheme> {
+  final UiStyle uiStyle;
+  const UiStyleTheme(this.uiStyle);
+
+  @override
+  UiStyleTheme copyWith({UiStyle? uiStyle}) =>
+      UiStyleTheme(uiStyle ?? this.uiStyle);
+
+  @override
+  UiStyleTheme lerp(ThemeExtension<UiStyleTheme>? other, double t) {
+    if (other is! UiStyleTheme) return this;
+    return UiStyleTheme(other.uiStyle);
+  }
+}
+
 /// 应用主题配置 - 基于logo的橙黄配色方案
 class AppTheme {
+  /// 从 ThemeData 读取当前 UI 风格（由 main 注入），装饰卡据此跟随风格切换圆角。
+  static UiStyle uiStyleOf(BuildContext context) {
+    final ext = Theme.of(context).extension<UiStyleTheme>();
+    return ext?.uiStyle ?? UiStyle.minimalFlat;
+  }
+
   // ===== Logo 主色调 =====
   static const Color primaryOrange = Color(0xFFF26522);   // 深橙色
   static const Color primaryYellow = Color(0xFFFFC107);   // 暖黄色
@@ -364,6 +387,7 @@ class AppTheme {
         ),
         textStyle: TextStyle(color: colorScheme.onInverseSurface),
       ),
+      extensions: <ThemeExtension<dynamic>>[UiStyleTheme(uiStyle)],
     );
   }
 }

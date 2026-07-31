@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/common_widgets.dart';
 import '../../../../services/dict_service.dart';
 import '../../../../utils/date_time_utils.dart';
@@ -139,7 +140,9 @@ class _MoodDiaryTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: () => onShowEditForm(diary),
-        borderRadius: BorderRadius.circular(16),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Column(

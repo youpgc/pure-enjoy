@@ -296,7 +296,9 @@ class _FeedbackFlowSection extends StatelessWidget {
             padding: const EdgeInsets.all(24),
             decoration: BoxDecoration(
               color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-              borderRadius: BorderRadius.circular(8),
+              borderRadius: BorderRadius.circular(
+                UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+              ),
             ),
             child: Center(
               child: Text(
@@ -402,7 +404,9 @@ class _FeedbackTimelineItem extends StatelessWidget {
                       padding: const EdgeInsets.all(10),
                       decoration: BoxDecoration(
                         color: colorScheme.surfaceContainerHighest.withValues(alpha: 0.5),
-                        borderRadius: BorderRadius.circular(6),
+                        borderRadius: BorderRadius.circular(
+                          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+                        ),
                       ),
                       child: Text(
                         record['remark'],

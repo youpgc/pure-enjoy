@@ -6,6 +6,7 @@ import '../../../../services/dict_service.dart';
 import '../../../../services/api_client.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../../core/utils/event_bus.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../expense_list/expense_list_screen.dart';
 import '../mood_diary/mood_diary_screen.dart';
 import '../note_list/note_list_screen.dart';

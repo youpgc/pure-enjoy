@@ -23,7 +23,9 @@ class _FavoriteListItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 12),
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(12),
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
         child: Padding(
           padding: const EdgeInsets.all(16),
           child: Row(
@@ -33,7 +35,9 @@ class _FavoriteListItem extends StatelessWidget {
                 height: 48,
                 decoration: BoxDecoration(
                   color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(12),
+                  borderRadius: BorderRadius.circular(
+                    UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+                  ),
                 ),
                 child: Icon(
                   favorite.url != null ? Icons.link : Icons.bookmark,

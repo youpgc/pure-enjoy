@@ -47,7 +47,9 @@ class AnnouncementBanner extends StatelessWidget {
                 padding: const EdgeInsets.all(6),
                 decoration: BoxDecoration(
                   color: AppTheme.primaryOrange.withValues(alpha: 0.12),
-                  borderRadius: BorderRadius.circular(10),
+                  borderRadius: BorderRadius.circular(
+                    UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+                  ),
                 ),
                 child: const Icon(
                   Icons.campaign_outlined,
