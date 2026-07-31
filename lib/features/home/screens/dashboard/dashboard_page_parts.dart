@@ -40,7 +40,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
       EventType.noteUpdated: () => _loadRecentActivities(force: true),
       EventType.habitUpdated: _onHabitUpdated,
       EventType.reminderUpdated: () => _loadPendingReminders(force: true),
-      // [小说模块暂时停用] EventType.bookshelfUpdated: _onBookshelfChanged,
+      EventType.bookshelfUpdated: _onBookshelfChanged,
     };
     handlers.forEach((type, handler) {
       _eventSubscriptions.add(
@@ -51,11 +51,11 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
     });
   }
 
-  // [小说模块暂时停用] 书架变化刷新最近阅读
-  // void _onBookshelfChanged() {
-  //   unawaited(RequestCache.invalidate(_kCacheRecentNovels));
-  //   _loadRecentNovels(force: true);
-  // }
+  // 书架变化刷新最近阅读
+  void _onBookshelfChanged() {
+    unawaited(RequestCache.invalidate(_kCacheRecentNovels));
+    _loadRecentNovels(force: true);
+  }
 
   @override
   void dispose() {
@@ -69,7 +69,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
     await Future.wait([
       _loadRecentActivities(),
       _loadPendingReminders(),
-      // [小说模块暂时停用] _loadRecentNovels(),
+      _loadRecentNovels(),
       _loadToolConfig(),
       _loadHabitsForCheckin(),
       _loadAnnouncements(),
@@ -96,17 +96,17 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
     ).then((_) => _loadPendingReminders(force: true));
   }
 
-  // [小说模块暂时停用] 继续阅读小说入口
-  // Future<void> _continueReading(NovelModel novel, int lastChapter) async {
-  //   // 聚合小说按来源路由到外部；返回（内置阅读器/WebView 出栈）后刷新最近阅读
-  //   await NovelLaunchService.instance.launch(
-  //     context,
-  //     novel,
-  //     startChapter: lastChapter,
-  //   );
-  //   unawaited(RequestCache.invalidate(_kCacheRecentNovels));
-  //   _loadRecentNovels();
-  // }
+  // 继续阅读小说入口
+  Future<void> _continueReading(NovelModel novel, int lastChapter) async {
+    // 聚合小说按来源路由到外部；返回（内置阅读器/WebView 出栈）后刷新最近阅读
+    await NovelLaunchService.instance.launch(
+      context,
+      novel,
+      startChapter: lastChapter,
+    );
+    unawaited(RequestCache.invalidate(_kCacheRecentNovels));
+    _loadRecentNovels();
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -132,7 +132,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
           await Future.wait([
             _loadRecentActivities(force: true),
             _loadPendingReminders(force: true),
-            // [小说模块暂时停用] _loadRecentNovels(force: true),
+            _loadRecentNovels(force: true),
             _loadAnnouncements(),
           ]);
         },
@@ -164,12 +164,12 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
               ),
               onToolTap: _onToolTap,
             ),
-            // [小说模块暂时停用] 首页「最近阅读」小说入口隐藏
-            // RecentReadingSection(
-            //   isLoading: _isLoadingNovels,
-            //   novels: _recentNovels,
-            //   onContinueReading: _continueReading,
-            // ),
+            // 首页「最近阅读」小说入口
+            RecentReadingSection(
+              isLoading: _isLoadingNovels,
+              novels: _recentNovels,
+              onContinueReading: _continueReading,
+            ),
             RecentActivitySection(
               isLoading: _isLoadingActivities,
               activities: _recentActivities,
