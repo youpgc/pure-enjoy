@@ -1,5 +1,81 @@
 import 'package:flutter/material.dart';
 
+/// UI 视觉风格维度（与配色方案正交，仅改形状/边框/密度，不动语义色）
+enum UiStyle {
+  minimalFlat, // 简约扁平（默认）
+  sharpMinimal, // 锐利极简
+  pillModern, // 胶囊现代
+  elegantAiry, // 优雅留白
+}
+
+/// 各 UI 风格的视觉 token（半径/边框/密度）
+class UiStyleToken {
+  final double cardRadius;
+  final double inputRadius;
+  final double buttonRadius;
+  final double dialogRadius;
+  final double sheetRadius;
+  final double borderWidth;
+  final VisualDensity visualDensity;
+  final String label;
+
+  const UiStyleToken({
+    required this.cardRadius,
+    required this.inputRadius,
+    required this.buttonRadius,
+    required this.dialogRadius,
+    required this.sheetRadius,
+    required this.borderWidth,
+    required this.visualDensity,
+    required this.label,
+  });
+
+  static const Map<UiStyle, UiStyleToken> tokens = {
+    UiStyle.minimalFlat: UiStyleToken(
+      cardRadius: 8,
+      inputRadius: 8,
+      buttonRadius: 8,
+      dialogRadius: 16,
+      sheetRadius: 24,
+      borderWidth: 1,
+      visualDensity: VisualDensity(horizontal: -0.5, vertical: -0.5),
+      label: '简约扁平',
+    ),
+    UiStyle.sharpMinimal: UiStyleToken(
+      cardRadius: 4,
+      inputRadius: 4,
+      buttonRadius: 4,
+      dialogRadius: 8,
+      sheetRadius: 16,
+      borderWidth: 1,
+      visualDensity: VisualDensity(horizontal: -0.5, vertical: -0.5),
+      label: '锐利极简',
+    ),
+    UiStyle.pillModern: UiStyleToken(
+      cardRadius: 18,
+      inputRadius: 999,
+      buttonRadius: 999,
+      dialogRadius: 24,
+      sheetRadius: 24,
+      borderWidth: 1,
+      visualDensity: VisualDensity.standard,
+      label: '胶囊现代',
+    ),
+    UiStyle.elegantAiry: UiStyleToken(
+      cardRadius: 12,
+      inputRadius: 12,
+      buttonRadius: 12,
+      dialogRadius: 20,
+      sheetRadius: 24,
+      borderWidth: 1,
+      visualDensity: VisualDensity(horizontal: 0.5, vertical: 0.5),
+      label: '优雅留白',
+    ),
+  };
+
+  static UiStyleToken of(UiStyle style) => tokens[style]!;
+}
+
 /// 应用主题配置 - 基于logo的橙黄配色方案
 class AppTheme {
   // ===== Logo 主色调 =====
@@ -31,7 +107,7 @@ class AppTheme {
   static const Color neutral900 = Color(0xFF212121);
 
   /// 根据配色方案生成浅色主题
-  static ThemeData lightTheme(Color seedColor) {
+  static ThemeData lightTheme(Color seedColor, UiStyle uiStyle) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.light,
@@ -49,11 +125,11 @@ class AppTheme {
       outline: neutral400,
       shadow: neutral900.withValues(alpha: 0.1),
     );
-    return _buildTheme(colorScheme);
+    return _buildTheme(colorScheme, uiStyle);
   }
 
   /// 根据配色方案生成深色主题
-  static ThemeData darkTheme(Color seedColor) {
+  static ThemeData darkTheme(Color seedColor, UiStyle uiStyle) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
@@ -71,14 +147,17 @@ class AppTheme {
       outline: neutral600,
       shadow: Colors.black.withValues(alpha: 0.3),
     );
-    return _buildTheme(colorScheme);
+    return _buildTheme(colorScheme, uiStyle);
   }
 
   /// 统一构建主题
-  static ThemeData _buildTheme(ColorScheme colorScheme) {
+  static ThemeData _buildTheme(ColorScheme colorScheme, UiStyle uiStyle) {
+    final token = UiStyleToken.of(uiStyle);
+    final borderSide = BorderSide(color: colorScheme.outline, width: token.borderWidth);
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
+      visualDensity: token.visualDensity,
       scaffoldBackgroundColor: colorScheme.surface,
       appBarTheme: AppBarTheme(
         centerTitle: true,
@@ -96,30 +175,31 @@ class AppTheme {
         elevation: 0,
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(16),
+          borderRadius: BorderRadius.circular(token.cardRadius),
+          side: borderSide,
         ),
       ),
       inputDecorationTheme: InputDecorationTheme(
         filled: true,
         fillColor: colorScheme.surfaceContainerHighest,
         border: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(token.inputRadius),
+          borderSide: borderSide,
         ),
         enabledBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
-          borderSide: BorderSide.none,
+          borderRadius: BorderRadius.circular(token.inputRadius),
+          borderSide: borderSide,
         ),
         focusedBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(token.inputRadius),
           borderSide: BorderSide(color: colorScheme.primary, width: 2),
         ),
         errorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(token.inputRadius),
           borderSide: BorderSide(color: colorScheme.error, width: 1),
         ),
         focusedErrorBorder: OutlineInputBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(token.inputRadius),
           borderSide: BorderSide(color: colorScheme.error, width: 2),
         ),
         contentPadding: const EdgeInsets.symmetric(horizontal: 16, vertical: 16),
@@ -129,7 +209,7 @@ class AppTheme {
         style: ElevatedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(token.buttonRadius),
           ),
         ),
       ),
@@ -137,7 +217,7 @@ class AppTheme {
         style: FilledButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(token.buttonRadius),
           ),
         ),
       ),
@@ -145,7 +225,7 @@ class AppTheme {
         style: OutlinedButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 24, vertical: 12),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(12),
+            borderRadius: BorderRadius.circular(token.buttonRadius),
           ),
           side: BorderSide(color: colorScheme.outline),
         ),
@@ -154,7 +234,7 @@ class AppTheme {
         style: TextButton.styleFrom(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
           shape: RoundedRectangleBorder(
-            borderRadius: BorderRadius.circular(8),
+            borderRadius: BorderRadius.circular(token.buttonRadius),
           ),
         ),
       ),
@@ -167,14 +247,14 @@ class AppTheme {
       ),
       dialogTheme: DialogThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(24),
+          borderRadius: BorderRadius.circular(token.dialogRadius),
         ),
         backgroundColor: colorScheme.surface,
       ),
       bottomSheetTheme: BottomSheetThemeData(
         showDragHandle: true,
-        shape: const RoundedRectangleBorder(
-          borderRadius: BorderRadius.vertical(top: Radius.circular(24)),
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.vertical(top: Radius.circular(token.sheetRadius)),
         ),
         backgroundColor: colorScheme.surface,
       ),
@@ -185,14 +265,14 @@ class AppTheme {
       ),
       chipTheme: ChipThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(8),
+          borderRadius: BorderRadius.circular(token.buttonRadius),
         ),
         backgroundColor: colorScheme.surfaceContainerHighest,
         selectedColor: colorScheme.primaryContainer,
       ),
       listTileTheme: ListTileThemeData(
         shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
+          borderRadius: BorderRadius.circular(token.cardRadius),
         ),
         iconColor: colorScheme.onSurfaceVariant,
         textColor: colorScheme.onSurface,

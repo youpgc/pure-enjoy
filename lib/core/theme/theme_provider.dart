@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'app_theme.dart';
 import '../../features/auth/auth_provider.dart';
 
 /// 主题配色方案 - 基于Logo的橙黄渐变色系
@@ -47,6 +48,7 @@ class ThemeProvider extends ChangeNotifier {
   static const String _colorSchemeKeyBase = 'color_scheme';
   static const String _fontScaleKeyBase = 'font_scale';
   static const String _readerBgKeyBase = 'reader_bg';
+  static const String _uiStyleKeyBase = 'theme_ui_style';
 
   /// 当前用户业务 ID（null = 未登录/游客）
   final String? _userId;
@@ -60,6 +62,7 @@ class ThemeProvider extends ChangeNotifier {
   String get _colorSchemeKey => _key(_colorSchemeKeyBase);
   String get _fontScaleKey => _key(_fontScaleKeyBase);
   String get _readerBgKey => _key(_readerBgKeyBase);
+  String get _uiStyleKey => _key(_uiStyleKeyBase);
 
   // 主题模式
   ThemeMode _themeMode = ThemeMode.system;
@@ -77,6 +80,10 @@ class ThemeProvider extends ChangeNotifier {
   // 阅读背景
   ReaderBackgroundTheme _readerBg = ReaderBackgroundTheme.defaultWhite;
   ReaderBackgroundTheme get readerBg => _readerBg;
+
+  // UI 视觉风格
+  UiStyle _uiStyle = UiStyle.minimalFlat;
+  UiStyle get uiStyle => _uiStyle;
 
   ThemeProvider({String? userId}) : _userId = userId {
     _loadSettings();
@@ -111,6 +118,12 @@ class ThemeProvider extends ChangeNotifier {
     final bgIndex = prefs.getInt(_readerBgKey);
     if (bgIndex != null && bgIndex >= 0 && bgIndex < ReaderBackgroundTheme.values.length) {
       _readerBg = ReaderBackgroundTheme.values[bgIndex];
+    }
+
+    // UI 视觉风格
+    final uiStyleIndex = prefs.getInt(_uiStyleKey);
+    if (uiStyleIndex != null && uiStyleIndex >= 0 && uiStyleIndex < UiStyle.values.length) {
+      _uiStyle = UiStyle.values[uiStyleIndex];
     }
 
     notifyListeners();
@@ -160,6 +173,14 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_readerBgKey, bg.index);
+  }
+
+  /// 设置 UI 视觉风格
+  Future<void> setUiStyle(UiStyle style) async {
+    _uiStyle = style;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setInt(_uiStyleKey, style.index);
   }
 }
 

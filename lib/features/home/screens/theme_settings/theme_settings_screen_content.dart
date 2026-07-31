@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../../../core/theme/theme_provider.dart';
 
 /// {@template theme_settings_content}
@@ -23,6 +24,8 @@ class ThemeSettingsContent extends StatelessWidget {
           ColorSchemeSection(tp: tp),
           const SizedBox(height: 24),
           FontSizeSection(tp: tp),
+          const SizedBox(height: 24),
+          UiStyleSection(tp: tp),
           const SizedBox(height: 24),
           ReaderBgSection(tp: tp),
           const SizedBox(height: 32),
@@ -308,6 +311,81 @@ class ReaderBgSection extends StatelessWidget {
                         ),
                       ),
                     ],
+                  ),
+                );
+              }).toList(),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// UI 视觉风格分区
+class UiStyleSection extends StatelessWidget {
+  const UiStyleSection({super.key, required this.tp});
+  final ThemeProvider tp;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Column(
+      children: [
+        const _SectionTitle(title: 'UI 风格'),
+        const SizedBox(height: 8),
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(16),
+            child: Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: UiStyle.values.map((style) {
+                final token = UiStyleToken.of(style);
+                final isSelected = tp.uiStyle == style;
+                return GestureDetector(
+                  onTap: () => tp.setUiStyle(style),
+                  child: Container(
+                    width: 84,
+                    padding: const EdgeInsets.all(10),
+                    decoration: BoxDecoration(
+                      color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(token.cardRadius),
+                      border: Border.all(
+                        color: isSelected ? cs.primary : cs.outline.withValues(alpha: 0.5),
+                        width: isSelected ? 2 : 1,
+                      ),
+                    ),
+                    child: Column(
+                      children: [
+                        Container(
+                          height: 26,
+                          decoration: BoxDecoration(
+                            color: cs.primary,
+                            borderRadius: BorderRadius.circular(token.cardRadius),
+                          ),
+                        ),
+                        const SizedBox(height: 6),
+                        Container(
+                          height: 14,
+                          width: 44,
+                          decoration: BoxDecoration(
+                            color: cs.outline.withValues(alpha: 0.4),
+                            borderRadius: BorderRadius.circular(token.buttonRadius),
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          token.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 );
               }).toList(),
