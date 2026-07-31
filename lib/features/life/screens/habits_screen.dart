@@ -27,6 +27,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
   Map<String, ReminderScheduleModel> _reminderSchedules = {};
   bool _isLoading = true;
   bool _isLoadingMore = false;
+  /// 正在打卡中的习惯 ID（单习惯 loading，避免触发整列表 loading）
+  String? _checkingHabitId;
   bool _hasMore = true;
   /// 是否已至少成功加载过一次（用于并发守卫，避免拦截首次加载）
   bool _hasLoadedOnce = false;
@@ -62,7 +64,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     }
   }
 
-  Future<void> _loadHabits({bool refresh = false}) async {
+  Future<void> _loadHabits({bool refresh = false, bool fromCheckIn = false}) async {
     final userId = _userId;
     if (userId == null) {
       setState(() {
@@ -86,14 +88,22 @@ class _HabitsScreenState extends State<HabitsScreen> {
     final isFirstPage = _offset == 0;
 
     if (refresh) {
-      setState(() {
-        _offset = 0;
-        _hasMore = true;
-        _habits = [];
-        _checkinHistory = {};
-        _reminderSchedules = {};
-        _isLoading = true;
-      });
+      if (fromCheckIn) {
+        // 单习惯打卡刷新：保留列表可见，仅被打卡的按钮显示 loading，不触发整列表 loading
+        setState(() {
+          _offset = 0;
+          _hasMore = true;
+        });
+      } else {
+        setState(() {
+          _offset = 0;
+          _hasMore = true;
+          _habits = [];
+          _checkinHistory = {};
+          _reminderSchedules = {};
+          _isLoading = true;
+        });
+      }
     } else if (isFirstPage) {
       // 1. 先加载本地缓存（仅在初始第一页时）
       final cachedHabits = await CacheHelper.instance.loadList(CacheHelper.keyHabits);
@@ -224,18 +234,23 @@ class _HabitsScreenState extends State<HabitsScreen> {
   }
 
   Future<void> _checkIn(HabitModel habit) async {
+    // 防重复：同一习惯正在打卡中则忽略后续点击
+    if (_checkingHabitId == habit.id) return;
+    final today = DateTime.now();
+
+    // 检查今天是否已经打卡
+    final checkins = _checkinHistory[habit.id] ?? [];
+    final alreadyChecked = checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
+
+    if (alreadyChecked) {
+      _showError('今天已经打卡了');
+      return;
+    }
+
+    // 标记该习惯正在打卡，对应按钮显示 loading（而非整列表 loading）
+    if (mounted) setState(() => _checkingHabitId = habit.id);
+
     try {
-      final today = DateTime.now();
-
-      // 检查今天是否已经打卡
-      final checkins = _checkinHistory[habit.id] ?? [];
-      final alreadyChecked = checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
-
-      if (alreadyChecked) {
-        _showError('今天已经打卡了');
-        return;
-      }
-
       // 添加打卡记录
       final checkinId = const Uuid().v4();
       final checkinResult = await ApiClient.post(
@@ -264,7 +279,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
       }
 
-      await _loadHabits(refresh: true);
+      // 拉取后端维护的最新 streak（不触发整列表 loading）
+      await _loadHabits(refresh: true, fromCheckIn: true);
       EventBus.instance.fire(EventType.habitUpdated);
 
       if (!mounted) return;
@@ -278,6 +294,9 @@ class _HabitsScreenState extends State<HabitsScreen> {
       );
     } catch (e) {
       _showError('打卡失败，请稍后重试');
+    } finally {
+      // 无论成功失败，结束单习惯 loading
+      if (mounted) setState(() => _checkingHabitId = null);
     }
   }
 
@@ -491,6 +510,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         totalCheckins: totalCheckins,
                         reminderSchedule: schedule,
                         shouldRemindToday: shouldRemindToday,
+                        isCheckingIn: _checkingHabitId == habit.id,
                         onCheckIn: () => _checkIn(habit),
                         onEdit: () => _showEditDialog(habit: habit),
                         onDelete: () => _deleteHabit(habit.id),

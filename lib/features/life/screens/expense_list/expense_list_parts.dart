@@ -154,8 +154,8 @@ class _ExpenseListItem extends StatelessWidget {
   final ExpenseModel expense;
   final String categoryLabel;
   final DateTime displayDate;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
+  final VoidCallback? onEdit;
+  final VoidCallback? onDelete;
 
   const _ExpenseListItem({
     required this.expense,
@@ -186,10 +186,11 @@ class _ExpenseListItem extends StatelessWidget {
                 fontWeight: FontWeight.bold,
               ),
             ),
-            EditDeletePopupMenu(
-              onEdit: onEdit,
-              onDelete: onDelete,
-            ),
+            if (onEdit != null || onDelete != null)
+              EditDeletePopupMenu(
+                onEdit: onEdit,
+                onDelete: onDelete,
+              ),
           ],
         ),
       ),

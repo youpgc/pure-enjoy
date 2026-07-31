@@ -171,7 +171,7 @@ class PieCenterInfo extends StatelessWidget {
   Widget build(BuildContext context) {
     final textColor = Theme.of(context).colorScheme.onSurface;
     return SizedBox(
-      width: 104,
+      width: 100,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
@@ -245,21 +245,23 @@ class ExpensePieChart extends StatelessWidget {
             amount: total,
           );
 
-    return SizedBox(
-      height: 220,
-      child: Stack(
-        alignment: Alignment.center,
-        children: [
-          PieChart(
-            PieChartData(
-              sections: categories.asMap().entries.map((entry) {
-                final index = entry.key;
-                final category = entry.value;
-                final percentage = total > 0 ? (category.value / total * 100) : 0.0;
-                final isSelected = selectedIndex == index;
-                final radius = isSelected
-                    ? 98.0
-                    : (selectedIndex == null ? 80.0 : 68.0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 12),
+      child: SizedBox(
+        height: 290,
+        child: Stack(
+          alignment: Alignment.center,
+          children: [
+            PieChart(
+              PieChartData(
+                sections: categories.asMap().entries.map((entry) {
+                  final index = entry.key;
+                  final category = entry.value;
+                  final percentage = total > 0 ? (category.value / total * 100) : 0.0;
+                  final isSelected = selectedIndex == index;
+                  // 选中态半径略大、未选中稍小；外半径 = centerSpaceRadius + radius 必须 ≤ 容器半高(145)，
+                  // 否则选中交互放大后会溢出压住下方分类列表。
+                  final radius = isSelected ? 74.0 : 64.0;
                 return PieChartSectionData(
                   value: category.value,
                   title: '${percentage.toStringAsFixed(1)}%',
@@ -289,6 +291,7 @@ class ExpensePieChart extends StatelessWidget {
           ),
           centerChild,
         ],
+      ),
       ),
     );
   }

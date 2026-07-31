@@ -93,7 +93,7 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
     setState(() => _selectedIndex = _selectedIndex == index ? null : index);
   }
 
-  /// 跳转至该分类在统计区间内的消费记录列表。
+  /// 跳转至该分类在统计区间内的消费记录列表（只读明细模式）。
   void _openCategoryRecords(int index, String categoryKey) {
     Navigator.of(context).push(
       MaterialPageRoute(
@@ -101,6 +101,7 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
           initialCategory: categoryKey,
           initialStartMonth: widget.startMonth,
           initialEndMonth: widget.endMonth,
+          readOnly: true,
         ),
       ),
     );
@@ -170,17 +171,6 @@ class _ExpenseStatisticsLoadedState extends State<_ExpenseStatisticsLoaded> {
             total: total,
             selectedIndex: _selectedIndex,
             onTouched: _toggleSelect,
-          ),
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Center(
-              child: Text(
-                '轻触扇区或分类查看明细，选中后点下方按钮跳转对应消费记录',
-                style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                      color: Theme.of(context).colorScheme.onSurfaceVariant,
-                    ),
-              ),
-            ),
           ),
           const SizedBox(height: 16),
           ExpenseCategoryList(

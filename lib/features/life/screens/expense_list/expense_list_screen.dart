@@ -25,6 +25,7 @@ class ExpenseListScreen extends StatefulWidget {
     this.initialCategory = 'all',
     this.initialStartMonth,
     this.initialEndMonth,
+    this.readOnly = false,
   });
 
   /// 从统计页跳转带入的预选分类，默认 'all'（不限分类）。
@@ -33,6 +34,11 @@ class ExpenseListScreen extends StatefulWidget {
   /// 从统计页跳转带入的预置日期区间（月份），为空表示不限日期。
   final DateTime? initialStartMonth;
   final DateTime? initialEndMonth;
+
+  /// 是否为只读明细模式：统计页按分类查看对应消费记录时传入 true。
+  /// 只读模式下隐藏全部交互控件（统计跳转 / 分类筛选 / 时间区间 / 新增 / 编辑删除），
+  /// 仅保留下拉刷新与触底加载等数据加载能力；普通记账列表页保持默认 false，逻辑不受影响。
+  final bool readOnly;
 
   @override
   State<ExpenseListScreen> createState() => _ExpenseListScreenState();
@@ -335,16 +341,17 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
       appBar: AppBar(
         title: const Text('记账'),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.bar_chart),
-            tooltip: '消费统计',
-            onPressed: () {
-              Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const ExpenseStatisticsScreen()),
-              );
-            },
-          ),
+          if (!widget.readOnly)
+            IconButton(
+              icon: const Icon(Icons.bar_chart),
+              tooltip: '消费统计',
+              onPressed: () {
+                Navigator.push(
+                  context,
+                  MaterialPageRoute(builder: (_) => const ExpenseStatisticsScreen()),
+                );
+              },
+            ),
         ],
       ),
       body: Column(
@@ -358,7 +365,8 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
           ),
 
           // 统计页跳转带入的筛选区间提示（可清除，清除后恢复不限日期）
-          if (_rangeStart != null || _rangeEnd != null)
+          // 只读明细模式下隐藏，避免修改时间区间
+          if (!widget.readOnly && (_rangeStart != null || _rangeEnd != null))
             _ExpenseRangeBar(
               hint: _rangeHint,
               onClear: () {
@@ -371,15 +379,16 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
             ),
           const SizedBox(height: 8),
 
-          // 分类筛选
-          _ExpenseCategoryFilter(
-            selectedCategory: _selectedCategory,
-            onSelected: (category) {
-              setState(() => _selectedCategory = category);
-              _loadExpenses(refresh: true);
-            },
-          ),
-          const SizedBox(height: 8),
+          // 分类筛选（只读明细模式下隐藏，避免修改消费分类）
+          if (!widget.readOnly)
+            _ExpenseCategoryFilter(
+              selectedCategory: _selectedCategory,
+              onSelected: (category) {
+                setState(() => _selectedCategory = category);
+                _loadExpenses(refresh: true);
+              },
+            ),
+          if (!widget.readOnly) const SizedBox(height: 8),
 
           // 支出列表
           Expanded(
@@ -421,8 +430,12 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
                               expense: expense,
                               categoryLabel: categoryLabel,
                               displayDate: displayDate,
-                              onEdit: () => _showEditExpenseForm(expense),
-                              onDelete: () => _deleteExpense(expense.id),
+                              onEdit: widget.readOnly
+                                  ? null
+                                  : () => _showEditExpenseForm(expense),
+                              onDelete: widget.readOnly
+                                  ? null
+                                  : () => _deleteExpense(expense.id),
                             );
                           },
                         ),
@@ -430,10 +443,12 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
           ),
         ],
       ),
-      floatingActionButton: FloatingActionButton(
-        onPressed: () => _showExpenseForm(),
-        child: const Icon(Icons.add),
-      ),
+      floatingActionButton: !widget.readOnly
+          ? FloatingActionButton(
+              onPressed: () => _showExpenseForm(),
+              child: const Icon(Icons.add),
+            )
+          : null,
     );
   }
 }

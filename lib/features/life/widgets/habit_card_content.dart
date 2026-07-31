@@ -18,6 +18,7 @@ class HabitCardContent extends StatelessWidget {
     required this.totalCheckins,
     this.reminderSchedule,
     required this.shouldRemindToday,
+    required this.isCheckingIn,
     required this.onCheckIn,
     required this.onEdit,
     required this.onDelete,
@@ -30,6 +31,7 @@ class HabitCardContent extends StatelessWidget {
   final int totalCheckins;
   final ReminderScheduleModel? reminderSchedule;
   final bool shouldRemindToday;
+  final bool isCheckingIn;
   final VoidCallback onCheckIn;
   final VoidCallback onEdit;
   final VoidCallback onDelete;
@@ -70,6 +72,7 @@ class HabitCardContent extends StatelessWidget {
             const SizedBox(height: 12),
             HabitCardAction(
               isCheckedIn: isCheckedIn,
+              isCheckingIn: isCheckingIn,
               color: habitColor,
               onCheckIn: onCheckIn,
             ),
@@ -384,24 +387,38 @@ class HabitCardAction extends StatelessWidget {
   const HabitCardAction({
     super.key,
     required this.isCheckedIn,
+    required this.isCheckingIn,
     required this.color,
     required this.onCheckIn,
   });
 
   final bool isCheckedIn;
+  final bool isCheckingIn;
   final Color color;
   final VoidCallback onCheckIn;
 
   @override
   Widget build(BuildContext context) {
+    // 单习惯打卡中优先显示 loading，盖过「今日已打卡」状态，保证按钮 spinner 持续到接口完成
+    final showChecking = isCheckingIn;
+    final showCheckedIn = !showChecking && isCheckedIn;
     return SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
-        onPressed: isCheckedIn ? null : onCheckIn,
-        icon: Icon(isCheckedIn ? Icons.check : Icons.add),
-        label: Text(isCheckedIn ? '今日已打卡' : '立即打卡'),
+        onPressed: (showCheckedIn || showChecking) ? null : onCheckIn,
+        icon: showChecking
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: Colors.white,
+                ),
+              )
+            : Icon(showCheckedIn ? Icons.check : Icons.add),
+        label: Text(showCheckedIn ? '今日已打卡' : (showChecking ? '打卡中...' : '立即打卡')),
         style: FilledButton.styleFrom(
-          backgroundColor: isCheckedIn ? AppTheme.success : color,
+          backgroundColor: showCheckedIn ? AppTheme.success : color,
           foregroundColor: Colors.white,
         ),
       ),
