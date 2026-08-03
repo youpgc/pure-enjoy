@@ -174,15 +174,19 @@ class ColorSchemeSection extends StatelessWidget {
                             : null,
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        scheme.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isSelected
-                              ? scheme.seedColor
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          scheme.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected
+                                ? scheme.seedColor
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -315,15 +319,19 @@ class ReaderBgSection extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(height: 4),
-                      Text(
-                        bg.label,
-                        style: TextStyle(
-                          fontSize: 11,
-                          color: isSelected
-                              ? Theme.of(context).colorScheme.primary
-                              : Theme.of(context).colorScheme.onSurfaceVariant,
-                          fontWeight:
-                              isSelected ? FontWeight.bold : FontWeight.normal,
+                      FittedBox(
+                        fit: BoxFit.scaleDown,
+                        child: Text(
+                          bg.label,
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: isSelected
+                                ? Theme.of(context).colorScheme.primary
+                                : Theme.of(context).colorScheme.onSurfaceVariant,
+                            fontWeight:
+                                isSelected ? FontWeight.bold : FontWeight.normal,
+                          ),
+                          maxLines: 1,
                         ),
                       ),
                     ],
@@ -399,15 +407,19 @@ class UiStyleSection extends StatelessWidget {
                           ),
                         ),
                         const Spacer(),
-                        Text(
-                          token.label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isSelected ? cs.primary : cs.onSurfaceVariant,
-                            fontWeight:
-                                isSelected ? FontWeight.bold : FontWeight.normal,
+                        FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            token.label,
+                            style: TextStyle(
+                              fontSize: 11,
+                              color: isSelected ? cs.primary : cs.onSurfaceVariant,
+                              fontWeight:
+                                  isSelected ? FontWeight.bold : FontWeight.normal,
+                            ),
+                            textAlign: TextAlign.center,
+                            maxLines: 1,
                           ),
-                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),

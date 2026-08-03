@@ -253,7 +253,10 @@ class _WeightRecordTile extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const Icon(Icons.monitor_weight),
-        title: Row(
+        title: Wrap(
+          spacing: 12,
+          runSpacing: 4,
+          crossAxisAlignment: WrapCrossAlignment.center,
           children: [
             Text(
               '${record.weight.toStringAsFixed(2)} kg',
@@ -261,20 +264,16 @@ class _WeightRecordTile extends StatelessWidget {
                     fontWeight: FontWeight.bold,
                   ),
             ),
-            if (record.bodyFat != null) ...[
-              const SizedBox(width: 12),
+            if (record.bodyFat != null)
               Text(
                 '体脂 ${record.bodyFat!.toStringAsFixed(1)}%',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
-            if (record.bmi != null) ...[
-              const SizedBox(width: 12),
+            if (record.bmi != null)
               Text(
                 'BMI ${record.bmi!.toStringAsFixed(1)}',
                 style: Theme.of(context).textTheme.bodySmall,
               ),
-            ],
           ],
         ),
         subtitle: Column(
