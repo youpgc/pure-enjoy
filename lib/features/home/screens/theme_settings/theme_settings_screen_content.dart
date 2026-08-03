@@ -27,6 +27,8 @@ class ThemeSettingsContent extends StatelessWidget {
           const SizedBox(height: 24),
           UiStyleSection(tp: tp),
           const SizedBox(height: 24),
+          BorderShadowSection(tp: tp),
+          const SizedBox(height: 24),
           ReaderBgSection(tp: tp),
           const SizedBox(height: 32),
         ],
@@ -397,6 +399,43 @@ class UiStyleSection extends StatelessWidget {
                 );
               }).toList(),
             ),
+          ),
+        ),
+      ],
+    );
+  }
+}
+
+/// 边框与阴影分区
+class BorderShadowSection extends StatelessWidget {
+  const BorderShadowSection({super.key, required this.tp});
+  final ThemeProvider tp;
+
+  @override
+  Widget build(BuildContext context) {
+    return Column(
+      children: [
+        const _SectionTitle(title: '边框与阴影'),
+        const SizedBox(height: 8),
+        Card(
+          child: Column(
+            children: [
+              SwitchListTile(
+                secondary: const Icon(Icons.border_outer),
+                title: const Text('显示边框'),
+                subtitle: const Text('关闭后卡片仅以背景区分，去掉描边'),
+                value: tp.useBorder,
+                onChanged: (v) => tp.setUseBorder(v),
+              ),
+              const Divider(height: 1),
+              SwitchListTile(
+                secondary: const Icon(Icons.filter_none),
+                title: const Text('开启阴影'),
+                subtitle: const Text('卡片悬浮投影，参考经典立体风格'),
+                value: tp.enableShadow,
+                onChanged: (v) => tp.setEnableShadow(v),
+              ),
+            ],
           ),
         ),
       ],

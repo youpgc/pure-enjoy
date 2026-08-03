@@ -116,8 +116,18 @@ class PureEnjoyApp extends ConsumerWidget {
       navigatorKey: navigatorKey,
       title: '纯享',
       debugShowCheckedModeBanner: false,
-      theme: AppTheme.lightTheme(theme.colorScheme.seedColor, theme.uiStyle),
-      darkTheme: AppTheme.darkTheme(theme.colorScheme.seedColor, theme.uiStyle),
+      theme: AppTheme.lightTheme(
+        theme.colorScheme.seedColor,
+        theme.uiStyle,
+        useBorder: theme.useBorder,
+        enableShadow: theme.enableShadow,
+      ),
+      darkTheme: AppTheme.darkTheme(
+        theme.colorScheme.seedColor,
+        theme.uiStyle,
+        useBorder: theme.useBorder,
+        enableShadow: theme.enableShadow,
+      ),
       themeMode: theme.themeMode,
       // 字体缩放：Flutter 3.16+ 已移除 ThemeData.textScaleFactor，改为在 MediaQuery 层
       // 全局注入 textScaler，确保 themeProvider.fontScale 全局生效（pure-enjoy-theme §7⑤）

@@ -49,6 +49,8 @@ class ThemeProvider extends ChangeNotifier {
   static const String _fontScaleKeyBase = 'font_scale';
   static const String _readerBgKeyBase = 'reader_bg';
   static const String _uiStyleKeyBase = 'theme_ui_style';
+  static const String _useBorderKeyBase = 'theme_use_border';
+  static const String _enableShadowKeyBase = 'theme_enable_shadow';
 
   /// 当前用户业务 ID（null = 未登录/游客）
   final String? _userId;
@@ -63,6 +65,8 @@ class ThemeProvider extends ChangeNotifier {
   String get _fontScaleKey => _key(_fontScaleKeyBase);
   String get _readerBgKey => _key(_readerBgKeyBase);
   String get _uiStyleKey => _key(_uiStyleKeyBase);
+  String get _useBorderKey => _key(_useBorderKeyBase);
+  String get _enableShadowKey => _key(_enableShadowKeyBase);
 
   // 主题模式
   ThemeMode _themeMode = ThemeMode.system;
@@ -84,6 +88,14 @@ class ThemeProvider extends ChangeNotifier {
   // UI 视觉风格
   UiStyle _uiStyle = UiStyle.minimalFlat;
   UiStyle get uiStyle => _uiStyle;
+
+  // 是否显示边框
+  bool _useBorder = true;
+  bool get useBorder => _useBorder;
+
+  // 是否开启阴影
+  bool _enableShadow = false;
+  bool get enableShadow => _enableShadow;
 
   ThemeProvider({String? userId}) : _userId = userId {
     _loadSettings();
@@ -124,6 +136,18 @@ class ThemeProvider extends ChangeNotifier {
     final uiStyleIndex = prefs.getInt(_uiStyleKey);
     if (uiStyleIndex != null && uiStyleIndex >= 0 && uiStyleIndex < UiStyle.values.length) {
       _uiStyle = UiStyle.values[uiStyleIndex];
+    }
+
+    // 是否显示边框
+    final useBorder = prefs.getBool(_useBorderKey);
+    if (useBorder != null) {
+      _useBorder = useBorder;
+    }
+
+    // 是否开启阴影
+    final enableShadow = prefs.getBool(_enableShadowKey);
+    if (enableShadow != null) {
+      _enableShadow = enableShadow;
     }
 
     notifyListeners();
@@ -181,6 +205,22 @@ class ThemeProvider extends ChangeNotifier {
     notifyListeners();
     final prefs = await SharedPreferences.getInstance();
     await prefs.setInt(_uiStyleKey, style.index);
+  }
+
+  /// 设置是否显示边框
+  Future<void> setUseBorder(bool value) async {
+    _useBorder = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_useBorderKey, value);
+  }
+
+  /// 设置是否开启阴影
+  Future<void> setEnableShadow(bool value) async {
+    _enableShadow = value;
+    notifyListeners();
+    final prefs = await SharedPreferences.getInstance();
+    await prefs.setBool(_enableShadowKey, value);
   }
 }
 

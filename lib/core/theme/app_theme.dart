@@ -101,6 +101,18 @@ class AppTheme {
     return ext?.uiStyle ?? UiStyle.minimalFlat;
   }
 
+  /// 由模块内容背景色派生边框色：保持色相，沿明度偏移一个档位，
+  /// 浅底→更深边、深底→更浅边，使边框与内容背景形成明显对比，
+  /// 且同色系更和谐（替代原本与主题冷调冲突的纯灰 outline）。
+  static Color surfaceBorder(Color surface) {
+    final hsl = HSLColor.fromColor(surface);
+    const double step = 0.28; // 一个明度档（亮底→更深边/深底→更浅边，制造明显对比）
+    final double newL = hsl.lightness > 0.5
+        ? (hsl.lightness - step).clamp(0.0, 1.0)
+        : (hsl.lightness + step).clamp(0.0, 1.0);
+    return hsl.withLightness(newL).toColor();
+  }
+
   // ===== Logo 主色调 =====
   static const Color primaryOrange = Color(0xFFF26522);   // 深橙色
   static const Color primaryYellow = Color(0xFFFFC107);   // 暖黄色
@@ -130,7 +142,12 @@ class AppTheme {
   static const Color neutral900 = Color(0xFF212121);
 
   /// 根据配色方案生成浅色主题
-  static ThemeData lightTheme(Color seedColor, UiStyle uiStyle) {
+  static ThemeData lightTheme(
+    Color seedColor,
+    UiStyle uiStyle, {
+    bool useBorder = true,
+    bool enableShadow = false,
+  }) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.light,
@@ -148,11 +165,16 @@ class AppTheme {
       outline: neutral400,
       shadow: neutral900.withValues(alpha: 0.1),
     );
-    return _buildTheme(colorScheme, uiStyle);
+    return _buildTheme(colorScheme, uiStyle, useBorder, enableShadow);
   }
 
   /// 根据配色方案生成深色主题
-  static ThemeData darkTheme(Color seedColor, UiStyle uiStyle) {
+  static ThemeData darkTheme(
+    Color seedColor,
+    UiStyle uiStyle, {
+    bool useBorder = true,
+    bool enableShadow = false,
+  }) {
     final colorScheme = ColorScheme.fromSeed(
       seedColor: seedColor,
       brightness: Brightness.dark,
@@ -170,13 +192,21 @@ class AppTheme {
       outline: neutral600,
       shadow: Colors.black.withValues(alpha: 0.3),
     );
-    return _buildTheme(colorScheme, uiStyle);
+    return _buildTheme(colorScheme, uiStyle, useBorder, enableShadow);
   }
 
   /// 统一构建主题
-  static ThemeData _buildTheme(ColorScheme colorScheme, UiStyle uiStyle) {
+  static ThemeData _buildTheme(
+    ColorScheme colorScheme,
+    UiStyle uiStyle,
+    bool useBorder,
+    bool enableShadow,
+  ) {
     final token = UiStyleToken.of(uiStyle);
-    final borderSide = BorderSide(color: colorScheme.outline, width: token.borderWidth);
+    final Color borderColor = surfaceBorder(colorScheme.surfaceContainerHighest);
+    final BorderSide borderSide = useBorder
+        ? BorderSide(color: borderColor, width: token.borderWidth)
+        : BorderSide.none;
     return ThemeData(
       useMaterial3: true,
       colorScheme: colorScheme,
@@ -195,7 +225,8 @@ class AppTheme {
         ),
       ),
       cardTheme: CardThemeData(
-        elevation: 0,
+        elevation: enableShadow ? 2 : 0,
+        shadowColor: colorScheme.shadow,
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(token.cardRadius),
@@ -250,7 +281,7 @@ class AppTheme {
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(token.buttonRadius),
           ),
-          side: BorderSide(color: colorScheme.outline),
+          side: borderSide,
         ),
       ),
       textButtonTheme: TextButtonThemeData(
