@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../core/theme/theme_provider.dart';
 import '../../widgets/section_header.dart';
 // [小说模块暂时停用] import './settings_helpers.dart';
 
@@ -7,7 +6,6 @@ import '../../widgets/section_header.dart';
 class SettingsList extends StatelessWidget {
   final bool isDarkMode;
   final double fontScale;
-  final ReaderBackgroundTheme readerBg;
   final bool autoSync;
   final bool wifiOnly;
   final bool pushNotification;
@@ -16,7 +14,6 @@ class SettingsList extends StatelessWidget {
 
   final ValueChanged<bool> onDarkModeChanged;
   final VoidCallback onFontSizeTap;
-  final VoidCallback onReadingBgTap;
   final ValueChanged<bool> onAutoSyncChanged;
   final ValueChanged<bool> onWifiOnlyChanged;
   final ValueChanged<bool> onPushNotifChanged;
@@ -30,7 +27,6 @@ class SettingsList extends StatelessWidget {
     super.key,
     required this.isDarkMode,
     required this.fontScale,
-    required this.readerBg,
     required this.autoSync,
     required this.wifiOnly,
     required this.pushNotification,
@@ -38,7 +34,6 @@ class SettingsList extends StatelessWidget {
     required this.anniversaryReminder,
     required this.onDarkModeChanged,
     required this.onFontSizeTap,
-    required this.onReadingBgTap,
     required this.onAutoSyncChanged,
     required this.onWifiOnlyChanged,
     required this.onPushNotifChanged,
@@ -72,9 +67,7 @@ class SettingsList extends StatelessWidget {
         // ListTile(
         //   leading: const Icon(Icons.palette_outlined),
         //   title: const Text('阅读背景'),
-        //   subtitle: Text(bgToName(readerBg)),
         //   trailing: const Icon(Icons.chevron_right),
-        //   onTap: onReadingBgTap,
         // ),
 
         // 同步设置

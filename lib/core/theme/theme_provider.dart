@@ -20,24 +20,7 @@ enum AppColorScheme {
   final Color seedColor;
 }
 
-/// 阅读背景主题
-enum ReaderBackgroundTheme {
-  defaultWhite('默认白', Colors.white, Colors.black87),
-  warmYellow('护眼黄', Color(0xFFF5E6C8), Color(0xFF5D4E37)),
-  lightGreen('淡绿', Color(0xFFCCE8CF), Color(0xFF2D4A30)),
-  lightBlue('淡蓝', Color(0xFFD4E6F1), Color(0xFF2C3E50)),
-  lightPink('淡粉', Color(0xFFF5D5D5), Color(0xFF6B3A3A)),
-  darkGray('深灰', Color(0xFF2C2C2C), Color(0xFFD0D0D0)),
-  pureBlack('纯黑', Color(0xFF000000), Color(0xFFB0B0B0)),
-  brown('牛皮纸', Color(0xFFD4B896), Color(0xFF5C4A32));
-
-  const ReaderBackgroundTheme(this.label, this.bgColor, this.textColor);
-  final String label;
-  final Color bgColor;
-  final Color textColor;
-}
-
-/// 主题提供者 - 管理主题模式、配色、字体大小、阅读背景
+/// 主题提供者 - 管理主题模式、配色、字体大小
 ///
 /// 按用户隔离：登录用户的设置存储键带业务 userId 后缀（如 theme_mode_U178...），
 /// 未登录（游客）使用显式 '_guest' 后缀键，避免与升级前旧版共享键（如 'theme_mode'）
@@ -47,7 +30,6 @@ class ThemeProvider extends ChangeNotifier {
   static const String _themeKeyBase = 'theme_mode';
   static const String _colorSchemeKeyBase = 'color_scheme';
   static const String _fontScaleKeyBase = 'font_scale';
-  static const String _readerBgKeyBase = 'reader_bg';
   static const String _uiStyleKeyBase = 'theme_ui_style';
   static const String _useBorderKeyBase = 'theme_use_border';
   static const String _enableShadowKeyBase = 'theme_enable_shadow';
@@ -63,7 +45,6 @@ class ThemeProvider extends ChangeNotifier {
   String get _themeKey => _key(_themeKeyBase);
   String get _colorSchemeKey => _key(_colorSchemeKeyBase);
   String get _fontScaleKey => _key(_fontScaleKeyBase);
-  String get _readerBgKey => _key(_readerBgKeyBase);
   String get _uiStyleKey => _key(_uiStyleKeyBase);
   String get _useBorderKey => _key(_useBorderKeyBase);
   String get _enableShadowKey => _key(_enableShadowKeyBase);
@@ -80,10 +61,6 @@ class ThemeProvider extends ChangeNotifier {
   // 字体缩放 (0.8 ~ 1.4)
   double _fontScale = 1.0;
   double get fontScale => _fontScale;
-
-  // 阅读背景
-  ReaderBackgroundTheme _readerBg = ReaderBackgroundTheme.defaultWhite;
-  ReaderBackgroundTheme get readerBg => _readerBg;
 
   // UI 视觉风格
   UiStyle _uiStyle = UiStyle.minimalFlat;
@@ -124,12 +101,6 @@ class ThemeProvider extends ChangeNotifier {
     final scale = prefs.getDouble(_fontScaleKey);
     if (scale != null && scale >= 0.8 && scale <= 1.4) {
       _fontScale = scale;
-    }
-
-    // 阅读背景
-    final bgIndex = prefs.getInt(_readerBgKey);
-    if (bgIndex != null && bgIndex >= 0 && bgIndex < ReaderBackgroundTheme.values.length) {
-      _readerBg = ReaderBackgroundTheme.values[bgIndex];
     }
 
     // UI 视觉风格
@@ -191,14 +162,6 @@ class ThemeProvider extends ChangeNotifier {
     await prefs.setDouble(_fontScaleKey, _fontScale);
   }
 
-  /// 设置阅读背景
-  Future<void> setReaderBackground(ReaderBackgroundTheme bg) async {
-    _readerBg = bg;
-    notifyListeners();
-    final prefs = await SharedPreferences.getInstance();
-    await prefs.setInt(_readerBgKey, bg.index);
-  }
-
   /// 设置 UI 视觉风格
   Future<void> setUiStyle(UiStyle style) async {
     _uiStyle = style;
@@ -226,7 +189,7 @@ class ThemeProvider extends ChangeNotifier {
 
 /// 主题 Provider（Riverpod）
 /// 依赖 currentUserIdProvider：登录/登出/切换账号时自动重建，
-/// 加载对应用户的主题/字号/阅读背景设置（防跨账号继承）。
+/// 加载对应用户的主题/字号设置（防跨账号继承）。
 final themeProvider = ChangeNotifierProvider<ThemeProvider>((ref) {
   final userId = ref.watch(currentUserIdProvider);
   return ThemeProvider(userId: userId);

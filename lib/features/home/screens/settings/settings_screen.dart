@@ -23,7 +23,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // 从 ThemeProvider 同步的状态
   bool _isDarkMode = false;
   double _fontScale = 1.0;
-  ReaderBackgroundTheme _readerBg = ReaderBackgroundTheme.defaultWhite;
 
   // 持久化到 SharedPreferences 的设置
   bool _autoSync = true;
@@ -49,7 +48,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     final tp = ref.read(themeProvider);
     _isDarkMode = tp.isDarkMode;
     _fontScale = tp.fontScale;
-    _readerBg = tp.readerBg;
 
     // 加载持久化设置
     SharedPreferences.getInstance().then((prefs) {
@@ -91,7 +89,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       body: SettingsList(
         isDarkMode: _isDarkMode,
         fontScale: _fontScale,
-        readerBg: _readerBg,
         autoSync: _autoSync,
         wifiOnly: _wifiOnly,
         pushNotification: _pushNotification,
@@ -102,7 +99,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
         },
         onFontSizeTap: _showFontSizeDialog,
-        onReadingBgTap: _showReadingBgDialog,
         onAutoSyncChanged: (val) {
           setState(() => _autoSync = val);
           _saveBoolSetting(_autoSyncKey, val);
@@ -166,39 +162,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     );
   }
 
-  void _showReadingBgDialog() {
-    showDialog(
-      context: context,
-      builder: (dialogContext) => SimpleDialog(
-        title: const Text('阅读背景'),
-        children: [
-          RadioGroup<ReaderBackgroundTheme>(
-            groupValue: _readerBg,
-            onChanged: (val) {
-              if (val == null) return;
-              ref.read(themeProvider).setReaderBackground(val);
-              setState(() => _readerBg = val);
-              Navigator.pop(dialogContext);
-            },
-            child: Column(
-              children: ReaderBackgroundTheme.values.map((bg) {
-                return ListTile(
-                  leading: Radio<ReaderBackgroundTheme>(value: bg),
-                  title: Text(bg.label),
-                  onTap: () {
-                    ref.read(themeProvider).setReaderBackground(bg);
-                    setState(() => _readerBg = bg);
-                    Navigator.pop(dialogContext);
-                  },
-                );
-              }).toList(),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
   Future<void> _clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -206,7 +169,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       final keysToRemove = prefs.getKeys().where((key) =>
         !key.startsWith('theme_') &&
         !key.startsWith('font_') &&
-        !key.startsWith('reader_') &&
         !key.startsWith('color_') &&
         !key.startsWith('setting_') &&
         key != 'user'

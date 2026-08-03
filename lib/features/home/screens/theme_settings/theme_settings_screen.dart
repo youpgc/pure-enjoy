@@ -5,7 +5,7 @@ import './theme_settings_screen_content.dart';
 
 /// 个性化设置页面
 ///
-/// 提供主题模式、配色方案、字体大小、阅读背景等个性化设置。
+/// 提供主题模式、配色方案、字体大小等个性化设置。
 class ThemeSettingsScreen extends ConsumerWidget {
   const ThemeSettingsScreen({super.key});
 

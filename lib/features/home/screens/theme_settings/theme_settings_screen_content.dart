@@ -28,8 +28,6 @@ class ThemeSettingsContent extends StatelessWidget {
           FontSizeSection(tp: tp),
           const SizedBox(height: 24),
           BorderShadowSection(tp: tp),
-          const SizedBox(height: 24),
-          ReaderBgSection(tp: tp),
           const SizedBox(height: 32),
         ],
       ),
@@ -253,91 +251,6 @@ class FontSizeSection extends StatelessWidget {
                   ),
                 ),
               ],
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-}
-
-/// 阅读背景分区
-class ReaderBgSection extends StatelessWidget {
-  const ReaderBgSection({super.key, required this.tp});
-  final ThemeProvider tp;
-
-  @override
-  Widget build(BuildContext context) {
-    return Column(
-      children: [
-        const _SectionTitle(title: '阅读背景'),
-        const SizedBox(height: 8),
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(16),
-            child: GridView.count(
-              crossAxisCount: 4,
-              shrinkWrap: true,
-              physics: const NeverScrollableScrollPhysics(),
-              mainAxisSpacing: 12,
-              crossAxisSpacing: 12,
-              childAspectRatio: AppTheme.gridAspectRatio(context, 1),
-              padding: EdgeInsets.zero,
-              children: ReaderBackgroundTheme.values.map((bg) {
-                final isSelected = tp.readerBg == bg;
-                return GestureDetector(
-                  onTap: () => tp.setReaderBackground(bg),
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Container(
-                        width: 48,
-                        height: 48,
-                        decoration: BoxDecoration(
-                          color: bg.bgColor,
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context)
-                                    .colorScheme
-                                    .onSurfaceVariant
-                                    .withValues(alpha: 0.3),
-                            width: isSelected ? 3 : 1,
-                          ),
-                        ),
-                        child: Center(
-                          child: Text(
-                            'Aa',
-                            style: TextStyle(
-                              color: bg.textColor,
-                              fontSize: 16,
-                              fontWeight:
-                                  isSelected ? FontWeight.bold : FontWeight.normal,
-                            ),
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 4),
-                      FittedBox(
-                        fit: BoxFit.scaleDown,
-                        child: Text(
-                          bg.label,
-                          style: TextStyle(
-                            fontSize: 11,
-                            color: isSelected
-                                ? Theme.of(context).colorScheme.primary
-                                : Theme.of(context).colorScheme.onSurfaceVariant,
-                            fontWeight:
-                                isSelected ? FontWeight.bold : FontWeight.normal,
-                          ),
-                          maxLines: 1,
-                        ),
-                      ),
-                    ],
-                  ),
-                );
-              }).toList(),
             ),
           ),
         ),
