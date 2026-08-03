@@ -431,6 +431,8 @@ class _StatCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: color.withValues(alpha: 0.1),
+      elevation: AppTheme.cardElevation(context),
+      shadowColor: AppTheme.cardShadowColor(color.withValues(alpha: 0.1)),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(
           UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,

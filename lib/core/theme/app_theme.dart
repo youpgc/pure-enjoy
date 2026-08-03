@@ -94,14 +94,18 @@ class UiStyleTheme extends ThemeExtension<UiStyleTheme> {
 }
 
 /// 主题级开关扩展，供任意 widget 读取（与 UiStyleTheme 同理，避免装饰卡/彩色卡耦合 Riverpod）。
-/// 目前承载「显示边框」开关，使全局 cardTheme 之外的彩色 Card 也能跟随该开关。
+/// 承载全局开关：useBorder（显示边框）、enableShadow（开启阴影），
+/// 使全局 cardTheme 之外的彩色 Card 也能跟随这两个开关。
 class _BorderFlags extends ThemeExtension<_BorderFlags> {
   final bool useBorder;
-  const _BorderFlags({required this.useBorder});
+  final bool enableShadow;
+  const _BorderFlags({required this.useBorder, required this.enableShadow});
 
   @override
-  _BorderFlags copyWith({bool? useBorder}) =>
-      _BorderFlags(useBorder: useBorder ?? this.useBorder);
+  _BorderFlags copyWith({bool? useBorder, bool? enableShadow}) => _BorderFlags(
+        useBorder: useBorder ?? this.useBorder,
+        enableShadow: enableShadow ?? this.enableShadow,
+      );
 
   @override
   _BorderFlags lerp(_BorderFlags? other, double t) => other ?? this;
@@ -131,13 +135,31 @@ class AppTheme {
   /// 并遵循全局「显示边框」开关。供所有非默认背景色的 Card 复用，
   /// 解决全局 cardTheme 边框只认单一基准色、导致彩色卡片边框与背景不匹配的问题。
   static BorderSide cardBorderSide(BuildContext context, Color background) {
-    final flags =
-        Theme.of(context).extension<_BorderFlags>() ?? const _BorderFlags(useBorder: true);
+    final flags = Theme.of(context).extension<_BorderFlags>() ??
+        const _BorderFlags(useBorder: true, enableShadow: false);
     if (!flags.useBorder) return BorderSide.none;
     return BorderSide(
       color: surfaceBorder(background),
       width: UiStyleToken.of(uiStyleOf(context)).borderWidth,
     );
+  }
+
+  /// 由某张卡片的「实际背景色」派生阴影色：保留色相、压暗一档并降低不透明度，
+  /// 使投影与卡片内容背景同色系（替代中性灰投影），呼应「阴影随内容背景色展示」。
+  static Color cardShadowColor(Color background) {
+    final hsl = HSLColor.fromColor(background);
+    const double step = 0.35; // 压暗一档
+    final double newL = (hsl.lightness - step).clamp(0.0, 1.0);
+    return hsl.withLightness(newL).toColor().withValues(alpha: 0.35);
+  }
+
+  /// 由全局「开启阴影」开关决定彩色 Card 的 elevation（2/0）。
+  /// 供非默认背景色的彩色 Card 复用，使其与全局 cardTheme 行为一致：
+  /// 默认关闭阴影时不显示投影，避免彩色卡恒带阴影而违背「默认不开启阴影」。
+  static double cardElevation(BuildContext context) {
+    final flags = Theme.of(context).extension<_BorderFlags>() ??
+        const _BorderFlags(useBorder: true, enableShadow: false);
+    return flags.enableShadow ? 2 : 0;
   }
 
   // ===== Logo 主色调 =====
@@ -253,7 +275,7 @@ class AppTheme {
       ),
       cardTheme: CardThemeData(
         elevation: enableShadow ? 2 : 0,
-        shadowColor: colorScheme.shadow,
+        shadowColor: cardShadowColor(colorScheme.surfaceContainerHighest),
         color: colorScheme.surfaceContainerHighest,
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(token.cardRadius),
@@ -447,7 +469,7 @@ class AppTheme {
       ),
       extensions: <ThemeExtension<dynamic>>[
         UiStyleTheme(uiStyle),
-        _BorderFlags(useBorder: useBorder),
+        _BorderFlags(useBorder: useBorder, enableShadow: enableShadow),
       ],
     );
   }

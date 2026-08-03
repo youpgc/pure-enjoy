@@ -11,7 +11,8 @@ class _LifeShimmerCard extends StatelessWidget {
     return Expanded(
       child: Card(
         color: baseColor.withValues(alpha: 0.3),
-        elevation: 2,
+        elevation: AppTheme.cardElevation(context),
+        shadowColor: AppTheme.cardShadowColor(baseColor.withValues(alpha: 0.3)),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(
             UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
@@ -118,7 +119,8 @@ class _LatestRecordCard extends StatelessWidget {
 
     return Card(
       color: backgroundColor,
-      elevation: 2,
+      elevation: AppTheme.cardElevation(context),
+      shadowColor: AppTheme.cardShadowColor(backgroundColor),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(
           UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
@@ -236,7 +238,8 @@ class _LifeFeatureCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Card(
       color: color,
-      elevation: 2,
+      elevation: AppTheme.cardElevation(context),
+      shadowColor: AppTheme.cardShadowColor(color),
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(
           UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
