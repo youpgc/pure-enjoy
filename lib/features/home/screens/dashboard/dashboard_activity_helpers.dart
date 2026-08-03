@@ -74,6 +74,8 @@ List<HabitModel> computePendingHabits(
 
   return habits.where((habit) {
     final checkins = checkinHistory[habit.id] ?? [];
+    // 闭环：已达成目标天数的习惯不再出现在首页待打卡
+    if (isHabitCompleted(checkins.length, habit.targetDays)) return false;
     return !checkins.any((c) {
       final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
       return dateStr == todayStr;

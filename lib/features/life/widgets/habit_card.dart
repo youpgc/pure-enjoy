@@ -8,6 +8,7 @@ class HabitCard extends StatelessWidget {
   final HabitModel habit;
   final bool isCheckedIn;
   final int totalCheckins;
+  final bool isCompleted;
   final ReminderScheduleModel? reminderSchedule;
   final bool shouldRemindToday;
   final bool isCheckingIn;
@@ -22,6 +23,7 @@ class HabitCard extends StatelessWidget {
     required this.habit,
     required this.isCheckedIn,
     required this.totalCheckins,
+    this.isCompleted = false,
     this.reminderSchedule,
     required this.shouldRemindToday,
     required this.isCheckingIn,
@@ -38,6 +40,7 @@ class HabitCard extends StatelessWidget {
       habit: habit,
       isCheckedIn: isCheckedIn,
       totalCheckins: totalCheckins,
+      isCompleted: isCompleted,
       reminderSchedule: reminderSchedule,
       shouldRemindToday: shouldRemindToday,
       isCheckingIn: isCheckingIn,

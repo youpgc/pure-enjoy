@@ -49,12 +49,13 @@ extension NotificationSchedulers on NotificationService {
   Future<void> scheduleHabitReminder({
     required ReminderScheduleModel schedule,
     required String habitName,
+    bool isCompleted = false,
   }) async {
     if (!_initialized) await initialize();
     final id = _habitNotificationId(schedule.habitId);
 
-    // 未启用或无法计算下次提醒时间 → 取消已设定的提醒
-    if (!schedule.isEnabled) {
+    // 未启用 / 习惯已达成目标天数（闭环完成态）→ 取消已设定的提醒，不再发起
+    if (!schedule.isEnabled || isCompleted) {
       await cancelNotification(id);
       return;
     }
@@ -118,15 +119,42 @@ extension NotificationSchedulers on NotificationService {
         filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
       );
       final nameById = <String, String>{};
+      final targetById = <String, int>{};
       if (habitsResult.isSuccess && habitsResult.data != null) {
         for (final h in habitsResult.data!) {
           nameById[h['id'] as String] = (h['name'] as String?) ?? '习惯';
+          targetById[h['id'] as String] = (h['target_days'] as int?) ?? 21;
+        }
+      }
+
+      // 计算每个习惯的累计打卡数，用于「已完成」判定（闭环：达成目标后不再发起提醒）
+      final checkinCountById = <String, int>{};
+      final checkinsResult = await ApiClient.get(
+        'habit_checkins',
+        filters: {'user_id': 'eq.$userId'},
+        select: 'habit_id',
+      );
+      if (checkinsResult.isSuccess && checkinsResult.data != null) {
+        for (final c in checkinsResult.data!) {
+          final hid = c['habit_id'] as String?;
+          if (hid != null) {
+            checkinCountById[hid] = (checkinCountById[hid] ?? 0) + 1;
+          }
         }
       }
 
       for (final s in result.data!) {
         final model = ReminderScheduleModel.fromJson(s);
         final name = nameById[model.habitId] ?? '习惯';
+        final completed = isHabitCompleted(
+          checkinCountById[model.habitId] ?? 0,
+          targetById[model.habitId] ?? 21,
+        );
+        if (completed) {
+          // 闭环：已完成的习惯取消其可能存在的提醒，不重挂
+          await cancelHabitReminder(model.habitId);
+          continue;
+        }
         await scheduleHabitReminder(schedule: model, habitName: name);
       }
     } catch (e) {

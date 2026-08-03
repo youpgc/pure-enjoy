@@ -92,6 +92,9 @@ mixin _DashboardLogic on State<DashboardPage> {
   /// 一键打卡
   Future<void> _quickCheckIn(HabitModel habit) async {
     if (_checkingHabitId != null) return; // 防止重复请求
+    // 闭环：已达成目标天数的习惯不再允许打卡
+    final totalCheckins = _checkinHistory[habit.id]?.length ?? 0;
+    if (isHabitCompleted(totalCheckins, habit.targetDays)) return;
     setState(() => _checkingHabitId = habit.id);
     try {
       final today = DateTime.now();

@@ -7,6 +7,7 @@ import 'package:timezone/data/latest_all.dart' as tz_data;
 import './api_client.dart';
 import './supabase_service.dart';
 import '../features/life/models/reminder_schedule_model.dart';
+import '../features/life/models/habit_model.dart';
 import '../features/life/models/reminder_model.dart';
 import '../features/life/models/anniversary_model.dart';
 import '../features/life/models/remind_offset.dart';

@@ -153,6 +153,13 @@ class HabitCheckinModel {
   }
 }
 
+/// 习惯「已完成」判定（前端实时推导，不持久化）。
+/// 口径：累计打卡天数 >= 目标天数 即标记为完成，达标后不再执行任何过程逻辑
+/// （打卡/提醒/首页待打卡均据此拦截）。[targetDays] <= 0 视为无限目标，永不满足。
+bool isHabitCompleted(int totalCheckins, int targetDays) {
+  return targetDays > 0 && totalCheckins >= targetDays;
+}
+
 /// 习惯颜色选项
 final habitColors = {
   'red': 0xFFEF4444,

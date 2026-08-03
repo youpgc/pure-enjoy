@@ -16,6 +16,7 @@ class HabitCardContent extends StatelessWidget {
     required this.habit,
     required this.isCheckedIn,
     required this.totalCheckins,
+    this.isCompleted = false,
     this.reminderSchedule,
     required this.shouldRemindToday,
     required this.isCheckingIn,
@@ -29,6 +30,7 @@ class HabitCardContent extends StatelessWidget {
   final HabitModel habit;
   final bool isCheckedIn;
   final int totalCheckins;
+  final bool isCompleted;
   final ReminderScheduleModel? reminderSchedule;
   final bool shouldRemindToday;
   final bool isCheckingIn;
@@ -50,6 +52,7 @@ class HabitCardContent extends StatelessWidget {
           children: [
             HabitCardHeader(
               habit: habit,
+              isCompleted: isCompleted,
               reminderSchedule: reminderSchedule,
               shouldRemindToday: shouldRemindToday,
               onViewHistory: onViewHistory,
@@ -73,6 +76,7 @@ class HabitCardContent extends StatelessWidget {
             HabitCardAction(
               isCheckedIn: isCheckedIn,
               isCheckingIn: isCheckingIn,
+              isCompleted: isCompleted,
               color: habitColor,
               onCheckIn: onCheckIn,
             ),
@@ -88,6 +92,7 @@ class HabitCardHeader extends StatelessWidget {
   const HabitCardHeader({
     super.key,
     required this.habit,
+    this.isCompleted = false,
     this.reminderSchedule,
     required this.shouldRemindToday,
     required this.onViewHistory,
@@ -97,6 +102,7 @@ class HabitCardHeader extends StatelessWidget {
   });
 
   final HabitModel habit;
+  final bool isCompleted;
   final ReminderScheduleModel? reminderSchedule;
   final bool shouldRemindToday;
   final VoidCallback onViewHistory;
@@ -134,7 +140,33 @@ class HabitCardHeader extends StatelessWidget {
                       style: Theme.of(context).textTheme.titleMedium,
                     ),
                   ),
-                  if (!habit.isActive) ...[
+                  if (isCompleted) ...[
+                    const SizedBox(width: 8),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 8,
+                        vertical: 2,
+                      ),
+                      decoration: BoxDecoration(
+                        color: AppTheme.success.withValues(alpha: 0.18),
+                        borderRadius: BorderRadius.circular(4),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.verified, size: 12, color: AppTheme.success),
+                          SizedBox(width: 2),
+                          Text(
+                            '已完成',
+                            style: TextStyle(
+                              fontSize: 10,
+                              color: AppTheme.success,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ] else if (!habit.isActive) ...[
                     const SizedBox(width: 8),
                     Container(
                       padding: const EdgeInsets.symmetric(
@@ -390,24 +422,29 @@ class HabitCardAction extends StatelessWidget {
     super.key,
     required this.isCheckedIn,
     required this.isCheckingIn,
+    this.isCompleted = false,
     required this.color,
     required this.onCheckIn,
   });
 
   final bool isCheckedIn;
   final bool isCheckingIn;
+  final bool isCompleted;
   final Color color;
   final VoidCallback onCheckIn;
 
   @override
   Widget build(BuildContext context) {
-    // 单习惯打卡中优先显示 loading，盖过「今日已打卡」状态，保证按钮 spinner 持续到接口完成
+    // 优先级：打卡中 > 已完成(闭环不再可打卡) > 今日已打卡 > 可打卡
     final showChecking = isCheckingIn;
-    final showCheckedIn = !showChecking && isCheckedIn;
+    final showCompleted = !showChecking && isCompleted;
+    final showCheckedIn = !showChecking && !showCompleted && isCheckedIn;
     return SizedBox(
       width: double.infinity,
       child: FilledButton.icon(
-        onPressed: (showCheckedIn || showChecking) ? null : onCheckIn,
+        onPressed: (showChecking || showCompleted || showCheckedIn)
+            ? null
+            : onCheckIn,
         icon: showChecking
             ? const SizedBox(
                 width: 18,
@@ -417,10 +454,18 @@ class HabitCardAction extends StatelessWidget {
                   color: Colors.white,
                 ),
               )
-            : Icon(showCheckedIn ? Icons.check : Icons.add),
-        label: Text(showCheckedIn ? '今日已打卡' : (showChecking ? '打卡中...' : '立即打卡')),
+            : Icon(showCompleted
+                ? Icons.verified
+                : (showCheckedIn ? Icons.check : Icons.add)),
+        label: Text(showCompleted
+            ? '已完成目标'
+            : (showCheckedIn
+                ? '今日已打卡'
+                : (showChecking ? '打卡中...' : '立即打卡'))),
         style: FilledButton.styleFrom(
-          backgroundColor: showCheckedIn ? AppTheme.success : color,
+          backgroundColor: (showCompleted || showCheckedIn)
+              ? AppTheme.success
+              : color,
           foregroundColor: Colors.white,
         ),
       ),

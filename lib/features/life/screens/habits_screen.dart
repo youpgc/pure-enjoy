@@ -238,6 +238,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
     if (_checkingHabitId == habit.id) return;
     final today = DateTime.now();
 
+    // 闭环：已达成目标天数则不再允许打卡（状态标记已完成，停止过程逻辑）
+    if (isHabitCompleted(_getTotalCheckins(habit.id), habit.targetDays)) {
+      _showError('「${habit.name}」已达成目标天数，已自动完成');
+      return;
+    }
+
     // 检查今天是否已经打卡
     final checkins = _checkinHistory[habit.id] ?? [];
     final alreadyChecked = checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
@@ -282,6 +288,11 @@ class _HabitsScreenState extends State<HabitsScreen> {
       // 拉取后端维护的最新 streak（不触发整列表 loading）
       await _loadHabits(refresh: true, fromCheckIn: true);
       EventBus.instance.fire(EventType.habitUpdated);
+
+      // 闭环：达成目标天数后取消该习惯的提醒，不再发起任何过程提醒
+      if (isHabitCompleted(_getTotalCheckins(habit.id), habit.targetDays)) {
+        await NotificationService.instance.cancelHabitReminder(habit.id);
+      }
 
       if (!mounted) return;
       // 显示成功提示
@@ -354,12 +365,21 @@ class _HabitsScreenState extends State<HabitsScreen> {
         if (!newActive) {
           await NotificationService.instance.cancelHabitReminder(habit.id);
         } else {
-          final sched = _reminderSchedules[habit.id];
-          if (sched != null) {
-            await NotificationService.instance.scheduleHabitReminder(
-              schedule: sched,
-              habitName: habit.name,
-            );
+          final completed = isHabitCompleted(
+            _checkinHistory[habit.id]?.length ?? 0,
+            habit.targetDays,
+          );
+          if (completed) {
+            // 闭环：已完成习惯即便恢复启用也不重挂提醒
+            await NotificationService.instance.cancelHabitReminder(habit.id);
+          } else {
+            final sched = _reminderSchedules[habit.id];
+            if (sched != null) {
+              await NotificationService.instance.scheduleHabitReminder(
+                schedule: sched,
+                habitName: habit.name,
+              );
+            }
           }
         }
         _loadHabits(refresh: true);
@@ -502,12 +522,14 @@ class _HabitsScreenState extends State<HabitsScreen> {
                       final habit = _habits[index];
                       final isCheckedIn = _isCheckedInToday(habit.id);
                       final totalCheckins = _getTotalCheckins(habit.id);
+                      final completed = isHabitCompleted(totalCheckins, habit.targetDays);
                       final schedule = _reminderSchedules[habit.id];
                       final shouldRemindToday = schedule?.shouldRemindToday(DateTime.now()) ?? false;
                       return HabitCard(
                         habit: habit,
                         isCheckedIn: isCheckedIn,
                         totalCheckins: totalCheckins,
+                        isCompleted: completed,
                         reminderSchedule: schedule,
                         shouldRemindToday: shouldRemindToday,
                         isCheckingIn: _checkingHabitId == habit.id,
