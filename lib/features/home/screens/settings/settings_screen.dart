@@ -7,7 +7,6 @@ import '../../../../services/api_client.dart';
 import '../../../../services/chapter_cache_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../core/widgets/widgets.dart';
-import '../theme_settings/theme_settings_screen.dart';
 import './settings_list.dart';
 import './settings_dialogs.dart';
 import './settings_helpers.dart';
@@ -127,12 +126,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onClearCacheTap: () => showClearCacheDialog(context, _clearCache),
         onChangePasswordTap: _showChangePasswordDialog,
         onDeleteAccountTap: () => showDeleteAccountDialog(context, _deleteAccount),
-        onThemeSettingsTap: () {
-          Navigator.push(
-            context,
-            MaterialPageRoute(builder: (_) => const ThemeSettingsScreen()),
-          );
-        },
       ),
     );
   }

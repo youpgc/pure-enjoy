@@ -25,7 +25,6 @@ class SettingsList extends StatelessWidget {
   final VoidCallback onClearCacheTap;
   final VoidCallback onChangePasswordTap;
   final VoidCallback onDeleteAccountTap;
-  final VoidCallback onThemeSettingsTap;
 
   const SettingsList({
     super.key,
@@ -48,23 +47,12 @@ class SettingsList extends StatelessWidget {
     required this.onClearCacheTap,
     required this.onChangePasswordTap,
     required this.onDeleteAccountTap,
-    required this.onThemeSettingsTap,
   });
 
   @override
   Widget build(BuildContext context) {
     return ListView(
       children: [
-        // 外观设置：进入个性化设置（配色/字体/UI 风格等）
-        const SectionHeader(title: '外观'),
-        ListTile(
-          leading: const Icon(Icons.palette_outlined),
-          title: const Text('个性化设置'),
-          subtitle: const Text('主题模式、配色、字体与 UI 风格'),
-          trailing: const Icon(Icons.chevron_right),
-          onTap: onThemeSettingsTap,
-        ),
-
         // [小说模块暂时停用] 阅读设置分区
         // const SectionHeader(title: '阅读设置'),
         // SwitchListTile(

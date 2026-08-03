@@ -5,6 +5,7 @@ import '../../avatar_render.dart';
 // [小说模块暂时停用] import '../reading_history_screen.dart';
 import '../about_legal_screen.dart';
 import '../../../life/screens/feedback_list_screen.dart';
+import '../theme_settings/theme_settings_screen.dart';
 
 /// {@template profile_page_content}
 /// [ProfilePage] 的主体内容（从超长 build 抽取，便于维护）。
@@ -27,6 +28,7 @@ class ProfilePageContent extends StatelessWidget {
     required this.onPointsTap,
     required this.onVersionTap,
     required this.onSignOut,
+    required this.onThemeSettingsTap,
   });
 
   final String? currentUserName;
@@ -43,6 +45,7 @@ class ProfilePageContent extends StatelessWidget {
   final VoidCallback onPointsTap;
   final VoidCallback onVersionTap;
   final VoidCallback onSignOut;
+  final VoidCallback onThemeSettingsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -95,6 +98,18 @@ class ProfilePageContent extends StatelessWidget {
           //     );
           //   },
           // ),
+          ListTile(
+            leading: const Icon(Icons.palette_outlined),
+            title: const Text('个性化设置'),
+            subtitle: const Text('主题模式、配色、字体与 UI 风格'),
+            trailing: const Icon(Icons.chevron_right),
+            onTap: () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const ThemeSettingsScreen()),
+              );
+            },
+          ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于与法律'),

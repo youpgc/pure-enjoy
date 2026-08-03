@@ -10,6 +10,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../profile/screens/point_records/point_records_screen.dart';
 import '../edit_profile/edit_profile_screen.dart';
 import '../settings/settings_screen.dart';
+import '../theme_settings/theme_settings_screen.dart';
 import './profile_page_content.dart';
 
 /// 个人中心页面
@@ -154,6 +155,12 @@ class _ProfilePageState extends State<ProfilePage> {
         } else {
           showSnackBar(context, '当前已是最新版本');
         }
+      },
+      onThemeSettingsTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const ThemeSettingsScreen()),
+        ).then((_) => _loadUserData());
       },
       onSignOut: () async {
         final confirm = await showDialog<bool>(
