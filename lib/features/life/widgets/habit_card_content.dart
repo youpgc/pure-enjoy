@@ -231,6 +231,7 @@ class HabitCardHeader extends StatelessWidget {
         ),
         HabitCardMenu(
           habit: habit,
+          isCompleted: isCompleted,
           onViewHistory: onViewHistory,
           onToggleActive: onToggleActive,
           onEdit: onEdit,
@@ -246,6 +247,7 @@ class HabitCardMenu extends StatelessWidget {
   const HabitCardMenu({
     super.key,
     required this.habit,
+    this.isCompleted = false,
     required this.onViewHistory,
     required this.onToggleActive,
     required this.onEdit,
@@ -253,6 +255,7 @@ class HabitCardMenu extends StatelessWidget {
   });
 
   final HabitModel habit;
+  final bool isCompleted;
   final VoidCallback onViewHistory;
   final VoidCallback onToggleActive;
   final VoidCallback onEdit;
@@ -288,22 +291,23 @@ class HabitCardMenu extends StatelessWidget {
             ],
           ),
         ),
-        PopupMenuItem(
-          value: 'toggle',
-          child: Row(
-            children: [
-              Icon(
-                habit.isActive ? Icons.pause : Icons.play_arrow,
-                size: 20,
-                color: habit.isActive
-                    ? Theme.of(context).colorScheme.primary
-                    : AppTheme.success,
-              ),
-              const SizedBox(width: 8),
-              Text(habit.isActive ? '暂停' : '恢复'),
-            ],
+        if (!isCompleted)
+          PopupMenuItem(
+            value: 'toggle',
+            child: Row(
+              children: [
+                Icon(
+                  habit.isActive ? Icons.pause : Icons.play_arrow,
+                  size: 20,
+                  color: habit.isActive
+                      ? Theme.of(context).colorScheme.primary
+                      : AppTheme.success,
+                ),
+                const SizedBox(width: 8),
+                Text(habit.isActive ? '暂停' : '恢复'),
+              ],
+            ),
           ),
-        ),
         const PopupMenuItem(
           value: 'edit',
           child: Row(

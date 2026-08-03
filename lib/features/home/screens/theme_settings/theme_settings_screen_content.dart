@@ -21,11 +21,11 @@ class ThemeSettingsContent extends StatelessWidget {
         children: [
           ThemeModeSection(tp: tp),
           const SizedBox(height: 24),
+          UiStyleSection(tp: tp),
+          const SizedBox(height: 24),
           ColorSchemeSection(tp: tp),
           const SizedBox(height: 24),
           FontSizeSection(tp: tp),
-          const SizedBox(height: 24),
-          UiStyleSection(tp: tp),
           const SizedBox(height: 24),
           BorderShadowSection(tp: tp),
           const SizedBox(height: 24),
@@ -136,14 +136,20 @@ class ColorSchemeSection extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1,
+              padding: EdgeInsets.zero,
               children: AppColorScheme.values.map((scheme) {
                 final isSelected = tp.colorScheme == scheme;
                 return GestureDetector(
                   onTap: () => tp.setColorScheme(scheme),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         width: 48,
@@ -265,14 +271,20 @@ class ReaderBgSection extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 1,
+              padding: EdgeInsets.zero,
               children: ReaderBackgroundTheme.values.map((bg) {
                 final isSelected = tp.readerBg == bg;
                 return GestureDetector(
                   onTap: () => tp.setReaderBackground(bg),
                   child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
                     children: [
                       Container(
                         width: 48,
