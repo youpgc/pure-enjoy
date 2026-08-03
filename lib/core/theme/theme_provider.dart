@@ -89,8 +89,8 @@ class ThemeProvider extends ChangeNotifier {
   UiStyle _uiStyle = UiStyle.minimalFlat;
   UiStyle get uiStyle => _uiStyle;
 
-  // 是否显示边框
-  bool _useBorder = true;
+  // 是否显示边框（默认关闭）
+  bool _useBorder = false;
   bool get useBorder => _useBorder;
 
   // 是否开启阴影

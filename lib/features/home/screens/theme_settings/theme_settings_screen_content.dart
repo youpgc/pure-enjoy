@@ -341,9 +341,14 @@ class UiStyleSection extends StatelessWidget {
         Card(
           child: Padding(
             padding: const EdgeInsets.all(16),
-            child: Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            child: GridView.count(
+              crossAxisCount: 4,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              mainAxisSpacing: 12,
+              crossAxisSpacing: 12,
+              childAspectRatio: 0.72,
+              padding: EdgeInsets.zero,
               children: const [
                 UiStyle.sharpMinimal, // 圆角 4
                 UiStyle.minimalFlat, // 圆角 8
@@ -355,8 +360,7 @@ class UiStyleSection extends StatelessWidget {
                 return GestureDetector(
                   onTap: () => tp.setUiStyle(style),
                   child: Container(
-                    width: 84,
-                    padding: const EdgeInsets.all(10),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: isSelected ? cs.primaryContainer : cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(token.cardRadius),
@@ -368,7 +372,7 @@ class UiStyleSection extends StatelessWidget {
                     child: Column(
                       children: [
                         Container(
-                          height: 26,
+                          height: 22,
                           decoration: BoxDecoration(
                             color: cs.primary,
                             borderRadius: BorderRadius.circular(token.cardRadius),
@@ -376,14 +380,13 @@ class UiStyleSection extends StatelessWidget {
                         ),
                         const SizedBox(height: 6),
                         Container(
-                          height: 14,
-                          width: 44,
+                          height: 10,
                           decoration: BoxDecoration(
                             color: cs.outline.withValues(alpha: 0.4),
                             borderRadius: BorderRadius.circular(token.buttonRadius),
                           ),
                         ),
-                        const SizedBox(height: 8),
+                        const Spacer(),
                         Text(
                           token.label,
                           style: TextStyle(
@@ -392,6 +395,7 @@ class UiStyleSection extends StatelessWidget {
                             fontWeight:
                                 isSelected ? FontWeight.bold : FontWeight.normal,
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
