@@ -19,10 +19,5 @@ class AppConfig {
   static const String moodDiariesTable = 'mood_diaries';
   static const String notesTable = 'notes';
   static const String weightRecordsTable = 'weight_records';
-  static const String novelsTable = 'novels';
-  static const String novelChaptersTable = 'novel_chapters';
-  static const String userNovelsTable = 'user_novels';
-  static const String readingProgressTable = 'user_novels';
   static const String feedbackTable = 'user_feedback';
-  static const String novelCommentsTable = 'novel_comments';
 }

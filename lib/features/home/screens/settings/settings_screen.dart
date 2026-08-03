@@ -210,7 +210,6 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'user_favorites',
         'user_feedback',
         'reminders',
-        'user_novels',
         'user_anniversaries',
         'point_records',
       ];
