@@ -176,11 +176,11 @@ class _LifeScreenState extends State<LifeScreen> {
               GridView.builder(
                 shrinkWrap: true,
                 physics: const NeverScrollableScrollPhysics(),
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
                   crossAxisCount: 2,
                   crossAxisSpacing: 12,
                   mainAxisSpacing: 12,
-                  childAspectRatio: 1.3,
+                  childAspectRatio: AppTheme.gridAspectRatio(context, 1.3),
                 ),
                 itemCount: _gridFeatures.length,
                 itemBuilder: (context, index) {

@@ -10,6 +10,7 @@ import '../../../../utils/date_time_utils.dart';
 import '../../../../utils/cache_helper.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../core/widgets/paginated_list_mixin.dart';
+import '../../../../core/theme/app_theme.dart';
 import '../../models/note_model.dart';
 
 part 'note_list_parts.dart';
@@ -334,11 +335,11 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
                           controller: scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.all(16),
-                          gridDelegate: const SliverGridDelegateWithMaxCrossAxisExtent(
+                          gridDelegate: SliverGridDelegateWithMaxCrossAxisExtent(
                             maxCrossAxisExtent: 200,
                             mainAxisSpacing: 12,
                             crossAxisSpacing: 12,
-                            childAspectRatio: 1,
+                            childAspectRatio: AppTheme.gridAspectRatio(context, 1),
                           ),
                           itemCount: _notes.length + 1,
                           itemBuilder: (context, index) {

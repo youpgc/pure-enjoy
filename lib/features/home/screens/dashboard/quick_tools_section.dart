@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../sheets/tool_config_sheet.dart';
 import '../../widgets/tool_card.dart';
+import '../../../../core/theme/app_theme.dart';
 
 /// 快捷工具网格区块组件
 ///
@@ -57,11 +58,11 @@ class QuickToolsSection extends StatelessWidget {
           GridView.builder(
             shrinkWrap: true,
             physics: const NeverScrollableScrollPhysics(),
-            gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            gridDelegate: SliverGridDelegateWithFixedCrossAxisCount(
               crossAxisCount: 3,
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 1,
+              childAspectRatio: AppTheme.gridAspectRatio(context, 1),
             ),
             itemCount: visibleTools.length,
             itemBuilder: (context, index) {

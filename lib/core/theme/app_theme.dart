@@ -162,6 +162,14 @@ class AppTheme {
     return flags.enableShadow ? 2 : 0;
   }
 
+  /// 字体缩放感知的网格宽高比。
+  /// 字体放大（textScale>1）时降低 ratio 以抬高单元格高度，避免卡片内文字溢出；
+  /// 用 clamp 限制范围，避免比例过扁/过竖导致布局变形。
+  static double gridAspectRatio(BuildContext context, double base) {
+    final scale = MediaQuery.of(context).textScaler.scale(1);
+    return (base / scale).clamp(base * 0.7, base * 1.2);
+  }
+
   // ===== Logo 主色调 =====
   static const Color primaryOrange = Color(0xFFF26522);   // 深橙色
   static const Color primaryYellow = Color(0xFFFFC107);   // 暖黄色

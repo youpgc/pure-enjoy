@@ -142,7 +142,7 @@ class ColorSchemeSection extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 1,
+              childAspectRatio: AppTheme.gridAspectRatio(context, 1),
               padding: EdgeInsets.zero,
               children: AppColorScheme.values.map((scheme) {
                 final isSelected = tp.colorScheme == scheme;
@@ -277,7 +277,7 @@ class ReaderBgSection extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 1,
+              childAspectRatio: AppTheme.gridAspectRatio(context, 1),
               padding: EdgeInsets.zero,
               children: ReaderBackgroundTheme.values.map((bg) {
                 final isSelected = tp.readerBg == bg;
@@ -359,7 +359,7 @@ class UiStyleSection extends StatelessWidget {
               physics: const NeverScrollableScrollPhysics(),
               mainAxisSpacing: 12,
               crossAxisSpacing: 12,
-              childAspectRatio: 0.72,
+              childAspectRatio: AppTheme.gridAspectRatio(context, 0.72),
               padding: EdgeInsets.zero,
               children: const [
                 UiStyle.sharpMinimal, // 圆角 4
