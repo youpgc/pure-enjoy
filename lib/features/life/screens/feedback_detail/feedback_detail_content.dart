@@ -247,6 +247,15 @@ class _FeedbackTitleSection extends StatelessWidget {
           const SizedBox(height: 8),
           Card(
             color: colorScheme.primaryContainer.withValues(alpha: 0.3),
+            shape: RoundedRectangleBorder(
+              borderRadius: BorderRadius.circular(
+                UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+              ),
+              side: AppTheme.cardBorderSide(
+                context,
+                colorScheme.primaryContainer.withValues(alpha: 0.3),
+              ),
+            ),
             child: Padding(
               padding: const EdgeInsets.all(16),
               child: Text(

@@ -39,6 +39,17 @@ class TodoReminderSection extends StatelessWidget {
                 color: isOverdue
                     ? colorScheme.errorContainer
                     : colorScheme.primaryContainer,
+                shape: RoundedRectangleBorder(
+                  borderRadius: BorderRadius.circular(
+                    UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+                  ),
+                  side: AppTheme.cardBorderSide(
+                    context,
+                    isOverdue
+                        ? colorScheme.errorContainer
+                        : colorScheme.primaryContainer,
+                  ),
+                ),
                 child: Padding(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 16, vertical: 12),

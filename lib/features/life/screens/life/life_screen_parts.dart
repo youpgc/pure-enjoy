@@ -12,6 +12,12 @@ class _LifeShimmerCard extends StatelessWidget {
       child: Card(
         color: baseColor.withValues(alpha: 0.3),
         elevation: 2,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(
+            UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+          ),
+          side: AppTheme.cardBorderSide(context, baseColor.withValues(alpha: 0.3)),
+        ),
         child: Padding(
           padding: const EdgeInsets.all(12),
           child: Column(
@@ -113,6 +119,12 @@ class _LatestRecordCard extends StatelessWidget {
     return Card(
       color: backgroundColor,
       elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
+        side: AppTheme.cardBorderSide(context, backgroundColor),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(
@@ -225,6 +237,12 @@ class _LifeFeatureCard extends StatelessWidget {
     return Card(
       color: color,
       elevation: 2,
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(
+          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
+        ),
+        side: AppTheme.cardBorderSide(context, color),
+      ),
       child: InkWell(
         onTap: onTap,
         borderRadius: BorderRadius.circular(

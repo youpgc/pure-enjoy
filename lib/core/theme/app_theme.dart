@@ -93,6 +93,20 @@ class UiStyleTheme extends ThemeExtension<UiStyleTheme> {
   }
 }
 
+/// 主题级开关扩展，供任意 widget 读取（与 UiStyleTheme 同理，避免装饰卡/彩色卡耦合 Riverpod）。
+/// 目前承载「显示边框」开关，使全局 cardTheme 之外的彩色 Card 也能跟随该开关。
+class _BorderFlags extends ThemeExtension<_BorderFlags> {
+  final bool useBorder;
+  const _BorderFlags({required this.useBorder});
+
+  @override
+  _BorderFlags copyWith({bool? useBorder}) =>
+      _BorderFlags(useBorder: useBorder ?? this.useBorder);
+
+  @override
+  _BorderFlags lerp(_BorderFlags? other, double t) => other ?? this;
+}
+
 /// 应用主题配置 - 基于logo的橙黄配色方案
 class AppTheme {
   /// 从 ThemeData 读取当前 UI 风格（由 main 注入），装饰卡据此跟随风格切换圆角。
@@ -111,6 +125,19 @@ class AppTheme {
         ? (hsl.lightness - step).clamp(0.0, 1.0)
         : (hsl.lightness + step).clamp(0.0, 1.0);
     return hsl.withLightness(newL).toColor();
+  }
+
+  /// 由某张卡片的「实际背景色」派生其边框线（保留色相、压暗一档），
+  /// 并遵循全局「显示边框」开关。供所有非默认背景色的 Card 复用，
+  /// 解决全局 cardTheme 边框只认单一基准色、导致彩色卡片边框与背景不匹配的问题。
+  static BorderSide cardBorderSide(BuildContext context, Color background) {
+    final flags =
+        Theme.of(context).extension<_BorderFlags>() ?? const _BorderFlags(useBorder: true);
+    if (!flags.useBorder) return BorderSide.none;
+    return BorderSide(
+      color: surfaceBorder(background),
+      width: UiStyleToken.of(uiStyleOf(context)).borderWidth,
+    );
   }
 
   // ===== Logo 主色调 =====
@@ -418,7 +445,10 @@ class AppTheme {
         ),
         textStyle: TextStyle(color: colorScheme.onInverseSurface),
       ),
-      extensions: <ThemeExtension<dynamic>>[UiStyleTheme(uiStyle)],
+      extensions: <ThemeExtension<dynamic>>[
+        UiStyleTheme(uiStyle),
+        _BorderFlags(useBorder: useBorder),
+      ],
     );
   }
 }
