@@ -3,7 +3,6 @@ part of './dashboard_page.dart';
 const String _prefsKeyTools = 'dashboard_visible_tools';
 
 /// 首页各区块本地缓存键（stale-while-revalidate，秒开用）
-// [小说模块暂时停用] const String _kCacheRecentNovels = 'cache_home_recent_novels';
 const String _kCacheHabits = 'cache_home_habits';
 const String _kCacheActivities = 'cache_home_activities';
 
@@ -28,9 +27,6 @@ mixin _DashboardLogic on State<DashboardPage> {
   // 提醒加载：实时获取；10s 内重复调用（快速切 tab）不重复请求
   DateTime? _remindersLastFetched;
   static const Duration _remindersThrottle = Duration(seconds: 10);
-
-  // [小说模块暂时停用] bool _isLoadingNovels = true;
-  // [小说模块暂时停用] List<Map<String, dynamic>> _recentNovels = [];
 
   List<String> _visibleToolIds = [];
 
@@ -271,85 +267,4 @@ mixin _DashboardLogic on State<DashboardPage> {
     setState(() => _pendingReminders = reminders);
   }
 
-  /* [小说模块暂时停用]
-  /// 加载最近阅读的小说（带本地缓存：先秒开，后台静默刷新）
-  /// 仍分两步查询（保持原 RLS/外键兼容），但整体结果经 RequestCache 缓存为 plain JSON
-  /// [force] 为 true 时跳过缓存直接拉最新（事件回程/下拉刷新用，保证加删书后强一致）
-  Future<void> _loadRecentNovels({bool force = false}) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) {
-      if (mounted) setState(() => _isLoadingNovels = false);
-      return;
-    }
-
-    // fetcher 返回 plain JSON（可缓存），读取时再转 NovelModel
-    Future<ApiResponse> fetcher() async {
-      // 第一步：用户阅读记录
-      final progressResult = await ApiClient.get('user_novels',
-          filters: {'user_id': 'eq.$userId'},
-          select: 'novel_id,last_chapter,progress,last_read_at',
-          order: 'last_read_at.desc.nullslast',
-          limit: 5);
-
-      if (!progressResult.isSuccess ||
-          progressResult.data == null ||
-          progressResult.data!.isEmpty) {
-        return ApiResponse.success([]);
-      }
-
-      final novelIds = <String>[];
-      final progressMap = <String, Map<String, dynamic>>{};
-      for (final item in progressResult.data!) {
-        final novelId = item['novel_id']?.toString();
-        if (novelId != null && novelId.isNotEmpty) {
-          novelIds.add(novelId);
-          progressMap[novelId] = item;
-        }
-      }
-      if (novelIds.isEmpty) return ApiResponse.success([]);
-
-      // 第二步：小说详情（含 source/source_url，聚合书路由必需）
-      final novelsResult = await ApiClient.get('novels',
-          filters: {'id': 'in.(${novelIds.join(",")})'},
-          select: 'id,title,author,cover_url,category,chapter_count,source,source_url',
-          limit: novelIds.length);
-
-      final novels = <Map<String, dynamic>>[];
-      if (novelsResult.isSuccess && novelsResult.data != null) {
-        for (final nd in novelsResult.data!) {
-          final id = nd['id']?.toString() ?? '';
-          final p = progressMap[id];
-          if (p != null) {
-            novels.add({
-              'novel': nd,
-              'lastChapter': p['last_chapter'] as int? ?? 1,
-              'progress': p['progress'] as num? ?? 0.0,
-            });
-          }
-        }
-      }
-      return ApiResponse.success(novels);
-    }
-
-    final (rows, _) = await RequestCache.getList(
-      _kCacheRecentNovels,
-      fetcher,
-      ttl: _kHomeLongTtl,
-      forceRefresh: force,
-    );
-    if (!mounted) return;
-    final novels = rows.map((m) {
-      final novelJson = m['novel'] as Map<String, dynamic>? ?? {};
-      return {
-        'novel': NovelModel.fromJson(novelJson),
-        'lastChapter': m['lastChapter'] as int? ?? 1,
-        'progress': m['progress'] as num? ?? 0.0,
-      };
-    }).toList();
-    setState(() {
-      _recentNovels = novels;
-      _isLoadingNovels = false;
-    });
-  }
-   */
 }

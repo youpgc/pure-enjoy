@@ -51,12 +51,6 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
     });
   }
 
-  // [小说模块暂时停用] 书架变化刷新最近阅读
-  // void _onBookshelfChanged() {
-  //   unawaited(RequestCache.invalidate(_kCacheRecentNovels));
-  //   _loadRecentNovels(force: true);
-  // }
-
   @override
   void dispose() {
     for (final sub in _eventSubscriptions) {

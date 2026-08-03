@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../services/dict_service.dart';
 import '../../avatar_render.dart';
-// [小说模块暂时停用] import '../reading_history_screen.dart';
 import '../about_legal_screen.dart';
 import '../../../life/screens/feedback_list_screen.dart';
 import '../theme_settings/theme_settings_screen.dart';
@@ -86,18 +85,6 @@ class ProfilePageContent extends StatelessWidget {
               ),
             ),
           ),
-          // [小说模块暂时停用] 阅读历史入口
-          // ListTile(
-          //   leading: const Icon(Icons.history_outlined),
-          //   title: const Text('阅读历史'),
-          //   trailing: const Icon(Icons.chevron_right),
-          //   onTap: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (_) => const ReadingHistoryScreen()),
-          //     );
-          //   },
-          // ),
           ListTile(
             leading: const Icon(Icons.palette_outlined),
             title: const Text('个性化设置'),

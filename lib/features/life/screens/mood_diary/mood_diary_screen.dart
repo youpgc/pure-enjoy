@@ -342,19 +342,6 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     return Scaffold(
       appBar: AppBar(
         title: const Text('心情日记'),
-        actions: const [
-          // 心情统计入口暂不使用
-          // IconButton(
-          //   icon: const Icon(Icons.bar_chart),
-          //   tooltip: '心情统计',
-          //   onPressed: () {
-          //     Navigator.push(
-          //       context,
-          //       MaterialPageRoute(builder: (_) => const MoodStatisticsScreen()),
-          //     );
-          //   },
-          // ),
-        ],
       ),
       body: MoodDiaryContent(
         diaries: _diaries,
