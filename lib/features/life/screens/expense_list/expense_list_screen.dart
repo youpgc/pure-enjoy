@@ -157,7 +157,7 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     _monthUpdateDebounce = Timer(const Duration(milliseconds: 150), () {
       if (!mounted) return;
       final pixels = scrollController.position.pixels;
-      const itemHeight = 72.0;
+      final double itemHeight = AppTheme.scaledHeight(context, 72.0);
       final index = (pixels / itemHeight).floor().clamp(0, _expenses.length - 1);
       final expense = _expenses[index];
       final month = DateTime(expense.date.year, expense.date.month);
@@ -405,7 +405,7 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
                           controller: scrollController,
                           physics: const AlwaysScrollableScrollPhysics(),
                           padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemExtent: 72.0,
+                          itemExtent: AppTheme.scaledHeight(context, 72.0),
                           itemCount: _expenses.length + 1,
                           itemBuilder: (context, index) {
                             if (index == _expenses.length) {

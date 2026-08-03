@@ -170,6 +170,18 @@ class AppTheme {
     return (base / scale).clamp(base * 0.7, base * 1.2);
   }
 
+  /// 字体缩放感知的固定高度：固定高度容器（列表项 itemExtent、横滑筛选条等）
+  /// 乘以文字缩放比，避免放大字体后内容被挤压/裁切。
+  /// 下限为原始高度（缩放 <1 时不缩小），上限防止过度拉伸导致布局松散。
+  static double scaledHeight(
+    BuildContext context,
+    double base, {
+    double maxFactor = 1.7,
+  }) {
+    final scale = MediaQuery.of(context).textScaler.scale(1);
+    return (base * scale).clamp(base, base * maxFactor);
+  }
+
   // ===== Logo 主色调 =====
   static const Color primaryOrange = Color(0xFFF26522);   // 深橙色
   static const Color primaryYellow = Color(0xFFFFC107);   // 暖黄色

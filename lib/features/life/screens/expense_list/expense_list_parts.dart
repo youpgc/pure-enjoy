@@ -73,7 +73,7 @@ class _ExpenseCategoryFilter extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return SizedBox(
-      height: 40,
+      height: AppTheme.scaledHeight(context, 40.0),
       child: ListView(
         scrollDirection: Axis.horizontal,
         padding: const EdgeInsets.symmetric(horizontal: 16),
@@ -179,6 +179,8 @@ class _ExpenseListItem extends StatelessWidget {
         title: Text(categoryLabel),
         subtitle: Text(
           '${DateTimeUtils.formatStandard(displayDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
         ),
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
