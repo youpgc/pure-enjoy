@@ -318,8 +318,6 @@ void main() {
       expect(DictService.expenseCategory, isEmpty);
       expect(DictService.userRole, isEmpty);
       expect(DictService.memberLevel, isEmpty);
-      expect(DictService.novelCategory, isEmpty);
-      expect(DictService.novelStatus, isEmpty);
       expect(DictService.feedbackCategory, isEmpty);
       expect(DictService.feedbackStatus, isEmpty);
     });

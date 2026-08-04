@@ -27,8 +27,6 @@ const List<String> dictCodes = [
   'mood_type',
   'habit_frequency',
   'habit_color',
-  'novel_category',
-  'novel_status',
   'feedback_category',
   'feedback_status',
   'notification_type',

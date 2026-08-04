@@ -465,8 +465,6 @@ class DictService {
   static List<DictItem> get memberLevel => _instance._cache['member_level'] ?? [];
   static List<DictItem> get habitFrequency => _instance._cache['habit_frequency'] ?? [];
   static List<DictItem> get habitColor => _instance._cache['habit_color'] ?? [];
-  static List<DictItem> get novelCategory => _instance._cache['novel_category'] ?? [];
-  static List<DictItem> get novelStatus => _instance._cache['novel_status'] ?? [];
   static List<DictItem> get feedbackCategory => _instance._cache['feedback_category'] ?? [];
   static List<DictItem> get feedbackStatus => _instance._cache['feedback_status'] ?? [];
   static List<DictItem> get notificationType => _instance._cache['notification_type'] ?? [];
