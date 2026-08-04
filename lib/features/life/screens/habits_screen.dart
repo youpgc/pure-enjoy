@@ -272,7 +272,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       _loadHabits(refresh: true);
       EventBus.instance.fire(EventType.habitUpdated);
     } catch (e) {
-      if (mounted) showHabitError(context, '\$action失败，请稍后重试');
+      if (mounted) showHabitError(context, '$action失败，请稍后重试');
     }
   }
 
