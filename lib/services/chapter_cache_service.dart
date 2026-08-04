@@ -3,10 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:connectivity_plus/connectivity_plus.dart';
 import './cache_entry.dart';
+import './chapter_cache_format.dart';
+import './chapter_cache_paths.dart';
+import './chapter_preload.dart';
 
 /// ============================================================
 /// 章节三级缓存服务（L1 内存 + L2 磁盘 + L3 网络）
@@ -39,22 +40,14 @@ class ChapterCacheService extends WidgetsBindingObserver {
   /// 当前正在显示的章节 ID，内存压力时保护不清除
   String? _protectedChapterId;
 
-  // ==================== 去重与预加载（新增）====================
+  // ==================== 去重（新增）====================
   /// 正在进行的加载操作：key=chapterId，value=Completer
   /// 防止并发请求同一章节时重复发起网络调用
   final Map<String, Completer<String?>> _loadingCompleters = {};
 
-  /// 预加载队列：待预加载的章节 ID 列表
-  final List<String> _preloadQueue = [];
-
-  /// 是否正在执行预加载
-  bool _isPreloading = false;
-
-  /// WiFi 环境下预加载章节数
-  static const int _preloadCountWifi = 5;
-
-  /// 蜂窝网络下预加载章节数
-  static const int _preloadCountCellular = 2;
+  // ==================== 预加载（抽到 chapter_preload.dart）====================
+  /// 预加载管理器（组合式复用，行为与原实现一致）
+  final ChapterPreloadManager _preload = ChapterPreloadManager();
 
   // ==================== 初始化 ====================
 
@@ -164,27 +157,6 @@ class ChapterCacheService extends WidgetsBindingObserver {
 
   // ==================== L2 磁盘缓存（按小说分目录）====================
 
-  /// 获取应用级缓存根目录
-  Future<Directory> get _cacheRootDir async {
-    final appDir = await getApplicationDocumentsDirectory();
-    final cacheDir = Directory('${appDir.path}/chapter_cache');
-    if (!await cacheDir.exists()) {
-      await cacheDir.create(recursive: true);
-    }
-    return cacheDir;
-  }
-
-  /// 获取指定小说的缓存目录
-  Future<Directory> _cacheDir(String novelId) async {
-    final root = await _cacheRootDir;
-    final novelDir = Directory('${root.path}/$novelId');
-    if (!await novelDir.exists()) {
-      await novelDir.create(recursive: true);
-    }
-    return novelDir;
-  }
-
-  String _cacheFileName(String chapterId) => '${chapterId.replaceAll('-', '')}.txt';
 
   /// 缓存章节内容（L1 + L2 同时写入）
   Future<void> cacheChapter({
@@ -209,8 +181,8 @@ class ChapterCacheService extends WidgetsBindingObserver {
     String content,
   ) async {
     try {
-      final dir = await _cacheDir(novelId);
-      final file = File('${dir.path}/${_cacheFileName(chapterId)}');
+      final dir = await chapterCacheDir(novelId);
+      final file = File('${dir.path}/${chapterCacheFileName(chapterId)}');
       await file.writeAsString(content);
 
       _diskIndex ??= {};
@@ -245,8 +217,8 @@ class ChapterCacheService extends WidgetsBindingObserver {
       final novelId = _diskIndex?[chapterId]?.novelId;
       if (novelId == null) return null;
 
-      final dir = await _cacheDir(novelId);
-      final file = File('${dir.path}/${_cacheFileName(chapterId)}');
+      final dir = await chapterCacheDir(novelId);
+      final file = File('${dir.path}/${chapterCacheFileName(chapterId)}');
       if (await file.exists()) {
         final content = await file.readAsString();
         // 回填 L1 内存缓存
@@ -302,7 +274,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
     }
   }
 
-  // ==================== 预加载队列（新增）====================
+  // ==================== 预加载队列（委托 chapter_preload.dart）====================
 
   /// 触发预加载：根据网络环境决定预加载数量
   /// [chapterIds]: 待预加载的章节 ID 列表（按阅读顺序）
@@ -313,61 +285,16 @@ class ChapterCacheService extends WidgetsBindingObserver {
   }) {
     if (chapterIds.isEmpty) return;
 
-    // 清空旧队列，加入新队列
-    _preloadQueue.clear();
-    _preloadQueue.addAll(chapterIds);
-
-    if (!_isPreloading) {
-      _processPreloadQueue(fetcher);
-    }
-  }
-
-  Future<void> _processPreloadQueue(
-    Future<String?> Function(String chapterId) fetcher,
-  ) async {
-    _isPreloading = true;
-
-    // 检测网络类型
-    int preloadCount;
-    try {
-      final connectivityResult = await Connectivity().checkConnectivity();
-      if (connectivityResult == ConnectivityResult.wifi) {
-        preloadCount = _preloadCountWifi;
-      } else {
-        preloadCount = _preloadCountCellular;
-      }
-    } catch (_) {
-      preloadCount = _preloadCountCellular;
-    }
-
-    int processed = 0;
-    while (_preloadQueue.isNotEmpty && processed < preloadCount) {
-      final chapterId = _preloadQueue.removeAt(0);
-
-      // 跳过已缓存的
-      if (_memoryCache.containsKey(chapterId) || (_diskIndex?.containsKey(chapterId) ?? false)) {
-        continue;
-      }
-
-      // fire-and-forget 预加载（吞没错误）
+    _preload.enqueue(chapterIds);
+    if (!_preload.isPreloading) {
       unawaited(
-        fetcher(chapterId).then((content) {
-          if (content != null && content.isNotEmpty) {
-            _putMemoryCache(chapterId, content);
-          }
-        }).catchError((e) {
-          if (kDebugMode) debugPrint('⚠️ 预加载失败(已忽略): $chapterId');
-        }),
+        _preload.run(
+          fetcher: fetcher,
+          isCached: (id) =>
+              _memoryCache.containsKey(id) || (_diskIndex?.containsKey(id) ?? false),
+          onCache: (id, content) => _putMemoryCache(id, content),
+        ),
       );
-
-      processed++;
-    }
-
-    _preloadQueue.clear();
-    _isPreloading = false;
-
-    if (kDebugMode && processed > 0) {
-      debugPrint('🚀 已触发预加载 $processed 章');
     }
   }
 
@@ -395,11 +322,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
     return _diskIndex?.values.fold<int>(0, (sum, entry) => sum + entry.contentLength) ?? 0;
   }
 
-  String formatCacheSize(int bytes) {
-    if (bytes < 1024) return '$bytes B';
-    if (bytes < 1024 * 1024) return '${(bytes / 1024).toStringAsFixed(1)} KB';
-    return '${(bytes / (1024 * 1024)).toStringAsFixed(1)} MB';
-  }
+  String formatCacheSize(int bytes) => formatChapterCacheSize(bytes);
 
   /// 清理指定小说的所有缓存（L1 + L2 一起清理）
   Future<int> clearNovelCache(String novelId) async {
@@ -415,7 +338,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
     // 2. 清理 L2 磁盘缓存（直接删除小说目录）
     int count = 0;
     try {
-      final root = await _cacheRootDir;
+      final root = await chapterCacheRootDir();
       final novelDir = Directory('${root.path}/$novelId');
       if (await novelDir.exists()) {
         final files = novelDir.listSync();
@@ -440,7 +363,7 @@ class ChapterCacheService extends WidgetsBindingObserver {
   Future<int> clearAllCache() async {
     int count = 0;
     try {
-      final root = await _cacheRootDir;
+      final root = await chapterCacheRootDir();
       if (await root.exists()) {
         final items = root.listSync();
         for (final item in items) {

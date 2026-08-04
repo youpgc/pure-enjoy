@@ -5,10 +5,14 @@ import 'package:shared_preferences/shared_preferences.dart';
 import './api_client.dart';
 import '../constants/app_constants.dart';
 import './dict_models.dart';
+import './dict_queries.dart';
+import './dict_compat.dart';
 
 /// 兼容导出：DictItem/DictType 已抽到 dict_models.dart，
 /// 原仅 import dict_service.dart 的调用方（含 test）无需改动即可访问。
 export './dict_models.dart';
+export './dict_queries.dart';
+export './dict_compat.dart';
 
 /// 字典服务
 /// 首页获取全部字典数据，本地缓存，后台静默更新
@@ -21,6 +25,9 @@ class DictService {
   Map<String, List<DictItem>> _cache = {};
   Map<String, String> _typeIdMap = {}; // code -> type_id
   bool _initialized = false;
+
+  /// 只读暴露内存缓存，供抽取的查询扩展（dict_queries.dart）使用
+  Map<String, List<DictItem>> get cacheMap => _cache;
 
   // 本地缓存 key
   static const String _cacheKey = 'dict_service_cache_v2';
@@ -336,69 +343,6 @@ class DictService {
     }
   }
 
-  /// 获取指定类型的字典项（同步，内存缓存）
-  List<DictItem> getItemsSync(String typeCode) {
-    return _cache[typeCode] ?? [];
-  }
-
-  /// 获取指定类型的字典项（异步，确保已初始化）
-  Future<List<DictItem>> getItems(String typeCode) async {
-    await ensureInitialized();
-    return _cache[typeCode] ?? [];
-  }
-
-  /// 获取字典项的标签
-  /// 优先按 value 匹配，找不到时按 code 匹配（兼容业务表存储 code 的情况）
-  String? getLabel(String typeCode, String value) {
-    final items = _cache[typeCode] ?? [];
-    try {
-      return items.firstWhere((item) => item.value == value).label;
-    } catch (e) {
-      // value 未匹配到，尝试按 code 匹配
-      try {
-        return items.firstWhere((item) => item.code == value).label;
-      } catch (e) {
-        return null;
-      }
-    }
-  }
-
-  /// 获取字典项的额外信息
-  /// 优先按 value 匹配，找不到时按 code 匹配
-  String? getExtra(String typeCode, String value) {
-    final items = _cache[typeCode] ?? [];
-    try {
-      return items.firstWhere((item) => item.value == value).extra;
-    } catch (e) {
-      try {
-        return items.firstWhere((item) => item.code == value).extra;
-      } catch (e) {
-        return null;
-      }
-    }
-  }
-
-  /// 获取指定类型的字典项选项（用于下拉选择）
-  List<Map<String, String>> getOptions(String typeCode) {
-    final items = _cache[typeCode] ?? [];
-    return items.map((item) => {
-      'value': item.value,
-      'label': item.label,
-      'extra': item.extra ?? '',
-    }).toList();
-  }
-
-  /// 获取指定类型的字典项值列表
-  List<String> getValues(String typeCode) {
-    final items = _cache[typeCode] ?? [];
-    return items.map((item) => item.value).toList();
-  }
-
-  /// 检查字典项是否存在
-  bool hasItem(String typeCode, String value) {
-    final items = _cache[typeCode] ?? [];
-    return items.any((item) => item.value == value);
-  }
 
   /// 清空缓存
   void clearCache() {
@@ -418,39 +362,6 @@ class DictService {
     };
   }
 
-  // ==================== 兼容旧代码方法 ====================
-
-  /// 兼容旧代码：获取 emoji（从 extra 字段解析 JSON）
-  String getEmoji(String typeCode, String value) {
-    final extra = getExtra(typeCode, value);
-    if (extra == null || extra.isEmpty) return '';
-    try {
-      final Map<String, dynamic> parsed = jsonDecode(extra);
-      return parsed['emoji'] as String? ?? extra;
-    } catch (_) {
-      return extra;
-    }
-  }
-
-  /// 兼容旧代码：获取默认 code
-  String getDefaultCode(String typeCode) {
-    final items = _cache[typeCode] ?? [];
-    try {
-      return items.firstWhere((item) => item.isDefault).code;
-    } catch (e) {
-      return items.isNotEmpty ? items.first.code : '';
-    }
-  }
-
-  /// 兼容旧代码：根据 code 查找 item
-  DictItem? findByCode(String typeCode, String code) {
-    final items = _cache[typeCode] ?? [];
-    try {
-      return items.firstWhere((item) => item.code == code);
-    } catch (e) {
-      return null;
-    }
-  }
 
   /// 字典缓存更新通知器（单例共享，缓存变更时自增，供已开表单即时刷新）
   /// 旧实现每次访问 new 一个实例，导致 addListener/removeListener 作用在互不相干的实例上、
@@ -473,9 +384,4 @@ class DictService {
   static List<DictItem> get favoriteCategory => _instance._cache['favorite_category'] ?? [];
   static List<DictItem> get noteCategory => _instance._cache['note_category'] ?? [];
 
-  /// 兼容旧代码：getLabel 带 defaultValue 参数
-  String getLabelOrDefault(String typeCode, String value, {String? defaultValue}) {
-    final label = getLabel(typeCode, value);
-    return label ?? defaultValue ?? value;
-  }
 }

@@ -3,48 +3,13 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
 import './http_client.dart';
+import './storage_models.dart';
+import './storage_convenience.dart';
 
-/// 存储文件对象
-class FileObject {
-  final String name;
-  final String? id;
-  final int? createdAt;
-  final int? updatedAt;
-  final int? lastAccessedAt;
-  final Map<String, dynamic>? metadata;
+export './storage_models.dart';
+export './storage_convenience.dart';
 
-  FileObject({
-    required this.name,
-    this.id,
-    this.createdAt,
-    this.updatedAt,
-    this.lastAccessedAt,
-    this.metadata,
-  });
-
-  factory FileObject.fromJson(Map<String, dynamic> json) {
-    return FileObject(
-      name: json['name'] ?? '',
-      id: json['id'],
-      createdAt: json['created_at'],
-      updatedAt: json['updated_at'],
-      lastAccessedAt: json['last_accessed_at'],
-      metadata: json['metadata'],
-    );
-  }
-}
-
-/// 存储异常
-class StorageException implements Exception {
-  final String message;
-  final String? error;
-  final String? statusCode;
-
-  StorageException(this.message, {this.error, this.statusCode});
-
-  @override
-  String toString() => 'StorageException: $message';
-}
+/// 存储文件对象与异常已抽到 storage_models.dart（见本文件顶部 export）
 
 /// Supabase 存储服务
 class StorageService {
@@ -346,99 +311,4 @@ class StorageService {
     }
   }
 
-  // ==================== 便捷方法 ====================
-
-  /// 上传头像
-  ///
-  /// [userId] - 用户 ID
-  /// [bytes] - 图片字节数据
-  /// [contentType] - 图片类型，默认 image/jpeg
-  Future<String> uploadAvatar(String userId, List<int> bytes, {String? contentType}) async {
-    final path = 'avatars/$userId.jpg';
-    return await uploadFile(
-      bucket: AppConfig.avatarsBucket,
-      path: path,
-      bytes: bytes,
-      contentType: contentType ?? 'image/jpeg',
-      upsert: true,
-    );
-  }
-
-  /// 上传图片
-  ///
-  /// [folder] - 文件夹名称
-  /// [fileName] - 文件名
-  /// [bytes] - 图片字节数据
-  /// [contentType] - 图片类型，默认 image/jpeg
-  Future<String> uploadImage(String folder, String fileName, List<int> bytes, {String? contentType}) async {
-    final path = '$folder/$fileName';
-    return await uploadFile(
-      bucket: AppConfig.imagesBucket,
-      path: path,
-      bytes: bytes,
-      contentType: contentType ?? 'image/jpeg',
-    );
-  }
-
-  /// 上传心情日记图片
-  ///
-  /// [userId] - 用户 ID
-  /// [diaryId] - 日记 ID
-  /// [fileName] - 文件名
-  /// [bytes] - 图片字节数据
-  Future<String> uploadMoodDiaryImage(
-    String userId,
-    String diaryId,
-    String fileName,
-    List<int> bytes,
-  ) async {
-    final path = 'mood_diaries/$userId/$diaryId/$fileName';
-    return await uploadFile(
-      bucket: AppConfig.imagesBucket,
-      path: path,
-      bytes: bytes,
-      contentType: 'image/jpeg',
-    );
-  }
-
-  /// 上传笔记附件
-  ///
-  /// [userId] - 用户 ID
-  /// [noteId] - 笔记 ID
-  /// [fileName] - 文件名
-  /// [bytes] - 文件字节数据
-  /// [contentType] - 文件类型
-  Future<String> uploadNoteAttachment(
-    String userId,
-    String noteId,
-    String fileName,
-    List<int> bytes, {
-    String? contentType,
-  }) async {
-    final path = 'notes/$userId/$noteId/$fileName';
-    return await uploadFile(
-      bucket: AppConfig.imagesBucket,
-      path: path,
-      bytes: bytes,
-      contentType: contentType,
-    );
-  }
-
-  /// 删除头像
-  Future<void> deleteAvatar(String userId) async {
-    final path = 'avatars/$userId.jpg';
-    await deleteFile(AppConfig.avatarsBucket, path);
-  }
-
-  /// 删除心情日记图片
-  Future<void> deleteMoodDiaryImage(String userId, String diaryId, String fileName) async {
-    final path = 'mood_diaries/$userId/$diaryId/$fileName';
-    await deleteFile(AppConfig.imagesBucket, path);
-  }
-
-  /// 删除笔记附件
-  Future<void> deleteNoteAttachment(String userId, String noteId, String fileName) async {
-    final path = 'notes/$userId/$noteId/$fileName';
-    await deleteFile(AppConfig.imagesBucket, path);
-  }
 }

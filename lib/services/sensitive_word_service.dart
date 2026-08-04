@@ -1,78 +1,11 @@
 import 'package:flutter/foundation.dart';
 import './api_client.dart';
+import './sensitive_word_models.dart';
+import './sensitive_word_logger.dart';
 
-/// 敏感词模型
-class SensitiveWordModel {
-  final String id;
-  final String word;
-  final String category; // novel, system
-  final String level; // block, replace, warn
-  final String? replaceWord;
-  final String matchMode; // exact, contains, regex
-  final bool isActive;
-  final int hitCount;
+export './sensitive_word_models.dart';
 
-  SensitiveWordModel({
-    required this.id,
-    required this.word,
-    required this.category,
-    required this.level,
-    this.replaceWord,
-    required this.matchMode,
-    required this.isActive,
-    required this.hitCount,
-  });
-
-  factory SensitiveWordModel.fromJson(Map<String, dynamic> json) {
-    return SensitiveWordModel(
-      id: json['id'] as String,
-      word: json['word'] as String,
-      category: json['category'] as String,
-      level: json['level'] as String,
-      replaceWord: json['replace_word'] as String?,
-      matchMode: json['match_mode'] as String? ?? 'contains',
-      isActive: json['is_active'] as bool? ?? true,
-      hitCount: json['hit_count'] as int? ?? 0,
-    );
-  }
-}
-
-/// 敏感词检测结果
-class SensitiveWordCheckResult {
-  /// 是否包含敏感词
-  final bool hasSensitive;
-
-  /// 是否被拦截（仅 level=block 时为 true）
-  final bool isBlocked;
-
-  /// 处理后的文本（替换后的内容）
-  final String processedText;
-
-  /// 命中的敏感词列表
-  final List<SensitiveWordModel> matchedWords;
-
-  /// 处理动作: blocked, replaced, warned, none
-  final String actionTaken;
-
-  SensitiveWordCheckResult({
-    required this.hasSensitive,
-    required this.isBlocked,
-    required this.processedText,
-    required this.matchedWords,
-    required this.actionTaken,
-  });
-
-  /// 安全结果（无敏感词）
-  factory SensitiveWordCheckResult.safe(String text) {
-    return SensitiveWordCheckResult(
-      hasSensitive: false,
-      isBlocked: false,
-      processedText: text,
-      matchedWords: [],
-      actionTaken: 'none',
-    );
-  }
-}
+/// 敏感词模型与检测结果已抽到 sensitive_word_models.dart（见本文件顶部 export）
 
 /// 敏感词过滤服务
 /// 从 Supabase 加载敏感词列表，在本地进行文本检测和过滤
@@ -349,14 +282,7 @@ class SensitiveWordService {
 
   /// ==================== 日志记录 ====================
 
-  /// 记录敏感词命中日志到 Supabase
-  /// [word] 命中的敏感词
-  /// [category] 分类
-  /// [source] 来源类型
-  /// [sourceId] 来源记录ID
-  /// [userId] 用户ID
-  /// [contentSnippet] 内容片段
-  /// [actionTaken] 处理动作
+  /// 记录敏感词命中日志到 Supabase（实现见 sensitive_word_logger.dart）
   Future<void> logHit({
     required SensitiveWordModel word,
     required String source,
@@ -364,63 +290,15 @@ class SensitiveWordService {
     String? userId,
     String? contentSnippet,
     required String actionTaken,
-  }) async {
-    try {
-      // 截取内容片段（前后各50字符）
-      String? snippet;
-      if (contentSnippet != null && contentSnippet.length > 100) {
-        final index = contentSnippet.toLowerCase().indexOf(word.word.toLowerCase());
-        if (index >= 0) {
-          final start = (index - 50).clamp(0, contentSnippet.length);
-          final end = (index + word.word.length + 50).clamp(0, contentSnippet.length);
-          snippet = contentSnippet.substring(start, end);
-        } else {
-          snippet = '${contentSnippet.substring(0, 50)}...';
-        }
-      } else {
-        snippet = contentSnippet;
-      }
-
-      await ApiClient.post(
-        'sensitive_word_logs',
-        {
-          'word_id': word.id,
-          'word': word.word,
-          'category': word.category,
-          'source': source,
-          'source_id': sourceId,
-          'user_id': userId,
-          'content_snippet': snippet,
-          'action_taken': actionTaken,
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        },
+  }) =>
+      logSensitiveWordHit(
+        word: word,
+        source: source,
+        sourceId: sourceId,
+        userId: userId,
+        contentSnippet: contentSnippet,
+        actionTaken: actionTaken,
       );
-
-      // 更新命中次数（异步，不等待）
-      _incrementHitCount(word.id);
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 记录敏感词日志失败');
-    }
-  }
-
-  /// 增加敏感词命中次数（使用 RPC 原子更新）
-  Future<void> _incrementHitCount(String wordId) async {
-    try {
-      // 使用 RPC 函数原子更新命中次数，避免 N+1 查询问题
-      final response = await ApiClient.post(
-        'rpc/increment_sensitive_word_hit_count',
-        {
-          'word_id': wordId,
-        },
-      );
-
-      if (!response.isSuccess) {
-        if (kDebugMode) debugPrint('❌ 更新命中次数失败: HTTP ${response.statusCode}');
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 更新命中次数失败');
-    }
-  }
 
   /// ==================== 便捷方法 ====================
 
