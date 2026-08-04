@@ -86,6 +86,23 @@ class HttpClient {
     };
   }
 
+  /// 构建请求头，并在每次重试时重新读取 [_accessToken]。
+  ///
+  /// 关键约束：401 刷新成功后 [_accessToken] 已被更新，重试必须重新构建认证头，
+  /// 否则会复用首次请求捕获的旧 token（GET 曾因此导致刷新无效、全部请求 401）。
+  /// [etagUrl] 非空且命中 ETag 缓存时附带 If-None-Match。
+  Map<String, String> _buildRequestHeaders(
+    Map<String, String>? customHeaders, {
+    String? etagUrl,
+  }) {
+    final headers = _mergeHeaders(customHeaders);
+    if (etagUrl != null && _etagCache.contains(etagUrl)) {
+      final cached = _etagCache.get(etagUrl);
+      if (cached != null) headers['If-None-Match'] = cached.etag;
+    }
+    return headers;
+  }
+
   // ==================== HTTP 方法 ====================
 
   /// GET 请求（支持 ETag/304 缓存，默认关闭，仅对章节内容等不常变的数据启用）
@@ -104,16 +121,13 @@ class HttpClient {
     // 加载 ETag 缓存（仅在需要时）
     if (useETag) await _loadETagCache();
 
-    // 构建请求头（如有 ETag 则带上 If-None-Match）
-    final requestHeaders = _mergeHeaders(headers);
-    if (useETag && _etagCache.contains(url)) {
-      requestHeaders['If-None-Match'] = _etagCache.get(url)!.etag;
-    }
-
     http.Response response;
     try {
       response = await requestWithRetry(
-        () => _client.get(uri, headers: requestHeaders),
+        () => _client.get(
+          uri,
+          headers: _buildRequestHeaders(headers, etagUrl: useETag ? url : null),
+        ),
         timeout: timeout,
         cancelToken: cancelToken,
         logMethod: 'GET',
@@ -128,7 +142,7 @@ class HttpClient {
         if (kDebugMode) debugPrint('⚠️ ETag 请求失败，回退普通请求: $path');
         _etagCache.remove(url);
         response = await requestWithRetry(
-          () => _client.get(uri, headers: _mergeHeaders(headers)),
+          () => _client.get(uri, headers: _buildRequestHeaders(headers)),
           timeout: timeout,
           cancelToken: cancelToken,
           logMethod: 'GET',
@@ -171,7 +185,7 @@ class HttpClient {
     return requestWithRetry(
       () => _client.post(
         uri,
-        headers: _mergeHeaders(headers),
+        headers: _buildRequestHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
@@ -198,7 +212,7 @@ class HttpClient {
     return requestWithRetry(
       () => _client.put(
         uri,
-        headers: _mergeHeaders(headers),
+        headers: _buildRequestHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
@@ -225,7 +239,7 @@ class HttpClient {
     return requestWithRetry(
       () => _client.patch(
         uri,
-        headers: _mergeHeaders(headers),
+        headers: _buildRequestHeaders(headers),
         body: body != null ? jsonEncode(body) : null,
       ),
       timeout: timeout,
@@ -249,7 +263,7 @@ class HttpClient {
   }) async {
     final uri = _buildUri(path, queryParams);
     return requestWithRetry(
-      () => _client.delete(uri, headers: _mergeHeaders(headers)),
+      () => _client.delete(uri, headers: _buildRequestHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
       logMethod: 'DELETE',
