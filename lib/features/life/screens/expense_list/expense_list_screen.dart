@@ -18,6 +18,7 @@ import '../expense_statistics/expense_statistics_screen.dart';
 import '../../widgets/expense_form.dart';
 
 part 'expense_list_parts.dart';
+part 'expense_list_ui_part.dart';
 
 /// 支出列表页面 - Supabase 数据同步
 class ExpenseListScreen extends StatefulWidget {
@@ -338,118 +339,36 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(
-        title: const Text('记账'),
-        actions: [
-          if (!widget.readOnly)
-            IconButton(
-              icon: const Icon(Icons.bar_chart),
-              tooltip: '消费统计',
-              onPressed: () {
-                Navigator.push(
-                  context,
-                  MaterialPageRoute(builder: (_) => const ExpenseStatisticsScreen()),
-                );
-              },
-            ),
-        ],
-      ),
-      body: Column(
-        children: [
-          // 统计卡片（服务端聚合查询，不受分页限制）
-          _ExpenseStatCard(
-            displayedMonth: _displayedMonth,
-            totalAmount: _headlineTotal,
-            isLoadingTotal: _rangeStart != null ? false : _isLoadingTotal,
-            overrideLabel: _rangeStart != null ? _headlineLabel : null,
-          ),
-
-          // 统计页跳转带入的筛选区间提示（可清除，清除后恢复不限日期）
-          // 只读明细模式下隐藏，避免修改时间区间
-          if (!widget.readOnly && (_rangeStart != null || _rangeEnd != null))
-            _ExpenseRangeBar(
-              hint: _rangeHint,
-              onClear: () {
-                setState(() {
-                  _rangeStart = null;
-                  _rangeEnd = null;
-                });
-                _loadExpenses(refresh: true);
-              },
-            ),
-          const SizedBox(height: 8),
-
-          // 分类筛选（只读明细模式下隐藏，避免修改消费分类）
-          if (!widget.readOnly)
-            _ExpenseCategoryFilter(
-              selectedCategory: _selectedCategory,
-              onSelected: (category) {
-                setState(() => _selectedCategory = category);
-                _loadExpenses(refresh: true);
-              },
-            ),
-          if (!widget.readOnly) const SizedBox(height: 8),
-
-          // 支出列表
-          Expanded(
-            child: _isLoading
-                ? const LoadingWidget()
-                : _expenses.isEmpty
-                    ? _ExpenseEmptyState(
-                        onRefresh: () => _loadExpenses(refresh: true),
-                      )
-                    : RefreshIndicator(
-                        onRefresh: () => _loadExpenses(refresh: true),
-                        child: ListView.builder(
-                          controller: scrollController,
-                          physics: const AlwaysScrollableScrollPhysics(),
-                          padding: const EdgeInsets.symmetric(horizontal: 16),
-                          itemExtent: AppTheme.scaledHeight(context, 72.0),
-                          itemCount: _expenses.length + 1,
-                          itemBuilder: (context, index) {
-                            if (index == _expenses.length) {
-                              return buildLoadMoreIndicator();
-                            }
-
-                            final expense = _expenses[index];
-                            final categoryLabel = DictService.instance.getLabelOrDefault(
-                              'expense_category',
-                              expense.category,
-                              defaultValue: expense.category,
-                            );
-                            // date 与 created_at 日期相同时展示 created_at（含时间），不同时展示 date
-                            final isSameDate = expense.createdAt != null &&
-                                expense.date.year == expense.createdAt!.year &&
-                                expense.date.month == expense.createdAt!.month &&
-                                expense.date.day == expense.createdAt!.day;
-                            final displayDate = (isSameDate && expense.createdAt != null)
-                                ? expense.createdAt!
-                                : expense.date;
-
-                            return _ExpenseListItem(
-                              expense: expense,
-                              categoryLabel: categoryLabel,
-                              displayDate: displayDate,
-                              onEdit: widget.readOnly
-                                  ? null
-                                  : () => _showEditExpenseForm(expense),
-                              onDelete: widget.readOnly
-                                  ? null
-                                  : () => _deleteExpense(expense.id),
-                            );
-                          },
-                        ),
-                      ),
-          ),
-        ],
-      ),
-      floatingActionButton: !widget.readOnly
-          ? FloatingActionButton(
-              onPressed: () => _showExpenseForm(),
-              child: const Icon(Icons.add),
-            )
-          : null,
+    return _buildExpenseListBody(
+      context: context,
+      isLoading: _isLoading,
+      isLoadingTotal: _isLoadingTotal,
+      expenses: _expenses,
+      displayedMonth: _displayedMonth,
+      headlineTotal: _headlineTotal,
+      headlineLabel: _headlineLabel,
+      rangeHint: _rangeHint,
+      rangeStart: _rangeStart,
+      rangeEnd: _rangeEnd,
+      selectedCategory: _selectedCategory,
+      readOnly: widget.readOnly,
+      scrollController: scrollController,
+      onClearRange: () {
+        setState(() {
+          _rangeStart = null;
+          _rangeEnd = null;
+        });
+        _loadExpenses(refresh: true);
+      },
+      onSelectCategory: (category) {
+        setState(() => _selectedCategory = category);
+        _loadExpenses(refresh: true);
+      },
+      onEditExpense: _showEditExpenseForm,
+      onDeleteExpense: _deleteExpense,
+      onLoadExpenses: () => _loadExpenses(refresh: true),
+      onShowExpenseForm: _showExpenseForm,
+      onBuildLoadMore: buildLoadMoreIndicator,
     );
   }
 }
