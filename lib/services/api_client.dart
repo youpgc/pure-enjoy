@@ -4,6 +4,8 @@ import './http_client.dart';
 import './cancel_token.dart';
 import './api_response.dart';
 import './api_logger.dart';
+import './api_url_builder.dart';
+import './api_response_handler.dart';
 
 export './api_response.dart';
 
@@ -27,64 +29,6 @@ class ApiClient {
   /// 用法: filters: {ApiClient.userKey(userId): 'eq.$userId'}
   static String userKey(String userId) => _isUuid(userId) ? 'auth_id' : 'id';
 
-  /// 构建请求 URL
-  static String _buildUrl(
-    String table, {
-    Map<String, String>? filters,
-    String? select,
-    String? order,
-    int? limit = 10,
-    int? offset,
-    String? search,
-    String? searchFields,
-  }) {
-    final queryParts = <String>[];
-
-    // 选择字段
-    if (select != null && select.isNotEmpty) {
-      queryParts.add('select=${Uri.encodeComponent(select)}');
-    }
-
-    // 过滤条件
-    if (filters != null) {
-      filters.forEach((key, value) {
-        // and/or 操作符的值包含括号与逗号，需保持原样供 PostgREST 解析
-        if (key == 'and' || key == 'or') {
-          queryParts.add('$key=$value');
-        } else {
-          queryParts.add('$key=${Uri.encodeComponent(value)}');
-        }
-      });
-    }
-
-    // 搜索
-    if (search != null && search.isNotEmpty) {
-      if (searchFields != null && searchFields.isNotEmpty) {
-        final fields = searchFields.split(',');
-        final orConditions = fields.map((field) {
-          return '$field.ilike.*${Uri.encodeComponent(search)}*';
-        }).join(',');
-        queryParts.add('or=($orConditions)');
-      }
-    }
-
-    // 排序
-    if (order != null && order.isNotEmpty) {
-      queryParts.add('order=${Uri.encodeComponent(order)}');
-    }
-
-    // 分页 - 默认 limit=10，传 null 取消限制
-    if (limit != null) {
-      queryParts.add('limit=$limit');
-    }
-    if (offset != null) {
-      queryParts.add('offset=$offset');
-    }
-
-    final queryString = queryParts.isNotEmpty ? '?${queryParts.join('&')}' : '';
-    return '$_baseUrl/rest/v1/$table$queryString';
-  }
-
   /// GET 请求
   /// [columns] 兼容旧代码，等同于 select
   static Future<ApiResponse> get(
@@ -102,7 +46,7 @@ class ApiClient {
     String? note,
   }) async {
     try {
-      final url = _buildUrl(
+      final url = buildApiUrl(
         table,
         filters: filters,
         select: select ?? columns, // columns 兼容旧代码
@@ -120,7 +64,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } on RequestCancelledException {
       return ApiResponse.error('请求已取消');
     } catch (e) {
@@ -154,7 +98,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ POST 请求失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -182,7 +126,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ PATCH 请求失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -198,7 +142,7 @@ class ApiClient {
     String? note,
   }) async {
     try {
-      final url = _buildUrl(
+      final url = buildApiUrl(
         table,
         filters: filters,
         limit: null,
@@ -211,7 +155,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ PATCH 请求失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -234,7 +178,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ DELETE 请求失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -258,7 +202,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ 批量删除失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -273,7 +217,7 @@ class ApiClient {
     String? note,
   }) async {
     try {
-      final url = _buildUrl(
+      final url = buildApiUrl(
         table,
         filters: filters,
         limit: null,
@@ -285,7 +229,7 @@ class ApiClient {
         note: note ?? table,
       );
 
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ 批量删除失败 [$table]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
@@ -402,56 +346,11 @@ class ApiClient {
         timeout: timeout ?? RequestTimeout.simple,
         note: note ?? 'rpc/$functionName',
       );
-      return _handleResponse(response);
+      return handleApiResponse(response);
     } catch (e) {
       ApiLogger.error('❌ RPC 请求失败 [$functionName]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
     }
   }
 
-  /// 处理响应
-  static ApiResponse _handleResponse(dynamic response) {
-    if (response == null) {
-      return ApiResponse.error('网络请求失败: 无响应', statusCode: 0);
-    }
-    final statusCode = response.statusCode;
-
-    if (statusCode >= 200 && statusCode < 300) {
-      try {
-        final body = response.body;
-        // PATCH/PUT 带 Prefer: return=representation 时：
-        //   200 + 有数据 = 更新成功
-        //   204 + 空 body = 无匹配行（RLS 拦截或过滤条件无结果）
-        if (body.isEmpty) {
-          // 204 No Content：对写操作（PATCH/PUT/DELETE）意味着 0 行被更新
-          if (statusCode == 204) {
-            return ApiResponse.error('更新失败：未匹配到任何记录', statusCode: statusCode);
-          }
-          return ApiResponse.success([], statusCode: statusCode);
-        }
-        final data = jsonDecode(body) as List<dynamic>;
-        return ApiResponse.success(
-          data.cast<Map<String, dynamic>>(),
-          statusCode: statusCode,
-        );
-      } catch (e) {
-        ApiLogger.error('❌ 响应解析失败', error: e);
-        return ApiResponse.error('数据解析异常', statusCode: statusCode);
-      }
-    } else if (statusCode == 401) {
-      return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
-    } else if (statusCode == 404) {
-      return ApiResponse.error('资源不存在', statusCode: statusCode);
-    } else if (statusCode == 409) {
-      return ApiResponse.error('数据冲突', statusCode: statusCode);
-    } else if (statusCode == 429) {
-      return ApiResponse.error('请求过于频繁，请稍后再试', statusCode: statusCode);
-    } else {
-      ApiLogger.error('❌ HTTP 错误 [$statusCode]: ${response.body}');
-      return ApiResponse.error(
-        '服务器响应异常 (HTTP $statusCode)',
-        statusCode: statusCode,
-      );
-    }
-  }
 }
