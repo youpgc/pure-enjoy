@@ -7,6 +7,7 @@ import '../../../../services/api_client.dart';
 import '../../../../services/chapter_cache_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/notification_service.dart';
+import '../../../../services/offline_sync_service.dart';
 import '../../../../core/widgets/widgets.dart';
 import './settings_list.dart';
 import './settings_dialogs.dart';
@@ -103,10 +104,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onAutoSyncChanged: (val) {
           setState(() => _autoSync = val);
           _saveBoolSetting(_autoSyncKey, val);
+          // 开关立即生效：关闭后后台不再自动补发；开启后立即补发挂起队列
+          OfflineSyncService.instance.syncPending();
         },
         onWifiOnlyChanged: (val) {
           setState(() => _wifiOnly = val);
           _saveBoolSetting(_wifiOnlyKey, val);
+          // 开关立即生效：解除/启用 WiFi 限制后立即尝试同步（非 WiFi 时按限制跳过）
+          OfflineSyncService.instance.syncPending();
         },
         onPushNotifChanged: (val) {
           setState(() => _pushNotification = val);

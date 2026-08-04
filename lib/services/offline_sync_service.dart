@@ -18,6 +18,10 @@ class OfflineSyncService {
   static const String _queueKey = 'offline_sync_queue';
   static const int maxRetryCount = 10;
 
+  /// 与设置页（settings_screen）保持一致的开关 key / 默认值
+  static const String _autoSyncSettingKey = 'setting_auto_sync';
+  static const String _wifiOnlySettingKey = 'setting_wifi_only';
+
   bool _isSyncing = false;
 
   final Connectivity _connectivity = Connectivity();
@@ -27,7 +31,7 @@ class OfflineSyncService {
 
   /// 初始化：启动时尝试同步待处理队列，并注册网络恢复监听
   Future<void> initialize() async {
-    await syncPending();
+    await syncPending(isBackground: true);
     _registerConnectivityListener();
   }
 
@@ -40,7 +44,7 @@ class OfflineSyncService {
       final online = result != ConnectivityResult.none;
       if (online && _wasOffline) {
         if (kDebugMode) debugPrint('📡 网络恢复，自动补发离线队列');
-        syncPending();
+        syncPending(isBackground: true);
       }
       _wasOffline = !online;
     });
@@ -75,8 +79,30 @@ class OfflineSyncService {
     }
   }
 
-  /// 同步所有待处理的操作
-  Future<void> syncPending() async {
+  /// 同步所有待处理的操作。
+  /// [isBackground] 标记是否为后台自动触发（启动 / 网络恢复）；
+  /// 仅后台触发受「自动同步」总闸约束，用户主动操作（内联）触发的同步始终执行。
+  Future<void> syncPending({bool isBackground = false}) async {
+    // 全局总闸：仅 WiFi 同步 —— 当前非 WiFi 网络直接中止本次同步
+    final wifiOnly = await _isWifiOnlyEnabled();
+    if (wifiOnly) {
+      final connectivity = await _connectivity.checkConnectivity();
+      if (connectivity != ConnectivityResult.wifi) {
+        if (kDebugMode) {
+          debugPrint('📶 仅 WiFi 同步已开启，当前非 WiFi 网络，跳过本次同步');
+        }
+        return;
+      }
+    }
+
+    // 后台自动同步总闸：关闭后启动 / 网络恢复不再自动补发（用户主动操作仍同步）
+    if (isBackground && !await _isAutoSyncEnabled()) {
+      if (kDebugMode) {
+        debugPrint('🔕 自动同步已关闭，跳过后台自动补发');
+      }
+      return;
+    }
+
     if (_isSyncing) return;
     _isSyncing = true;
 
@@ -131,6 +157,18 @@ class OfflineSyncService {
   /// 清空队列
   Future<void> clearQueue() async {
     await _saveQueue([]);
+  }
+
+  /// 读取「自动同步」开关（默认开启，与设置页一致）
+  Future<bool> _isAutoSyncEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_autoSyncSettingKey) ?? true;
+  }
+
+  /// 读取「仅 WiFi 同步」开关（默认开启，与设置页一致）
+  Future<bool> _isWifiOnlyEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_wifiOnlySettingKey) ?? true;
   }
 
   /// 同步单条操作
