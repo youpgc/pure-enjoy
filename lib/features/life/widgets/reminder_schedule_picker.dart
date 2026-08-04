@@ -4,6 +4,8 @@ import '../models/reminder_schedule_model.dart';
 import './app_date_picker.dart';
 import './reminder_schedule_picker_utils.dart';
 
+part 'reminder_schedule_picker_parts.dart';
+
 /// 习惯提醒计划选择器
 /// 支持按周、按月、按年、自定义日期组合提醒
 /// 单选/多选 + 具体时间选择
@@ -32,7 +34,6 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
   late bool _isEnabled;
 
   final List<String> _weekDayLabels = ['周一', '周二', '周三', '周四', '周五', '周六', '周日'];
-
 
   @override
   void initState() {
@@ -134,24 +135,69 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
           const Divider(),
 
           // 提醒类型选择
-          _buildSectionTitle('提醒周期'),
+          _buildSectionTitle(context, '提醒周期'),
           const SizedBox(height: 8),
           Wrap(
             spacing: 8,
             runSpacing: 8,
             children: [
-              _buildTypeChip('daily', '每日'),
-              _buildTypeChip('weekly', '每周'),
-              _buildTypeChip('monthly', '每月'),
-              _buildTypeChip('yearly', '每年'),
-              _buildTypeChip('custom', '自定义'),
+              _buildTypeChip(
+                context,
+                type: 'daily',
+                label: '每日',
+                isSelected: _scheduleType == 'daily',
+                onSelected: () {
+                  setState(() => _scheduleType = 'daily');
+                  _notifyChange();
+                },
+              ),
+              _buildTypeChip(
+                context,
+                type: 'weekly',
+                label: '每周',
+                isSelected: _scheduleType == 'weekly',
+                onSelected: () {
+                  setState(() => _scheduleType = 'weekly');
+                  _notifyChange();
+                },
+              ),
+              _buildTypeChip(
+                context,
+                type: 'monthly',
+                label: '每月',
+                isSelected: _scheduleType == 'monthly',
+                onSelected: () {
+                  setState(() => _scheduleType = 'monthly');
+                  _notifyChange();
+                },
+              ),
+              _buildTypeChip(
+                context,
+                type: 'yearly',
+                label: '每年',
+                isSelected: _scheduleType == 'yearly',
+                onSelected: () {
+                  setState(() => _scheduleType = 'yearly');
+                  _notifyChange();
+                },
+              ),
+              _buildTypeChip(
+                context,
+                type: 'custom',
+                label: '自定义',
+                isSelected: _scheduleType == 'custom',
+                onSelected: () {
+                  setState(() => _scheduleType = 'custom');
+                  _notifyChange();
+                },
+              ),
             ],
           ),
 
           const SizedBox(height: 16),
 
           // 时间选择
-          _buildSectionTitle('提醒时间'),
+          _buildSectionTitle(context, '提醒时间'),
           const SizedBox(height: 8),
           ListTile(
             contentPadding: EdgeInsets.zero,
@@ -176,256 +222,76 @@ class _ReminderSchedulePickerState extends State<ReminderSchedulePicker> {
     );
   }
 
-  Widget _buildSectionTitle(String text) {
-    return Text(
-      text,
-      style: TextStyle(
-        fontSize: 14,
-        fontWeight: FontWeight.w600,
-        color: Theme.of(context).colorScheme.onSurfaceVariant,
-      ),
-    );
-  }
-
-  Widget _buildTypeChip(String type, String label) {
-    final isSelected = _scheduleType == type;
-    return ChoiceChip(
-      label: Text(label),
-      selected: isSelected,
-      onSelected: (_) {
-        setState(() => _scheduleType = type);
-        _notifyChange();
-      },
-    );
-  }
-
   Widget _buildTypeSpecificOptions() {
     switch (_scheduleType) {
       case 'daily':
-        return _buildDailySelector();
+        return const SizedBox.shrink();
       case 'weekly':
-        return _buildWeekDaySelector();
+        return _buildWeekDaySelector(
+          context,
+          weekDays: _weekDays,
+          weekDayLabels: _weekDayLabels,
+          onToggleDay: (day, selected) {
+            setState(() {
+              if (selected) {
+                _weekDays.add(day);
+                _weekDays.sort();
+              } else {
+                _weekDays.remove(day);
+              }
+            });
+            _notifyChange();
+          },
+        );
       case 'monthly':
-        return _buildMonthDaySelector();
+        return _buildMonthDaySelector(
+          context,
+          monthDays: _monthDays,
+          onToggleMonthDay: (day, selected) {
+            setState(() {
+              if (selected) {
+                _monthDays.add(day);
+                _monthDays.sort();
+              } else {
+                _monthDays.remove(day);
+              }
+            });
+            _notifyChange();
+          },
+        );
       case 'yearly':
-        return _buildYearSelector();
+        return _buildYearSelector(
+          context,
+          months: _months,
+          monthDays: _monthDays,
+          years: _years,
+          onRemoveYearDatePair: _removeYearDatePair,
+          onPickYearDate: _pickYearDate,
+          onRemoveYear: (year) {
+            setState(() => _years.remove(year));
+            _notifyChange();
+          },
+          onAddYear: () async {
+            final year = await showYearPickerDialog(context);
+            if (year != null && !_years.contains(year)) {
+              setState(() {
+                _years.add(year);
+                _years.sort();
+              });
+              _notifyChange();
+            }
+          },
+        );
       case 'custom':
-        return _buildCustomDateSelector();
+        return _buildCustomDateSelector(
+          context,
+          dates: _dates,
+          onRemoveCustomDate: _removeCustomDate,
+          onAddCustomDate: _pickCustomDate,
+        );
       default:
         return const SizedBox.shrink();
     }
-  }
-
-  // === 每日选择器 ===
-  Widget _buildDailySelector() {
-    return const SizedBox.shrink();
-  }
-
-  // === 每周选择器 ===
-  Widget _buildWeekDaySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('选择星期几（可多选）'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: List.generate(7, (index) {
-            final day = index + 1;
-            final isSelected = _weekDays.contains(day);
-            return FilterChip(
-              label: Text(_weekDayLabels[index]),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _weekDays.add(day);
-                    _weekDays.sort();
-                  } else {
-                    _weekDays.remove(day);
-                  }
-                });
-                _notifyChange();
-              },
-            );
-          }),
-        ),
-        if (_weekDays.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '请至少选择一天',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // === 每月选择器 ===
-  Widget _buildMonthDaySelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('选择每月几号（可多选）'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 6,
-          runSpacing: 6,
-          children: List.generate(31, (index) {
-            final day = index + 1;
-            final isSelected = _monthDays.contains(day);
-            return FilterChip(
-              label: Text('$day'),
-              selected: isSelected,
-              onSelected: (selected) {
-                setState(() {
-                  if (selected) {
-                    _monthDays.add(day);
-                    _monthDays.sort();
-                  } else {
-                    _monthDays.remove(day);
-                  }
-                });
-                _notifyChange();
-              },
-              padding: EdgeInsets.zero,
-              labelPadding: const EdgeInsets.symmetric(horizontal: 8),
-            );
-          }),
-        ),
-        if (_monthDays.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '请至少选择一天',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-      ],
-    );
-  }
-
-  // === 每年选择器 ===
-  Widget _buildYearSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('选择每年提醒日期（可多选）'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ...List.generate(_months.length, (i) {
-              if (_monthDays.length <= i) return const SizedBox.shrink();
-              final month = _months[i];
-              final day = _monthDays[i];
-              return Chip(
-                label: Text('$month月$day日'),
-                deleteIcon: const Icon(Icons.close, size: 18),
-                onDeleted: () => _removeYearDatePair(month, day),
-              );
-            }),
-            ActionChip(
-              avatar: const Icon(Icons.add, size: 18),
-              label: const Text('添加日期'),
-              onPressed: _pickYearDate,
-            ),
-          ],
-        ),
-        if (_months.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '请至少添加一个日期',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-
-        const SizedBox(height: 16),
-
-        // 年份选择（可选）
-        _buildSectionTitle('指定年份（可选）'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ..._years.map((year) => Chip(
-              label: Text('$year'),
-              deleteIcon: const Icon(Icons.close, size: 18),
-              onDeleted: () {
-                setState(() => _years.remove(year));
-                _notifyChange();
-              },
-            )),
-            ActionChip(
-              avatar: const Icon(Icons.add, size: 18),
-              label: const Text('添加年份'),
-              onPressed: () async {
-                final year = await showYearPickerDialog(context);
-                if (year != null && !_years.contains(year)) {
-                  setState(() {
-                    _years.add(year);
-                    _years.sort();
-                  });
-                  _notifyChange();
-                }
-              },
-            ),
-          ],
-        ),
-      ],
-    );
-  }
-
-  // === 自定义日期选择器 ===
-  Widget _buildCustomDateSelector() {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        _buildSectionTitle('自定义日期（可多选）'),
-        const SizedBox(height: 8),
-        Wrap(
-          spacing: 8,
-          runSpacing: 8,
-          children: [
-            ..._dates.map((date) => Chip(
-              label: Text(date),
-              deleteIcon: const Icon(Icons.close, size: 18),
-              onDeleted: () => _removeCustomDate(date),
-            )),
-            ActionChip(
-              avatar: const Icon(Icons.add, size: 18),
-              label: const Text('添加日期'),
-              onPressed: _pickCustomDate,
-            ),
-          ],
-        ),
-        if (_dates.isEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 8),
-            child: Text(
-              '请至少添加一个日期',
-              style: TextStyle(
-                fontSize: 12,
-                color: Theme.of(context).colorScheme.error,
-              ),
-            ),
-          ),
-      ],
-    );
   }
 
   Future<void> _pickYearDate() async {
