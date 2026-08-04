@@ -1,6 +1,5 @@
 import 'dart:convert';
 import 'dict_service.dart';
-import 'dict_models.dart';
 
 /// 字典兼容旧代码方法（从 DictService 抽出，仅依赖其公开 API）
 /// 与原类内实现逐字节一致。

@@ -5,8 +5,6 @@ import 'package:shared_preferences/shared_preferences.dart';
 import './api_client.dart';
 import '../constants/app_constants.dart';
 import './dict_models.dart';
-import './dict_queries.dart';
-import './dict_compat.dart';
 
 /// 兼容导出：DictItem/DictType 已抽到 dict_models.dart，
 /// 原仅 import dict_service.dart 的调用方（含 test）无需改动即可访问。

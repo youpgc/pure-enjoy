@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/notification_service.dart';
-import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/habit_model.dart';
@@ -206,10 +205,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
       habit: habit,
       userId: _userId!,
       addLocalCheckin: (id, c) {
-        if (mounted) setState(() {
+        if (mounted) {
+          setState(() {
           _checkinHistory.putIfAbsent(id, () => []);
           _checkinHistory[id]!.add(c);
         });
+        }
       },
       refresh: () => _loadHabits(refresh: true, fromCheckIn: true),
     );
@@ -242,7 +243,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
           showSnackBar(context, '删除成功');
         }
       } catch (e) {
-        showHabitError(context, '删除失败，请稍后重试');
+        if (mounted) showHabitError(context, '删除失败，请稍后重试');
       }
     }
   }
@@ -271,7 +272,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
       _loadHabits(refresh: true);
       EventBus.instance.fire(EventType.habitUpdated);
     } catch (e) {
-      showHabitError(context, '\$action失败，请稍后重试');
+      if (mounted) showHabitError(context, '\$action失败，请稍后重试');
     }
   }
 

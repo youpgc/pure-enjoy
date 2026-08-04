@@ -189,7 +189,7 @@ Future<void> showAnniversaryEditDialog(
               }
               final nickname = userNickname;
               // 统一提醒 ID（编辑用原 ID，新建生成），供保存后挂接横幅
-              final annId = isEditing ? anniversary!.id : const Uuid().v4();
+              final annId = isEditing ? anniversary.id : const Uuid().v4();
 
               try {
                 final body = {
@@ -213,7 +213,7 @@ Future<void> showAnniversaryEditDialog(
                 if (isEditing) {
                   final result = await ApiClient.patchByFilter(
                     'user_anniversaries',
-                    filters: {'id': 'eq.${anniversary!.id}'},
+                    filters: {'id': 'eq.${anniversary.id}'},
                     body: body,
                   );
                   if (!result.isSuccess) {

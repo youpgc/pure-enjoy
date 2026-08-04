@@ -1,5 +1,4 @@
 import 'dict_service.dart';
-import 'dict_models.dart';
 
 /// 字典查询方法（从 DictService 抽出，仅读取 cacheMap 公开只读缓存）
 /// 与原类内实现逐字节一致。
