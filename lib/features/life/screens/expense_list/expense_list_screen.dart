@@ -81,8 +81,10 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
         ? '${_rangeStart!.year}年${_rangeStart!.month}月 - ${_rangeEnd!.year}年${_rangeEnd!.month}月'
         : _rangeStart != null
             ? '${_rangeStart!.year}年${_rangeStart!.month}月起'
-            : '至${_rangeEnd!.year}年${_rangeEnd!.month}月';
-    return '统计区间：$range · $cat';
+            : _rangeEnd != null
+                ? '至${_rangeEnd!.year}年${_rangeEnd!.month}月'
+                : '';
+    return range.isEmpty ? '统计区间：$cat' : '统计区间：$range · $cat';
   }
 
   @override
