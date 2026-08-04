@@ -8,8 +8,8 @@ import '../models/anniversary_model.dart';
 import '../models/remind_offset.dart';
 import '../widgets/remind_offset_selector.dart';
 import '../widgets/app_date_picker.dart';
-import './anniversary_helpers.dart';
-import './anniversary_lunar_picker.dart';
+import '../screens/anniversary_helpers.dart';
+import '../screens/anniversary_lunar_picker.dart';
 import '../helpers/anniversary_cache_helper.dart';
 
 /// 纪念日/生日 新增/编辑表单 Dialog。

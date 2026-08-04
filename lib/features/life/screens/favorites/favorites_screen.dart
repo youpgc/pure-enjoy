@@ -12,6 +12,7 @@ import '../../../../services/dict_service.dart';
 import '../../models/favorite_model.dart';
 
 part 'favorites_screen_parts.dart';
+part 'favorites_item_part.dart';
 
 /// 收藏夹页面 - Supabase 数据同步
 class FavoritesScreen extends StatefulWidget {
@@ -22,15 +23,6 @@ class FavoritesScreen extends StatefulWidget {
 }
 
 class _FavoritesScreenState extends State<FavoritesScreen> with _FavoritesScreenDialogMixin {
-  List<FavoriteModel> _favorites = [];
-  bool _isLoading = true;
-  bool _isLoadingMore = false;
-  bool _hasMore = true;
-  int _offset = 0;
-  final int _limit = 10;
-  final ScrollController _scrollController = ScrollController();
-
-  String? get _userId => AuthService.instance.currentUserId;
 
   @override
   void initState() {
@@ -56,95 +48,6 @@ class _FavoritesScreenState extends State<FavoritesScreen> with _FavoritesScreen
     }
   }
 
-  Future<void> _loadFavorites({bool refresh = false}) async {
-    final userId = _userId;
-    if (userId == null) {
-      setState(() {
-        _favorites = [];
-        _isLoading = false;
-        _isLoadingMore = false;
-      });
-      return;
-    }
-
-    final isFirstPage = _offset == 0;
-
-    if (refresh) {
-      setState(() {
-        _offset = 0;
-        _hasMore = true;
-        _favorites = [];
-        _isLoading = true;
-      });
-    } else if (isFirstPage) {
-      // 1. 先加载本地缓存（仅在初始第一页时）
-      final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
-      if (cached.isNotEmpty && mounted) {
-        setState(() {
-          _favorites = cached.map((e) => FavoriteModel.fromJson(e)).toList();
-          _isLoading = false;
-        });
-      } else if (mounted) {
-        setState(() => _isLoading = true);
-      }
-    } else {
-      setState(() => _isLoadingMore = true);
-    }
-
-    // 2. 从网络分页加载
-    try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-      };
-
-      final result = await ApiClient.get(
-        'user_favorites',
-        filters: filters,
-        order: 'created_at.desc',
-        limit: _limit,
-        offset: _offset,
-      );
-
-      if (result.isSuccess) {
-        final data = result.data!;
-        final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
-        // 仅第一页时保存缓存
-        if (_offset == 0) {
-          await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
-        }
-        if (mounted) {
-          setState(() {
-            if (refresh || isFirstPage) {
-              _favorites = items;
-            } else {
-              _favorites.addAll(items);
-            }
-            _offset += _limit;
-            _hasMore = items.length >= _limit;
-            _isLoading = false;
-            _isLoadingMore = false;
-          });
-        }
-      } else {
-        throw Exception('HTTP ${result.statusCode}');
-      }
-    } catch (e) {
-      if (mounted) {
-        setState(() {
-          _isLoading = false;
-          _isLoadingMore = false;
-        });
-        // 如果已有缓存数据，静默失败不提示
-        if (_favorites.isEmpty) {
-          _showError('加载收藏失败，请稍后重试');
-        }
-      }
-    }
-  }
-
-  void _showError(String message) {
-    showSnackBar(context, message, isError: true);
-  }
 
   Future<void> _openUrl(String? url) async {
     if (url == null || url.isEmpty) return;
@@ -245,4 +148,5 @@ class _FavoritesScreenState extends State<FavoritesScreen> with _FavoritesScreen
     );
   }
 }
+
 

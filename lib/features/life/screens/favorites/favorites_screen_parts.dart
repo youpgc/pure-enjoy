@@ -1,151 +1,107 @@
 part of './favorites_screen.dart';
 
-/// 收藏列表单项卡片
-class _FavoriteListItem extends StatelessWidget {
-  final FavoriteModel favorite;
-  final String categoryLabel;
-  final VoidCallback onTap;
-  final VoidCallback onEdit;
-  final VoidCallback onDelete;
-
-  const _FavoriteListItem({
-    required this.favorite,
-    required this.categoryLabel,
-    required this.onTap,
-    required this.onEdit,
-    required this.onDelete,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    return Card(
-      margin: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(
-          UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
-        ),
-        child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Row(
-            children: [
-              Container(
-                width: 48,
-                height: 48,
-                decoration: BoxDecoration(
-                  color: colorScheme.primaryContainer,
-                  borderRadius: BorderRadius.circular(
-                    UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
-                  ),
-                ),
-                child: Icon(
-                  favorite.url != null ? Icons.link : Icons.bookmark,
-                  color: colorScheme.primary,
-                ),
-              ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      favorite.title,
-                      style: Theme.of(context).textTheme.titleMedium,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                    ),
-                    const SizedBox(height: 4),
-                    Row(
-                      children: [
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 8,
-                            vertical: 2,
-                          ),
-                          decoration: BoxDecoration(
-                            color: colorScheme.secondaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            categoryLabel,
-                            style: TextStyle(
-                              fontSize: 12,
-                              color: colorScheme.onSecondaryContainer,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                    if (favorite.description != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        favorite.description!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.outline,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    if (favorite.tags != null && favorite.tags!.isNotEmpty) ...[
-                      const SizedBox(height: 4),
-                      Wrap(
-                        spacing: 4,
-                        children: favorite.tags!.take(3).map((tag) => Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                          decoration: BoxDecoration(
-                            color: colorScheme.tertiaryContainer,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Text(
-                            tag,
-                            style: TextStyle(
-                              fontSize: 10,
-                              color: colorScheme.onTertiaryContainer,
-                            ),
-                          ),
-                        )).toList(),
-                      ),
-                    ],
-                    if (favorite.url != null) ...[
-                      const SizedBox(height: 4),
-                      Text(
-                        favorite.url!,
-                        style: TextStyle(
-                          fontSize: 12,
-                          color: colorScheme.outline,
-                        ),
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                      ),
-                    ],
-                    const SizedBox(height: 4),
-                    Text(
-                      DateTimeUtils.formatStandard(favorite.createdAt),
-                      style: TextStyle(
-                        fontSize: 11,
-                        color: colorScheme.outline.withValues(alpha: 0.7),
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              EditDeletePopupMenu(
-                onEdit: onEdit,
-                onDelete: onDelete,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-
-/// 收藏新增/编辑对话框逻辑抽为 mixin (膨胀修复), 避免 [_FavoritesScreenState] 超 400 行。
+/// 收藏 状态 + 新增/编辑对话框逻辑抽为 mixin (膨胀修复), 避免 [_FavoritesScreenState] 超 400 行。
+///
+/// 关键约束：Dart 的 `mixin on State<T>` 只能访问声明在 `State<T>` 或 mixin 自身上的成员，
+/// 无法看到被混入具体类里定义的私有字段/方法。`_showEditDialog` 依赖的 `_showError` /
+/// `_userId` / `_loadFavorites` 以及它们依赖的状态字段一并放入 mixin，保证行为完全等价。
 mixin _FavoritesScreenDialogMixin on State<FavoritesScreen> {
+  List<FavoriteModel> _favorites = [];
+  bool _isLoading = true;
+  bool _isLoadingMore = false;
+  bool _hasMore = true;
+  int _offset = 0;
+  final int _limit = 10;
+  final ScrollController _scrollController = ScrollController();
+  String? get _userId => AuthService.instance.currentUserId;
+  void _showError(String message) {
+    showSnackBar(context, message, isError: true);
+  }
+  Future<void> _loadFavorites({bool refresh = false}) async {
+    final userId = _userId;
+    if (userId == null) {
+      setState(() {
+        _favorites = [];
+        _isLoading = false;
+        _isLoadingMore = false;
+      });
+      return;
+    }
+
+    final isFirstPage = _offset == 0;
+
+    if (refresh) {
+      setState(() {
+        _offset = 0;
+        _hasMore = true;
+        _favorites = [];
+        _isLoading = true;
+      });
+    } else if (isFirstPage) {
+      // 1. 先加载本地缓存（仅在初始第一页时）
+      final cached = await CacheHelper.instance.loadList(CacheHelper.keyFavorites);
+      if (cached.isNotEmpty && mounted) {
+        setState(() {
+          _favorites = cached.map((e) => FavoriteModel.fromJson(e)).toList();
+          _isLoading = false;
+        });
+      } else if (mounted) {
+        setState(() => _isLoading = true);
+      }
+    } else {
+      setState(() => _isLoadingMore = true);
+    }
+
+    // 2. 从网络分页加载
+    try {
+      final filters = <String, String>{
+        'user_id': 'eq.$userId',
+      };
+
+      final result = await ApiClient.get(
+        'user_favorites',
+        filters: filters,
+        order: 'created_at.desc',
+        limit: _limit,
+        offset: _offset,
+      );
+
+      if (result.isSuccess) {
+        final data = result.data!;
+        final items = data.map((e) => FavoriteModel.fromJson(e)).toList();
+        // 仅第一页时保存缓存
+        if (_offset == 0) {
+          await CacheHelper.instance.saveList(CacheHelper.keyFavorites, data);
+        }
+        if (mounted) {
+          setState(() {
+            if (refresh || isFirstPage) {
+              _favorites = items;
+            } else {
+              _favorites.addAll(items);
+            }
+            _offset += _limit;
+            _hasMore = items.length >= _limit;
+            _isLoading = false;
+            _isLoadingMore = false;
+          });
+        }
+      } else {
+        throw Exception('HTTP ${result.statusCode}');
+      }
+    } catch (e) {
+      if (mounted) {
+        setState(() {
+          _isLoading = false;
+          _isLoadingMore = false;
+        });
+        // 如果已有缓存数据，静默失败不提示
+        if (_favorites.isEmpty) {
+          _showError('加载收藏失败，请稍后重试');
+        }
+      }
+    }
+  }
   Future<void> _showEditDialog({FavoriteModel? favorite}) async {
     // 确保字典已加载，避免下拉选项为空
     await DictService.instance.ensureInitialized();

@@ -24,7 +24,7 @@ Widget _buildExpenseListBody({
   required void Function(String) onSelectCategory,
   required void Function(ExpenseModel) onEditExpense,
   required void Function(String) onDeleteExpense,
-  required void Function() onLoadExpenses,
+  required Future<void> Function() onLoadExpenses,
   required void Function() onShowExpenseForm,
   required Widget Function() onBuildLoadMore,
 }) {
