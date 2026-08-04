@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
+import 'package:shared_preferences/shared_preferences.dart';
 import './api_client.dart';
 import './supabase_service.dart';
 import '../features/life/models/reminder_schedule_model.dart';

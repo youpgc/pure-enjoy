@@ -6,6 +6,7 @@ import '../../../../core/theme/theme_provider.dart';
 import '../../../../services/api_client.dart';
 import '../../../../services/chapter_cache_service.dart';
 import '../../../../services/supabase_service.dart';
+import '../../../../services/notification_service.dart';
 import '../../../../core/widgets/widgets.dart';
 import './settings_list.dart';
 import './settings_dialogs.dart';
@@ -28,7 +29,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   bool _autoSync = true;
   bool _wifiOnly = true;
   bool _pushNotification = true;
-  bool _dailyReminder = false;
+  bool _dailyReminder = true;
   bool _anniversaryReminder = true;
 
   // SharedPreferences keys
@@ -56,7 +57,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           _autoSync = prefs.getBool(_autoSyncKey) ?? true;
           _wifiOnly = prefs.getBool(_wifiOnlyKey) ?? true;
           _pushNotification = prefs.getBool(_pushNotifKey) ?? true;
-          _dailyReminder = prefs.getBool(_dailyReminderKey) ?? false;
+          _dailyReminder = prefs.getBool(_dailyReminderKey) ?? true;
           _anniversaryReminder = prefs.getBool(_anniversaryReminderKey) ?? true;
         });
       }
@@ -114,10 +115,15 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         onDailyReminderChanged: (val) {
           setState(() => _dailyReminder = val);
           _saveBoolSetting(_dailyReminderKey, val);
+          // 总闸立即生效：重新挂接习惯+待办提醒（关闭时按总闸取消已调度的提醒）
+          NotificationService.instance.armHabitRemindersFromRemote().catchError((e) {});
+          NotificationService.instance.armRemindersFromRemote().catchError((e) {});
         },
         onAnniversaryReminderChanged: (val) {
           setState(() => _anniversaryReminder = val);
           _saveBoolSetting(_anniversaryReminderKey, val);
+          // 总闸立即生效：重新挂接纪念日提醒（关闭时按总闸取消已调度的提醒）
+          NotificationService.instance.armAnniversariesFromRemote().catchError((e) {});
         },
         onClearCacheTap: () => showClearCacheDialog(context, _clearCache),
         onChangePasswordTap: _showChangePasswordDialog,

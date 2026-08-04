@@ -23,6 +23,25 @@ extension NotificationSchedulers on NotificationService {
   static const int _offsetStride = 10;
   static const int _maxOffsets = 8;
 
+  // ========== 全局通知总闸（与系统设置页共用 key） ==========
+  // 用户可在「系统设置 → 通知设置」关闭全局总闸；关闭后对应类型的本地提醒
+  // 一律不调度，已调度的立即取消。默认值 true 确保不回归现有已设提醒。
+  static const String _dailyReminderSettingKey = 'setting_daily_reminder';
+  static const String _anniversaryReminderSettingKey =
+      'setting_anniversary_reminder';
+
+  /// 读取「每日提醒」全局总闸（覆盖 习惯 + 待办）。key 与默认值须与 settings_screen 一致。
+  Future<bool> _isDailyReminderEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_dailyReminderSettingKey) ?? true;
+  }
+
+  /// 读取「纪念日提醒」全局总闸。key 与默认值须与 settings_screen 一致。
+  Future<bool> _isAnniversaryReminderEnabled() async {
+    final prefs = await SharedPreferences.getInstance();
+    return prefs.getBool(_anniversaryReminderSettingKey) ?? true;
+  }
+
   int _habitNotificationId(String habitId) =>
       _habitNotificationBaseId + (habitId.hashCode.abs() % 10000);
 
@@ -53,6 +72,12 @@ extension NotificationSchedulers on NotificationService {
   }) async {
     if (!_initialized) await initialize();
     final id = _habitNotificationId(schedule.habitId);
+
+    // 全局「每日提醒」总闸关闭：取消已设定的习惯提醒，不再发起
+    if (!await _isDailyReminderEnabled()) {
+      await cancelNotification(id);
+      return;
+    }
 
     // 未启用 / 习惯已达成目标天数（闭环完成态）→ 取消已设定的提醒，不再发起
     if (!schedule.isEnabled || isCompleted) {
@@ -170,6 +195,12 @@ extension NotificationSchedulers on NotificationService {
   Future<void> scheduleReminderNotification(ReminderModel reminder) async {
     if (!_initialized) await initialize();
 
+    // 全局「每日提醒」总闸关闭：取消整段已设定的待办提醒，不再发起
+    if (!await _isDailyReminderEnabled()) {
+      await _cancelReminderBlock(reminder.id, _reminderBlockBase);
+      return;
+    }
+
     if (!reminder.remindEnabled ||
         reminder.isCompleted ||
         !reminder.remindAt.isAfter(DateTime.now())) {
@@ -239,6 +270,12 @@ extension NotificationSchedulers on NotificationService {
   /// 未开启提醒时自动取消整段已设定的提醒。
   Future<void> scheduleAnniversaryReminder(AnniversaryModel a) async {
     if (!_initialized) await initialize();
+
+    // 全局「纪念日提醒」总闸关闭：取消整段已设定的纪念日提醒，不再发起
+    if (!await _isAnniversaryReminderEnabled()) {
+      await _cancelReminderBlock(a.id, _anniversaryBlockBase);
+      return;
+    }
 
     if (!a.remindEnabled) {
       await _cancelReminderBlock(a.id, _anniversaryBlockBase);
