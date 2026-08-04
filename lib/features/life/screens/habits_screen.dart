@@ -1,17 +1,19 @@
 import 'package:flutter/material.dart';
-import 'package:uuid/uuid.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../../utils/cache_helper.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
 import '../widgets/habit_card.dart';
+import '../widgets/habit_history_dialog.dart';
+import '../data/habit_repository.dart';
 import './habit_edit_dialog.dart';
 import '../../../core/utils/event_bus.dart';
+import '../helpers/habit_screen_helpers.dart';
+import '../helpers/habit_reminder_sync.dart';
+import '../helpers/habit_checkin_action.dart';
 
 /// 习惯打卡页面 - Supabase 数据同步
 class HabitsScreen extends StatefulWidget {
@@ -120,76 +122,19 @@ class _HabitsScreenState extends State<HabitsScreen> {
       setState(() => _isLoadingMore = true);
     }
 
-    // 2. 从网络分页加载
+    // 2. 从网络分页加载（数据层已抽离至 habit_repository.fetchHabitPage）
     try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-      };
-      if (_filterStatus != null) {
-        filters['is_active'] = 'eq.$_filterStatus';
-      }
-
-      final habitsResult = await ApiClient.get(
-        'habits',
-        filters: filters,
-        order: 'is_active.desc',
-        limit: _limit,
+      final bundle = await fetchHabitPage(
+        userId: userId,
+        filterStatus: _filterStatus,
         offset: _offset,
+        limit: _limit,
       );
-
-      if (!habitsResult.isSuccess) {
-        throw Exception('HTTP ${habitsResult.statusCode}');
-      }
-
-      final habitsData = habitsResult.data!;
-      final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
+      final items = bundle.habits;
 
       // 仅第一页时保存缓存
       if (_offset == 0) {
-        await CacheHelper.instance.saveList(CacheHelper.keyHabits, habitsData);
-      }
-
-      // 并行加载打卡记录和提醒计划（分页）
-      final history = <String, List<HabitCheckinModel>>{};
-      final schedules = <String, ReminderScheduleModel>{};
-      if (items.isNotEmpty) {
-        final habitIds = items.map((h) => h.id).join(',');
-        final results = await Future.wait([
-          ApiClient.get(
-            'habit_checkins',
-            filters: {'habit_id': 'in.($habitIds)'},
-            order: 'checkin_at.desc',
-            limit: _limit,
-            offset: _offset,
-          ),
-          ApiClient.get(
-            'reminder_schedules',
-            filters: {'habit_id': 'in.($habitIds)'},
-            limit: _limit,
-            offset: _offset,
-          ),
-        ]);
-
-        final checkinsResult = results[0];
-        final scheduleResult = results[1];
-
-        if (checkinsResult.isSuccess) {
-          for (final checkin in checkinsResult.data!) {
-            final model = HabitCheckinModel.fromJson(checkin);
-            history.putIfAbsent(model.habitId, () => []).add(model);
-          }
-        }
-        // 确保每个 habit 都有条目
-        for (final habit in items) {
-          history.putIfAbsent(habit.id, () => []);
-        }
-
-        if (scheduleResult.isSuccess) {
-          for (final s in scheduleResult.data!) {
-            final model = ReminderScheduleModel.fromJson(s);
-            schedules[model.habitId] = model;
-          }
-        }
+        await CacheHelper.instance.saveList(CacheHelper.keyHabits, bundle.rawHabits);
       }
 
       if (mounted) {
@@ -198,12 +143,12 @@ class _HabitsScreenState extends State<HabitsScreen> {
         setState(() {
           if (refresh || isFirstPage) {
             _habits = items;
-            _checkinHistory = history;
-            _reminderSchedules = schedules;
+            _checkinHistory = bundle.checkinHistory;
+            _reminderSchedules = bundle.reminderSchedules;
           } else {
             _habits.addAll(items);
-            _checkinHistory.addAll(history);
-            _reminderSchedules.addAll(schedules);
+            _checkinHistory.addAll(bundle.checkinHistory);
+            _reminderSchedules.addAll(bundle.reminderSchedules);
           }
           _offset += _limit;
           _hasMore = items.length >= _limit;
@@ -223,92 +168,59 @@ class _HabitsScreenState extends State<HabitsScreen> {
         });
         // 如果已有数据，静默失败不提示
         if (_habits.isEmpty) {
-          _showError('加载习惯失败，请稍后重试');
+          showHabitError(context, '加载习惯失败，请稍后重试');
         }
       }
     }
   }
 
-  void _showError(String message) {
-    showSnackBar(context, message, isError: true);
-  }
-
   Future<void> _checkIn(HabitModel habit) async {
     // 防重复：同一习惯正在打卡中则忽略后续点击
     if (_checkingHabitId == habit.id) return;
+    // 未登录保护（createCheckin 需要非空业务 ID）
+    if (_userId == null) {
+      showHabitError(context, '请先登录后再打卡');
+      return;
+    }
     final today = DateTime.now();
 
     // 闭环：已达成目标天数则不再允许打卡（状态标记已完成，停止过程逻辑）
-    if (isHabitCompleted(_getTotalCheckins(habit.id), habit.targetDays)) {
-      _showError('「${habit.name}」已达成目标天数，已自动完成');
+    if (isHabitCompleted(getTotalCheckins(_checkinHistory[habit.id] ?? []), habit.targetDays)) {
+      showHabitError(context, '「${habit.name}」已达成目标天数，已自动完成');
       return;
     }
 
     // 检查今天是否已经打卡
     final checkins = _checkinHistory[habit.id] ?? [];
-    final alreadyChecked = checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
-
-    if (alreadyChecked) {
-      _showError('今天已经打卡了');
+    if (checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today))) {
+      showHabitError(context, '今天已经打卡了');
       return;
     }
 
     // 标记该习惯正在打卡，对应按钮显示 loading（而非整列表 loading）
     if (mounted) setState(() => _checkingHabitId = habit.id);
 
-    try {
-      // 添加打卡记录
-      final checkinId = const Uuid().v4();
-      final checkinResult = await ApiClient.post(
-        'habit_checkins',
-        {
-          'id': checkinId,
-          'habit_id': habit.id,
-          'user_id': _userId,
-          'checkin_at': today.toUtc().toIso8601String(),
-        },
-      );
-
-      if (!checkinResult.isSuccess) {
-        throw Exception('添加打卡记录失败: HTTP ${checkinResult.statusCode}');
-      }
-
-      // 立即本地更新打卡记录，UI马上变为已打卡状态
-      if (mounted) {
-        setState(() {
-          _checkinHistory.putIfAbsent(habit.id, () => []);
-          _checkinHistory[habit.id]!.add(HabitCheckinModel(
-            id: checkinId,
-            habitId: habit.id,
-            checkinAt: today,
-          ));
+    // 网络+本地反馈+事件+UI 提示已抽离至 habit_checkin_action.performHabitCheckIn
+    await performHabitCheckIn(
+      context: context,
+      habit: habit,
+      userId: _userId!,
+      addLocalCheckin: (id, c) {
+        if (mounted) setState(() {
+          _checkinHistory.putIfAbsent(id, () => []);
+          _checkinHistory[id]!.add(c);
         });
-      }
+      },
+      refresh: () => _loadHabits(refresh: true, fromCheckIn: true),
+    );
 
-      // 拉取后端维护的最新 streak（不触发整列表 loading）
-      await _loadHabits(refresh: true, fromCheckIn: true);
-      EventBus.instance.fire(EventType.habitUpdated);
-
-      // 闭环：达成目标天数后取消该习惯的提醒，不再发起任何过程提醒
-      if (isHabitCompleted(_getTotalCheckins(habit.id), habit.targetDays)) {
-        await NotificationService.instance.cancelHabitReminder(habit.id);
-      }
-
-      if (!mounted) return;
-      // 显示成功提示
-      // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${habit.name} 打卡成功！'),
-          backgroundColor: AppTheme.success,
-        ),
-      );
-    } catch (e) {
-      _showError('打卡失败，请稍后重试');
-    } finally {
-      // 无论成功失败，结束单习惯 loading
-      if (mounted) setState(() => _checkingHabitId = null);
+    // 闭环：达成目标天数后取消该习惯的提醒，不再发起任何过程提醒
+    if (isHabitCompleted(getTotalCheckins(_checkinHistory[habit.id] ?? []), habit.targetDays)) {
+      await NotificationService.instance.cancelHabitReminder(habit.id);
     }
+
+    // 无论成功失败，结束单习惯 loading
+    if (mounted) setState(() => _checkingHabitId = null);
   }
 
   Future<void> _deleteHabit(String id) async {
@@ -320,24 +232,17 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     if (confirmed == true) {
       try {
-        final result = await ApiClient.batchDeleteByFilter(
-          'habits',
-          filters: {'id': 'eq.$id'},
-        );
-
-        if (result.isSuccess) {
-          // 删除习惯时同步取消其本地横幅提醒
-          await NotificationService.instance.cancelHabitReminder(id);
-          _loadHabits(refresh: true);
-          EventBus.instance.fire(EventType.habitUpdated);
-          if (mounted) {
-            showSnackBar(context, '删除成功');
-          }
-        } else {
-          throw Exception('HTTP ${result.statusCode}');
+        // 数据层已抽离至 habit_repository.deleteHabit
+        await deleteHabit(id);
+        // 删除习惯时同步取消其本地横幅提醒
+        await NotificationService.instance.cancelHabitReminder(id);
+        _loadHabits(refresh: true);
+        EventBus.instance.fire(EventType.habitUpdated);
+        if (mounted) {
+          showSnackBar(context, '删除成功');
         }
       } catch (e) {
-        _showError('删除失败，请稍后重试');
+        showHabitError(context, '删除失败，请稍后重试');
       }
     }
   }
@@ -354,41 +259,19 @@ class _HabitsScreenState extends State<HabitsScreen> {
 
     try {
       final newActive = !habit.isActive;
-      final result = await ApiClient.patchByFilter(
-        'habits',
-        filters: {'id': 'eq.${habit.id}'},
-        body: {'is_active': newActive},
+      // 数据层已抽离至 habit_repository.setHabitActive
+      await setHabitActive(habit.id, newActive);
+      // 暂停/恢复后的提醒同步已抽离至 habit_reminder_sync.syncHabitReminderOnToggle
+      await syncHabitReminderOnToggle(
+        isActiveNow: newActive,
+        habit: habit,
+        schedule: _reminderSchedules[habit.id],
+        totalCheckins: getTotalCheckins(_checkinHistory[habit.id] ?? []),
       );
-
-      if (result.isSuccess) {
-        // 暂停时取消提醒，恢复时按原计划重挂
-        if (!newActive) {
-          await NotificationService.instance.cancelHabitReminder(habit.id);
-        } else {
-          final completed = isHabitCompleted(
-            _checkinHistory[habit.id]?.length ?? 0,
-            habit.targetDays,
-          );
-          if (completed) {
-            // 闭环：已完成习惯即便恢复启用也不重挂提醒
-            await NotificationService.instance.cancelHabitReminder(habit.id);
-          } else {
-            final sched = _reminderSchedules[habit.id];
-            if (sched != null) {
-              await NotificationService.instance.scheduleHabitReminder(
-                schedule: sched,
-                habitName: habit.name,
-              );
-            }
-          }
-        }
-        _loadHabits(refresh: true);
-        EventBus.instance.fire(EventType.habitUpdated);
-      } else {
-        throw Exception('HTTP ${result.statusCode}');
-      }
+      _loadHabits(refresh: true);
+      EventBus.instance.fire(EventType.habitUpdated);
     } catch (e) {
-      _showError('\$action失败，请稍后重试');
+      showHabitError(context, '\$action失败，请稍后重试');
     }
   }
 
@@ -405,48 +288,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
     );
   }
 
-  Future<void> _showHistoryDialog(HabitModel habit) async {
-    final checkins = _checkinHistory[habit.id] ?? [];
 
-    await showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('${habit.name} 打卡记录'),
-        content: SizedBox(
-          width: double.maxFinite,
-          height: 300,
-          child: checkins.isEmpty
-              ? const Center(child: Text('暂无打卡记录'))
-              : ListView.builder(
-                  itemCount: checkins.length,
-                  itemBuilder: (context, index) {
-                    final checkin = checkins[index];
-                    return ListTile(
-                      leading: const Icon(Icons.check_circle, color: AppTheme.success),
-                      title: Text(DateTimeUtils.formatStandard(checkin.checkinAt)),
-                    );
-                  },
-                ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  bool _isCheckedInToday(String habitId) {
-    final today = DateTime.now();
-    final checkins = _checkinHistory[habitId] ?? [];
-    return checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today));
-  }
-
-  int _getTotalCheckins(String habitId) {
-    return _checkinHistory[habitId]?.length ?? 0;
-  }
 
   @override
   Widget build(BuildContext context) {
@@ -520,8 +362,8 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         );
                       }
                       final habit = _habits[index];
-                      final isCheckedIn = _isCheckedInToday(habit.id);
-                      final totalCheckins = _getTotalCheckins(habit.id);
+                      final isCheckedIn = isCheckedInToday(_checkinHistory[habit.id] ?? []);
+                      final totalCheckins = getTotalCheckins(_checkinHistory[habit.id] ?? []);
                       final completed = isHabitCompleted(totalCheckins, habit.targetDays);
                       final schedule = _reminderSchedules[habit.id];
                       final shouldRemindToday = schedule?.shouldRemindToday(DateTime.now()) ?? false;
@@ -536,7 +378,7 @@ class _HabitsScreenState extends State<HabitsScreen> {
                         onCheckIn: () => _checkIn(habit),
                         onEdit: () => _showEditDialog(habit: habit),
                         onDelete: () => _deleteHabit(habit.id),
-                        onViewHistory: () => _showHistoryDialog(habit),
+                        onViewHistory: () => showHabitHistoryDialog(context, habit.name, _checkinHistory[habit.id] ?? []),
                         onToggleActive: () => _toggleHabitActive(habit),
                       );
                     },

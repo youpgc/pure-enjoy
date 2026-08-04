@@ -1,21 +1,14 @@
-import 'dart:convert';
 import 'package:flutter/material.dart';
-import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
-import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
-import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
-import '../models/remind_offset.dart';
-import '../widgets/remind_offset_selector.dart';
-import '../widgets/app_date_picker.dart';
 import '../widgets/anniversary_card.dart';
+import '../widgets/anniversary_edit_dialog.dart';
+import '../helpers/anniversary_cache_helper.dart';
 import './anniversary_helpers.dart';
-import './anniversary_lunar_picker.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
 class AnniversariesScreen extends StatefulWidget {
@@ -75,7 +68,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
     // 1. 先加载本地缓存（仅 refresh 时）
     if (refresh) {
-      final cachedData = await _loadCachedList();
+      final cachedData = await loadAnniversaryCache(_cacheKey);
       if (cachedData.isNotEmpty && mounted) {
         setState(() {
           _anniversaries =
@@ -111,7 +104,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
       // 保存缓存（只保存当前用户、当前类型的数据，仅 refresh 时）
       if (refresh) {
-        await _saveCachedList(data);
+        await saveAnniversaryCache(_cacheKey, data);
       }
 
       if (mounted) {
@@ -140,38 +133,6 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   void _sortAnniversaries() {
     _anniversaries.sort((a, b) => a.daysUntilNext.compareTo(b.daysUntilNext));
   }
-
-  /// 加载缓存列表
-  Future<List<dynamic>> _loadCachedList() async {
-    try {
-      final prefs = await _getPrefs();
-      final jsonStr = prefs.getString(_cacheKey);
-      if (jsonStr == null || jsonStr.isEmpty) return [];
-      final decoded = jsonDecode(jsonStr);
-      if (decoded is List) return decoded;
-      return [];
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('错误');
-      }
-      return [];
-    }
-  }
-
-  /// 保存缓存列表
-  Future<void> _saveCachedList(List<dynamic> data) async {
-    try {
-      final prefs = await _getPrefs();
-      await prefs.setString(_cacheKey, jsonEncode(data));
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('错误');
-      }
-    }
-  }
-
-  /// 获取 SharedPreferences
-  Future<SharedPreferences> _getPrefs() => SharedPreferences.getInstance();
 
   void _showError(String message) {
     showSnackBar(context, message, isError: true);
@@ -214,268 +175,13 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
   }
 
   Future<void> _showEditDialog({AnniversaryModel? anniversary}) async {
-    final isEditing = anniversary != null;
-    final nameController = TextEditingController(text: anniversary?.title ?? '');
-    final descController =
-        TextEditingController(text: anniversary?.description ?? '');
-
-    final String selectedType = anniversary?.type ?? widget.filterType;
-    DateTime selectedDate = anniversary?.date ?? DateTime.now();
-    bool repeatYearly = anniversary?.repeatYearly ?? true;
-    bool remindEnabled = anniversary?.remindEnabled ?? false;
-    List<RemindOffset> remindOffsets =
-        List.from(anniversary?.remindOffsets ?? const <RemindOffset>[]);
-    final rt = (anniversary?.remindTime ?? '09:00').split(':');
-    TimeOfDay remindTime = TimeOfDay(
-      hour: int.tryParse(rt[0]) ?? 9,
-      minute: int.tryParse(rt.length > 1 ? rt[1] : '0') ?? 0,
-    );
-    bool isLunar = anniversary?.isLunar ?? false;
-
-    final isBirthday = widget.filterType == 'birthday';
-    final typeLabel = isBirthday ? '生日' : '纪念日';
-
-    await showDialog(
-      context: context,
-      builder: (_) => StatefulBuilder(
-        builder: (dialogContext, setDialogState) => AlertDialog(
-          title: Text(isEditing ? '编辑$typeLabel' : '添加$typeLabel'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                // 名称输入
-                TextField(
-                  controller: nameController,
-                  decoration: InputDecoration(
-                    labelText: '名称 *',
-                    hintText: isBirthday ? '例如：妈妈生日、爸爸生日' : '例如：结婚纪念日、入职纪念日',
-                  ),
-                ),
-                const SizedBox(height: 12),
-
-                // 日期选择
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('日期 *'),
-                  subtitle: Text(
-                    isLunar
-                        ? '农历 ${getLunarDateStr(selectedDate)}'
-                        : DateTimeUtils.formatDate(selectedDate),
-                  ),
-                  trailing: const Icon(Icons.calendar_today),
-                  onTap: () async {
-                    if (isLunar) {
-                      // 农历日期选择器
-                      final picked = await showLunarDatePicker(
-                        dialogContext,
-                        initialDate: selectedDate,
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    } else {
-                      final picked = await AppDatePicker.show(
-                        dialogContext,
-                        type: DateTimeType.date,
-                        initialDate: selectedDate,
-                        minDate: DateTime(1900),
-                        maxDate: DateTime(2100),
-                      );
-                      if (picked != null) {
-                        setDialogState(() => selectedDate = picked);
-                      }
-                    }
-                  },
-                ),
-                const SizedBox(height: 4),
-                // 农历/公历切换
-                SwitchListTile(
-                  title: const Text('农历'),
-                  subtitle: Text(isLunar ? '当前为农历日期' : '当前为公历日期'),
-                  contentPadding: EdgeInsets.zero,
-                  value: isLunar,
-                  onChanged: (value) {
-                    setDialogState(() => isLunar = value);
-                  },
-                ),
-                const Divider(),
-                const SizedBox(height: 4),
-
-                // 描述输入
-                TextField(
-                  controller: descController,
-                  decoration: const InputDecoration(
-                    labelText: '描述',
-                    hintText: '输入描述（可选）',
-                  ),
-                  maxLines: 2,
-                ),
-                const SizedBox(height: 12),
-
-                // 是否每年重复
-                SwitchListTile(
-                  title: const Text('每年重复'),
-                  subtitle: Text(repeatYearly ? '每年都会提醒' : '仅一次'),
-                  contentPadding: EdgeInsets.zero,
-                  value: repeatYearly,
-                  onChanged: (value) {
-                    setDialogState(() => repeatYearly = value);
-                  },
-                ),
-                const Divider(),
-
-                // 提醒设置：开关 + 多选提前时间（含 hh:mm）+ 当天提醒时刻
-                RemindOffsetSelector(
-                  baseTime: DateTime(
-                    selectedDate.year,
-                    selectedDate.month,
-                    selectedDate.day,
-                    remindTime.hour,
-                    remindTime.minute,
-                  ),
-                  initialEnabled: remindEnabled,
-                  initialOffsets: remindOffsets,
-                  onChanged: (settings) {
-                    setDialogState(() {
-                      remindEnabled = settings.enabled;
-                      remindOffsets = settings.offsets;
-                    });
-                  },
-                ),
-                const SizedBox(height: 8),
-                ListTile(
-                  contentPadding: EdgeInsets.zero,
-                  title: const Text('当天提醒时刻'),
-                  subtitle: Text(remindTime.format(dialogContext)),
-                  trailing: const Icon(Icons.access_time),
-                  onTap: () async {
-                    final picked = await AppDatePicker.show(
-                      dialogContext,
-                      type: DateTimeType.time,
-                      initialDate: DateTime(1970, 1, 1, remindTime.hour, remindTime.minute),
-                    );
-                    if (picked != null) {
-                      setDialogState(() => remindTime = TimeOfDay(hour: picked.hour, minute: picked.minute));
-                    }
-                  },
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(
-              onPressed: () => Navigator.pop(dialogContext),
-              child: const Text('取消'),
-            ),
-            FilledButton(
-              onPressed: () async {
-                if (nameController.text.trim().isEmpty) {
-                  _showError('请输入名称');
-                  return;
-                }
-
-                final userId = _userId;
-                if (userId == null) {
-                  _showError('请先登录后再保存');
-                  return;
-                }
-                final nickname = _userNickname;
-                // 统一提醒 ID（编辑用原 ID，新建生成），供保存后挂接横幅
-                final annId = isEditing ? anniversary.id : const Uuid().v4();
-
-                try {
-                  if (isEditing) {
-                    final result = await ApiClient.patchByFilter(
-                      'user_anniversaries',
-                      filters: {'id': 'eq.${anniversary.id}'},
-                      body: {
-                        'user_nickname': nickname,
-                        'title': nameController.text.trim(),
-                        'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
-                        'type': selectedType,
-                        'description':
-                            descController.text.trim().isEmpty
-                                ? null
-                                : descController.text.trim(),
-                        'repeat_yearly': repeatYearly,
-                        'remind_enabled': remindEnabled,
-                        'remind_offsets':
-                            remindOffsets.map((e) => e.toJson()).toList(),
-                        'remind_time':
-                            '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
-                        'is_lunar': isLunar,
-                      },
-                    );
-                    if (!result.isSuccess) {
-                      throw Exception('HTTP ${result.statusCode}');
-                    }
-                  } else {
-                    final result = await ApiClient.post(
-                      'user_anniversaries',
-                      {
-                        'id': annId,
-                        'user_id': userId,
-                        'user_nickname': nickname,
-                        'title': nameController.text.trim(),
-                        'date': DateTime(selectedDate.year, selectedDate.month, selectedDate.day, 12).toIso8601String(),
-                        'type': selectedType,
-                        'description':
-                            descController.text.trim().isEmpty
-                                ? null
-                                : descController.text.trim(),
-                        'repeat_yearly': repeatYearly,
-                        'remind_enabled': remindEnabled,
-                        'remind_offsets':
-                            remindOffsets.map((e) => e.toJson()).toList(),
-                        'remind_time':
-                            '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
-                        'is_lunar': isLunar,
-                      },
-                    );
-                    if (!result.isSuccess) {
-                      throw Exception('HTTP ${result.statusCode}');
-                    }
-                  }
-
-                  // 纪念日提醒：开启则挂接横幅，关闭则取消已设定的提醒
-                  final annModel = AnniversaryModel(
-                    id: annId,
-                    userId: userId,
-                    userNickname: nickname,
-                    title: nameController.text.trim(),
-                    date: DateTime(selectedDate.year, selectedDate.month,
-                        selectedDate.day, 12),
-                    type: selectedType,
-                    description: descController.text.trim().isEmpty
-                        ? null
-                        : descController.text.trim(),
-                    repeatYearly: repeatYearly,
-                    remindEnabled: remindEnabled,
-                    remindOffsets: remindOffsets,
-                    remindTime:
-                        '${remindTime.hour.toString().padLeft(2, '0')}:${remindTime.minute.toString().padLeft(2, '0')}',
-                    isLunar: isLunar,
-                  );
-                  if (remindEnabled) {
-                    await NotificationService.instance.scheduleAnniversaryReminder(annModel);
-                  } else {
-                    NotificationService.instance.cancelAnniversaryReminder(annId);
-                  }
-
-                  if (!mounted) return;
-                  Navigator.pop(context);
-                  _loadAnniversaries(refresh: true);
-                } catch (e) {
-                  _showError('保存失败，请稍后重试');
-                }
-              },
-              child: Text(isEditing ? '保存' : '添加'),
-            ),
-          ],
-        ),
-      ),
+    await showAnniversaryEditDialog(
+      context,
+      anniversary: anniversary,
+      filterType: widget.filterType,
+      userId: _userId,
+      userNickname: _userNickname,
+      onSaved: () => _loadAnniversaries(refresh: true),
     );
   }
 

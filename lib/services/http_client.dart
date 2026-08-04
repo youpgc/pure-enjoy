@@ -8,6 +8,8 @@ import './supabase_service.dart';
 import './http_logger.dart';
 import './etag_cache.dart';
 import './http_raw.dart';
+import './retry_policy.dart';
+import './etag_strategy.dart';
 
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {
@@ -111,55 +113,46 @@ class HttpClient {
     }
 
     http.Response response;
-    if (useETag && _etagCache.contains(url)) {
-      // 有 ETag 缓存时：先尝试带 If-None-Match 请求
-      try {
-        response = await _requestWithRetry(
-          () => _client.get(uri, headers: requestHeaders),
+    try {
+      response = await requestWithRetry(
+        () => _client.get(uri, headers: requestHeaders),
+        timeout: timeout,
+        cancelToken: cancelToken,
+        logMethod: 'GET',
+        logUrl: url,
+        logParams: queryParams,
+        logNote: note,
+        onUnauthorized: _tryRefreshToken,
+      );
+    } catch (e) {
+      // ETag 请求失败：清除该条缓存，回退到普通请求（等价原行为）
+      if (useETag && _etagCache.contains(url)) {
+        if (kDebugMode) debugPrint('⚠️ ETag 请求失败，回退普通请求: $path');
+        _etagCache.remove(url);
+        response = await requestWithRetry(
+          () => _client.get(uri, headers: _mergeHeaders(headers)),
           timeout: timeout,
           cancelToken: cancelToken,
           logMethod: 'GET',
           logUrl: url,
           logParams: queryParams,
           logNote: note,
+          onUnauthorized: _tryRefreshToken,
         );
-
-        // 处理 304 Not Modified：返回缓存内容
-        if (response.statusCode == 304) {
-          final cached = _etagCache.get(url);
-          if (cached != null) {
-            if (kDebugMode) debugPrint('📦 ETag 304 缓存命中: $path');
-            return http.Response(
-              cached.body,
-              200,
-              headers: {'X-Cache': 'HIT'},
-            );
-          }
-        }
-      } catch (e) {
-        // ETag 请求失败：清除该条缓存，回退到普通请求
-        if (kDebugMode) debugPrint('⚠️ ETag 请求失败，回退普通请求: $path');
-        _etagCache.remove(url);
+      } else {
+        rethrow;
       }
     }
 
-    // 普通请求（无 ETag 或 ETag 未命中）
-    response = await _requestWithRetry(
-      () => _client.get(uri, headers: _mergeHeaders(headers)),
-      timeout: timeout,
-      cancelToken: cancelToken,
-      logMethod: 'GET',
-      logUrl: url,
-      logParams: queryParams,
-      logNote: note,
-    );
-
-    // 处理 200 OK：保存 ETag 缓存（仅当 useETag 启用时）
-    if (useETag && response.statusCode == 200) {
-      final etag = response.headers['etag'];
-      if (etag != null && etag.isNotEmpty) {
-        _etagCache.store(url, etag, response.body);
-        unawaited(_etagCache.save());
+    // 处理缓存：304 返回缓存内容；200 保存 ETag（单请求路径，无冗余）
+    if (useETag) {
+      if (response.statusCode == 304) {
+        final cached = _etagCache.get(url);
+        if (cached != null) {
+          return cachedResponseFromEtag(path, cached);
+        }
+      } else if (response.statusCode == 200) {
+        storeEtagIfPresent(_etagCache, url, response);
       }
     }
 
@@ -177,7 +170,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return _requestWithRetry(
+    return requestWithRetry(
       () => _client.post(
         uri,
         headers: _mergeHeaders(headers),
@@ -189,6 +182,7 @@ class HttpClient {
       logUrl: uri.toString(),
       logParams: body,
       logNote: note,
+      onUnauthorized: _tryRefreshToken,
     );
   }
 
@@ -203,7 +197,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return _requestWithRetry(
+    return requestWithRetry(
       () => _client.put(
         uri,
         headers: _mergeHeaders(headers),
@@ -215,6 +209,7 @@ class HttpClient {
       logUrl: uri.toString(),
       logParams: body,
       logNote: note,
+      onUnauthorized: _tryRefreshToken,
     );
   }
 
@@ -229,7 +224,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return _requestWithRetry(
+    return requestWithRetry(
       () => _client.patch(
         uri,
         headers: _mergeHeaders(headers),
@@ -241,6 +236,7 @@ class HttpClient {
       logUrl: uri.toString(),
       logParams: body,
       logNote: note,
+      onUnauthorized: _tryRefreshToken,
     );
   }
 
@@ -254,7 +250,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return _requestWithRetry(
+    return requestWithRetry(
       () => _client.delete(uri, headers: _mergeHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
@@ -262,6 +258,7 @@ class HttpClient {
       logUrl: uri.toString(),
       logParams: queryParams,
       logNote: note,
+      onUnauthorized: _tryRefreshToken,
     );
   }
 
@@ -321,7 +318,7 @@ class HttpClient {
   }) async {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
-    return _requestWithRetry(
+    return requestWithRetry(
       () => sendRawRequest(_client, method, url, headers, encodedBody),
       timeout: timeout,
       handle401: false,
@@ -329,6 +326,7 @@ class HttpClient {
       logUrl: url,
       logParams: body,
       logNote: note,
+      onUnauthorized: _tryRefreshToken,
     );
   }
 
@@ -347,134 +345,6 @@ class HttpClient {
     }
 
     return Uri.parse(url);
-  }
-
-  /// 带重试的请求执行
-  Future<http.Response> _requestWithRetry(
-    Future<http.Response> Function() request, {
-    int maxRetries = HttpClientConfig.maxRetries,
-    Duration? timeout,
-    CancelToken? cancelToken,
-    bool handle401 = true,
-    String? logMethod,
-    String? logUrl,
-    Object? logParams,
-    String? logNote,
-  }) async {
-    http.Response? response;
-    Exception? lastError;
-    final requestTimeout = timeout ?? HttpClientConfig.timeout;
-    final sw = Stopwatch()..start();
-
-    for (int attempt = 1; attempt <= maxRetries; attempt++) {
-      // 请求前检查是否已取消
-      if (cancelToken?.isCancelled == true) {
-        sw.stop();
-        logRequest(
-          method: logMethod,
-          url: logUrl,
-          params: logParams,
-          duration: sw.elapsed,
-          error: '请求已取消',
-          note: logNote,
-        );
-        throw RequestCancelledException();
-      }
-
-      try {
-        response = await request().timeout(requestTimeout);
-
-        // 响应后检查是否已取消（防止旧响应覆盖新数据）
-        if (cancelToken?.isCancelled == true) {
-          sw.stop();
-          logRequest(
-            method: logMethod,
-            url: logUrl,
-            params: logParams,
-            duration: sw.elapsed,
-            error: '请求已取消',
-            note: logNote,
-          );
-          throw RequestCancelledException();
-        }
-
-        // 处理 401：尝试刷新 Token，失败才清空
-        if (response.statusCode == 401) {
-          if (!handle401) {
-            // 调用方自行处理 401（如认证端点需返回错误响应而非抛异常）
-            sw.stop();
-            logRequest(
-              method: logMethod,
-              url: logUrl,
-              params: logParams,
-              duration: sw.elapsed,
-              statusCode: response.statusCode,
-              responseBody: response.body,
-              note: logNote,
-            );
-            return response;
-          }
-          final refreshed = await _tryRefreshToken();
-          if (refreshed) {
-            continue; // Token 已刷新，重试当前请求
-          }
-          _accessToken = null;
-          sw.stop();
-          logRequest(
-            method: logMethod,
-            url: logUrl,
-            params: logParams,
-            duration: sw.elapsed,
-            statusCode: 401,
-            error: '401 未授权',
-            note: logNote,
-          );
-          throw const HttpException('401_UNAUTHORIZED');
-        }
-
-        sw.stop();
-        logRequest(
-          method: logMethod,
-          url: logUrl,
-          params: logParams,
-          duration: sw.elapsed,
-          statusCode: response.statusCode,
-          responseBody: response.body,
-          note: logNote,
-        );
-        return response;
-      } on RequestCancelledException {
-        rethrow; // 取消异常不重试，直接抛出
-      } on SocketException catch (e) {
-        lastError = e;
-        if (attempt < maxRetries) {
-          await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
-        }
-      } on HttpException catch (e) {
-        lastError = e;
-        if (attempt < maxRetries) {
-          await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
-        }
-      } catch (e) {
-        lastError = e is Exception ? e : Exception(e.toString());
-        if (attempt < maxRetries) {
-          await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
-        }
-      }
-    }
-
-    sw.stop();
-    logRequest(
-      method: logMethod,
-      url: logUrl,
-      params: logParams,
-      duration: sw.elapsed,
-      statusCode: response?.statusCode,
-      error: lastError,
-      responseBody: response?.body,
-      note: logNote,
-    );
-    throw lastError ?? Exception('请求失败，已重试 $maxRetries 次');
   }
 
   /// 尝试刷新 Token，成功则更新 _accessToken 并返回 true
