@@ -4,6 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../utils/date_time_utils.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/feedback_model.dart';
 import './feedback_submit_screen.dart';
@@ -20,6 +21,7 @@ class FeedbackListScreen extends StatefulWidget {
 class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedListMixin {
   List<FeedbackModel> _feedbacks = [];
   bool _isLoading = true;
+  bool _isFirstLoad = true;
 
   String? get _userId => AuthService.instance.currentUserId;
 
@@ -54,8 +56,15 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
 
     if (refresh) {
       resetPagination();
+      _isFirstLoad = false;
+    } else if (_isFirstLoad) {
+      // 首次加载必须从第 1 页（offset 0）开始。beginLoadMore() 会自增 _currentPage 到 2，
+      // 使 offset=10，导致反馈 ≤10 条时首页读不到、进入页面无数据（刷新时才复位为第 1 页）。
+      resetPagination();
+      _isFirstLoad = false;
+    } else {
+      if (!beginLoadMore()) return;
     }
-    if (!refresh && !beginLoadMore()) return;
 
     try {
       final (limit, offset) = paginationParams;
@@ -135,19 +144,22 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
     return _StatusInfo(label: label, color: color);
   }
 
-  /// 格式化时间
+  /// 格式化时间（固定北京时区，与详情屏口径一致）
+  /// created_at 为 UTC，需先转北京墙钟；now 用 nowBeijing() 取北京自然日，
+  /// 否则本机时区非 UTC+8 时「今天/昨天」边界会偏移（如 UTC 模拟器偏 8 小时）。
   String _formatDate(DateTime? dateTime) {
     if (dateTime == null) return '';
-    final now = DateTime.now();
-    final diff = now.difference(dateTime).inDays;
+    final nowBj = DateTimeUtils.nowBeijing();
+    final dtBj = DateTimeUtils.toBeijingWallClock(dateTime);
+    final diff = nowBj.difference(dtBj).inDays;
     if (diff == 0) {
-      return '${dateTime.hour.toString().padLeft(2, '0')}:${dateTime.minute.toString().padLeft(2, '0')}';
+      return '${dtBj.hour.toString().padLeft(2, '0')}:${dtBj.minute.toString().padLeft(2, '0')}';
     } else if (diff == 1) {
       return '昨天';
     } else if (diff < 7) {
       return '$diff天前';
     } else {
-      return '${dateTime.month}/${dateTime.day}';
+      return '${dtBj.month}/${dtBj.day}';
     }
   }
 
