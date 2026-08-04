@@ -29,6 +29,9 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // 持久化到 SharedPreferences 的设置
   bool _autoSync = true;
   bool _wifiOnly = true;
+  // [FCM 待接入·占位开关] 推送通知总闸。
+  //   目前 App 无任何远程推送通道（pubspec 无 firebase_messaging，lib 内只有 flutter_local_notifications 本地通知），
+  //   故该开关仅为 UI 占位与用户偏好持久化，不触发任何实际逻辑。接入 FCM 后的行为见 onPushNotifChanged。
   bool _pushNotification = true;
   bool _dailyReminder = true;
   bool _anniversaryReminder = true;
@@ -36,6 +39,7 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   // SharedPreferences keys
   static const _autoSyncKey = 'setting_auto_sync';
   static const _wifiOnlyKey = 'setting_wifi_only';
+  // [FCM 待接入] 推送通知总闸 key。接入方案见 onPushNotifChanged 注释。
   static const _pushNotifKey = 'setting_push_notification';
   static const _dailyReminderKey = 'setting_daily_reminder';
   static const _anniversaryReminderKey = 'setting_anniversary_reminder';
@@ -113,6 +117,23 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           // 开关立即生效：解除/启用 WiFi 限制后立即尝试同步（非 WiFi 时按限制跳过）
           OfflineSyncService.instance.syncPending();
         },
+        // [FCM 待接入·占位逻辑] 当前仅持久化用户偏好，不触发任何推送行为（无 FCM 通道）。
+        // —— 接入方案（待实施）——
+        // 1. 依赖：pubspec.yaml 增加 `firebase_messaging`（及 `firebase_core`）；
+        //    移动端放置 google-services.json / GoogleService-Info.plist，并配置 APNs。
+        // 2. 启动初始化：在 main.dart / auth_provider 登录成功后调用
+        //    `FirebaseMessaging.instance.requestPermission()` 申请通知权限，
+        //    取 `FirebaseMessaging.instance.getToken()` 得到设备 FCM token。
+        // 3. 上报 token：将 token 写入用户表（如 users.fcm_token 或独立 user_devices 表），
+        //    并在 token 刷新 (`onTokenRefresh`) 时同步更新。
+        // 4. 服务端推送：由 Supabase Edge Function / 定时函数按目标 fcm_token 下发通知
+        //    （纯享现有习惯/待办/纪念日提醒如要上云推送，也走此链路）。
+        // 5. 消息处理：注册 `FirebaseMessaging.onMessage`（前台）与
+        //    `FirebaseMessaging.onBackgroundMessage`（后台/退出态）回调，
+        //    统一转交 flutter_local_notifications 弹出本地通知。
+        // 6. 总闸联动：本开关为总闸——关闭时调用 `FirebaseMessaging.instance.deleteToken()`
+        //    （或上报后端置 is_push_enabled=false 停止下发）；开启时重新 getToken 并上报。
+        // 注：在 1~6 落地前，本回调保持"只存不生效"，避免误导。
         onPushNotifChanged: (val) {
           setState(() => _pushNotification = val);
           _saveBoolSetting(_pushNotifKey, val);

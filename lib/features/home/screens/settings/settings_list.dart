@@ -89,6 +89,9 @@ class SettingsList extends StatelessWidget {
 
         // 通知设置
         const SectionHeader(title: '通知设置'),
+        // [FCM 待接入·占位开关] 当前为 UI 占位与偏好持久化，无远程推送通道故不触发实际逻辑。
+        // 接入方案见 settings_screen.dart 的 onPushNotifChanged 注释（依赖 firebase_messaging /
+        // 启动 getToken 上报 / 服务端按 fcm_token 下发 / onMessage 转本地通知 / 总闸 deleteToken）。
         SwitchListTile(
           secondary: const Icon(Icons.notifications_outlined),
           title: const Text('推送通知'),
