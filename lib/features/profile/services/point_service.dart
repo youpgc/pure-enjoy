@@ -7,6 +7,7 @@ import './point_cache.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../models/point_record_model.dart';
+import '../../../core/utils/event_bus.dart';
 
 /// 积分服务
 ///
@@ -142,6 +143,7 @@ class PointService {
         return {'success': false, 'message': '签到失败: ${insertResult.error}'};
       }
 
+      EventBus.instance.fire(EventType.pointsUpdated);
       // 5-7（非关键）：回写展示字段 + 重算积分 + 刷新缓存，全部异步，不阻塞返回
       _fireAndForget(_updateUserStats(
         consecutiveCheckinDays: streak,
@@ -318,6 +320,7 @@ class PointService {
       'created_at': now.toIso8601String(),
       if (expiresAt != null) 'expires_at': expiresAt,
     });
+    EventBus.instance.fire(EventType.pointsUpdated);
 
     // 重算 users 表积分统计字段
     await _recalcAndUpdateUserPoints();

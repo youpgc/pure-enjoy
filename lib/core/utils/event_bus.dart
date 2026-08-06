@@ -62,6 +62,15 @@ enum EventType {
   /// 提醒事项更新
   reminderUpdated,
 
-  /// 书架更新
-  bookshelfUpdated,
+  /// 纪念日更新
+  anniversaryUpdated,
+
+  /// 收藏更新
+  favoritesUpdated,
+
+  /// 反馈更新
+  feedbackUpdated,
+
+  /// 积分更新
+  pointsUpdated,
 }

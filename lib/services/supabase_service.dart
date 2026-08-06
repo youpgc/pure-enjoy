@@ -10,7 +10,6 @@ import './auth_api.dart';
 import './api_client.dart';
 import './http_client.dart';
 import '../utils/cache_helper.dart';
-import './chapter_cache_service.dart';
 import './notification_service.dart';
 import 'package:flutter/foundation.dart';
 import 'dart:convert';
@@ -206,13 +205,6 @@ class AuthService {
     // 切换账号前清除本地缓存数据，防止旧账号数据残留
     try {
       await CacheHelper.instance.clearAllUserData();
-    } catch (e) {
-      if (kDebugMode) {
-        debugPrint('清理缓存失败: $e');
-      }
-    }
-    try {
-      await ChapterCacheService.instance.clearAllCache();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('清理缓存失败: $e');

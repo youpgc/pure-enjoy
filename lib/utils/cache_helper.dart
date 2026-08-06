@@ -10,8 +10,6 @@ class CacheHelper {
   static CacheHelper get instance => _instance;
 
   /// 缓存键名常量
-  static const String keyBookshelf = 'cache_bookshelf';
-  static const String keyNovelList = 'cache_novel_list';
   static const String keyDiaries = 'cache_diaries';
   static const String keyExpenses = 'cache_expenses';
   static const String keyWeightRecords = 'cache_weight_records';
@@ -72,8 +70,6 @@ class CacheHelper {
   Future<void> clearAllUserData() async {
     final prefs = await SharedPreferences.getInstance();
     final keysToRemove = [
-      keyBookshelf,
-      keyNovelList,
       keyDiaries,
       keyExpenses,
       keyWeightRecords,

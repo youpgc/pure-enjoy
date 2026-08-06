@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import 'package:cached_network_image/cached_network_image.dart';
 
 /// 分类筛选标签
 class CategoryChip extends StatelessWidget {
@@ -24,48 +23,6 @@ class CategoryChip extends StatelessWidget {
         onSelected: (_) => onTap(),
       ),
     );
-  }
-}
-
-/// 小说封面图片组件
-class NovelCoverImage extends StatelessWidget {
-  final String? coverUrl;
-  final double width;
-  final double height;
-
-  const NovelCoverImage({
-    super.key,
-    this.coverUrl,
-    this.width = 80,
-    this.height = 110,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final placeholder = Container(
-      color: colorScheme.surfaceContainerHighest,
-      child: Icon(
-        Icons.book,
-        size: 32,
-        color: colorScheme.onSurfaceVariant,
-      ),
-    );
-
-    if (coverUrl != null && coverUrl!.isNotEmpty) {
-      return ClipRRect(
-        borderRadius: BorderRadius.circular(4),
-        child: CachedNetworkImage(
-          imageUrl: coverUrl!,
-          width: width,
-          height: height,
-          fit: BoxFit.cover,
-          placeholder: (context, url) => placeholder,
-          errorWidget: (_, __, ___) => placeholder,
-        ),
-      );
-    }
-    return placeholder;
   }
 }
 

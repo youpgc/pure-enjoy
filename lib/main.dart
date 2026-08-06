@@ -16,7 +16,6 @@ import './services/error_reporter.dart';
 import './services/dict_service.dart';
 import './services/notification_service.dart';
 import './services/offline_sync_service.dart';
-import './services/chapter_cache_service.dart';
 import './features/home/screens/notification_center_screen.dart';
 import './features/life/screens/habits_screen.dart';
 import './features/life/screens/reminders_screen.dart';
@@ -95,13 +94,6 @@ void _lazyInitializeServices() {
   OfflineSyncService.instance.initialize().catchError((e) {
     if (kDebugMode) {
       debugPrint('离线同步服务初始化失败');
-    }
-  });
-
-  // 章节缓存服务：加载缓存索引（修复 Bug: initialize 从未被调用）
-  ChapterCacheService.instance.initialize().catchError((e) {
-    if (kDebugMode) {
-      debugPrint('章节缓存服务初始化失败');
     }
   });
 }

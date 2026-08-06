@@ -6,6 +6,7 @@ import '../../../../services/api_client.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../../utils/cache_helper.dart';
 import '../../../../core/widgets/widgets.dart';
+import '../../../../core/utils/event_bus.dart';
 import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/common_widgets.dart';
 import '../../../../services/dict_service.dart';
@@ -77,6 +78,7 @@ class _FavoritesScreenState extends State<FavoritesScreen> with _FavoritesScreen
 
         if (result.isSuccess) {
           _loadFavorites(refresh: true);
+          EventBus.instance.fire(EventType.favoritesUpdated);
           if (mounted) {
             showSnackBar(context, '删除成功');
           }

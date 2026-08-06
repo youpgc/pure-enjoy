@@ -11,6 +11,7 @@ import '../widgets/app_date_picker.dart';
 import '../screens/anniversary_helpers.dart';
 import '../screens/anniversary_lunar_picker.dart';
 import '../helpers/anniversary_cache_helper.dart';
+import '../../../core/utils/event_bus.dart';
 
 /// 纪念日/生日 新增/编辑表单 Dialog。
 /// 从 [AnniversariesScreen._showEditDialog] 抽离（治理 §1.5.5 膨胀防御）。
@@ -261,6 +262,7 @@ Future<void> showAnniversaryEditDialog(
 
                 if (!context.mounted) return;
                 Navigator.pop(context);
+                EventBus.instance.fire(EventType.anniversaryUpdated);
                 onSaved();
               } catch (e) {
                 showSnackBar(context, '保存失败，请稍后重试', isError: true);

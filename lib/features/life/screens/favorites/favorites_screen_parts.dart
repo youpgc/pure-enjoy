@@ -252,6 +252,7 @@ mixin _FavoritesScreenDialogMixin on State<FavoritesScreen> {
                       throw Exception('HTTP ${result.statusCode}: ${result.errorMessage}');
                     }
                   }
+                  EventBus.instance.fire(EventType.favoritesUpdated);
                   if (!mounted) return;
                   Navigator.pop(context);
                   _loadFavorites(refresh: true);

@@ -4,7 +4,6 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../services/api_client.dart';
-import '../../../../services/chapter_cache_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/notification_service.dart';
 import '../../../../services/offline_sync_service.dart';
@@ -207,11 +206,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
       ).toList();
       await Future.wait(keysToRemove.map((key) => prefs.remove(key)));
 
-      // 清除章节缓存文件（Bug 9 修复：之前只清除了索引，磁盘文件未被删除）
-      final chapterCacheCount = await ChapterCacheService.instance.clearAllCache();
-
       if (mounted) {
-        showSnackBar(context, '缓存已清除（${keysToRemove.length}项 + $chapterCacheCount个章节文件）');
+        showSnackBar(context, '缓存已清除（${keysToRemove.length}项）');
       }
     } catch (e) {
       if (mounted) {

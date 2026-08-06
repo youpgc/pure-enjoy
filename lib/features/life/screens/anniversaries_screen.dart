@@ -2,12 +2,13 @@ import 'package:flutter/material.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
+import '../../../core/utils/event_bus.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/widgets/paginated_list_mixin.dart';
 import '../models/anniversary_model.dart';
 import '../widgets/anniversary_card.dart';
 import '../widgets/anniversary_edit_dialog.dart';
-import '../helpers/anniversary_cache_helper.dart';
+import '../../../utils/cache_helper.dart';
 import './anniversary_helpers.dart';
 
 /// 纪念日/生日列表页面 - Supabase 数据同步
@@ -68,7 +69,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
     // 1. 先加载本地缓存（仅 refresh 时）
     if (refresh) {
-      final cachedData = await loadAnniversaryCache(_cacheKey);
+      final cachedData = await CacheHelper.instance.loadList(_cacheKey);
       if (cachedData.isNotEmpty && mounted) {
         setState(() {
           _anniversaries =
@@ -104,7 +105,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
 
       // 保存缓存（只保存当前用户、当前类型的数据，仅 refresh 时）
       if (refresh) {
-        await saveAnniversaryCache(_cacheKey, data);
+        await CacheHelper.instance.saveList(_cacheKey, data);
       }
 
       if (mounted) {
@@ -161,6 +162,7 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
         if (result.isSuccess) {
           // 删除后取消对应的本地横幅提醒
           NotificationService.instance.cancelAnniversaryReminder(id);
+          EventBus.instance.fire(EventType.anniversaryUpdated);
           _loadAnniversaries(refresh: true);
           if (mounted) {
             showSnackBar(context, '删除成功');

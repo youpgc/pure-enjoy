@@ -4,6 +4,7 @@ import '../../../services/supabase_service.dart';
 import '../../../services/sensitive_word_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../core/utils/event_bus.dart';
 
 /// 提交问题反馈页面
 class FeedbackSubmitScreen extends StatefulWidget {
@@ -84,6 +85,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       );
 
       if (result.isSuccess) {
+        EventBus.instance.fire(EventType.feedbackUpdated);
         if (mounted) {
           showSnackBar(context, '反馈提交成功');
           Navigator.pop(context);

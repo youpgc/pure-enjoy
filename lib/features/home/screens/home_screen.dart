@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/version_check_service.dart';
 import '../../life/screens/life/life_screen.dart';
-// import '../../novel/screens/book_shelf/book_shelf_screen.dart'; // [小说模块暂时停用]
 import './dashboard/dashboard_page.dart';
 import './profile/profile_page.dart';
 
@@ -22,7 +21,6 @@ class _HomeScreenState extends State<HomeScreen> {
     const DashboardPage(), // 首页为默认 landing，开屏即构建
     const SizedBox.shrink(),
     const SizedBox.shrink(),
-    // [小说模块暂时停用] 原 index 2 = BookShelfScreen（书架），入口已隐藏
   ];
 
   /// 按索引创建对应 tab 页（仅首次进入时调用，构造即触发该页 initState 发起请求）
@@ -32,7 +30,6 @@ class _HomeScreenState extends State<HomeScreen> {
         return const DashboardPage();
       case 1:
         return const LifeScreen();
-      // [小说模块暂时停用] case 2: return const BookShelfScreen();
       case 2:
         return const ProfilePage();
       default:
@@ -84,12 +81,6 @@ class _HomeScreenState extends State<HomeScreen> {
             selectedIcon: Icon(Icons.favorite),
             label: '生活',
           ),
-          // [小说模块暂时停用] 书架 tab 入口隐藏
-          // NavigationDestination(
-          //   icon: Icon(Icons.book_outlined),
-          //   selectedIcon: Icon(Icons.book),
-          //   label: '书架',
-          // ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
