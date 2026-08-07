@@ -4,6 +4,7 @@ import '../../../services/dict_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/expense_model.dart';
 import './app_date_picker.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 支出表单组件（底部弹窗用）
 class ExpenseForm extends StatefulWidget {
@@ -29,7 +30,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
   late final TextEditingController _noteController;
   String _selectedCategoryCode = '';
   late DateTime _selectedDate;
-  bool _isSaving = false;
 
   bool get _isEditing => widget.expense != null;
 
@@ -81,11 +81,8 @@ class _ExpenseFormState extends State<ExpenseForm> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    try {
-      final newExpense = ExpenseModel(
+    final newExpense = ExpenseModel(
         id: _isEditing ? widget.expense!.id : const Uuid().v4(),
         userId: _isEditing ? widget.expense!.userId : widget.userId,
         amount: double.parse(_amountController.text),
@@ -96,11 +93,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
       );
 
       widget.onSave(newExpense);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -195,10 +187,7 @@ class _ExpenseFormState extends State<ExpenseForm> {
             ),
             const SizedBox(height: 16),
 
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: const Text('保存'),
-            ),
+            AsyncSubmitButton(label: '保存', onPressed: _save),
           ],
         ),
       ),

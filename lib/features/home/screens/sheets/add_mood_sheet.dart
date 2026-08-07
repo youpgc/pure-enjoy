@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/widgets/widgets.dart';
 import '../../../../services/dict_service.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../life/models/mood_diary_model.dart';
@@ -24,7 +25,6 @@ class AddMoodSheetState extends State<AddMoodSheet> {
   String _selectedMoodCode = '';
   DateTime _selectedDate = DateTime.now();
   bool _isDictLoading = true;
-  bool _isSaving = false;
 
   /// 获取心情选项列表（从字典服务）
   List<String> get _moodCodes {
@@ -69,10 +69,7 @@ class AddMoodSheetState extends State<AddMoodSheet> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
-    setState(() => _isSaving = true);
-    try {
-      final diary = MoodDiaryModel(
+    final diary = MoodDiaryModel(
         id: const Uuid().v4(),
         userId: AuthService.instance.currentUserId ?? 'local_user',
         mood: _selectedMoodCode,
@@ -82,11 +79,6 @@ class AddMoodSheetState extends State<AddMoodSheet> {
       );
 
       widget.onSave(diary);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -157,7 +149,7 @@ class AddMoodSheetState extends State<AddMoodSheet> {
             },
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
+          AsyncSubmitButton(label: '保存', onPressed: _save),
         ],
       ),
     );

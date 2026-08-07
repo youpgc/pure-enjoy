@@ -24,7 +24,6 @@ class AddHabitSheetState extends State<AddHabitSheet> {
   final _descController = TextEditingController();
   final _targetDaysController = TextEditingController(text: '21');
   ReminderScheduleModel? _reminderSchedule;
-  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -35,14 +34,11 @@ class AddHabitSheetState extends State<AddHabitSheet> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
     if (_nameController.text.trim().isEmpty) {
       showSnackBar(context, '请输入习惯名称');
       return;
     }
-    setState(() => _isSaving = true);
-    try {
-      final targetDays = int.tryParse(_targetDaysController.text) ?? 21;
+    final targetDays = int.tryParse(_targetDaysController.text) ?? 21;
 
       final habit = HabitModel(
         id: const Uuid().v4(),
@@ -54,11 +50,6 @@ class AddHabitSheetState extends State<AddHabitSheet> {
       );
 
       widget.onSave(habit, _reminderSchedule);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -109,7 +100,7 @@ class AddHabitSheetState extends State<AddHabitSheet> {
               onChanged: (schedule) => setState(() => _reminderSchedule = schedule),
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
+            AsyncSubmitButton(label: '保存', onPressed: _save),
           ],
         ),
       ),

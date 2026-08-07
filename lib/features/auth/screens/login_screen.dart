@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../home/screens/home_screen.dart';
 import '../auth_provider.dart';
 /// 登录页面
@@ -149,31 +150,13 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
                       _buildLoginForm(colorScheme),
                       const SizedBox(height: 24),
                       // 登录按钮
-                      FilledButton(
-                        onPressed: _isLoading ? null : _submitLogin,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('登录'),
-                      ),
+                      AsyncSubmitButton(label: '登录', onPressed: _submitLogin),
                     ] else ...[
                       // 注册表单
                       _buildRegisterForm(colorScheme),
                       const SizedBox(height: 24),
                       // 注册按钮
-                      FilledButton(
-                        onPressed: _isLoading ? null : _submitRegister,
-                        child: _isLoading
-                            ? const SizedBox(
-                                height: 20,
-                                width: 20,
-                                child: CircularProgressIndicator(strokeWidth: 2),
-                              )
-                            : const Text('注册'),
-                      ),
+                      AsyncSubmitButton(label: '注册', onPressed: _submitRegister),
                     ],
                     const SizedBox(height: 16),
                     // 切换登录/注册

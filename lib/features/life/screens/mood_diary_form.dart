@@ -24,7 +24,6 @@ class DiaryFormState extends State<DiaryForm> {
   late String _selectedMoodCode;
   late DateTime _selectedDate;
   bool _isDictLoading = true;
-  bool _isSaving = false;
 
   bool get _isEditing => widget.diary != null;
 
@@ -79,10 +78,7 @@ class DiaryFormState extends State<DiaryForm> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
-    setState(() => _isSaving = true);
-    try {
-      final newDiary = MoodDiaryModel(
+    final newDiary = MoodDiaryModel(
         id: _isEditing ? widget.diary!.id : const Uuid().v4(),
         userId: _isEditing ? widget.diary!.userId : widget.userId,
         mood: _selectedMoodCode,
@@ -92,11 +88,6 @@ class DiaryFormState extends State<DiaryForm> {
       );
 
       widget.onSave(newDiary);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -180,10 +171,7 @@ class DiaryFormState extends State<DiaryForm> {
           ),
           const SizedBox(height: 16),
 
-          FilledButton(
-            onPressed: _isSaving ? null : _save,
-            child: const Text('保存'),
-          ),
+          AsyncSubmitButton(label: '保存', onPressed: _save),
         ],
       ),
     );

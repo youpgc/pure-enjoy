@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 
+import '../../../../core/widgets/widgets.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../life/models/reminder_model.dart';
 import '../../../life/models/remind_offset.dart';
@@ -27,7 +28,6 @@ class AddReminderSheetState extends State<AddReminderSheet> {
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
   bool _remindEnabled = false;
   List<RemindOffset> _remindOffsets = [];
-  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -37,11 +37,8 @@ class AddReminderSheetState extends State<AddReminderSheet> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    try {
-      final reminder = ReminderModel(
+    final reminder = ReminderModel(
         id: const Uuid().v4(),
         userId: AuthService.instance.currentUserId ?? 'local_user',
         title: _titleController.text,
@@ -52,11 +49,6 @@ class AddReminderSheetState extends State<AddReminderSheet> {
       );
 
       widget.onSave(reminder);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -137,7 +129,7 @@ class AddReminderSheetState extends State<AddReminderSheet> {
               },
             ),
             const SizedBox(height: 16),
-            FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
+            AsyncSubmitButton(label: '保存', onPressed: _save),
           ],
         ),
       ),

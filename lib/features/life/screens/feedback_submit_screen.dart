@@ -19,7 +19,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
   final _titleController = TextEditingController();
   final _descController = TextEditingController();
   String _category = 'bug'; // 默认分类
-  bool _isSubmitting = false;
   bool _isDictLoading = true;
 
   @override
@@ -44,7 +43,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
 
   /// 提交反馈
   Future<void> _submitFeedback() async {
-    if (_isSubmitting) return;
     if (!_formKey.currentState!.validate()) return;
 
     final userId = AuthService.instance.currentUserId;
@@ -66,8 +64,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
       }
       return;
     }
-
-    setState(() => _isSubmitting = true);
 
     try {
       final result = await ApiClient.post(
@@ -96,10 +92,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     } catch (e) {
       if (mounted) {
         showSnackBar(context, '提交失败，请稍后重试', isError: true);
-      }
-    } finally {
-      if (mounted) {
-        setState(() => _isSubmitting = false);
       }
     }
   }
@@ -169,22 +161,7 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
               const SizedBox(height: 32),
 
               // 提交按钮
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: _isSubmitting ? null : _submitFeedback,
-                  child: _isSubmitting
-                      ? const SizedBox(
-                          width: 20,
-                          height: 20,
-                          child: CircularProgressIndicator(
-                            strokeWidth: 2,
-                            color: Colors.white,
-                          ),
-                        )
-                      : const Text('提交反馈'),
-                ),
-              ),
+              AsyncSubmitButton(label: '提交反馈', onPressed: _submitFeedback),
             ],
           ),
         ),

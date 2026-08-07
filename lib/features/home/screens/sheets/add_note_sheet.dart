@@ -21,7 +21,6 @@ class AddNoteSheetState extends State<AddNoteSheet> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _categoryController = TextEditingController();
-  bool _isSaving = false;
 
   @override
   void dispose() {
@@ -32,14 +31,11 @@ class AddNoteSheetState extends State<AddNoteSheet> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
     if (_titleController.text.isEmpty) {
       showSnackBar(context, '请输入标题');
       return;
     }
-    setState(() => _isSaving = true);
-    try {
-      final note = NoteModel(
+    final note = NoteModel(
         id: const Uuid().v4(),
         userId: AuthService.instance.currentUserId ?? 'local_user',
         title: _titleController.text,
@@ -48,11 +44,6 @@ class AddNoteSheetState extends State<AddNoteSheet> {
       );
 
       widget.onSave(note);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -95,7 +86,7 @@ class AddNoteSheetState extends State<AddNoteSheet> {
             ),
           ),
           const SizedBox(height: 16),
-          FilledButton(onPressed: _isSaving ? null : _save, child: const Text('保存')),
+          AsyncSubmitButton(label: '保存', onPressed: _save),
         ],
       ),
     );

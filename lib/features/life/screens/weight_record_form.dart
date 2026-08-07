@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
+import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
 import '../../../utils/date_time_utils.dart';
@@ -26,7 +27,6 @@ class RecordFormState extends State<RecordForm> {
   late final TextEditingController _bmiController;
   late final TextEditingController _noteController;
   late DateTime _selectedDate;
-  bool _isSaving = false;
 
   /// 用户身高（cm），用于自动计算 BMI/体脂率
   double? _userHeight;
@@ -139,11 +139,8 @@ class RecordFormState extends State<RecordForm> {
   }
 
   Future<void> _save() async {
-    if (_isSaving) return;
     if (!_formKey.currentState!.validate()) return;
-    setState(() => _isSaving = true);
-    try {
-      final newRecord = WeightRecordModel(
+    final newRecord = WeightRecordModel(
         id: _isEditing ? widget.record!.id : const Uuid().v4(),
         userId: _isEditing ? widget.record!.userId : widget.userId,
         weight: double.parse(_weightController.text),
@@ -156,11 +153,6 @@ class RecordFormState extends State<RecordForm> {
       );
 
       widget.onSave(newRecord);
-    } finally {
-      if (mounted) {
-        setState(() => _isSaving = false);
-      }
-    }
   }
 
   @override
@@ -247,10 +239,7 @@ class RecordFormState extends State<RecordForm> {
             ),
             const SizedBox(height: 16),
 
-            FilledButton(
-              onPressed: _isSaving ? null : _save,
-              child: const Text('保存'),
-            ),
+            AsyncSubmitButton(label: '保存', onPressed: _save),
           ],
         ),
       ),
