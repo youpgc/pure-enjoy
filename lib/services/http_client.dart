@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
+import 'package:connectivity_plus/connectivity_plus.dart';
 import './cancel_token.dart';
 import './supabase_service.dart';
 import './etag_cache.dart';
@@ -9,9 +10,17 @@ import './http_raw.dart';
 import './retry_policy.dart';
 import './etag_strategy.dart';
 
+/// 离线异常：设备无可用网络接口（飞行模式 / 真无网）。
+/// 由 [_assertOnline] 抛出，页面层可作为「网络已断开」友好提示。
+class NetworkOfflineException implements Exception {
+  const NetworkOfflineException();
+  @override
+  String toString() => '网络连接已断开，请检查网络设置';
+}
+
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {
-  static const int maxRetries = 3;
+  static const int maxRetries = 2;
   static const Duration timeout = Duration(seconds: 30);
 
   static String get baseUrl => SupabaseConfig.url;
@@ -21,8 +30,8 @@ class HttpClientConfig {
 
 /// 请求超时时间预设
 class RequestTimeout {
-  static const Duration list = Duration(seconds: 30);
-  static const Duration simple = Duration(seconds: 15);
+  static const Duration list = Duration(seconds: 20);
+  static const Duration simple = Duration(seconds: 10);
   static const Duration file = Duration(seconds: 60);
 }
 
@@ -65,6 +74,52 @@ class HttpClient {
   /// 清空 ETag 缓存（内存 + 持久化）
   /// 切换账号时调用：避免命中 304 后向新用户返回旧用户的缓存响应体
   Future<void> clearEtagCache() async => _etagCache.clear();
+
+  /// 带离线短路的统一重试入口（封装 [requestWithRetry] + 离线预检）。
+  /// 所有公开 HTTP 方法经此发出请求：发请求前先确认存在可用网络接口，
+  /// 避免真无网/飞行模式时烧满重试预算才失败（秒级快速失败而非数十秒冻结）。
+  Future<http.Response> _request(
+    Future<http.Response> Function() request, {
+    Duration? timeout,
+    CancelToken? cancelToken,
+    bool handle401 = true,
+    String? logMethod,
+    String? logUrl,
+    Object? logParams,
+    String? logNote,
+    required Future<bool> Function() onUnauthorized,
+  }) async {
+    await _assertOnline();
+    return requestWithRetry(
+      request,
+      timeout: timeout,
+      cancelToken: cancelToken,
+      handle401: handle401,
+      logMethod: logMethod,
+      logUrl: logUrl,
+      logParams: logParams,
+      logNote: logNote,
+      onUnauthorized: onUnauthorized,
+    );
+  }
+
+  /// 离线短路预检：发请求前确认存在可用网络接口。
+  /// connectivity_plus 仅判断「是否有网络接口」，无法判定「能否真正连通外网」，
+  /// 故弱网 / 跨境丢包仍依赖 [requestWithRetry] 的总耗时预算兜底；
+  /// 此处只拦截「真无网 / 飞行模式」场景，使其秒级失败而非烧满预算。
+  /// 插件不可用（权限缺失 / 平台异常）时不拦截正常请求。
+  Future<void> _assertOnline() async {
+    try {
+      final result = await Connectivity().checkConnectivity();
+      if (result == ConnectivityResult.none) {
+        throw const NetworkOfflineException();
+      }
+    } on NetworkOfflineException {
+      rethrow;
+    } catch (_) {
+      // 插件异常不阻断请求（如权限缺失、平台不支持）
+    }
+  }
 
   /// 获取认证头
   /// 已登录时返回 JWT 头，未登录时返回 Anon Key
@@ -123,7 +178,7 @@ class HttpClient {
 
     http.Response response;
     try {
-      response = await requestWithRetry(
+      response = await _request(
         () => _client.get(
           uri,
           headers: _buildRequestHeaders(headers, etagUrl: useETag ? url : null),
@@ -141,7 +196,7 @@ class HttpClient {
       if (useETag && _etagCache.contains(url)) {
         if (kDebugMode) debugPrint('⚠️ ETag 请求失败，回退普通请求: $path');
         _etagCache.remove(url);
-        response = await requestWithRetry(
+        response = await _request(
           () => _client.get(uri, headers: _buildRequestHeaders(headers)),
           timeout: timeout,
           cancelToken: cancelToken,
@@ -182,7 +237,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return requestWithRetry(
+    return _request(
       () => _client.post(
         uri,
         headers: _buildRequestHeaders(headers),
@@ -209,7 +264,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return requestWithRetry(
+    return _request(
       () => _client.put(
         uri,
         headers: _buildRequestHeaders(headers),
@@ -236,7 +291,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return requestWithRetry(
+    return _request(
       () => _client.patch(
         uri,
         headers: _buildRequestHeaders(headers),
@@ -262,7 +317,7 @@ class HttpClient {
     String? note,
   }) async {
     final uri = _buildUri(path, queryParams);
-    return requestWithRetry(
+    return _request(
       () => _client.delete(uri, headers: _buildRequestHeaders(headers)),
       timeout: timeout,
       cancelToken: cancelToken,
@@ -330,7 +385,7 @@ class HttpClient {
   }) async {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
-    return requestWithRetry(
+    return _request(
       () => sendRawRequest(_client, method, url, headers, encodedBody),
       timeout: timeout,
       handle401: false,
