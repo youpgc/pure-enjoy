@@ -182,7 +182,7 @@ class _ExpenseListItem extends StatelessWidget {
           overflow: TextOverflow.ellipsis,
         ),
         subtitle: Text(
-          DateTimeUtils.formatDate(displayDate),
+          DateTimeUtils.formatStandard(displayDate),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
