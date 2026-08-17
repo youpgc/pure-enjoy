@@ -144,11 +144,11 @@ class _ExpenseFormState extends State<ExpenseForm> {
             ),
             const SizedBox(height: 16),
 
-            // 描述
+            // 备注
             TextFormField(
               controller: _descriptionController,
               decoration: const InputDecoration(
-                labelText: '描述（可选）',
+                labelText: '备注（可选）',
               ),
             ),
             const SizedBox(height: 16),
