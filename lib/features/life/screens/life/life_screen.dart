@@ -221,7 +221,7 @@ class _LifeScreenState extends State<LifeScreen> {
                       return '$categoryLabel ${_latestExpense!['amount'] ?? ''}';
                     }()
                   : null,
-              description: _latestExpense?['note'] as String?,
+              description: _latestExpense?['description'] as String?,
               date: _formatDate(_latestExpense?['created_at'] as String?),
               onTap: () {
                 Navigator.push(

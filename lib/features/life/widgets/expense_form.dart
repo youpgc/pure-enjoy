@@ -27,7 +27,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _descriptionController;
-  late final TextEditingController _noteController;
   String _selectedCategoryCode = '';
   late DateTime _selectedDate;
 
@@ -47,9 +46,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
     );
     _descriptionController = TextEditingController(
       text: expense?.description ?? '',
-    );
-    _noteController = TextEditingController(
-      text: expense?.note ?? '',
     );
     _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode('expense_category');
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
@@ -76,7 +72,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
     _amountController.dispose();
     _descriptionController.dispose();
-    _noteController.dispose();
     super.dispose();
   }
 
@@ -88,7 +83,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
         amount: double.parse(_amountController.text),
         category: _selectedCategoryCode,
         description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
-        note: _noteController.text.isEmpty ? null : _noteController.text,
         date: _selectedDate,
       );
 
@@ -155,15 +149,6 @@ class _ExpenseFormState extends State<ExpenseForm> {
               controller: _descriptionController,
               decoration: const InputDecoration(
                 labelText: '描述（可选）',
-              ),
-            ),
-            const SizedBox(height: 16),
-
-            // 备注
-            TextFormField(
-              controller: _noteController,
-              decoration: const InputDecoration(
-                labelText: '备注（可选）',
               ),
             ),
             const SizedBox(height: 16),

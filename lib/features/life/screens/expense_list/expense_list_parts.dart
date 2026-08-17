@@ -176,9 +176,13 @@ class _ExpenseListItem extends StatelessWidget {
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
         leading: const Icon(Icons.receipt),
-        title: Text(categoryLabel),
+        title: Text(
+          '$categoryLabel${expense.description != null && expense.description!.isNotEmpty ? ' · ${expense.description}' : ''}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
         subtitle: Text(
-          '${DateTimeUtils.formatStandard(displayDate)}${expense.description != null ? ' - ${expense.description}' : ''}',
+          DateTimeUtils.formatDate(displayDate),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
@@ -315,7 +319,6 @@ mixin _ExpenseListActionsMixin on _ExpenseListActionsHost {
         'amount': expense.amount,
         'category': expense.category,
         'description': expense.description,
-        'note': expense.note,
         'date': expense.date.toIso8601String().split('T').first,
       };
       final result = await ApiClient.patchByFilter(
@@ -347,7 +350,6 @@ mixin _ExpenseListActionsMixin on _ExpenseListActionsHost {
         'amount': expense.amount,
         'category': expense.category,
         'description': expense.description,
-        'note': expense.note,
         'date': expense.date.toIso8601String().split('T').first,
       };
       await OfflineSyncService.instance.enqueue(
