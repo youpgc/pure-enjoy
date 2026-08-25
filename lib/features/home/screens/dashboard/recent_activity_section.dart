@@ -3,7 +3,7 @@ import '../../widgets/activity_item.dart';
 
 /// 最近活动区块组件
 ///
-/// 展示用户最近的心情日记、支出记录和体重记录。
+/// 仅展示用户最近的心情日记。
 class RecentActivitySection extends StatefulWidget {
   final bool isLoading;
   final List<Map<String, dynamic>> activities;

@@ -6,6 +6,7 @@ import 'package:uuid/uuid.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../services/api_client.dart';
 import '../../../../services/notification_service.dart';
+import '../../../../core/utils/event_bus.dart';
 import './dashboard_helpers.dart';
 import '../sheets/sheets.dart';
 import '../sheets/tool_config_sheet.dart';
@@ -62,7 +63,11 @@ void dashboardHandleToolTap(
           'mood_diaries',
           diary.toJson(),
           '日记添加成功',
-          onSuccess: reloadActivities,
+          onSuccess: () {
+            reloadActivities();
+            // 写日记完成同步首页最近活动（dashboard 监听 moodDiaryUpdated 以 force 重拉）
+            EventBus.instance.fire(EventType.moodDiaryUpdated);
+          },
         ),
       );
       break;

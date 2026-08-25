@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../../services/dict_service.dart';
 import '../../../life/models/habit_model.dart';
 import './dashboard_helpers.dart';
 
@@ -9,33 +8,6 @@ Map<String, dynamic> buildDiaryActivity(Map<String, dynamic> item) {
     'icon': Icons.edit_note,
     'title': '心情日记',
     'subtitle': item['content'] ?? item['mood']?.toString() ?? '记录了一条心情',
-    'time': formatDashboardDisplayDate(item['created_at'], item['date']),
-    'created_at_raw': item['created_at'] as String? ?? '',
-  };
-}
-
-/// 由支出记录构建最近活动条目
-Map<String, dynamic> buildExpenseActivity(Map<String, dynamic> item) {
-  final categoryLabel = DictService.instance.getLabelOrDefault(
-    'expense_category',
-    item['category'] as String? ?? '',
-    defaultValue: item['category'] as String? ?? '其他',
-  );
-  return {
-    'icon': Icons.attach_money,
-    'title': '支出记录',
-    'subtitle': '$categoryLabel ¥${item['amount'] ?? 0}',
-    'time': formatDashboardDisplayDate(item['created_at'], item['date']),
-    'created_at_raw': item['created_at'] as String? ?? '',
-  };
-}
-
-/// 由体重记录构建最近活动条目
-Map<String, dynamic> buildWeightActivity(Map<String, dynamic> item) {
-  return {
-    'icon': Icons.monitor_weight,
-    'title': '体重记录',
-    'subtitle': '${item['weight'] ?? 0} kg',
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };

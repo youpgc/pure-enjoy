@@ -178,33 +178,17 @@ mixin _DashboardLogic on State<DashboardPage> {
     // fetcher 只缓存原始 plain JSON（Supabase 返回），不缓存 IconData 等非序列化对象；
     // 读取时再 buildXxxActivity 生成含图标的渲染条目。否则 jsonEncode 缓存会抛异常。
     Future<ApiResponse> fetcher() async {
-      final futures = [
-        ApiClient.get('expenses',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'category,amount,created_at,date',
-            order: 'created_at.desc',
-            limit: 1),
-        ApiClient.get('mood_diaries',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'content,mood,created_at,date',
-            order: 'created_at.desc',
-            limit: 1),
-        ApiClient.get('weight_records',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'weight,created_at,date',
-            order: 'created_at.desc',
-            limit: 1),
-      ];
-      final results = await Future.wait(futures);
+      // 最近活动仅展示心情日记：只拉取 mood_diaries 最新一条
+      final result = await ApiClient.get('mood_diaries',
+          filters: {'user_id': 'eq.$userId'},
+          select: 'content,mood,created_at,date',
+          order: 'created_at.desc',
+          limit: 1);
       final raw = <Map<String, dynamic>>[];
-      const sources = ['expense', 'mood', 'weight'];
-      for (var i = 0; i < results.length; i++) {
-        final r = results[i];
-        if (r.isSuccess && r.data != null && r.data!.isNotEmpty) {
-          final item = Map<String, dynamic>.from(r.data![0]);
-          item['__source'] = sources[i];
-          raw.add(item);
-        }
+      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+        final item = Map<String, dynamic>.from(result.data![0]);
+        item['__source'] = 'mood';
+        raw.add(item);
       }
       return ApiResponse.success(raw);
     }
@@ -219,15 +203,7 @@ mixin _DashboardLogic on State<DashboardPage> {
       if (!mounted) return;
       final activities = <Map<String, dynamic>>[];
       for (final r in rows) {
-        final source = r['__source'] as String?;
-        final item = Map<String, dynamic>.from(r)..remove('__source');
-        if (source == 'mood') {
-          activities.add(buildDiaryActivity(item));
-        } else if (source == 'expense') {
-          activities.add(buildExpenseActivity(item));
-        } else if (source == 'weight') {
-          activities.add(buildWeightActivity(item));
-        }
+        activities.add(buildDiaryActivity(r));
       }
       setState(() {
         _recentActivities = activities;
