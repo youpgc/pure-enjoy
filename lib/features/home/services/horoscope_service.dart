@@ -1,4 +1,6 @@
 import 'package:flutter/foundation.dart';
+import 'dart:convert';
+import '../../../services/http_client.dart';
 
 /// 星座信息
 class ZodiacSign {
@@ -95,6 +97,31 @@ class HoroscopeResult {
   });
 }
 
+/// 详细运势解读（真实接口或内置回退统一结构）
+class HoroscopeDetail {
+  final String signName;
+  final String overview;
+  final Map<String, String> indices;
+  final bool indicesArePercent;
+  final String luckyColor;
+  final String luckyNumber;
+  final String? extraSign;
+  final String? extraSignLabel;
+  final bool fromRemote;
+
+  const HoroscopeDetail({
+    required this.signName,
+    required this.overview,
+    required this.indices,
+    required this.indicesArePercent,
+    required this.luckyColor,
+    required this.luckyNumber,
+    this.extraSign,
+    this.extraSignLabel,
+    required this.fromRemote,
+  });
+}
+
 /// 星座符号（用于卡片图标展示），按中文名索引
 const Map<String, String> zodiacSymbol = {
   '水瓶座': '♒',
@@ -126,6 +153,12 @@ const Map<String, String> zodiacDateRange = {
   '射手座': '11.23 - 12.21',
   '摩羯座': '12.22 - 1.19',
 };
+
+/// 天行数据「星座运势」接口密钥（https://www.tianapi.com/apiview/78）
+///
+/// 普通会员免费 100 次/天。前往上述地址注册并申请「星座运势」接口获取 apiKey，
+/// 填入下方单引号内即可启用真实详细今日解读；留空则自动回退到内置离线数据集。
+const String _tianApiKey = '';
 
 /// 幸运数字 / 颜色 / 方位 / 时间池（日期种子选取）
 const List<String> _luckyNumbers = ['1', '3', '5', '7', '8', '9', '2', '6', '4'];
@@ -317,6 +350,115 @@ class HoroscopeService {
       ratings: ratings,
     );
   }
+
+  /// 拉取真实第三方「详细今日运势解读」（天行数据 star 接口）。
+  ///
+  /// 返回 [HoroscopeDetail]（含今日概述大段文字 + 分项百分比指数 + 幸运信息）；
+  /// 未配置密钥 / 请求失败 / 业务异常时返回 null，由调用方回退到内置离线数据集。
+  static Future<HoroscopeDetail?> fetchHoroscopeDetail(
+    String signName, {
+    DateTime? date,
+  }) async {
+    const key = _tianApiKey;
+    if (key.isEmpty) {
+      if (kDebugMode) debugPrint('[星座运势] 未配置天行 apiKey，使用内置数据集');
+      return null;
+    }
+    final d = date ?? DateTime.now();
+    final dateStr = '${d.year}-${_twoDigits(d.month)}-${_twoDigits(d.day)}';
+    final url = Uri.https(
+      'apis.tianapi.com',
+      'star/index',
+      {'key': key, 'astro': signName, 'date': dateStr},
+    ).toString();
+
+    try {
+      final resp = await HttpClient.instance.rawRequest(
+        url,
+        method: 'GET',
+        note: '星座详细运势',
+      );
+      if (resp.statusCode != 200) {
+        if (kDebugMode) debugPrint('[星座运势] 天行接口 HTTP ${resp.statusCode}');
+        return null;
+      }
+      final json = jsonDecode(resp.body);
+      if (json is! Map || json['code'] != 200 || json['result'] is! Map) {
+        if (kDebugMode) {
+          debugPrint(
+            '[星座运势] 天行接口业务异常 code=${json['code']} msg=${json['msg']}',
+          );
+        }
+        return null;
+      }
+      final list = json['result']['list'];
+      if (list is! List || list.isEmpty) return null;
+
+      String overview = '';
+      final Map<String, String> indices = {};
+      String luckyColor = '';
+      String luckyNumber = '';
+      String? noble;
+      for (final item in list) {
+        if (item is! Map) continue;
+        final type = (item['type'] as String?) ?? '';
+        final content = (item['content'] as String?) ?? '';
+        switch (type) {
+          case '综合指数':
+            indices['综合'] = content;
+            break;
+          case '爱情指数':
+            indices['爱情'] = content;
+            break;
+          case '工作指数':
+            indices['事业'] = content;
+            break;
+          case '财运指数':
+            indices['财运'] = content;
+            break;
+          case '健康指数':
+            indices['健康'] = content;
+            break;
+          case '幸运颜色':
+            luckyColor = content;
+            break;
+          case '幸运数字':
+            luckyNumber = content;
+            break;
+          case '贵人星座':
+            noble = content;
+            break;
+          case '今日概述':
+            overview = content;
+            break;
+        }
+      }
+      if (overview.isEmpty && indices.isEmpty) return null;
+
+      if (kDebugMode) {
+        debugPrint(
+          '[星座运势] 天行接口命中 sign=$signName -> 概述${overview.length}字 指数$indices',
+        );
+      }
+      return HoroscopeDetail(
+        signName: signName,
+        overview: overview,
+        indices: indices,
+        indicesArePercent: true,
+        luckyColor: luckyColor,
+        luckyNumber: luckyNumber,
+        extraSign: noble,
+        extraSignLabel: noble != null ? '贵人星座' : null,
+        fromRemote: true,
+      );
+    } catch (e) {
+      if (kDebugMode) debugPrint('[星座运势] 天行接口异常: $e');
+      return null;
+    }
+  }
+
+  /// 两位数字补零
+  static String _twoDigits(int n) => n.toString().padLeft(2, '0');
 
   /// 计算一年中的第几天（1-366）
   static int _dayOfYear(DateTime d) {

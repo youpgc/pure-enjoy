@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/api_client.dart';
 import '../../services/horoscope_service.dart';
+import '../horoscope_detail_page.dart';
 
 /// 欢迎区块组件
 ///
@@ -150,10 +151,18 @@ class HoroscopeCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final symbol = zodiacSymbol[signName] ?? '✨';
 
-    return Card(
-      child: Padding(
-        padding: const EdgeInsets.all(16),
-        child: Column(
+    return GestureDetector(
+      onTap: () {
+        Navigator.of(context).push(
+          MaterialPageRoute(
+            builder: (_) => HoroscopeDetailPage(signName: signName),
+          ),
+        );
+      },
+      child: Card(
+        child: Padding(
+          padding: const EdgeInsets.all(16),
+          child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
             Row(
@@ -255,6 +264,7 @@ class HoroscopeCard extends StatelessWidget {
           ],
         ),
       ),
+    ),
     );
   }
 }
