@@ -181,7 +181,7 @@ class CheckinCalendarCard extends StatelessWidget {
                     size: 18,
                   ),
                   const SizedBox(width: 6),
-                  Text(hasCheckedInToday ? '今日已签到' : '签到'),
+                  Text(hasCheckedInToday ? '已签到' : '签到'),
                 ],
               ),
       ),

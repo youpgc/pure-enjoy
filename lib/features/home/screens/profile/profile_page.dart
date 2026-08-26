@@ -7,7 +7,7 @@ import '../../../profile/services/point_service.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../../services/version_check_service.dart';
 import '../../../../core/widgets/widgets.dart';
-import '../../../profile/screens/point_records/point_records_screen.dart';
+import '../../../profile/screens/point_records/checkin_screen.dart';
 import '../edit_profile/edit_profile_screen.dart';
 import '../settings/settings_screen.dart';
 import '../theme_settings/theme_settings_screen.dart';
@@ -136,7 +136,7 @@ class _ProfilePageState extends State<ProfilePage> {
       onPointsTap: () {
         Navigator.push(
           context,
-          MaterialPageRoute(builder: (_) => const PointRecordsScreen()),
+          MaterialPageRoute(builder: (_) => const CheckinScreen()),
         ).then((_) => _loadUserData());
       },
       onVersionTap: () async {
