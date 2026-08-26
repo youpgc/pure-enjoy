@@ -96,9 +96,20 @@ class HoroscopeService {
       );
       if (resp.statusCode >= 200 && resp.statusCode < 300) {
         final text = _extractText(resp.body);
+        if (kDebugMode) {
+          debugPrint(
+            '[星座运势] status=${resp.statusCode} '
+            '提取文案=${text == null ? "null(未匹配字段)" : text.length >= 40 ? "${text.substring(0, 40)}..." : text} '
+            '原文前120=${resp.body.length >= 120 ? resp.body.substring(0, 120) : resp.body}',
+          );
+        }
         if (text != null && text.isNotEmpty) {
           _cache[cacheKey] = text;
           return text;
+        }
+      } else {
+        if (kDebugMode) {
+          debugPrint('[星座运势] 非 2xx 响应: status=${resp.statusCode} body=${resp.body}');
         }
       }
     } catch (e) {
