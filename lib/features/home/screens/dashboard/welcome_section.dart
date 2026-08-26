@@ -152,7 +152,7 @@ class HoroscopeCard extends StatelessWidget {
 
     return Card(
       child: Padding(
-        padding: const EdgeInsets.all(20),
+        padding: const EdgeInsets.all(16),
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
@@ -197,12 +197,12 @@ class HoroscopeCard extends StatelessWidget {
                 ),
               ],
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             Text(
               data.text,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
-            const SizedBox(height: 16),
+            const SizedBox(height: 12),
             // 左右两栏：左=分项星级，右=今日幸运，各纵向展示
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
@@ -218,7 +218,7 @@ class HoroscopeCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       ...data.ratings.entries.map((e) {
                         return _RatingRow(
                           label: e.key,
@@ -229,7 +229,7 @@ class HoroscopeCard extends StatelessWidget {
                     ],
                   ),
                 ),
-                const SizedBox(width: 24),
+                const SizedBox(width: 16),
                 Expanded(
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
@@ -241,7 +241,7 @@ class HoroscopeCard extends StatelessWidget {
                               fontWeight: FontWeight.w600,
                             ),
                       ),
-                      const SizedBox(height: 10),
+                      const SizedBox(height: 8),
                       _LuckyRow(label: '幸运数字', value: data.luckyNumber, colorScheme: colorScheme),
                       _LuckyRow(label: '幸运颜色', value: data.luckyColor, colorScheme: colorScheme),
                       _LuckyRow(label: '幸运方位', value: data.luckyDirection, colorScheme: colorScheme),
@@ -276,7 +276,7 @@ class _RatingRow extends StatelessWidget {
     final filled = '★' * stars;
     final empty = '☆' * (5 - stars);
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         children: [
           Text(
@@ -290,7 +290,7 @@ class _RatingRow extends StatelessWidget {
           Text(
             '$filled$empty',
             style: TextStyle(
-              fontSize: 14,
+              fontSize: 13,
               color: colorScheme.tertiary,
               letterSpacing: 1,
             ),
@@ -316,7 +316,7 @@ class _LuckyRow extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.only(bottom: 5),
       child: Row(
         children: [
           Text(
