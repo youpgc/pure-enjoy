@@ -86,5 +86,6 @@ void logRequest({
     sb.writeln('   响应: ${truncate(responseBody)}');
   }
   sb.writeln(logDivider);
-  debugPrint(sb.toString());
+  // [临时] 暂时关闭统一 HTTP 请求日志打印（调试积分页面崩溃时使用，恢复正常时取消本行注释即可）
+  // debugPrint(sb.toString());
 }

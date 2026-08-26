@@ -35,11 +35,14 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   void initState() {
     super.initState();
     initPagination();
+    // 初始化展示月份为当前北京月份，避免 late 字段未初始化导致首屏崩溃
+    _displayMonth = DateTime(beijingToday().year, beijingToday().month, 1);
     // 先读取本地缓存，立即展示上一次的积分值与连续签到天数，避免闪现 0
     _loadCachedPoints();
     _loadAvailablePoints();
     _loadMakeupCardCount();
     _loadRecords(refresh: true);
+    _loadCheckedDates(); // 首屏加载当月已签到日期，日历才有数据
   }
 
   @override
