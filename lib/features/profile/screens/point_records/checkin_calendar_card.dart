@@ -22,6 +22,7 @@ class CheckinCalendarCard extends StatelessWidget {
     required this.onNextMonth,
     required this.onMakeup,
     required this.canGoNext,
+    required this.makeupCardCount,
   });
 
   final int availablePoints;
@@ -35,8 +36,9 @@ class CheckinCalendarCard extends StatelessWidget {
   final VoidCallback onCheckin;
   final VoidCallback onPrevMonth;
   final VoidCallback onNextMonth;
-  final VoidCallback onMakeup;
+  final void Function(DateTime) onMakeup;
   final bool canGoNext;
+  final int makeupCardCount;
 
   @override
   Widget build(BuildContext context) {
@@ -149,7 +151,7 @@ class CheckinCalendarCard extends StatelessWidget {
             const SizedBox(height: 12),
             Center(
               child: Text(
-                '点击漏签日期可补签（功能即将上线）',
+                '点击漏签日期可补签（持有 $makeupCardCount 张补签卡）',
                 style: Theme.of(context).textTheme.labelSmall?.copyWith(
                       color: colorScheme.onPrimaryContainer.withValues(alpha: 0.55),
                     ),
@@ -259,7 +261,7 @@ class CheckinCalendarCard extends StatelessWidget {
     final isFuture = cellDate.isAfter(todayDate);
     final isPastMissed = !isToday && !isFuture && !isChecked;
 
-    final onTap = isPastMissed ? onMakeup : null;
+    final onTap = isPastMissed ? () => onMakeup(cellDate) : null;
 
     return AspectRatio(
       aspectRatio: 1,

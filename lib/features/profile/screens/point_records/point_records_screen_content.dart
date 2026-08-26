@@ -33,6 +33,8 @@ class PointRecordsContent extends StatelessWidget {
     required this.onNextMonth,
     required this.onMakeup,
     required this.canGoNext,
+    required this.makeupCardCount,
+    required this.onOpenMall,
   });
 
   final int availablePoints;
@@ -54,8 +56,10 @@ class PointRecordsContent extends StatelessWidget {
   final bool isLoadingCalendar;
   final VoidCallback onPrevMonth;
   final VoidCallback onNextMonth;
-  final VoidCallback onMakeup;
+  final void Function(DateTime) onMakeup;
   final bool canGoNext;
+  final int makeupCardCount;
+  final VoidCallback onOpenMall;
 
   @override
   Widget build(BuildContext context) {
@@ -63,6 +67,11 @@ class PointRecordsContent extends StatelessWidget {
       appBar: AppBar(
         title: const Text('积分记录'),
         actions: [
+          IconButton(
+            icon: const Icon(Icons.storefront_outlined),
+            onPressed: onOpenMall,
+            tooltip: '积分商城',
+          ),
           IconButton(
             icon: const Icon(Icons.help_outline),
             onPressed: onShowRules,
@@ -88,6 +97,7 @@ class PointRecordsContent extends StatelessWidget {
               onNextMonth: onNextMonth,
               onMakeup: onMakeup,
               canGoNext: canGoNext,
+              makeupCardCount: makeupCardCount,
             ),
             if (records.isNotEmpty)
               Padding(

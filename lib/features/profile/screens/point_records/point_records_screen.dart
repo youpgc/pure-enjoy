@@ -4,6 +4,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../models/point_record_model.dart';
 import '../../services/point_service.dart';
 import '../../services/point_service_utils.dart';
+import '../point_mall/point_mall_screen.dart';
 import './point_records_screen_content.dart';
 
 /// 积分记录页面
@@ -25,6 +26,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   late DateTime _displayMonth;
   Set<String> _checkedDates = {};
   bool _isLoadingCalendar = false;
+  int _makeupCardCount = 0;
 
   @override
   int get pageSize => 20;
@@ -36,6 +38,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     // 先读取本地缓存，立即展示上一次的积分值与连续签到天数，避免闪现 0
     _loadCachedPoints();
     _loadAvailablePoints();
+    _loadMakeupCardCount();
     _loadRecords(refresh: true);
   }
 
@@ -168,9 +171,92 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
             _displayMonth.month < today.month);
   }
 
-  /// 补签入口（预留，暂未实现逻辑）
-  void _onMakeup() {
-    showSnackBar(context, '补签功能即将上线');
+  /// 加载持有的补签卡数量（供日历提示与补签弹窗使用）
+  Future<void> _loadMakeupCardCount() async {
+    final count = await PointService.instance.getMakeupCardCount();
+    if (mounted) setState(() => _makeupCardCount = count);
+  }
+
+  /// 进入积分商城（返回后刷新库存与积分）
+  void _openMall() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PointMallScreen()),
+    ).then((_) {
+      _loadMakeupCardCount();
+      _loadAvailablePoints();
+    });
+  }
+
+  /// 补签入口：点击日历漏签日期触发。
+  ///
+  /// 弹确认框：显示目标日期与当前持有补签卡数。
+  /// - 无卡：引导去积分商城兑换。
+  /// - 有卡：确认后调用 makeupCheckin，成功后刷新日历 / 库存 / 积分。
+  void _onMakeup(DateTime date) {
+    final key = beijingDateKey(date);
+    showDialog(
+      context: context,
+      builder: (ctx) {
+        var making = false;
+        return StatefulBuilder(
+          builder: (_, setLocal) {
+            final hasCard = _makeupCardCount > 0;
+            return AlertDialog(
+              title: const Text('补签确认'),
+              content: Text(
+                hasCard
+                    ? '补签 $key ？将消耗 1 张补签卡（不额外发放积分，仅维持连续天数）。'
+                    : '你还没有补签卡。\n补签卡可在「积分商城」消耗 ${PointService.makeupCardCost} 积分兑换。',
+              ),
+              actions: [
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx),
+                  child: const Text('取消'),
+                ),
+                if (hasCard)
+                  FilledButton(
+                    onPressed: making
+                        ? null
+                          : () async {
+                            setLocal(() => making = true);
+                            final result = await PointService.instance
+                                .makeupCheckin(date);
+                            if (!mounted) return;
+                            setLocal(() => making = false);
+                            Navigator.pop(context);
+                            showSnackBar(
+                              context,
+                              result['message'] ?? '补签完成',
+                            );
+                            if (result['success'] == true) {
+                              _loadCheckedDates();
+                              _loadMakeupCardCount();
+                              _loadAvailablePoints();
+                            }
+                          },
+                    child: making
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : const Text('确认补签'),
+                  )
+                else
+                  FilledButton(
+                    onPressed: () {
+                      Navigator.pop(ctx);
+                      _openMall();
+                    },
+                    child: const Text('去积分商城'),
+                  ),
+              ],
+            );
+          },
+        );
+      },
+    );
   }
 
   /// 打卡
@@ -241,6 +327,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       onShowRules: _showRulesDialog,
       onRefresh: () async {
         await _loadAvailablePoints();
+        await _loadMakeupCardCount();
         await _loadRecords(refresh: true);
         await _loadCheckedDates();
       },
@@ -252,6 +339,8 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       onNextMonth: () => _changeMonth(1),
       onMakeup: _onMakeup,
       canGoNext: _canGoNextMonth(),
+      makeupCardCount: _makeupCardCount,
+      onOpenMall: _openMall,
     );
   }
 }
