@@ -65,23 +65,28 @@ ZodiacSign? zodiacSignFromDate(DateTime d) {
 
 /// 星座运势服务
 ///
-/// 数据源：免费公开接口 horoscope-app-api.vercel.app（无需 key，App 直连）。
-/// 该接口返回英文运势文案；失败时静默降级（返回 null），由 UI 决定不展示，
-/// 不影响首页其它内容。
+/// 数据源：国内免费公开接口 api.vvhan.com（无需 key，App 直连），返回中文运势文案。
+/// 失败时静默降级（返回 null），由 UI 决定不展示，不影响首页其它内容。
+///
+/// 注意：该接口返回结构社区通用形态为 { code, msg, data:{ name, day, text, ... } }，
+/// 此处做多字段容错解析（text / content / description / all / summary 等），
+/// 即使字段名随版本变动也不崩、缺失时仅不展示。
 class HoroscopeService {
-  static const String _endpoint =
-      'https://horoscope-app-api.vercel.app/v1/get-horoscope/daily';
+  static const String _endpoint = 'https://api.vvhan.com/api/horoscope';
 
   /// 进程内缓存：key = "signKey|dateKey"，避免同一天重复请求 / 重建时重拉
   static final Map<String, String> _cache = {};
 
   /// 获取指定星座的「今日运势」文案；失败 / 无数据时返回 null
-  static Future<String?> getDailyHoroscope(String signKey) async {
-    final cacheKey = '$signKey|${_todayKey()}';
+  ///
+  /// [signName] 为星座中文名（如 双子座），用于拼接接口参数。
+  static Future<String?> getDailyHoroscope(String signName) async {
+    final cacheKey = '$signName|${_todayKey()}';
     final cached = _cache[cacheKey];
     if (cached != null) return cached;
 
-    final url = '$_endpoint?sign=$signKey&day=today';
+    final url =
+        '$_endpoint?type=today&sign=${Uri.encodeComponent(signName)}';
     try {
       final resp = await HttpClient.instance.rawRequest(
         url,
@@ -103,16 +108,40 @@ class HoroscopeService {
     return null;
   }
 
-  /// 从响应体容错提取运势文案（兼容 horoscope_data / data / horoscope / content 多种字段）
+  /// 从响应体容错提取运势文案
+  /// 兼容形态：
+  ///   { data:{ text / content / description / all / summary } }
+  ///   { text / content / description / horoscope }
   static String? _extractText(String body) {
     try {
       final json = jsonDecode(body);
-      if (json is Map<String, dynamic>) {
-        return (json['horoscope_data'] ??
-                json['data'] ??
-                json['horoscope'] ??
-                json['content'])
-            as String?;
+      if (json is! Map<String, dynamic>) return null;
+
+      // 1) 优先取 data 内部常见字段
+      final data = json['data'];
+      if (data is Map<String, dynamic>) {
+        final candidates = [
+          data['text'],
+          data['content'],
+          data['description'],
+          data['all'],
+          data['summary'],
+          data['horoscope'],
+        ];
+        for (final c in candidates) {
+          if (c is String && c.trim().isNotEmpty) return c.trim();
+        }
+      }
+
+      // 2) 退化到顶层常见字段
+      final topCandidates = [
+        json['text'],
+        json['content'],
+        json['description'],
+        json['horoscope'],
+      ];
+      for (final c in topCandidates) {
+        if (c is String && c.trim().isNotEmpty) return c.trim();
       }
     } catch (_) {
       // 解析失败：返回 null

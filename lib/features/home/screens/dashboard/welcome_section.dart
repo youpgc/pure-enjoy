@@ -81,7 +81,7 @@ class _HoroscopeLineState extends State<HoroscopeLine> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final text = await HoroscopeService.getDailyHoroscope(sign.key);
+    final text = await HoroscopeService.getDailyHoroscope(sign.name);
     if (mounted) {
       setState(() {
         _signName = sign.name;
