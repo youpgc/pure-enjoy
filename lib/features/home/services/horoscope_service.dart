@@ -61,12 +61,38 @@ ZodiacSign? zodiacSignFromDate(DateTime d) {
   return const ZodiacSign('capricorn', '摩羯座');
 }
 
-/// 运势结果（文案 + 幸运数字/颜色），供卡片完整展示
+/// 运势结果（完整信息），供卡片展示
 class HoroscopeResult {
+  /// 当日运势文案
   final String text;
+
+  /// 幸运数字
   final String luckyNumber;
+
+  /// 幸运颜色
   final String luckyColor;
-  const HoroscopeResult(this.text, this.luckyNumber, this.luckyColor);
+
+  /// 幸运方位
+  final String luckyDirection;
+
+  /// 幸运时间
+  final String luckyTime;
+
+  /// 速配星座
+  final String matchSign;
+
+  /// 分项运势星级（1~5 星），维度见 [_ratingDims]
+  final Map<String, int> ratings;
+
+  const HoroscopeResult({
+    required this.text,
+    required this.luckyNumber,
+    required this.luckyColor,
+    required this.luckyDirection,
+    required this.luckyTime,
+    required this.matchSign,
+    required this.ratings,
+  });
 }
 
 /// 星座符号（用于卡片图标展示），按中文名索引
@@ -85,11 +111,20 @@ const Map<String, String> zodiacSymbol = {
   '摩羯座': '♑',
 };
 
-/// 幸运数字 / 颜色池（日期种子选取）
+/// 幸运数字 / 颜色 / 方位 / 时间池（日期种子选取）
 const List<String> _luckyNumbers = ['1', '3', '5', '7', '8', '9', '2', '6', '4'];
 const List<String> _luckyColors = [
   '红色', '橙色', '黄色', '绿色', '蓝色', '紫色', '粉色', '白色', '金色'
 ];
+const List<String> _luckyDirections = [
+  '正东', '正南', '正西', '正北', '东南', '西南', '东北', '西北'
+];
+const List<String> _luckyTimes = [
+  '清晨 6-8 点', '上午 9-11 点', '中午 12-14 点', '下午 15-17 点', '傍晚 18-20 点', '夜晚 21-23 点'
+];
+
+/// 分项运势维度（用于星级评分展示，顺序即卡片展示顺序）
+const List<String> _ratingDims = ['整体', '爱情', '事业', '财运', '健康'];
 
 /// 星座运势服务（内置离线数据集，稳定可用）
 ///
@@ -219,7 +254,8 @@ class HoroscopeService {
     '摩羯座',
   ];
 
-  /// 获取指定星座的「今日运势」完整信息（文案 + 幸运数字/颜色）；始终返回非空结果（离线内置）。
+  /// 获取指定星座的「今日运势」完整信息（文案 + 幸运数字/颜色/方位/时间/速配/分项星级）；
+  /// 始终返回非空结果（离线内置）。
   ///
   /// [signName] 为星座中文名（如 双子座）。未知星座回退到通用文案。
   static Future<HoroscopeResult?> getDailyHoroscope(String signName) async {
@@ -235,13 +271,36 @@ class HoroscopeService {
         _luckyNumbers[(dayOfYear + signIndex * 3) % _luckyNumbers.length];
     final luckyColor =
         _luckyColors[(dayOfYear + signIndex * 5) % _luckyColors.length];
+    final luckyDirection =
+        _luckyDirections[(dayOfYear + signIndex * 2) % _luckyDirections.length];
+    final luckyTime =
+        _luckyTimes[(dayOfYear + signIndex * 4) % _luckyTimes.length];
+    // 速配星座：至少偏移 1，且日期种子稳定，避免与自身相同
+    final matchOffset = 1 + (dayOfYear ~/ 7) % (_order.length - 1);
+    final matchSign = _order[(signIndex + matchOffset) % _order.length];
+
+    // 分项星级：每天稳定、各维度略有差异（1~5 星）
+    final ratings = <String, int>{
+      for (var i = 0; i < _ratingDims.length; i++)
+        _ratingDims[i]: ((dayOfYear + signIndex * 7 + i * 3) % 5) + 1,
+    };
 
     if (kDebugMode) {
       debugPrint(
-        '[星座运势] 内置数据集命中 sign=$signName day=$dayOfYear -> $text | 幸运$luckyNumber/$luckyColor',
+        '[星座运势] 内置数据集命中 sign=$signName day=$dayOfYear -> $text | '
+        '幸运$luckyNumber/$luckyColor/$luckyDirection/$luckyTime | 速配$matchSign | '
+        '星级$ratings',
       );
     }
-    return HoroscopeResult(text, luckyNumber, luckyColor);
+    return HoroscopeResult(
+      text: text,
+      luckyNumber: luckyNumber,
+      luckyColor: luckyColor,
+      luckyDirection: luckyDirection,
+      luckyTime: luckyTime,
+      matchSign: matchSign,
+      ratings: ratings,
+    );
   }
 
   /// 计算一年中的第几天（1-366）

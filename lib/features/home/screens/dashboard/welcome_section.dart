@@ -203,6 +203,21 @@ class HoroscopeCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
+            // 分项运势星级
+            Wrap(
+              spacing: 18,
+              runSpacing: 8,
+              children: data.ratings.entries.map((e) {
+                return _RatingItem(
+                  label: e.key,
+                  stars: e.value,
+                  colorScheme: colorScheme,
+                );
+              }).toList(),
+            ),
+            const SizedBox(height: 16),
+            const Divider(height: 1),
+            const SizedBox(height: 16),
             Wrap(
               spacing: 10,
               runSpacing: 10,
@@ -217,11 +232,67 @@ class HoroscopeCard extends StatelessWidget {
                   value: data.luckyColor,
                   colorScheme: colorScheme,
                 ),
+                _LuckyChip(
+                  label: '幸运方位',
+                  value: data.luckyDirection,
+                  colorScheme: colorScheme,
+                ),
+                _LuckyChip(
+                  label: '幸运时间',
+                  value: data.luckyTime,
+                  colorScheme: colorScheme,
+                ),
+                _LuckyChip(
+                  label: '速配星座',
+                  value: data.matchSign,
+                  colorScheme: colorScheme,
+                ),
               ],
             ),
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 分项运势星级（维度名 + 星标）
+class _RatingItem extends StatelessWidget {
+  final String label;
+  final int stars;
+  final ColorScheme colorScheme;
+
+  const _RatingItem({
+    required this.label,
+    required this.stars,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final filled = '★' * stars;
+    final empty = '☆' * (5 - stars);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      mainAxisSize: MainAxisSize.min,
+      children: [
+        Text(
+          label,
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: colorScheme.onSurfaceVariant),
+        ),
+        const SizedBox(height: 2),
+        Text(
+          '$filled$empty',
+          style: TextStyle(
+            fontSize: 14,
+            color: colorScheme.tertiary,
+            letterSpacing: 1,
+          ),
+        ),
+      ],
     );
   }
 }
