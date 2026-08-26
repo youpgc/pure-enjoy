@@ -134,7 +134,7 @@ class _WelcomeSectionState extends State<WelcomeSection> {
 ///
 /// 头部：星座符号 + 「今日 {星座} 运势」标题；
 /// 主体：当日运势文案（完整展示）；
-/// 底部：幸运数字 / 幸运颜色胶囊。
+/// 底部：左右两栏——左「运势指数」(分项星级) / 右「今日幸运」(幸运信息)，各纵向展示。
 class HoroscopeCard extends StatelessWidget {
   final String signName;
   final HoroscopeResult data;
@@ -203,49 +203,52 @@ class HoroscopeCard extends StatelessWidget {
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 16),
-            // 分项运势星级
-            Wrap(
-              spacing: 18,
-              runSpacing: 8,
-              children: data.ratings.entries.map((e) {
-                return _RatingItem(
-                  label: e.key,
-                  stars: e.value,
-                  colorScheme: colorScheme,
-                );
-              }).toList(),
-            ),
-            const SizedBox(height: 16),
-            const Divider(height: 1),
-            const SizedBox(height: 16),
-            Wrap(
-              spacing: 10,
-              runSpacing: 10,
+            // 左右两栏：左=分项星级，右=今日幸运，各纵向展示
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                _LuckyChip(
-                  label: '幸运数字',
-                  value: data.luckyNumber,
-                  colorScheme: colorScheme,
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '运势指数',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      ...data.ratings.entries.map((e) {
+                        return _RatingRow(
+                          label: e.key,
+                          stars: e.value,
+                          colorScheme: colorScheme,
+                        );
+                      }),
+                    ],
+                  ),
                 ),
-                _LuckyChip(
-                  label: '幸运颜色',
-                  value: data.luckyColor,
-                  colorScheme: colorScheme,
-                ),
-                _LuckyChip(
-                  label: '幸运方位',
-                  value: data.luckyDirection,
-                  colorScheme: colorScheme,
-                ),
-                _LuckyChip(
-                  label: '幸运时间',
-                  value: data.luckyTime,
-                  colorScheme: colorScheme,
-                ),
-                _LuckyChip(
-                  label: '速配星座',
-                  value: data.matchSign,
-                  colorScheme: colorScheme,
+                const SizedBox(width: 24),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '今日幸运',
+                        style: Theme.of(context).textTheme.labelMedium?.copyWith(
+                              color: colorScheme.primary,
+                              fontWeight: FontWeight.w600,
+                            ),
+                      ),
+                      const SizedBox(height: 10),
+                      _LuckyRow(label: '幸运数字', value: data.luckyNumber, colorScheme: colorScheme),
+                      _LuckyRow(label: '幸运颜色', value: data.luckyColor, colorScheme: colorScheme),
+                      _LuckyRow(label: '幸运方位', value: data.luckyDirection, colorScheme: colorScheme),
+                      _LuckyRow(label: '幸运时间', value: data.luckyTime, colorScheme: colorScheme),
+                      _LuckyRow(label: '速配星座', value: data.matchSign, colorScheme: colorScheme),
+                    ],
+                  ),
                 ),
               ],
             ),
@@ -256,13 +259,13 @@ class HoroscopeCard extends StatelessWidget {
   }
 }
 
-/// 分项运势星级（维度名 + 星标）
-class _RatingItem extends StatelessWidget {
+/// 分项运势星级一行（维度名左 + 星标右）
+class _RatingRow extends StatelessWidget {
   final String label;
   final int stars;
   final ColorScheme colorScheme;
 
-  const _RatingItem({
+  const _RatingRow({
     required this.label,
     required this.stars,
     required this.colorScheme,
@@ -272,38 +275,39 @@ class _RatingItem extends StatelessWidget {
   Widget build(BuildContext context) {
     final filled = '★' * stars;
     final empty = '☆' * (5 - stars);
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        Text(
-          label,
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: colorScheme.onSurfaceVariant),
-        ),
-        const SizedBox(height: 2),
-        Text(
-          '$filled$empty',
-          style: TextStyle(
-            fontSize: 14,
-            color: colorScheme.tertiary,
-            letterSpacing: 1,
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
-        ),
-      ],
+          const Spacer(),
+          Text(
+            '$filled$empty',
+            style: TextStyle(
+              fontSize: 14,
+              color: colorScheme.tertiary,
+              letterSpacing: 1,
+            ),
+          ),
+        ],
+      ),
     );
   }
 }
 
-/// 幸运信息胶囊（标签 + 加粗值）
-class _LuckyChip extends StatelessWidget {
+/// 幸运信息一行（标签左 + 加粗值右）
+class _LuckyRow extends StatelessWidget {
   final String label;
   final String value;
   final ColorScheme colorScheme;
 
-  const _LuckyChip({
+  const _LuckyRow({
     required this.label,
     required this.value,
     required this.colorScheme,
@@ -311,26 +315,29 @@ class _LuckyChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-      decoration: BoxDecoration(
-        color: colorScheme.secondaryContainer,
-        borderRadius: BorderRadius.circular(20),
-      ),
-      child: RichText(
-        text: TextSpan(
-          style: Theme.of(context)
-              .textTheme
-              .bodySmall
-              ?.copyWith(color: colorScheme.onSecondaryContainer),
-          children: [
-            TextSpan(text: '$label  '),
-            TextSpan(
-              text: value,
-              style: const TextStyle(fontWeight: FontWeight.bold),
+    return Padding(
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(
+            label,
+            style: Theme.of(context)
+                .textTheme
+                .bodySmall
+                ?.copyWith(color: colorScheme.onSurfaceVariant),
+          ),
+          const Spacer(),
+          Flexible(
+            child: Text(
+              value,
+              textAlign: TextAlign.end,
+              style: Theme.of(context)
+                  .textTheme
+                  .bodySmall
+                  ?.copyWith(fontWeight: FontWeight.bold),
             ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
