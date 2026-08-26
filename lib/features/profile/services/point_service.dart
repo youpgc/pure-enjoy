@@ -451,6 +451,46 @@ class PointService {
     }
   }
 
+  /// 每月补签次数上限（产品决策：每月最多补签 4 次，按真实操作时间所在北京自然月统计）
+  static const int maxMakeupPerMonth = 4;
+
+  /// 统计当前北京自然月内已发生的补签次数（按 makeup_checkins.created_at 真实操作时间）。
+  ///
+  /// 仅读 makeup_checkins，不修改任何数据。用于「每月最多 [maxMakeupPerMonth] 次」限额校验。
+  /// 若用户未登录或查询异常，安全返回 0（不阻断正常补签）。
+  Future<int> getMakeupCountThisMonth() async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return 0;
+    try {
+      final now = beijingToday();
+      final nextMonth = now.month == 12 ? 1 : now.month + 1;
+      final nextYear = now.month == 12 ? now.year + 1 : now.year;
+      // 北京自然月窗口：北京时间 [月-01 00:00, 下月-01 00:00)，中国固定 UTC+8，故 UTC 边界减 8h
+      final startUtc =
+          DateTime.utc(now.year, now.month, 1).subtract(const Duration(hours: 8));
+      final endUtc = DateTime.utc(nextYear, nextMonth, 1)
+          .subtract(const Duration(hours: 8));
+
+      final result = await ApiClient.get(
+        'makeup_checkins',
+        filters: {
+          'user_id': 'eq.$userId',
+          'and':
+              '(created_at.gte.${startUtc.toIso8601String()},created_at.lt.${endUtc.toIso8601String()})',
+        },
+        columns: 'id',
+        limit: null,
+      );
+      if (result.isSuccess && result.data != null) {
+        return result.data!.length;
+      }
+      return 0;
+    } catch (e) {
+      if (kDebugMode) debugPrint('统计本月补签次数失败: $e');
+      return 0;
+    }
+  }
+
   /// 积分商城兑换补签卡（消耗 [makeupCardCost] 积分，获得 1 张补签卡）。
   ///
   /// 流程：校验可用积分 ≥ 成本 → 复用既有「消费」闭环（插 spend 流水 + 重算回写 users 展示列）
@@ -542,6 +582,15 @@ class PointService {
         return {'success': false, 'message': '该日期已签到'};
       }
 
+      // 2.5 本月补签次数已达上限（每月最多 maxMakeupPerMonth 次，按真实操作时间统计）
+      final usedThisMonth = await getMakeupCountThisMonth();
+      if (usedThisMonth >= maxMakeupPerMonth) {
+        return {
+          'success': false,
+          'message': '本月补签次数已用完（每月最多 $maxMakeupPerMonth 次）',
+        };
+      }
+
       // 3. 补签卡数量
       final count = await getMakeupCardCount();
       if (count < 1) {
@@ -579,6 +628,19 @@ class PointService {
         // 插流水失败 → 回滚扣减（补签卡加回）
         await _upsertMakeupCard(1);
         return {'success': false, 'message': '补签失败：${insert.error}'};
+      }
+
+      // 5.5 记录补签操作流水（真实操作时间 created_at=now，用于月度限额统计）
+      final makeupInsert = await ApiClient.post('makeup_checkins', {
+        'id': const Uuid().v4(),
+        'user_id': userId,
+        'makeup_date': beijingDateKey(targetDay),
+        'created_at': DateTime.now().toUtc().toIso8601String(),
+      });
+      // 409（同一目标日并发重复补签，理论上已被步骤2拦截）视为已记录，不回滚
+      if (!makeupInsert.isSuccess && makeupInsert.statusCode != 409) {
+        if (kDebugMode) debugPrint('记录补签流水失败: ${makeupInsert.error}');
+        // 不回滚补签卡：checkin 流水已生效、连续天数已补全，仅限额计数漏记（宽松）
       }
 
       // 6. 重算连续天数（补签填补断签，可能影响当前连续天数展示）
