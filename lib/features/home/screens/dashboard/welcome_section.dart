@@ -186,7 +186,7 @@ class HoroscopeCard extends StatelessWidget {
                       ),
                       const SizedBox(height: 2),
                       Text(
-                        '每日星座指南',
+                        '${zodiacDateRange[signName] ?? ''} · 每日星座指南',
                         style: Theme.of(context)
                             .textTheme
                             .bodySmall
@@ -286,7 +286,7 @@ class _RatingRow extends StatelessWidget {
                 .bodySmall
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Text(
             '$filled$empty',
             style: TextStyle(
@@ -318,6 +318,7 @@ class _LuckyRow extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Text(
             label,
@@ -326,11 +327,10 @@ class _LuckyRow extends StatelessWidget {
                 .bodySmall
                 ?.copyWith(color: colorScheme.onSurfaceVariant),
           ),
-          const Spacer(),
+          const SizedBox(width: 8),
           Flexible(
             child: Text(
               value,
-              textAlign: TextAlign.end,
               style: Theme.of(context)
                   .textTheme
                   .bodySmall
