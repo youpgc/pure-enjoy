@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
+import 'package:flutter/foundation.dart';
 import '../../../../services/supabase_service.dart';
+import '../../../../services/api_client.dart';
 import '../../services/horoscope_service.dart';
 
 /// 欢迎区块组件
@@ -74,8 +76,33 @@ class _HoroscopeLineState extends State<HoroscopeLine> {
   }
 
   Future<void> _load() async {
-    final birthday =
-        AuthService.instance.currentUser?['birthday'] as String?;
+    // 生日存在 public.users 表，不在 Auth 用户对象里，必须从 users 表查询
+    final userId = AuthService.instance.currentUserId;
+    String? birthday;
+    if (userId != null) {
+      try {
+        final result = await ApiClient.get(
+          'users',
+          filters: {
+            ApiClient.userKey(userId): 'eq.$userId',
+            'is_deleted': 'eq.false',
+          },
+          limit: 1,
+        );
+        if (result.isSuccess &&
+            result.data != null &&
+            result.data!.isNotEmpty) {
+          birthday = result.data!.first['birthday'] as String?;
+        }
+      } catch (_) {
+        // 查询失败：静默降级
+      }
+    }
+
+    if (kDebugMode && birthday == null) {
+      debugPrint('[星座运势] 未取到生日（users 表无 birthday 或查询失败），不展示');
+    }
+
     final sign = zodiacSignFromBirthday(birthday);
     if (sign == null) {
       if (mounted) setState(() => _loading = false);
