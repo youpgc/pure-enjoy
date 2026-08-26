@@ -61,6 +61,36 @@ ZodiacSign? zodiacSignFromDate(DateTime d) {
   return const ZodiacSign('capricorn', '摩羯座');
 }
 
+/// 运势结果（文案 + 幸运数字/颜色），供卡片完整展示
+class HoroscopeResult {
+  final String text;
+  final String luckyNumber;
+  final String luckyColor;
+  const HoroscopeResult(this.text, this.luckyNumber, this.luckyColor);
+}
+
+/// 星座符号（用于卡片图标展示），按中文名索引
+const Map<String, String> zodiacSymbol = {
+  '水瓶座': '♒',
+  '双鱼座': '♓',
+  '白羊座': '♈',
+  '金牛座': '♉',
+  '双子座': '♊',
+  '巨蟹座': '♋',
+  '狮子座': '♌',
+  '处女座': '♍',
+  '天秤座': '♎',
+  '天蝎座': '♏',
+  '射手座': '♐',
+  '摩羯座': '♑',
+};
+
+/// 幸运数字 / 颜色池（日期种子选取）
+const List<String> _luckyNumbers = ['1', '3', '5', '7', '8', '9', '2', '6', '4'];
+const List<String> _luckyColors = [
+  '红色', '橙色', '黄色', '绿色', '蓝色', '紫色', '粉色', '白色', '金色'
+];
+
 /// 星座运势服务（内置离线数据集，稳定可用）
 ///
 /// 设计说明：原依赖的第三方免费公开接口（api.vvhan.com 等）在 2026 年已陆续停服 /
@@ -189,26 +219,29 @@ class HoroscopeService {
     '摩羯座',
   ];
 
-  /// 获取指定星座的「今日运势」单行文案；始终返回非空字符串（离线内置）。
+  /// 获取指定星座的「今日运势」完整信息（文案 + 幸运数字/颜色）；始终返回非空结果（离线内置）。
   ///
   /// [signName] 为星座中文名（如 双子座）。未知星座回退到通用文案。
-  static Future<String?> getDailyHoroscope(String signName) async {
-    final list = _pool[signName];
-    if (list == null || list.isEmpty) {
-      return '保持好心情，今天也是值得期待的一天。';
-    }
-
+  static Future<HoroscopeResult?> getDailyHoroscope(String signName) async {
     final signIndex = _order.indexOf(signName).clamp(0, _order.length - 1);
-    final now = DateTime.now();
-    final dayOfYear = _dayOfYear(now);
-    // 日期种子：每天轮换、各星座错位，结果稳定可复现
-    final index = (dayOfYear + signIndex) % list.length;
-    final text = list[index];
+    final dayOfYear = _dayOfYear(DateTime.now());
+
+    final list = _pool[signName];
+    final text = (list == null || list.isEmpty)
+        ? '保持好心情，今天也是值得期待的一天。'
+        : list[(dayOfYear + signIndex) % list.length];
+
+    final luckyNumber =
+        _luckyNumbers[(dayOfYear + signIndex * 3) % _luckyNumbers.length];
+    final luckyColor =
+        _luckyColors[(dayOfYear + signIndex * 5) % _luckyColors.length];
 
     if (kDebugMode) {
-      debugPrint('[星座运势] 内置数据集命中 sign=$signName day=$dayOfYear -> $text');
+      debugPrint(
+        '[星座运势] 内置数据集命中 sign=$signName day=$dayOfYear -> $text | 幸运$luckyNumber/$luckyColor',
+      );
     }
-    return text;
+    return HoroscopeResult(text, luckyNumber, luckyColor);
   }
 
   /// 计算一年中的第几天（1-366）

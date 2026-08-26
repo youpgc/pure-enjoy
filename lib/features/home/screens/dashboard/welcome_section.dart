@@ -6,67 +6,19 @@ import '../../services/horoscope_service.dart';
 
 /// 欢迎区块组件
 ///
-/// 展示用户欢迎语、用户名，并在卡片内追加一行「今日星座运势」（按生日推算星座，
-/// 读取内置离线运势数据集，无生日时静默不展示）。
-class WelcomeSection extends StatelessWidget {
+/// 按条件渲染：
+///   - 无生日 / 加载中：展示原欢迎卡（欢迎回来 + 用户名 + 今天想做些什么）；
+///   - 有星座运势：展示完整星座运势卡片（替换原欢迎文案）。
+class WelcomeSection extends StatefulWidget {
   const WelcomeSection({super.key});
 
   @override
-  Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.stretch,
-      children: [
-        Card(
-          child: Padding(
-            padding: const EdgeInsets.all(20),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  '欢迎回来',
-                  style: Theme.of(context).textTheme.headlineSmall,
-                ),
-                const SizedBox(height: 8),
-                Text(
-                  AuthService.instance.currentUserName ?? '用户',
-                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-                const SizedBox(height: 16),
-                Text(
-                  '今天想做些什么？',
-                  style: Theme.of(context).textTheme.bodyMedium,
-                ),
-                const SizedBox(height: 12),
-                const HoroscopeLine(),
-              ],
-            ),
-          ),
-        ),
-        const SizedBox(height: 16),
-      ],
-    );
-  }
+  State<WelcomeSection> createState() => _WelcomeSectionState();
 }
 
-/// 欢迎卡内的「今日星座运势」单行组件
-///
-/// 自包含：initState 时读取生日 → 推算星座 → 取内置运势文案，不污染 DashboardPage 聚合逻辑。
-/// 加载中显示细进度条；无生日 / 空文案时静默折叠（SizedBox.shrink），
-/// 绝不抛异常或影响首页其它区块。
-class HoroscopeLine extends StatefulWidget {
-  const HoroscopeLine({super.key});
-
-  @override
-  State<HoroscopeLine> createState() => _HoroscopeLineState();
-}
-
-class _HoroscopeLineState extends State<HoroscopeLine> {
+class _WelcomeSectionState extends State<WelcomeSection> {
   String? _signName;
-  String? _text;
+  HoroscopeResult? _result;
   bool _loading = true;
 
   @override
@@ -100,7 +52,7 @@ class _HoroscopeLineState extends State<HoroscopeLine> {
     }
 
     if (kDebugMode && birthday == null) {
-      debugPrint('[星座运势] 未取到生日（users 表无 birthday 或查询失败），不展示');
+      debugPrint('[星座运势] 未取到生日（users 表无 birthday 或查询失败），展示原欢迎卡');
     }
 
     final sign = zodiacSignFromBirthday(birthday);
@@ -108,11 +60,11 @@ class _HoroscopeLineState extends State<HoroscopeLine> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final text = await HoroscopeService.getDailyHoroscope(sign.name);
+    final data = await HoroscopeService.getDailyHoroscope(sign.name);
     if (mounted) {
       setState(() {
         _signName = sign.name;
-        _text = text;
+        _result = data;
         _loading = false;
       });
     }
@@ -121,31 +73,194 @@ class _HoroscopeLineState extends State<HoroscopeLine> {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final userName = AuthService.instance.currentUserName ?? '用户';
 
-    if (_loading) {
-      return const SizedBox(
-        height: 14,
-        child: LinearProgressIndicator(minHeight: 2),
+    // 有星座运势：展示完整运势卡片（替换原欢迎文案）
+    if (!_loading && _signName != null && _result != null) {
+      return Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          HoroscopeCard(signName: _signName!, data: _result!),
+          const SizedBox(height: 16),
+        ],
       );
     }
 
-    // 无生日 / 获取失败 / 空文案：静默不展示
-    if (_signName == null || _text == null || _text!.trim().isEmpty) {
-      return const SizedBox.shrink();
-    }
-
-    // 取首句作为「一行」概要，过长再省略，保持欢迎卡内轻量展示
-    final firstSentence = _text!.split(RegExp(r'(?<=[.!?])\s')).first;
-    final summary =
-        firstSentence.trim().isNotEmpty ? firstSentence.trim() : _text!;
-
-    return Text(
-      '今日 $_signName 运势：$summary',
-      style: Theme.of(context).textTheme.bodyMedium?.copyWith(
-            color: colorScheme.onSurfaceVariant,
+    // 无星座运势 / 加载中：沿用原欢迎卡
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Card(
+          child: Padding(
+            padding: const EdgeInsets.all(20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  '欢迎回来',
+                  style: Theme.of(context).textTheme.headlineSmall,
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  userName,
+                  style: Theme.of(context).textTheme.bodyLarge?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                ),
+                const SizedBox(height: 16),
+                Text(
+                  '今天想做些什么？',
+                  style: Theme.of(context).textTheme.bodyMedium,
+                ),
+                if (_loading)
+                  const Padding(
+                    padding: EdgeInsets.only(top: 12),
+                    child: SizedBox(
+                      height: 14,
+                      child: LinearProgressIndicator(minHeight: 2),
+                    ),
+                  ),
+              ],
+            ),
           ),
-      maxLines: 2,
-      overflow: TextOverflow.ellipsis,
+        ),
+        const SizedBox(height: 16),
+      ],
+    );
+  }
+}
+
+/// 完整星座运势卡片
+///
+/// 头部：星座符号 + 「今日 {星座} 运势」标题；
+/// 主体：当日运势文案（完整展示）；
+/// 底部：幸运数字 / 幸运颜色胶囊。
+class HoroscopeCard extends StatelessWidget {
+  final String signName;
+  final HoroscopeResult data;
+
+  const HoroscopeCard({
+    super.key,
+    required this.signName,
+    required this.data,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final symbol = zodiacSymbol[signName] ?? '✨';
+
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(20),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Container(
+                  width: 44,
+                  height: 44,
+                  decoration: BoxDecoration(
+                    color: colorScheme.primaryContainer,
+                    borderRadius: BorderRadius.circular(12),
+                  ),
+                  child: Center(
+                    child: Text(
+                      symbol,
+                      style: TextStyle(
+                        fontSize: 24,
+                        color: colorScheme.onPrimaryContainer,
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        '今日 $signName 运势',
+                        style: Theme.of(context).textTheme.titleMedium,
+                      ),
+                      const SizedBox(height: 2),
+                      Text(
+                        '每日星座指南',
+                        style: Theme.of(context)
+                            .textTheme
+                            .bodySmall
+                            ?.copyWith(color: colorScheme.onSurfaceVariant),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 16),
+            Text(
+              data.text,
+              style: Theme.of(context).textTheme.bodyMedium,
+            ),
+            const SizedBox(height: 16),
+            Wrap(
+              spacing: 10,
+              runSpacing: 10,
+              children: [
+                _LuckyChip(
+                  label: '幸运数字',
+                  value: data.luckyNumber,
+                  colorScheme: colorScheme,
+                ),
+                _LuckyChip(
+                  label: '幸运颜色',
+                  value: data.luckyColor,
+                  colorScheme: colorScheme,
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+}
+
+/// 幸运信息胶囊（标签 + 加粗值）
+class _LuckyChip extends StatelessWidget {
+  final String label;
+  final String value;
+  final ColorScheme colorScheme;
+
+  const _LuckyChip({
+    required this.label,
+    required this.value,
+    required this.colorScheme,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+      decoration: BoxDecoration(
+        color: colorScheme.secondaryContainer,
+        borderRadius: BorderRadius.circular(20),
+      ),
+      child: RichText(
+        text: TextSpan(
+          style: Theme.of(context)
+              .textTheme
+              .bodySmall
+              ?.copyWith(color: colorScheme.onSecondaryContainer),
+          children: [
+            TextSpan(text: '$label  '),
+            TextSpan(
+              text: value,
+              style: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }
