@@ -22,6 +22,9 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
   int _availablePoints = 0;
   bool _hasCheckedInToday = false;
   int _consecutiveCheckinDays = 0;
+  late DateTime _displayMonth;
+  Set<String> _checkedDates = {};
+  bool _isLoadingCalendar = false;
 
   @override
   int get pageSize => 20;
@@ -127,6 +130,49 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
     }
   }
 
+  /// 加载指定月份的已签到日期（供日历展示；只读查询）
+  Future<void> _loadCheckedDates() async {
+    if (mounted) setState(() => _isLoadingCalendar = true);
+    final dates =
+        await PointService.instance.getCheckinDatesInMonth(_displayMonth);
+    if (mounted) {
+      setState(() {
+        _checkedDates = dates;
+        _isLoadingCalendar = false;
+      });
+    }
+  }
+
+  /// 切换展示月份（delta = -1 上一月 / +1 下一月），不允许跳到未来月份
+  void _changeMonth(int delta) {
+    final today = beijingToday();
+    var y = _displayMonth.year;
+    var m = _displayMonth.month + delta;
+    if (m < 1) {
+      m = 12;
+      y -= 1;
+    } else if (m > 12) {
+      m = 1;
+      y += 1;
+    }
+    if (y > today.year || (y == today.year && m > today.month)) return;
+    setState(() => _displayMonth = DateTime(y, m, 1));
+    _loadCheckedDates();
+  }
+
+  /// 是否还能翻到下一月（当前月之后不可翻）
+  bool _canGoNextMonth() {
+    final today = beijingToday();
+    return _displayMonth.year < today.year ||
+        (_displayMonth.year == today.year &&
+            _displayMonth.month < today.month);
+  }
+
+  /// 补签入口（预留，暂未实现逻辑）
+  void _onMakeup() {
+    showSnackBar(context, '补签功能即将上线');
+  }
+
   /// 打卡
   Future<void> _handleCheckin() async {
     if (_isCheckingIn) return;
@@ -149,6 +195,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
         });
         showSnackBar(context, result['message'] ?? '签到成功');
         _loadRecords(refresh: true);
+        _loadCheckedDates();
       } else {
         showSnackBar(context, result['message'] ?? '签到失败');
       }
@@ -195,8 +242,16 @@ class _PointRecordsScreenState extends State<PointRecordsScreen> with PaginatedL
       onRefresh: () async {
         await _loadAvailablePoints();
         await _loadRecords(refresh: true);
+        await _loadCheckedDates();
       },
       onCheckin: _handleCheckin,
+      displayMonth: _displayMonth,
+      checkedDates: _checkedDates,
+      isLoadingCalendar: _isLoadingCalendar,
+      onPrevMonth: () => _changeMonth(-1),
+      onNextMonth: () => _changeMonth(1),
+      onMakeup: _onMakeup,
+      canGoNext: _canGoNextMonth(),
     );
   }
 }

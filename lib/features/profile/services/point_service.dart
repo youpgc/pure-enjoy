@@ -275,6 +275,48 @@ class PointService {
     return result.isSuccess && (result.data ?? []).isNotEmpty;
   }
 
+  /// 获取指定月份（北京时区）已签到的日期键集合（yyyy-MM-dd）。
+  ///
+  /// 仅供签到日历展示使用，纯只读查询 point_records，不修改任何数据、不改奖励逻辑。
+  /// [month] 任意代表目标月份的 DateTime（仅取年月）。
+  Future<Set<String>> getCheckinDatesInMonth(DateTime month) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return {};
+
+    final nextMonth = month.month == 12 ? 1 : month.month + 1;
+    final nextYear = month.month == 12 ? month.year + 1 : month.year;
+
+    // 以北京自然月为窗口：北京时间 [month-01 00:00, nextMonth-01 00:00)
+    // 中国不实行夏令时，固定 UTC+8，故直接对 UTC 零点边界减 8 小时即得对应 UTC 过滤边界。
+    final startUtc =
+        DateTime.utc(month.year, month.month, 1).subtract(const Duration(hours: 8));
+    final endUtc =
+        DateTime.utc(nextYear, nextMonth, 1).subtract(const Duration(hours: 8));
+
+    final result = await ApiClient.get(
+      'point_records',
+      filters: {
+        'user_id': 'eq.$userId',
+        'type': 'eq.checkin',
+        'and':
+            '(created_at.gte.${startUtc.toIso8601String()},created_at.lt.${endUtc.toIso8601String()})',
+      },
+      columns: 'created_at',
+      limit: null,
+    );
+
+    final dates = <String>{};
+    if (result.isSuccess && result.data != null) {
+      for (final record in result.data!) {
+        final created = record['created_at'] as String?;
+        if (created != null) {
+          dates.add(beijingDateKey(DateTime.parse(created)));
+        }
+      }
+    }
+    return dates;
+  }
+
   /// 积分变动时插入 point_records 流水记录（供其他模块调用）
   ///
   /// 插入后自动重算 users 表积分统计字段。
