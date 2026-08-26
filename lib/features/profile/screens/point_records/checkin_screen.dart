@@ -24,7 +24,9 @@ class _CheckinScreenState extends State<CheckinScreen> {
   bool _isCheckingIn = false;
   int _consecutiveCheckinDays = 0;
   late DateTime _displayMonth;
-  late DateTime _earliestDataMonth;
+  // 向前翻月的下界：非 late，默认给一个远过去的哨兵值，避免首帧 build 读取时触发
+  // LateInitializationError；initState 与查询最早签到月份后会覆盖为真实下界。
+  DateTime _earliestDataMonth = DateTime(2000, 1, 1);
   Set<String> _checkedDates = {};
   bool _isLoadingCalendar = false;
   int _makeupCardCount = 0;
