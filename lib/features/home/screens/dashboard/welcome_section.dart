@@ -7,7 +7,7 @@ import '../../services/horoscope_service.dart';
 /// 欢迎区块组件
 ///
 /// 展示用户欢迎语、用户名，并在卡片内追加一行「今日星座运势」（按生日推算星座，
-/// 调用免费公开接口获取，失败/无生日时静默不展示）。
+/// 读取内置离线运势数据集，无生日时静默不展示）。
 class WelcomeSection extends StatelessWidget {
   const WelcomeSection({super.key});
 
@@ -54,8 +54,8 @@ class WelcomeSection extends StatelessWidget {
 
 /// 欢迎卡内的「今日星座运势」单行组件
 ///
-/// 自包含：initState 时读取生日 → 推算星座 → 拉取运势，不污染 DashboardPage 聚合逻辑。
-/// 加载中显示细进度条；无生日 / 获取失败 / 空文案时静默折叠（SizedBox.shrink），
+/// 自包含：initState 时读取生日 → 推算星座 → 取内置运势文案，不污染 DashboardPage 聚合逻辑。
+/// 加载中显示细进度条；无生日 / 空文案时静默折叠（SizedBox.shrink），
 /// 绝不抛异常或影响首页其它区块。
 class HoroscopeLine extends StatefulWidget {
   const HoroscopeLine({super.key});
