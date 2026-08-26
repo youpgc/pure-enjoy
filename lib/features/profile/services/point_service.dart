@@ -454,6 +454,61 @@ class PointService {
   /// 每月补签次数上限（产品决策：每月最多补签 4 次，按真实操作时间所在北京自然月统计）
   static const int maxMakeupPerMonth = 4;
 
+  /// 补签可回溯的最大自然月数（仅允许补签最近 [maxMakeupMonthsBack] 个自然月内的日期，含当前月）
+  static const int maxMakeupMonthsBack = 3;
+
+  /// 判断目标日期是否仍在可补签的时间窗口内（最近 [maxMakeupMonthsBack] 个自然月 + 必须是过去日）。
+  ///
+  /// 供 UI 前置禁用不可用日期的点击，以及 [makeupCheckin] 服务端兜底校验。
+  static bool isMakeupDateAllowed(DateTime date) {
+    final today = beijingToday();
+    final todayDay = DateTime(today.year, today.month, today.day);
+    if (!date.isBefore(todayDay)) return false; // 必须是过去的日期
+    // 窗口起点：当前月往前推 (maxMakeupMonthsBack - 1) 个月的首日
+    var y = today.year;
+    var m = today.month - (maxMakeupMonthsBack - 1);
+    while (m <= 0) {
+      m += 12;
+      y -= 1;
+    }
+    final windowStart = DateTime(y, m, 1);
+    return !date.isBefore(windowStart);
+  }
+
+  /// 查询最早一条签到记录所在月份的首日（仅取年月），无数据返回 null。
+  ///
+  /// 用于约束日历向前翻月范围：早于该月的月份均无签到数据，不再允许切换。
+  /// 只读 point_records，不修改任何数据。
+  Future<DateTime?> getEarliestCheckinMonth() async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return null;
+    try {
+      final result = await ApiClient.get(
+        'point_records',
+        filters: {
+          'user_id': 'eq.$userId',
+          'type': 'eq.checkin',
+        },
+        columns: 'created_at',
+        order: 'created_at.asc',
+        limit: 1,
+      );
+      if (result.isSuccess &&
+          result.data != null &&
+          result.data!.isNotEmpty) {
+        final created = result.data![0]['created_at'] as String?;
+        if (created != null) {
+          final dt = DateTime.parse(created);
+          return DateTime(dt.year, dt.month, 1);
+        }
+      }
+      return null;
+    } catch (e) {
+      if (kDebugMode) debugPrint('查询最早签到月份失败: $e');
+      return null;
+    }
+  }
+
   /// 统计当前北京自然月内已发生的补签次数（按 makeup_checkins.created_at 真实操作时间）。
   ///
   /// 仅读 makeup_checkins，不修改任何数据。用于「每月最多 [maxMakeupPerMonth] 次」限额校验。
@@ -563,6 +618,11 @@ class PointService {
       // 只允许补签过去的日期（不含今天）
       if (!targetDay.isBefore(todayDay)) {
         return {'success': false, 'message': '只能补签过去的日期'};
+      }
+
+      // 1.5 补签时间窗口：仅允许最近 maxMakeupMonthsBack 个自然月内的日期
+      if (!isMakeupDateAllowed(targetDay)) {
+        return {'success': false, 'message': '只能补签最近3个月内的日期'};
       }
 
       // 2. 目标日是否已签到（北京自然日窗口）

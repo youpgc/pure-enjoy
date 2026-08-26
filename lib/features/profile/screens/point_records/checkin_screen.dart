@@ -24,6 +24,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
   bool _isCheckingIn = false;
   int _consecutiveCheckinDays = 0;
   late DateTime _displayMonth;
+  late DateTime _earliestDataMonth;
   Set<String> _checkedDates = {};
   bool _isLoadingCalendar = false;
   int _makeupCardCount = 0;
@@ -33,10 +34,23 @@ class _CheckinScreenState extends State<CheckinScreen> {
     super.initState();
     // 初始化展示月份为当前北京月份，避免 late 字段未初始化导致首屏崩溃
     _displayMonth = DateTime(beijingToday().year, beijingToday().month, 1);
+    // 向前翻月的下界：默认等同于当前月，待查询最早签到月份后修正
+    _earliestDataMonth = _displayMonth;
     _loadCachedPoints();
     _loadAvailablePoints();
     _loadMakeupCardCount();
     _loadCheckedDates();
+    _loadEarliestDataMonth();
+  }
+
+  /// 加载最早有签到数据的月份（约束向前翻月：更早的月份无数据则不再允许切换）
+  Future<void> _loadEarliestDataMonth() async {
+    final earliest = await PointService.instance.getEarliestCheckinMonth();
+    if (mounted) {
+      setState(() {
+        _earliestDataMonth = earliest ?? _displayMonth;
+      });
+    }
   }
 
   /// 读取本地缓存的积分统计，进入页面时立即展示（避免闪现 0）
@@ -86,7 +100,8 @@ class _CheckinScreenState extends State<CheckinScreen> {
     }
   }
 
-  /// 切换展示月份（delta = -1 上一月 / +1 下一月），不允许跳到未来月份
+  /// 切换展示月份（delta = -1 上一月 / +1 下一月）。
+  /// 不允许跳到未来月份；也不允许翻到早于最早签到数据的月份（更早月份无数据）。
   void _changeMonth(int delta) {
     final today = beijingToday();
     var y = _displayMonth.year;
@@ -99,6 +114,10 @@ class _CheckinScreenState extends State<CheckinScreen> {
       y += 1;
     }
     if (y > today.year || (y == today.year && m > today.month)) return;
+    if (y < _earliestDataMonth.year ||
+        (y == _earliestDataMonth.year && m < _earliestDataMonth.month)) {
+      return;
+    }
     setState(() => _displayMonth = DateTime(y, m, 1));
     _loadCheckedDates();
   }
@@ -109,6 +128,16 @@ class _CheckinScreenState extends State<CheckinScreen> {
     return _displayMonth.year < today.year ||
         (_displayMonth.year == today.year &&
             _displayMonth.month < today.month);
+  }
+
+  /// 是否还能向前翻月（早于最早签到数据的月份无数据则不可翻）
+  bool _canGoPrevMonth() {
+    if (_displayMonth.year > _earliestDataMonth.year) return true;
+    if (_displayMonth.year == _earliestDataMonth.year &&
+        _displayMonth.month > _earliestDataMonth.month) {
+      return true;
+    }
+    return false;
   }
 
   /// 加载持有的补签卡数量（供日历提示与补签弹窗使用）
@@ -169,6 +198,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
                               _loadCheckedDates();
                               _loadMakeupCardCount();
                               _loadAvailablePoints();
+                              _loadEarliestDataMonth();
                             }
                           },
                     child: making
@@ -216,6 +246,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
         });
         showSnackBar(context, result['message'] ?? '签到成功');
         _loadCheckedDates();
+        _loadEarliestDataMonth();
       } else {
         showSnackBar(context, result['message'] ?? '签到失败');
       }
@@ -261,6 +292,7 @@ class _CheckinScreenState extends State<CheckinScreen> {
           onNextMonth: () => _changeMonth(1),
           onMakeup: _onMakeup,
           canGoNext: _canGoNextMonth(),
+          canGoPrev: _canGoPrevMonth(),
           makeupCardCount: _makeupCardCount,
         ),
       ),

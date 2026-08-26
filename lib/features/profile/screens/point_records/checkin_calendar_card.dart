@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../services/point_service_utils.dart';
+import '../../services/point_service.dart';
 
 /// 会员积分打卡日历卡片（重新设计版）。
 ///
@@ -22,6 +23,7 @@ class CheckinCalendarCard extends StatelessWidget {
     required this.onNextMonth,
     required this.onMakeup,
     required this.canGoNext,
+    required this.canGoPrev,
     required this.makeupCardCount,
   });
 
@@ -38,6 +40,7 @@ class CheckinCalendarCard extends StatelessWidget {
   final VoidCallback onNextMonth;
   final void Function(DateTime) onMakeup;
   final bool canGoNext;
+  final bool canGoPrev;
   final int makeupCardCount;
 
   @override
@@ -193,7 +196,7 @@ class CheckinCalendarCard extends StatelessWidget {
       mainAxisAlignment: MainAxisAlignment.spaceBetween,
       children: [
         IconButton(
-          onPressed: onPrevMonth,
+          onPressed: canGoPrev ? onPrevMonth : null,
           icon: const Icon(Icons.chevron_left),
           color: cs.onSurface,
           visualDensity: VisualDensity.compact,
@@ -281,8 +284,10 @@ class CheckinCalendarCard extends StatelessWidget {
     final todayDate = DateTime(today.year, today.month, today.day);
     final isFuture = cellDate.isAfter(todayDate);
     final isPastMissed = !isToday && !isFuture && !isChecked;
+    // 仅在「过去日 + 未签到 + 处于可补签时间窗口（最近3个月）」内才允许点击补签
+    final canMakeup = isPastMissed && PointService.isMakeupDateAllowed(cellDate);
 
-    final onTap = isPastMissed ? () => onMakeup(cellDate) : null;
+    final onTap = canMakeup ? () => onMakeup(cellDate) : null;
 
     return AspectRatio(
       aspectRatio: 1,
@@ -294,7 +299,7 @@ class CheckinCalendarCard extends StatelessWidget {
           decoration: BoxDecoration(
             shape: BoxShape.circle,
             color: isChecked ? cs.primary : null,
-            border: (!isChecked && (isToday || isPastMissed))
+            border: (!isChecked && (isToday || canMakeup))
                 ? Border.all(
                     color: isToday
                         ? cs.primary
@@ -319,7 +324,7 @@ class CheckinCalendarCard extends StatelessWidget {
                     fontSize: 13,
                   ),
                 ),
-              if (isPastMissed)
+              if (canMakeup)
                 Container(
                   width: 4,
                   height: 4,
