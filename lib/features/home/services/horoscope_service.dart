@@ -124,7 +124,7 @@ const List<String> _luckyTimes = [
 ];
 
 /// 分项运势维度（用于星级评分展示，顺序即卡片展示顺序）
-const List<String> _ratingDims = ['整体', '爱情', '事业', '财运', '健康'];
+const List<String> _ratingDims = ['整体', '事业', '财运', '爱情', '健康'];
 
 /// 星座运势服务（内置离线数据集，稳定可用）
 ///
