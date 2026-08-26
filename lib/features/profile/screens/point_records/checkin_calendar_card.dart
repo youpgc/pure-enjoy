@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 import '../../services/point_service_utils.dart';
 
-/// 支付宝式「会员积分打卡日历」卡片。
+/// 会员积分打卡日历卡片（重新设计版）。
 ///
-/// 形态：可用积分概览 + 月份导航 + 当月签到日网格 + 连续天数/满额进度 + 大签到按钮。
-/// 网格状态：已签(打勾) / 今日(高亮描边) / 未来(置灰不可点) / 历史漏签(可点触发补签占位)。
-/// 主题感知（不硬编码配色），仅展示与当日签到，不触碰 checkin() 奖励公式、不动后端。
+/// 结构：顶部品牌色头部（可用积分 + 右上角签到按钮）/ 浅色身体（月份导航 + 签到网格 + 连续进度）。
+/// 网格状态：已签(实心圆+勾) / 今日(主色描边) / 未来(置灰) / 历史漏签(可点触发补签)。
+/// 主题感知（仅用 colorScheme 语义色，不硬编码配色），不触碰 checkin() 奖励公式、不动后端。
 class CheckinCalendarCard extends StatelessWidget {
   const CheckinCalendarCard({
     super.key,
@@ -50,24 +50,26 @@ class CheckinCalendarCard extends StatelessWidget {
     return Card(
       margin: const EdgeInsets.all(16),
       clipBehavior: Clip.antiAlias,
-      child: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topLeft,
-            end: Alignment.bottomRight,
-            colors: [
-              colorScheme.primaryContainer,
-              colorScheme.primaryContainer.withValues(alpha: 0.65),
-            ],
-          ),
-        ),
-        padding: const EdgeInsets.all(20),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            // 积分概览
-            Row(
-              crossAxisAlignment: CrossAxisAlignment.end,
+      elevation: 2,
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // ===== 顶部品牌色头部：积分 + 右上角签到按钮 =====
+          Container(
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+                colors: [
+                  colorScheme.primary,
+                  colorScheme.primary.withValues(alpha: 0.88),
+                ],
+              ),
+            ),
+            padding: const EdgeInsets.fromLTRB(20, 22, 16, 20),
+            child: Row(
+              crossAxisAlignment: CrossAxisAlignment.center,
               children: [
                 Expanded(
                   child: Column(
@@ -80,7 +82,8 @@ class CheckinCalendarCard extends StatelessWidget {
                             .displayMedium
                             ?.copyWith(
                               fontWeight: FontWeight.bold,
-                              color: colorScheme.onPrimaryContainer,
+                              color: colorScheme.onPrimary,
+                              height: 1.1,
                             ),
                       ),
                       const SizedBox(height: 4),
@@ -90,114 +93,129 @@ class CheckinCalendarCard extends StatelessWidget {
                             .textTheme
                             .bodyMedium
                             ?.copyWith(
-                              color: colorScheme.onPrimaryContainer
-                                  .withValues(alpha: 0.7),
+                              color:
+                                  colorScheme.onPrimary.withValues(alpha: 0.85),
                             ),
                       ),
                     ],
                   ),
                 ),
-                if (isLoadingPoints)
-                  SizedBox(
-                    width: 14,
-                    height: 14,
-                    child: CircularProgressIndicator(
-                      strokeWidth: 2,
-                      color: colorScheme.onPrimaryContainer,
-                    ),
-                  ),
+                const SizedBox(width: 12),
+                if (isCurrentMonth) _buildCheckinButton(colorScheme),
               ],
             ),
-            const SizedBox(height: 16),
+          ),
 
-            // 月份导航
-            Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          // ===== 浅色身体：月份导航 + 日历网格 + 连续进度 =====
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 18, 20, 20),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
               children: [
-                IconButton(
-                  onPressed: onPrevMonth,
-                  icon: const Icon(Icons.chevron_left),
-                  color: colorScheme.onPrimaryContainer,
-                  visualDensity: VisualDensity.compact,
+                _buildMonthNav(context, colorScheme),
+                const SizedBox(height: 14),
+                _buildWeekdayHeader(colorScheme),
+                const SizedBox(height: 8),
+                isLoadingCalendar
+                    ? const Padding(
+                        padding: EdgeInsets.all(24),
+                        child:
+                            Center(child: CircularProgressIndicator()),
+                      )
+                    : _buildDayGrid(colorScheme, today, isCurrentMonth),
+                const SizedBox(height: 12),
+                Center(
+                  child: Text(
+                    '点击漏签日期可补签（持有 $makeupCardCount 张补签卡）',
+                    style: Theme.of(context)
+                        .textTheme
+                        .labelSmall
+                        ?.copyWith(
+                          color: colorScheme.onSurfaceVariant
+                              .withValues(alpha: 0.8),
+                        ),
+                  ),
                 ),
-                Text(
-                  '${displayMonth.year}年${displayMonth.month}月',
-                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                        color: colorScheme.onPrimaryContainer,
-                        fontWeight: FontWeight.w600,
-                      ),
-                ),
-                IconButton(
-                  onPressed: canGoNext ? onNextMonth : null,
-                  icon: const Icon(Icons.chevron_right),
-                  color: colorScheme.onPrimaryContainer,
-                  visualDensity: VisualDensity.compact,
-                ),
+                const SizedBox(height: 16),
+                _buildStreakProgress(context, colorScheme),
               ],
             ),
-
-            // 星期表头（周一开头）
-            _weekdayHeader(colorScheme),
-            const SizedBox(height: 8),
-
-            // 日期网格
-            isLoadingCalendar
-                ? const Padding(
-                    padding: EdgeInsets.all(24),
-                    child: Center(child: CircularProgressIndicator()),
-                  )
-                : _dayGrid(colorScheme, today, isCurrentMonth),
-
-            const SizedBox(height: 12),
-            Center(
-              child: Text(
-                '点击漏签日期可补签（持有 $makeupCardCount 张补签卡）',
-                style: Theme.of(context).textTheme.labelSmall?.copyWith(
-                      color: colorScheme.onPrimaryContainer.withValues(alpha: 0.55),
-                    ),
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // 连续签到 + 满额进度
-            _streakProgress(context, colorScheme),
-
-            const SizedBox(height: 16),
-
-            // 签到按钮（仅当前月展示）
-            if (isCurrentMonth)
-              SizedBox(
-                width: double.infinity,
-                child: FilledButton(
-                  onPressed: (hasCheckedInToday || isCheckingIn) ? null : onCheckin,
-                  child: isCheckingIn
-                      ? const SizedBox(
-                          width: 18,
-                          height: 18,
-                          child: CircularProgressIndicator(strokeWidth: 2),
-                        )
-                      : Row(
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(
-                              hasCheckedInToday
-                                  ? Icons.check_circle
-                                  : Icons.edit_calendar,
-                            ),
-                            const SizedBox(width: 6),
-                            Text(hasCheckedInToday ? '今日已签到' : '签到'),
-                          ],
-                        ),
-                ),
-              ),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
 
-  Widget _weekdayHeader(ColorScheme cs) {
+  /// 右上角签到按钮（仅当前月展示），玻璃质感的浅色按钮置于品牌头部之上
+  Widget _buildCheckinButton(ColorScheme cs) {
+    final onPrimary = cs.onPrimary;
+    return SizedBox(
+      height: 40,
+      child: FilledButton(
+        style: FilledButton.styleFrom(
+          backgroundColor: onPrimary.withValues(alpha: 0.18),
+          foregroundColor: onPrimary,
+          disabledBackgroundColor: onPrimary.withValues(alpha: 0.12),
+          disabledForegroundColor: onPrimary.withValues(alpha: 0.6),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(20),
+          ),
+          padding: const EdgeInsets.symmetric(horizontal: 16),
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        onPressed: (hasCheckedInToday || isCheckingIn) ? null : onCheckin,
+        child: isCheckingIn
+            ? SizedBox(
+                width: 16,
+                height: 16,
+                child: CircularProgressIndicator(
+                  strokeWidth: 2,
+                  color: onPrimary,
+                ),
+              )
+            : Row(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Icon(
+                    hasCheckedInToday ? Icons.check_circle : Icons.edit_calendar,
+                    size: 18,
+                  ),
+                  const SizedBox(width: 6),
+                  Text(hasCheckedInToday ? '今日已签到' : '签到'),
+                ],
+              ),
+      ),
+    );
+  }
+
+  Widget _buildMonthNav(BuildContext context, ColorScheme cs) {
+    return Row(
+      mainAxisAlignment: MainAxisAlignment.spaceBetween,
+      children: [
+        IconButton(
+          onPressed: onPrevMonth,
+          icon: const Icon(Icons.chevron_left),
+          color: cs.onSurface,
+          visualDensity: VisualDensity.compact,
+        ),
+        Text(
+          '${displayMonth.year}年${displayMonth.month}月',
+          style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                color: cs.onSurface,
+                fontWeight: FontWeight.w600,
+              ),
+        ),
+        IconButton(
+          onPressed: canGoNext ? onNextMonth : null,
+          icon: const Icon(Icons.chevron_right),
+          color: cs.onSurface,
+          visualDensity: VisualDensity.compact,
+        ),
+      ],
+    );
+  }
+
+  Widget _buildWeekdayHeader(ColorScheme cs) {
     const labels = ['一', '二', '三', '四', '五', '六', '日'];
     return Row(
       children: labels
@@ -207,7 +225,7 @@ class CheckinCalendarCard extends StatelessWidget {
                 child: Text(
                   l,
                   style: TextStyle(
-                    color: cs.onPrimaryContainer.withValues(alpha: 0.65),
+                    color: cs.onSurfaceVariant,
                     fontSize: 12,
                     fontWeight: FontWeight.w500,
                   ),
@@ -219,7 +237,8 @@ class CheckinCalendarCard extends StatelessWidget {
     );
   }
 
-  Widget _dayGrid(ColorScheme cs, DateTime today, bool isCurrentMonth) {
+  Widget _buildDayGrid(
+      ColorScheme cs, DateTime today, bool isCurrentMonth) {
     final firstDay = DateTime(displayMonth.year, displayMonth.month, 1);
     final daysInMonth =
         DateTime(displayMonth.year, displayMonth.month + 1, 1)
@@ -235,7 +254,8 @@ class CheckinCalendarCard extends StatelessWidget {
         continue;
       }
       final day = i - leading + 1;
-      cells.add(Expanded(child: _dayCell(cs, today, day, isCurrentMonth)));
+      cells.add(Expanded(
+          child: _buildDayCell(cs, today, day, isCurrentMonth)));
     }
 
     return Column(
@@ -249,7 +269,8 @@ class CheckinCalendarCard extends StatelessWidget {
     );
   }
 
-  Widget _dayCell(ColorScheme cs, DateTime today, int day, bool isCurrentMonth) {
+  Widget _buildDayCell(
+      ColorScheme cs, DateTime today, int day, bool isCurrentMonth) {
     final key =
         '${displayMonth.year}-${displayMonth.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
     final isToday = displayMonth.year == today.year &&
@@ -267,7 +288,7 @@ class CheckinCalendarCard extends StatelessWidget {
       aspectRatio: 1,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(10),
         child: Container(
           margin: const EdgeInsets.all(2),
           decoration: BoxDecoration(
@@ -277,7 +298,8 @@ class CheckinCalendarCard extends StatelessWidget {
                 ? Border.all(
                     color: isToday
                         ? cs.primary
-                        : cs.onPrimaryContainer.withValues(alpha: 0.3),
+                        : cs.onSurfaceVariant.withValues(alpha: 0.5),
+                    width: isToday ? 1.5 : 1,
                   )
                 : null,
           ),
@@ -291,8 +313,8 @@ class CheckinCalendarCard extends StatelessWidget {
                   '$day',
                   style: TextStyle(
                     color: isFuture
-                        ? cs.onPrimaryContainer.withValues(alpha: 0.3)
-                        : (isToday ? cs.primary : cs.onPrimaryContainer),
+                        ? cs.onSurface.withValues(alpha: 0.3)
+                        : (isToday ? cs.primary : cs.onSurface),
                     fontWeight: isToday ? FontWeight.bold : FontWeight.normal,
                     fontSize: 13,
                   ),
@@ -304,7 +326,7 @@ class CheckinCalendarCard extends StatelessWidget {
                   margin: const EdgeInsets.only(top: 2),
                   decoration: BoxDecoration(
                     shape: BoxShape.circle,
-                    color: cs.onPrimaryContainer.withValues(alpha: 0.4),
+                    color: cs.primary.withValues(alpha: 0.6),
                   ),
                 ),
             ],
@@ -314,7 +336,7 @@ class CheckinCalendarCard extends StatelessWidget {
     );
   }
 
-  Widget _streakProgress(BuildContext context, ColorScheme cs) {
+  Widget _buildStreakProgress(BuildContext context, ColorScheme cs) {
     const cap = 7;
     final reached =
         consecutiveCheckinDays >= cap ? cap : consecutiveCheckinDays;
@@ -330,7 +352,7 @@ class CheckinCalendarCard extends StatelessWidget {
             Text(
               '已连续签到 $consecutiveCheckinDays 天',
               style: TextStyle(
-                color: cs.onPrimaryContainer,
+                color: cs.onSurface,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -338,7 +360,7 @@ class CheckinCalendarCard extends StatelessWidget {
             Text(
               maxed ? '已享满额 7分/天' : '满7天每日得7分',
               style: TextStyle(
-                color: cs.onPrimaryContainer.withValues(alpha: 0.7),
+                color: cs.onSurfaceVariant,
                 fontSize: 12,
               ),
             ),
@@ -351,7 +373,7 @@ class CheckinCalendarCard extends StatelessWidget {
             value: progress,
             minHeight: 6,
             color: cs.primary,
-            backgroundColor: cs.onPrimaryContainer.withValues(alpha: 0.15),
+            backgroundColor: cs.onSurfaceVariant.withValues(alpha: 0.18),
           ),
         ),
       ],
