@@ -158,7 +158,7 @@ const Map<String, String> zodiacDateRange = {
 ///
 /// 普通会员免费 100 次/天。前往上述地址注册并申请「星座运势」接口获取 apiKey，
 /// 填入下方单引号内即可启用真实详细今日解读；留空则自动回退到内置离线数据集。
-const String _tianApiKey = '';
+const String _tianApiKey = '1720c03b95dfd17c4a4cb4a838cdc286';
 
 /// 幸运数字 / 颜色 / 方位 / 时间池（日期种子选取）
 const List<String> _luckyNumbers = ['1', '3', '5', '7', '8', '9', '2', '6', '4'];
@@ -376,6 +376,10 @@ class HoroscopeService {
       final resp = await HttpClient.instance.rawRequest(
         url,
         method: 'GET',
+        // 必须显式传 timeout：rawRequest 默认 requestTimeout=30s，而 requestWithRetry
+        // 默认总耗时预算=25s，若不传会在第一轮熔断判断即 abort（抛出"请求总耗时
+        // 超出预算"且不真正发请求）。10s 既小于预算、又给跨境/弱网足够余量。
+        timeout: const Duration(seconds: 10),
         note: '星座详细运势',
       );
       if (resp.statusCode != 200) {
