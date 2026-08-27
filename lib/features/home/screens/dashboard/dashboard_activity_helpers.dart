@@ -1,34 +1,32 @@
 import 'package:flutter/material.dart';
+import '../../../../services/dict_service.dart';
 import '../../../life/models/habit_model.dart';
 import './dashboard_helpers.dart';
 
 /// 由心情日记记录构建最近活动条目
 ///
-/// 展示用户选择的「心情」（mood_label / mood），不展示日记正文内容。
+/// 展示用户选择的「心情」（不展示日记正文内容）。
 Map<String, dynamic> buildDiaryActivity(Map<String, dynamic> item) {
-  final mood = item['mood']?.toString();
-  final moodLabel = item['mood_label']?.toString();
-  final moodText = '${mood != null && mood.isNotEmpty ? '$mood ' : ''}${moodLabel ?? ''}'
-      .trim();
   return {
     'icon': Icons.edit_note,
     'title': '心情日记',
-    'subtitle': moodText.isNotEmpty ? moodText : '记录了一条心情',
+    'subtitle': item['mood']?.toString() ?? item['content'] ?? '记录了一条心情',
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };
 }
 
-/// 由消费记录构建最近活动条目
+/// 由支出记录构建最近活动条目
 Map<String, dynamic> buildExpenseActivity(Map<String, dynamic> item) {
-  final amount = (item['amount'] as num?)?.toDouble() ?? 0;
-  final category = item['category']?.toString();
-  final subtitle =
-      '支出 ¥${amount.toStringAsFixed(2)}${category != null && category.isNotEmpty ? ' · $category' : ''}';
+  final categoryLabel = DictService.instance.getLabelOrDefault(
+    'expense_category',
+    item['category'] as String? ?? '',
+    defaultValue: item['category'] as String? ?? '其他',
+  );
   return {
-    'icon': Icons.payment,
-    'title': '消费记录',
-    'subtitle': subtitle,
+    'icon': Icons.attach_money,
+    'title': '支出记录',
+    'subtitle': '$categoryLabel ¥${item['amount'] ?? 0}',
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };
@@ -36,12 +34,10 @@ Map<String, dynamic> buildExpenseActivity(Map<String, dynamic> item) {
 
 /// 由体重记录构建最近活动条目
 Map<String, dynamic> buildWeightActivity(Map<String, dynamic> item) {
-  final weight = (item['weight'] as num?)?.toDouble();
-  final subtitle = weight != null ? '体重 ${weight.toStringAsFixed(1)} kg' : '记录了一条体重';
   return {
     'icon': Icons.monitor_weight,
     'title': '体重记录',
-    'subtitle': subtitle,
+    'subtitle': '${item['weight'] ?? 0} kg',
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };
