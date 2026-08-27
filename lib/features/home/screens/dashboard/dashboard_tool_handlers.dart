@@ -162,6 +162,8 @@ void dashboardHandleToolTap(
                   habitName: habit.name,
                 );
               }
+              // 新增习惯成功 → 广播事件，首页「今日打卡」区块经监听 invalidate 缓存并刷新
+              EventBus.instance.fire(EventType.habitUpdated);
               if (context.mounted) {
                 Navigator.pop(context);
                 showSnackBar(context, '习惯添加成功');

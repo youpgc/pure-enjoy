@@ -260,8 +260,10 @@ class PointService {
     }
 
     // 方法2：直接查询 point_records 表作为验证
-    final todayStart = DateTime(today.year, today.month, today.day)
-        .toUtc()
+    // 红线：北京当日 00:00 对应的 UTC 边界（固定 UTC+8，无夏令时）。
+    // 切勿用 DateTime(本地时区).toUtc()，非东八区设备会把本地 0 点误当北京 0 点，导致查询窗口错位。
+    final todayStart = DateTime.utc(today.year, today.month, today.day)
+        .subtract(const Duration(hours: 8))
         .toIso8601String();
     final result = await ApiClient.get(
       'point_records',
