@@ -113,11 +113,14 @@ class _WelcomeSectionState extends State<WelcomeSection> {
                   style: Theme.of(context).textTheme.bodyMedium,
                 ),
                 if (_loading)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 12),
+                  Padding(
+                    padding: const EdgeInsets.only(top: 12),
                     child: SizedBox(
                       height: 14,
-                      child: LinearProgressIndicator(minHeight: 2),
+                      child: LinearProgressIndicator(
+                        minHeight: 2,
+                        borderRadius: BorderRadius.circular(4),
+                      ),
                     ),
                   ),
               ],

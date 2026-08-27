@@ -178,19 +178,48 @@ mixin _DashboardLogic on State<DashboardPage> {
     // fetcher 只缓存原始 plain JSON（Supabase 返回），不缓存 IconData 等非序列化对象；
     // 读取时再 buildXxxActivity 生成含图标的渲染条目。否则 jsonEncode 缓存会抛异常。
     Future<ApiResponse> fetcher() async {
-      // 最近活动仅展示心情日记：只拉取 mood_diaries 最新一条
-      final result = await ApiClient.get('mood_diaries',
-          filters: {'user_id': 'eq.$userId'},
-          select: 'content,mood,created_at,date',
-          order: 'created_at.desc',
-          limit: 1);
+      // 最近活动聚合三类记录：心情日记 / 消费记录 / 体重记录（各取最新若干，合并后按时间排序）
+      final results = await Future.wait([
+        ApiClient.get('mood_diaries',
+            filters: {'user_id': 'eq.$userId'},
+            select: 'content,mood,mood_label,created_at,date',
+            order: 'created_at.desc',
+            limit: 6),
+        ApiClient.get('expenses',
+            filters: {'user_id': 'eq.$userId'},
+            select: 'amount,category,description,created_at,date',
+            order: 'created_at.desc',
+            limit: 6),
+        ApiClient.get('weight_records',
+            filters: {'user_id': 'eq.$userId'},
+            select: 'weight,bmi,body_fat,created_at,date',
+            order: 'created_at.desc',
+            limit: 6),
+      ]);
+
       final raw = <Map<String, dynamic>>[];
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final item = Map<String, dynamic>.from(result.data![0]);
-        item['__source'] = 'mood';
-        raw.add(item);
+      void collect(ApiResponse resp, String source) {
+        if (resp.isSuccess && resp.data != null) {
+          for (final it in resp.data!) {
+            final item = Map<String, dynamic>.from(it);
+            item['__source'] = source;
+            raw.add(item);
+          }
+        }
       }
-      return ApiResponse.success(raw);
+
+      collect(results[0], 'mood');
+      collect(results[1], 'expense');
+      collect(results[2], 'weight');
+
+      // 按 created_at 倒序（ISO 字符串字典序即时间序），取最新 8 条
+      raw.sort((a, b) {
+        final ca = a['created_at'] as String? ?? '';
+        final cb = b['created_at'] as String? ?? '';
+        return cb.compareTo(ca);
+      });
+      final top = raw.take(8).toList();
+      return ApiResponse.success(top);
     }
 
     try {
@@ -203,7 +232,14 @@ mixin _DashboardLogic on State<DashboardPage> {
       if (!mounted) return;
       final activities = <Map<String, dynamic>>[];
       for (final r in rows) {
-        activities.add(buildDiaryActivity(r));
+        final source = r['__source'] as String? ?? 'mood';
+        if (source == 'expense') {
+          activities.add(buildExpenseActivity(r));
+        } else if (source == 'weight') {
+          activities.add(buildWeightActivity(r));
+        } else {
+          activities.add(buildDiaryActivity(r));
+        }
       }
       setState(() {
         _recentActivities = activities;
