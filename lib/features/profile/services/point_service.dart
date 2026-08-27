@@ -626,14 +626,16 @@ class PointService {
       }
 
       // 2. 目标日是否已签到（北京自然日窗口）
-      final nextDay = targetDay.add(const Duration(days: 1));
+      // 必须用服务端唯一索引列 created_date（北京日，触发器从 created_at 派生）直接判重，
+      // 不能用 created_at + 设备本地时区换算的窗口——旧逻辑 targetDay.toUtc() 在设备时区
+      // 非东八区时窗口会整体偏移，漏检已签到日，插入时触发唯一索引 409（用户看到的
+      // 「数据冲突」）。放宽 amount 约束后插入真正落地，该潜在漏检才暴露。
       final exist = await ApiClient.get(
         'point_records',
         filters: {
           'user_id': 'eq.$userId',
           'type': 'eq.checkin',
-          'and':
-              '(created_at.gte.${targetDay.toUtc().toIso8601String()},created_at.lt.${nextDay.toUtc().toIso8601String()})',
+          'created_date': 'eq.${beijingDateKey(targetDay)}',
         },
         columns: 'id',
         limit: 1,
@@ -687,6 +689,10 @@ class PointService {
       if (!insert.isSuccess) {
         // 插流水失败 → 回滚扣减（补签卡加回）
         await _upsertMakeupCard(1);
+        // 唯一索引 (user_id,type,created_date) 冲突：该北京日已有签到/补签，兜底翻译为友好文案
+        if (insert.statusCode == 409) {
+          return {'success': false, 'message': '该日期已签到或已补签'};
+        }
         return {'success': false, 'message': '补签失败：${insert.error}'};
       }
 
