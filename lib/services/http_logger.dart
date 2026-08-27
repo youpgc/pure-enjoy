@@ -86,6 +86,6 @@ void logRequest({
     sb.writeln('   响应: ${truncate(responseBody)}');
   }
   sb.writeln(logDivider);
-  // [临时] 调试补签 400 时恢复打印；定位后请重新注释本行
-  debugPrint(sb.toString());
+  // [临时] 调试补签 400 时曾恢复打印；根因已定位（point_records amount/type 约束），恢复正常静默
+  // debugPrint(sb.toString());
 }
