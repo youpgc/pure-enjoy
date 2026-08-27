@@ -19,7 +19,7 @@ class WelcomeSection extends StatefulWidget {
 
 class _WelcomeSectionState extends State<WelcomeSection> {
   String? _signName;
-  HoroscopeResult? _result;
+  HoroscopeDetail? _detail;
   bool _loading = true;
 
   @override
@@ -61,11 +61,11 @@ class _WelcomeSectionState extends State<WelcomeSection> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final data = await HoroscopeService.getDailyHoroscope(sign.name);
+    final data = await HoroscopeService.getHoroscope(sign.name);
     if (mounted) {
       setState(() {
         _signName = sign.name;
-        _result = data;
+        _detail = data;
         _loading = false;
       });
     }
@@ -77,11 +77,11 @@ class _WelcomeSectionState extends State<WelcomeSection> {
     final userName = AuthService.instance.currentUserName ?? '用户';
 
     // 有星座运势：展示完整运势卡片（替换原欢迎文案）
-    if (!_loading && _signName != null && _result != null) {
+    if (!_loading && _signName != null && _detail != null) {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.stretch,
         children: [
-          HoroscopeCard(signName: _signName!, data: _result!),
+          HoroscopeCard(signName: _signName!, data: _detail!),
           const SizedBox(height: 16),
         ],
       );
@@ -138,7 +138,7 @@ class _WelcomeSectionState extends State<WelcomeSection> {
 /// 底部：左右两栏——左「运势指数」(分项星级) / 右「今日幸运」(幸运信息)，各纵向展示。
 class HoroscopeCard extends StatelessWidget {
   final String signName;
-  final HoroscopeResult data;
+  final HoroscopeDetail data;
 
   const HoroscopeCard({
     super.key,
@@ -207,12 +207,23 @@ class HoroscopeCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 12),
+            if (!data.fromRemote)
+              Padding(
+                padding: const EdgeInsets.only(bottom: 8),
+                child: Text(
+                  '当前为内置解读（接口不可用）',
+                  style: Theme.of(context)
+                      .textTheme
+                      .bodySmall
+                      ?.copyWith(color: colorScheme.onSurfaceVariant),
+                ),
+              ),
             Text(
-              data.text,
+              data.overview,
               style: Theme.of(context).textTheme.bodyMedium,
             ),
             const SizedBox(height: 12),
-            // 左右两栏：左=分项星级，右=今日幸运，各纵向展示
+            // 左右两栏：左=分项指数，右=今日幸运，各纵向展示（与详情页同源）
             Row(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -228,10 +239,10 @@ class HoroscopeCard extends StatelessWidget {
                             ),
                       ),
                       const SizedBox(height: 8),
-                      ...data.ratings.entries.map((e) {
+                      ..._horoscopeIndexOrder.map((k) {
                         return _RatingRow(
-                          label: e.key,
-                          stars: e.value,
+                          label: k,
+                          starText: _horoscopeStarString(data, k),
                           colorScheme: colorScheme,
                         );
                       }),
@@ -251,11 +262,14 @@ class HoroscopeCard extends StatelessWidget {
                             ),
                       ),
                       const SizedBox(height: 8),
-                      _LuckyRow(label: '幸运数字', value: data.luckyNumber, colorScheme: colorScheme),
                       _LuckyRow(label: '幸运颜色', value: data.luckyColor, colorScheme: colorScheme),
-                      _LuckyRow(label: '幸运方位', value: data.luckyDirection, colorScheme: colorScheme),
-                      _LuckyRow(label: '幸运时间', value: data.luckyTime, colorScheme: colorScheme),
-                      _LuckyRow(label: '速配星座', value: data.matchSign, colorScheme: colorScheme),
+                      _LuckyRow(label: '幸运数字', value: data.luckyNumber, colorScheme: colorScheme),
+                      if (data.extraSign != null && data.extraSignLabel != null)
+                        _LuckyRow(
+                          label: data.extraSignLabel!,
+                          value: data.extraSign!,
+                          colorScheme: colorScheme,
+                        ),
                     ],
                   ),
                 ),
@@ -272,19 +286,17 @@ class HoroscopeCard extends StatelessWidget {
 /// 分项运势星级一行（维度名左 + 星标右）
 class _RatingRow extends StatelessWidget {
   final String label;
-  final int stars;
+  final String starText;
   final ColorScheme colorScheme;
 
   const _RatingRow({
     required this.label,
-    required this.stars,
+    required this.starText,
     required this.colorScheme,
   });
 
   @override
   Widget build(BuildContext context) {
-    final filled = '★' * stars;
-    final empty = '☆' * (5 - stars);
     return Padding(
       padding: const EdgeInsets.only(bottom: 5),
       child: Row(
@@ -298,7 +310,7 @@ class _RatingRow extends StatelessWidget {
           ),
           const SizedBox(width: 8),
           Text(
-            '$filled$empty',
+            starText,
             style: TextStyle(
               fontSize: 13,
               color: colorScheme.tertiary,
@@ -309,6 +321,21 @@ class _RatingRow extends StatelessWidget {
       ),
     );
   }
+}
+
+/// 首页运势卡各维度展示顺序（与详情页一致）
+const List<String> _horoscopeIndexOrder = ['综合', '爱情', '事业', '财运', '健康'];
+
+/// 将 [HoroscopeDetail.indices] 中某维度的值统一渲染为「★☆」星级文本
+/// （远程为百分比，四舍五入按 20% 一星换算；内置回退已为星级文本，原样返回）。
+String _horoscopeStarString(HoroscopeDetail d, String key) {
+  final v = d.indices[key] ?? '';
+  if (d.indicesArePercent) {
+    final p = int.tryParse(v.replaceAll('%', '').trim()) ?? 0;
+    final s = ((p + 9) ~/ 20).clamp(1, 5);
+    return '${'★' * s}${'☆' * (5 - s)}';
+  }
+  return v;
 }
 
 /// 幸运信息一行（标签左 + 加粗值右）

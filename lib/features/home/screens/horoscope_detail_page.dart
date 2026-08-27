@@ -26,42 +26,14 @@ class _HoroscopeDetailPageState extends State<HoroscopeDetailPage> {
   }
 
   Future<void> _load() async {
-    // 1) 优先真实接口
-    HoroscopeDetail? data =
-        await HoroscopeService.fetchHoroscopeDetail(widget.signName);
-    // 2) 回退内置数据集
-    if (data == null) {
-      final r = await HoroscopeService.getDailyHoroscope(widget.signName);
-      if (r != null) data = _fromResult(widget.signName, r);
-    }
+    // 优先真实接口，失败/无数据自动回退内置（getHoroscope 内部处理）
+    final data = await HoroscopeService.getHoroscope(widget.signName);
     if (mounted) {
       setState(() {
         _detail = data;
         _loading = false;
       });
     }
-  }
-
-  /// 由内置 [HoroscopeResult] 构造详情结构（指数用星级文本展示）
-  HoroscopeDetail _fromResult(String signName, HoroscopeResult r) {
-    String star(int n) => '${'★' * n}${'☆' * (5 - n)}';
-    return HoroscopeDetail(
-      signName: signName,
-      overview: r.text,
-      indices: {
-        '综合': star(r.ratings['整体'] ?? 3),
-        '爱情': star(r.ratings['爱情'] ?? 3),
-        '事业': star(r.ratings['事业'] ?? 3),
-        '财运': star(r.ratings['财运'] ?? 3),
-        '健康': star(r.ratings['健康'] ?? 3),
-      },
-      indicesArePercent: false,
-      luckyColor: r.luckyColor,
-      luckyNumber: r.luckyNumber,
-      extraSign: r.matchSign,
-      extraSignLabel: '速配星座',
-      fromRemote: false,
-    );
   }
 
   @override
@@ -137,7 +109,7 @@ class _HoroscopeDetailPageState extends State<HoroscopeDetailPage> {
                         Padding(
                           padding: const EdgeInsets.only(top: 12),
                           child: Text(
-                            '当前为内置解读（未接入第三方接口）',
+                            '当前为内置解读（接口不可用）',
                             style: Theme.of(context)
                                 .textTheme
                                 .bodySmall

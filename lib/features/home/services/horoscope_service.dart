@@ -351,6 +351,48 @@ class HoroscopeService {
     );
   }
 
+  /// 统一的「今日运势」获取入口：优先真实接口，失败/无数据回退内置。
+  ///
+  /// 首页卡片与详情页共用此方法，保证两者展示的运势内容一致（同一份 [HoroscopeDetail]）。
+  /// 永远返回非空结果（内置兜底），[HoroscopeDetail.fromRemote] 标识数据来源，
+  /// 调用方可据此决定是否展示「内置解读」提示。
+  static Future<HoroscopeDetail> getHoroscope(String signName) async {
+    final remote = await fetchHoroscopeDetail(signName);
+    if (remote != null) return remote;
+
+    // 回退到内置离线数据集
+    final builtin = await getDailyHoroscope(signName);
+    if (builtin == null) {
+      return HoroscopeDetail(
+        signName: signName,
+        overview: '保持好心情，今天也是值得期待的一天。',
+        indices: const {},
+        indicesArePercent: true,
+        luckyColor: '—',
+        luckyNumber: '—',
+        fromRemote: false,
+      );
+    }
+    String star(int n) => '${'★' * n}${'☆' * (5 - n)}';
+    return HoroscopeDetail(
+      signName: signName,
+      overview: builtin.text,
+      indices: {
+        '综合': star(builtin.ratings['整体'] ?? 3),
+        '爱情': star(builtin.ratings['爱情'] ?? 3),
+        '事业': star(builtin.ratings['事业'] ?? 3),
+        '财运': star(builtin.ratings['财运'] ?? 3),
+        '健康': star(builtin.ratings['健康'] ?? 3),
+      },
+      indicesArePercent: false,
+      luckyColor: builtin.luckyColor,
+      luckyNumber: builtin.luckyNumber,
+      extraSign: builtin.matchSign,
+      extraSignLabel: '速配星座',
+      fromRemote: false,
+    );
+  }
+
   /// 拉取真实第三方「详细今日运势解读」（天行数据 star 接口）。
   ///
   /// 返回 [HoroscopeDetail]（含今日概述大段文字 + 分项百分比指数 + 幸运信息）；
