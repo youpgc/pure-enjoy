@@ -5,12 +5,27 @@ import './dashboard_helpers.dart';
 
 /// 由心情日记记录构建最近活动条目
 ///
-/// 展示用户选择的「心情」（不展示日记正文内容）。
+/// 展示用户选择的「心情」对应的表情（不展示日记正文内容）。
+/// 表情与中文标签均取自 mood_type 字典，与 App 内其它心情展示保持一致。
 Map<String, dynamic> buildDiaryActivity(Map<String, dynamic> item) {
+  final moodCode = item['mood']?.toString() ?? '';
+  String subtitle;
+  if (moodCode.isEmpty) {
+    subtitle = '记录了一条心情';
+  } else {
+    final moodEmoji = DictService.instance.getEmoji('mood_type', moodCode);
+    final moodLabel = DictService.instance.getLabelOrDefault(
+      'mood_type',
+      moodCode,
+      defaultValue: moodCode,
+    );
+    final emojiPart = moodEmoji.isNotEmpty ? moodEmoji : '😊';
+    subtitle = moodLabel.isNotEmpty ? '$emojiPart $moodLabel' : emojiPart;
+  }
   return {
     'icon': Icons.edit_note,
     'title': '心情日记',
-    'subtitle': item['mood']?.toString() ?? item['content'] ?? '记录了一条心情',
+    'subtitle': subtitle,
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',
   };
