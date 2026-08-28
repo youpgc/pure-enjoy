@@ -116,9 +116,11 @@ class _WelcomeSectionState extends State<WelcomeSection> {
                   Padding(
                     padding: const EdgeInsets.only(top: 12),
                     child: SizedBox(
-                      height: 14,
+                      // 实际条高由 SizedBox 高度决定（LinearProgressIndicator 用 size.height 绘制，
+                      // minHeight 只是下限；外层紧约束会把它撑到该高度）。要变细须改这里。
+                      height: 4,
                       child: LinearProgressIndicator(
-                        // 弧度拉满：细胶囊，圆角给极大值让 Flutter 自动钳成半高→两端全圆
+                        // 弧度拉满：圆角给极大值→Flutter 自动钳成半高=2，两端全圆胶囊
                         minHeight: 4,
                         borderRadius: BorderRadius.circular(100),
                       ),
