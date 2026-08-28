@@ -118,10 +118,10 @@ class _WelcomeSectionState extends State<WelcomeSection> {
                     child: SizedBox(
                       // 实际条高由 SizedBox 高度决定（LinearProgressIndicator 用 size.height 绘制，
                       // minHeight 只是下限；外层紧约束会把它撑到该高度）。要变细须改这里。
-                      height: 4,
+                      height: 8,
                       child: LinearProgressIndicator(
-                        // 弧度拉满：圆角给极大值→Flutter 自动钳成半高=2，两端全圆胶囊
-                        minHeight: 4,
+                        // 弧度拉满：圆角给极大值→Flutter 自动钳成半高=4，两端全圆胶囊
+                        minHeight: 8,
                         borderRadius: BorderRadius.circular(100),
                       ),
                     ),
