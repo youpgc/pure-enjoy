@@ -242,13 +242,15 @@ class _CheckinScreenState extends State<CheckinScreen> {
 
       if (result['success'] == true) {
         final streak = result['streak'] as int? ?? _consecutiveCheckinDays;
+        final todayKey = beijingDateKey(DateTime.now());
         setState(() {
           _consecutiveCheckinDays = streak;
           _hasCheckedInToday = true;
+          // 直接本地把今天标记为已签：只更新对应日期的格子，不再触发整月日历
+          // loading 重渲染（_loadCheckedDates 会把网格替换成转圈再重装，导致整体闪烁）
+          _checkedDates = {..._checkedDates, todayKey};
         });
         showSnackBar(context, result['message'] ?? '签到成功');
-        _loadCheckedDates();
-        _loadEarliestDataMonth();
       } else {
         showSnackBar(context, result['message'] ?? '签到失败');
       }
