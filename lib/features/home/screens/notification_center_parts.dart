@@ -122,16 +122,11 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       final userId = _userId;
       if (userId == null) return;
 
-      final unreadIds = _notifications
-          .where((n) => !n['is_read'])
-          .map((n) => n['id'])
-          .toList();
-      
-      if (unreadIds.isEmpty) return;
-
+      // 与拉取过滤一致：本人通知 + 系统广播(user_id 为 null) 一并标记已读，
+      // 否则系统广播在服务端仍为未读，下次拉取会回弹（闭环断裂）。
       final result = await ApiClient.patchByFilter(
         'notifications',
-        filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
+        filters: {'or': '(user_id.eq.$userId,user_id.is.null)', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
       if (!result.isSuccess) {
