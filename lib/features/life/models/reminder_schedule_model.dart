@@ -149,6 +149,8 @@ class ReminderScheduleModel {
   /// 检查今天是否需要提醒
   bool shouldRemindToday(DateTime date) {
     if (!isEnabled) return false;
+    // 指定年份约束：years 非空且不含当日年份则不提醒（被通知调度实际调用）
+    if (years.isNotEmpty && !years.contains(date.year)) return false;
 
     switch (scheduleType) {
       case 'daily':
@@ -232,10 +234,11 @@ class ReminderScheduleModel {
 
       case 'yearly':
         if (months.isEmpty) return null;
+        // years 非空时仅在这些年份内查找下次提醒，否则沿用当前年与下一年
+        final yearList = years.isNotEmpty ? years : [now.year, now.year + 1];
         // 新逻辑：当 months 和 monthDays 长度一致时，按索引一一配对
         if (months.length == monthDays.length) {
-          for (int yearOffset = 0; yearOffset < 2; yearOffset++) {
-            final checkYear = now.year + yearOffset;
+          for (final checkYear in yearList) {
             for (int i = 0; i < months.length; i++) {
               final checkDate = DateTime(checkYear, months[i], monthDays[i]);
               if (!checkDate.isBefore(today)) {
@@ -246,8 +249,7 @@ class ReminderScheduleModel {
           return null;
         }
         // 兼容旧数据：笛卡尔积
-        for (int yearOffset = 0; yearOffset < 2; yearOffset++) {
-          final checkYear = now.year + yearOffset;
+        for (final checkYear in yearList) {
           for (final month in months) {
             if (monthDays.isNotEmpty) {
               for (final day in monthDays) {

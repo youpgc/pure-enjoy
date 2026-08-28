@@ -19,7 +19,9 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
   final _titleController = TextEditingController();
   final _contentController = TextEditingController();
   final _categoryController = TextEditingController();
+  final _tagsController = TextEditingController();
   bool _isSaving = false;
+  bool _isPinned = false;
 
   @override
   void initState() {
@@ -28,6 +30,9 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
       _titleController.text = widget.note!.title;
       _contentController.text = widget.note!.content ?? '';
       _categoryController.text = widget.note!.category ?? '';
+      // 回填标签（逗号分隔）与置顶，避免编辑时丢失已有值
+      _tagsController.text = widget.note!.tags?.join(', ') ?? '';
+      _isPinned = widget.note!.isPinned;
     }
   }
 
@@ -36,6 +41,7 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
     _titleController.dispose();
     _contentController.dispose();
     _categoryController.dispose();
+    _tagsController.dispose();
     super.dispose();
   }
 
@@ -48,12 +54,20 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
 
     setState(() => _isSaving = true);
     try {
+      // 逗号分隔文本 → 标签数组（铁律⑤）；空则传 null 以清空
+      final tags = _tagsController.text
+          .split(',')
+          .map((e) => e.trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
       final newNote = NoteModel(
         id: widget.note?.id ?? const Uuid().v4(),
         userId: widget.userId,
         title: _titleController.text,
         content: _contentController.text.isEmpty ? null : _contentController.text,
         category: _categoryController.text.isEmpty ? null : _categoryController.text,
+        tags: tags.isNotEmpty ? tags : null,
+        isPinned: _isPinned,
       );
 
       widget.onSave(newNote);
@@ -106,6 +120,22 @@ class _NoteEditScreenState extends State<_NoteEditScreen> {
                 prefixIcon: Icon(Icons.folder_outlined),
               ),
               textAlign: TextAlign.start,
+            ),
+            const SizedBox(height: 8),
+            TextField(
+              controller: _tagsController,
+              decoration: const InputDecoration(
+                hintText: '标签（逗号分隔，可选）',
+                border: InputBorder.none,
+                prefixIcon: Icon(Icons.tag_outlined),
+              ),
+              textAlign: TextAlign.start,
+            ),
+            SwitchListTile(
+              contentPadding: EdgeInsets.zero,
+              title: const Text('置顶'),
+              value: _isPinned,
+              onChanged: (v) => setState(() => _isPinned = v),
             ),
             const Divider(),
             const SizedBox(height: 8),

@@ -169,10 +169,10 @@ class PointService {
   /// 异步执行非关键维护逻辑（如签到后的统计回写 / 重算 / 缓存刷新），
   /// 吞掉异常，确保不影响主流程与接口响应耗时。
   void _fireAndForget(Future future) {
+    // 非关键路径：仍不向上抛出，避免影响主流程响应；
+    // 但移除 kDebugMode 门控，确保 release 下也能落日志，便于排查积分维护失败。
     future.catchError((e, st) {
-      if (kDebugMode) {
-        debugPrint('后台积分维护任务失败（已忽略）: $e');
-      }
+      debugPrint('后台积分维护任务失败（已忽略）: $e');
     });
   }
 

@@ -15,6 +15,7 @@ class PointRecordsContent extends StatelessWidget {
     super.key,
     required this.records,
     required this.isLoading,
+    required this.expiringPoints,
     required this.scrollController,
     required this.loadMoreIndicator,
     required this.onShowRules,
@@ -23,6 +24,7 @@ class PointRecordsContent extends StatelessWidget {
 
   final List<PointRecord> records;
   final bool isLoading;
+  final int expiringPoints;
   final ScrollController scrollController;
   final Widget loadMoreIndicator;
   final VoidCallback onShowRules;
@@ -45,6 +47,27 @@ class PointRecordsContent extends StatelessWidget {
         child: ListView(
           controller: scrollController,
           children: [
+            if (expiringPoints > 0)
+              Container(
+                margin: const EdgeInsets.fromLTRB(16, 12, 16, 0),
+                padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+                decoration: BoxDecoration(
+                  color: Theme.of(context).colorScheme.errorContainer.withValues(alpha: 0.18),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Row(
+                  children: [
+                    const Icon(Icons.access_time, size: 18, color: Colors.orange),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$expiringPoints 积分将于 30 天内过期',
+                        style: TextStyle(fontSize: 13, color: Colors.orange.shade800),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             if (records.isEmpty && !isLoading)
               const PointRecordsEmpty(),
             ...records.map((record) {

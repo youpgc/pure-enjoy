@@ -16,6 +16,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen>
     with PaginatedListMixin {
   final List<PointRecord> _records = [];
   bool _isLoading = false;
+  int _expiringPoints = 0;
 
   @override
   int get pageSize => 20;
@@ -24,7 +25,14 @@ class _PointRecordsScreenState extends State<PointRecordsScreen>
   void initState() {
     super.initState();
     initPagination();
+    _loadExpiringPoints();
     _loadRecords(refresh: true);
+  }
+
+  /// 加载 30 天内即将过期的积分数（用于头部提示，独立于列表分页）
+  Future<void> _loadExpiringPoints() async {
+    final count = await PointService.instance.getExpiringSoonPoints();
+    if (mounted) setState(() => _expiringPoints = count);
   }
 
   @override
@@ -55,7 +63,8 @@ class _PointRecordsScreenState extends State<PointRecordsScreen>
     final newRecords = await PointService.instance.getRecords(
       page: offset ~/ limit + 1,
       pageSize: limit,
-      statusFilter: 'active',
+      // 拉全量记录（含已过期），使「已过期 / 即将过期」标签生效；不再仅限 active
+      statusFilter: null,
     );
 
     if (mounted) {
@@ -109,6 +118,7 @@ class _PointRecordsScreenState extends State<PointRecordsScreen>
     return PointRecordsContent(
       records: _records,
       isLoading: _isLoading,
+      expiringPoints: _expiringPoints,
       scrollController: scrollController,
       loadMoreIndicator: buildLoadMoreIndicator(),
       onShowRules: _showRulesDialog,

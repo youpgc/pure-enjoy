@@ -179,12 +179,20 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     setState(() => _isLoadingTotal = true);
 
     try {
-      final result = await ApiClient.rpc('fn_get_monthly_expense_total', params: {
+      // 'all' 表示不限分类：与列表查询口径一致（:234 对 'all' 跳过分类过滤），
+      // 故不向 RPC 传 p_category，避免云端按 category='all' 字面匹配导致合计恒为 0。
+      final rpcParams = <String, dynamic>{
         'p_user_id': userId,
         'p_year': month.year,
         'p_month': month.month,
-        'p_category': _selectedCategory,
-      });
+      };
+      if (_selectedCategory != 'all') {
+        rpcParams['p_category'] = _selectedCategory;
+      }
+      final result = await ApiClient.rpc(
+        'fn_get_monthly_expense_total',
+        params: rpcParams,
+      );
 
       double total = 0.0;
       if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {

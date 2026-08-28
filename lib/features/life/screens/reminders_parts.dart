@@ -71,6 +71,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
   DateTime _remindAt = DateTime.now().add(const Duration(hours: 1));
   bool _remindEnabled = false;
   List<RemindOffset> _remindOffsets = [];
+  String? _repeatType;
 
   @override
   void initState() {
@@ -81,6 +82,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
       _remindAt = widget.reminder!.remindAt;
       _remindEnabled = widget.reminder!.remindEnabled;
       _remindOffsets = List.from(widget.reminder!.remindOffsets);
+      _repeatType = widget.reminder!.repeatType;
     }
   }
 
@@ -155,6 +157,19 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                   });
                 },
               ),
+              const SizedBox(height: 16),
+              DropdownButtonFormField<String>(
+                decoration: const InputDecoration(labelText: '重复'),
+                value: _repeatType,
+                items: const [
+                  DropdownMenuItem(value: null, child: Text('不重复')),
+                  DropdownMenuItem(value: 'daily', child: Text('每天')),
+                  DropdownMenuItem(value: 'weekly', child: Text('每周')),
+                  DropdownMenuItem(value: 'monthly', child: Text('每月')),
+                  DropdownMenuItem(value: 'yearly', child: Text('每年')),
+                ],
+                onChanged: (v) => setState(() => _repeatType = v),
+              ),
             ],
           ),
         ),
@@ -177,6 +192,9 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
                 isCompleted: widget.reminder?.isCompleted ?? false,
                 remindEnabled: _remindEnabled,
                 remindOffsets: _remindOffsets,
+                // 周期仅存储（铁律③），不在此展开重复实例/不挂 habits
+                repeatType: _repeatType,
+                isRepeated: _repeatType != null,
               );
               Navigator.pop(context, reminder);
             }

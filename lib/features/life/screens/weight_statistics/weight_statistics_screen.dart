@@ -1,7 +1,9 @@
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/api_client.dart';
+import '../../../../core/utils/event_bus.dart';
 import '../../widgets/app_date_picker.dart';
 import './weight_statistics_content.dart';
 
@@ -19,6 +21,7 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
   String _error = '';
   DateTime _startMonth = DateTime.now();
   DateTime _endMonth = DateTime.now();
+  StreamSubscription<void>? _weightSub;
 
   @override
   void initState() {
@@ -26,6 +29,16 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
     _startMonth = DateTime.now();
     _endMonth = DateTime.now();
     _loadData();
+    // 闭环：体重记录增删改会 fire(weightRecordUpdated)，统计页返回时需刷新
+    _weightSub = EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
+      if (mounted) _loadData();
+    });
+  }
+
+  @override
+  void dispose() {
+    _weightSub?.cancel();
+    super.dispose();
   }
 
   Future<void> _loadData() async {
