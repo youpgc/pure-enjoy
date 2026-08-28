@@ -228,11 +228,6 @@ class PointService {
     return (stats?['consecutive_checkin_days'] as num?)?.toInt() ?? 0;
   }
 
-  /// 从 AuthService 获取用户总积分（兼容旧代码）
-  int getTotalPoints() {
-    return AuthService.instance.currentPoints ?? 0;
-  }
-
   /// 查询30天内即将过期的积分总数
   Future<int> getExpiringSoonPoints() async {
     final stats = await _fetchUserStats();
@@ -720,11 +715,6 @@ class PointService {
       if (kDebugMode) debugPrint('补签失败: $e');
       return {'success': false, 'message': '补签失败，请稍后重试'};
     }
-  }
-
-  /// 手动触发积分重算（用于数据修复或初始化场景）
-  Future<void> recalcPoints() async {
-    await _recalcAndUpdateUserPoints();
   }
 
   /// 缓存积分统计到本地，供积分页进入时立即展示（避免闪现 0）

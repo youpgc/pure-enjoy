@@ -6,7 +6,6 @@ import './http_client.dart';
 import './storage_models.dart';
 
 export './storage_models.dart';
-export './storage_convenience.dart';
 
 /// 存储文件对象与异常已抽到 storage_models.dart（见本文件顶部 export）
 
