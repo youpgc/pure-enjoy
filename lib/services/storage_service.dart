@@ -3,6 +3,7 @@ import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
 import './http_client.dart';
+import './supabase_service.dart';
 import './storage_models.dart';
 
 export './storage_models.dart';
@@ -23,10 +24,17 @@ class StorageService {
   String get _baseUrl => AppConfig.supabaseUrl;
   String get _anonKey => AppConfig.supabaseAnonKey;
 
+  /// 上传/删除文件的认证头。
+  ///
+  /// 与 [HttpClient._authHeaders] 保持一致：apikey 始终用发布密钥（Supabase 路由必需），
+  /// Authorization 优先用当前登录用户的 JWT（[SupabaseService.accessToken]），
+  /// 未登录时回退 anon key。私有桶的 storage.objects RLS 以 `auth.uid()` 鉴权，
+  /// 仅传 anon key 会导致 Bearer 解析为匿名角色（uid=null）而写入失败，故必须带用户 token。
   Map<String, String> get _headers {
+    final token = SupabaseService.instance.accessToken;
     return {
       'apikey': _anonKey,
-      'Authorization': 'Bearer $_anonKey',
+      'Authorization': 'Bearer ${token ?? _anonKey}',
     };
   }
 
