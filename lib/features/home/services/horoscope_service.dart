@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import '../../../env.dart';
 import '../../../services/http_client.dart';
 import './horoscope_models.dart';
 
@@ -7,9 +8,11 @@ export './horoscope_models.dart';
 
 /// 天行数据「星座运势」接口密钥（https://www.tianapi.com/apiview/78）
 ///
-/// 普通会员免费 100 次/天。前往上述地址注册并申请「星座运势」接口获取 apiKey，
-/// 填入下方单引号内即可启用真实详细今日解读；留空则自动回退到内置离线数据集。
-const String _tianApiKey = '1720c03b95dfd17c4a4cb4a838cdc286';
+/// 普通会员免费 100 次/天。**密钥禁止硬编码进源码**，已外置为环境变量：
+/// 优先级 `--dart-define=TIAN_API_KEY=xxx` > `.env` 文件 > 空串（回退离线）。
+/// 经 [Env.get] 读取，见 [fetchHoroscopeDetail]；为空则自动回退到内置离线数据集。
+/// ⚠️ 密钥一旦泄露须在天行后台轮换——旧值已存在于 git 历史，外置仅消除工作区明文。
+const String _kTianApiKeyEnv = 'TIAN_API_KEY';
 
 /// 幸运数字 / 颜色 / 方位 / 时间池（日期种子选取）
 const List<String> _luckyNumbers = ['1', '3', '5', '7', '8', '9', '2', '6', '4'];
@@ -252,7 +255,7 @@ class HoroscopeService {
     String signName, {
     DateTime? date,
   }) async {
-    const key = _tianApiKey;
+    final key = Env.get(_kTianApiKeyEnv, fallback: '');
     if (key.isEmpty) {
       if (kDebugMode) debugPrint('[星座运势] 未配置天行 apiKey，使用内置数据集');
       return null;
