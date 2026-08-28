@@ -118,8 +118,8 @@ class _WelcomeSectionState extends State<WelcomeSection> {
                     child: SizedBox(
                       height: 14,
                       child: LinearProgressIndicator(
-                        // 弧度拉满：加厚到 6，圆角给极大值让 Flutter 自动钳成半高→两端全圆胶囊
-                        minHeight: 6,
+                        // 弧度拉满：细胶囊，圆角给极大值让 Flutter 自动钳成半高→两端全圆
+                        minHeight: 4,
                         borderRadius: BorderRadius.circular(100),
                       ),
                     ),
