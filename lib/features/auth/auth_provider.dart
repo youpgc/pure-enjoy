@@ -85,6 +85,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
 
   /// 初始化：检查当前登录状态
   void _init() {
+    // 注册 Token 刷新成功回调：401→刷新后重同步 Riverpod 鉴权镜像，闭合 refreshUser 钩子。
+    SupabaseService.instance.setOnTokenRefreshed(_onTokenRefreshed);
     final service = SupabaseService.instance;
     if (service.isLoggedIn) {
       final user = service.currentUser;
@@ -186,8 +188,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (response.success) {
         final user = SupabaseService.instance.currentUser;
         final role = _resolveRole(user);
+        // 注册成功但当前 UX 为「需手动登录」（技能 §4.5 产品决策），
+        // 故不置 isAuthenticated=true，使 authProvider 与「请登录」UI 一致，
+        // 避免路由守卫误判已登录而错误跳转。
         state = AuthState(
-          isAuthenticated: true,
+          isAuthenticated: false,
           userId: SupabaseService.instance.currentUserId,
           email: response.email,
           role: role,
@@ -207,6 +212,18 @@ class AuthNotifier extends StateNotifier<AuthState> {
   Future<void> signOut() async {
     await SupabaseService.instance.signOut();
     state = const AuthState();
+  }
+
+  /// Token 刷新成功后由 SupabaseService 回调触发：重同步 Riverpod 鉴权镜像。
+  /// 不阻塞刷新链（调用方不 await），异常仅调试日志输出，绝不抛出影响主流程。
+  Future<void> _onTokenRefreshed() async {
+    try {
+      await refreshUser();
+    } catch (e) {
+      if (kDebugMode) {
+        debugPrint('🔐 [Provider] Token 刷新后同步鉴权状态失败: $e');
+      }
+    }
   }
 
   /// 刷新用户信息

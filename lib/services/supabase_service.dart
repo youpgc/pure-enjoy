@@ -37,6 +37,13 @@ class AuthService {
   final _session = SessionManager.instance;
   final _auth = AuthApi.instance;
 
+  /// Token 刷新成功后的回调（由鉴权层注册，用于重同步 Riverpod 镜像）。
+  /// 保持 services 层与 Riverpod 解耦：本类不感知 authProvider，仅通过回调通知。
+  void Function()? _onTokenRefreshed;
+
+  /// 注册 Token 刷新成功回调（鉴权层 AuthNotifier._init 调用）。
+  void setOnTokenRefreshed(void Function()? cb) => _onTokenRefreshed = cb;
+
   // ==================== 用户信息代理 ====================
 
   String? get currentUserId => _session.currentUserId;
@@ -242,6 +249,9 @@ class AuthService {
         refreshToken: result.refreshToken!,
         authUser: result.user,
       );
+      // 通知鉴权层重同步 Riverpod 镜像（不 await，避免阻塞刷新链）。
+      // 401→刷新后 authProvider 的 role/userId 需重新解析，否则路由守卫读到陈旧值。
+      _onTokenRefreshed?.call();
       return true;
     }
     return false;
