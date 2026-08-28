@@ -50,8 +50,8 @@ class _AnnouncementListScreenState extends State<AnnouncementListScreen> {
       body: _loading
           ? const Center(child: CircularProgressIndicator())
           : _list.isEmpty
-              ? const Center(
-                  child: Text('暂无公告', style: TextStyle(color: Colors.grey)),
+              ? Center(
+                  child: Text('暂无公告', style: TextStyle(color: Theme.of(context).colorScheme.onSurfaceVariant)),
                 )
               : RefreshIndicator(
                   onRefresh: _load,
@@ -112,8 +112,8 @@ class _AnnouncementListScreenState extends State<AnnouncementListScreen> {
                                   const SizedBox(width: 8),
                                   Text(
                                     '发布于 ${_format(a.publishAt)}',
-                                    style: const TextStyle(
-                                      color: Colors.grey,
+                                    style: TextStyle(
+                                      color: Theme.of(context).colorScheme.onSurfaceVariant,
                                       fontSize: 12,
                                     ),
                                   ),

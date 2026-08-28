@@ -45,6 +45,8 @@ class SupabaseConfig {
   static String get url =>
       Env.get('SUPABASE_URL', fallback: _devDefaultUrl);
 
+  // 注意：anon key 是 Supabase 公开客户端密钥（publishable），并非敏感凭据，
+  // 可随前端包发布；真正的访问控制由数据库 RLS 策略保障，切勿在此放置 service_role key。
   static String get anonKey =>
       Env.get('SUPABASE_ANON_KEY', fallback: _devDefaultAnonKey);
 

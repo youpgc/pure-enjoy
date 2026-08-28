@@ -10,6 +10,12 @@ const String _kCacheActivities = 'cache_home_activities';
 /// （与 DictService / 版本检查同策略）。写操作经事件 invalidate / forceRefresh 保证强一致。
 const Duration _kHomeLongTtl = Duration(hours: 1);
 
+/// 首页「多条目」区块每屏拉取条数（最近活动 / 快捷工具等）
+const int _kHomeListLimit = 3;
+
+/// 首页「单条」展示区块条数（banner / 推荐位等）
+const int _kHomeSingleLimit = 1;
+
 /// 首页数据加载逻辑 mixin（从 [_DashboardPageState] 拆出，行为不变）
 ///
 /// 与这些方法配套的实例字段一并放在本 mixin 中（Dart mixin 无法直接访问类实例字段，
@@ -46,7 +52,7 @@ mixin _DashboardLogic on State<DashboardPage> {
           select:
               'id,user_id,name,description,target_days,current_streak,longest_streak,is_active,created_at',
           order: 'created_at.desc',
-          limit: 3);
+          limit: _kHomeListLimit);
       if (!result.isSuccess) return ApiResponse.success([]);
       final habitsData = result.data as List;
       final checkinsData = <dynamic>[];
@@ -56,7 +62,7 @@ mixin _DashboardLogic on State<DashboardPage> {
             filters: {'habit_id': 'in.(${habitIds.join(",")})'},
             select: 'id,habit_id,user_id,checkin_at,note,created_at',
             order: 'checkin_at.desc',
-            limit: 3);
+            limit: _kHomeListLimit);
         if (checkinsResult.isSuccess && checkinsResult.data != null) {
           checkinsData.addAll(checkinsResult.data!);
         }
@@ -183,17 +189,17 @@ mixin _DashboardLogic on State<DashboardPage> {
             filters: {'user_id': 'eq.$userId'},
             select: 'category,amount,created_at,date',
             order: 'created_at.desc',
-            limit: 1),
+            limit: _kHomeSingleLimit),
         ApiClient.get('mood_diaries',
             filters: {'user_id': 'eq.$userId'},
             select: 'content,mood,created_at,date',
             order: 'created_at.desc',
-            limit: 1),
+            limit: _kHomeSingleLimit),
         ApiClient.get('weight_records',
             filters: {'user_id': 'eq.$userId'},
             select: 'weight,created_at,date',
             order: 'created_at.desc',
-            limit: 1),
+            limit: _kHomeSingleLimit),
       ];
       final results = await Future.wait(futures);
       final raw = <Map<String, dynamic>>[];

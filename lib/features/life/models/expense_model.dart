@@ -63,14 +63,6 @@ class ExpenseModel {
     return json;
   }
 
-  Map<String, dynamic> toJsonForUpdate() {
-    return {
-      'amount': amount,
-      'category': category,
-      'description': description,
-      'date': date.toIso8601String().split('T').first,
-    };
-  }
 
   ExpenseModel copyWith({
     String? id,

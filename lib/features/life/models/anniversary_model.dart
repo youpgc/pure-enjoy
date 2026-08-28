@@ -83,20 +83,6 @@ class AnniversaryModel {
     return json;
   }
 
-  Map<String, dynamic> toJsonForUpdate() {
-    return {
-      'user_nickname': userNickname,
-      'title': title,
-      'date': DateTimeUtils.toDateString(date),
-      'type': type,
-      'description': description,
-      'repeat_yearly': repeatYearly,
-      'remind_enabled': remindEnabled,
-      'remind_offsets': remindOffsets.map((e) => e.toJson()).toList(),
-      'remind_time': remindTime,
-      'is_lunar': isLunar,
-    };
-  }
 
   AnniversaryModel copyWith({
     String? id,

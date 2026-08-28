@@ -21,26 +21,26 @@ PointTypeInfo _getTypeInfo(String type) {
       return PointTypeInfo(
         icon: Icons.remove_circle_outline,
         label: '消费',
-        color: Colors.red,
+        color: AppTheme.error,
       );
     case 'adjust':
       return PointTypeInfo(
         icon: Icons.swap_horiz,
         label: '调整',
-        color: Colors.blue,
+        color: AppTheme.info,
       );
     case 'admin_adjust':
     case 'admin_recharge': // 兼容历史数据
       return PointTypeInfo(
         icon: Icons.admin_panel_settings_outlined,
         label: '管理员调整',
-        color: Colors.purple,
+        color: AppTheme.info,
       );
     default:
       return PointTypeInfo(
         icon: Icons.help_outline,
         label: type,
-        color: Colors.grey,
+        color: AppTheme.neutral500,
       );
   }
 }
@@ -59,7 +59,7 @@ ExpiryInfo _getExpiryInfo(PointRecord record) {
     if (diff.inDays <= 30 && diff.inDays >= 0) {
       return ExpiryInfo(
         label: '即将过期',
-        color: Colors.orange,
+        color: AppTheme.warning,
       );
     }
   }
@@ -119,7 +119,7 @@ class PointRecordListItem extends StatelessWidget {
             isPositive ? '+${record.amount}' : '${record.amount}',
             style: TextStyle(
               fontWeight: FontWeight.bold,
-              color: isPositive ? Colors.green : Colors.red,
+              color: isPositive ? AppTheme.success : AppTheme.error,
             ),
           ),
         ],

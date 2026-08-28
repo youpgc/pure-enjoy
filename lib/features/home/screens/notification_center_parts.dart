@@ -1,5 +1,7 @@
 part of './notification_center_screen.dart';
 
+const double _kAlphaFaint = 0.1;
+const double _kAlphaSoft = 0.3;
 /// 通知中心 状态 + UI 构建逻辑抽为 mixin (膨胀修复), 避免 [_NotificationCenterScreenState] 超 400 行。
 ///
 /// 关键约束：Dart 的 `mixin on State<T>` 只能访问声明在 `State<T>` 或 mixin 自身上的成员，
@@ -284,7 +286,7 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
               width: 40,
               height: 40,
               decoration: BoxDecoration(
-                color: color.withValues(alpha: 0.1),
+                color: color.withValues(alpha: _kAlphaFaint),
                 borderRadius: BorderRadius.circular(20),
               ),
               child: Icon(icon, color: color, size: 20),
@@ -331,7 +333,7 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
                     Container(
                       padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
                       decoration: BoxDecoration(
-                        border: Border.all(color: color.withValues(alpha: 0.3)),
+                        border: Border.all(color: color.withValues(alpha: _kAlphaSoft)),
                         borderRadius: BorderRadius.circular(3),
                       ),
                       child: Text(type, style: TextStyle(fontSize: 10, color: color)),

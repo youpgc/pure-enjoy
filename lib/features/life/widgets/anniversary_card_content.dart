@@ -132,12 +132,12 @@ class AnniversaryCardHeader extends StatelessWidget {
                       padding: const EdgeInsets.symmetric(
                           horizontal: 8, vertical: 2),
                       decoration: BoxDecoration(
-                        color: Colors.orange.withValues(alpha: 0.15),
+                        color: Theme.of(context).colorScheme.tertiary.withValues(alpha: 0.15),
                         borderRadius: BorderRadius.circular(12),
                       ),
-                      child: const Text(
+                      child: Text(
                         '农历',
-                        style: TextStyle(fontSize: 11, color: Colors.orange),
+                        style: TextStyle(fontSize: 11, color: Theme.of(context).colorScheme.tertiary),
                       ),
                     ),
                   ],

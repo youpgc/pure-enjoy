@@ -100,40 +100,6 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
   }
 
-  /// 使用 Supabase Auth 登录（邮箱+密码）
-  Future<bool> signInWithEmail({
-    required String email,
-    required String password,
-  }) async {
-    try {
-      state = state.clearError();
-      if (kDebugMode) debugPrint('🔐 [Provider] 开始邮箱登录: $email');
-      final response = await SupabaseService.instance.signInWithEmail(
-        email: email,
-        password: password,
-      );
-      if (kDebugMode) debugPrint('🔐 [Provider] 结果: success=${response.success}, error=${response.error}');
-
-      if (response.success) {
-        final user = SupabaseService.instance.currentUser;
-        final role = _resolveRole(user);
-        state = AuthState(
-          isAuthenticated: true,
-          userId: SupabaseService.instance.currentUserId,
-          email: response.email,
-          role: role,
-        );
-        _armLocalReminders();
-        return true;
-      }
-      state = state.copyWith(error: response.error ?? '登录失败');
-      return false;
-    } catch (e) {
-      state = state.copyWith(error: '登录失败：${SecureLogger.extractError(e)}');
-      return false;
-    }
-  }
-
 /// 统一账号登录（邮箱 / 手机号 / 用户名 + 密码）
 /// 注：昵称(nickname)可重复，不能作为登录标识；登录标识仅 email/phone/username。
   Future<bool> signInWithAccount({

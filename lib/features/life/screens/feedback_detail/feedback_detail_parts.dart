@@ -60,7 +60,7 @@ _StatusInfo _getStatusInfo(String status, BuildContext context) {
     case 'rejected':
       color = Theme.of(context).colorScheme.error;
     case 'delayed':
-      color = Colors.orange;
+      color = AppTheme.warning;
     default:
       color = Theme.of(context).colorScheme.onSurfaceVariant;
   }
@@ -75,10 +75,10 @@ _ActionInfo _getActionInfo(String action, BuildContext context) {
   switch (action) {
     case 'confirmed':
       icon = Icons.check_circle;
-      color = Colors.blue;
+      color = AppTheme.info;
     case 'in_progress':
       icon = Icons.sync;
-      color = Colors.orange;
+      color = AppTheme.warning;
     case 'resolved':
       icon = Icons.check_circle_outline;
       color = AppTheme.success;
@@ -87,13 +87,13 @@ _ActionInfo _getActionInfo(String action, BuildContext context) {
       color = Theme.of(context).colorScheme.error;
     case 'delayed':
       icon = Icons.schedule;
-      color = Colors.orange;
+      color = AppTheme.warning;
     case 'deleted':
       icon = Icons.delete_outline;
-      color = Colors.grey;
+      color = AppTheme.neutral500;
     default:
       icon = Icons.circle;
-      color = Colors.grey;
+      color = AppTheme.neutral500;
   }
   return _ActionInfo(label: label, icon: icon, color: color);
 }

@@ -114,7 +114,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
                 child: SingleChildScrollView(
                   child: Text(
                     widget.releaseNotes,
-                    style: const TextStyle(fontSize: 14, color: Colors.black54),
+                    style: TextStyle(fontSize: 14, color: Theme.of(context).colorScheme.onSurfaceVariant),
                   ),
                 ),
               ),
@@ -138,7 +138,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
               const SizedBox(height: 8),
               Text(
                 _statusText,
-                style: const TextStyle(fontSize: 12, color: Colors.black54),
+                style: TextStyle(fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant),
                 textAlign: TextAlign.center,
               ),
             ],

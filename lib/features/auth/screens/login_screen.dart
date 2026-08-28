@@ -4,6 +4,9 @@ import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../home/screens/home_screen.dart';
 import '../auth_provider.dart';
+
+const int _kMinPasswordLength = 6;
+
 /// 登录页面
 /// 统一账号（用户名/昵称/邮箱/手机号）+ 密码
 class LoginScreen extends ConsumerStatefulWidget {
@@ -229,8 +232,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             if (value == null || value.isEmpty) {
               return '请输入密码';
             }
-            if (value.length < 6) {
-              return '密码至少需要6个字符';
+            if (value.length < _kMinPasswordLength) {
+              return '密码至少需要$_kMinPasswordLength个字符';
             }
             return null;
           },
@@ -269,7 +272,7 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             textInputAction: TextInputAction.next,
             decoration: InputDecoration(
               labelText: '密码',
-              hintText: '请输入密码（至少6位）',
+              hintText: '请输入密码（至少$_kMinPasswordLength位）',
               prefixIcon: const Icon(Icons.lock_outlined),
               suffixIcon: IconButton(
                 icon: Icon(
@@ -284,8 +287,8 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
               if (value == null || value.isEmpty) {
                 return '请输入密码';
               }
-              if (value.length < 6) {
-                return '密码至少需要6个字符';
+              if (value.length < _kMinPasswordLength) {
+                return '密码至少需要$_kMinPasswordLength个字符';
               }
               return null;
             },

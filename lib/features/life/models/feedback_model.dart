@@ -57,15 +57,6 @@ class FeedbackModel {
     return json;
   }
 
-  Map<String, dynamic> toJsonForUpdate() {
-    return {
-      'title': title,
-      'description': description,
-      'category': category,
-      'status': status,
-      'admin_reply': adminReply,
-    };
-  }
 
   FeedbackModel copyWith({
     String? id,

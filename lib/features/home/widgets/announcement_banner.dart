@@ -100,7 +100,7 @@ class AnnouncementBanner extends StatelessWidget {
                       .toList(),
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Colors.grey, size: 20),
+              Icon(Icons.chevron_right, color: Theme.of(context).colorScheme.onSurfaceVariant, size: 20),
             ],
           ),
         ),

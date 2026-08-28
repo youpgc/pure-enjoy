@@ -67,15 +67,6 @@ class WeightRecordModel {
     return json;
   }
 
-  Map<String, dynamic> toJsonForUpdate() {
-    return {
-      'weight': weight,
-      'bmi': bmi,
-      'body_fat': bodyFat,
-      'note': note,
-      'date': date.toIso8601String().split('T').first,
-    };
-  }
 
   WeightRecordModel copyWith({
     String? id,

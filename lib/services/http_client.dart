@@ -10,6 +10,8 @@ import './http_raw.dart';
 import './retry_policy.dart';
 import './etag_strategy.dart';
 
+const String _kUserAgent = 'PureEnjoy/1.0';
+
 /// 全局 HttpClient 配置（统一引用 SupabaseConfig）
 class HttpClientConfig {
   static const int maxRetries = 2;
@@ -334,7 +336,7 @@ class HttpClient {
     final uri = Uri.parse(url);
     final request = http.Request('GET', uri);
     request.headers['Accept'] = '*/*';
-    request.headers['User-Agent'] = 'PureEnjoy/1.0';
+    request.headers['User-Agent'] = _kUserAgent;
     if (headers != null) {
       request.headers.addAll(headers);
     }

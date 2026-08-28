@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import './point_record_info.dart';
 import '../../models/point_record_model.dart';
 import '../../../../utils/date_time_utils.dart';
+import '../../../../core/theme/app_theme.dart';
 
 part 'point_records_parts.dart';
 
@@ -57,12 +58,12 @@ class PointRecordsContent extends StatelessWidget {
                 ),
                 child: Row(
                   children: [
-                    const Icon(Icons.access_time, size: 18, color: Colors.orange),
+                    Icon(Icons.access_time, size: 18, color: Theme.of(context).colorScheme.tertiary),
                     const SizedBox(width: 8),
                     Expanded(
                       child: Text(
                         '$expiringPoints 积分将于 30 天内过期',
-                        style: TextStyle(fontSize: 13, color: Colors.orange.shade800),
+                        style: TextStyle(fontSize: 13, color: Theme.of(context).colorScheme.tertiary),
                       ),
                     ),
                   ],
