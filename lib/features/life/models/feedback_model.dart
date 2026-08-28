@@ -6,7 +6,7 @@ class FeedbackModel {
   final String title;
   final String? description;
   final String category; // bug / feature / improvement / other
-  final String status; // pending / confirmed / in_progress / resolved
+  final String status; // pending / confirmed / in_progress / resolved / rejected (delayed 仅后台运营标记，App 仅展示)
   final String? adminReply;
   final String? userNickname;
   final bool isDeleted;
