@@ -96,15 +96,27 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   }
 
   /// 直接进入某模式首个未通关关卡（frontier）；全通关回第一关。
-  /// 用于模式网格点按，替代「弹窗选关」直接开局。
+  /// 该模式后台未配关卡时，合成一局「体验关」直接开玩（id 为空、不计首通、
+  /// 不计入通关进度），保证点任意模式都有响应，不再静默无反应。
   void _startMode(Match3Mode mode) {
     final list = _levelsOfMode(mode);
-    if (list.isEmpty) return;
-    var maxCleared = -1;
-    for (var i = 0; i < list.length; i++) {
-      if (_clearedIds.contains(list[i].id)) maxCleared = i;
+    final GameLevelModel lv;
+    if (list.isEmpty) {
+      lv = GameLevelModel(
+        id: '',
+        gameId: widget.game.id,
+        levelNo: mode.index * 10 + 1,
+        name: '${mode.label} · 体验关',
+        config: <String, dynamic>{'mode': mode.code},
+        countForDailyClear: false,
+      );
+    } else {
+      var maxCleared = -1;
+      for (var i = 0; i < list.length; i++) {
+        if (_clearedIds.contains(list[i].id)) maxCleared = i;
+      }
+      lv = list[maxCleared + 1 < list.length ? maxCleared + 1 : 0];
     }
-    final lv = list[maxCleared + 1 < list.length ? maxCleared + 1 : 0];
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GamePlayScreen(game: widget.game, level: lv)),
     );

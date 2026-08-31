@@ -90,7 +90,8 @@ class _G2048GameState extends State<G2048Game> {
   }
 
   void _persistBest() {
-    SharedPreferences.getInstance().then((sp) => sp.setInt('g2048_best', _best));
+    // 用与读取一致的 _bestKey（按关卡号区分），旧版写死 'g2048_best' 导致最高分存错 key
+    SharedPreferences.getInstance().then((sp) => sp.setInt(_bestKey, _best));
   }
 
   void _reset() {
@@ -157,6 +158,12 @@ class _G2048GameState extends State<G2048Game> {
 
   void _move(String dir) {
     if (_animating || _finished) return;
+    // 关键：重置合并标记。merged 只在本回合合并判定中生效，若不重置，
+    // 参与过合并的方块将永久失去合并资格 → 盘面「看似可并实则不可并」，
+    // 各方向 changed=false 直接 return，表现为滑动几次后卡死无响应。
+    for (final t in _tiles) {
+      t.merged = false;
+    }
     final lines = _linesFor(dir);
     var changed = false;
     var gain = 0;

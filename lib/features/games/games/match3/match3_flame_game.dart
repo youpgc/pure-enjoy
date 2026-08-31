@@ -108,6 +108,25 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       Paint()..color = const Color(0xFF26263A),
     );
     if (!_loaded) return; // 盘面/目标层尚未就绪
+    // 白色圆角格底：糖块画在白底上，与深色底板形成强对比，
+    // 边缘清晰不发虚（缓解「看久了眼睛不舒服」）
+    final cellPaint = Paint()..color = const Color(0xFFFFFFFF);
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              _offsetX + c * _cell + _cell * 0.03,
+              _offsetY + r * _cell + _cell * 0.03,
+              _cell * 0.94,
+              _cell * 0.94,
+            ),
+            Radius.circular(_cell * 0.18),
+          ),
+          cellPaint,
+        );
+      }
+    }
     // 果冻底层（在糖果下方）
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {

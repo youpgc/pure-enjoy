@@ -163,3 +163,12 @@ int match3LevelIndex(int levelNo) {
   final unit = levelNo % 10;
   return unit == 0 ? levelNo : unit;
 }
+
+/// 模式编码 → 中文展示名（未知编码原样返回）。
+/// 供道具商城/道具管理等展示 `game_items.mode`（如 timed → 限时模式）。
+String match3ModeLabelOf(String code) {
+  for (final m in Match3Mode.values) {
+    if (m.code == code) return m.label;
+  }
+  return code;
+}

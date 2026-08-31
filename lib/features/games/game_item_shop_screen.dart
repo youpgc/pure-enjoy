@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import 'models/game_item_model.dart';
 import 'models/game_model.dart';
+import 'models/match3_mode.dart';
 import 'services/game_item_service.dart';
 import '../../features/profile/services/point_service.dart';
 
@@ -147,7 +148,8 @@ class _ItemCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final modeLabel = item.mode.isEmpty ? '通用' : item.mode;
+    final modeLabel =
+        item.mode.isEmpty ? '通用' : match3ModeLabelOf(item.mode);
     final disabled = busy || !canAfford || item.pointCost <= 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
