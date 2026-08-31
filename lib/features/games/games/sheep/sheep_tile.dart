@@ -92,7 +92,7 @@ class SheepTileWidget extends StatelessWidget {
                     ],
             ),
             padding: EdgeInsets.all(size * 0.08),
-            child: SvgPicture.string(
+            child: SvgPicture.asset(
               GameIcons.fruit(tile.type),
               fit: BoxFit.contain,
             ),
