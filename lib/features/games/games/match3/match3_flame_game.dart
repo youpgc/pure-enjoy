@@ -63,7 +63,13 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     const Color(0xFFFFA726),
   ];
 
-  static const Duration _anim = Duration(milliseconds: 150);
+  static const Duration _anim = Duration(milliseconds: 220);
+
+  /// 消除（弹出+淡出）动画时长（秒），与 [_anim] 对齐，确保方块淡出后再移除。
+  static const double _dieDur = 0.22;
+
+  /// 棋盘左右留白（逻辑像素），让糖块不贴边、视觉更透气（2~4px）。
+  static const double _padX = 3.0;
 
   Match3FlameGame({
     required this.onFinished,
@@ -76,8 +82,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   @override
   Future<void> onLoad() async {
     await super.onLoad();
-    _cell = (size.x / cols).clamp(0, size.y / rows);
-    _offsetX = (size.x - cols * _cell) / 2;
+    // 横向留出 _padX 左右边距；网格在剩余空间内居中，纵向居中。
+    _cell = ((size.x - 2 * _padX) / cols).clamp(0, size.y / rows);
+    _offsetX = _padX + (size.x - 2 * _padX - cols * _cell) / 2;
     _offsetY = (size.y - rows * _cell) / 2;
     _newBoard();
     objective.initBoard(_rng);
@@ -177,7 +184,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
         hudTick.value++;
       }
     }
-    final k = min(1.0, dt * 14);
+    // 降低缓动速率（14→8），下落/交换更舒缓、过渡更自然，不再「生硬」。
+    final k = min(1.0, dt * 8);
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         final cand = grid[r][c];
@@ -186,8 +194,17 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
         final ty = _offsetY + cand.row * _cell;
         cand.px += (tx - cand.px) * k;
         cand.py += (ty - cand.py) * k;
-        final ts = cand.dying ? 0.0 : 1.0;
-        cand.scale += (ts - cand.scale) * k;
+        if (cand.dying) {
+          // 弹出曲线：先轻微放大(1→1.25)再缩小归零，配合透明度淡出，手感更柔和。
+          cand.dyingT += dt;
+          final p = (cand.dyingT / _dieDur).clamp(0.0, 1.0);
+          cand.scale = p < 0.3
+              ? 1.0 + (p / 0.3) * 0.25
+              : 1.25 * (1 - (p - 0.3) / 0.7);
+          cand.dyingAlpha = 1.0 - p;
+        } else {
+          cand.scale += (1.0 - cand.scale) * k;
+        }
       }
     }
   }

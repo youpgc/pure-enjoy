@@ -47,6 +47,10 @@ class _G2048GameState extends State<G2048Game> {
   /// 本次拖动是否已经触发过移动（防止一次长拖连续触发多次）
   bool _dragConsumed = false;
 
+  /// 动画期间缓存的待执行方向：若滑动发生在下落动画进行中，
+  /// 先缓存、动画结束后再执行，避免「多次交互后无响应」的输入丢失。
+  String? _pendingDir;
+
   final List<TileModel> _tiles = <TileModel>[];
   late List<List<TileModel?>> _grid;
   int _score = 0;
@@ -101,6 +105,7 @@ class _G2048GameState extends State<G2048Game> {
     _animating = false;
     _finished = false;
     _pendingWin = false;
+    _pendingDir = null;
     _spawn();
     _spawn();
   }
@@ -245,7 +250,14 @@ class _G2048GameState extends State<G2048Game> {
       } else if (lost) {
         _finish(false);
       } else {
-        setState(() {});
+        // 动画期间缓存的滑动：立即补执行，保证输入不丢、不卡死。
+        final buffered = _pendingDir;
+        _pendingDir = null;
+        if (buffered != null && !_finished) {
+          _requestMove(buffered);
+        } else {
+          setState(() {});
+        }
       }
     });
   }
@@ -281,6 +293,28 @@ class _G2048GameState extends State<G2048Game> {
     ));
   }
 
+  /// 新游戏按钮：进行中需二次确认，避免误触丢失当前进度。
+  Future<void> _confirmNewGame() async {
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃当前游戏？'),
+        content: const Text('点击「新游戏」将放弃当前进度，确定要重新开始吗？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('放弃并重新开始'),
+          ),
+        ],
+      ),
+    );
+    if (sure == true && mounted) setState(_reset);
+  }
+
   /// 按累计位移判定滑动方向。
   /// 原实现只看抬手瞬时速度（velocity），慢速拖动抬手时速度≈0 → 永远不触发，
   /// 表现为「点击不行、滑动也不行」。改为总位移判定后任意速度均可操作。
@@ -294,11 +328,21 @@ class _G2048GameState extends State<G2048Game> {
     }
   }
 
+  /// 请求一次滑动移动：动画进行中则缓存方向，结束后补执行（输入不丢）。
+  void _requestMove(String dir) {
+    if (_finished) return;
+    if (_animating) {
+      _pendingDir = dir;
+      return;
+    }
+    _move(dir);
+  }
+
   void _applySwipe(Offset delta) {
     if (delta.dx.abs() > delta.dy.abs()) {
-      _move(delta.dx > 0 ? 'right' : 'left');
+      _requestMove(delta.dx > 0 ? 'right' : 'left');
     } else {
-      _move(delta.dy > 0 ? 'down' : 'up');
+      _requestMove(delta.dy > 0 ? 'down' : 'up');
     }
   }
 
@@ -316,7 +360,7 @@ class _G2048GameState extends State<G2048Game> {
           icon: Icons.refresh,
           label: '新游戏',
           primary: true,
-          onPressed: _finished ? null : () => setState(_reset),
+          onPressed: _finished ? () => setState(_reset) : _confirmNewGame,
         ),
       ],
       content: LayoutBuilder(
@@ -371,6 +415,11 @@ class _G2048GameState extends State<G2048Game> {
                 if (!_dragConsumed && _dragDelta.distance >= _swipeThreshold) {
                   _applySwipe(_dragDelta);
                 }
+                _dragDelta = Offset.zero;
+                _dragConsumed = false;
+              },
+              // 手势被系统/手势竞技场取消时复位，避免 _dragConsumed 卡死导致后续无响应。
+              onPanCancel: () {
                 _dragDelta = Offset.zero;
                 _dragConsumed = false;
               },

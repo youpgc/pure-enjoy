@@ -16,6 +16,13 @@ class Candy {
   double scale;
   bool dying;
 
+  /// 消除动画进度透明度（1→0），由 [Match3FlameGame.update] 驱动，
+  /// 让方块「弹出再淡出」而非瞬间消失，过渡更柔和。
+  double dyingAlpha = 1.0;
+
+  /// 消除动画已过去时长（秒），用于计算 [dyingAlpha] 与 [scale] 弹出曲线。
+  double dyingT = 0.0;
+
   Candy(
     this.type,
     this.row,
@@ -35,6 +42,8 @@ class Candy {
 ///
 /// [cell] 为格子边长；方块中心位于 (px+cell/2, py+cell/2)。
 void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
+  final a = candy.dying ? candy.dyingAlpha.clamp(0.0, 1.0) : 1.0;
+  if (a <= 0.01) return;
   final r = cell * 0.42 * candy.scale;
   final cx = candy.px + cell / 2;
   final cy = candy.py + cell / 2;
@@ -46,17 +55,17 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
   canvas.drawPath(
     path,
     Paint()
-      ..color = Colors.black.withOpacity(0.35)
+      ..color = Colors.black.withOpacity(0.35 * a)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
   );
 
   // 主体
-  canvas.drawPath(path, Paint()..color = color);
+  canvas.drawPath(path, Paint()..color = color.withOpacity(a));
   // 加粗描边：清晰界定形状、提升辨识度（对比深色底板）
   canvas.drawPath(
     path,
     Paint()
-      ..color = color.darken(0.3)
+      ..color = color.darken(0.3).withOpacity(a)
       ..style = PaintingStyle.stroke
       ..strokeWidth = cell * 0.08,
   );
@@ -68,26 +77,26 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
       width: r * 0.5,
       height: r * 0.7,
     ),
-    Paint()..color = const Color(0xFFFFFFFF).withOpacity(0.55),
+    Paint()..color = const Color(0xFFFFFFFF).withOpacity(0.55 * a),
   );
 
   // 特殊糖标识
   switch (candy.special) {
     case 'row':
-      _drawStripes(canvas, cx, cy, r, true);
+      _drawStripes(canvas, cx, cy, r, true, a);
       break;
     case 'col':
-      _drawStripes(canvas, cx, cy, r, false);
+      _drawStripes(canvas, cx, cy, r, false, a);
       break;
     case 'bomb':
-      _drawBomb(canvas, cx, cy, r);
+      _drawBomb(canvas, cx, cy, r, a);
       break;
     case 'wrap':
       canvas.drawCircle(
         Offset(cx, cy),
         r * 0.9,
         Paint()
-          ..color = Colors.white.withOpacity(0.85)
+          ..color = Colors.white.withOpacity(0.85 * a)
           ..style = PaintingStyle.stroke
           ..strokeWidth = cell * 0.06,
       );
@@ -153,9 +162,9 @@ Path _shapePath(int type, double cx, double cy, double r) {
   return p;
 }
 
-void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal) {
+void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal, double a) {
   final paint = Paint()
-    ..color = Colors.white.withOpacity(0.8)
+    ..color = Colors.white.withOpacity(0.8 * a)
     ..strokeWidth = r * 0.18
     ..strokeCap = StrokeCap.round;
   for (var i = -1; i <= 1; i++) {
@@ -175,7 +184,7 @@ void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal
   }
 }
 
-void _drawBomb(Canvas canvas, double cx, double cy, double r) {
+void _drawBomb(Canvas canvas, double cx, double cy, double r, double a) {
   final colors = <Color>[
     const Color(0xFFEF5350),
     const Color(0xFF42A5F5),
@@ -190,13 +199,13 @@ void _drawBomb(Canvas canvas, double cx, double cy, double r) {
       i * 2 * pi / colors.length,
       2 * pi / colors.length,
       true,
-      Paint()..color = colors[i],
+      Paint()..color = colors[i].withOpacity(a),
     );
   }
   canvas.drawCircle(
     Offset(cx, cy),
     r * 0.32,
-    Paint()..color = Colors.white,
+    Paint()..color = Colors.white.withOpacity(a),
   );
 }
 
