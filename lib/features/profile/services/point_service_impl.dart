@@ -205,13 +205,18 @@ mixin PointServiceCheckinMixin {
   ///   - 'earn' / 'game_earn'：正积分，落库带 expires_at（+180 天）
   ///   - 'consume' / 'game_spend'：消费，delta 应为负数，落库无 expires_at
   /// [remark] 备注说明
-  Future<void> updatePointsStats({
+  ///
+  /// **返回是否真正写入成功**。调用方（道具购买 / 游戏发奖）必须据此判断：
+  /// 流水写入失败时不得继续发放业务权益，否则出现「扣分流失败仍白送道具」
+  /// 或「发分流失败却回报已发放并烧掉占坑」两类事故。
+  /// 注意：本方法**不抛异常**，失败只返回 false，切勿用 try/catch 判定成败。
+  Future<bool> updatePointsStats({
     required int delta,
     required String type,
     String? remark,
   }) async {
     final userId = AuthService.instance.currentUserId;
-    if (userId == null) return;
+    if (userId == null) return false;
 
     String recordType;
     String defaultRemark;
@@ -233,7 +238,7 @@ mixin PointServiceCheckinMixin {
         defaultRemark = '游戏消费';
         break;
       default:
-        return;
+        return false;
     }
 
     final now = DateTime.now().toUtc();
@@ -241,7 +246,7 @@ mixin PointServiceCheckinMixin {
         ? now.add(const Duration(days: 180)).toIso8601String()
         : null;
 
-    await ApiClient.post('point_records', {
+    final insert = await ApiClient.post('point_records', {
       'id': const Uuid().v4(),
       'user_id': userId,
       'type': recordType,
@@ -251,10 +256,20 @@ mixin PointServiceCheckinMixin {
       'created_at': now.toIso8601String(),
       if (expiresAt != null) 'expires_at': expiresAt,
     });
+
+    if (!insert.isSuccess) {
+      // 流水未落库：直接返回 false，调用方据此中止业务发放
+      if (kDebugMode) {
+        debugPrint('写入积分流水失败（$recordType $delta）：${insert.error}');
+      }
+      return false;
+    }
+
     EventBus.instance.fire(EventType.pointsUpdated);
 
     // 重算 users 表积分统计字段
     await _recalcAndUpdateUserPoints();
+    return true;
   }
 
   /// 读取当前用户持有的补签卡数量（只读查询 user_items）。

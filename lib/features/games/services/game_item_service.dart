@@ -94,21 +94,31 @@ class GameItemService {
       }
 
       // 1) 消费积分（game_spend 闭环，自动重算回写 users 展示列）
-      await PointService.instance.updatePointsStats(
+      //    扣分流未落库即中止：不得继续发放道具（否则白送）。
+      final spent = await PointService.instance.updatePointsStats(
         delta: -item.pointCost,
         type: 'game_spend',
         remark: '购买道具:${item.name}',
       );
+      if (!spent) {
+        return {'success': false, 'message': '积分扣减失败，请稍后重试'};
+      }
 
       // 2) 入库 owned+1（先查后 upsert，复用 user_items 模式）
       final ok = await _upsertOwned(item.id, 1);
       if (!ok) {
-        await PointService.instance.updatePointsStats(
+        // 入库失败 → 回退积分；回退也失败则记录，交由后续对账
+        final refunded = await PointService.instance.updatePointsStats(
           delta: item.pointCost,
           type: 'earn',
           remark: '购买道具回退:${item.name}',
         );
-        return {'success': false, 'message': '购买失败，已退回积分'};
+        return {
+          'success': false,
+          'message': refunded
+              ? '购买失败，已退回积分'
+              : '购买失败且回退失败，请联系客服核对积分',
+        };
       }
 
       EventBus.instance.fire(EventType.pointsUpdated);

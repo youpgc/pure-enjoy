@@ -424,18 +424,22 @@ class GameRewardService {
     }
 
     // 3) 发分：走积分统一入口（type=game_earn，正积分 +180 天）
+    //    必须以返回值判定成败（updatePointsStats 失败不抛异常）：
+    //    否则会「回报已发放但实际未发分」，且占坑已被烧掉、无法重试。
+    var grantedOk = false;
     try {
-      await PointService.instance.updatePointsStats(
+      grantedOk = await PointService.instance.updatePointsStats(
         delta: points,
         type: 'game_earn',
         remark: remark,
       );
-      // 4) 发分成功，刷新积分展示
-      EventBus.instance.fire(EventType.pointsUpdated);
-      return GameRewardResult.granted(points: points);
     } catch (e) {
-      // 5) 回滚占坑，允许下次重试
-      debugPrint('[GameRewardService] 发分失败，回滚占坑：$e');
+      debugPrint('[GameRewardService] 发分异常：$e');
+    }
+
+    if (!grantedOk) {
+      // 4) 发分失败 → 回滚占坑，允许下次重试
+      debugPrint('[GameRewardService] 发分失败，回滚占坑：$claimKey');
       await ApiClient.delete(
         'game_reward_claims',
         id: claimId,
@@ -443,5 +447,9 @@ class GameRewardService {
       );
       return GameRewardResult.notGranted(reason: '发放失败，请重试');
     }
+
+    // 5) 发分成功，刷新积分展示
+    EventBus.instance.fire(EventType.pointsUpdated);
+    return GameRewardResult.granted(points: points);
   }
 }
