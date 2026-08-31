@@ -1,7 +1,7 @@
 part of './point_records_screen_content.dart';
 
 /// 积分类型映射（与数据库 point_records.type 和后台 POINT_TYPE_MAP 一致）
-/// 标准类型：checkin / earn / spend / adjust / admin_adjust
+/// 标准类型：checkin / earn / spend / adjust / admin_adjust / game_earn / game_spend
 /// 兼容历史类型：admin_recharge（后台 POINT_TYPE_MAP 未单列，仅本端兼容映射到 admin_adjust）
 PointTypeInfo _getTypeInfo(String type) {
   switch (type) {
@@ -21,6 +21,18 @@ PointTypeInfo _getTypeInfo(String type) {
       return PointTypeInfo(
         icon: Icons.remove_circle_outline,
         label: '消费',
+        color: AppTheme.error,
+      );
+    case 'game_earn':
+      return PointTypeInfo(
+        icon: Icons.sports_esports_outlined,
+        label: '游戏奖励',
+        color: Colors.green,
+      );
+    case 'game_spend':
+      return PointTypeInfo(
+        icon: Icons.sports_esports_outlined,
+        label: '游戏消费',
         color: AppTheme.error,
       );
     case 'adjust':

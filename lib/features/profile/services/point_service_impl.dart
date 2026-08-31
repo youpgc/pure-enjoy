@@ -201,7 +201,9 @@ mixin PointServiceCheckinMixin {
   /// 插入后自动重算 users 表积分统计字段。
   ///
   /// [delta] 变动值（正数增加，负数减少）
-  /// [type] 变动类型：'earn' | 'consume'
+  /// [type] 变动类型：'earn' | 'consume' | 'game_earn' | 'game_spend'
+  ///   - 'earn' / 'game_earn'：正积分，落库带 expires_at（+180 天）
+  ///   - 'consume' / 'game_spend'：消费，delta 应为负数，落库无 expires_at
   /// [remark] 备注说明
   Future<void> updatePointsStats({
     required int delta,
@@ -221,6 +223,14 @@ mixin PointServiceCheckinMixin {
       case 'consume':
         recordType = 'spend';
         defaultRemark = '消费积分';
+        break;
+      case 'game_earn':
+        recordType = 'game_earn';
+        defaultRemark = '游戏奖励';
+        break;
+      case 'game_spend':
+        recordType = 'game_spend';
+        defaultRemark = '游戏消费';
         break;
       default:
         return;

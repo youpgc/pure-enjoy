@@ -18,6 +18,11 @@ class CacheHelper {
   static const String keyReminders = 'cache_reminders';
   static const String keyHabits = 'cache_habits';
   static const String keyPointStats = 'cache_point_stats';
+  /// 游戏中心配置缓存（games/维度/关卡/成就/奖励规则）。
+  /// 属全局配置而非用户数据，切换账号无需清除（见 clearAllUserData）。
+  static const String keyGames = 'cache_games';
+  /// 游戏成绩看板缓存（按用户隔离，切换账号须清除）。
+  static const String keyGameScores = 'cache_game_scores';
 
   /// 保存 JSON 列表缓存
   Future<void> saveList(String key, List<dynamic> data) async {
@@ -78,6 +83,8 @@ class CacheHelper {
       keyReminders,
       keyHabits,
       keyPointStats,
+      keyGameScores,
+      // 注：keyGames 是全局配置（非用户数据），故意不在此清除
     ];
     for (final key in keysToRemove) {
       await prefs.remove(key);
