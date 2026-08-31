@@ -194,18 +194,13 @@ class _Match3GameState extends State<Match3Game> {
           ],
           content: LayoutBuilder(
             builder: (ctx, constraints) {
-              // 盘面取正方形居中，避免 Flame 画布被拉伸导致格子错位
-              final side = constraints.maxWidth < constraints.maxHeight
-                  ? constraints.maxWidth
-                  : constraints.maxHeight;
-              return Center(
-                child: SizedBox(
-                  width: side,
-                  height: side,
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(12),
-                    child: GameWidget(game: _game),
-                  ),
+              // 画布铺满内容区，正方形网格在内部居中，深色底板自然填满上下留白
+              return SizedBox(
+                width: constraints.maxWidth,
+                height: constraints.maxHeight,
+                child: ClipRRect(
+                  borderRadius: BorderRadius.circular(12),
+                  child: GameWidget(game: _game),
                 ),
               );
             },

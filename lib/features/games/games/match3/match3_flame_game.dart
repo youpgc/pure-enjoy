@@ -49,6 +49,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   int? _selectedR;
   int? _selectedC;
   late double _cell;
+  /// 网格相对画布左上角的偏移（画布非正方形时居中网格，背景填满留白）
+  late double _offsetX;
+  late double _offsetY;
   final Random _rng = Random();
 
   final List<Color> _palette = <Color>[
@@ -74,6 +77,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   Future<void> onLoad() async {
     await super.onLoad();
     _cell = (size.x / cols).clamp(0, size.y / rows);
+    _offsetX = (size.x - cols * _cell) / 2;
+    _offsetY = (size.y - rows * _cell) / 2;
     _newBoard();
     objective.initBoard(_rng);
     movesLeft = objective.steps;
@@ -107,7 +112,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         if (objective.jelly[r][c] > 0) {
-          Match3Overlays.drawJelly(canvas, c * _cell, r * _cell, _cell);
+          Match3Overlays.drawJelly(
+              canvas, _offsetX + c * _cell, _offsetY + r * _cell, _cell);
         }
       }
     }
@@ -122,13 +128,15 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       for (var c = 0; c < cols; c++) {
         final lv = objective.ice[r][c];
         if (lv > 0) {
-          Match3Overlays.drawIce(canvas, c * _cell, r * _cell, _cell, lv);
+          Match3Overlays.drawIce(
+              canvas, _offsetX + c * _cell, _offsetY + r * _cell, _cell, lv);
         }
       }
     }
     if (_selectedR != null && _selectedC != null) {
       canvas.drawRect(
-        Rect.fromLTWH(_selectedC! * _cell, _selectedR! * _cell, _cell, _cell),
+        Rect.fromLTWH(_offsetX + _selectedC! * _cell,
+            _offsetY + _selectedR! * _cell, _cell, _cell),
         Paint()
           ..color = Colors.white.withValues(alpha: 0.25)
           ..style = PaintingStyle.stroke
@@ -155,8 +163,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       for (var c = 0; c < cols; c++) {
         final cand = grid[r][c];
         if (cand == null) continue;
-        final tx = cand.col * _cell;
-        final ty = cand.row * _cell;
+        final tx = _offsetX + cand.col * _cell;
+        final ty = _offsetY + cand.row * _cell;
         cand.px += (tx - cand.px) * k;
         cand.py += (ty - cand.py) * k;
         final ts = cand.dying ? 0.0 : 1.0;
@@ -180,7 +188,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
             (r >= 2 &&
                 grid[r - 1][c]?.type == t &&
                 grid[r - 2][c]?.type == t));
-        grid[r][c] = Candy(t, r, c, c * _cell, r * _cell);
+        grid[r][c] = Candy(
+            t, r, c, _offsetX + c * _cell, _offsetY + r * _cell);
       }
     }
   }
@@ -235,8 +244,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   @override
   void onTapUp(TapUpEvent event) {
     if (!_loaded || _busy || _over) return;
-    final c = (event.canvasPosition.x / _cell).floor();
-    final r = (event.canvasPosition.y / _cell).floor();
+    final c = ((event.canvasPosition.x - _offsetX) / _cell).floor();
+    final r = ((event.canvasPosition.y - _offsetY) / _cell).floor();
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
 
     if (_selectedR == null) {
@@ -475,8 +484,8 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
           _rng.nextInt(_palette.length),
           r,
           c,
-          c * _cell,
-          spawnY * _cell,
+          _offsetX + c * _cell,
+          _offsetY + spawnY * _cell,
         );
         spawnY--;
         grid[r][c] = cand;

@@ -40,28 +40,35 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
   final cy = candy.py + cell / 2;
   if (r <= 0) return;
 
-  final paint = Paint()..color = color;
   final Path path = _shapePath(candy.type, cx, cy, r);
 
-  // 主体
-  canvas.drawPath(path, paint);
-  // 描边增加立体感
+  // 投影：让糖块从深色底板浮起，避免与背景糊在一起（缓解久看眼累）
   canvas.drawPath(
     path,
     Paint()
-      ..color = color.darken(0.18)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = cell * 0.04,
+      ..color = Colors.black.withOpacity(0.35)
+      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
   );
 
-    // 高光
-    canvas.drawOval(
-      Rect.fromCenter(
+  // 主体
+  canvas.drawPath(path, Paint()..color = color);
+  // 加粗描边：清晰界定形状、提升辨识度（对比深色底板）
+  canvas.drawPath(
+    path,
+    Paint()
+      ..color = color.darken(0.3)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = cell * 0.08,
+  );
+
+  // 高光：更亮、更聚焦的椭圆，增强立体与清晰感
+  canvas.drawOval(
+    Rect.fromCenter(
       center: Offset(cx - r * 0.3, cy - r * 0.35),
       width: r * 0.5,
       height: r * 0.7,
     ),
-    Paint()..color = const Color(0xFFFFFFFF).withOpacity(0.35),
+    Paint()..color = const Color(0xFFFFFFFF).withOpacity(0.55),
   );
 
   // 特殊糖标识
