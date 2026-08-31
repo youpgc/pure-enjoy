@@ -13,7 +13,10 @@ class GamePlayScreen extends StatefulWidget {
   /// 要游玩的游戏
   final GameModel game;
 
-  const GamePlayScreen({super.key, required this.game});
+  /// 指定关卡（选关界面传入）；为 null 时自动取第一个启用关卡。
+  final GameLevelModel? level;
+
+  const GamePlayScreen({super.key, required this.game, this.level});
 
   @override
   State<GamePlayScreen> createState() => _GamePlayScreenState();
@@ -27,7 +30,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   @override
   void initState() {
     super.initState();
-    _level = resolveLevel(widget.game);
+    // 选关界面已指定关卡则直接用；否则回退到「第一个启用关卡」
+    _level = widget.level ?? resolveLevel(widget.game);
   }
 
   void _onFinished(GamePlayOutcome outcome) async {

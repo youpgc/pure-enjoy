@@ -36,6 +36,10 @@ class GameModel {
   /// 配置版本（App 可据此判断是否需要重拉）
   final int version;
 
+  /// 是否允许选关：true 时游戏大厅点击该游戏弹出选关界面；
+  /// false（默认）则直接进入第一个启用关卡，不弹选关。由后台配置下发。
+  final bool levelSelectable;
+
   /// 创建时间（UTC）
   final DateTime? createdAt;
 
@@ -53,6 +57,7 @@ class GameModel {
     this.sortOrder = 0,
     this.config = const <String, dynamic>{},
     this.version = 1,
+    this.levelSelectable = false,
     this.createdAt,
     this.updatedAt,
   });
@@ -70,6 +75,7 @@ class GameModel {
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       version: (json['version'] as num?)?.toInt() ?? 1,
+      levelSelectable: json['level_selectable'] as bool? ?? false,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -92,6 +98,7 @@ class GameModel {
       'sort_order': sortOrder,
       'config': config,
       'version': version,
+      'level_selectable': levelSelectable,
       if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
     };
@@ -109,6 +116,7 @@ class GameModel {
     int? sortOrder,
     Map<String, dynamic>? config,
     int? version,
+    bool? levelSelectable,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -123,6 +131,7 @@ class GameModel {
       sortOrder: sortOrder ?? this.sortOrder,
       config: config ?? this.config,
       version: version ?? this.version,
+      levelSelectable: levelSelectable ?? this.levelSelectable,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

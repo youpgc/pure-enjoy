@@ -4,6 +4,7 @@ import 'package:pure_enjoy/core/theme/app_theme.dart';
 import './game_total_dashboard.dart';
 import '../game_play_helpers.dart';
 import '../game_play_screen.dart';
+import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 import '../services/game_score_service.dart';
 import '../services/game_service.dart';
@@ -56,6 +57,60 @@ class _GameHallPageState extends State<GameHallPage> {
     return '${b.bestValue.toInt()}${b.unit ?? ''}';
   }
 
+  /// 点击游戏入口：允许选关且启用关卡 > 1 时弹选关界面，否则直接进入首关。
+  void _openGame(GameModel game) {
+    final levels = _config?.levelsOf(game.id) ?? <GameLevelModel>[];
+    if (game.levelSelectable && levels.length > 1) {
+      _showLevelSelect(game, levels);
+      return;
+    }
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GamePlayScreen(game: game)),
+    );
+  }
+
+  /// 选关底部弹窗（仅展示启用关卡）。
+  void _showLevelSelect(GameModel game, List<GameLevelModel> levels) {
+    showModalBottomSheet(
+      context: context,
+      isScrollControlled: true,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
+            child: Text(
+              '选择关卡 · ${game.name}',
+              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+            ),
+          ),
+          ...levels.map(
+            (lv) => ListTile(
+              title: Text(lv.name),
+              subtitle: lv.countForDailyClear
+                  ? const Text('通关计入每日首通奖励')
+                  : const Text('不计入每日首通奖励'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: () {
+                Navigator.of(ctx).pop();
+                Navigator.of(context).push(
+                  MaterialPageRoute(
+                    builder: (_) => GamePlayScreen(game: game, level: lv),
+                  ),
+                );
+              },
+            ),
+          ),
+          const SizedBox(height: 8),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final games = _config?.games ?? <GameModel>[];
@@ -95,11 +150,7 @@ class _GameHallPageState extends State<GameHallPage> {
                         final game = games[i];
                         final best = _primaryBest(game.id);
                         return InkWell(
-                          onTap: () => Navigator.of(context).push(
-                            MaterialPageRoute(
-                              builder: (_) => GamePlayScreen(game: game),
-                            ),
-                          ),
+                          onTap: () => _openGame(game),
                           borderRadius: BorderRadius.circular(16),
                           child: Card(
                             child: Padding(
