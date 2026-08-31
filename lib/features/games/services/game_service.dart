@@ -134,6 +134,9 @@ class GameService {
   /// 内存快照（进程内复用，避免同一开屏重复解析缓存）
   GameConfigSnapshot? _memory;
 
+  /// 进程内缓存快照（未拉取过返回空快照；调用方应先 fetchConfig / loadCachedConfig）。
+  GameConfigSnapshot get cachedConfig => _memory ?? const GameConfigSnapshot();
+
   /// 读取本地缓存快照（供开屏秒渲染；无缓存返回 null）。
   Future<GameConfigSnapshot?> loadCachedConfig() async {
     if (_memory != null) return _memory;

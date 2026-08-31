@@ -24,6 +24,10 @@ class GameLevelModel {
   /// 是否启用
   final bool enabled;
 
+  /// 是否计入「每日首次通关奖励」。
+  /// 仅当 true 时通关该关才触发每日首通奖励（首关过简单时不开启，由后台指定）。
+  final bool countForDailyClear;
+
   /// 排序号（升序）
   final int sortOrder;
 
@@ -41,6 +45,7 @@ class GameLevelModel {
     this.config = const <String, dynamic>{},
     this.target = const <String, dynamic>{},
     this.enabled = true,
+    this.countForDailyClear = false,
     this.sortOrder = 0,
     this.createdAt,
     this.updatedAt,
@@ -56,6 +61,8 @@ class GameLevelModel {
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       target: (json['target'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       enabled: json['enabled'] as bool? ?? true,
+      countForDailyClear:
+          json['count_for_daily_clear'] as bool? ?? false,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -76,6 +83,7 @@ class GameLevelModel {
       'config': config,
       'target': target,
       'enabled': enabled,
+      'count_for_daily_clear': countForDailyClear,
       'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
@@ -91,6 +99,7 @@ class GameLevelModel {
     Map<String, dynamic>? config,
     Map<String, dynamic>? target,
     bool? enabled,
+    bool? countForDailyClear,
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -103,6 +112,7 @@ class GameLevelModel {
       config: config ?? this.config,
       target: target ?? this.target,
       enabled: enabled ?? this.enabled,
+      countForDailyClear: countForDailyClear ?? this.countForDailyClear,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,

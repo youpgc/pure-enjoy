@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../services/version_check_service.dart';
+import '../../games/hall/game_hall_page.dart';
 import '../../life/screens/life/life_screen.dart';
 import './dashboard/dashboard_page.dart';
 import './profile/profile_page.dart';
@@ -21,6 +22,7 @@ class _HomeScreenState extends State<HomeScreen> {
     const DashboardPage(), // 首页为默认 landing，开屏即构建
     const SizedBox.shrink(),
     const SizedBox.shrink(),
+    const SizedBox.shrink(),
   ];
 
   /// 按索引创建对应 tab 页（仅首次进入时调用，构造即触发该页 initState 发起请求）
@@ -31,6 +33,8 @@ class _HomeScreenState extends State<HomeScreen> {
       case 1:
         return const LifeScreen();
       case 2:
+        return const GameHallPage();
+      case 3:
         return const ProfilePage();
       default:
         return const SizedBox.shrink();
@@ -80,6 +84,11 @@ class _HomeScreenState extends State<HomeScreen> {
             icon: Icon(Icons.favorite_outline),
             selectedIcon: Icon(Icons.favorite),
             label: '生活',
+          ),
+          NavigationDestination(
+            icon: Icon(Icons.sports_esports_outlined),
+            selectedIcon: Icon(Icons.sports_esports),
+            label: '游戏',
           ),
           NavigationDestination(
             icon: Icon(Icons.person_outline),

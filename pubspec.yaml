@@ -54,6 +54,8 @@ dependencies:
   image_picker: ^1.0.7
   # 图表库
   fl_chart: ^0.68.0
+  # 游戏引擎（消消乐三消，1.38.x 纯 Dart 依赖，无原生二进制；需 Flutter>=3.41 / Dart>=3.11）
+  flame: ^1.38.0
   # 电池电量
   battery_plus: ^5.0.2
   # 农历
