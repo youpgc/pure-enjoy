@@ -6,6 +6,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
+import '../../models/game_level_model.dart';
 import 'g2048_tile.dart';
 
 /// 2048（成熟手感版）
@@ -22,15 +23,18 @@ class G2048Game extends StatefulWidget {
   /// 结束回调
   final void Function(GamePlayOutcome) onFinished;
 
-  const G2048Game({super.key, required this.onFinished});
+  /// 当前关卡（含 size / target 配置）
+  final GameLevelModel level;
+
+  G2048Game({super.key, required this.onFinished, required this.level});
 
   @override
   State<G2048Game> createState() => _G2048GameState();
 }
 
 class _G2048GameState extends State<G2048Game> {
-  static const int _size = 4;
-  static const int _target = 2048;
+  late int _size;
+  late int _target;
   static const Duration _slide = Duration(milliseconds: 120);
 
   /// 判定为「一次滑动」的最小拖动距离（逻辑像素）。
@@ -54,10 +58,24 @@ class _G2048GameState extends State<G2048Game> {
   late final DateTime _startTime;
   final Random _rng = Random();
 
+  /// 最高分持久化 key（按关卡号区分，避免不同关卡共用同一最高分）
+  String get _bestKey => 'g2048_best_${widget.level.levelNo}';
+
   @override
   void initState() {
     super.initState();
     _startTime = DateTime.now();
+    // 从后台关卡配置读取棋盘尺寸与目标分（含安全边界，异常值回退默认）
+    final cfgSize = widget.level.config['size'];
+    final cfgTarget = widget.level.config['target'];
+    final parsedSize = cfgSize is int
+        ? cfgSize
+        : (cfgSize is num ? cfgSize.toInt() : 4);
+    _size = (parsedSize >= 3 && parsedSize <= 8) ? parsedSize : 4;
+    final parsedTarget = cfgTarget is int
+        ? cfgTarget
+        : (cfgTarget is num ? cfgTarget.toInt() : 2048);
+    _target = parsedTarget > 0 ? parsedTarget : 2048;
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
@@ -66,7 +84,7 @@ class _G2048GameState extends State<G2048Game> {
   Future<void> _loadBest() async {
     final sp = await SharedPreferences.getInstance();
     if (mounted) {
-      _best = sp.getInt('g2048_best') ?? 0;
+      _best = sp.getInt(_bestKey) ?? 0;
       setState(() {});
     }
   }

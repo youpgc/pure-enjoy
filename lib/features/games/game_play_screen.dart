@@ -78,6 +78,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         return G2048Game(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
+          level: _level,
         );
       case 'match3':
         return Match3Game(
