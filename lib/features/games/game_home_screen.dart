@@ -16,10 +16,12 @@ import 'services/game_service.dart';
 
 /// 游戏主界面（大厅点击游戏入口后的落地页）。
 ///
-/// 四入口：**开始游戏 / 选关 / 查看说明 / 查看游戏记录**。
-/// - 单关卡游戏（[GameModel.levelSelectable]=false 或仅 1 关）：隐藏「选关」。
-/// - 消消乐（match3）：额外展示「6 模式网格」（模式为主），点模式可直接深链到
-///   该模式的选关；「开始游戏」跳到当前可挑战关卡（gated 取 frontier，free 取首关）。
+/// 入口层级（避免「模式+开始游戏+选关」堆叠混乱）：
+/// - 消消乐（match3）：以「6 模式网格」为**选择模式**入口，点模式**直接进入**该模式
+///   首个未通关关卡（全通关回第一关），不再弹窗；底部「选择关卡」用于挑具体关卡。
+/// - 有选关能力的其它游戏（[GameModel.levelSelectable] 且 >1 关）：以「选择关卡」
+///   代替「开始游戏」，避免重复入口。
+/// - 单关卡游戏：保留「开始游戏」直接开局。
 class GameHomeScreen extends StatefulWidget {
   final GameModel game;
 
@@ -93,6 +95,30 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
+  /// 直接进入某模式首个未通关关卡（frontier）；全通关回第一关。
+  /// 用于模式网格点按，替代「弹窗选关」直接开局。
+  void _startMode(Match3Mode mode) {
+    final list = _levelsOfMode(mode);
+    if (list.isEmpty) return;
+    var maxCleared = -1;
+    for (var i = 0; i < list.length; i++) {
+      if (_clearedIds.contains(list[i].id)) maxCleared = i;
+    }
+    final lv = list[maxCleared + 1 < list.length ? maxCleared + 1 : 0];
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GamePlayScreen(game: widget.game, level: lv)),
+    );
+  }
+
+  /// 某模式下的关卡（按 level_no 升序）
+  List<GameLevelModel> _levelsOfMode(Match3Mode mode) {
+    final list = _levels
+        .where((l) => parseMatch3Mode(l.config, l.levelNo) == mode)
+        .toList()
+      ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
+    return list;
+  }
+
   void _showGuide() {
     final guide = gameGuideOf(widget.game);
     showModalBottomSheet<void>(
@@ -147,6 +173,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
+    final isMatch3 = game.code == 'match3';
     final startable = _startLevel != null;
 
     return Scaffold(
@@ -193,20 +220,23 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 四入口
-                  _EntryTile(
-                    icon: Icons.play_arrow_rounded,
-                    label: '开始游戏',
-                    desc: startable ? '从当前可挑战关卡开始' : '暂无可玩关卡',
-                    primary: true,
-                    enabled: startable,
-                    onTap: _startGame,
-                  ),
+                  // 入口：有选关/模式能力的游戏，优先「选择关卡」；消消乐以模式网格为起点，隐藏「开始游戏」
+                  if (!isMatch3 && !_canSelectLevel)
+                    _EntryTile(
+                      icon: Icons.play_arrow_rounded,
+                      label: '开始游戏',
+                      desc: startable ? '从当前可挑战关卡开始' : '暂无可玩关卡',
+                      primary: true,
+                      enabled: startable,
+                      onTap: _startGame,
+                    ),
                   if (_canSelectLevel)
                     _EntryTile(
                       icon: Icons.list_alt_rounded,
                       label: '选择关卡',
-                      desc: '按模式与关序挑选关卡',
+                      desc:
+                          isMatch3 ? '按模式与关序挑选具体关卡' : '按关序挑选关卡',
+                      primary: !isMatch3,
                       onTap: () => _openPicker(),
                     ),
                   _EntryTile(
@@ -258,7 +288,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
             final mode = Match3Mode.values[idx];
             final cleared = _modeCleared(mode);
             return InkWell(
-              onTap: () => _openPicker(initialMode: mode),
+              onTap: () => _startMode(mode),
               borderRadius: BorderRadius.circular(14),
               child: Card(
                 child: Padding(
