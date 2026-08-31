@@ -121,6 +121,8 @@ class GameScoreService {
   /// 上报一次游玩成绩。
   ///
   /// [values] 为「维度 id → 取值」，按配置维度传入（如分数、用时）。
+  /// [statusOverride] 可显式指定状态（'cleared' / 'failed' / 'aborted'）；
+  /// 缺省按 [cleared] 派生（true→cleared，false→failed）。
   /// 先插主记录再插各维度取值；维度取值并行写入，任一失败仅记日志不阻断主流程。
   ///
   /// 返回成绩 id；未登录或主记录插入失败返回 null。
@@ -128,6 +130,7 @@ class GameScoreService {
     required String gameId,
     String? levelId,
     required bool cleared,
+    String? statusOverride,
     required int durationMs,
     Map<String, num> values = const <String, num>{},
   }) async {
@@ -144,7 +147,7 @@ class GameScoreService {
         'user_id': userId,
         'game_id': gameId,
         'level_id': levelId,
-        'status': cleared ? 'cleared' : 'failed',
+        'status': statusOverride ?? (cleared ? 'cleared' : 'failed'),
         'duration_ms': durationMs,
         'played_at': now.toIso8601String(),
         'created_at': now.toIso8601String(),

@@ -24,6 +24,7 @@ class GamePlayScreen extends StatefulWidget {
 
 class _GamePlayScreenState extends State<GamePlayScreen> {
   late final GameLevelModel _level;
+  late final DateTime _enterTime;
   GamePlayOutcome? _outcome;
   int _restartNonce = 0;
 
@@ -32,6 +33,45 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     super.initState();
     // 选关界面已指定关卡则直接用；否则回退到「第一个启用关卡」
     _level = widget.level ?? resolveLevel(widget.game);
+    _enterTime = DateTime.now();
+  }
+
+  /// 返回键拦截：对局进行中弹「放弃本局」确认；确认后上报 status=aborted
+  /// （只记成绩不结算发分），再退出。结算页已弹出（_outcome != null）时直接放行。
+  Future<void> _onPopInvokedWithResult(bool didPop, Object? result) async {
+    if (didPop) return;
+    if (_outcome != null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    final abandon = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃本局？'),
+        content: const Text('退出将记为一次「放弃」，本局不获得积分奖励'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('继续游戏'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('放弃退出'),
+          ),
+        ],
+      ),
+    );
+    if (abandon != true || !mounted) return;
+    await reportAndSettle(
+      context: context,
+      game: widget.game,
+      level: _level,
+      scoreValuesByCode: <String, num>{'level': _level.levelNo},
+      durationMs: DateTime.now().difference(_enterTime).inMilliseconds,
+      cleared: false,
+      aborted: true,
+    );
+    if (mounted) Navigator.of(context).pop();
   }
 
   void _onFinished(GamePlayOutcome outcome) async {
@@ -97,17 +137,21 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: buildGameAppBar(
-        context,
-        widget.game,
-        () => Navigator.of(context).push(
-          MaterialPageRoute(
-            builder: (_) => GameSingleDashboard(game: widget.game),
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: _onPopInvokedWithResult,
+      child: Scaffold(
+        appBar: buildGameAppBar(
+          context,
+          widget.game,
+          () => Navigator.of(context).push(
+            MaterialPageRoute(
+              builder: (_) => GameSingleDashboard(game: widget.game),
+            ),
           ),
         ),
+        body: _buildGame(),
       ),
-      body: _buildGame(),
     );
   }
 }

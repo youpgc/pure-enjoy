@@ -90,6 +90,9 @@ AppBar buildGameAppBar(
 }
 
 /// 上报成绩 + 结算奖励 + 弹结算页。返回结算结果（未登录/失败可能为 null）。
+///
+/// [aborted] 为 true 表示用户中途主动放弃：只上报 status='aborted' 的成绩，
+/// 不结算奖励、不弹结算页（放弃不发分，防止刷分）。
 Future<GameSettlementResult?> reportAndSettle({
   required BuildContext context,
   required GameModel game,
@@ -97,6 +100,7 @@ Future<GameSettlementResult?> reportAndSettle({
   required Map<String, num> scoreValuesByCode,
   required int durationMs,
   bool cleared = true,
+  bool aborted = false,
   VoidCallback? onReplay,
   VoidCallback? onNext,
   bool canNext = false,
@@ -116,14 +120,18 @@ Future<GameSettlementResult?> reportAndSettle({
     if (dim != null) valuesById[dim.id] = entry.value;
   }
 
-  // 上报成绩（best-effort，失败仅记日志）
+  // 上报成绩（best-effort，失败仅记日志）。放弃时状态记 aborted。
   await GameScoreService.instance.submitScore(
     gameId: game.id,
     levelId: level.id.isEmpty ? null : level.id,
     cleared: cleared,
+    statusOverride: aborted ? 'aborted' : null,
     durationMs: durationMs,
     values: valuesById,
   );
+
+  // 放弃：只上报，不结算不弹窗
+  if (aborted) return null;
 
   // 结算奖励
     final result = await GameRewardService.instance.settleGame(
