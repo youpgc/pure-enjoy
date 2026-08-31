@@ -67,6 +67,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
           level: _level,
+          onRestart: () => setState(() {
+            _outcome = null;
+            _restartNonce++;
+          }),
         );
       default:
         return const Center(child: Text('该游戏暂未实现'));

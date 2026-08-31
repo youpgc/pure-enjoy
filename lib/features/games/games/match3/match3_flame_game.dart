@@ -2,12 +2,13 @@ import 'dart:math';
 
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import 'candy_component.dart';
+import 'match3_objective.dart';
+import 'match3_overlays.dart';
 
 /// 消消乐一次连线（用于生成特殊糖与消除判定）
 class _Run {
@@ -20,16 +21,20 @@ class _Run {
 ///
 /// - 自绘卡通糖块（6 种形状+颜色），条纹/彩爆/包装特殊糖。
 /// - 4 连→条纹糖（清整行/列）；5 连→彩爆（清同色）；L/T→包装糖（清 3×3）。
-/// - 关卡目标 + 步数限制 + 连击倍率；消除/下落/交换全动画 + 音效。
+/// - **6 种关卡目标**由 [Match3Objective] 驱动（计分/消除/收集/破冰/限时/Boss），
+///   引擎只负责盘面与消除，目标判定与进度全部交给状态机。
+/// - 连击倍率；消除/下落/交换全动画 + 音效。
 class Match3FlameGame extends FlameGame with TapCallbacks {
   final void Function(GamePlayOutcome) onFinished;
-  final ValueNotifier<int> scoreNotifier;
-  final ValueNotifier<int> movesNotifier;
+
+  /// 关卡目标状态机（模式、进度、达成判定、HUD 数据）
+  final Match3Objective objective;
+
+  /// HUD 变更信号：每次分数/步数/目标进度变化自增，Flutter 层据此重建信息条
+  final ValueNotifier<int> hudTick;
 
   final int rows;
   final int cols;
-  final int steps;
-  final int goal;
 
   List<List<Candy?>> grid = <List<Candy?>>[];
   int score = 0;
@@ -59,12 +64,10 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
 
   Match3FlameGame({
     required this.onFinished,
-    required this.scoreNotifier,
-    required this.movesNotifier,
+    required this.objective,
+    required this.hudTick,
     this.rows = 8,
     this.cols = 8,
-    this.steps = 20,
-    this.goal = 1000,
   });
 
   @override
@@ -72,10 +75,17 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     await super.onLoad();
     _cell = (size.x / cols).clamp(0, size.y / rows);
     _newBoard();
-    movesLeft = steps;
-    movesNotifier.value = movesLeft;
-    scoreNotifier.value = score;
+    objective.initBoard(_rng);
+    movesLeft = objective.steps;
+    _syncHud();
     _loaded = true;
+  }
+
+  /// 把引擎侧的分数/步数同步进目标状态机，并通知 Flutter 层刷新 HUD
+  void _syncHud() {
+    objective.score = score;
+    objective.movesLeft = movesLeft;
+    hudTick.value++;
   }
 
   @override
@@ -85,17 +95,35 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       Rect.fromLTWH(0, 0, size.x, size.y),
       Paint()..color = const Color(0xFF26263A),
     );
+    if (!_loaded) return; // 盘面/目标层尚未就绪
+    // 果冻底层（在糖果下方）
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        if (objective.jelly[r][c] > 0) {
+          Match3Overlays.drawJelly(canvas, c * _cell, r * _cell, _cell);
+        }
+      }
+    }
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
         final cand = grid[r][c];
         if (cand != null) drawCandy(canvas, cand, _cell, _palette[cand.type]);
       }
     }
+    // 冰封盖层（在糖果上方）
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        final lv = objective.ice[r][c];
+        if (lv > 0) {
+          Match3Overlays.drawIce(canvas, c * _cell, r * _cell, _cell, lv);
+        }
+      }
+    }
     if (_selectedR != null && _selectedC != null) {
       canvas.drawRect(
         Rect.fromLTWH(_selectedC! * _cell, _selectedR! * _cell, _cell, _cell),
         Paint()
-          ..color = Colors.white.withOpacity(0.25)
+          ..color = Colors.white.withValues(alpha: 0.25)
           ..style = PaintingStyle.stroke
           ..strokeWidth = _cell * 0.06,
       );
@@ -105,6 +133,16 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   @override
   void update(double dt) {
     super.update(dt);
+    // 限时模式：倒计时推进，归零即结算
+    if (objective.isTimed && _loaded && !_over) {
+      objective.secondsLeft -= dt;
+      if (objective.secondsLeft <= 0) {
+        objective.secondsLeft = 0;
+        _finishByObjective();
+      } else {
+        hudTick.value++;
+      }
+    }
     final k = min(1.0, dt * 14);
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
@@ -237,8 +275,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
           if (isMounted) _busy = false;
         });
       } else {
-        movesLeft--;
-        movesNotifier.value = movesLeft;
+        // 限时模式不限步数，仅倒计时约束
+        if (!objective.isTimed) movesLeft--;
+        _syncHud();
         combo = 1;
         _resolveCascade(r1, c1, r2, c2);
       }
@@ -254,8 +293,10 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     }
     final runs = _findRuns();
     if (runs.isEmpty) {
-      if (movesLeft <= 0) {
-        _finishByGoal();
+      _syncHud();
+      // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败
+      if (objective.achieved || objective.exhausted) {
+        _finishByObjective();
       } else {
         _busy = false;
       }
@@ -303,7 +344,22 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     _applySpecials(toClear, created);
 
     score += toClear.length * 10 * combo;
-    scoreNotifier.value = score;
+
+    // 目标进度累计（果冻清除 / 冰块削层 / 收集计数 / Boss 掉血）
+    final clearedCells = <ClearedCell>[];
+    for (final cell in toClear) {
+      final cand = grid[cell.$1][cell.$2];
+      if (cand == null) continue;
+      clearedCells.add(ClearedCell(
+        cell.$1,
+        cell.$2,
+        cand.type,
+        special: cand.special.isNotEmpty,
+      ));
+    }
+    objective.onCleared(clearedCells);
+    _syncHud();
+
     GameAudio.instance.match();
     GameAudio.instance.haptic(GameHaptic.medium);
 
@@ -421,10 +477,12 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     }
   }
 
-  void _finishByGoal() {
+  /// 按当前模式的目标判定通关/失败并结算
+  void _finishByObjective() {
     if (_over) return;
     _over = true;
-    final cleared = score >= goal;
+    _syncHud();
+    final cleared = objective.achieved;
     if (cleared) {
       GameAudio.instance.win();
     } else {

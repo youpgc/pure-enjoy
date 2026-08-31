@@ -1,85 +1,154 @@
 import 'package:flame/game.dart';
 import 'package:flutter/material.dart';
 
+import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
+import '../../models/match3_mode.dart';
+import '../../shared/game_shell.dart';
 import 'match3_flame_game.dart';
+import 'match3_objective.dart';
 
-/// 消消乐 Flutter 承载组件：嵌入 Flame 游戏 + 分数/步数/目标叠加层。
+/// 消消乐 Flutter 承载组件。
+///
+/// 布局遵循「按钮与视图分离」：信息条在**上方独立容器**、盘面独占中间容器、
+/// 控制按钮统一在**底部控制栏**，任何控件都不再叠加覆盖在盘面之上。
+/// 关卡目标由 [Match3Objective] 按 6 种模式驱动。
 class Match3Game extends StatefulWidget {
   /// 结束回调
   final void Function(GamePlayOutcome) onFinished;
 
-  /// 关卡（读取 config 的 goal/steps 决定目标与步数；为 null 用默认）
+  /// 关卡（读取 config 的 mode/steps/goal 等决定模式与目标；为 null 用默认）
   final GameLevelModel? level;
 
-  const Match3Game({super.key, required this.onFinished, this.level});
+  /// 请求重开本局（由外层承载页重建游戏实例）
+  final VoidCallback? onRestart;
+
+  const Match3Game({
+    super.key,
+    required this.onFinished,
+    this.level,
+    this.onRestart,
+  });
 
   @override
   State<Match3Game> createState() => _Match3GameState();
 }
 
 class _Match3GameState extends State<Match3Game> {
-  late final ValueNotifier<int> _score;
-  late final ValueNotifier<int> _moves;
-  late final ValueNotifier<int> _goal;
+  late final ValueNotifier<int> _hudTick;
+  late final Match3Objective _objective;
   late final Match3FlameGame _game;
+  late final Match3Mode _mode;
 
   @override
   void initState() {
     super.initState();
     final cfg = widget.level?.config ?? const <String, dynamic>{};
-    final steps = (cfg['steps'] as int?) ?? 20;
-    final goal = (cfg['goal'] as int?) ?? 1000;
-    _score = ValueNotifier<int>(0);
-    _moves = ValueNotifier<int>(steps);
-    _goal = ValueNotifier<int>(goal);
+    final levelNo = widget.level?.levelNo ?? 0;
+    final rows = (cfg['rows'] as num?)?.toInt() ?? 8;
+    final cols = (cfg['cols'] as num?)?.toInt() ?? 8;
+    _mode = parseMatch3Mode(cfg, levelNo);
+    _objective = Match3Objective.fromConfig(
+      cfg,
+      levelNo,
+      rows: rows,
+      cols: cols,
+    );
+    _hudTick = ValueNotifier<int>(0);
     _game = Match3FlameGame(
       onFinished: widget.onFinished,
-      scoreNotifier: _score,
-      movesNotifier: _moves,
-      steps: steps,
-      goal: goal,
+      objective: _objective,
+      hudTick: _hudTick,
+      rows: rows,
+      cols: cols,
     );
   }
 
   @override
   void dispose() {
-    _score.dispose();
-    _moves.dispose();
-    _goal.dispose();
+    _hudTick.dispose();
     super.dispose();
+  }
+
+  /// Boss 模式的血条 / 其他模式的目标进度条
+  Widget? _buildBanner() {
+    if (_mode != Match3Mode.boss) return null;
+    final ratio = _objective.bossHp <= 0
+        ? 0.0
+        : (_objective.bossLeft / _objective.bossHp).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.symmetric(horizontal: 16),
+      child: Row(
+        children: <Widget>[
+          Icon(_mode.icon, size: 20, color: _mode.color),
+          const SizedBox(width: 8),
+          Expanded(
+            child: ClipRRect(
+              borderRadius: BorderRadius.circular(8),
+              child: LinearProgressIndicator(
+                value: ratio,
+                minHeight: 10,
+                backgroundColor: AppTheme.neutral300,
+                // 血量条按国内涨红跌绿之外的通用语义：血量用红色
+                valueColor:
+                    const AlwaysStoppedAnimation<Color>(AppTheme.error),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('${_objective.bossLeft}',
+              style: const TextStyle(
+                  fontSize: 12, fontWeight: FontWeight.bold)),
+        ],
+      ),
+    );
   }
 
   @override
   Widget build(BuildContext context) {
-    return Stack(
-      children: <Widget>[
-        GameWidget(game: _game),
-        Positioned(
-          top: 8,
-          left: 12,
-          right: 12,
-          child: Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: <Widget>[
-              ValueListenableBuilder<int>(
-                valueListenable: _score,
-                builder: (_, v, __) => Chip(label: Text('得分 $v')),
-              ),
-              ValueListenableBuilder<int>(
-                valueListenable: _goal,
-                builder: (_, v, __) => Chip(label: Text('目标 $v')),
-              ),
-              ValueListenableBuilder<int>(
-                valueListenable: _moves,
-                builder: (_, v, __) =>
-                    Chip(label: Text('剩余步数 $v')),
-              ),
-            ],
+    return ValueListenableBuilder<int>(
+      valueListenable: _hudTick,
+      builder: (_, __, ___) {
+        final stats = _objective.stats();
+        return GameShell(
+          statusItems: stats
+              .map((s) => GameStatusItem(
+                    label: s.label,
+                    value: s.value,
+                    valueColor: s.alert ? AppTheme.error : null,
+                  ))
+              .toList(),
+          banner: _buildBanner(),
+          hint: _objective.hint,
+          actions: <GameAction>[
+            GameAction(
+              icon: Icons.refresh,
+              label: '重新开始',
+              primary: true,
+              onPressed: widget.onRestart,
+            ),
+          ],
+          content: LayoutBuilder(
+            builder: (ctx, constraints) {
+              // 盘面取正方形居中，避免 Flame 画布被拉伸导致格子错位
+              final side = constraints.maxWidth < constraints.maxHeight
+                  ? constraints.maxWidth
+                  : constraints.maxHeight;
+              return Center(
+                child: SizedBox(
+                  width: side,
+                  height: side,
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(12),
+                    child: GameWidget(game: _game),
+                  ),
+                ),
+              );
+            },
           ),
-        ),
-      ],
+        );
+      },
     );
   }
 }

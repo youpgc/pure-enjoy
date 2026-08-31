@@ -2,18 +2,22 @@ import 'dart:math';
 
 import 'package:flutter/material.dart';
 
+import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_icons.dart';
+import '../../shared/game_shell.dart';
+import './sheep_layout.dart';
 import './sheep_props.dart';
 import './sheep_tile.dart';
 
 /// 羊了个羊（成熟手感版）
 ///
 /// - 多层堆叠遮挡：上层方块盖住下层，仅「未遮挡」方块可点（原版核心机制）。
+/// - **紧凑团簇布局**：牌堆聚成一团、层间错半格形成遮挡（布局算法见 [SheepLayout]）。
 /// - 7 槽位 + 三连消除：凑齐 3 个同类自动消除；槽位溢出即失败；清空棋盘通关。
-/// - 三道具（每局各 1 次）：移出 / 撤回 / 洗牌，缓解死局。
+/// - 三道具（每局各 1 次）：移出 / 撤回 / 洗牌，统一收纳在底部控制栏。
 /// - 公平难度：按关卡 config 的「类型数/层数/每类数」程序化生成，并用贪心模拟
 ///   校验可解性（保证每类数量为 3 的倍数，存在可通关顺序）。
 /// - 音效 + 触感 + 方块飞入槽位动画。
@@ -64,33 +68,6 @@ class _SheepGameState extends State<SheepGame> {
 
   // ---------- 生成（可解性保证） ----------
 
-  List<(int, double, double)> _generatePositions(int total) {
-    final step = _overlap;
-    final perLayer = (total / _layers).ceil();
-    final area = (perLayer * step).clamp(5.0, 14.0);
-    final cols = (area / step).ceil() + 1;
-    final positions = <(int, double, double)>[];
-    for (var l = 0; l < _layers; l++) {
-      final cells = <(double, double)>[];
-      for (var cx = 0; cx < cols; cx++) {
-        for (var cy = 0; cy < cols; cy++) {
-          cells.add((cx * step + l * 0.12, cy * step + l * 0.12));
-        }
-      }
-      cells.shuffle(_rng);
-      final take = perLayer.clamp(0, cells.length);
-      for (var k = 0; k < take; k++) {
-        positions.add((l, cells[k].$1, cells[k].$2));
-      }
-    }
-    while (positions.length > total) positions.removeLast();
-    while (positions.length < total) {
-      positions.add((0, _rng.nextDouble() * area, _rng.nextDouble() * area));
-    }
-    positions.sort((a, b) => a.$1.compareTo(b.$1));
-    return positions;
-  }
-
   List<SheepTile> _buildTiles(List<(int, double, double)> pos) {
     final typeList = <int>[];
     for (var t = 0; t < _types; t++) {
@@ -104,90 +81,15 @@ class _SheepGameState extends State<SheepGame> {
     return tiles;
   }
 
-  bool _rectsOverlap(SheepTile a, SheepTile b) =>
-      a.x < b.x + 1 && a.x + 1 > b.x && a.y < b.y + 1 && a.y + 1 > b.y;
-
-  void _computeCoverageOn(List<SheepTile> list) {
-    for (final t in list) {
-      if (t.state == SheepTileState.board) t.covered = false;
-    }
-    for (final a in list) {
-      if (a.state != SheepTileState.board) continue;
-      for (final b in list) {
-        if (b.layer > a.layer &&
-            b.state == SheepTileState.board &&
-            _rectsOverlap(a, b)) {
-          a.covered = true;
-        }
-      }
-    }
-  }
-
-  /// 贪心模拟校验可解性（7 槽位，优先完成三连）
-  bool _solvable(List<SheepTile> src) {
-    final board = src
-        .map((t) => SheepTile(t.id, t.type, t.layer, t.x, t.y))
-        .toList();
-    _computeCoverageOn(board);
-    final slots = <SheepTile>[];
-    var guard = 0;
-    while (guard++ < 10000) {
-      final counts = <int, int>{};
-      for (final s in slots) counts[s.type] = (counts[s.type] ?? 0) + 1;
-      int? t3;
-      for (final e in counts.entries) {
-        if (e.value >= 3) {
-          t3 = e.key;
-          break;
-        }
-      }
-      if (t3 != null) {
-        var r = 0;
-        slots.removeWhere((s) {
-          if (s.type == t3 && r < 3) {
-            r++;
-            return true;
-          }
-          return false;
-        });
-        continue;
-      }
-      final uncovered = board
-          .where((t) => t.state == SheepTileState.board && !t.covered)
-          .toList();
-      if (uncovered.isEmpty) break;
-      SheepTile? pick;
-      for (final t in uncovered) {
-        if ((counts[t.type] ?? 0) == 2) {
-          pick = t;
-          break;
-        }
-      }
-      pick ??= uncovered.firstWhere(
-        (t) => (counts[t.type] ?? 0) == 1,
-        orElse: () => uncovered.first,
-      );
-      slots.add(pick);
-      pick.state = SheepTileState.slot;
-      _computeCoverageOn(board);
-      if (slots.length > _slotCapacity) return false;
-    }
-    final counts = <int, int>{};
-    for (final s in slots) counts[s.type] = (counts[s.type] ?? 0) + 1;
-    for (final e in counts.entries) {
-      if (e.value >= 3) return false;
-    }
-    return slots.isEmpty;
-  }
-
   void _generate() {
     final total = _types * _perType;
+    final layout = SheepLayout(layers: _layers, overlap: _overlap, rng: _rng);
+    const solver = SheepSolver(slotCapacity: _slotCapacity);
     List<SheepTile>? result;
-    for (var attempt = 0; attempt < 60; attempt++) {
-      final pos = _generatePositions(total);
-      final tiles = _buildTiles(pos);
+    for (var attempt = 0; attempt < 80; attempt++) {
+      final tiles = _buildTiles(layout.generate(total));
       result = tiles;
-      if (_solvable(tiles)) break;
+      if (solver.solvable(tiles)) break;
     }
     _tiles = result!;
     _slots.clear();
@@ -202,7 +104,7 @@ class _SheepGameState extends State<SheepGame> {
     _computeCoverage();
   }
 
-  void _computeCoverage() => _computeCoverageOn(_tiles);
+  void _computeCoverage() => SheepSolver.computeCoverage(_tiles);
 
   // ---------- 交互 ----------
 
@@ -382,87 +284,113 @@ class _SheepGameState extends State<SheepGame> {
 
   @override
   Widget build(BuildContext context) {
-    return Column(
-      children: <Widget>[
-        SheepPropBar(remaining: _propRemaining, onUse: _useProp),
-        Expanded(
-          child: LayoutBuilder(
-            builder: (ctx, constraints) {
-              final w = constraints.maxWidth;
-              final h = constraints.maxHeight;
-              const slotH = 88.0;
-              final boardH = h - slotH;
+    final boardLeft =
+        _tiles.where((t) => t.state == SheepTileState.board).length;
+    final nearFull = _slots.length >= _slotCapacity - 1;
 
-              double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
-              for (final t in _tiles) {
-                minX = min(minX, t.x);
-                minY = min(minY, t.y);
-                maxX = max(maxX, t.x + 1);
-                maxY = max(maxY, t.y + 1);
+    return GameShell(
+      statusItems: <Widget>[
+        GameStatusItem(label: '剩余方块', value: '$boardLeft'),
+        GameStatusItem(
+          label: '槽位',
+          value: '${_slots.length}/$_slotCapacity',
+          valueColor: nearFull ? AppTheme.error : null,
+        ),
+        GameStatusItem(label: '层数', value: '$_layers'),
+      ],
+      hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
+      // 三道具统一收纳到底部控制栏，不再叠在牌堆上方
+      actions: SheepProp.values.map((p) {
+        final n = _propRemaining[p] ?? 0;
+        return GameAction(
+          icon: p.icon,
+          label: p.label,
+          badge: '$n',
+          onPressed:
+              (n > 0 && !_finished && !_busy) ? () => _useProp(p) : null,
+        );
+      }).toList(),
+      content: LayoutBuilder(
+        builder: (ctx, constraints) {
+          final w = constraints.maxWidth;
+          final h = constraints.maxHeight;
+          const slotH = 82.0;
+          final boardH = h - slotH;
+
+          // 牌堆包围盒 → 等比缩放居中，紧凑布局下即呈现「聚成一团」
+          double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+          for (final t in _tiles) {
+            minX = min(minX, t.x);
+            minY = min(minY, t.y);
+            maxX = max(maxX, t.x + 1);
+            maxY = max(maxY, t.y + 1);
+          }
+          if (_tiles.isEmpty) {
+            minX = 0;
+            minY = 0;
+            maxX = 1;
+            maxY = 1;
+          }
+          final pileW = max(maxX - minX, 0.001);
+          final pileH = max(maxY - minY, 0.001);
+          const pad = 12.0;
+          final scale =
+              min((w - 2 * pad) / pileW, (boardH - 2 * pad) / pileH);
+          final drawW = pileW * scale;
+          final drawH = pileH * scale;
+          final offX = (w - drawW) / 2 - minX * scale;
+          final offY = (boardH - drawH) / 2 - minY * scale;
+
+          const slotPad = 8.0;
+          final slotW = (w - 2 * slotPad) / _slotCapacity;
+          final slotTile = min(scale, slotW * 0.86);
+          final slotY = boardH + (slotH - slotTile) / 2;
+
+          double slotCenterX(int i) => slotPad + (i + 0.5) * slotW;
+
+          final ordered = [..._tiles]
+            ..sort((a, b) {
+              if (a.state == SheepTileState.board &&
+                  b.state != SheepTileState.board) {
+                return -1;
               }
-              final pileW = max(maxX - minX, 0.001);
-              final pileH = max(maxY - minY, 0.001);
-              const pad = 14.0;
-              final scale = min((w - 2 * pad) / pileW, (boardH - 2 * pad) / pileH);
-              final drawW = pileW * scale;
-              final drawH = pileH * scale;
-              final offX = (w - drawW) / 2 - minX * scale;
-              final offY = (boardH - drawH) / 2 - minY * scale;
+              if (a.state != SheepTileState.board &&
+                  b.state == SheepTileState.board) {
+                return 1;
+              }
+              return a.layer.compareTo(b.layer);
+            });
 
-              final slotPad = 10.0;
-              final slotW = (w - 2 * slotPad) / _slotCapacity;
-              final slotTile = min(scale, slotW * 0.86);
-              final slotY = boardH + (slotH - slotTile) / 2;
-
-              double slotCenterX(int i) => slotPad + (i + 0.5) * slotW;
-
-              final ordered = [..._tiles]
-                ..sort((a, b) {
-                  if (a.state == SheepTileState.board &&
-                      b.state != SheepTileState.board) {
-                    return -1;
-                  }
-                  if (a.state != SheepTileState.board &&
-                      b.state == SheepTileState.board) {
-                    return 1;
-                  }
-                  return a.layer.compareTo(b.layer);
-                });
-
-              final children = <Widget>[
-                Positioned.fill(
-                  child: Container(
-                    margin: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: const Color(0xFFF3E9DC),
-                      borderRadius: BorderRadius.circular(14),
-                    ),
+          final children = <Widget>[
+            Positioned.fill(
+              child: Container(
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF3E9DC),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+              ),
+            ),
+            for (var i = 0; i < _slotCapacity; i++)
+              Positioned(
+                left: slotPad + i * slotW + 2,
+                top: slotY - 4,
+                width: slotW - 4,
+                height: slotTile + 8,
+                child: Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white,
+                    borderRadius: BorderRadius.circular(10),
+                    border: Border.all(color: const Color(0xFFE0E0E0)),
                   ),
                 ),
-                for (var i = 0; i < _slotCapacity; i++)
-                  Positioned(
-                    left: slotPad + i * slotW + 2,
-                    top: slotY - 4,
-                    width: slotW - 4,
-                    height: slotTile + 8,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: Colors.white,
-                        borderRadius: BorderRadius.circular(10),
-                        border: Border.all(color: const Color(0xFFE0E0E0)),
-                      ),
-                    ),
-                  ),
-                for (final t in ordered)
-                  _tileWidget(t, offX, offY, scale, slotCenterX, slotY,
-                      slotTile),
-              ];
+              ),
+            for (final t in ordered)
+              _tileWidget(t, offX, offY, scale, slotCenterX, slotY, slotTile),
+          ];
 
-              return Stack(children: children);
-            },
-          ),
-        ),
-      ],
+          return Stack(children: children);
+        },
+      ),
     );
   }
 

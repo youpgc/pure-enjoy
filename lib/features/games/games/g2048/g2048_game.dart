@@ -5,11 +5,16 @@ import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
+import '../../shared/game_shell.dart';
 import 'g2048_tile.dart';
 
 /// 2048（成熟手感版）
 ///
-/// - 滑动合并：方块用 [G2048Tile] 做丝滑滑动 + 出现/合并弹跳。
+/// 操作方式：**在棋盘上朝上/下/左/右拖动（滑动）**，同方向所有数字整体推移，
+/// 相邻且数字相同的两块合并成一块（2+2=4）。本游戏**没有点击操作**。
+///
+/// - 滑动判定用「拖动总位移」而非抬手瞬时速度，慢速拖动同样生效（v2 修复）。
+/// - 方块用 [G2048Tile] 做丝滑滑动 + 出现/合并弹跳。
 /// - 触感 + 音效：每次移动轻触感 + 点击音；合并中触感 + 合并音。
 /// - 最高分本地持久化（shared_preferences）。
 /// - 到达 2048 记「通关」；无可移动空间记「失败」。成绩维度：score + duration_ms。
@@ -27,6 +32,16 @@ class _G2048GameState extends State<G2048Game> {
   static const int _size = 4;
   static const int _target = 2048;
   static const Duration _slide = Duration(milliseconds: 120);
+
+  /// 判定为「一次滑动」的最小拖动距离（逻辑像素）。
+  /// 取 24：既能过滤误触抖动，又让短距离轻扫可用。
+  static const double _swipeThreshold = 24.0;
+
+  /// 本次拖动的累计位移（onPanStart 归零，onPanUpdate 累加，onPanEnd 判方向）
+  Offset _dragDelta = Offset.zero;
+
+  /// 本次拖动是否已经触发过移动（防止一次长拖连续触发多次）
+  bool _dragConsumed = false;
 
   final List<TileModel> _tiles = <TileModel>[];
   late List<List<TileModel?>> _grid;
@@ -241,113 +256,112 @@ class _G2048GameState extends State<G2048Game> {
     ));
   }
 
-  @override
-  Widget build(BuildContext context) {
-    return GestureDetector(
-      onPanEnd: (d) {
-        final v = d.velocity.pixelsPerSecond;
-        if (v.dx.abs() > v.dy.abs()) {
-          _move(v.dx > 0 ? 'right' : 'left');
-        } else if (v.dy.abs() > 1) {
-          _move(v.dy > 0 ? 'down' : 'up');
-        }
-      },
-      child: Column(
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-            child: Row(
-              children: <Widget>[
-                const Text('2048',
-                    style:
-                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
-                const Spacer(),
-                _statChip('得分', _score),
-                const SizedBox(width: 8),
-                _statChip('最高', _best),
-                const SizedBox(width: 8),
-                FilledButton.tonal(
-                  onPressed: _finished ? null : _reset,
-                  child: const Text('新游戏'),
-                ),
-              ],
-            ),
-          ),
-          Expanded(
-            child: LayoutBuilder(
-              builder: (ctx, constraints) {
-                final board = constraints.maxWidth;
-                final gap = board * 0.03;
-                final cell = (board - gap * (_size + 1)) / _size;
-                double pos(int index) => gap + index * (cell + gap);
-
-                final children = <Widget>[
-                  // 棋盘底格
-                  for (var r = 0; r < _size; r++)
-                    for (var c = 0; c < _size; c++)
-                      Positioned(
-                        left: pos(c),
-                        top: pos(r),
-                        width: cell,
-                        height: cell,
-                        child: Container(
-                          decoration: BoxDecoration(
-                            color: const Color(0xFFCDC1B4),
-                            borderRadius: BorderRadius.circular(cell * 0.14),
-                          ),
-                        ),
-                      ),
-                  // 方块
-                  for (final t in _tiles)
-                    G2048Tile(
-                      key: ValueKey<int>(t.id),
-                      value: t.value,
-                      size: cell,
-                      left: pos(t.col),
-                      top: pos(t.row),
-                      isNew: t.isNew,
-                      merged: t.merged,
-                      slide: _slide,
-                    ),
-                ];
-
-                return Container(
-                  decoration: BoxDecoration(
-                    color: const Color(0xFFBBADA0),
-                    borderRadius: BorderRadius.circular(gap * 2),
-                  ),
-                  padding: EdgeInsets.zero,
-                  child: Stack(
-                    children: children,
-                  ),
-                );
-              },
-            ),
-          ),
-          const Padding(
-            padding: EdgeInsets.symmetric(vertical: 14),
-            child: Text('滑动合并相同数字，凑出 2048'),
-          ),
-        ],
-      ),
-    );
+  /// 按累计位移判定滑动方向。
+  /// 原实现只看抬手瞬时速度（velocity），慢速拖动抬手时速度≈0 → 永远不触发，
+  /// 表现为「点击不行、滑动也不行」。改为总位移判定后任意速度均可操作。
+  void _onDragUpdate(DragUpdateDetails d) {
+    if (_dragConsumed) return;
+    _dragDelta += d.delta;
+    // 拖动过程中一旦越过阈值立即响应，手感更即时（不必等抬手）
+    if (_dragDelta.distance >= _swipeThreshold) {
+      _dragConsumed = true;
+      _applySwipe(_dragDelta);
+    }
   }
 
-  Widget _statChip(String label, int value) {
-    return Column(
-      children: <Widget>[
-        Text(label,
-            style: const TextStyle(fontSize: 11, color: Color(0xFF776E65))),
-        AnimatedSwitcher(
-          duration: const Duration(milliseconds: 180),
-          child: Text(
-            '$value',
-            key: ValueKey<int>(value),
-            style: const TextStyle(
-                fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF776E65)),
-          ),
+  void _applySwipe(Offset delta) {
+    if (delta.dx.abs() > delta.dy.abs()) {
+      _move(delta.dx > 0 ? 'right' : 'left');
+    } else {
+      _move(delta.dy > 0 ? 'down' : 'up');
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    return GameShell(
+      statusItems: <Widget>[
+        GameStatusItem(label: '得分', value: '$_score'),
+        GameStatusItem(label: '最高分', value: '$_best'),
+        GameStatusItem(label: '目标', value: '$_target'),
+      ],
+      hint: '在棋盘上朝上下左右拖动，相同数字相撞即合并（无需点击）',
+      actions: <GameAction>[
+        GameAction(
+          icon: Icons.refresh,
+          label: '新游戏',
+          primary: true,
+          onPressed: _finished ? null : () => setState(_reset),
         ),
       ],
+      content: LayoutBuilder(
+        builder: (ctx, constraints) {
+          // 棋盘取正方形，居中显示，避免长屏被拉伸
+          final board = min(constraints.maxWidth, constraints.maxHeight);
+          final gap = board * 0.03;
+          final cell = (board - gap * (_size + 1)) / _size;
+          double pos(int index) => gap + index * (cell + gap);
+
+          final children = <Widget>[
+            // 棋盘底格
+            for (var r = 0; r < _size; r++)
+              for (var c = 0; c < _size; c++)
+                Positioned(
+                  left: pos(c),
+                  top: pos(r),
+                  width: cell,
+                  height: cell,
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: const Color(0xFFCDC1B4),
+                      borderRadius: BorderRadius.circular(cell * 0.14),
+                    ),
+                  ),
+                ),
+            // 方块
+            for (final t in _tiles)
+              G2048Tile(
+                key: ValueKey<int>(t.id),
+                value: t.value,
+                size: cell,
+                left: pos(t.col),
+                top: pos(t.row),
+                isNew: t.isNew,
+                merged: t.merged,
+                slide: _slide,
+              ),
+          ];
+
+          return Center(
+            child: GestureDetector(
+              // opaque：棋盘空白处同样接收拖动，避免只有方块上能滑
+              behavior: HitTestBehavior.opaque,
+              onPanStart: (_) {
+                _dragDelta = Offset.zero;
+                _dragConsumed = false;
+              },
+              onPanUpdate: _onDragUpdate,
+              onPanEnd: (_) {
+                // 兜底：整段拖动都很短但已越过阈值时在抬手时判定
+                if (!_dragConsumed && _dragDelta.distance >= _swipeThreshold) {
+                  _applySwipe(_dragDelta);
+                }
+                _dragDelta = Offset.zero;
+                _dragConsumed = false;
+              },
+              child: Container(
+                width: board,
+                height: board,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFBBADA0),
+                  borderRadius: BorderRadius.circular(gap * 2),
+                ),
+                child: Stack(children: children),
+              ),
+            ),
+          );
+        },
+      ),
     );
   }
 }

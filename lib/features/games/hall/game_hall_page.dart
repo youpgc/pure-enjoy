@@ -2,9 +2,8 @@ import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import './game_total_dashboard.dart';
+import '../game_home_screen.dart';
 import '../game_play_helpers.dart';
-import '../game_play_screen.dart';
-import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 import '../services/game_score_service.dart';
 import '../services/game_service.dart';
@@ -57,97 +56,13 @@ class _GameHallPageState extends State<GameHallPage> {
     return '${b.bestValue.toInt()}${b.unit ?? ''}';
   }
 
-  /// 点击游戏入口：
-  /// - 选关关闭：直接进入首关（顺序通关，结算页「下一关」推进）。
-  /// - 选关开启且启用关卡 > 1：弹选关界面（按 [GameModel.levelSelectMode] 决定锁状态）。
-  /// - 仅 1 个启用关卡：直接进该关。
+  /// 点击游戏入口：统一进入该游戏的「主界面」([GameHomeScreen])。
+  /// 主界面内再决定「开始游戏 / 选关 / 查看说明 / 查看记录」，
+  /// 选关逻辑已抽到 [GameLevelPicker]，按 [GameModel.levelSelectMode] 决定锁状态。
   Future<void> _openGame(GameModel game) async {
-    final levels = _config?.levelsOf(game.id) ?? <GameLevelModel>[];
-    if (game.levelSelectable && levels.length > 1) {
-      final cleared = await GameScoreService.instance.fetchClearedLevelIds(game.id);
-      if (!mounted) return;
-      _showLevelSelect(game, levels, cleared);
-      return;
-    }
     if (!mounted) return;
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GamePlayScreen(game: game)),
-    );
-  }
-
-  /// 选关底部弹窗：按选关模式显示锁状态。
-  /// - free：全部关卡可直接挑战。
-  /// - gated：已通关关卡可重挑战；最新未通关关卡（frontier）可解锁；其余上锁。
-  void _showLevelSelect(
-    GameModel game,
-    List<GameLevelModel> levels,
-    Set<String> clearedIds,
-  ) {
-    // gated 模式下计算「最新可挑战关卡(frontier)」索引
-    int maxClearedIdx = -1;
-    for (int i = 0; i < levels.length; i++) {
-      if (clearedIds.contains(levels[i].id)) maxClearedIdx = i;
-    }
-    final frontierIdx = maxClearedIdx < 0 ? 0 : maxClearedIdx + 1;
-
-    bool canSelect(int i) {
-      if (game.levelSelectMode == 'free') return true; // 直接选关
-      if (clearedIds.contains(levels[i].id)) return true; // 已通关可重挑战
-      return i == frontierIdx; // 最新可挑战关卡
-    }
-
-    showModalBottomSheet(
-      context: context,
-      isScrollControlled: true,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
-      ),
-      builder: (ctx) => Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.stretch,
-        children: <Widget>[
-          Padding(
-            padding: const EdgeInsets.fromLTRB(20, 20, 20, 8),
-            child: Text(
-              '选择关卡 · ${game.name}',
-              style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
-            ),
-          ),
-          ...levels.asMap().entries.map((entry) {
-            final i = entry.key;
-            final lv = entry.value;
-            final selectable = canSelect(i);
-            final cleared = clearedIds.contains(lv.id);
-            return ListTile(
-              leading: !selectable
-                  ? const Icon(Icons.lock_outline, color: AppTheme.neutral500)
-                  : (cleared
-                      ? const Icon(Icons.check_circle, color: AppTheme.success)
-                      : null),
-              title: Text(lv.name),
-              subtitle: cleared
-                  ? const Text('已通关 · 可重挑战')
-                  : (selectable
-                      ? const Text('可选择挑战')
-                      : const Text('未解锁 · 需先通关前置关卡')),
-              trailing: Icon(selectable ? Icons.chevron_right : Icons.lock),
-              enabled: selectable,
-              onTap: selectable
-                  ? () {
-                      Navigator.of(ctx).pop();
-                      if (!mounted) return;
-                      Navigator.of(context).push(
-                        MaterialPageRoute(
-                          builder: (_) => GamePlayScreen(game: game, level: lv),
-                        ),
-                      );
-                    }
-                  : null,
-            );
-          }),
-          const SizedBox(height: 8),
-        ],
-      ),
+      MaterialPageRoute(builder: (_) => GameHomeScreen(game: game)),
     );
   }
 
