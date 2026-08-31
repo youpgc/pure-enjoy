@@ -5,6 +5,8 @@ import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
 import '../../models/match3_mode.dart';
+import '../../models/game_item_model.dart';
+import '../../services/game_item_service.dart';
 import '../../shared/game_shell.dart';
 import 'match3_flame_game.dart';
 import 'match3_objective.dart';
@@ -41,6 +43,10 @@ class _Match3GameState extends State<Match3Game> {
   late final Match3FlameGame _game;
   late final Match3Mode _mode;
 
+  /// 限时模式加时卡道具状态
+  GameItemModel? _addTimeItem;
+  int _addTimeRemaining = 0;
+
   @override
   void initState() {
     super.initState();
@@ -63,6 +69,42 @@ class _Match3GameState extends State<Match3Game> {
       rows: rows,
       cols: cols,
     );
+    if (_mode == Match3Mode.timed) _loadAddTime();
+  }
+
+  /// 限时模式开局：载入 add_time 道具持有数，按 per_game_limit 限用。
+  Future<void> _loadAddTime() async {
+    try {
+      final items = await GameItemService.instance
+          .fetchItems(gameCode: 'match3', mode: 'timed');
+      final item =
+          items.where((it) => it.itemType == 'add_time').firstOrNull;
+      if (item == null) return;
+      final inv = await GameItemService.instance.fetchInventory();
+      final owned = inv[item.id] ?? 0;
+      if (mounted) {
+        setState(() {
+          _addTimeItem = item;
+          _addTimeRemaining =
+              owned <= 0 ? 0 : (owned < item.perGameLimit ? owned : item.perGameLimit);
+        });
+      }
+    } catch (e) {
+      // 载入失败不影响对局
+    }
+  }
+
+  /// 使用加时卡：消耗 1 张库存，成功后本局加时 15 秒。
+  Future<void> _useAddTime() async {
+    if (_addTimeRemaining <= 0 || _addTimeItem == null) return;
+    final ok = await GameItemService.instance.consumeItem(_addTimeItem!.id);
+    if (!ok) {
+      if (mounted) setState(() => _addTimeRemaining = 0);
+      return;
+    }
+    _addTimeRemaining -= 1;
+    _game.addTime(15);
+    if (mounted) setState(() {});
   }
 
   @override
@@ -122,6 +164,14 @@ class _Match3GameState extends State<Match3Game> {
           banner: _buildBanner(),
           hint: _objective.hint,
           actions: <GameAction>[
+            if (_mode == Match3Mode.timed && _addTimeItem != null)
+              GameAction(
+                icon: Icons.timer_outlined,
+                label: '加时卡',
+                badge: '$_addTimeRemaining',
+                onPressed:
+                    _addTimeRemaining > 0 ? () { _useAddTime(); } : null,
+              ),
             GameAction(
               icon: Icons.refresh,
               label: '重新开始',

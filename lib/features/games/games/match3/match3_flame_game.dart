@@ -88,6 +88,13 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     hudTick.value++;
   }
 
+  /// 加时卡：限时模式追加秒数（由游戏外壳在消耗 add_time 道具后调用）。
+  void addTime(double seconds) {
+    if (_over || !objective.isTimed) return;
+    objective.secondsLeft += seconds;
+    _syncHud();
+  }
+
   @override
   void render(Canvas canvas) {
     super.render(canvas);

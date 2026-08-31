@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
+import '../../services/game_item_service.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_icons.dart';
 import '../../shared/game_shell.dart';
@@ -40,6 +41,10 @@ class _SheepGameState extends State<SheepGame> {
   List<SheepTile> _tiles = <SheepTile>[];
   List<SheepTile> _slots = <SheepTile>[];
   Map<SheepProp, int> _propRemaining = <SheepProp, int>{};
+  /// 道具 -> 目录 item_id（消耗库存用）
+  final Map<SheepProp, String> _itemIds = <SheepProp, String>{};
+  /// 道具 -> 单局使用上限（来自 game_items.per_game_limit）
+  final Map<SheepProp, int> _perGameLimits = <SheepProp, int>{};
   final List<Map<int, (SheepTileState, int)>> _snapshots =
       <Map<int, (SheepTileState, int)>>[];
   bool _finished = false;
@@ -64,6 +69,43 @@ class _SheepGameState extends State<SheepGame> {
     if (_perType < 3) _perType = 3;
     _overlap = ((cfg['overlap'] as num?)?.toDouble() ?? 0.78).clamp(0.55, 0.95);
     _generate();
+    _loadInventory();
+  }
+
+  /// 开局从库存载入三道具持有数，并按 per_game_limit 限用。
+  /// 未购买则持有为 0，本局不可使用该道具（对应「需购买道具卡」）。
+  Future<void> _loadInventory() async {
+    try {
+      final items =
+          await GameItemService.instance.fetchItems(gameCode: 'sheep', mode: '');
+      if (items.isEmpty) return;
+      final inv = await GameItemService.instance.fetchInventory();
+      for (final it in items) {
+        final prop = _propFromType(it.itemType);
+        if (prop == null) continue;
+        _itemIds[prop] = it.id;
+        _perGameLimits[prop] = it.perGameLimit;
+        final owned = inv[it.id] ?? 0;
+        _propRemaining[prop] =
+            owned <= 0 ? 0 : (owned < it.perGameLimit ? owned : it.perGameLimit);
+      }
+      if (mounted) setState(() {});
+    } catch (e) {
+      // 载入失败不影响对局，仅道具不可用
+    }
+  }
+
+  SheepProp? _propFromType(String type) {
+    switch (type) {
+      case 'remove':
+        return SheepProp.remove;
+      case 'undo':
+        return SheepProp.undo;
+      case 'shuffle':
+        return SheepProp.shuffle;
+      default:
+        return null;
+    }
   }
 
   // ---------- 生成（可解性保证） ----------
@@ -94,11 +136,8 @@ class _SheepGameState extends State<SheepGame> {
     _tiles = result!;
     _slots.clear();
     _snapshots.clear();
-    _propRemaining = <SheepProp, int>{
-      SheepProp.remove: 1,
-      SheepProp.undo: 1,
-      SheepProp.shuffle: 1,
-    };
+    // 道具数量改为开局从库存载入（见 _loadInventory），此处先清空
+    _propRemaining = <SheepProp, int>{};
     _finished = false;
     _busy = false;
     _computeCoverage();
@@ -196,9 +235,20 @@ class _SheepGameState extends State<SheepGame> {
 
   // ---------- 道具 ----------
 
-  void _useProp(SheepProp p) {
+  /// 使用道具：先扣库存（消耗 1 张），成功后再执行效果并扣减本局限用计数。
+  Future<void> _useProp(SheepProp p) async {
     if (_finished || _busy) return;
-    if ((_propRemaining[p] ?? 0) <= 0) return;
+    final left = _propRemaining[p] ?? 0;
+    if (left <= 0) return;
+    final itemId = _itemIds[p];
+    if (itemId == null) return;
+    final ok = await GameItemService.instance.consumeItem(itemId);
+    if (!ok) {
+      // 库存不足：刷新本地持有为 0
+      if (mounted) setState(() => _propRemaining[p] = 0);
+      return;
+    }
+    _propRemaining[p] = left - 1;
     switch (p) {
       case SheepProp.remove:
         _removeProp();
@@ -221,7 +271,6 @@ class _SheepGameState extends State<SheepGame> {
     }
     _slots.removeWhere((t) => take.contains(t));
     _reindexSlots();
-    _propRemaining[SheepProp.remove] = _propRemaining[SheepProp.remove]! - 1;
     GameAudio.instance.prop();
     _afterProp();
   }
@@ -237,7 +286,6 @@ class _SheepGameState extends State<SheepGame> {
       }
     }
     _rebuildSlotsFromTiles();
-    _propRemaining[SheepProp.undo] = _propRemaining[SheepProp.undo]! - 1;
     GameAudio.instance.prop();
     _computeCoverage();
     setState(() {});
@@ -248,7 +296,6 @@ class _SheepGameState extends State<SheepGame> {
     if (board.isEmpty) return;
     final typesList = board.map((t) => t.type).toList()..shuffle(_rng);
     for (var i = 0; i < board.length; i++) board[i].type = typesList[i];
-    _propRemaining[SheepProp.shuffle] = _propRemaining[SheepProp.shuffle]! - 1;
     GameAudio.instance.prop();
     _computeCoverage();
     setState(() {});
@@ -307,7 +354,7 @@ class _SheepGameState extends State<SheepGame> {
           label: p.label,
           badge: '$n',
           onPressed:
-              (n > 0 && !_finished && !_busy) ? () => _useProp(p) : null,
+              (n > 0 && !_finished && !_busy) ? () { _useProp(p); } : null,
         );
       }).toList(),
       content: LayoutBuilder(

@@ -5,6 +5,8 @@ import 'game_guide.dart';
 import 'game_level_picker.dart';
 import 'game_play_helpers.dart';
 import 'game_play_screen.dart';
+import 'game_item_shop_screen.dart';
+import 'services/game_item_service.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'models/match3_mode.dart';
@@ -30,6 +32,7 @@ class GameHomeScreen extends StatefulWidget {
 class _GameHomeScreenState extends State<GameHomeScreen> {
   List<GameLevelModel> _levels = <GameLevelModel>[];
   Set<String> _clearedIds = const <String>{};
+  bool _hasShop = false;
   bool _loading = true;
 
   @override
@@ -47,10 +50,12 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     }
     final config = await GameService.instance.fetchConfig();
     final cleared = await GameScoreService.instance.fetchClearedLevelIds(widget.game.id);
+    final items = await GameItemService.instance.fetchItems(gameCode: widget.game.code);
     if (mounted) {
       setState(() {
         _levels = config.levelsOf(widget.game.id);
         _clearedIds = cleared;
+        _hasShop = items.isNotEmpty;
         _loading = false;
       });
     }
@@ -133,6 +138,12 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
+  void _openShop() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GameItemShopScreen(game: widget.game)),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
@@ -210,6 +221,13 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     desc: '我的成绩与最佳记录',
                     onTap: _openRecords,
                   ),
+                  if (_hasShop)
+                    _EntryTile(
+                      icon: Icons.wallet_giftcard_rounded,
+                      label: '道具商城',
+                      desc: '积分兑换游戏道具卡',
+                      onTap: _openShop,
+                    ),
                 ],
               ),
             ),
