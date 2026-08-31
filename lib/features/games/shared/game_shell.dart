@@ -13,6 +13,9 @@ class GameAction {
   /// 角标（如道具剩余次数）；为 null 不显示
   final String? badge;
 
+  /// 角标下方的小标签（如「免2」表示剩余免费次数）；为 null 不显示
+  final String? extraTag;
+
   /// 点击回调；为 null 表示禁用
   final VoidCallback? onPressed;
 
@@ -23,6 +26,7 @@ class GameAction {
     required this.icon,
     required this.label,
     this.badge,
+    this.extraTag,
     this.onPressed,
     this.primary = false,
   });
@@ -157,6 +161,18 @@ class _ActionLabel extends StatelessWidget {
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),
+        if (action.extraTag != null)
+          Padding(
+            padding: const EdgeInsets.only(top: 1),
+            child: Text(
+              action.extraTag!,
+              style: const TextStyle(
+                fontSize: 10,
+                color: AppTheme.success,
+              ),
+              maxLines: 1,
+            ),
+          ),
       ],
     );
   }

@@ -43,9 +43,10 @@ class _Match3GameState extends State<Match3Game> {
   late final Match3FlameGame _game;
   late final Match3Mode _mode;
 
-  /// 限时模式加时卡道具状态
+  /// 限时模式加时卡道具状态（免费额度 + 购买库存）
   GameItemModel? _addTimeItem;
-  int _addTimeRemaining = 0;
+  int _addTimeFree = 0;
+  int _addTimeOwned = 0;
 
   @override
   void initState() {
@@ -72,7 +73,7 @@ class _Match3GameState extends State<Match3Game> {
     if (_mode == Match3Mode.timed) _loadAddTime();
   }
 
-  /// 限时模式开局：载入 add_time 道具持有数，按 per_game_limit 限用。
+  /// 限时模式开局：载入 add_time 道具，先免费用 free_per_game 次，再消耗购买库存。
   Future<void> _loadAddTime() async {
     try {
       final items = await GameItemService.instance
@@ -82,11 +83,14 @@ class _Match3GameState extends State<Match3Game> {
       if (item == null) return;
       final inv = await GameItemService.instance.fetchInventory();
       final owned = inv[item.id] ?? 0;
+      final free = item.freePerGame;
+      final limit = item.perGameLimit;
+      final purchasedBudget = (limit - free).clamp(0, limit);
       if (mounted) {
         setState(() {
           _addTimeItem = item;
-          _addTimeRemaining =
-              owned <= 0 ? 0 : (owned < item.perGameLimit ? owned : item.perGameLimit);
+          _addTimeFree = free;
+          _addTimeOwned = owned < purchasedBudget ? owned : purchasedBudget;
         });
       }
     } catch (e) {
@@ -94,15 +98,20 @@ class _Match3GameState extends State<Match3Game> {
     }
   }
 
-  /// 使用加时卡：消耗 1 张库存，成功后本局加时 15 秒。
+  /// 使用加时卡：先免费用完再消耗库存，成功后本局加时 15 秒。
   Future<void> _useAddTime() async {
-    if (_addTimeRemaining <= 0 || _addTimeItem == null) return;
-    final ok = await GameItemService.instance.consumeItem(_addTimeItem!.id);
-    if (!ok) {
-      if (mounted) setState(() => _addTimeRemaining = 0);
-      return;
+    if (_addTimeItem == null) return;
+    if (_addTimeFree <= 0 && _addTimeOwned <= 0) return;
+    if (_addTimeFree > 0) {
+      _addTimeFree -= 1;
+    } else {
+      final ok = await GameItemService.instance.consumeItem(_addTimeItem!.id);
+      if (!ok) {
+        if (mounted) setState(() => _addTimeOwned = 0);
+        return;
+      }
+      _addTimeOwned -= 1;
     }
-    _addTimeRemaining -= 1;
     _game.addTime(15);
     if (mounted) setState(() {});
   }
@@ -168,9 +177,13 @@ class _Match3GameState extends State<Match3Game> {
               GameAction(
                 icon: Icons.timer_outlined,
                 label: '加时卡',
-                badge: '$_addTimeRemaining',
-                onPressed:
-                    _addTimeRemaining > 0 ? () { _useAddTime(); } : null,
+                badge: '${_addTimeFree + _addTimeOwned}',
+                extraTag: _addTimeFree > 0 ? '免$_addTimeFree' : null,
+                onPressed: (_addTimeFree + _addTimeOwned) > 0
+                    ? () {
+                        _useAddTime();
+                      }
+                    : null,
               ),
             GameAction(
               icon: Icons.refresh,

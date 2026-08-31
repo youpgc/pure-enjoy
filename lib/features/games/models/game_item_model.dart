@@ -8,6 +8,9 @@ class GameItemModel {
   final String? description;
   final int pointCost;
   final int perGameLimit;
+  /// 每局免费使用次数（后台可配，全游戏适用）。先免费用 freePerGame 次，
+  /// 超出部分再消耗购买库存（至多 perGameLimit 次/局）。
+  final int freePerGame;
   final bool enabled;
   final int sortOrder;
 
@@ -20,6 +23,7 @@ class GameItemModel {
     this.description,
     required this.pointCost,
     required this.perGameLimit,
+    this.freePerGame = 0,
     required this.enabled,
     required this.sortOrder,
   });
@@ -34,6 +38,7 @@ class GameItemModel {
       description: json['description'] as String?,
       pointCost: (json['point_cost'] as num?)?.toInt() ?? 0,
       perGameLimit: (json['per_game_limit'] as num?)?.toInt() ?? 1,
+      freePerGame: (json['free_per_game'] as num?)?.toInt() ?? 0,
       enabled: json['enabled'] as bool? ?? true,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
     );
@@ -48,6 +53,7 @@ class GameItemModel {
         if (description != null) 'description': description,
         'point_cost': pointCost,
         'per_game_limit': perGameLimit,
+        'free_per_game': freePerGame,
         'enabled': enabled,
         'sort_order': sortOrder,
       };

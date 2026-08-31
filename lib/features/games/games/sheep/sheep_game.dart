@@ -40,7 +40,10 @@ class _SheepGameState extends State<SheepGame> {
 
   List<SheepTile> _tiles = <SheepTile>[];
   List<SheepTile> _slots = <SheepTile>[];
-  Map<SheepProp, int> _propRemaining = <SheepProp, int>{};
+  /// 道具 -> 本局剩余免费次数（来自 game_items.free_per_game）
+  final Map<SheepProp, int> _freeLeft = <SheepProp, int>{};
+  /// 道具 -> 本局剩余购买次数（来自库存，受 per_game_limit 截断）
+  final Map<SheepProp, int> _ownedLeft = <SheepProp, int>{};
   /// 道具 -> 目录 item_id（消耗库存用）
   final Map<SheepProp, String> _itemIds = <SheepProp, String>{};
   /// 道具 -> 单局使用上限（来自 game_items.per_game_limit）
@@ -72,8 +75,8 @@ class _SheepGameState extends State<SheepGame> {
     _loadInventory();
   }
 
-  /// 开局从库存载入三道具持有数，并按 per_game_limit 限用。
-  /// 未购买则持有为 0，本局不可使用该道具（对应「需购买道具卡」）。
+  /// 开局载入三道具：先免费用 free_per_game 次，超出部分消耗购买库存（最多 per_game_limit 次/局）。
+  /// free=0 且无库存则本局不可用（对应「需购买道具卡」）。
   Future<void> _loadInventory() async {
     try {
       final items =
@@ -85,9 +88,13 @@ class _SheepGameState extends State<SheepGame> {
         if (prop == null) continue;
         _itemIds[prop] = it.id;
         _perGameLimits[prop] = it.perGameLimit;
+        final free = it.freePerGame;
+        final limit = it.perGameLimit;
+        // 本局可购买额度 = 单局上限 - 免费次数（保底 0）
+        final purchasedBudget = (limit - free).clamp(0, limit);
         final owned = inv[it.id] ?? 0;
-        _propRemaining[prop] =
-            owned <= 0 ? 0 : (owned < it.perGameLimit ? owned : it.perGameLimit);
+        _freeLeft[prop] = free;
+        _ownedLeft[prop] = owned < purchasedBudget ? owned : purchasedBudget;
       }
       if (mounted) setState(() {});
     } catch (e) {
@@ -137,7 +144,8 @@ class _SheepGameState extends State<SheepGame> {
     _slots.clear();
     _snapshots.clear();
     // 道具数量改为开局从库存载入（见 _loadInventory），此处先清空
-    _propRemaining = <SheepProp, int>{};
+    _freeLeft.clear();
+    _ownedLeft.clear();
     _finished = false;
     _busy = false;
     _computeCoverage();
@@ -235,20 +243,28 @@ class _SheepGameState extends State<SheepGame> {
 
   // ---------- 道具 ----------
 
-  /// 使用道具：先扣库存（消耗 1 张），成功后再执行效果并扣减本局限用计数。
+  /// 使用道具：
+  /// - 优先消耗免费额度（free_per_game），不扣库存；
+  /// - 免费用尽后消耗购买库存（consumeItem 减 1 张），受 per_game_limit 截断。
   Future<void> _useProp(SheepProp p) async {
     if (_finished || _busy) return;
-    final left = _propRemaining[p] ?? 0;
-    if (left <= 0) return;
+    var free = _freeLeft[p] ?? 0;
+    var owned = _ownedLeft[p] ?? 0;
     final itemId = _itemIds[p];
     if (itemId == null) return;
-    final ok = await GameItemService.instance.consumeItem(itemId);
-    if (!ok) {
-      // 库存不足：刷新本地持有为 0
-      if (mounted) setState(() => _propRemaining[p] = 0);
-      return;
+    if (free <= 0 && owned <= 0) return;
+
+    if (free > 0) {
+      _freeLeft[p] = free - 1; // 免费使用
+    } else {
+      final ok = await GameItemService.instance.consumeItem(itemId);
+      if (!ok) {
+        if (mounted) setState(() => _ownedLeft[p] = 0);
+        return;
+      }
+      _ownedLeft[p] = owned - 1;
     }
-    _propRemaining[p] = left - 1;
+
     switch (p) {
       case SheepProp.remove:
         _removeProp();
@@ -348,13 +364,16 @@ class _SheepGameState extends State<SheepGame> {
       hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
       // 三道具统一收纳到底部控制栏，不再叠在牌堆上方
       actions: SheepProp.values.map((p) {
-        final n = _propRemaining[p] ?? 0;
+        final avail = (_freeLeft[p] ?? 0) + (_ownedLeft[p] ?? 0);
+        final free = _freeLeft[p] ?? 0;
         return GameAction(
           icon: p.icon,
           label: p.label,
-          badge: '$n',
+          badge: '$avail',
+          // 免费次数用角标区分：有免费剩余时提示「免」，否则显示可用数
+          extraTag: free > 0 ? '免$free' : null,
           onPressed:
-              (n > 0 && !_finished && !_busy) ? () { _useProp(p); } : null,
+              (avail > 0 && !_finished && !_busy) ? () { _useProp(p); } : null,
         );
       }).toList(),
       content: LayoutBuilder(
