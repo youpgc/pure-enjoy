@@ -191,6 +191,29 @@ class GameRewardService {
     );
   }
 
+  /// 领取「每关通关奖励」。
+  ///
+  /// [level.rewardPoints] <= 0 视为无奖励；
+  /// [level.rewardRepeatable]=true 时每次通关均可领（claim_key 带随机后缀，受单日上限约束）；
+  /// =false 时终身只领一次（固定 claim_key）。
+  Future<GameRewardResult> claimLevelReward({
+    required GameLevelModel level,
+    required String gameName,
+  }) async {
+    if (level.rewardPoints <= 0) {
+      return GameRewardResult.notGranted(reason: '本关无通关奖励');
+    }
+    final claimKey = level.rewardRepeatable
+        ? 'level_clear:${level.id}:${const Uuid().v4()}'
+        : 'level_clear_once:${level.id}';
+    return _tryClaim(
+      claimKey: claimKey,
+      points: level.rewardPoints,
+      remark: '通关奖励（$gameName·${level.name}）',
+      gameId: level.gameId,
+    );
+  }
+
   /// 统一结算：评估三类奖励并返回明细。
   ///
   /// [scoreValuesByCode] 为「维度编码 → 取值」（如 {'score': 2048, 'duration_ms': 12345}）。
@@ -199,9 +222,29 @@ class GameRewardService {
     required GameModel game,
     required GameLevelModel level,
     required Map<String, num> scoreValuesByCode,
+    required bool cleared,
   }) async {
+    // 未通关不发放任何奖励（通关奖励 / 首通 / 成就均只针对通关，避免失败也发分）
+    if (!cleared) {
+      return const GameSettlementResult(items: <GameSettlementItem>[]);
+    }
     final items = <GameSettlementItem>[];
     final config = await GameService.instance.fetchConfig();
+
+    // 0) 每关通关奖励（rewardPoints<=0 时跳过，结算页不展示无效行）
+    if (level.rewardPoints > 0) {
+      final levelReward = await claimLevelReward(
+        gameName: game.name,
+        level: level,
+      );
+      items.add(GameSettlementItem(
+        kind: 'level_clear',
+        label: '通关奖励',
+        points: levelReward.points,
+        granted: levelReward.granted,
+        reason: levelReward.reason,
+      ));
+    }
 
     // 1) 每日首次通关（仅后台标记为计入的关卡）
     final daily = await claimDailyFirstClear(

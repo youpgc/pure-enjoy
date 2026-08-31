@@ -126,11 +126,12 @@ Future<GameSettlementResult?> reportAndSettle({
   );
 
   // 结算奖励
-  final result = await GameRewardService.instance.settleGame(
-    game: game,
-    level: level,
-    scoreValuesByCode: scoreValuesByCode,
-  );
+    final result = await GameRewardService.instance.settleGame(
+      game: game,
+      level: level,
+      scoreValuesByCode: scoreValuesByCode,
+      cleared: cleared,
+    );
 
   if (context.mounted) {
     showSettlementSheet(

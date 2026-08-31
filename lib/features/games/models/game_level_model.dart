@@ -28,6 +28,13 @@ class GameLevelModel {
   /// 仅当 true 时通关该关才触发每日首通奖励（首关过简单时不开启，由后台指定）。
   final bool countForDailyClear;
 
+  /// 通关该关获得的积分；0 表示无通关奖励（结算时告知，不展示无效行）。
+  final int rewardPoints;
+
+  /// 是否可重复通关获取奖励。
+  /// true = 每次通关均可获得（受单日上限约束）；false = 仅首次通关获得（终身一次）。
+  final bool rewardRepeatable;
+
   /// 排序号（升序）
   final int sortOrder;
 
@@ -46,6 +53,8 @@ class GameLevelModel {
     this.target = const <String, dynamic>{},
     this.enabled = true,
     this.countForDailyClear = false,
+    this.rewardPoints = 0,
+    this.rewardRepeatable = false,
     this.sortOrder = 0,
     this.createdAt,
     this.updatedAt,
@@ -63,6 +72,8 @@ class GameLevelModel {
       enabled: json['enabled'] as bool? ?? true,
       countForDailyClear:
           json['count_for_daily_clear'] as bool? ?? false,
+      rewardPoints: (json['reward_points'] as num?)?.toInt() ?? 0,
+      rewardRepeatable: json['reward_repeatable'] as bool? ?? false,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
@@ -84,6 +95,8 @@ class GameLevelModel {
       'target': target,
       'enabled': enabled,
       'count_for_daily_clear': countForDailyClear,
+      'reward_points': rewardPoints,
+      'reward_repeatable': rewardRepeatable,
       'sort_order': sortOrder,
       if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
@@ -100,6 +113,8 @@ class GameLevelModel {
     Map<String, dynamic>? target,
     bool? enabled,
     bool? countForDailyClear,
+    int? rewardPoints,
+    bool? rewardRepeatable,
     int? sortOrder,
     DateTime? createdAt,
     DateTime? updatedAt,
@@ -113,6 +128,8 @@ class GameLevelModel {
       target: target ?? this.target,
       enabled: enabled ?? this.enabled,
       countForDailyClear: countForDailyClear ?? this.countForDailyClear,
+      rewardPoints: rewardPoints ?? this.rewardPoints,
+      rewardRepeatable: rewardRepeatable ?? this.rewardRepeatable,
       sortOrder: sortOrder ?? this.sortOrder,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
