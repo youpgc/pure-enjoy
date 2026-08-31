@@ -179,8 +179,16 @@ class _SheepGameState extends State<SheepGame> {
     }
     _pushSnapshot();
     tile.state = SheepTileState.slot;
-    tile.slotIndex = _slots.length;
-    _slots.add(tile);
+    // 按类型归组：插入到同类方块之后（无同类则追加到末尾），保证同类三连在槽位中相邻
+    var insertAt = _slots.length;
+    for (var i = _slots.length - 1; i >= 0; i--) {
+      if (_slots[i].type == tile.type) {
+        insertAt = i + 1;
+        break;
+      }
+    }
+    _slots.insert(insertAt, tile);
+    _reindexSlots();
     GameAudio.instance.select();
     GameAudio.instance.haptic(GameHaptic.light);
     _computeCoverage();
@@ -215,6 +223,7 @@ class _SheepGameState extends State<SheepGame> {
       return false;
     });
     for (final t in toRemove) _tiles.remove(t);
+    _reindexSlots();
     return true;
   }
 
@@ -302,6 +311,7 @@ class _SheepGameState extends State<SheepGame> {
       }
     }
     _rebuildSlotsFromTiles();
+    _reindexSlots();
     GameAudio.instance.prop();
     _computeCoverage();
     setState(() {});
@@ -473,7 +483,8 @@ class _SheepGameState extends State<SheepGame> {
     double top;
     double size;
     if (t.state == SheepTileState.slot) {
-      final i = t.slotIndex.clamp(0, _slotCapacity - 1);
+      // 槽位位置以 _slots 权威列表为准，避免 slotIndex 陈旧导致方块错位/重叠/不可见
+      final i = _slots.indexOf(t).clamp(0, _slotCapacity - 1);
       left = slotCenterX(i) - slotTile / 2;
       top = slotY;
       size = slotTile;
