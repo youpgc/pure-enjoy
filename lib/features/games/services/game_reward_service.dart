@@ -139,6 +139,7 @@ class GameRewardService {
   /// 领取成就达成奖励。
   ///
   /// 同一成就终身只发一次（claim_key 唯一索引 + user_game_achievements 唯一索引双兜底）。
+  /// 成就奖励**不占用单日游戏奖励上限**（独立激励体系，byPassDailyLimit）。
   Future<GameRewardResult> claimAchievement({
     required GameAchievementModel achievement,
   }) async {
@@ -150,6 +151,7 @@ class GameRewardService {
       points: achievement.rewardPoints,
       remark: '成就达成（${achievement.name}）',
       gameId: achievement.gameId,
+      bypassDailyLimit: true,
     );
     if (res.granted) {
       // 记录用户成就（看板展示 + 终身唯一兜底）。best-effort，失败仅记日志。
@@ -379,24 +381,30 @@ class GameRewardService {
   }
 
   /// 通用领取流程：上限校验 → 占坑 → 发分 → 失败回滚占坑 → 刷新积分。
+  ///
+  /// [bypassDailyLimit] 为 true 时跳过单日上限校验（成就奖励独立于单日上限）。
   Future<GameRewardResult> _tryClaim({
     required String claimKey,
     required int points,
     required String remark,
     String? gameId,
     String? ruleId,
+    bool bypassDailyLimit = false,
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return GameRewardResult.notGranted(reason: '未登录');
     if (points <= 0) return GameRewardResult.notGranted(reason: '积分为 0');
 
-    // 1) 单日上限校验
-    final limit = (await GameService.instance.fetchConfig()).dailyLimit;
-    final claimed = await fetchTodayClaimedPoints();
-    if (claimed + points > limit) {
-      return GameRewardResult.notGranted(
-        reason: '今日游戏奖励已达上限（$limit 分）',
-      );
+    // 1) 单日上限校验（超限时直接返回、不占坑——坑未烧掉，明日刷新后
+    //    重新通关同一奖励仍可领取，实现「超限次日可重获」）
+    if (!bypassDailyLimit) {
+      final limit = (await GameService.instance.fetchConfig()).dailyLimit;
+      final claimed = await fetchTodayClaimedPoints();
+      if (claimed + points > limit) {
+        return GameRewardResult.notGranted(
+          reason: '今日游戏奖励已达上限（$limit 分）',
+        );
+      }
     }
 
     // 2) 占坑：唯一索引 (user_id, claim_key) 保证同一奖励只领一次

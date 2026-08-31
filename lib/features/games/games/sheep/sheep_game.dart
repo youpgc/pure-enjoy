@@ -61,6 +61,10 @@ class _SheepGameState extends State<SheepGame> {
   late int _perType;
   late double _overlap;
 
+  /// 开局牌堆包围盒快照：视图缩放固定用它。若跟随消除动态重算，
+  /// 边缘方块被消除后包围盒变小 → scale 变大 → 表现为「自动放大局部视图」。
+  double _initMinX = 0, _initMinY = 0, _initMaxX = 1, _initMaxY = 1;
+
   @override
   void initState() {
     super.initState();
@@ -149,6 +153,28 @@ class _SheepGameState extends State<SheepGame> {
     _finished = false;
     _busy = false;
     _computeCoverage();
+    _snapshotBounds();
+  }
+
+  /// 记录开局牌堆包围盒（视图缩放的固定基准）
+  void _snapshotBounds() {
+    double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (final t in _tiles) {
+      minX = min(minX, t.x);
+      minY = min(minY, t.y);
+      maxX = max(maxX, t.x + 1);
+      maxY = max(maxY, t.y + 1);
+    }
+    if (_tiles.isEmpty) {
+      minX = 0;
+      minY = 0;
+      maxX = 1;
+      maxY = 1;
+    }
+    _initMinX = minX;
+    _initMinY = minY;
+    _initMaxX = maxX;
+    _initMaxY = maxY;
   }
 
   void _computeCoverage() => SheepSolver.computeCoverage(_tiles);
@@ -393,25 +419,15 @@ class _SheepGameState extends State<SheepGame> {
           const slotH = 82.0;
           final boardH = h - slotH;
 
-          // 牌堆包围盒 → 等比缩放居中，紧凑布局下即呈现「聚成一团」
-          double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
-          for (final t in _tiles) {
-            minX = min(minX, t.x);
-            minY = min(minY, t.y);
-            maxX = max(maxX, t.x + 1);
-            maxY = max(maxY, t.y + 1);
-          }
-          if (_tiles.isEmpty) {
-            minX = 0;
-            minY = 0;
-            maxX = 1;
-            maxY = 1;
-          }
-          final pileW = max(maxX - minX, 0.001);
-          final pileH = max(maxY - minY, 0.001);
+          // 牌堆包围盒固定用开局快照 → 等比缩放居中，不随消除自动放大；
+          // 0.92 整体再缩一档，方片高度更紧凑
+          final minX = _initMinX;
+          final minY = _initMinY;
+          final pileW = max(_initMaxX - _initMinX, 0.001);
+          final pileH = max(_initMaxY - _initMinY, 0.001);
           const pad = 12.0;
           final scale =
-              min((w - 2 * pad) / pileW, (boardH - 2 * pad) / pileH);
+              min((w - 2 * pad) / pileW, (boardH - 2 * pad) / pileH) * 0.92;
           final drawW = pileW * scale;
           final drawH = pileH * scale;
           final offX = (w - drawW) / 2 - minX * scale;

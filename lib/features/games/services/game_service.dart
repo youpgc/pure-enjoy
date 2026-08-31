@@ -134,6 +134,12 @@ class GameService {
   /// 内存快照（进程内复用，避免同一开屏重复解析缓存）
   GameConfigSnapshot? _memory;
 
+  /// 上次成功拉取时间：内存缓存在 TTL 内直接复用，过期后重新拉取。
+  /// 旧实现「有内存缓存就永远不刷新」导致后台新配的关卡/规则 App 端收不到
+  /// （表现为：后台扩到 10 关，App 仍按旧 2 关推进，通关后没有下一关）。
+  static const Duration _ttl = Duration(seconds: 30);
+  DateTime? _lastFetchAt;
+
   /// 进程内缓存快照（未拉取过返回空快照；调用方应先 fetchConfig / loadCachedConfig）。
   GameConfigSnapshot get cachedConfig => _memory ?? const GameConfigSnapshot();
 
@@ -148,11 +154,15 @@ class GameService {
     return snapshot;
   }
 
-  /// 拉取最新配置；[force] 为 true 时跳过内存缓存直接请求（下拉刷新用）。
+  /// 拉取最新配置；[force] 为 true 时跳过缓存直接请求（下拉刷新用）。
   ///
+  /// 非 force 时若内存快照在 TTL 内直接复用，过期则重新拉取并回写；
   /// 任一张表失败时按空列表兜底并记日志，不影响其余配置渲染。
   Future<GameConfigSnapshot> fetchConfig({bool force = false}) async {
-    if (!force && _memory != null) return _memory!;
+    final memory = _memory;
+    final fresh = _lastFetchAt != null &&
+        DateTime.now().difference(_lastFetchAt!) < _ttl;
+    if (!force && memory != null && fresh) return memory;
 
     final results = await Future.wait<dynamic>(<Future<dynamic>>[
       _fetchRows('games', order: 'sort_order.asc'),
@@ -175,6 +185,7 @@ class GameService {
     );
 
     _memory = snapshot;
+    _lastFetchAt = DateTime.now();
     // 回写本地缓存，供下次开屏秒渲染
     await CacheHelper.instance.saveMap(CacheHelper.keyGames, snapshot.toJson());
     return snapshot;
@@ -183,6 +194,7 @@ class GameService {
   /// 清空配置缓存（后台改配置后可在下拉刷新时调用）。
   Future<void> clearCache() async {
     _memory = null;
+    _lastFetchAt = null;
     await CacheHelper.instance.clear(CacheHelper.keyGames);
   }
 

@@ -285,6 +285,8 @@ class GameScoreService {
       filters: <String, String>{
         'user_id': 'eq.$userId',
         'game_id': 'eq.$gameId',
+        // App 端看板不展示「放弃」记录（通关/失败仍展示；放弃仅后台可见）
+        'status': 'neq.aborted',
       },
       order: 'played_at.desc',
       limit: limit,

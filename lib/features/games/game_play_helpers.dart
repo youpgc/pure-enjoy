@@ -263,7 +263,7 @@ void showSettlementSheet(
                   const SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '今日游戏奖励已达上限，后续通关不再获得积分',
+                      '今日游戏奖励已达上限，本次积分暂未发放；明日上限刷新后，重新通关即可获得',
                       style: TextStyle(color: AppTheme.warning, fontSize: 13),
                     ),
                   ),
