@@ -39,6 +39,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     setState(() => _outcome = outcome);
     // 注入关卡号维度（后台已配置则参与成绩/奖励判定）
     final values = <String, num>{...outcome.values, 'level': _level.levelNo};
+    // 结算弹窗内的「下一关 / 再玩一次 / 返回大厅」统一由结算页承载，
+    // 不再另弹居中卡片，避免与结算页重复。
+    final next = nextLevelOf(widget.game, _level);
+    final canNext = outcome.cleared && next != null;
     await reportAndSettle(
       context: context,
       game: widget.game,
@@ -46,6 +50,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       scoreValuesByCode: values,
       durationMs: outcome.durationMs,
       cleared: outcome.cleared,
+      onReplay: () => setState(() {
+        _outcome = null;
+        _restartNonce++;
+      }),
+      onNext: canNext
+          ? () => Navigator.of(context).pushReplacement(
+                MaterialPageRoute(
+                  builder: (_) => GamePlayScreen(game: widget.game, level: next),
+                ),
+              )
+          : null,
+      canNext: canNext,
+      onExit: () => Navigator.of(context).pop(),
     );
   }
 
@@ -79,10 +96,6 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   @override
   Widget build(BuildContext context) {
-    // 顺序通关 / 选关模式下，通关当前关后是否可推进到下一关
-    final next = nextLevelOf(widget.game, _level);
-    final canNext = _outcome?.cleared == true && next != null;
-
     return Scaffold(
       appBar: buildGameAppBar(
         context,
@@ -93,79 +106,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
           ),
         ),
       ),
-      body: Stack(
-        children: <Widget>[
-          _buildGame(),
-          if (_outcome != null)
-            Positioned.fill(
-              child: Container(
-                color: Colors.black45,
-                child: Center(
-                  child: Card(
-                    margin: const EdgeInsets.all(24),
-                    child: Padding(
-                      padding: const EdgeInsets.all(24),
-                      child: Column(
-                        mainAxisSize: MainAxisSize.min,
-                        children: <Widget>[
-                          Text(
-                            _outcome!.cleared ? '🎉 通关！' : '本局结束',
-                            style: const TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                          const SizedBox(height: 20),
-                          if (canNext)
-                            Row(
-                              children: <Widget>[
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => setState(() {
-                                      _outcome = null;
-                                      _restartNonce++;
-                                    }),
-                                    child: const Text('再玩一次'),
-                                  ),
-                                ),
-                                const SizedBox(width: 12),
-                                Expanded(
-                                  child: FilledButton(
-                                    onPressed: () => Navigator.of(context)
-                                        .pushReplacement(
-                                      MaterialPageRoute(
-                                        builder: (_) => GamePlayScreen(
-                                          game: widget.game,
-                                          level: next,
-                                        ),
-                                      ),
-                                    ),
-                                    child: const Text('下一关'),
-                                  ),
-                                ),
-                              ],
-                            )
-                          else
-                            FilledButton(
-                              onPressed: () => setState(() {
-                                _outcome = null;
-                                _restartNonce++;
-                              }),
-                              child: const Text('再玩一次'),
-                            ),
-                          TextButton(
-                            onPressed: () => Navigator.of(context).pop(),
-                            child: const Text('返回大厅'),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ),
-              ),
-            ),
-        ],
-      ),
+      body: _buildGame(),
     );
   }
 }

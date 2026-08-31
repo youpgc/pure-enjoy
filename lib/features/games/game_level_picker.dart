@@ -142,7 +142,10 @@ class _PickerBodyState extends State<_PickerBody> {
             ),
           ),
           if (isMatch3 && _selectedMode != null) _modeChips(),
-          Expanded(
+          ConstrainedBox(
+            constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.62,
+            ),
             child: ListView(
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: list.asMap().entries.map((entry) {

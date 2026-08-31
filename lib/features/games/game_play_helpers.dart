@@ -97,6 +97,10 @@ Future<GameSettlementResult?> reportAndSettle({
   required Map<String, num> scoreValuesByCode,
   required int durationMs,
   bool cleared = true,
+  VoidCallback? onReplay,
+  VoidCallback? onNext,
+  bool canNext = false,
+  VoidCallback? onExit,
 }) async {
   // 维度编码 → 维度 id（成绩表按维度 id 存值）
   final dims = GameService.instance.cachedConfig.dimensionsOf(game.id);
@@ -129,18 +133,35 @@ Future<GameSettlementResult?> reportAndSettle({
   );
 
   if (context.mounted) {
-    showSettlementSheet(context, game, result, scoreValuesByCode);
+    showSettlementSheet(
+      context,
+      game,
+      result,
+      scoreValuesByCode,
+      onReplay: onReplay,
+      onNext: onNext,
+      canNext: canNext,
+      onExit: onExit,
+    );
   }
   return result;
 }
 
-/// 弹出结算页（本次成绩 + 奖励明细 + 总积分）
+/// 弹出结算页（本次成绩 + 奖励明细 + 单日上限提醒 + 再玩/下一关/返回大厅）。
+///
+/// 统一为单个底部弹窗：成绩、奖励与「再玩一次」入口合并展示，解决旧实现中
+/// 游戏页自带居中弹窗与结算页重复出现的问题。弹窗不可点遮罩关闭，必须选择
+/// 一个操作退出，避免结算后停留在无操作的「死页」。
 void showSettlementSheet(
   BuildContext context,
   GameModel game,
   GameSettlementResult result,
-  Map<String, num> scoreValuesByCode,
-) {
+  Map<String, num> scoreValuesByCode, {
+  VoidCallback? onReplay,
+  VoidCallback? onNext,
+  bool canNext = false,
+  VoidCallback? onExit,
+}) {
   final dims = GameService.instance.cachedConfig.dimensionsOf(game.id);
   String fmtDim(String code, num value) {
     if (code == 'duration_ms') {
@@ -151,9 +172,16 @@ void showSettlementSheet(
     return '${value.toInt()}${dim?.unit ?? ''}';
   }
 
+  // 单日游戏奖励是否已达上限（命中上限的奖励项 reason 含「上限」）
+  final hitCap = result.items.any(
+    (i) => i.reason != null && i.reason!.contains('上限'),
+  );
+
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
+    isDismissible: false,
+    enableDrag: false,
     shape: const RoundedRectangleBorder(
       borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
     ),
@@ -211,6 +239,29 @@ void showSettlementSheet(
                   ),
                 ),
               )),
+          if (hitCap) ...<Widget>[
+            const SizedBox(height: 8),
+            Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: AppTheme.warning.withAlpha(26),
+                borderRadius: BorderRadius.circular(10),
+              ),
+              child: Row(
+                children: <Widget>[
+                  Icon(Icons.info_outline, color: AppTheme.warning, size: 18),
+                  const SizedBox(width: 8),
+                  Expanded(
+                    child: Text(
+                      '今日游戏奖励已达上限，后续通关不再获得积分',
+                      style: TextStyle(color: AppTheme.warning, fontSize: 13),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ],
           const Divider(height: 24),
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
@@ -227,13 +278,40 @@ void showSettlementSheet(
             ],
           ),
           const SizedBox(height: 16),
-          SizedBox(
-            width: double.infinity,
-            child: FilledButton(
-              onPressed: () => Navigator.of(ctx).pop(),
-              child: const Text('好的'),
-            ),
+          Row(
+            children: <Widget>[
+              if (onReplay != null)
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      onReplay();
+                    },
+                    child: const Text('再玩一次'),
+                  ),
+                ),
+              if (canNext && onNext != null) ...<Widget>[
+                const SizedBox(width: 12),
+                Expanded(
+                  child: FilledButton(
+                    onPressed: () {
+                      Navigator.of(ctx).pop();
+                      onNext();
+                    },
+                    child: const Text('下一关'),
+                  ),
+                ),
+              ],
+            ],
           ),
+          if (onExit != null)
+            TextButton(
+              onPressed: () {
+                Navigator.of(ctx).pop();
+                onExit();
+              },
+              child: const Text('返回大厅'),
+            ),
         ],
       ),
     ),
