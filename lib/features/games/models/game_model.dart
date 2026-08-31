@@ -40,6 +40,12 @@ class GameModel {
   /// false（默认）则直接进入第一个启用关卡，不弹选关。由后台配置下发。
   final bool levelSelectable;
 
+  /// 选关模式（仅 [levelSelectable]=true 时生效）：
+  ///   'gated' = 需通关后选关（未通关且非最新关卡上锁，已通关可重挑战）
+  ///   'free'  = 直接选关挑战（无视前置关卡是否通关）
+  /// 顺序通关（[levelSelectable]=false）时不参与逻辑。
+  final String levelSelectMode;
+
   /// 创建时间（UTC）
   final DateTime? createdAt;
 
@@ -58,6 +64,7 @@ class GameModel {
     this.config = const <String, dynamic>{},
     this.version = 1,
     this.levelSelectable = false,
+    this.levelSelectMode = 'gated',
     this.createdAt,
     this.updatedAt,
   });
@@ -76,6 +83,7 @@ class GameModel {
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       version: (json['version'] as num?)?.toInt() ?? 1,
       levelSelectable: json['level_selectable'] as bool? ?? false,
+      levelSelectMode: (json['level_select_mode'] as String? ?? 'gated'),
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -99,6 +107,7 @@ class GameModel {
       'config': config,
       'version': version,
       'level_selectable': levelSelectable,
+      'level_select_mode': levelSelectMode,
       if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
     };
@@ -117,6 +126,7 @@ class GameModel {
     Map<String, dynamic>? config,
     int? version,
     bool? levelSelectable,
+    String? levelSelectMode,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -132,6 +142,7 @@ class GameModel {
       config: config ?? this.config,
       version: version ?? this.version,
       levelSelectable: levelSelectable ?? this.levelSelectable,
+      levelSelectMode: levelSelectMode ?? this.levelSelectMode,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

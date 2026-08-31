@@ -59,6 +59,18 @@ GameLevelModel resolveLevel(GameModel game) {
   );
 }
 
+/// 取当前关卡的下一个启用关卡（按 sort_order 升序）；无后续则返回 null。
+/// 顺序通关与结算页「下一关」按钮共用：通关当前关后推进到下一关。
+GameLevelModel? nextLevelOf(GameModel game, GameLevelModel current) {
+  final levels = GameService.instance.cachedConfig.levelsOf(game.id);
+  for (int i = 0; i < levels.length; i++) {
+    if (levels[i].id == current.id) {
+      return i + 1 < levels.length ? levels[i + 1] : null;
+    }
+  }
+  return null;
+}
+
 /// 构建游戏页 AppBar（含右上角「看板」入口）
 AppBar buildGameAppBar(
   BuildContext context,

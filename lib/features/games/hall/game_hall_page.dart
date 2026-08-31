@@ -57,20 +57,45 @@ class _GameHallPageState extends State<GameHallPage> {
     return '${b.bestValue.toInt()}${b.unit ?? ''}';
   }
 
-  /// 点击游戏入口：允许选关且启用关卡 > 1 时弹选关界面，否则直接进入首关。
-  void _openGame(GameModel game) {
+  /// 点击游戏入口：
+  /// - 选关关闭：直接进入首关（顺序通关，结算页「下一关」推进）。
+  /// - 选关开启且启用关卡 > 1：弹选关界面（按 [GameModel.levelSelectMode] 决定锁状态）。
+  /// - 仅 1 个启用关卡：直接进该关。
+  Future<void> _openGame(GameModel game) async {
     final levels = _config?.levelsOf(game.id) ?? <GameLevelModel>[];
     if (game.levelSelectable && levels.length > 1) {
-      _showLevelSelect(game, levels);
+      final cleared = await GameScoreService.instance.fetchClearedLevelIds(game.id);
+      if (!mounted) return;
+      _showLevelSelect(game, levels, cleared);
       return;
     }
+    if (!mounted) return;
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GamePlayScreen(game: game)),
     );
   }
 
-  /// 选关底部弹窗（仅展示启用关卡）。
-  void _showLevelSelect(GameModel game, List<GameLevelModel> levels) {
+  /// 选关底部弹窗：按选关模式显示锁状态。
+  /// - free：全部关卡可直接挑战。
+  /// - gated：已通关关卡可重挑战；最新未通关关卡（frontier）可解锁；其余上锁。
+  void _showLevelSelect(
+    GameModel game,
+    List<GameLevelModel> levels,
+    Set<String> clearedIds,
+  ) {
+    // gated 模式下计算「最新可挑战关卡(frontier)」索引
+    int maxClearedIdx = -1;
+    for (int i = 0; i < levels.length; i++) {
+      if (clearedIds.contains(levels[i].id)) maxClearedIdx = i;
+    }
+    final frontierIdx = maxClearedIdx < 0 ? 0 : maxClearedIdx + 1;
+
+    bool canSelect(int i) {
+      if (game.levelSelectMode == 'free') return true; // 直接选关
+      if (clearedIds.contains(levels[i].id)) return true; // 已通关可重挑战
+      return i == frontierIdx; // 最新可挑战关卡
+    }
+
     showModalBottomSheet(
       context: context,
       isScrollControlled: true,
@@ -88,23 +113,38 @@ class _GameHallPageState extends State<GameHallPage> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
-          ...levels.map(
-            (lv) => ListTile(
+          ...levels.asMap().entries.map((entry) {
+            final i = entry.key;
+            final lv = entry.value;
+            final selectable = canSelect(i);
+            final cleared = clearedIds.contains(lv.id);
+            return ListTile(
+              leading: !selectable
+                  ? const Icon(Icons.lock_outline, color: AppTheme.neutral500)
+                  : (cleared
+                      ? const Icon(Icons.check_circle, color: AppTheme.success)
+                      : null),
               title: Text(lv.name),
-              subtitle: lv.countForDailyClear
-                  ? const Text('通关计入每日首通奖励')
-                  : const Text('不计入每日首通奖励'),
-              trailing: const Icon(Icons.chevron_right),
-              onTap: () {
-                Navigator.of(ctx).pop();
-                Navigator.of(context).push(
-                  MaterialPageRoute(
-                    builder: (_) => GamePlayScreen(game: game, level: lv),
-                  ),
-                );
-              },
-            ),
-          ),
+              subtitle: cleared
+                  ? const Text('已通关 · 可重挑战')
+                  : (selectable
+                      ? const Text('可选择挑战')
+                      : const Text('未解锁 · 需先通关前置关卡')),
+              trailing: Icon(selectable ? Icons.chevron_right : Icons.lock),
+              enabled: selectable,
+              onTap: selectable
+                  ? () {
+                      Navigator.of(ctx).pop();
+                      if (!mounted) return;
+                      Navigator.of(context).push(
+                        MaterialPageRoute(
+                          builder: (_) => GamePlayScreen(game: game, level: lv),
+                        ),
+                      );
+                    }
+                  : null,
+            );
+          }),
           const SizedBox(height: 8),
         ],
       ),

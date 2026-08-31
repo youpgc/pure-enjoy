@@ -73,6 +73,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 顺序通关 / 选关模式下，通关当前关后是否可推进到下一关
+    final next = nextLevelOf(widget.game, _level);
+    final canNext = _outcome?.cleared == true && next != null;
+
     return Scaffold(
       appBar: buildGameAppBar(
         context,
@@ -106,13 +110,43 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
                             ),
                           ),
                           const SizedBox(height: 20),
-                          FilledButton(
-                            onPressed: () => setState(() {
-                              _outcome = null;
-                              _restartNonce++;
-                            }),
-                            child: const Text('再玩一次'),
-                          ),
+                          if (canNext)
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => setState(() {
+                                      _outcome = null;
+                                      _restartNonce++;
+                                    }),
+                                    child: const Text('再玩一次'),
+                                  ),
+                                ),
+                                const SizedBox(width: 12),
+                                Expanded(
+                                  child: FilledButton(
+                                    onPressed: () => Navigator.of(context)
+                                        .pushReplacement(
+                                      MaterialPageRoute(
+                                        builder: (_) => GamePlayScreen(
+                                          game: widget.game,
+                                          level: next,
+                                        ),
+                                      ),
+                                    ),
+                                    child: const Text('下一关'),
+                                  ),
+                                ),
+                              ],
+                            )
+                          else
+                            FilledButton(
+                              onPressed: () => setState(() {
+                                _outcome = null;
+                                _restartNonce++;
+                              }),
+                              child: const Text('再玩一次'),
+                            ),
                           TextButton(
                             onPressed: () => Navigator.of(context).pop(),
                             child: const Text('返回大厅'),

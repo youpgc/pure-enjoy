@@ -186,6 +186,40 @@ class GameScoreService {
     return scoreId;
   }
 
+  /// 查询当前用户在某游戏下已通关的关卡 id 集合。
+  ///
+  /// 供「需通关后选关(gated)」模式判断锁状态：已通关关卡可重挑战，
+  /// 最新未通关关卡（frontier）可解锁，其余上锁。未登录返回空集合。
+  Future<Set<String>> fetchClearedLevelIds(String gameId) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return <String>{};
+
+    final result = await ApiClient.get(
+      'game_scores',
+      filters: <String, String>{
+        'user_id': 'eq.$userId',
+        'game_id': 'eq.$gameId',
+        'status': 'eq.cleared',
+      },
+      order: 'played_at.desc',
+      limit: null,
+      note: 'games:cleared_levels',
+    );
+    if (!result.isSuccess) {
+      debugPrint('[GameScoreService] 已通关关卡查询失败：${result.errorMessage}');
+      return <String>{};
+    }
+    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+    final set = <String>{};
+    for (final row in rows) {
+      if (row is Map<String, dynamic>) {
+        final lv = row['level_id'] as String?;
+        if (lv != null) set.add(lv);
+      }
+    }
+    return set;
+  }
+
   /// 查询最佳成绩（服务端聚合）。
   ///
   /// [gameId] 为 null 时返回全部游戏最佳成绩（总看板用）；
