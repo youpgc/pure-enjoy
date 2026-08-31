@@ -56,6 +56,10 @@ dependencies:
   fl_chart: ^0.68.0
   # 游戏引擎（消消乐三消，1.38.x 纯 Dart 依赖，无原生二进制；需 Flutter>=3.41 / Dart>=3.11）
   flame: ^1.38.0
+  # 自绘卡通图标（羊了个羊/消消乐图块用 SVG 矢量绘制，无位图资源）
+  flutter_svg: ^2.0.10
+  # 轻量音效（合成 WAV + 触感反馈；无 BGM，体积小）
+  audioplayers: ^6.1.0
   # 电池电量
   battery_plus: ^5.0.2
   # 农历
@@ -84,3 +88,4 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/logo.jpg
+    - assets/audio/

@@ -1,43 +1,51 @@
-import 'dart:async';
 import 'dart:math';
-import 'dart:ui';
 
-import 'package:flame/components.dart';
-import 'package:flame/events.dart';
-import 'package:flame/extensions.dart';
 import 'package:flame/game.dart';
+import 'package:flame/events.dart';
 import 'package:flutter/foundation.dart';
+import 'package:flutter/material.dart';
 
 import '../../game_play_helpers.dart';
+import '../../shared/game_audio.dart';
+import 'candy_component.dart';
 
-/// 消消乐（Flame 引擎实现）
+/// 消消乐一次连线（用于生成特殊糖与消除判定）
+class _Run {
+  final String orient;
+  final List<(int, int)> cells;
+  _Run(this.orient, this.cells);
+}
+
+/// 消消乐（Flame 引擎 · 成熟手感版）
 ///
-/// 8x8 网格，点击两个相邻方块交换；若形成 ≥3 连则消除并计分，
-/// 上方方块下落补充，连锁继续。剩余步数耗尽即结束（cleared=true，成绩=得分）。
+/// - 自绘卡通糖块（6 种形状+颜色），条纹/彩爆/包装特殊糖。
+/// - 4 连→条纹糖（清整行/列）；5 连→彩爆（清同色）；L/T→包装糖（清 3×3）。
+/// - 关卡目标 + 步数限制 + 连击倍率；消除/下落/交换全动画 + 音效。
 class Match3FlameGame extends FlameGame with TapCallbacks {
-  /// 结束回调
   final void Function(GamePlayOutcome) onFinished;
-
-  /// 分数 / 步数通知（供 Flutter 层叠加展示）
   final ValueNotifier<int> scoreNotifier;
   final ValueNotifier<int> movesNotifier;
 
   final int rows;
   final int cols;
-  final int moveLimit;
+  final int steps;
+  final int goal;
 
-  List<List<int>> grid = <List<int>>[];
+  List<List<Candy?>> grid = <List<Candy?>>[];
   int score = 0;
   int movesLeft = 0;
+  int combo = 1;
+
   final DateTime _startTime = DateTime.now();
-  bool _finished = false;
+  bool _over = false;
+  bool _busy = false;
   bool _loaded = false;
 
   int? _selectedR;
   int? _selectedC;
   late double _cell;
   final Random _rng = Random();
-  final List<RectangleComponent> _comps = <RectangleComponent>[];
+
   final List<Color> _palette = <Color>[
     const Color(0xFFEF5350),
     const Color(0xFF42A5F5),
@@ -47,13 +55,16 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     const Color(0xFFFFA726),
   ];
 
+  static const Duration _anim = Duration(milliseconds: 150);
+
   Match3FlameGame({
     required this.onFinished,
     required this.scoreNotifier,
     required this.movesNotifier,
     this.rows = 8,
     this.cols = 8,
-    this.moveLimit = 20,
+    this.steps = 20,
+    this.goal = 1000,
   });
 
   @override
@@ -61,144 +72,124 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     await super.onLoad();
     _cell = (size.x / cols).clamp(0, size.y / rows);
     _newBoard();
-    movesLeft = moveLimit;
+    movesLeft = steps;
     movesNotifier.value = movesLeft;
     scoreNotifier.value = score;
-    _rebuildTiles();
     _loaded = true;
   }
 
-  Vector2 _cellCenter(int r, int c) =>
-      Vector2(c * _cell + _cell / 2, r * _cell + _cell / 2);
-
-  void _newBoard() {
-    do {
-      grid = List.generate(
-        rows,
-        (_) => List.generate(cols, (_) => _rng.nextInt(_palette.length)),
-      );
-    } while (_findMatches().isNotEmpty);
-  }
-
-  Set<Point> _findMatches() {
-    final s = <Point>{};
-    // 水平
-    for (var r = 0; r < rows; r++) {
-      var runStart = 0;
-      for (var c = 1; c <= cols; c++) {
-        if (c < cols && grid[r][c] != 0 && grid[r][c] == grid[r][runStart]) {
-          continue;
-        }
-        final len = c - runStart;
-        if (grid[r][runStart] != 0 && len >= 3) {
-          for (var k = runStart; k < c; k++) {
-            s.add(Point(r, k));
-          }
-        }
-        runStart = c;
-      }
-    }
-    // 垂直
-    for (var c = 0; c < cols; c++) {
-      var runStart = 0;
-      for (var r = 1; r <= rows; r++) {
-        if (r < rows && grid[r][c] != 0 && grid[r][c] == grid[runStart][c]) {
-          continue;
-        }
-        final len = r - runStart;
-        if (grid[runStart][c] != 0 && len >= 3) {
-          for (var k = runStart; k < r; k++) {
-            s.add(Point(k, c));
-          }
-        }
-        runStart = r;
-      }
-    }
-    return s;
-  }
-
-  void _applyGravity() {
-    for (var c = 0; c < cols; c++) {
-      final remain = <int>[];
-      for (var r = 0; r < rows; r++) {
-        if (grid[r][c] != 0) remain.add(grid[r][c]);
-      }
-      var idx = remain.length - 1;
-      for (var r = rows - 1; r >= 0; r--) {
-        grid[r][c] = idx >= 0 ? remain[idx--] : _rng.nextInt(_palette.length);
-      }
-    }
-  }
-
-  void _resolveBoard() {
-    var any = true;
-    while (any) {
-      any = false;
-      final matches = _findMatches();
-      if (matches.isEmpty) break;
-      any = true;
-      score += matches.length * 10;
-      for (final p in matches) {
-        grid[p.r][p.c] = 0;
-      }
-      _applyGravity();
-    }
-    scoreNotifier.value = score;
-    _rebuildTiles();
-  }
-
-  void _rebuildTiles() {
-    if (_comps.isNotEmpty) removeAll(_comps);
-    _comps.clear();
+  @override
+  void render(Canvas canvas) {
+    super.render(canvas);
+    canvas.drawRect(
+      Rect.fromLTWH(0, 0, size.x, size.y),
+      Paint()..color = const Color(0xFF26263A),
+    );
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
-        final comp = RectangleComponent(
-          position: _cellCenter(r, c),
-          size: Vector2(_cell * 0.92, _cell * 0.92),
-          anchor: Anchor.center,
-          paint: Paint()..color = _palette[grid[r][c]],
-        );
-        _comps.add(comp);
-        add(comp);
+        final cand = grid[r][c];
+        if (cand != null) drawCandy(canvas, cand, _cell, _palette[cand.type]);
       }
     }
-  }
-
-  void _trySwap(int r1, int c1, int r2, int c2) {
-    final tmp = grid[r1][c1];
-    grid[r1][c1] = grid[r2][c2];
-    grid[r2][c2] = tmp;
-    if (_findMatches().isNotEmpty) {
-      movesLeft--;
-      movesNotifier.value = movesLeft;
-      _resolveBoard();
-      if (movesLeft <= 0) _finish();
-    } else {
-      // 无可消除，换回
-      final back = grid[r1][c1];
-      grid[r1][c1] = grid[r2][c2];
-      grid[r2][c2] = back;
-      _rebuildTiles();
+    if (_selectedR != null && _selectedC != null) {
+      canvas.drawRect(
+        Rect.fromLTWH(_selectedC! * _cell, _selectedR! * _cell, _cell, _cell),
+        Paint()
+          ..color = Colors.white.withOpacity(0.25)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = _cell * 0.06,
+      );
     }
-  }
-
-  void _finish() {
-    if (_finished) return;
-    _finished = true;
-    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    onFinished(GamePlayOutcome(
-      cleared: true,
-      values: <String, num>{
-        'score': score,
-        'duration_ms': elapsed,
-      },
-      durationMs: elapsed,
-    ));
   }
 
   @override
+  void update(double dt) {
+    super.update(dt);
+    final k = min(1.0, dt * 14);
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        final cand = grid[r][c];
+        if (cand == null) continue;
+        final tx = cand.col * _cell;
+        final ty = cand.row * _cell;
+        cand.px += (tx - cand.px) * k;
+        cand.py += (ty - cand.py) * k;
+        final ts = cand.dying ? 0.0 : 1.0;
+        cand.scale += (ts - cand.scale) * k;
+      }
+    }
+  }
+
+  // ---------- 棋盘生成 ----------
+
+  void _newBoard() {
+    grid = List.generate(rows, (_) => List<Candy?>.filled(cols, null));
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        int t;
+        do {
+          t = _rng.nextInt(_palette.length);
+        } while ((c >= 2 &&
+                grid[r][c - 1]?.type == t &&
+                grid[r][c - 2]?.type == t) ||
+            (r >= 2 &&
+                grid[r - 1][c]?.type == t &&
+                grid[r - 2][c]?.type == t));
+        grid[r][c] = Candy(t, r, c, c * _cell, r * _cell);
+      }
+    }
+  }
+
+  // ---------- 连线检测 ----------
+
+  List<_Run> _findRuns() {
+    final runs = <_Run>[];
+    for (var r = 0; r < rows; r++) {
+      var c = 0;
+      while (c < cols) {
+        final t = grid[r][c]?.type;
+        if (t == null) {
+          c++;
+          continue;
+        }
+        var end = c;
+        while (end + 1 < cols && grid[r][end + 1]?.type == t) end++;
+        final len = end - c + 1;
+        if (len >= 3) {
+          final cells = <(int, int)>[];
+          for (var k = c; k <= end; k++) cells.add((r, k));
+          runs.add(_Run('h', cells));
+        }
+        c = end + 1;
+      }
+    }
+    for (var c = 0; c < cols; c++) {
+      var r = 0;
+      while (r < rows) {
+        final t = grid[r][c]?.type;
+        if (t == null) {
+          r++;
+          continue;
+        }
+        var end = r;
+        while (end + 1 < rows && grid[end + 1][c]?.type == t) end++;
+        final len = end - r + 1;
+        if (len >= 3) {
+          final cells = <(int, int)>[];
+          for (var k = r; k <= end; k++) cells.add((k, c));
+          runs.add(_Run('v', cells));
+        }
+        r = end + 1;
+      }
+    }
+    return runs;
+  }
+
+  // ---------- 交换 ----------
+
+  @override
   void onTapUp(TapUpEvent event) {
-    if (!_loaded || _finished) return;
+    if (!_loaded || _busy || _over) return;
     final c = (event.canvasPosition.x / _cell).floor();
     final r = (event.canvasPosition.y / _cell).floor();
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
@@ -212,16 +203,238 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     final sc = _selectedC!;
     _selectedR = null;
     _selectedC = null;
-    if (sr == r && sc == c) return; // 取消选择
-    final adjacent =
-        (sr - r).abs() + (sc - c).abs() == 1; // 仅相邻可交换
+    if (sr == r && sc == c) return;
+    final adjacent = (sr - r).abs() + (sc - c).abs() == 1;
     if (!adjacent) return;
     _trySwap(sr, sc, r, c);
   }
-}
 
-class Point {
-  final int r;
-  final int c;
-  const Point(this.r, this.c);
+  void _trySwap(int r1, int c1, int r2, int c2) {
+    final a = grid[r1][c1];
+    final b = grid[r2][c2];
+    if (a == null || b == null) return;
+    grid[r1][c1] = b;
+    grid[r2][c2] = a;
+    a.row = r2;
+    a.col = c2;
+    b.row = r1;
+    b.col = c1;
+    _busy = true;
+    GameAudio.instance.select();
+    GameAudio.instance.haptic(GameHaptic.light);
+
+    Future.delayed(_anim, () {
+      if (!isMounted) return;
+      if (_findRuns().isEmpty) {
+        grid[r1][c1] = a;
+        grid[r2][c2] = b;
+        a.row = r1;
+        a.col = c1;
+        b.row = r2;
+        b.col = c2;
+        GameAudio.instance.tap();
+        Future.delayed(_anim, () {
+          if (isMounted) _busy = false;
+        });
+      } else {
+        movesLeft--;
+        movesNotifier.value = movesLeft;
+        combo = 1;
+        _resolveCascade(r1, c1, r2, c2);
+      }
+    });
+  }
+
+  // ---------- 连锁消除 ----------
+
+  void _resolveCascade(int sr1, int sc1, int sr2, int sc2, [int depth = 0]) {
+    if (depth > 200) {
+      _busy = false;
+      return;
+    }
+    final runs = _findRuns();
+    if (runs.isEmpty) {
+      if (movesLeft <= 0) {
+        _finishByGoal();
+      } else {
+        _busy = false;
+      }
+      return;
+    }
+
+    final toClear = <(int, int)>{};
+    final created = <(int, int), String>{};
+    final swapped = {(sr1, sc1), (sr2, sc2)};
+
+    for (final run in runs) {
+      String? sp;
+      if (run.cells.length >= 5) {
+        sp = 'bomb';
+      } else if (run.cells.length == 4) {
+        sp = run.orient == 'h' ? 'row' : 'col';
+      }
+      for (final cell in run.cells) toClear.add(cell);
+      if (sp != null) {
+        final spot = run.cells.firstWhere(
+          (cell) => swapped.contains(cell),
+          orElse: () => run.cells[run.cells.length ~/ 2],
+        );
+        created[spot] = sp;
+      }
+    }
+
+    // L/T 交叉 → 包装糖
+    final hCells = <(int, int)>{};
+    final vCells = <(int, int)>{};
+    for (final run in runs) {
+      for (final cell in run.cells) {
+        if (run.orient == 'h') {
+          hCells.add(cell);
+        } else {
+          vCells.add(cell);
+        }
+      }
+    }
+    for (final cell in hCells) {
+      if (vCells.contains(cell)) created[cell] = 'wrap';
+    }
+
+    for (final cell in created.keys) toClear.remove(cell);
+    _applySpecials(toClear, created);
+
+    score += toClear.length * 10 * combo;
+    scoreNotifier.value = score;
+    GameAudio.instance.match();
+    GameAudio.instance.haptic(GameHaptic.medium);
+
+    for (final cell in toClear) {
+      final cand = grid[cell.$1][cell.$2];
+      if (cand != null) cand.dying = true;
+    }
+    for (final e in created.entries) {
+      final cand = grid[e.key.$1][e.key.$2];
+      if (cand != null) cand.special = e.value;
+    }
+
+    combo++;
+    Future.delayed(_anim, () {
+      if (!isMounted) return;
+      _removeCleared(toClear);
+      _applyGravity();
+      Future.delayed(_anim, () => _resolveCascade(sr1, sc1, sr2, sc2, depth + 1));
+    });
+  }
+
+  void _applySpecials(
+    Set<(int, int)> toClear,
+    Map<(int, int), String> created,
+  ) {
+    final queue = <(int, int)>[];
+    for (final cell in toClear) {
+      final cand = grid[cell.$1][cell.$2];
+      if (cand != null && cand.special.isNotEmpty) queue.add(cell);
+    }
+    final handled = <(int, int)>{};
+    while (queue.isNotEmpty) {
+      final cell = queue.removeLast();
+      if (handled.contains(cell)) continue;
+      handled.add(cell);
+      final cand = grid[cell.$1][cell.$2];
+      if (cand == null) continue;
+      for (final ac in _effectCells(cand, cell.$1, cell.$2)) {
+        if (created.containsKey(ac)) continue;
+        if (toClear.add(ac)) {
+          final o = grid[ac.$1][ac.$2];
+          if (o != null && o.special.isNotEmpty && !handled.contains(ac)) {
+            queue.add(ac);
+          }
+        }
+      }
+    }
+  }
+
+  List<(int, int)> _effectCells(Candy cand, int r, int c) {
+    switch (cand.special) {
+      case 'row':
+        return [for (var cc = 0; cc < cols; cc++) (r, cc)];
+      case 'col':
+        return [for (var rr = 0; rr < rows; rr++) (rr, c)];
+      case 'wrap':
+        final list = <(int, int)>[];
+        for (var dr = -1; dr <= 1; dr++) {
+          for (var dc = -1; dc <= 1; dc++) {
+            final rr = r + dr;
+            final cc = c + dc;
+            if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) {
+              list.add((rr, cc));
+            }
+          }
+        }
+        return list;
+      case 'bomb':
+        final list = <(int, int)>[];
+        for (var rr = 0; rr < rows; rr++) {
+          for (var cc = 0; cc < cols; cc++) {
+            final o = grid[rr][cc];
+            if (o != null && o.type == cand.type) list.add((rr, cc));
+          }
+        }
+        return list;
+      default:
+        return [];
+    }
+  }
+
+  void _removeCleared(Set<(int, int)> toClear) {
+    for (final cell in toClear) grid[cell.$1][cell.$2] = null;
+  }
+
+  void _applyGravity() {
+    for (var c = 0; c < cols; c++) {
+      final remain = <Candy>[];
+      for (var r = 0; r < rows; r++) {
+        final cand = grid[r][c];
+        if (cand != null) {
+          remain.add(cand);
+          grid[r][c] = null;
+        }
+      }
+      var idx = rows - 1;
+      for (var k = remain.length - 1; k >= 0; k--) {
+        final cand = remain[k];
+        cand.row = idx;
+        grid[idx][c] = cand;
+        idx--;
+      }
+      var spawnY = -1;
+      for (var r = idx; r >= 0; r--) {
+        final cand = Candy(
+          _rng.nextInt(_palette.length),
+          r,
+          c,
+          c * _cell,
+          spawnY * _cell,
+        );
+        spawnY--;
+        grid[r][c] = cand;
+      }
+    }
+  }
+
+  void _finishByGoal() {
+    if (_over) return;
+    _over = true;
+    final cleared = score >= goal;
+    if (cleared) {
+      GameAudio.instance.win();
+    } else {
+      GameAudio.instance.fail();
+    }
+    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
+    onFinished(GamePlayOutcome(
+      cleared: cleared,
+      values: <String, num>{'score': score, 'duration_ms': elapsed},
+      durationMs: elapsed,
+    ));
+  }
 }

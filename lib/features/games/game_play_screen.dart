@@ -55,6 +55,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         return SheepGame(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
+          level: _level,
         );
       case 'g2048':
         return G2048Game(
@@ -65,6 +66,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         return Match3Game(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
+          level: _level,
         );
       default:
         return const Center(child: Text('该游戏暂未实现'));

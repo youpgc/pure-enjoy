@@ -1,12 +1,18 @@
+import 'dart:math';
+
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
-import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
+import '../../shared/game_audio.dart';
+import 'g2048_tile.dart';
 
-/// 2048（纯 Widget 实现）
+/// 2048（成熟手感版）
 ///
-/// 玩法：上下左右滑动合并相同数字，冲击 2048。到达 2048 记为「通关」，
-/// 棋盘填满且无合并空间记为「失败」。成绩维度：score（累计得分）+ duration_ms。
+/// - 滑动合并：方块用 [G2048Tile] 做丝滑滑动 + 出现/合并弹跳。
+/// - 触感 + 音效：每次移动轻触感 + 点击音；合并中触感 + 合并音。
+/// - 最高分本地持久化（shared_preferences）。
+/// - 到达 2048 记「通关」；无可移动空间记「失败」。成绩维度：score + duration_ms。
 class G2048Game extends StatefulWidget {
   /// 结束回调
   final void Function(GamePlayOutcome) onFinished;
@@ -20,118 +26,217 @@ class G2048Game extends StatefulWidget {
 class _G2048GameState extends State<G2048Game> {
   static const int _size = 4;
   static const int _target = 2048;
+  static const Duration _slide = Duration(milliseconds: 120);
 
-  late List<List<int>> _grid;
-  late int _score;
-  late bool _reachedTarget;
-  late final DateTime _startTime;
+  final List<TileModel> _tiles = <TileModel>[];
+  late List<List<TileModel?>> _grid;
+  int _score = 0;
+  int _best = 0;
+  bool _animating = false;
   bool _finished = false;
+  bool _pendingWin = false;
+  int _nextId = 1;
+  late final DateTime _startTime;
+  final Random _rng = Random();
 
   @override
   void initState() {
     super.initState();
     _startTime = DateTime.now();
+    _grid = List.generate(_size, (_) => List.filled(_size, null));
+    _loadBest();
     _reset();
   }
 
+  Future<void> _loadBest() async {
+    final sp = await SharedPreferences.getInstance();
+    if (mounted) {
+      _best = sp.getInt('g2048_best') ?? 0;
+      setState(() {});
+    }
+  }
+
+  void _persistBest() {
+    SharedPreferences.getInstance().then((sp) => sp.setInt('g2048_best', _best));
+  }
+
   void _reset() {
-    _grid = List.generate(_size, (_) => List.filled(_size, 0));
+    _tiles.clear();
+    _grid = List.generate(_size, (_) => List.filled(_size, null));
     _score = 0;
-    _reachedTarget = false;
+    _animating = false;
+    _finished = false;
+    _pendingWin = false;
     _spawn();
     _spawn();
+  }
+
+  void _rebuildGrid() {
+    _grid = List.generate(_size, (_) => List.filled(_size, null));
+    for (final t in _tiles) {
+      if (!t.toRemove) _grid[t.row][t.col] = t;
+    }
   }
 
   void _spawn() {
-    final empties = <Point>[];
+    final empties = <(int, int)>[];
     for (var r = 0; r < _size; r++) {
       for (var c = 0; c < _size; c++) {
-        if (_grid[r][c] == 0) empties.add(Point(r, c));
+        if (_grid[r][c] == null) empties.add((r, c));
       }
     }
     if (empties.isEmpty) return;
-    final p = empties[DateTime.now().microsecondsSinceEpoch % empties.length];
-    _grid[p.r][p.c] = (DateTime.now().microsecondsSinceEpoch % 10 == 0) ? 4 : 2;
+    final cell = empties[_rng.nextInt(empties.length)];
+    final t = TileModel(
+      _nextId++,
+      _rng.nextInt(10) == 0 ? 4 : 2,
+      cell.$1,
+      cell.$2,
+      isNew: true,
+    );
+    _tiles.add(t);
+    _grid[cell.$1][cell.$2] = t;
   }
 
-  List<int> _mergeLine(List<int> line) {
-    final nums = line.where((n) => n != 0).toList();
-    final res = <int>[];
-    var i = 0;
-    while (i < nums.length) {
-      if (i + 1 < nums.length && nums[i] == nums[i + 1]) {
-        final v = nums[i] * 2;
-        res.add(v);
-        _score += v;
-        if (v >= _target) _reachedTarget = true;
-        i += 2;
-      } else {
-        res.add(nums[i]);
-        i++;
-      }
-    }
-    while (res.length < _size) {
-      res.add(0);
-    }
-    return res;
-  }
-
-  void _move(String dir) {
-    if (_finished) return;
-    var changed = false;
+  List<List<(int, int)>> _linesFor(String dir) {
+    final lines = <List<(int, int)>>[];
     if (dir == 'left' || dir == 'right') {
       for (var r = 0; r < _size; r++) {
-        var row = <int>[_grid[r][0], _grid[r][1], _grid[r][2], _grid[r][3]];
-        if (dir == 'right') row = row.reversed.toList();
-        final merged = _mergeLine(row);
-        final out = dir == 'right' ? merged.reversed.toList() : merged;
+        final cells = <(int, int)>[];
         for (var c = 0; c < _size; c++) {
-          if (_grid[r][c] != out[c]) changed = true;
-          _grid[r][c] = out[c];
+          final cc = dir == 'left' ? c : _size - 1 - c;
+          cells.add((r, cc));
         }
+        lines.add(cells);
       }
     } else {
       for (var c = 0; c < _size; c++) {
-        var col = <int>[_grid[0][c], _grid[1][c], _grid[2][c], _grid[3][c]];
-        if (dir == 'down') col = col.reversed.toList();
-        final merged = _mergeLine(col);
-        final out = dir == 'down' ? merged.reversed.toList() : merged;
+        final cells = <(int, int)>[];
         for (var r = 0; r < _size; r++) {
-          if (_grid[r][c] != out[r]) changed = true;
-          _grid[r][c] = out[r];
+          final rr = dir == 'up' ? r : _size - 1 - r;
+          cells.add((rr, c));
+        }
+        lines.add(cells);
+      }
+    }
+    return lines;
+  }
+
+  void _move(String dir) {
+    if (_animating || _finished) return;
+    final lines = _linesFor(dir);
+    var changed = false;
+    var gain = 0;
+    var reached = false;
+
+    for (final cells in lines) {
+      final lineTiles = <TileModel>[];
+      for (final cell in cells) {
+        final t = _grid[cell.$1][cell.$2];
+        if (t != null) lineTiles.add(t);
+      }
+      final entries = <List<TileModel>>[];
+      var i = 0;
+      while (i < lineTiles.length) {
+        if (i + 1 < lineTiles.length &&
+            lineTiles[i].value == lineTiles[i + 1].value &&
+            !lineTiles[i].merged) {
+          lineTiles[i].value *= 2;
+          lineTiles[i].merged = true;
+          gain += lineTiles[i].value;
+          if (lineTiles[i].value >= _target) reached = true;
+          entries.add([lineTiles[i], lineTiles[i + 1]]);
+          i += 2;
+        } else {
+          entries.add([lineTiles[i]]);
+          i += 1;
+        }
+      }
+      for (var idx = 0; idx < entries.length; idx++) {
+        final cell = cells[idx];
+        final e = entries[idx];
+        if (e.length == 2) {
+          e[0].row = cell.$1;
+          e[0].col = cell.$2;
+          e[1].row = cell.$1;
+          e[1].col = cell.$2;
+          e[1].toRemove = true;
+          changed = true;
+        } else {
+          if (e[0].row != cell.$1 || e[0].col != cell.$2) changed = true;
+          e[0].row = cell.$1;
+          e[0].col = cell.$2;
         }
       }
     }
-    if (!changed) return;
-    _spawn();
 
-    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    if (_reachedTarget) {
-      _finish(true, elapsed);
-    } else if (!_hasMoves()) {
-      _finish(false, elapsed);
+    if (!changed) return;
+
+    if (gain > 0) {
+      GameAudio.instance.merge();
+      GameAudio.instance.haptic(GameHaptic.medium);
+    } else {
+      GameAudio.instance.tap();
+      GameAudio.instance.haptic(GameHaptic.light);
     }
+    _score += gain;
+    if (_score > _best) {
+      _best = _score;
+      _persistBest();
+    }
+    _rebuildGrid();
+    _animating = true;
+    _pendingWin = reached;
+    setState(() {});
+
+    Future.delayed(_slide + const Duration(milliseconds: 20), () {
+      if (!mounted) return;
+      _tiles.removeWhere((t) => t.toRemove);
+      _rebuildGrid();
+      var lost = false;
+      if (!_pendingWin) {
+        _spawn();
+        _rebuildGrid();
+        if (!_hasMoves()) lost = true;
+      }
+      _animating = false;
+      if (_pendingWin) {
+        _finish(true);
+      } else if (lost) {
+        _finish(false);
+      } else {
+        setState(() {});
+      }
+    });
   }
 
   bool _hasMoves() {
     for (var r = 0; r < _size; r++) {
       for (var c = 0; c < _size; c++) {
-        if (_grid[r][c] == 0) return true;
-        if (c + 1 < _size && _grid[r][c] == _grid[r][c + 1]) return true;
-        if (r + 1 < _size && _grid[r][c] == _grid[r + 1][c]) return true;
+        if (_grid[r][c] == null) return true;
+        if (c + 1 < _size && _grid[r][c]!.value == _grid[r][c + 1]!.value) {
+          return true;
+        }
+        if (r + 1 < _size && _grid[r][c]!.value == _grid[r + 1][c]!.value) {
+          return true;
+        }
       }
     }
     return false;
   }
 
-  void _finish(bool cleared, int elapsed) {
+  void _finish(bool cleared) {
+    if (_finished) return;
     _finished = true;
+    if (cleared) {
+      GameAudio.instance.win();
+    } else {
+      GameAudio.instance.fail();
+    }
+    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     widget.onFinished(GamePlayOutcome(
       cleared: cleared,
-      values: <String, num>{
-        'score': _score,
-        'duration_ms': elapsed,
-      },
+      values: <String, num>{'score': _score, 'duration_ms': elapsed},
       durationMs: elapsed,
     ));
   }
@@ -143,59 +248,84 @@ class _G2048GameState extends State<G2048Game> {
         final v = d.velocity.pixelsPerSecond;
         if (v.dx.abs() > v.dy.abs()) {
           _move(v.dx > 0 ? 'right' : 'left');
-        } else {
+        } else if (v.dy.abs() > 1) {
           _move(v.dy > 0 ? 'down' : 'up');
         }
-        if (mounted) setState(() {});
       },
       child: Column(
         children: <Widget>[
           Padding(
-            padding: const EdgeInsets.all(12),
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
             child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: <Widget>[
-                const Text('2048', style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
-                Chip(label: Text('得分 $_score')),
+                const Text('2048',
+                    style:
+                        TextStyle(fontSize: 22, fontWeight: FontWeight.bold)),
+                const Spacer(),
+                _statChip('得分', _score),
+                const SizedBox(width: 8),
+                _statChip('最高', _best),
+                const SizedBox(width: 8),
+                FilledButton.tonal(
+                  onPressed: _finished ? null : _reset,
+                  child: const Text('新游戏'),
+                ),
               ],
             ),
           ),
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(12),
-              child: GridView.builder(
-                physics: const NeverScrollableScrollPhysics(),
-                itemCount: _size * _size,
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: _size,
-                  mainAxisSpacing: 8,
-                  crossAxisSpacing: 8,
-                ),
-                itemBuilder: (ctx, idx) {
-                  final r = idx ~/ _size;
-                  final c = idx % _size;
-                  final v = _grid[r][c];
-                  return Container(
-                    decoration: BoxDecoration(
-                      color: _tileColor(v),
-                      borderRadius: BorderRadius.circular(8),
+            child: LayoutBuilder(
+              builder: (ctx, constraints) {
+                final board = constraints.maxWidth;
+                final gap = board * 0.03;
+                final cell = (board - gap * (_size + 1)) / _size;
+                double pos(int index) => gap + index * (cell + gap);
+
+                final children = <Widget>[
+                  // 棋盘底格
+                  for (var r = 0; r < _size; r++)
+                    for (var c = 0; c < _size; c++)
+                      Positioned(
+                        left: pos(c),
+                        top: pos(r),
+                        width: cell,
+                        height: cell,
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: const Color(0xFFCDC1B4),
+                            borderRadius: BorderRadius.circular(cell * 0.14),
+                          ),
+                        ),
+                      ),
+                  // 方块
+                  for (final t in _tiles)
+                    G2048Tile(
+                      key: ValueKey<int>(t.id),
+                      value: t.value,
+                      size: cell,
+                      left: pos(t.col),
+                      top: pos(t.row),
+                      isNew: t.isNew,
+                      merged: t.merged,
+                      slide: _slide,
                     ),
-                    alignment: Alignment.center,
-                    child: v == 0
-                        ? null
-                        : Text('$v',
-                            style: TextStyle(
-                              fontSize: v >= 1000 ? 20 : 26,
-                              fontWeight: FontWeight.bold,
-                              color: v <= 4 ? AppTheme.neutral800 : Colors.white,
-                            )),
-                  );
-                },
-              ),
+                ];
+
+                return Container(
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFBBADA0),
+                    borderRadius: BorderRadius.circular(gap * 2),
+                  ),
+                  padding: EdgeInsets.zero,
+                  child: Stack(
+                    children: children,
+                  ),
+                );
+              },
             ),
           ),
           const Padding(
-            padding: EdgeInsets.only(bottom: 16),
+            padding: EdgeInsets.symmetric(vertical: 14),
             child: Text('滑动合并相同数字，凑出 2048'),
           ),
         ],
@@ -203,34 +333,21 @@ class _G2048GameState extends State<G2048Game> {
     );
   }
 
-  Color _tileColor(int v) {
-    switch (v) {
-      case 2:
-        return AppTheme.neutral200;
-      case 4:
-        return AppTheme.neutral300;
-      case 8:
-        return AppTheme.secondaryColor;
-      case 16:
-        return AppTheme.primaryLight;
-      case 32:
-        return AppTheme.primaryYellow;
-      case 64:
-        return AppTheme.warning;
-      case 128:
-        return AppTheme.primaryOrange;
-      case 256:
-        return AppTheme.accentColor;
-      case 512:
-        return AppTheme.info;
-      default:
-        return v >= 1024 ? AppTheme.success : AppTheme.neutral100;
-    }
+  Widget _statChip(String label, int value) {
+    return Column(
+      children: <Widget>[
+        Text(label,
+            style: const TextStyle(fontSize: 11, color: Color(0xFF776E65))),
+        AnimatedSwitcher(
+          duration: const Duration(milliseconds: 180),
+          child: Text(
+            '$value',
+            key: ValueKey<int>(value),
+            style: const TextStyle(
+                fontSize: 18, fontWeight: FontWeight.bold, color: Color(0xFF776E65)),
+          ),
+        ),
+      ],
+    );
   }
-}
-
-class Point {
-  final int r;
-  final int c;
-  const Point(this.r, this.c);
 }
