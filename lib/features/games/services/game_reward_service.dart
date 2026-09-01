@@ -9,6 +9,7 @@ import '../../profile/services/point_service_utils.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
 import '../models/game_model.dart';
+import '../models/match3_mode.dart';
 import '../models/game_reward_rule_model.dart';
 import 'game_service.dart';
 
@@ -287,7 +288,8 @@ class GameRewardService {
         .achievementsOf(game.id)
         .where((a) => a.enabled);
     for (final ach in achievements) {
-      if (_meetsAchievement(ach, level, scoreValuesByCode)) {
+      if (_meetsAchievement(ach, level, scoreValuesByCode,
+          gameCode: game.code)) {
         final r = await claimAchievement(achievement: ach);
         items.add(GameSettlementItem(
           kind: 'achievement',
@@ -328,8 +330,9 @@ class GameRewardService {
   bool _meetsAchievement(
     GameAchievementModel ach,
     GameLevelModel level,
-    Map<String, num> values,
-  ) {
+    Map<String, num> values, {
+    required String gameCode,
+  }) {
     final cond = ach.condition;
     final type = cond['type']?.toString() ?? 'first_clear';
     switch (type) {
@@ -344,7 +347,13 @@ class GameRewardService {
       case 'level':
         final minLevel = cond['min_level_no'];
         if (minLevel == null) return false;
-        return level.levelNo >= (minLevel as num);
+        // 消消乐的 level_no 采用「模式序号×10+关序」编码（如 11=计分模式第1关），
+        // 直接用原始 level_no 比对 min_level_no 会把「第1关」误判为已满足
+        // 「通关第5/10关」。需折算为本模式内的关序（match3LevelIndex）再比对。
+        final effectiveLevelNo = gameCode == 'match3'
+            ? match3LevelIndex(level.levelNo)
+            : level.levelNo;
+        return effectiveLevelNo >= (minLevel as num);
       default:
         return false;
     }
