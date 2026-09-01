@@ -4,7 +4,6 @@ import 'package:uuid/uuid.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
-import '../../profile/services/point_service.dart';
 import '../../profile/services/point_service_utils.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
@@ -87,12 +86,14 @@ class GameSettlementResult {
 /// **统一入口 [settleGame]**：游戏结束（通关）时调用一次，内部按顺序评估三类奖励，
 /// 返回 [GameSettlementResult] 供结算页展示。
 ///
-/// **发放顺序（先占坑，再发分）**：
+/// **发放顺序（原子占坑 + 发分）**：
 ///   1. 校验单日上限（rule_type='daily_limit'，初始 10 分）
-///   2. 插入 `game_reward_claims`（靠 (user_id, claim_key) 唯一索引保证同一奖励只领一次）
-///   3. 占坑成功才调 `PointService.updatePointsStats(type:'game_earn')` 发分
-///   4. 发分失败则删除占坑记录，允许下次重试（宁可少发，不可重复发）
-///   5. 发分成功后 fire(EventType.pointsUpdated) 刷新积分展示
+///   2. 调 `grant_game_reward` RPC（security definer 事务）：同一奖励靠
+///      (user_id, claim_key) 唯一索引原子占坑，并原子插入 point_records + 回写 users；
+///      要么全成要么全回滚，granted=true 幂等返回（绝不重复发分）。
+///      彻底替代旧「insert + updatePointsStats + delete 回滚」三步——旧流程的 delete
+///      回滚被 RLS 拦截，会导致占坑烧掉、奖励永久无法再领。
+///   3. 发分成功后 fire(EventType.pointsUpdated) 刷新积分展示
 ///
 /// 说明：成绩由客户端判定，本方案只能提高作弊门槛、不能杜绝；
 /// 量化风险靠「单日上限 + 单日仅一次首通 + 关卡计入标记」三重约束压低损失上限。
@@ -402,7 +403,7 @@ class GameRewardService {
     return total;
   }
 
-  /// 通用领取流程：上限校验 → 占坑 → 发分 → 失败回滚占坑 → 刷新积分。
+  /// 通用领取流程：上限校验 → 调 grant_game_reward RPC（原子占坑 + 发分，幂等）→ 刷新积分。
   ///
   /// [bypassDailyLimit] 为 true 时跳过单日上限校验（成就奖励独立于单日上限）。
   Future<GameRewardResult> _tryClaim({
@@ -429,64 +430,45 @@ class GameRewardService {
       }
     }
 
-    // 2) 占坑：唯一索引 (user_id, claim_key) 保证同一奖励只领一次
-    final claimId = const Uuid().v4();
-    final claimResult = await ApiClient.post(
-      'game_reward_claims',
-      <String, dynamic>{
-        'id': claimId,
-        'user_id': userId,
-        'game_id': gameId,
-        'rule_id': ruleId,
-        'claim_key': claimKey,
-        'points': points,
-        'claimed_at': DateTime.now().toUtc().toIso8601String(),
-        'created_at': DateTime.now().toUtc().toIso8601String(),
+    // 2) 原子占坑 + 发分：统一走 grant_game_reward RPC（security definer 事务）。
+    //    要么占坑 + 发分 + 置 granted=true 全成，要么全回滚；granted 已存在则幂等
+    //    返回 already=true，不再发分、也无需 delete 回滚（彻底解决旧流程「回滚被 RLS
+    //    拦截 → 占坑烧掉、奖励永久无法再领」的漏洞）。
+    final rpc = await ApiClient.rpc(
+      'grant_game_reward',
+      params: <String, dynamic>{
+        'p_user_id': userId,
+        'p_claim_key': claimKey,
+        'p_points': points,
+        'p_game_id': gameId,
+        'p_rule_id': ruleId,
+        'p_type': 'game_earn',
+        'p_remark': remark,
       },
-      returnRepresentation: false,
-      note: 'games:claim',
+      note: 'games:grant_reward',
     );
 
-    if (!claimResult.isSuccess) {
-      // 唯一冲突即已领；其余失败也按已领处理，避免重复发分
-      debugPrint('[GameRewardService] 占坑失败（视为已领取）：$claimKey');
-      return GameRewardResult.notGranted(reason: '该奖励已领取');
-    }
-
-    // 3) 发分：走积分统一入口（type=game_earn，正积分 +180 天）
-    //    必须以返回值判定成败（updatePointsStats 失败不抛异常）：
-    //    否则会「回报已发放但实际未发分」，且占坑已被烧掉、无法重试。
-    var grantedOk = false;
-    try {
-      grantedOk = await PointService.instance.updatePointsStats(
-        delta: points,
-        type: 'game_earn',
-        remark: remark,
-      );
-    } catch (e) {
-      debugPrint('[GameRewardService] 发分异常：$e');
-    }
-
-    if (!grantedOk) {
-      // 4) 发分失败 → 回滚占坑，允许下次重试
-      debugPrint('[GameRewardService] 发分失败，回滚占坑：$claimKey');
-      final rollback = await ApiClient.delete(
-        'game_reward_claims',
-        id: claimId,
-        note: 'games:rollback_claim',
-      );
-      if (!rollback.isSuccess) {
-        // 回滚失败（典型原因：RLS 未放开该表 delete）→ 坑已烧掉且清不掉，
-        // 该奖励将永久无法再领。必须显式告警，否则问题被静默吞掉。
-        debugPrint(
-          '[GameRewardService] ⚠️ 回滚占坑失败，该奖励将无法重试：'
-          '$claimKey（${rollback.error ?? rollback.statusCode}）',
-        );
-      }
+    if (!rpc.isSuccess) {
+      debugPrint('[GameRewardService] 发奖 RPC 失败：$claimKey ${rpc.error}');
       return GameRewardResult.notGranted(reason: '发放失败，请重试');
     }
 
-    // 5) 发分成功，刷新积分展示
+    // PostgREST 对 returns jsonb 标量直接返回对象；个别版本会包成单元素数组，兼容两种。
+    Map<String, dynamic>? dataMap;
+    if (rpc.data is Map<String, dynamic>) {
+      dataMap = rpc.data as Map<String, dynamic>;
+    } else if (rpc.data is List<dynamic> &&
+        (rpc.data as List<dynamic>).isNotEmpty &&
+        (rpc.data as List<dynamic>).first is Map<String, dynamic>) {
+      dataMap = (rpc.data as List<dynamic>).first as Map<String, dynamic>;
+    }
+
+    if (dataMap != null && dataMap['already'] == true) {
+      // 该奖励此前已发放（唯一索引命中 / 并发第二请求），按已领取处理，不重复计入
+      return GameRewardResult.notGranted(reason: '该奖励已领取');
+    }
+
+    // 3) 发分成功，刷新积分展示
     EventBus.instance.fire(EventType.pointsUpdated);
     return GameRewardResult.granted(points: points);
   }
