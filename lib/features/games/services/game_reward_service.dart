@@ -10,6 +10,7 @@ import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 import '../models/match3_mode.dart';
 import '../models/game_reward_rule_model.dart';
+import 'game_reward_picker.dart';
 import 'game_service.dart';
 
 /// 奖励发放结果
@@ -277,23 +278,25 @@ class GameRewardService {
     ));
 
     // 2) 成绩区间首次达成（按该游戏配置的 score_range 规则）
-    final scoreRules = config.rewardRules.where(
-      (r) =>
-          r.gameId == game.id &&
-          r.ruleType == GameRewardRuleType.scoreRange &&
-          r.enabled,
-    );
-    for (final rule in scoreRules) {
-      if (_meetsScoreRange(rule, judgeValues)) {
-        final r = await claimScoreRange(rule: rule, gameCode: game.code);
-        items.add(GameSettlementItem(
-          kind: 'score_range',
-          label: rule.name ?? '成绩达标',
-          points: r.points,
-          granted: r.granted,
-          reason: r.reason,
-        ));
-      }
+    //    里程碑式分档：只发「本局成绩落入的最高档」一条，其余档位属非本局区间。
+    final scoreRules = config.rewardRules
+        .where(
+          (r) =>
+              r.gameId == game.id &&
+              r.ruleType == GameRewardRuleType.scoreRange &&
+              r.enabled,
+        )
+        .toList();
+    final topRule = pickTopScoreRangeRule(scoreRules, judgeValues);
+    if (topRule != null) {
+      final r = await claimScoreRange(rule: topRule, gameCode: game.code);
+      items.add(GameSettlementItem(
+        kind: 'score_range',
+        label: topRule.name ?? '成绩达标',
+        points: r.points,
+        granted: r.granted,
+        reason: r.reason,
+      ));
     }
 
     // 3) 成就达成（按该游戏启用的成就条件 + 全局成就 game_id=null）
@@ -304,77 +307,56 @@ class GameRewardService {
       ...config.achievementsOf(game.id).where((a) => a.enabled),
       ...config.achievements.where((a) => a.gameId == null && a.enabled),
     ];
+
+    // 消消乐的 level_no 采用「模式序号×100 + 模式内关序(1~50)」编码
+    // （如 201=消除模式第 1 关，即全局第 51 关）。直接用原始 level_no 比对
+    // min_level_no 会把「第 1 关」误判为已满足「通关第 100/150/200 关」。
+    // 需折算为跨模式的全局关序(1~300)（match3LevelIndex）再比对，
+    // 成就阈值 10..300 正是按全局关序配置的（300=第 6 模式第 50 关）。
+    final effectiveLevelNo =
+        game.code == 'match3' ? match3LevelIndex(level.levelNo) : level.levelNo;
+
+    // 3a) 「首次通关」类成就：账号终身唯一、全局与单游戏可叠加，
+    //     已领取由 claim_key 唯一索引幂等拦截（不二次计算发放）。
     for (final ach in achievements) {
-      if (_meetsAchievement(ach, level, judgeValues, gameCode: game.code)) {
-        final r = await claimAchievement(achievement: ach);
-        items.add(GameSettlementItem(
-          kind: 'achievement',
-          label: '成就：${ach.name}',
-          points: r.points,
-          granted: r.granted,
-          reason: r.reason,
-        ));
-      }
+      if (achievementTypeOf(ach) != kAchievementTypeFirstClear) continue;
+      final r = await claimAchievement(achievement: ach);
+      items.add(GameSettlementItem(
+        kind: 'achievement',
+        label: '成就：${ach.name}',
+        points: r.points,
+        granted: r.granted,
+        reason: r.reason,
+      ));
+    }
+
+    // 3b) 「关卡里程碑」成就：单局至多一条（本局关序对应的最高档）。
+    final topLevel = pickTopLevelAchievement(achievements, effectiveLevelNo);
+    if (topLevel != null) {
+      final r = await claimAchievement(achievement: topLevel);
+      items.add(GameSettlementItem(
+        kind: 'achievement',
+        label: '成就：${topLevel.name}',
+        points: r.points,
+        granted: r.granted,
+        reason: r.reason,
+      ));
+    }
+
+    // 3c) 「单局得分里程碑」成就：单局至多一条（本局分数对应的最高档）。
+    final topScore = pickTopScoreAchievement(achievements, judgeValues);
+    if (topScore != null) {
+      final r = await claimAchievement(achievement: topScore);
+      items.add(GameSettlementItem(
+        kind: 'achievement',
+        label: '成就：${topScore.name}',
+        points: r.points,
+        granted: r.granted,
+        reason: r.reason,
+      ));
     }
 
     return GameSettlementResult(items: items);
-  }
-
-  /// 判断成绩区间规则是否达成。
-  /// condition 形如 {'dimension': 'score', 'gte': 1000, 'lte': 9999}。
-  bool _meetsScoreRange(
-    GameRewardRuleModel rule,
-    Map<String, num> values,
-  ) {
-    final cond = rule.condition;
-    final dim = cond['dimension']?.toString();
-    if (dim == null) return false;
-    final v = values[dim];
-    if (v == null) return false;
-    final gte = cond['gte'];
-    final lte = cond['lte'];
-    if (gte != null && v < (gte as num)) return false;
-    if (lte != null && v > (lte as num)) return false;
-    return true;
-  }
-
-  /// 判断成就条件是否达成。
-  /// condition 支持：
-  ///   {'type': 'first_clear'}                  任意通关
-  ///   {'type': 'score', 'dimension': 'score', 'gte': 2048}
-  ///   {'type': 'level', 'min_level_no': 2}     通关关卡号 >= 2
-  bool _meetsAchievement(
-    GameAchievementModel ach,
-    GameLevelModel level,
-    Map<String, num> values, {
-    required String gameCode,
-  }) {
-    final cond = ach.condition;
-    final type = cond['type']?.toString() ?? 'first_clear';
-    switch (type) {
-      case 'first_clear':
-        return true;
-      case 'score':
-        final dim = cond['dimension']?.toString();
-        final gte = cond['gte'];
-        if (dim == null || gte == null) return false;
-        final v = values[dim];
-        return v != null && v >= (gte as num);
-      case 'level':
-        final minLevel = cond['min_level_no'];
-        if (minLevel == null) return false;
-        // 消消乐的 level_no 采用「模式序号×100 + 模式内关序(1~50)」编码
-        // （如 201=消除模式第 1 关，即全局第 51 关）。直接用原始 level_no 比对
-        // min_level_no 会把「第 1 关」误判为已满足「通关第 100/150/200 关」。
-        // 需折算为跨模式的全局关序(1~300)（match3LevelIndex）再比对，
-        // 成就阈值 5..300 正是按全局关序配置的（300=第 6 模式第 50 关）。
-        final effectiveLevelNo = gameCode == 'match3'
-            ? match3LevelIndex(level.levelNo)
-            : level.levelNo;
-        return effectiveLevelNo >= (minLevel as num);
-      default:
-        return false;
-    }
   }
 
   /// 查询今日（北京自然日）已领取的游戏奖励积分。
