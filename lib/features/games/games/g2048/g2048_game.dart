@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -58,6 +59,12 @@ class _G2048GameState extends State<G2048Game> {
   bool _animating = false;
   bool _finished = false;
   bool _pendingWin = false;
+  int _movesUsed = 0;
+  int? _movesLimit;
+  int? _timeLimit;
+  int? _scoreTarget;
+  bool _reachedTarget = false;
+  Timer? _tickTimer;
   int _nextId = 1;
   late final DateTime _startTime;
   final Random _rng = Random();
@@ -80,6 +87,13 @@ class _G2048GameState extends State<G2048Game> {
         ? cfgTarget
         : (cfgTarget is num ? cfgTarget.toInt() : 2048);
     _target = parsedTarget > 0 ? parsedTarget : 2048;
+    // 扩展维度（无则该维不限制）：步数上限 / 时间上限(秒) / 分数达标
+    final cfgMoves = widget.level.config['moves'];
+    _movesLimit = cfgMoves is int ? cfgMoves : null;
+    final cfgTime = widget.level.config['timeLimit'];
+    _timeLimit = cfgTime is int ? cfgTime : null;
+    final cfgScore = widget.level.config['scoreTarget'];
+    _scoreTarget = cfgScore is int ? cfgScore : null;
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
@@ -106,8 +120,37 @@ class _G2048GameState extends State<G2048Game> {
     _finished = false;
     _pendingWin = false;
     _pendingDir = null;
+    _movesUsed = 0;
+    _reachedTarget = false;
+    _startTimer();
     _spawn();
     _spawn();
+  }
+
+  /// 启动限时倒计时（仅当本关配置 timeLimit 时）；每 250ms 检查超时并刷新显示。
+  void _startTimer() {
+    _tickTimer?.cancel();
+    if (_timeLimit == null) return;
+    _tickTimer = Timer.periodic(const Duration(milliseconds: 250), _onTick);
+  }
+
+  void _onTick(Timer timer) {
+    if (_finished) {
+      timer.cancel();
+      return;
+    }
+    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
+    if (elapsed >= _timeLimit! * 1000) {
+      _finish(false);
+      return;
+    }
+    if (mounted) setState(() {});
+  }
+
+  /// 限时模式剩余秒数（用于状态栏展示）。
+  int _remainingSeconds() {
+    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
+    return max(0, _timeLimit! - elapsed ~/ 1000);
   }
 
   void _rebuildGrid() {
@@ -180,7 +223,6 @@ class _G2048GameState extends State<G2048Game> {
     final lines = _linesFor(dir);
     var changed = false;
     var gain = 0;
-    var reached = false;
 
     for (final cells in lines) {
       final lineTiles = <TileModel>[];
@@ -197,7 +239,9 @@ class _G2048GameState extends State<G2048Game> {
           lineTiles[i].value *= 2;
           lineTiles[i].merged = true;
           gain += lineTiles[i].value;
-          if (lineTiles[i].value >= _target) reached = true;
+          if (lineTiles[i].value >= _target) {
+            _reachedTarget = true;
+          }
           entries.add([lineTiles[i], lineTiles[i + 1]]);
           i += 2;
         } else {
@@ -224,6 +268,7 @@ class _G2048GameState extends State<G2048Game> {
     }
 
     if (!changed) return;
+    _movesUsed++;
     debugPrint('[G2048] _move 无变化，未移动 dir=$dir');
 
     if (gain > 0) {
@@ -240,11 +285,14 @@ class _G2048GameState extends State<G2048Game> {
     }
     _rebuildGrid();
     _animating = true;
-    _pendingWin = reached;
+    // 通关 = 合成到目标方块 且 (未设分数门槛 或 累计分已达标)
+    final scoreTarget = _scoreTarget;
+    _pendingWin = _reachedTarget && (scoreTarget == null || _score >= scoreTarget);
     setState(() {});
 
     Future.delayed(_slide + const Duration(milliseconds: 20), () {
       if (!mounted) return;
+      final movesLimit = _movesLimit;
       try {
         _tiles.removeWhere((t) => t.toRemove);
         _rebuildGrid();
@@ -254,7 +302,10 @@ class _G2048GameState extends State<G2048Game> {
           _rebuildGrid();
           if (!_hasMoves()) lost = true;
         }
-        if (_pendingWin) {
+        // 步数耗尽且未通关 → 失败（优先于棋盘卡死判定）
+        if (!_pendingWin && movesLimit != null && _movesUsed >= movesLimit) {
+          _finish(false);
+        } else if (_pendingWin) {
           _finish(true);
         } else if (lost) {
           _finish(false);
@@ -294,9 +345,16 @@ class _G2048GameState extends State<G2048Game> {
     return false;
   }
 
+  @override
+  void dispose() {
+    _tickTimer?.cancel();
+    super.dispose();
+  }
+
   void _finish(bool cleared) {
     if (_finished) return;
     _finished = true;
+    _tickTimer?.cancel();
     if (cleared) {
       GameAudio.instance.win();
     } else {
@@ -305,7 +363,11 @@ class _G2048GameState extends State<G2048Game> {
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     widget.onFinished(GamePlayOutcome(
       cleared: cleared,
-      values: <String, num>{'score': _score, 'duration_ms': elapsed},
+      values: <String, num>{
+        'score': _score,
+        'duration_ms': elapsed,
+        'moves': _movesUsed,
+      },
       durationMs: elapsed,
     ));
   }
@@ -373,8 +435,17 @@ class _G2048GameState extends State<G2048Game> {
     return GameShell(
       statusItems: <Widget>[
         GameStatusItem(label: '得分', value: '$_score'),
-        GameStatusItem(label: '最高分', value: '$_best'),
         GameStatusItem(label: '目标', value: '$_target'),
+        if (_movesLimit != null)
+          GameStatusItem(
+            label: '剩余步数',
+            value: '${max(0, _movesLimit! - _movesUsed)}',
+          ),
+        if (_timeLimit != null)
+          GameStatusItem(
+            label: '剩余时间',
+            value: '${_remainingSeconds()}s',
+          ),
       ],
       hint: '在棋盘上朝上下左右拖动，相同数字相撞即合并（无需点击）',
       actions: <GameAction>[
