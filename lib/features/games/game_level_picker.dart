@@ -71,9 +71,11 @@ class _PickerBodyState extends State<_PickerBody> {
   void initState() {
     super.initState();
     if (widget.game.code == 'match3') {
+      // 「还没全通」= 该模式已通关数 < 该模式实际关卡数（不写死每模式关卡数，
+      // 后台增删关卡后自动跟随；无关卡的模式自然被跳过）。
       _selectedMode = widget.initialMode ??
           Match3Mode.values
-              .where((m) => _modeCleared(m) < 5)
+              .where((m) => _modeCleared(m) < _levelsOfMode(m).length)
               .firstOrNull ??
           Match3Mode.values.first;
     }

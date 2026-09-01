@@ -3,9 +3,13 @@ import 'package:flutter/material.dart';
 /// 消消乐玩法模式（对标市场主流三消手游的 6 类关卡目标）。
 ///
 /// 落库方式（**无 DDL**）：模式写在 `game_levels.config.mode`，同时用
-/// `level_no` 编码 `模式序号 × 10 + 关序`（如 21..25 = 消除模式 1~5 关），
-/// 使 `(game_id, level_no)` 唯一约束天然容纳「每模式 5 关」，且后台关卡
-/// 管理页无需改造即可维护。config 缺 mode 时按 level_no 十位兜底推导。
+/// `level_no` 编码 `模式序号 × 100 + 模式内关序(1~50)`（如 201..250 =
+/// 消除模式 1~50 关），使 `(game_id, level_no)` 唯一约束天然容纳
+/// 「每模式 50 关 / 共 300 关」，且后台关卡管理页无需改造即可维护。
+/// config 缺 mode 时按 level_no **百位**兜底推导。
+///
+/// ⚠️ 该编码由 `/d/workspace/sql/feature_reseed_match3_levels_300.sql` 落库，
+/// 改动编码规则必须同步 [parseMatch3Mode] 与 [match3LevelIndex]。
 enum Match3Mode {
   /// 步数计分：限定步数内达到目标分（经典关）
   score,
@@ -45,7 +49,7 @@ extension Match3ModeMeta on Match3Mode {
     }
   }
 
-  /// 模式序号（1~6），即 level_no 的十位
+  /// 模式序号（1~6），即 level_no 的百位（level_no = index × 100 + 关序）
   int get index => Match3Mode.values.indexOf(this) + 1;
 
   /// 展示名
@@ -150,18 +154,32 @@ Match3Mode parseMatch3Mode(Map<String, dynamic> config, int levelNo) {
       if (m.code == raw) return m;
     }
   }
-  // 兜底：level_no 十位即模式序号（11..15=计分，21..25=消除 ...）
-  final idx = levelNo ~/ 10;
+  // 兜底：level_no 百位即模式序号（101..150=计分，201..250=消除 ...）
+  final idx = levelNo ~/ 100;
   if (idx >= 1 && idx <= Match3Mode.values.length) {
     return Match3Mode.values[idx - 1];
   }
   return Match3Mode.score;
 }
 
-/// 关卡在其所属模式内的关序（level_no 个位；旧数据无编码时返回 level_no）。
+/// 每个 match3 模式的关卡数（编码 `模式序号 × 100 + 1..50` 的容量）。
+const int match3LevelsPerMode = 50;
+
+/// 关卡的**全局关序**（1~300）：把 `level_no` 的
+/// 「模式序号 × 100 + 模式内关序(1~50)」编码折算为跨模式连续关序。
+///
+/// 该口径用于成就「累计通关至第 N 关」判定：`game_achievements.condition`
+/// 的 `min_level_no` 阈值为 5/10/20/30/50/70/100/150/200/300，其中
+/// 300 恰为「第 6 模式第 50 关」（最后一关），故必须按全局关序比对，
+/// 不能用原始 level_no（101 会被当成第 101 关而误判达成多档成就），
+/// 也不能只取模式内关序（最大 50，会让 70 以上的成就永不可达）。
+///
+/// 旧数据（未编码、`level_no < 100`）原样返回，保证兼容。
 int match3LevelIndex(int levelNo) {
-  final unit = levelNo % 10;
-  return unit == 0 ? levelNo : unit;
+  final mode = levelNo ~/ 100; // 1..6
+  final unit = levelNo % 100; // 1..50
+  if (mode < 1 || mode > Match3Mode.values.length || unit < 1) return levelNo;
+  return (mode - 1) * match3LevelsPerMode + unit;
 }
 
 /// 模式编码 → 中文展示名（未知编码原样返回）。

@@ -234,6 +234,18 @@ class GameRewardService {
     final items = <GameSettlementItem>[];
     final config = await GameService.instance.fetchConfig();
 
+    // 判定专用取值：match3 的 level_no 是「模式序号×100 + 模式内关序(1~50)」编码，
+    // 若后台把 'level' 配成 score_range 规则或成就的比对维度，必须先折算为
+    // 全局关序(1~300) 再比对，否则 101（第 1 关）会被当成第 101 关而误发高档奖励。
+    // 仅用于判定；成绩上报（game_scores）由调用方使用原始 level_no，不受影响。
+    final judgeValues =
+        game.code == 'match3' && scoreValuesByCode.containsKey('level')
+            ? <String, num>{
+                ...scoreValuesByCode,
+                'level': match3LevelIndex(scoreValuesByCode['level']!.toInt()),
+              }
+            : scoreValuesByCode;
+
     // 0) 每关通关奖励（rewardPoints<=0 时跳过，结算页不展示无效行）
     if (level.rewardPoints > 0) {
       final levelReward = await claimLevelReward(
@@ -271,7 +283,7 @@ class GameRewardService {
           r.enabled,
     );
     for (final rule in scoreRules) {
-      if (_meetsScoreRange(rule, scoreValuesByCode)) {
+      if (_meetsScoreRange(rule, judgeValues)) {
         final r = await claimScoreRange(rule: rule, gameCode: game.code);
         items.add(GameSettlementItem(
           kind: 'score_range',
@@ -288,8 +300,7 @@ class GameRewardService {
         .achievementsOf(game.id)
         .where((a) => a.enabled);
     for (final ach in achievements) {
-      if (_meetsAchievement(ach, level, scoreValuesByCode,
-          gameCode: game.code)) {
+      if (_meetsAchievement(ach, level, judgeValues, gameCode: game.code)) {
         final r = await claimAchievement(achievement: ach);
         items.add(GameSettlementItem(
           kind: 'achievement',
@@ -347,9 +358,11 @@ class GameRewardService {
       case 'level':
         final minLevel = cond['min_level_no'];
         if (minLevel == null) return false;
-        // 消消乐的 level_no 采用「模式序号×10+关序」编码（如 11=计分模式第1关），
-        // 直接用原始 level_no 比对 min_level_no 会把「第1关」误判为已满足
-        // 「通关第5/10关」。需折算为本模式内的关序（match3LevelIndex）再比对。
+        // 消消乐的 level_no 采用「模式序号×100 + 模式内关序(1~50)」编码
+        // （如 201=消除模式第 1 关，即全局第 51 关）。直接用原始 level_no 比对
+        // min_level_no 会把「第 1 关」误判为已满足「通关第 100/150/200 关」。
+        // 需折算为跨模式的全局关序(1~300)（match3LevelIndex）再比对，
+        // 成就阈值 5..300 正是按全局关序配置的（300=第 6 模式第 50 关）。
         final effectiveLevelNo = gameCode == 'match3'
             ? match3LevelIndex(level.levelNo)
             : level.levelNo;
@@ -457,11 +470,19 @@ class GameRewardService {
     if (!grantedOk) {
       // 4) 发分失败 → 回滚占坑，允许下次重试
       debugPrint('[GameRewardService] 发分失败，回滚占坑：$claimKey');
-      await ApiClient.delete(
+      final rollback = await ApiClient.delete(
         'game_reward_claims',
         id: claimId,
         note: 'games:rollback_claim',
       );
+      if (!rollback.isSuccess) {
+        // 回滚失败（典型原因：RLS 未放开该表 delete）→ 坑已烧掉且清不掉，
+        // 该奖励将永久无法再领。必须显式告警，否则问题被静默吞掉。
+        debugPrint(
+          '[GameRewardService] ⚠️ 回滚占坑失败，该奖励将无法重试：'
+          '$claimKey（${rollback.error ?? rollback.statusCode}）',
+        );
+      }
       return GameRewardResult.notGranted(reason: '发放失败，请重试');
     }
 

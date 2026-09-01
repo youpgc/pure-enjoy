@@ -62,6 +62,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       ),
     );
     if (abandon != true || !mounted) return;
+    // 弹窗停留期间对局可能已自然结束（如限时模式倒计时归零触发 _onFinished），
+    // 此时结算已由 _onFinished 接管，不能再补一条 aborted 成绩造成双路结算。
+    if (_outcome != null) {
+      Navigator.of(context).pop();
+      return;
+    }
     await reportAndSettle(
       context: context,
       game: widget.game,
