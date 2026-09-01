@@ -9,13 +9,7 @@ import '../../shared/game_audio.dart';
 import 'candy_component.dart';
 import 'match3_objective.dart';
 import 'match3_overlays.dart';
-
-/// 消消乐一次连线（用于生成特殊糖与消除判定）
-class _Run {
-  final String orient;
-  final List<(int, int)> cells;
-  _Run(this.orient, this.cells);
-}
+import 'match3_runs.dart';
 
 /// 消消乐（Flame 引擎 · 成熟手感版）
 ///
@@ -230,59 +224,6 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     }
   }
 
-  // ---------- 连线检测 ----------
-
-  List<_Run> _findRuns() {
-    final runs = <_Run>[];
-    for (var r = 0; r < rows; r++) {
-      var c = 0;
-      while (c < cols) {
-        final t = grid[r][c]?.type;
-        if (t == null) {
-          c++;
-          continue;
-        }
-        var end = c;
-        while (end + 1 < cols && grid[r][end + 1]?.type == t) {
-          end++;
-        }
-        final len = end - c + 1;
-        if (len >= 3) {
-          final cells = <(int, int)>[];
-          for (var k = c; k <= end; k++) {
-            cells.add((r, k));
-          }
-          runs.add(_Run('h', cells));
-        }
-        c = end + 1;
-      }
-    }
-    for (var c = 0; c < cols; c++) {
-      var r = 0;
-      while (r < rows) {
-        final t = grid[r][c]?.type;
-        if (t == null) {
-          r++;
-          continue;
-        }
-        var end = r;
-        while (end + 1 < rows && grid[end + 1][c]?.type == t) {
-          end++;
-        }
-        final len = end - r + 1;
-        if (len >= 3) {
-          final cells = <(int, int)>[];
-          for (var k = r; k <= end; k++) {
-            cells.add((k, c));
-          }
-          runs.add(_Run('v', cells));
-        }
-        r = end + 1;
-      }
-    }
-    return runs;
-  }
-
   // ---------- 交换 ----------
 
   @override
@@ -323,7 +264,7 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
 
     Future.delayed(_anim, () {
       if (!isMounted) return;
-      if (_findRuns().isEmpty) {
+      if (findRuns(grid, rows, cols).isEmpty) {
         grid[r1][c1] = a;
         grid[r2][c2] = b;
         a.row = r1;
@@ -351,7 +292,7 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       _busy = false;
       return;
     }
-    final runs = _findRuns();
+    final runs = findRuns(grid, rows, cols);
     if (runs.isEmpty) {
       _syncHud();
       // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败
@@ -461,7 +402,7 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       handled.add(cell);
       final cand = grid[cell.$1][cell.$2];
       if (cand == null) continue;
-      for (final ac in _effectCells(cand, cell.$1, cell.$2)) {
+      for (final ac in effectCells(cand, cell.$1, cell.$2, grid, rows, cols)) {
         if (created.containsKey(ac)) continue;
         if (toClear.add(ac)) {
           final o = grid[ac.$1][ac.$2];
@@ -470,38 +411,6 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
           }
         }
       }
-    }
-  }
-
-  List<(int, int)> _effectCells(Candy cand, int r, int c) {
-    switch (cand.special) {
-      case 'row':
-        return [for (var cc = 0; cc < cols; cc++) (r, cc)];
-      case 'col':
-        return [for (var rr = 0; rr < rows; rr++) (rr, c)];
-      case 'wrap':
-        final list = <(int, int)>[];
-        for (var dr = -1; dr <= 1; dr++) {
-          for (var dc = -1; dc <= 1; dc++) {
-            final rr = r + dr;
-            final cc = c + dc;
-            if (rr >= 0 && rr < rows && cc >= 0 && cc < cols) {
-              list.add((rr, cc));
-            }
-          }
-        }
-        return list;
-      case 'bomb':
-        final list = <(int, int)>[];
-        for (var rr = 0; rr < rows; rr++) {
-          for (var cc = 0; cc < cols; cc++) {
-            final o = grid[rr][cc];
-            if (o != null && o.type == cand.type) list.add((rr, cc));
-          }
-        }
-        return list;
-      default:
-        return [];
     }
   }
 

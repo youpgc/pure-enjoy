@@ -83,6 +83,30 @@ class SheepLayout {
     return positions;
   }
 
+  /// 计算牌堆包围盒（视图缩放的固定基准）。
+  ///
+  /// 方块以「宽=1」为单位：maxX/maxY 取坐标 +1。返回
+  /// `(minX, minY, maxX, maxY)`。空列表时回退为 0~1 单位框。
+  ///
+  /// 调用方负责把结果写回视图状态（如 `_initMinX` 等），此处保持纯函数、
+  /// 不触碰任何实例字段，便于单测与复用。
+  static (double, double, double, double) computeBounds(List<SheepTile> tiles) {
+    double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
+    for (final t in tiles) {
+      minX = min(minX, t.x);
+      minY = min(minY, t.y);
+      maxX = max(maxX, t.x + 1);
+      maxY = max(maxY, t.y + 1);
+    }
+    if (tiles.isEmpty) {
+      minX = 0;
+      minY = 0;
+      maxX = 1;
+      maxY = 1;
+    }
+    return (minX, minY, maxX, maxY);
+  }
+
   /// 紧凑网格边长：格子数约为块数的 1.3 倍（留少量空位产生自然的不规则边缘）
   int _sideFor(int n) => max(2, sqrt(n * 1.3).ceil());
 

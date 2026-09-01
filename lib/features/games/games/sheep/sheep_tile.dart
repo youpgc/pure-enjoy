@@ -102,3 +102,43 @@ class SheepTileWidget extends StatelessWidget {
     );
   }
 }
+
+/// 在 [SheepTileWidget] 之上做「棋盘 vs 槽位」定位：
+/// - 棋盘方块按逻辑坐标 + 缩放偏移定位；
+/// - 槽位方块以 [slots] 权威列表的当前下标定位（避免 slotIndex 陈旧导致错位 /
+///   重叠 / 不可见）。[slotCapacity] 仅用于下标钳制。
+Widget buildSheepTileWidget({
+  required SheepTile t,
+  required double offX,
+  required double offY,
+  required double scale,
+  required double Function(int) slotCenterX,
+  required double slotY,
+  required double slotTile,
+  required List<SheepTile> slots,
+  required int slotCapacity,
+  required VoidCallback onTap,
+}) {
+  double left;
+  double top;
+  double size;
+  if (t.state == SheepTileState.slot) {
+    // 槽位位置以 slots 权威列表为准，避免 slotIndex 陈旧导致方块错位/重叠/不可见
+    final i = slots.indexOf(t).clamp(0, slotCapacity - 1);
+    left = slotCenterX(i) - slotTile / 2;
+    top = slotY;
+    size = slotTile;
+  } else {
+    left = offX + t.x * scale;
+    top = offY + t.y * scale;
+    size = scale;
+  }
+  return SheepTileWidget(
+    key: ValueKey<int>(t.id),
+    tile: t,
+    left: left,
+    top: top,
+    size: size,
+    onTap: onTap,
+  );
+}

@@ -88,7 +88,7 @@ class _SheepGameState extends State<SheepGame> {
       if (items.isEmpty) return;
       final inv = await GameItemService.instance.fetchInventory();
       for (final it in items) {
-        final prop = _propFromType(it.itemType);
+        final prop = sheepPropFromType(it.itemType);
         if (prop == null) continue;
         _itemIds[prop] = it.id;
         _perGameLimits[prop] = it.perGameLimit;
@@ -103,19 +103,6 @@ class _SheepGameState extends State<SheepGame> {
       if (mounted) setState(() {});
     } catch (e) {
       // 载入失败不影响对局，仅道具不可用
-    }
-  }
-
-  SheepProp? _propFromType(String type) {
-    switch (type) {
-      case 'remove':
-        return SheepProp.remove;
-      case 'undo':
-        return SheepProp.undo;
-      case 'shuffle':
-        return SheepProp.shuffle;
-      default:
-        return null;
     }
   }
 
@@ -155,28 +142,11 @@ class _SheepGameState extends State<SheepGame> {
     _finished = false;
     _busy = false;
     _computeCoverage();
-    _snapshotBounds();
-  }
-
-  /// 记录开局牌堆包围盒（视图缩放的固定基准）
-  void _snapshotBounds() {
-    double minX = 1e9, minY = 1e9, maxX = -1e9, maxY = -1e9;
-    for (final t in _tiles) {
-      minX = min(minX, t.x);
-      minY = min(minY, t.y);
-      maxX = max(maxX, t.x + 1);
-      maxY = max(maxY, t.y + 1);
-    }
-    if (_tiles.isEmpty) {
-      minX = 0;
-      minY = 0;
-      maxX = 1;
-      maxY = 1;
-    }
-    _initMinX = minX;
-    _initMinY = minY;
-    _initMaxX = maxX;
-    _initMaxY = maxY;
+    final b = SheepLayout.computeBounds(_tiles);
+    _initMinX = b.$1;
+    _initMinY = b.$2;
+    _initMaxX = b.$3;
+    _initMaxY = b.$4;
   }
 
   void _computeCoverage() => SheepSolver.computeCoverage(_tiles);
@@ -292,28 +262,7 @@ class _SheepGameState extends State<SheepGame> {
     final free = _freeLeft[p] ?? 0;
     final owned = _ownedLeft[p] ?? 0;
     if (free <= 0 && owned <= 0) return;
-    final useFree = free > 0;
-    final confirm = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('使用${p.label}？'),
-        content: Text(
-          useFree
-              ? '确定要使用「${p.label}」吗？将消耗 1 次免费次数（剩余 $free 次），使用后不可撤销。'
-              : '确定要使用「${p.label}」吗？将消耗 1 张道具卡（库存剩余 $owned 张），使用后不可撤销。',
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('取消'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确定使用'),
-          ),
-        ],
-      ),
-    );
+    final confirm = await confirmUsePropDialog(context, p, free, owned);
     if (confirm == true) {
       await _useProp(p);
     }
@@ -520,45 +469,23 @@ class _SheepGameState extends State<SheepGame> {
                 ),
               ),
             for (final t in ordered)
-              _tileWidget(t, offX, offY, scale, slotCenterX, slotY, slotTile),
+              buildSheepTileWidget(
+                t: t,
+                offX: offX,
+                offY: offY,
+                scale: scale,
+                slotCenterX: slotCenterX,
+                slotY: slotY,
+                slotTile: slotTile,
+                slots: _slots,
+                slotCapacity: _slotCapacity,
+                onTap: () => _tapTile(t),
+              ),
           ];
 
           return Stack(children: children);
         },
       ),
-    );
-  }
-
-  Widget _tileWidget(
-    SheepTile t,
-    double offX,
-    double offY,
-    double scale,
-    double Function(int) slotCenterX,
-    double slotY,
-    double slotTile,
-  ) {
-    double left;
-    double top;
-    double size;
-    if (t.state == SheepTileState.slot) {
-      // 槽位位置以 _slots 权威列表为准，避免 slotIndex 陈旧导致方块错位/重叠/不可见
-      final i = _slots.indexOf(t).clamp(0, _slotCapacity - 1);
-      left = slotCenterX(i) - slotTile / 2;
-      top = slotY;
-      size = slotTile;
-    } else {
-      left = offX + t.x * scale;
-      top = offY + t.y * scale;
-      size = scale;
-    }
-    return SheepTileWidget(
-      key: ValueKey<int>(t.id),
-      tile: t,
-      left: left,
-      top: top,
-      size: size,
-      onTap: () => _tapTile(t),
     );
   }
 }
