@@ -286,6 +286,39 @@ class _SheepGameState extends State<SheepGame> {
 
   // ---------- 道具 ----------
 
+  /// 使用道具前弹窗确认（免费次数或购买库存均先确认，避免误触消耗）。
+  Future<void> _confirmUseProp(SheepProp p) async {
+    if (_finished || _busy) return;
+    final free = _freeLeft[p] ?? 0;
+    final owned = _ownedLeft[p] ?? 0;
+    if (free <= 0 && owned <= 0) return;
+    final useFree = free > 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('使用${p.label}？'),
+        content: Text(
+          useFree
+              ? '确定要使用「${p.label}」吗？将消耗 1 次免费次数（剩余 $free 次），使用后不可撤销。'
+              : '确定要使用「${p.label}」吗？将消耗 1 张道具卡（库存剩余 $owned 张），使用后不可撤销。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定使用'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await _useProp(p);
+    }
+  }
+
   /// 使用道具：
   /// - 优先消耗免费额度（free_per_game），不扣库存；
   /// - 免费用尽后消耗购买库存（consumeItem 减 1 张），受 per_game_limit 截断。
@@ -419,7 +452,7 @@ class _SheepGameState extends State<SheepGame> {
           // 免费次数用角标区分：有免费剩余时提示「免」，否则显示可用数
           extraTag: free > 0 ? '免$free' : null,
           onPressed:
-              (avail > 0 && !_finished && !_busy) ? () { _useProp(p); } : null,
+              (avail > 0 && !_finished && !_busy) ? () { _confirmUseProp(p); } : null,
         );
       }).toList(),
       content: LayoutBuilder(

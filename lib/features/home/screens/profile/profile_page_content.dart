@@ -28,6 +28,8 @@ class ProfilePageContent extends StatelessWidget {
     required this.onVersionTap,
     required this.onSignOut,
     required this.onThemeSettingsTap,
+    required this.achievementCount,
+    required this.onAchievementsTap,
   });
 
   final String? currentUserName;
@@ -45,6 +47,8 @@ class ProfilePageContent extends StatelessWidget {
   final VoidCallback onVersionTap;
   final VoidCallback onSignOut;
   final VoidCallback onThemeSettingsTap;
+  final int achievementCount;
+  final VoidCallback onAchievementsTap;
 
   @override
   Widget build(BuildContext context) {
@@ -72,7 +76,9 @@ class ProfilePageContent extends StatelessWidget {
             currentRole: currentRole,
             currentMemberLevel: currentMemberLevel,
             totalPoints: totalPoints,
+            achievementCount: achievementCount,
             onPointsTap: onPointsTap,
+            onAchievementsTap: onAchievementsTap,
           ),
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
@@ -218,13 +224,17 @@ class ProfileStatsRow extends StatelessWidget {
     required this.currentRole,
     required this.currentMemberLevel,
     required this.totalPoints,
+    required this.achievementCount,
     required this.onPointsTap,
+    required this.onAchievementsTap,
   });
 
   final String? currentRole;
   final String? currentMemberLevel;
   final int totalPoints;
+  final int achievementCount;
   final VoidCallback onPointsTap;
+  final VoidCallback onAchievementsTap;
 
   String _getRoleLabel(String? role) {
     if (role == null || role.isEmpty) return '普通用户';
@@ -310,6 +320,14 @@ class ProfileStatsRow extends StatelessWidget {
             '积分',
             '$totalPoints',
             onTap: onPointsTap,
+            colorScheme: colorScheme,
+            context: context,
+          ),
+          _buildStatItem(
+            Icons.emoji_events_outlined,
+            '成就',
+            '$achievementCount',
+            onTap: onAchievementsTap,
             colorScheme: colorScheme,
             context: context,
           ),

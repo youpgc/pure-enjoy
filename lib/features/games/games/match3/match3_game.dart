@@ -98,6 +98,37 @@ class _Match3GameState extends State<Match3Game> {
     }
   }
 
+  /// 使用加时卡前弹窗确认（免费次数或购买库存均先确认，避免误触消耗）。
+  Future<void> _confirmAddTime() async {
+    if (_addTimeItem == null) return;
+    if (_addTimeFree <= 0 && _addTimeOwned <= 0) return;
+    final useFree = _addTimeFree > 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('使用加时卡？'),
+        content: Text(
+          useFree
+              ? '确定要使用「加时卡」吗？将消耗 1 次免费次数（剩余 $_addTimeFree 次），使用后本局 +15 秒，不可撤销。'
+              : '确定要使用「加时卡」吗？将消耗 1 张道具卡（库存剩余 $_addTimeOwned 张），使用后本局 +15 秒，不可撤销。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定使用'),
+          ),
+        ],
+      ),
+    );
+    if (confirm == true) {
+      await _useAddTime();
+    }
+  }
+
   /// 使用加时卡：先免费用完再消耗库存，成功后本局加时 15 秒。
   Future<void> _useAddTime() async {
     if (_addTimeItem == null) return;
@@ -181,7 +212,7 @@ class _Match3GameState extends State<Match3Game> {
                 extraTag: _addTimeFree > 0 ? '免$_addTimeFree' : null,
                 onPressed: (_addTimeFree + _addTimeOwned) > 0
                     ? () {
-                        _useAddTime();
+                        _confirmAddTime();
                       }
                     : null,
               ),

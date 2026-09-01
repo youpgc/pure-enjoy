@@ -4,6 +4,8 @@ import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/api_client.dart';
 import '../../../profile/services/point_service.dart';
+import '../../../games/services/achievement_service.dart';
+import '../../../games/screens/achievement_list_screen.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../../services/version_check_service.dart';
 import '../../../../core/widgets/widgets.dart';
@@ -26,6 +28,9 @@ class ProfilePage extends StatefulWidget {
 
 class _ProfilePageState extends State<ProfilePage> {
   int _totalPoints = 0;
+
+  /// 已获得成就数（按类目合并为最高级别后的数量，与成就页一致）
+  int _achievementCount = 0;
 
   /// 当前应用版本号（形如 1.10.11，手机安装版本）
   String _appVersion = '';
@@ -74,6 +79,15 @@ class _ProfilePageState extends State<ProfilePage> {
     await SupabaseService.instance.reloadCurrentUser();
     final points = await PointService.instance.getAvailablePoints();
 
+    // 拉取已获得成就数（按类目合并为最高级别）
+    int achievementCount = 0;
+    try {
+      achievementCount =
+          (await AchievementService.instance.fetchUserAchievements()).length;
+    } catch (e) {
+      if (kDebugMode) debugPrint('读取成就数失败: $e');
+    }
+
     // 直接读取 users 表 avatar_url（与「编辑资料」页同源），确保头像可靠显示，
     // 不依赖 auth user_metadata 的异步同步（该同步偶发未及时完成，导致显示默认头像）。
     String? avatarUrl = SupabaseService.instance.currentUserAvatar;
@@ -101,6 +115,7 @@ class _ProfilePageState extends State<ProfilePage> {
     if (mounted) {
       setState(() {
         _totalPoints = points;
+        _achievementCount = achievementCount;
         _avatarUrl = avatarUrl;
       });
     }
@@ -115,6 +130,7 @@ class _ProfilePageState extends State<ProfilePage> {
       currentRole: supabaseService.currentRole,
       currentMemberLevel: supabaseService.currentMemberLevel,
       totalPoints: _totalPoints,
+      achievementCount: _achievementCount,
       appVersion: _appVersion,
       hasUpdate: _hasUpdate,
       avatarUrl: _avatarUrl,
@@ -137,6 +153,12 @@ class _ProfilePageState extends State<ProfilePage> {
         Navigator.push(
           context,
           MaterialPageRoute(builder: (_) => const CheckinScreen()),
+        ).then((_) => _loadUserData());
+      },
+      onAchievementsTap: () {
+        Navigator.push(
+          context,
+          MaterialPageRoute(builder: (_) => const AchievementListScreen()),
         ).then((_) => _loadUserData());
       },
       onVersionTap: () async {
