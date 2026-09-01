@@ -142,7 +142,8 @@ class GameRewardService {
   /// 领取成就达成奖励。
   ///
   /// 同一成就终身只发一次（claim_key 唯一索引 + user_game_achievements 唯一索引双兜底）。
-  /// 成就奖励**不占用单日游戏奖励上限**（独立激励体系，byPassDailyLimit）。
+  /// 成就奖励**计入单日游戏奖励上限**（与通关/每日首通/成绩区间奖励共用全局与单游戏上限，
+  /// 由 [_tryClaim] 统一校验），避免成就叠加刷分突破单日上限。
   Future<GameRewardResult> claimAchievement({
     required GameAchievementModel achievement,
   }) async {
@@ -154,7 +155,6 @@ class GameRewardService {
       points: achievement.rewardPoints,
       remark: '成就达成（${achievement.name}）',
       gameId: achievement.gameId,
-      bypassDailyLimit: true,
     );
     if (res.granted) {
       // 记录用户成就（看板展示 + 终身唯一兜底）。best-effort，失败仅记日志。
