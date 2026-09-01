@@ -68,7 +68,7 @@ class GameConfigSnapshot {
   List<GameRewardRuleModel> get globalRewardRules =>
       rewardRules.where((r) => r.gameId == null).toList();
 
-  /// 取单日奖励上限；未配置时兜底 10 分。
+  /// 取全局单日奖励上限；未配置时兜底 10 分。
   int get dailyLimit {
     for (final rule in globalRewardRules) {
       if (rule.ruleType == GameRewardRuleType.dailyLimit && rule.enabled) {
@@ -76,6 +76,22 @@ class GameConfigSnapshot {
       }
     }
     return 10;
+  }
+
+  /// 取指定游戏的单日奖励上限；未配置该游戏专属规则时兜底为全局上限。
+  ///
+  /// 对应 `rule_type='daily_limit' and game_id = <gameId>` 的启用规则
+  /// （SQL 已为 sheep/g2048/match3 各配 100 分）。全局规则 game_id 为 null，
+  /// 不会命中此过滤，故未配置的兜底为全局上限而非 10，避免多游戏时过于苛刻。
+  int dailyLimitPerGame(String gameId) {
+    for (final rule in rewardRules) {
+      if (rule.gameId == gameId &&
+          rule.ruleType == GameRewardRuleType.dailyLimit &&
+          rule.enabled) {
+        return rule.points;
+      }
+    }
+    return dailyLimit;
   }
 
   /// 序列化为本地缓存结构（时间以 UTC ISO 字符串存储）。

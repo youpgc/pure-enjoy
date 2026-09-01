@@ -38,6 +38,10 @@ class GameLevelModel {
   /// 排序号（升序）
   final int sortOrder;
 
+  /// 难度指数（5..1000）：前 8 关跨越式跳增、后期挨个约 +1。
+  /// 仅配置展示用，不参与奖励结算（DB 已加列并种子，App 读取供 UI 展示/调试）。
+  final int difficulty;
+
   /// 创建时间（UTC）
   final DateTime? createdAt;
 
@@ -56,6 +60,7 @@ class GameLevelModel {
     this.rewardPoints = 0,
     this.rewardRepeatable = false,
     this.sortOrder = 0,
+    this.difficulty = 0,
     this.createdAt,
     this.updatedAt,
   });
@@ -75,6 +80,7 @@ class GameLevelModel {
       rewardPoints: (json['reward_points'] as num?)?.toInt() ?? 0,
       rewardRepeatable: json['reward_repeatable'] as bool? ?? false,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
+      difficulty: (json['difficulty'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] != null
           ? DateTime.tryParse(json['created_at'].toString())
           : null,
@@ -98,6 +104,7 @@ class GameLevelModel {
       'reward_points': rewardPoints,
       'reward_repeatable': rewardRepeatable,
       'sort_order': sortOrder,
+      'difficulty': difficulty,
       if (createdAt != null) 'created_at': createdAt!.toUtc().toIso8601String(),
       if (updatedAt != null) 'updated_at': updatedAt!.toUtc().toIso8601String(),
     };
@@ -116,6 +123,7 @@ class GameLevelModel {
     int? rewardPoints,
     bool? rewardRepeatable,
     int? sortOrder,
+    int? difficulty,
     DateTime? createdAt,
     DateTime? updatedAt,
   }) {
@@ -131,6 +139,7 @@ class GameLevelModel {
       rewardPoints: rewardPoints ?? this.rewardPoints,
       rewardRepeatable: rewardRepeatable ?? this.rewardRepeatable,
       sortOrder: sortOrder ?? this.sortOrder,
+      difficulty: difficulty ?? this.difficulty,
       createdAt: createdAt ?? this.createdAt,
       updatedAt: updatedAt ?? this.updatedAt,
     );

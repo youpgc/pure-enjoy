@@ -296,10 +296,14 @@ class GameRewardService {
       }
     }
 
-    // 3) 成就达成（按该游戏启用的成就条件）
-    final achievements = config
-        .achievementsOf(game.id)
-        .where((a) => a.enabled);
+    // 3) 成就达成（按该游戏启用的成就条件 + 全局成就 game_id=null）
+    //    全局成就（如 first_clear_all 任意通关全局 +3）跨游戏生效，此前
+    //    achievementsOf(game.id) 仅按 game_id 过滤，把 game_id=null 的全局成就
+    //    排除在外，导致 first_clear_all 永不发放——此处补齐闭环。
+    final achievements = <GameAchievementModel>[
+      ...config.achievementsOf(game.id).where((a) => a.enabled),
+      ...config.achievements.where((a) => a.gameId == null && a.enabled),
+    ];
     for (final ach in achievements) {
       if (_meetsAchievement(ach, level, judgeValues, gameCode: game.code)) {
         final r = await claimAchievement(achievement: ach);
@@ -374,16 +378,23 @@ class GameRewardService {
   }
 
   /// 查询今日（北京自然日）已领取的游戏奖励积分。
-  Future<int> fetchTodayClaimedPoints() async {
+  ///
+  /// [gameId] 非空时仅统计该游戏的领取记录（用于单游戏单日上限校验）；
+  /// 为 null（默认）时统计全部游戏（用于全局单日上限校验）。
+  Future<int> fetchTodayClaimedPoints({String? gameId}) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return 0;
 
+    final filters = <String, String>{
+      'user_id': 'eq.$userId',
+      'claimed_at': 'gte.${beijingToday().toUtc().toIso8601String()}',
+    };
+    if (gameId != null) {
+      filters['game_id'] = 'eq.$gameId';
+    }
     final result = await ApiClient.get(
       'game_reward_claims',
-      filters: <String, String>{
-        'user_id': 'eq.$userId',
-        'claimed_at': 'gte.${beijingToday().toUtc().toIso8601String()}',
-      },
+      filters: filters,
       limit: null,
       note: 'games:today_claimed',
     );
@@ -421,12 +432,27 @@ class GameRewardService {
     // 1) 单日上限校验（超限时直接返回、不占坑——坑未烧掉，明日刷新后
     //    重新通关同一奖励仍可领取，实现「超限次日可重获」）
     if (!bypassDailyLimit) {
-      final limit = (await GameService.instance.fetchConfig()).dailyLimit;
+      final config = await GameService.instance.fetchConfig();
+
+      // 1a) 全局单日上限（跨游戏合计，默认 200 分）
+      final limit = config.dailyLimit;
       final claimed = await fetchTodayClaimedPoints();
       if (claimed + points > limit) {
         return GameRewardResult.notGranted(
           reason: '今日游戏奖励已达上限（$limit 分）',
         );
+      }
+
+      // 1b) 单游戏单日上限（如 sheep/g2048/match3 各 100 分）。
+      //     与全局上限取「先到先拦」——两者独立约束，任一超限即止。
+      if (gameId != null) {
+        final gameLimit = config.dailyLimitPerGame(gameId);
+        final gameClaimed = await fetchTodayClaimedPoints(gameId: gameId);
+        if (gameClaimed + points > gameLimit) {
+          return GameRewardResult.notGranted(
+            reason: '本游戏今日奖励已达上限（$gameLimit 分）',
+          );
+        }
       }
     }
 
