@@ -243,11 +243,15 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
           continue;
         }
         var end = c;
-        while (end + 1 < cols && grid[r][end + 1]?.type == t) end++;
+        while (end + 1 < cols && grid[r][end + 1]?.type == t) {
+          end++;
+        }
         final len = end - c + 1;
         if (len >= 3) {
           final cells = <(int, int)>[];
-          for (var k = c; k <= end; k++) cells.add((r, k));
+          for (var k = c; k <= end; k++) {
+            cells.add((r, k));
+          }
           runs.add(_Run('h', cells));
         }
         c = end + 1;
@@ -262,11 +266,15 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
           continue;
         }
         var end = r;
-        while (end + 1 < rows && grid[end + 1][c]?.type == t) end++;
+        while (end + 1 < rows && grid[end + 1][c]?.type == t) {
+          end++;
+        }
         final len = end - r + 1;
         if (len >= 3) {
           final cells = <(int, int)>[];
-          for (var k = r; k <= end; k++) cells.add((k, c));
+          for (var k = r; k <= end; k++) {
+            cells.add((k, c));
+          }
           runs.add(_Run('v', cells));
         }
         r = end + 1;
@@ -366,7 +374,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       } else if (run.cells.length == 4) {
         sp = run.orient == 'h' ? 'row' : 'col';
       }
-      for (final cell in run.cells) toClear.add(cell);
+      for (final cell in run.cells) {
+        toClear.add(cell);
+      }
       if (sp != null) {
         final spot = run.cells.firstWhere(
           (cell) => swapped.contains(cell),
@@ -392,7 +402,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       if (vCells.contains(cell)) created[cell] = 'wrap';
     }
 
-    for (final cell in created.keys) toClear.remove(cell);
+    for (final cell in created.keys) {
+      toClear.remove(cell);
+    }
     _applySpecials(toClear, created);
 
     score += toClear.length * 10 * combo;
@@ -494,7 +506,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
   }
 
   void _removeCleared(Set<(int, int)> toClear) {
-    for (final cell in toClear) grid[cell.$1][cell.$2] = null;
+    for (final cell in toClear) {
+      grid[cell.$1][cell.$2] = null;
+    }
   }
 
   void _applyGravity() {

@@ -124,7 +124,9 @@ class _SheepGameState extends State<SheepGame> {
   List<SheepTile> _buildTiles(List<(int, double, double)> pos) {
     final typeList = <int>[];
     for (var t = 0; t < _types; t++) {
-      for (var k = 0; k < _perType; k++) typeList.add(t);
+      for (var k = 0; k < _perType; k++) {
+        typeList.add(t);
+      }
     }
     typeList.shuffle(_rng);
     final tiles = <SheepTile>[];
@@ -183,7 +185,9 @@ class _SheepGameState extends State<SheepGame> {
 
   void _pushSnapshot() {
     final m = <int, (SheepTileState, int)>{};
-    for (final t in _tiles) m[t.id] = (t.state, t.slotIndex);
+    for (final t in _tiles) {
+      m[t.id] = (t.state, t.slotIndex);
+    }
     _snapshots.add(m);
     if (_snapshots.length > 30) _snapshots.removeAt(0);
   }
@@ -196,7 +200,9 @@ class _SheepGameState extends State<SheepGame> {
   }
 
   void _reindexSlots() {
-    for (var i = 0; i < _slots.length; i++) _slots[i].slotIndex = i;
+    for (var i = 0; i < _slots.length; i++) {
+      _slots[i].slotIndex = i;
+    }
   }
 
   void _tapTile(SheepTile tile) {
@@ -248,7 +254,9 @@ class _SheepGameState extends State<SheepGame> {
       }
       return false;
     });
-    for (final t in toRemove) _tiles.remove(t);
+    for (final t in toRemove) {
+      _tiles.remove(t);
+    }
     _reindexSlots();
     return true;
   }
@@ -347,7 +355,9 @@ class _SheepGameState extends State<SheepGame> {
     final board = _tiles.where((t) => t.state == SheepTileState.board).toList();
     if (board.isEmpty) return;
     final typesList = board.map((t) => t.type).toList()..shuffle(_rng);
-    for (var i = 0; i < board.length; i++) board[i].type = typesList[i];
+    for (var i = 0; i < board.length; i++) {
+      board[i].type = typesList[i];
+    }
     GameAudio.instance.prop();
     _computeCoverage();
     setState(() {});
