@@ -22,10 +22,20 @@ ApiResponse handleApiResponse(dynamic response) {
         }
         return ApiResponse.success([], statusCode: statusCode);
       }
-      final data = jsonDecode(body) as List<dynamic>;
+      final decoded = jsonDecode(body);
+      if (decoded is List<dynamic>) {
+        // 常规表查询 / 返回集合的 RPC：数组响应
+        return ApiResponse.success(
+          decoded.cast<Map<String, dynamic>>(),
+          statusCode: statusCode,
+        );
+      }
+      // 单对象 / 标量响应（如 grant_game_reward 的 jsonb 标量、聚合 RPC 返回单值）：
+      // 承载于 raw，data 置空列表以保持 List 契约不变，避免 '_Map is not List' 转换异常。
       return ApiResponse.success(
-        data.cast<Map<String, dynamic>>(),
+        <Map<String, dynamic>>[],
         statusCode: statusCode,
+        raw: decoded,
       );
     } catch (e) {
       ApiLogger.error('❌ 响应解析失败', error: e);

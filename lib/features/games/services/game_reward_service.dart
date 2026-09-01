@@ -462,13 +462,17 @@ class GameRewardService {
     }
 
     // PostgREST 对 returns jsonb 标量直接返回对象；个别版本会包成单元素数组，兼容两种。
+    // 修复前 handleApiResponse 对非数组响应抛 cast 异常，导致 RPC 实际成功却被判失败；
+    // 现单对象走 rpc.raw，数组首项走 rpc.data。
     Map<String, dynamic>? dataMap;
-    if (rpc.data is Map<String, dynamic>) {
-      dataMap = rpc.data as Map<String, dynamic>;
-    } else if (rpc.data is List<dynamic> &&
-        (rpc.data as List<dynamic>).isNotEmpty &&
-        (rpc.data as List<dynamic>).first is Map<String, dynamic>) {
-      dataMap = (rpc.data as List<dynamic>).first as Map<String, dynamic>;
+    final raw = rpc.raw;
+    if (raw is Map<String, dynamic>) {
+      dataMap = raw;
+    } else {
+      final data = rpc.data;
+      if (data != null && data.isNotEmpty) {
+        dataMap = data.first;
+      }
     }
 
     if (dataMap != null && dataMap['already'] == true) {
