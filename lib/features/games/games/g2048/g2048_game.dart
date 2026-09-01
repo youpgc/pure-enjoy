@@ -162,7 +162,15 @@ class _G2048GameState extends State<G2048Game> {
   }
 
   void _move(String dir) {
-    if (_animating || _finished) return;
+    if (_animating) {
+      debugPrint('[G2048] _move 忽略：动画进行中 dir=$dir');
+      return;
+    }
+    if (_finished) {
+      debugPrint('[G2048] _move 忽略：本局已结束 dir=$dir');
+      return;
+    }
+    debugPrint('[G2048] _move 开始 dir=$dir（size=$_size target=$_target）');
     // 关键：重置合并标记。merged 只在本回合合并判定中生效，若不重置，
     // 参与过合并的方块将永久失去合并资格 → 盘面「看似可并实则不可并」，
     // 各方向 changed=false 直接 return，表现为滑动几次后卡死无响应。
@@ -216,6 +224,7 @@ class _G2048GameState extends State<G2048Game> {
     }
 
     if (!changed) return;
+    debugPrint('[G2048] _move 无变化，未移动 dir=$dir');
 
     if (gain > 0) {
       GameAudio.instance.merge();
@@ -236,28 +245,36 @@ class _G2048GameState extends State<G2048Game> {
 
     Future.delayed(_slide + const Duration(milliseconds: 20), () {
       if (!mounted) return;
-      _tiles.removeWhere((t) => t.toRemove);
-      _rebuildGrid();
-      var lost = false;
-      if (!_pendingWin) {
-        _spawn();
+      try {
+        _tiles.removeWhere((t) => t.toRemove);
         _rebuildGrid();
-        if (!_hasMoves()) lost = true;
-      }
-      _animating = false;
-      if (_pendingWin) {
-        _finish(true);
-      } else if (lost) {
-        _finish(false);
-      } else {
-        // 动画期间缓存的滑动：立即补执行，保证输入不丢、不卡死。
-        final buffered = _pendingDir;
-        _pendingDir = null;
-        if (buffered != null && !_finished) {
-          _requestMove(buffered);
-        } else {
-          setState(() {});
+        var lost = false;
+        if (!_pendingWin) {
+          _spawn();
+          _rebuildGrid();
+          if (!_hasMoves()) lost = true;
         }
+        if (_pendingWin) {
+          _finish(true);
+        } else if (lost) {
+          _finish(false);
+        } else {
+          // 动画期间缓存的滑动：立即补执行，保证输入不丢、不卡死。
+          final buffered = _pendingDir;
+          _pendingDir = null;
+          if (buffered != null && !_finished) {
+            _requestMove(buffered);
+          } else {
+            setState(() {});
+          }
+        }
+      } catch (e, st) {
+        // 兜底：任何异常都强制释放 _animating，避免棋盘永久冻结（滑动无响应）。
+        debugPrint('[G2048] 动画回调异常，强制释放 _animating：$e');
+        debugPrint('[G2048] $st');
+      } finally {
+        _animating = false;
+        if (mounted) setState(() {});
       }
     });
   }
@@ -324,26 +341,31 @@ class _G2048GameState extends State<G2048Game> {
     // 拖动过程中一旦越过阈值立即响应，手感更即时（不必等抬手）
     if (_dragDelta.distance >= _swipeThreshold) {
       _dragConsumed = true;
+      debugPrint('[G2048] 越过阈值触发滑动 delta=$_dragDelta');
       _applySwipe(_dragDelta);
     }
   }
 
   /// 请求一次滑动移动：动画进行中则缓存方向，结束后补执行（输入不丢）。
   void _requestMove(String dir) {
-    if (_finished) return;
+    if (_finished) {
+      debugPrint('[G2048] _requestMove 忽略：已结束 dir=$dir');
+      return;
+    }
     if (_animating) {
       _pendingDir = dir;
+      debugPrint('[G2048] _requestMove 动画中→缓存 dir=$dir');
       return;
     }
     _move(dir);
   }
 
   void _applySwipe(Offset delta) {
-    if (delta.dx.abs() > delta.dy.abs()) {
-      _requestMove(delta.dx > 0 ? 'right' : 'left');
-    } else {
-      _requestMove(delta.dy > 0 ? 'down' : 'up');
-    }
+    final dir = delta.dx.abs() > delta.dy.abs()
+        ? (delta.dx > 0 ? 'right' : 'left')
+        : (delta.dy > 0 ? 'down' : 'up');
+    debugPrint('[G2048] 判定方向=$dir');
+    _requestMove(dir);
   }
 
   @override
@@ -406,6 +428,7 @@ class _G2048GameState extends State<G2048Game> {
               // opaque：棋盘空白处同样接收拖动，避免只有方块上能滑
               behavior: HitTestBehavior.opaque,
               onPanStart: (_) {
+                debugPrint('[G2048] panStart');
                 _dragDelta = Offset.zero;
                 _dragConsumed = false;
               },
@@ -415,11 +438,13 @@ class _G2048GameState extends State<G2048Game> {
                 if (!_dragConsumed && _dragDelta.distance >= _swipeThreshold) {
                   _applySwipe(_dragDelta);
                 }
+                debugPrint('[G2048] panEnd consumed=$_dragConsumed');
                 _dragDelta = Offset.zero;
                 _dragConsumed = false;
               },
               // 手势被系统/手势竞技场取消时复位，避免 _dragConsumed 卡死导致后续无响应。
               onPanCancel: () {
+                debugPrint('[G2048] panCancel');
                 _dragDelta = Offset.zero;
                 _dragConsumed = false;
               },
