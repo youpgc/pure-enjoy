@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import 'candy_component.dart';
+import 'match3_effects.dart';
 import 'match3_objective.dart';
 import 'match3_overlays.dart';
 import 'match3_runs.dart';
+import 'match3_swipe.dart';
 
 /// 消消乐（Flame 引擎 · 成熟手感版）
 ///
@@ -18,7 +20,10 @@ import 'match3_runs.dart';
 /// - **6 种关卡目标**由 [Match3Objective] 驱动（计分/消除/收集/破冰/限时/Boss），
 ///   引擎只负责盘面与消除，目标判定与进度全部交给状态机。
 /// - 连击倍率；消除/下落/交换全动画 + 音效。
-class Match3FlameGame extends FlameGame with TapCallbacks {
+/// - 双交互：点选两格交换 + 按住某格朝相邻格滑动交换（按**起始格**判定）。
+/// - 特效层 [Match3Effects]：碎片迸发、条纹光束、冲击波、连击飘字。
+class Match3FlameGame extends FlameGame
+    with TapCallbacks, PanDetector, Match3SwipeMixin {
   final void Function(GamePlayOutcome) onFinished;
 
   /// 关卡目标状态机（模式、进度、达成判定、HUD 数据）
@@ -42,6 +47,9 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
 
   int? _selectedR;
   int? _selectedC;
+
+  final Match3Effects effects = Match3Effects();
+
   late double _cell;
   /// 网格相对画布左上角的偏移（画布非正方形时居中网格，背景填满留白）
   late double _offsetX;
@@ -72,6 +80,35 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     this.rows = 8,
     this.cols = 8,
   });
+
+  // ---------- 滑动手势（Match3SwipeMixin 接线）----------
+
+  @override
+  (int, int)? cellAt(double x, double y) {
+    final c = ((x - _offsetX) / _cell).floor();
+    final r = ((y - _offsetY) / _cell).floor();
+    if (r < 0 || r >= rows || c < 0 || c >= cols) return null;
+    return (r, c);
+  }
+
+  @override
+  bool get canInteract => _loaded && !_busy && !_over;
+
+  /// 滑动即交换：目标格越界则忽略，并清掉点选态避免与点选标记冲突。
+  @override
+  void onSwipe(int r, int c, int dr, int dc) {
+    final tr = r + dr;
+    final tc = c + dc;
+    if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
+    _selectedR = null;
+    _selectedC = null;
+    _trySwap(r, c, tr, tc);
+  }
+
+  Offset _cellCenter(int r, int c) => Offset(
+        _offsetX + c * _cell + _cell / 2,
+        _offsetY + r * _cell + _cell / 2,
+      );
 
   @override
   Future<void> onLoad() async {
@@ -109,25 +146,7 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       Paint()..color = const Color(0xFF26263A),
     );
     if (!_loaded) return; // 盘面/目标层尚未就绪
-    // 白色圆角格底：糖块画在白底上，与深色底板形成强对比，
-    // 边缘清晰不发虚（缓解「看久了眼睛不舒服」）
-    final cellPaint = Paint()..color = const Color(0xFFFFFFFF);
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              _offsetX + c * _cell + _cell * 0.03,
-              _offsetY + r * _cell + _cell * 0.03,
-              _cell * 0.94,
-              _cell * 0.94,
-            ),
-            Radius.circular(_cell * 0.18),
-          ),
-          cellPaint,
-        );
-      }
-    }
+    Match3Overlays.drawGrid(canvas, _offsetX, _offsetY, _cell, rows, cols);
     // 果冻底层（在糖果下方）
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
@@ -154,20 +173,17 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
       }
     }
     if (_selectedR != null && _selectedC != null) {
-      canvas.drawRect(
-        Rect.fromLTWH(_offsetX + _selectedC! * _cell,
-            _offsetY + _selectedR! * _cell, _cell, _cell),
-        Paint()
-          ..color = Colors.white.withValues(alpha: 0.25)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = _cell * 0.06,
-      );
+      Match3Overlays.drawSelection(
+          canvas, _offsetX, _offsetY, _cell, _selectedR!, _selectedC!);
     }
+    // 特效层置顶：碎片/光束/冲击波/飘字画在所有糖块之上
+    effects.render(canvas);
   }
 
   @override
   void update(double dt) {
     super.update(dt);
+    effects.update(dt);
     // 限时模式：倒计时推进，归零即结算
     if (objective.isTimed && _loaded && !_over) {
       objective.secondsLeft -= dt;
@@ -205,29 +221,25 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
 
   // ---------- 棋盘生成 ----------
 
+  /// 生成初始棋盘（盘面运算下沉至 match3_runs.newBoard）
   void _newBoard() {
-    grid = List.generate(rows, (_) => List<Candy?>.filled(cols, null));
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        int t;
-        do {
-          t = _rng.nextInt(_palette.length);
-        } while ((c >= 2 &&
-                grid[r][c - 1]?.type == t &&
-                grid[r][c - 2]?.type == t) ||
-            (r >= 2 &&
-                grid[r - 1][c]?.type == t &&
-                grid[r - 2][c]?.type == t));
-        grid[r][c] = Candy(
-            t, r, c, _offsetX + c * _cell, _offsetY + r * _cell);
-      }
-    }
+    grid = newBoard(
+      rows: rows,
+      cols: cols,
+      nextType: () => _rng.nextInt(_palette.length),
+      offsetX: _offsetX,
+      offsetY: _offsetY,
+      cell: _cell,
+      make: (t, r, c, x, y) => Candy(t, r, c, x, y),
+    );
   }
 
   // ---------- 交换 ----------
 
   @override
   void onTapUp(TapUpEvent event) {
+    // 滑动尾部在部分机型会补发 tap，防误触窗口内直接忽略
+    if (recentSwipe) return;
     if (!_loaded || _busy || _over) return;
     final c = ((event.canvasPosition.x - _offsetX) / _cell).floor();
     final r = ((event.canvasPosition.y - _offsetY) / _cell).floor();
@@ -368,13 +380,51 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     GameAudio.instance.match();
     GameAudio.instance.haptic(GameHaptic.medium);
 
+    // 消除特效：碎片迸发（特殊糖加倍）+ 特殊糖生成冲击波 + 连击飘字
     for (final cell in toClear) {
       final cand = grid[cell.$1][cell.$2];
-      if (cand != null) cand.dying = true;
+      if (cand == null) continue;
+      cand.dying = true;
+      final special = cand.special.isNotEmpty;
+      final center = _cellCenter(cell.$1, cell.$2);
+      effects.burst(
+        center: center,
+        color: _palette[cand.type],
+        cell: _cell,
+        power: special ? 1.8 : 1.0,
+      );
+      if (!special) continue;
+      effects.shock(
+          center: center, radius: _cell * 1.6, color: _palette[cand.type]);
+      // 条纹糖：沿整行/整列射出光带
+      final horiz = cand.special == 'row';
+      if (horiz || cand.special == 'col') {
+        effects.beam(
+          horizontal: horiz,
+          centerAlong: (horiz ? size.x : size.y) / 2,
+          centerCross: horiz ? center.dy : center.dx,
+          length: horiz ? size.x : size.y,
+          thickness: _cell * 0.5,
+          color: _palette[cand.type],
+        );
+      }
     }
     for (final e in created.entries) {
       final cand = grid[e.key.$1][e.key.$2];
       if (cand != null) cand.special = e.value;
+      effects.shock(
+        center: _cellCenter(e.key.$1, e.key.$2),
+        radius: _cell * 1.2,
+        color: Colors.white,
+      );
+    }
+    if (combo >= 2) {
+      effects.float(
+        center: Offset(size.x / 2, _offsetY + rows * _cell * 0.42),
+        text: '连击 ×$combo',
+        color: const Color(0xFFFFB300),
+        fontSize: _cell * 0.7,
+      );
     }
 
     combo++;
@@ -414,43 +464,19 @@ class Match3FlameGame extends FlameGame with TapCallbacks {
     }
   }
 
-  void _removeCleared(Set<(int, int)> toClear) {
-    for (final cell in toClear) {
-      grid[cell.$1][cell.$2] = null;
-    }
-  }
+  void _removeCleared(Set<(int, int)> toClear) => removeCleared(grid, toClear);
 
-  void _applyGravity() {
-    for (var c = 0; c < cols; c++) {
-      final remain = <Candy>[];
-      for (var r = 0; r < rows; r++) {
-        final cand = grid[r][c];
-        if (cand != null) {
-          remain.add(cand);
-          grid[r][c] = null;
-        }
-      }
-      var idx = rows - 1;
-      for (var k = remain.length - 1; k >= 0; k--) {
-        final cand = remain[k];
-        cand.row = idx;
-        grid[idx][c] = cand;
-        idx--;
-      }
-      var spawnY = -1;
-      for (var r = idx; r >= 0; r--) {
-        final cand = Candy(
-          _rng.nextInt(_palette.length),
-          r,
-          c,
-          _offsetX + c * _cell,
-          _offsetY + spawnY * _cell,
-        );
-        spawnY--;
-        grid[r][c] = cand;
-      }
-    }
-  }
+  /// 重力下落 + 顶部补充（盘面运算下沉至 match3_runs.applyGravity）
+  void _applyGravity() => applyGravity(
+        grid: grid,
+        rows: rows,
+        cols: cols,
+        offsetX: _offsetX,
+        offsetY: _offsetY,
+        cell: _cell,
+        spawn: (r, c, x, y) =>
+            Candy(_rng.nextInt(_palette.length), r, c, x, y),
+      );
 
   /// 按当前模式的目标判定通关/失败并结算
   void _finishByObjective() {

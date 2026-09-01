@@ -1,10 +1,58 @@
 import 'package:flutter/material.dart';
 
-/// 关卡目标叠加层绘制（果冻底 / 冰封盖）。
+/// 关卡目标叠加层与盘面底衬绘制（网格底 / 果冻底 / 冰封盖 / 选中框）。
 ///
 /// 与糖果绘制分离，绘制顺序由引擎控制：
-/// 果冻在糖果**下方**（底层装饰），冰封在糖果**上方**（遮罩感）。
+/// 网格底 → 果冻（糖果**下方**，底层装饰）→ 糖果 → 冰封（糖果**上方**，
+/// 遮罩感）→ 选中框。
 class Match3Overlays {
+  /// 网格底：白色圆角格底，糖块画在白底上与深色底板形成强对比，
+  /// 边缘清晰不发虚（缓解「看久了眼睛不舒服」）。
+  static void drawGrid(
+    Canvas canvas,
+    double offsetX,
+    double offsetY,
+    double cell,
+    int rows,
+    int cols,
+  ) {
+    final paint = Paint()..color = const Color(0xFFFFFFFF);
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        canvas.drawRRect(
+          RRect.fromRectAndRadius(
+            Rect.fromLTWH(
+              offsetX + c * cell + cell * 0.03,
+              offsetY + r * cell + cell * 0.03,
+              cell * 0.94,
+              cell * 0.94,
+            ),
+            Radius.circular(cell * 0.18),
+          ),
+          paint,
+        );
+      }
+    }
+  }
+
+  /// 选中高亮：白色描边方框，标出当前待交换的糖块。
+  static void drawSelection(
+    Canvas canvas,
+    double offsetX,
+    double offsetY,
+    double cell,
+    int row,
+    int col,
+  ) {
+    canvas.drawRect(
+      Rect.fromLTWH(offsetX + col * cell, offsetY + row * cell, cell, cell),
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.25)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = cell * 0.06,
+    );
+  }
+
   /// 果冻底：带果冻的格子铺一层半透明粉色圆角块
   static void drawJelly(Canvas canvas, double left, double top, double cell) {
     final rect = RRect.fromRectAndRadius(
