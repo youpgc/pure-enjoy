@@ -91,7 +91,8 @@ class GameShell extends StatelessWidget {
             child: Text(
               hint!,
               textAlign: TextAlign.center,
-              style: const TextStyle(fontSize: 12, color: AppTheme.neutral600),
+              // 通关条件（操作提示）文案字号调大，提升可读性
+              style: const TextStyle(fontSize: 14, color: AppTheme.neutral600),
             ),
           ),
         if (actions.isNotEmpty) _ControlBar(actions: actions),
@@ -112,8 +113,9 @@ class _ControlBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(10, 8, 10, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 8),
+        // 压缩纵向内边距 + 上间距，降低「重新开始」等控制按钮整体高度占比
+        margin: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
@@ -151,7 +153,7 @@ class _ActionLabel extends StatelessWidget {
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(action.icon, size: 20),
+        Icon(action.icon, size: 18),
         const SizedBox(height: 2),
         Text(
           action.badge == null
@@ -208,7 +210,7 @@ class GameStatusItem extends StatelessWidget {
             value,
             key: ValueKey<String>(value),
             style: TextStyle(
-              fontSize: 18,
+              fontSize: 20,
               fontWeight: FontWeight.bold,
               // 未指定强调色时跟随主题前景色，保证深色主题下可读
               color: valueColor ?? Theme.of(context).colorScheme.onSurface,

@@ -5,6 +5,7 @@ import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/cache_helper.dart';
 import '../models/game_score_model.dart';
+import '../services/game_service.dart';
 
 /// 最佳成绩项
 ///
@@ -273,9 +274,11 @@ class GameScoreService {
   /// 查询某游戏的成绩记录（按游玩时间倒序）。
   ///
   /// [limit] 为 null 时取全量（默认 10 会截断，看板场景须显式传值）。
+  /// [offset] 用于分页滚动加载（看板「游戏记录」列表）。
   Future<List<GameScoreModel>> fetchScoreHistory(
     String gameId, {
     int? limit = 50,
+    int offset = 0,
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return <GameScoreModel>[];
@@ -290,6 +293,7 @@ class GameScoreService {
       },
       order: 'played_at.desc',
       limit: limit,
+      offset: offset,
       note: 'games:score_history',
     );
 
@@ -303,6 +307,62 @@ class GameScoreService {
         .whereType<Map<String, dynamic>>()
         .map(GameScoreModel.fromJson)
         .toList();
+  }
+
+  /// 查询某游戏全部成绩记录（含各维度取值），供「各模式最佳成绩」等本地聚合。
+  ///
+  /// 通过 PostgREST 嵌入 game_score_values，避免逐条查维度值；维度编码由
+  /// 缓存的维度定义反查。未登录或失败返回空列表。
+  Future<List<GameScoreEntry>> fetchScoresWithValues(String gameId) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return <GameScoreEntry>[];
+
+    final result = await ApiClient.get(
+      'game_scores',
+      select:
+          'id,level_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
+      filters: <String, String>{
+        'user_id': 'eq.$userId',
+        'game_id': 'eq.$gameId',
+        'status': 'neq.aborted',
+      },
+      order: 'played_at.desc',
+      limit: null,
+      note: 'games:scores_with_values',
+    );
+
+    if (!result.isSuccess) {
+      debugPrint('[GameScoreService] 成绩维度值查询失败：${result.errorMessage}');
+      return <GameScoreEntry>[];
+    }
+
+    final dims = GameService.instance.cachedConfig.dimensionsOf(gameId);
+    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+    final list = <GameScoreEntry>[];
+    for (final raw in rows) {
+      if (raw is! Map<String, dynamic>) continue;
+      final score = GameScoreModel.fromJson(raw);
+      final values = <String, num>{};
+      final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
+      for (final v in vals) {
+        if (v is! Map<String, dynamic>) continue;
+        final dim = dims
+            .where((d) => d.id == (v['dimension_id'] as String?))
+            .firstOrNull;
+        final numVal = (v['value'] as num?) ?? 0;
+        if (dim != null) {
+          values[dim.code] = numVal;
+        } else {
+          values[v['dimension_id'].toString()] = numVal;
+        }
+      }
+      list.add(GameScoreEntry(
+        score: score,
+        values: values,
+        dimensions: dims,
+      ));
+    }
+    return list;
   }
 
   /// 清空成绩缓存（切换账号或下拉刷新用）。

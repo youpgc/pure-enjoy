@@ -114,9 +114,7 @@ class Match3FlameGame extends FlameGame
   Future<void> onLoad() async {
     await super.onLoad();
     // 横向留出 _padX 左右边距；网格在剩余空间内居中，纵向居中。
-    _cell = ((size.x - 2 * _padX) / cols).clamp(0, size.y / rows);
-    _offsetX = _padX + (size.x - 2 * _padX - cols * _cell) / 2;
-    _offsetY = (size.y - rows * _cell) / 2;
+    _recomputeLayout();
     _newBoard();
     objective.initBoard(_rng);
     movesLeft = objective.steps;
@@ -136,6 +134,22 @@ class Match3FlameGame extends FlameGame
     if (_over || !objective.isTimed) return;
     objective.secondsLeft += seconds;
     _syncHud();
+  }
+
+  /// 画布尺寸变化（首屏布局完成 / 旋转 / 安全区变化 / 父容器尺寸修正）时
+  /// 同步网格布局。若不跟随，cellAt 仍用旧 size 算出的 _cell/_offset，导致
+  /// 点触与滑动命中的格子相对实际盘面发生偏移（「滑动选不中正确方块」）。
+  @override
+  void onGameResize(Vector2 size) {
+    super.onGameResize(size);
+    _recomputeLayout();
+  }
+
+  void _recomputeLayout() {
+    if (size.x <= 0 || size.y <= 0) return;
+    _cell = ((size.x - 2 * _padX) / cols).clamp(0, size.y / rows);
+    _offsetX = _padX + (size.x - 2 * _padX - cols * _cell) / 2;
+    _offsetY = (size.y - rows * _cell) / 2;
   }
 
   @override

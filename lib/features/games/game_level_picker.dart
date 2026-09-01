@@ -143,7 +143,7 @@ class _PickerBodyState extends State<_PickerBody> {
               style: const TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
             ),
           ),
-          if (isMatch3 && _selectedMode != null) _modeChips(),
+          if (isMatch3 && _selectedMode != null) _modeHeader(),
           ConstrainedBox(
             constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.62,
@@ -180,50 +180,29 @@ class _PickerBodyState extends State<_PickerBody> {
     );
   }
 
-  /// 模式选择条：6 个模式芯片，带每模式进度；点击切换下方关卡列表
-  Widget _modeChips() {
-    return SizedBox(
-      height: 58,
-      child: ListView.separated(
-        scrollDirection: Axis.horizontal,
-        padding: const EdgeInsets.symmetric(horizontal: 12),
-        itemCount: Match3Mode.values.length,
-        separatorBuilder: (_, __) => const SizedBox(width: 8),
-        itemBuilder: (_, idx) {
-          final mode = Match3Mode.values[idx];
-          final cleared = _modeCleared(mode);
-          final selected = mode == _selectedMode;
-          return ChoiceChip(
-            selected: selected,
-            selectedColor: mode.color,
-            onSelected: (_) => setState(() => _selectedMode = mode),
-            avatar: Icon(
-              mode.icon,
-              size: 18,
-              color: selected ? Colors.white : mode.color,
+  /// 模式顶部条（静态，仅展示当前所选模式，不提供模式切换交互）：
+  /// 由主界面模式网格深链进入时已指定模式，选关弹窗内无需再切模式。
+  Widget _modeHeader() {
+    final mode = _selectedMode!;
+    final cleared = _modeCleared(mode);
+    final total = _levelsOfMode(mode).length;
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),
+      child: Row(
+        children: <Widget>[
+          Icon(mode.icon, color: mode.color, size: 22),
+          const SizedBox(width: 10),
+          Expanded(
+            child: Text(
+              mode.label,
+              style: const TextStyle(fontSize: 17, fontWeight: FontWeight.bold),
             ),
-            label: Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                Text(
-                  mode.label,
-                  style: TextStyle(
-                    fontSize: 12,
-                    color: selected ? Colors.white : null,
-                  ),
-                ),
-                Text(
-                  '$cleared/5',
-                  style: TextStyle(
-                    fontSize: 10,
-                    color: selected ? Colors.white70 : AppTheme.neutral500,
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
+          ),
+          Text(
+            '已通关 $cleared/$total',
+            style: const TextStyle(fontSize: 12, color: AppTheme.neutral500),
+          ),
+        ],
       ),
     );
   }

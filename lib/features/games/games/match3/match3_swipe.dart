@@ -51,6 +51,9 @@ mixin Match3SwipeMixin on FlameGame, PanDetector {
   void onPanStart(DragStartInfo info) {
     _resetPan();
     if (!canInteract) return;
+    // eventPosition.widget 即「相对 GameWidget 画布的局部坐标」，与 onTapUp 的
+    // event.canvasPosition 同为 convertGlobalToLocalCoordinate 换算结果（flame
+    // 1.38 已统一），故滑动与点击用的是同一坐标系，cellAt 可直接消费。
     final p = info.eventPosition.widget;
     final cell = cellAt(p.x, p.y);
     if (cell == null) return;

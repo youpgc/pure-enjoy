@@ -230,7 +230,11 @@ void showSettlementSheet(
           const SizedBox(height: 16),
           Text('奖励明细', style: Theme.of(ctx).textTheme.titleSmall),
           const SizedBox(height: 8),
-          ...result.items.map((item) => ListTile(
+          // 仅展示「实际获得的明细」；通关奖励不论是否获得都展示（kind=level_clear），
+          // 其余未获得的（已领取 / 不相关）不展示，避免结算页堆砌无效行。
+          ...result.items
+              .where((i) => i.granted || i.kind == 'level_clear')
+              .map((item) => ListTile(
                 dense: true,
                 contentPadding: EdgeInsets.zero,
                 leading: Icon(

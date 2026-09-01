@@ -74,9 +74,6 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     return _levels.last;
   }
 
-  bool get _canSelectLevel =>
-      widget.game.levelSelectable && _levels.length > 1;
-
   void _startGame() {
     final lv = _startLevel;
     if (lv == null) return;
@@ -95,10 +92,16 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  /// 直接进入某模式首个未通关关卡（frontier）；全通关回第一关。
-  /// 该模式后台未配关卡时，合成一局「体验关」直接开玩（id 为空、不计首通、
-  /// 不计入通关进度），保证点任意模式都有响应，不再静默无反应。
+  /// 点选模式后的分流：
+  /// - 配置为「需要选关」（levelSelectable）：先选模式再选对应关卡——
+  ///   打开选关弹窗并预选该模式（弹窗顶部只展示该模式，无模式切换交互）。
+  /// - 配置为「不需要选关」：直接以该模式最新可挑战关卡（frontier）开局，
+  ///   不再二次弹窗（如旧 mode 网格直接进关的体验）。
   void _startMode(Match3Mode mode) {
+    if (widget.game.levelSelectable) {
+      _openPicker(initialMode: mode);
+      return;
+    }
     final list = _levelsOfMode(mode);
     final GameLevelModel lv;
     if (list.isEmpty) {
@@ -232,8 +235,11 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 入口：有选关/模式能力的游戏，优先「选择关卡」；消消乐以模式网格为起点，隐藏「开始游戏」
-                  if (!isMatch3 && !_canSelectLevel)
+                  // 入口：消消乐以「模式网格」为起点（点模式即进入选关/最新关），
+                  // 其余非选关游戏直接「开始游戏」；「选择关卡」入口已隐藏，避免与
+                  // 模式网格/开始游戏重复堆叠。
+                  // 「选择关卡」入口已隐藏；非消消乐游戏统一以「开始游戏」进入
+                  if (!isMatch3)
                     _EntryTile(
                       icon: Icons.play_arrow_rounded,
                       label: '开始游戏',
@@ -241,15 +247,6 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                       primary: true,
                       enabled: startable,
                       onTap: _startGame,
-                    ),
-                  if (_canSelectLevel)
-                    _EntryTile(
-                      icon: Icons.list_alt_rounded,
-                      label: '选择关卡',
-                      desc:
-                          isMatch3 ? '按模式与关序挑选具体关卡' : '按关序挑选关卡',
-                      primary: !isMatch3,
-                      onTap: () => _openPicker(),
                     ),
                   _EntryTile(
                     icon: Icons.menu_book_rounded,
