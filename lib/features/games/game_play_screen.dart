@@ -8,6 +8,10 @@ import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'play/game_single_dashboard.dart';
 
+/// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
+/// 不结算发分，避免拉低正常通关率等统计数据。
+const int _minRecordDurationMs = 10000; // 10s
+
 /// 游戏承载页：按 game.code 分发对应游戏组件，统一处理结算与重玩。
 class GamePlayScreen extends StatefulWidget {
   /// 要游玩的游戏
@@ -68,12 +72,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       Navigator.of(context).pop();
       return;
     }
+    final durationMs = DateTime.now().difference(_enterTime).inMilliseconds;
+    // 极短时长（<10s）的主动放弃视为误触/异常退出，不计入游戏记录
+    // （不写 game_scores、不结算发分），避免拉低正常通关率等统计。
+    if (durationMs < _minRecordDurationMs) {
+      if (mounted) Navigator.of(context).pop();
+      return;
+    }
     await reportAndSettle(
       context: context,
       game: widget.game,
       level: _level,
       scoreValuesByCode: <String, num>{'level': _level.levelNo},
-      durationMs: DateTime.now().difference(_enterTime).inMilliseconds,
+      durationMs: durationMs,
       cleared: false,
       aborted: true,
     );
