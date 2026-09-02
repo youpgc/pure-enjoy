@@ -119,17 +119,30 @@ class CheckinCalendarCard extends StatelessWidget {
                 const SizedBox(height: 14),
                 _buildWeekdayHeader(colorScheme),
                 const SizedBox(height: 8),
-                isLoadingCalendar
-                    ? const Padding(
-                        padding: EdgeInsets.all(24),
-                        child:
-                            Center(child: CircularProgressIndicator()),
-                      )
-                    : _buildDayGrid(colorScheme, today, isCurrentMonth),
+                // 优先渲染日历网格（即使 checkedDates 为空也展示当月骨架 + 今日高亮），
+                // 接口请求中的 loading 以「遮罩层」覆盖在网格之上，不替换网格、不改变模块高度。
+                Stack(
+                  children: [
+                    _buildDayGrid(colorScheme, today, isCurrentMonth),
+                    if (isLoadingCalendar)
+                      Positioned.fill(
+                        child: Container(
+                          alignment: Alignment.center,
+                          decoration: BoxDecoration(
+                            color: colorScheme.surface.withValues(alpha: 0.55),
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          child: CircularProgressIndicator(
+                            color: colorScheme.primary,
+                          ),
+                        ),
+                      ),
+                  ],
+                ),
                 const SizedBox(height: 12),
                 Center(
                   child: Text(
-                    '点击漏签日期可补签（持有 $makeupCardCount 张补签卡）',
+                    '点击漏签日期可补签（持有 $makeupCardCount 张补签卡，仅支持近 3 个月内）',
                     style: Theme.of(context)
                         .textTheme
                         .labelSmall

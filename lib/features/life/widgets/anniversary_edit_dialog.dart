@@ -3,7 +3,6 @@ import 'package:uuid/uuid.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../services/api_client.dart';
 import '../../../services/notification_service.dart';
-import '../../../utils/date_time_utils.dart';
 import '../models/anniversary_model.dart';
 import '../models/remind_offset.dart';
 import '../widgets/remind_offset_selector.dart';
@@ -71,8 +70,8 @@ Future<void> showAnniversaryEditDialog(
                 title: const Text('日期 *'),
                 subtitle: Text(
                   isLunar
-                      ? '农历 ${getLunarDateStr(selectedDate)}'
-                      : DateTimeUtils.formatDate(selectedDate),
+                      ? '农历 ${getLunarYearStr(selectedDate)}${getLunarDateStr(selectedDate)}'
+                      : formatDateCN(selectedDate),
                 ),
                 trailing: const Icon(Icons.calendar_today),
                 onTap: () async {

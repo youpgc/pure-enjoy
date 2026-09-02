@@ -1,5 +1,6 @@
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 import '../../../services/http_client.dart';
 import './horoscope_models.dart';
 
@@ -43,6 +44,60 @@ const List<String> _ratingDims = ['整体', '事业', '财运', '爱情', '健�
 /// 若后续需要「真实每日运势数据」，可在此函数内优先请求稳定的付费/鉴权接口
 /// （如天行数据、聚合数据，需申请 key），失败时再回退到本数据集即可。
 class HoroscopeService {
+  /// ===== 当日缓存（避免重复消耗天行 API 次数）=====
+  ///
+  /// 键格式：`yyyy-MM-dd|星座名`。首页每次进入都会调用 [getHoroscope]，
+  /// 若当天已拉取过该星座运势（无论来自天行还是内置回退），直接返回缓存、
+  /// 不再发起天行请求，从而把每个星座每天的远程请求收敛为最多 1 次。
+  static final Map<String, HoroscopeDetail> _dayMemoryCache = {};
+  static const String _dayCacheSpKey = 'horoscope_day_cache_v1';
+
+  static String _dayCacheKey(String signName) {
+    final d = DateTime.now();
+    return '${d.year}-${_twoDigits(d.month)}-${_twoDigits(d.day)}|$signName';
+  }
+
+  static Future<HoroscopeDetail?> _readDayCache(String key) async {
+    // 1) 内存命中：当次会话零开销
+    final memHit = _dayMemoryCache[key];
+    if (memHit != null) return memHit;
+    // 2) 持久化命中（跨 App 重启，按「当天」生效）
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_dayCacheSpKey);
+      if (raw != null) {
+        final map = jsonDecode(raw) as Map<String, dynamic>;
+        final item = map[key];
+        if (item != null) {
+          final detail = HoroscopeDetail.fromJson(item as Map<String, dynamic>);
+          _dayMemoryCache[key] = detail; // 回填内存
+          return detail;
+        }
+      }
+    } catch (_) {
+      // 读取失败：静默降级为走网络
+    }
+    return null;
+  }
+
+  static Future<void> _writeDayCache(String key, HoroscopeDetail detail) async {
+    _dayMemoryCache[key] = detail;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final raw = prefs.getString(_dayCacheSpKey);
+      final map = raw == null
+          ? <String, dynamic>{}
+          : Map<String, dynamic>.from(jsonDecode(raw) as Map);
+      // 仅保留「今天」的条目，避免历史日期无限堆积
+      final today = key.split('|').first;
+      map.removeWhere((k, _) => k.split('|').first != today);
+      map[key] = detail.toJson();
+      await prefs.setString(_dayCacheSpKey, jsonEncode(map));
+    } catch (_) {
+      // 写入失败：不影响当次展示
+    }
+  }
+
   /// 各星座运势文案池（按中文名索引）；数量可自由扩充。
   static const Map<String, List<String>> _pool = {
     '水瓶座': [
@@ -213,13 +268,29 @@ class HoroscopeService {
   /// 永远返回非空结果（内置兜底），[HoroscopeDetail.fromRemote] 标识数据来源，
   /// 调用方可据此决定是否展示「内置解读」提示。
   static Future<HoroscopeDetail> getHoroscope(String signName) async {
-    final remote = await fetchHoroscopeDetail(signName);
-    if (remote != null) return remote;
+    // 当日缓存命中：直接展示，不消耗天行 API 次数
+    final cacheKey = _dayCacheKey(signName);
+    final cached = await _readDayCache(cacheKey);
+    if (cached != null) {
+      if (kDebugMode) {
+        debugPrint(
+          '[星座运势] 命中当日缓存 sign=$signName（来源：${cached.fromRemote ? '天行' : '内置'}），跳过远程请求',
+        );
+      }
+      return cached;
+    }
 
-    // 回退到内置离线数据集
+    // 缓存未命中：发起当日数据请求
+    final remote = await fetchHoroscopeDetail(signName);
+    if (remote != null) {
+      await _writeDayCache(cacheKey, remote);
+      return remote;
+    }
+
+    // 远程不可用：回退内置离线数据集，同样写入当日缓存（当天不再重试远程）
     final builtin = await getDailyHoroscope(signName);
     if (builtin == null) {
-      return HoroscopeDetail(
+      final fallback = HoroscopeDetail(
         signName: signName,
         overview: '保持好心情，今天也是值得期待的一天。',
         indices: const {},
@@ -228,9 +299,11 @@ class HoroscopeService {
         luckyNumber: '—',
         fromRemote: false,
       );
+      await _writeDayCache(cacheKey, fallback);
+      return fallback;
     }
     String star(int n) => '${'★' * n}${'☆' * (5 - n)}';
-    return HoroscopeDetail(
+    final detail = HoroscopeDetail(
       signName: signName,
       overview: builtin.text,
       indices: {
@@ -247,6 +320,8 @@ class HoroscopeService {
       extraSignLabel: '速配星座',
       fromRemote: false,
     );
+    await _writeDayCache(cacheKey, detail);
+    return detail;
   }
 
   /// 拉取真实第三方「详细今日运势解读」（天行数据 star 接口）。

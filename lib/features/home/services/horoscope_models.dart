@@ -116,6 +116,38 @@ class HoroscopeDetail {
     this.extraSignLabel,
     required this.fromRemote,
   });
+
+  /// 序列化为 JSON（供当日缓存持久化）
+  Map<String, dynamic> toJson() => {
+        'signName': signName,
+        'overview': overview,
+        'indices': indices,
+        'indicesArePercent': indicesArePercent,
+        'luckyColor': luckyColor,
+        'luckyNumber': luckyNumber,
+        'extraSign': extraSign,
+        'extraSignLabel': extraSignLabel,
+        'fromRemote': fromRemote,
+      };
+
+  /// 从 JSON 还原（[toJson] 的逆操作）
+  factory HoroscopeDetail.fromJson(Map<String, dynamic> json) {
+    return HoroscopeDetail(
+      signName: json['signName'] as String,
+      overview: json['overview'] as String,
+      indices: Map<String, String>.from(
+        (json['indices'] as Map? ?? {}).map(
+          (k, v) => MapEntry(k.toString(), v.toString()),
+        ),
+      ),
+      indicesArePercent: json['indicesArePercent'] as bool? ?? true,
+      luckyColor: json['luckyColor'] as String? ?? '—',
+      luckyNumber: json['luckyNumber'] as String? ?? '—',
+      extraSign: json['extraSign'] as String?,
+      extraSignLabel: json['extraSignLabel'] as String?,
+      fromRemote: json['fromRemote'] as bool? ?? false,
+    );
+  }
 }
 
 /// 星座符号（用于卡片图标展示），按中文名索引

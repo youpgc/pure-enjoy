@@ -99,11 +99,23 @@ Widget _buildExpenseListBody({
                             expense.category,
                             defaultValue: expense.category,
                           );
-                          // date 与 created_at 日期相同时展示 created_at（含时间），不同时展示 date
-                          final isSameDate = expense.createdAt != null &&
-                              expense.date.year == expense.createdAt!.year &&
-                              expense.date.month == expense.createdAt!.month &&
-                              expense.date.day == expense.createdAt!.day;
+                          // 展示口径：记录归属日（date）与创建日（created_at）一致时，
+                          // 展示含时刻的创建时间；用户手动改到其它日期时，只展示该日期（00:00:00）。
+                          //
+                          // ⚠️ 时区红线：created_at 为 TIMESTAMPTZ（UTC），date 为 DATE（本地凌晨）。
+                          // 直接比 year/month/day 会因「UTC 日」与「本地日」错位在跨天边界翻转：
+                          //   - 北京 08-30 00:16 创建 → 存为 UTC 08-29 16:16 → 旧逻辑判为不同日
+                          //     → 展示 date 的 00:00:00（错误，丢失真实时刻）；
+                          //   - 改日期为 08-29 后反被判定为「同日」→ 展示 created_at 的北京时刻
+                          //     （错误，显示为 08-30 00:16:39）。
+                          // 故统一换算到北京墙钟后再比「年月日」，与 formatStandard 的展示口径一致。
+                          final createdAtBj = expense.createdAt != null
+                              ? DateTimeUtils.toBeijingWallClock(expense.createdAt!)
+                              : null;
+                          final isSameDate = createdAtBj != null &&
+                              expense.date.year == createdAtBj.year &&
+                              expense.date.month == createdAtBj.month &&
+                              expense.date.day == createdAtBj.day;
                           final displayDate = (isSameDate && expense.createdAt != null)
                               ? expense.createdAt!
                               : expense.date;

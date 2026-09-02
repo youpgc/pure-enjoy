@@ -235,19 +235,30 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 入口：消消乐以「模式网格」为起点（点模式即进入选关/最新关），
-                  // 其余非选关游戏直接「开始游戏」；「选择关卡」入口已隐藏，避免与
-                  // 模式网格/开始游戏重复堆叠。
-                  // 「选择关卡」入口已隐藏；非消消乐游戏统一以「开始游戏」进入
+                  // 入口：
+                  // - 消消乐以「模式网格」为起点（点模式即进入选关/最新关）；
+                  // - 非消消乐且后台配置「可选关」(levelSelectable) 且关卡 >1：
+                  //   提供「选择关卡」入口，点击弹出选关弹窗（复用 match3 的 GameLevelPicker）；
+                  // - 非消消乐且不可选关：保留「开始游戏」直接以当前可挑战关卡开局。
                   if (!isMatch3)
-                    _EntryTile(
-                      icon: Icons.play_arrow_rounded,
-                      label: '开始游戏',
-                      desc: startable ? '从当前可挑战关卡开始' : '暂无可玩关卡',
-                      primary: true,
-                      enabled: startable,
-                      onTap: _startGame,
-                    ),
+                    if (game.levelSelectable && _levels.length > 1)
+                      _EntryTile(
+                        icon: Icons.grid_view_rounded,
+                        label: '选择关卡',
+                        desc: '挑选要挑战的关卡',
+                        primary: true,
+                        enabled: startable,
+                        onTap: () => _openPicker(),
+                      )
+                    else
+                      _EntryTile(
+                        icon: Icons.play_arrow_rounded,
+                        label: '开始游戏',
+                        desc: startable ? '从当前可挑战关卡开始' : '暂无可玩关卡',
+                        primary: true,
+                        enabled: startable,
+                        onTap: _startGame,
+                      ),
                   _EntryTile(
                     icon: Icons.menu_book_rounded,
                     label: '查看说明',

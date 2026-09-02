@@ -145,10 +145,15 @@ extension NotificationSchedulers on NotificationService {
       );
       final nameById = <String, String>{};
       final targetById = <String, int>{};
+      // 仅「进行中」习惯参与重挂；已暂停(is_active=false)或已删除的习惯不在此集合，
+      // 对应的提醒计划必须跳过，否则暂停后仍会在启动/登录时重新被挂上（未闭环）。
+      final activeHabitIds = <String>{};
       if (habitsResult.isSuccess && habitsResult.data != null) {
         for (final h in habitsResult.data!) {
-          nameById[h['id'] as String] = (h['name'] as String?) ?? '习惯';
-          targetById[h['id'] as String] = (h['target_days'] as int?) ?? 21;
+          final hid = h['id'] as String;
+          nameById[hid] = (h['name'] as String?) ?? '习惯';
+          targetById[hid] = (h['target_days'] as int?) ?? 21;
+          activeHabitIds.add(hid);
         }
       }
 
@@ -170,6 +175,11 @@ extension NotificationSchedulers on NotificationService {
 
       for (final s in result.data!) {
         final model = ReminderScheduleModel.fromJson(s);
+        // 闭环：习惯已暂停（不在进行中集合）/ 已删除 → 取消可能存在的提醒，不再重挂
+        if (!activeHabitIds.contains(model.habitId)) {
+          await cancelHabitReminder(model.habitId);
+          continue;
+        }
         final name = nameById[model.habitId] ?? '习惯';
         final completed = isHabitCompleted(
           checkinCountById[model.habitId] ?? 0,
