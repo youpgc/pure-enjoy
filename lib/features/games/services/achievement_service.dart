@@ -6,21 +6,39 @@ import '../../../services/supabase_service.dart';
 import '../models/game_achievement_model.dart';
 import 'game_service.dart';
 
-/// 用户已获得成就的展示视图。
-///
-/// 同一类目（如羊了个羊·通关第5/20关）只保留最高级别（sort_order 最大），
-/// 用于「成就」页按类目展示最高成就，避免低级别淹没列表。
+/// 单条已获取成就实例（某类目下的某一个已解锁等级）。
 class UserAchievementView {
   /// 成就定义（含名称 / 图标 / 奖励积分 / 类目）
   final GameAchievementModel achievement;
 
-  /// 该类目最高级别的获取时间（北京时区展示）
+  /// 该等级的获取时间（北京时区展示）
   final DateTime unlockedAt;
 
   const UserAchievementView({
     required this.achievement,
     required this.unlockedAt,
   });
+}
+
+/// 同类（重复类型）已获取成就的分组视图。
+///
+/// 同一类目（如羊了个羊·通关第 5/20 关，code 去尾部数字归为一组）归为一组，
+/// [obtained] 为该类目下用户【已获取】的各等级成就，按 sort_order 升序（低 → 高）；
+/// [highest] 为最高级别，网格仅展示此项，满足「重复类型仅显示最高等级」。
+class AchievementGroupView {
+  /// 类目分组键（code 去尾部数字）
+  final String groupKey;
+
+  /// 该类目下已获取的全部等级（升序）
+  final List<UserAchievementView> obtained;
+
+  const AchievementGroupView({
+    required this.groupKey,
+    required this.obtained,
+  });
+
+  /// 最高级别（列表末尾）。
+  UserAchievementView get highest => obtained.last;
 }
 
 /// 成就查询服务
@@ -36,10 +54,11 @@ class AchievementService {
   /// 单例
   static final AchievementService instance = AchievementService._();
 
-  /// 拉取当前用户已获得成就（按类目合并为最高级别）。未登录返回空列表。
-  Future<List<UserAchievementView>> fetchUserAchievements() async {
+  /// 拉取当前用户已获得成就（按类目分组，每组保留已获取的全部等级）。
+  /// 未登录返回空列表。
+  Future<List<AchievementGroupView>> fetchUserAchievements() async {
     final userId = AuthService.instance.currentUserId;
-    if (userId == null) return const <UserAchievementView>[];
+    if (userId == null) return const <AchievementGroupView>[];
 
     final result = await ApiClient.get(
       'user_game_achievements',
@@ -50,7 +69,7 @@ class AchievementService {
     );
     if (!result.isSuccess) {
       debugPrint('[AchievementService] 拉取失败：${result.errorMessage}');
-      return const <UserAchievementView>[];
+      return const <AchievementGroupView>[];
     }
 
     final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
@@ -75,26 +94,27 @@ class AchievementService {
       if (prev == null || ts.isBefore(prev)) unlockedByAch[aid] = ts;
     }
 
-    // 按类目分组，取每类 sort_order 最大的成就（即最高级别）
-    final byGroup = <String, UserAchievementView>{};
+    // 按类目分组，收集该类目下【已获取】的全部等级（升序排列）。
+    final byGroup = <String, List<UserAchievementView>>{};
     for (final entry in unlockedByAch.entries) {
       final ach = achMap[entry.key];
       if (ach == null) continue;
       final group = _groupKey(ach.code);
-      final existing = byGroup[group];
-      if (existing == null ||
-          ach.sortOrder > existing.achievement.sortOrder) {
-        byGroup[group] = UserAchievementView(
-          achievement: ach,
-          unlockedAt: entry.value,
-        );
-      }
+      byGroup
+          .putIfAbsent(group, () => <UserAchievementView>[])
+          .add(UserAchievementView(achievement: ach, unlockedAt: entry.value));
     }
 
-    final list = byGroup.values.toList()
-      ..sort((a, b) =>
+    final groups = byGroup.entries.map((e) {
+      e.value.sort((a, b) =>
           a.achievement.sortOrder.compareTo(b.achievement.sortOrder));
-    return list;
+      return AchievementGroupView(groupKey: e.key, obtained: e.value);
+    }).toList();
+
+    // 组间按最高级别的 sort_order 升序，保持展示稳定。
+    groups.sort((a, b) => a.highest.achievement.sortOrder
+        .compareTo(b.highest.achievement.sortOrder));
+    return groups;
   }
 
   /// 类目分组键：去掉 code 尾部数字段（level_sheep_5 -> level_sheep）。
@@ -106,8 +126,8 @@ class AchievementService {
   }
 }
 
-/// 将 UTC 时间格式化为北京时区展示串（YYYY-MM-DD HH:mm）。
+/// 将 UTC 时间格式化为北京时区展示串（YYYY-MM-DD HH:mm:ss）。
 String formatBeijing(DateTime utc) {
-  return DateFormat('yyyy-MM-dd HH:mm')
+  return DateFormat('yyyy-MM-dd HH:mm:ss')
       .format(utc.add(const Duration(hours: 8)));
 }

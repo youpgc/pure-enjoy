@@ -4,10 +4,14 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/achievement_service.dart';
 
+/// 成就图标资源路径（App 端按 code 派生，不依赖 game_achievements.icon 旧名）。
+String _achAssetPath(String code) => 'assets/games/achievements/ach_$code.svg';
+
 /// 我的成就页
 ///
 /// 展示当前用户已获得的成就（按类目合并为最高级别），网格呈现图标 + 名称；
-/// 点击某项弹窗展示大图标、成就名称与获取时间（北京时区）。
+/// 点击某项弹窗展示大图标、成就名称与获取时间（北京时区，YYYY-MM-DD HH:mm:ss）。
+/// 同类（重复类型）已获取的不同等级可通过左右按钮切换查看。
 class AchievementListScreen extends StatefulWidget {
   /// {@macro achievement_list_screen}
   const AchievementListScreen({super.key});
@@ -17,7 +21,7 @@ class AchievementListScreen extends StatefulWidget {
 }
 
 class _AchievementListScreenState extends State<AchievementListScreen> {
-  List<UserAchievementView> _items = const <UserAchievementView>[];
+  List<AchievementGroupView> _items = const <AchievementGroupView>[];
   bool _loading = true;
 
   @override
@@ -37,45 +41,11 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
     }
   }
 
-  static String _assetPath(String code) =>
-      'assets/games/achievements/ach_$code.svg';
-
-  void _showDetail(UserAchievementView view) {
-    final theme = Theme.of(context);
+  void _showDetail(AchievementGroupView group) {
     showDialog<void>(
       context: context,
-      builder: (ctx) => AlertDialog(
-        contentPadding: const EdgeInsets.fromLTRB(24, 24, 24, 8),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: <Widget>[
-            SvgPicture.asset(
-              _assetPath(view.achievement.code),
-              width: 96,
-              height: 96,
-            ),
-            const SizedBox(height: 16),
-            Text(
-              view.achievement.name,
-              style: theme.textTheme.titleMedium,
-              textAlign: TextAlign.center,
-            ),
-            const SizedBox(height: 10),
-            Text(
-              '获取时间：${formatBeijing(view.unlockedAt)}',
-              style: theme.textTheme.bodySmall
-                  ?.copyWith(color: theme.colorScheme.onSurfaceVariant),
-              textAlign: TextAlign.center,
-            ),
-          ],
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('知道了'),
-          ),
-        ],
-      ),
+      barrierColor: Colors.black54,
+      builder: (ctx) => _AchievementDetailDialog(group: group),
     );
   }
 
@@ -98,10 +68,11 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
                   ),
                   itemCount: _items.length,
                   itemBuilder: (ctx, i) {
-                    final view = _items[i];
+                    final group = _items[i];
+                    final view = group.highest; // 网格仅展示最高等级
                     return Card(
                       child: InkWell(
-                        onTap: () => _showDetail(view),
+                        onTap: () => _showDetail(group),
                         borderRadius: BorderRadius.circular(12),
                         child: Padding(
                           padding: const EdgeInsets.symmetric(
@@ -112,7 +83,7 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: <Widget>[
                               SvgPicture.asset(
-                                _assetPath(view.achievement.code),
+                                _achAssetPath(view.achievement.code),
                                 width: 64,
                                 height: 64,
                               ),
@@ -160,6 +131,123 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
           ],
         ),
       ),
+    );
+  }
+}
+
+/// 成就详情弹窗（透明背景）。
+///
+/// 同类（重复类型）已获取的多个等级可通过左右按钮切换；仅展示已获取成就，
+/// 未获取等级不展示（预留分支见下方注释）。底部按钮居中、文案「关闭」。
+class _AchievementDetailDialog extends StatefulWidget {
+  final AchievementGroupView group;
+  const _AchievementDetailDialog({required this.group});
+
+  @override
+  State<_AchievementDetailDialog> createState() =>
+      _AchievementDetailDialogState();
+}
+
+class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    // 默认展示最高等级（列表末尾）。
+    _index = widget.group.obtained.length - 1;
+  }
+
+  void _step(int delta) {
+    final next = _index + delta;
+    if (next >= 0 && next < widget.group.obtained.length) {
+      setState(() => _index = next);
+    }
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final obtained = widget.group.obtained;
+    final view = obtained[_index];
+    final showArrows = obtained.length > 1;
+    final canPrev = _index > 0;
+    final canNext = _index < obtained.length - 1;
+
+    return Dialog(
+      backgroundColor: Colors.transparent,
+      insetPadding: const EdgeInsets.symmetric(horizontal: 24, vertical: 24),
+      child: Container(
+        padding: const EdgeInsets.fromLTRB(20, 24, 20, 16),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surface.withValues(alpha: 0.94),
+          borderRadius: BorderRadius.circular(20),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                showArrows
+                    ? _arrow(canPrev, Icons.chevron_left, () => _step(-1))
+                    : const SizedBox(width: 48),
+                Expanded(
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: <Widget>[
+                      SvgPicture.asset(
+                        _achAssetPath(view.achievement.code),
+                        width: 96,
+                        height: 96,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        view.achievement.name,
+                        style: theme.textTheme.titleMedium,
+                        textAlign: TextAlign.center,
+                      ),
+                      const SizedBox(height: 10),
+                      // 仅展示获取时间（文案仅时间，不带「获取时间：」前缀）。
+                      Text(
+                        formatBeijing(view.unlockedAt),
+                        style: theme.textTheme.bodySmall?.copyWith(
+                          color: theme.colorScheme.onSurfaceVariant,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      // 预留：未获取等级的展示分支（文案「未获取」）。
+                      // 当前仅展示已获取成就（obtained），故此分支不触发：
+                      // if (!obtained) ... const Text('未获取')
+                    ],
+                  ),
+                ),
+                showArrows
+                    ? _arrow(canNext, Icons.chevron_right, () => _step(1))
+                    : const SizedBox(width: 48),
+              ],
+            ),
+            const SizedBox(height: 20),
+            Center(
+              child: TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text('关闭'),
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _arrow(bool enabled, IconData icon, VoidCallback onTap) {
+    final cs = Theme.of(context).colorScheme;
+    return IconButton(
+      onPressed: enabled ? onTap : null,
+      icon: Icon(icon),
+      color: enabled ? cs.onSurface : cs.onSurface.withValues(alpha: 0.25),
+      splashRadius: 20,
     );
   }
 }
