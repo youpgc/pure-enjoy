@@ -9,6 +9,9 @@ class GameLevelModel {
   /// 所属游戏 id
   final String gameId;
 
+  /// 所属模式 id（关联 game_modes；空字符串表示未绑定模式）
+  final String modeId;
+
   /// 关卡序号（同游戏内唯一）
   final int levelNo;
 
@@ -51,6 +54,7 @@ class GameLevelModel {
   const GameLevelModel({
     required this.id,
     required this.gameId,
+    this.modeId = '',
     required this.levelNo,
     required this.name,
     this.config = const <String, dynamic>{},
@@ -70,6 +74,7 @@ class GameLevelModel {
     return GameLevelModel(
       id: json['id'] as String? ?? '',
       gameId: json['game_id'] as String? ?? '',
+      modeId: json['mode_id'] as String? ?? '',
       levelNo: (json['level_no'] as num?)?.toInt() ?? 0,
       name: json['name'] as String? ?? '',
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
@@ -95,6 +100,7 @@ class GameLevelModel {
     return <String, dynamic>{
       'id': id,
       'game_id': gameId,
+      'mode_id': modeId,
       'level_no': levelNo,
       'name': name,
       'config': config,
@@ -110,10 +116,36 @@ class GameLevelModel {
     };
   }
 
+  /// 2048 经典模式「棋盘选择」合成关卡：指定尺寸、无通关条件（无尽）。
+  /// [size] 取值范围 3..8（引擎钳制），不写入数据库；
+  /// [levelNo] 取 10000+size 以与真实关卡号隔离（避免最高分 key 冲突）。
+  factory GameLevelModel.endless2048({
+    required String gameId,
+    required int size,
+    String modeId = '',
+  }) {
+    final clamped = size.clamp(3, 8);
+    return GameLevelModel(
+      id: 'endless_2048_$clamped',
+      gameId: gameId,
+      modeId: modeId,
+      levelNo: 10000 + clamped,
+      name: '$clamped×$clamped 无尽',
+      config: <String, dynamic>{
+        'size': clamped,
+        'target': 999999,
+        'noClear': true,
+      },
+      countForDailyClear: false,
+      rewardPoints: 0,
+    );
+  }
+
   /// 复制并覆盖指定字段。
   GameLevelModel copyWith({
     String? id,
     String? gameId,
+    String? modeId,
     int? levelNo,
     String? name,
     Map<String, dynamic>? config,
@@ -130,6 +162,7 @@ class GameLevelModel {
     return GameLevelModel(
       id: id ?? this.id,
       gameId: gameId ?? this.gameId,
+      modeId: modeId ?? this.modeId,
       levelNo: levelNo ?? this.levelNo,
       name: name ?? this.name,
       config: config ?? this.config,

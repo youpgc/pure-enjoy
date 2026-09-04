@@ -36,6 +36,9 @@ class G2048Game extends StatefulWidget {
 class _G2048GameState extends State<G2048Game> {
   late int _size;
   late int _target;
+  /// 无通关条件（经典「棋盘选择」无尽模式）：达到目标方块也不结束，
+  /// 仅当棋盘无法再移动时判负结束。由 config['noClear'] 驱动。
+  late bool _noClear;
   static const Duration _slide = Duration(milliseconds: 120);
 
   /// 判定为「一次滑动」的最小拖动距离（逻辑像素）。
@@ -87,6 +90,9 @@ class _G2048GameState extends State<G2048Game> {
         ? cfgTarget
         : (cfgTarget is num ? cfgTarget.toInt() : 2048);
     _target = parsedTarget > 0 ? parsedTarget : 2048;
+    // 无通关条件：config['noClear'] == true 时永不通关（仅棋盘卡死结束）
+    final cfgNoClear = widget.level.config['noClear'];
+    _noClear = cfgNoClear == true;
     // 扩展维度（无则该维不限制）：步数上限 / 时间上限(秒) / 分数达标
     final cfgMoves = widget.level.config['moves'];
     _movesLimit = cfgMoves is int ? cfgMoves : null;
@@ -288,6 +294,8 @@ class _G2048GameState extends State<G2048Game> {
     // 通关 = 合成到目标方块 且 (未设分数门槛 或 累计分已达标)
     final scoreTarget = _scoreTarget;
     _pendingWin = _reachedTarget && (scoreTarget == null || _score >= scoreTarget);
+    // 无尽模式：无论是否达成目标都不通关，仅棋盘卡死时结束
+    if (_noClear) _pendingWin = false;
     setState(() {});
 
     Future.delayed(_slide + const Duration(milliseconds: 20), () {
@@ -435,7 +443,10 @@ class _G2048GameState extends State<G2048Game> {
     return GameShell(
       statusItems: <Widget>[
         GameStatusItem(label: '得分', value: '$_score'),
-        GameStatusItem(label: '目标', value: '$_target'),
+        if (_noClear)
+          const GameStatusItem(label: '模式', value: '无尽')
+        else
+          GameStatusItem(label: '目标', value: '$_target'),
         if (_movesLimit != null)
           GameStatusItem(
             label: '剩余步数',
@@ -534,4 +545,53 @@ class _G2048GameState extends State<G2048Game> {
       ),
     );
   }
+}
+
+/// 2048 经典模式「棋盘选择」底部弹窗：尺寸 3×3 .. 8×8。
+/// 返回选定尺寸；用户点「返回」取消时返回 null。
+Future<int?> showG2048SizePicker(BuildContext context) {
+  return showModalBottomSheet<int?>(
+    context: context,
+    isScrollControlled: true,
+    isDismissible: false,
+    enableDrag: false,
+    shape: const RoundedRectangleBorder(
+      borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+    ),
+    builder: (ctx) => Padding(
+      padding: const EdgeInsets.all(20),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Text('选择棋盘尺寸', style: Theme.of(ctx).textTheme.titleLarge),
+          const SizedBox(height: 6),
+          Text(
+            '经典模式 · 无通关条件 · 玩到无法移动为止',
+            style: Theme.of(ctx).textTheme.bodySmall,
+          ),
+          const SizedBox(height: 16),
+          Wrap(
+            spacing: 12,
+            runSpacing: 12,
+            children: <Widget>[
+              for (var s = 3; s <= 8; s++)
+                ElevatedButton(
+                  onPressed: () => Navigator.of(ctx).pop(s),
+                  child: Text('${s}×${s}'),
+                ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton(
+              onPressed: () => Navigator.of(ctx).pop(null),
+              child: const Text('返回'),
+            ),
+          ),
+        ],
+      ),
+    ),
+  );
 }

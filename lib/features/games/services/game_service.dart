@@ -5,6 +5,7 @@ import '../../../utils/cache_helper.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_dimension_model.dart';
 import '../models/game_level_model.dart';
+import '../models/game_mode_model.dart';
 import '../models/game_model.dart';
 import '../models/game_reward_rule_model.dart';
 
@@ -28,6 +29,9 @@ class GameConfigSnapshot {
   /// 全部奖励规则
   final List<GameRewardRuleModel> rewardRules;
 
+  /// 全部游戏模式
+  final List<GameModeModel> modes;
+
   /// 快照时间（本地缓存时为写入时间）
   final DateTime? cachedAt;
 
@@ -37,6 +41,7 @@ class GameConfigSnapshot {
     this.levels = const <GameLevelModel>[],
     this.achievements = const <GameAchievementModel>[],
     this.rewardRules = const <GameRewardRuleModel>[],
+    this.modes = const <GameModeModel>[],
     this.cachedAt,
   });
 
@@ -53,6 +58,13 @@ class GameConfigSnapshot {
   /// 取指定游戏的关卡（按 sort_order 升序）。
   List<GameLevelModel> levelsOf(String gameId) {
     final list = levels.where((l) => l.gameId == gameId).toList()
+      ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+    return list;
+  }
+
+  /// 取指定游戏的模式（按 sort_order 升序）。
+  List<GameModeModel> modesOf(String gameId) {
+    final list = modes.where((m) => m.gameId == gameId).toList()
       ..sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
     return list;
   }
@@ -101,6 +113,7 @@ class GameConfigSnapshot {
         'levels': levels.map((e) => e.toJson()).toList(),
         'achievements': achievements.map((e) => e.toJson()).toList(),
         'reward_rules': rewardRules.map((e) => e.toJson()).toList(),
+        'modes': modes.map((e) => e.toJson()).toList(),
         'cached_at': (cachedAt ?? DateTime.now()).toUtc().toIso8601String(),
       };
 
@@ -128,6 +141,7 @@ class GameConfigSnapshot {
           'achievements', GameAchievementModel.fromJson),
       rewardRules: parseRows<GameRewardRuleModel>(
           'reward_rules', GameRewardRuleModel.fromJson),
+      modes: parseRows<GameModeModel>('modes', GameModeModel.fromJson),
       cachedAt:
           cachedAtRaw != null ? DateTime.tryParse(cachedAtRaw) : null,
     );
@@ -186,6 +200,7 @@ class GameService {
       _fetchRows('game_levels', order: 'sort_order.asc'),
       _fetchRows('game_achievements', order: 'sort_order.asc'),
       _fetchRows('game_reward_rules', order: 'sort_order.asc'),
+      _fetchRows('game_modes', order: 'sort_order.asc'),
     ]);
 
     final snapshot = GameConfigSnapshot(
@@ -197,6 +212,7 @@ class GameService {
           results[3], GameAchievementModel.fromJson),
       rewardRules: _toModels<GameRewardRuleModel>(
           results[4], GameRewardRuleModel.fromJson),
+      modes: _toModels<GameModeModel>(results[5], GameModeModel.fromJson),
       cachedAt: DateTime.now(),
     );
 

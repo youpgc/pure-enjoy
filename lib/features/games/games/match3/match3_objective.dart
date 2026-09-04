@@ -98,29 +98,38 @@ class Match3Objective {
   });
 
   /// 从关卡 config 构造（缺省值按模式给合理默认，保证无配置也能玩）
+  ///
+  /// [mode] 可由调用方按 play_kind 预先解析后传入，避免重复推导；
+  /// 不传则内部按 config/level_no 兜底解析。
+  /// 配置键兼容 04 种子的别名：jelly_layers→jelly、ingredients/orders→collect、
+  /// time_limit→seconds（旧键 jelly/collect/bossHp/seconds 仍生效）。
   factory Match3Objective.fromConfig(
     Map<String, dynamic> config,
     int levelNo, {
     required int rows,
     required int cols,
+    Match3Mode? mode,
   }) {
-    final mode = parseMatch3Mode(config, levelNo);
-    int intOf(String key, int fallback) {
-      final v = config[key];
-      if (v is num) return v.toInt();
+    final resolved = mode ?? parseMatch3Mode(config, levelNo);
+    int intOf(String key, int fallback, [List<String>? aliases]) {
+      final keys = <String>[key, ...?aliases];
+      for (final k in keys) {
+        final v = config[k];
+        if (v is num) return v.toInt();
+      }
       return fallback;
     }
 
     return Match3Objective(
-      mode: mode,
+      mode: resolved,
       rows: rows,
       cols: cols,
       steps: intOf('steps', 22),
-      seconds: intOf('seconds', 90),
+      seconds: intOf('seconds', 90, ['time_limit']),
       goalScore: intOf('goal', 1200),
-      collectTarget: intOf('collect', 20),
+      collectTarget: intOf('collect', 20, ['ingredients', 'orders']),
       collectType: intOf('collectType', 0),
-      jellyCount: intOf('jelly', 14),
+      jellyCount: intOf('jelly', 14, ['jelly_layers']),
       iceCount: intOf('ice', 16),
       bossHp: intOf('bossHp', 260),
     );

@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import 'game_guide.dart';
@@ -9,6 +10,7 @@ import 'game_item_shop_screen.dart';
 import 'services/game_item_service.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
+import 'models/game_mode_model.dart';
 import 'models/match3_mode.dart';
 import 'play/game_single_dashboard.dart';
 import 'services/game_score_service.dart';
@@ -16,12 +18,11 @@ import 'services/game_service.dart';
 
 /// 游戏主界面（大厅点击游戏入口后的落地页）。
 ///
-/// 入口层级（避免「模式+开始游戏+选关」堆叠混乱）：
-/// - 消消乐（match3）：以「6 模式网格」为**选择模式**入口，点模式**直接进入**该模式
-///   首个未通关关卡（全通关回第一关），不再弹窗；底部「选择关卡」用于挑具体关卡。
-/// - 有选关能力的其它游戏（[GameModel.levelSelectable] 且 >1 关）：以「选择关卡」
-///   代替「开始游戏」，避免重复入口。
-/// - 单关卡游戏：保留「开始游戏」直接开局。
+/// 三游戏统一入口层级（不再按 game.code 分叉）：
+/// - 模式网格（玩法模式为主）：展示该游戏在 `game_modes` 表里的所有「有关卡」模式，
+///   点模式 → 选关弹窗（按 mode_id 过滤）或直接开合成关（无尽模式）。
+/// - 无后台模式时回落旧逻辑：「选择关卡」/「开始游戏」。
+/// 模式清单完全来自后台配置，App 端不再硬编码任何模式。
 class GameHomeScreen extends StatefulWidget {
   final GameModel game;
 
@@ -33,6 +34,7 @@ class GameHomeScreen extends StatefulWidget {
 
 class _GameHomeScreenState extends State<GameHomeScreen> {
   List<GameLevelModel> _levels = <GameLevelModel>[];
+  List<GameModeModel> _modes = <GameModeModel>[];
   Set<String> _clearedIds = const <String>{};
   bool _hasShop = false;
   bool _loading = true;
@@ -56,6 +58,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     if (mounted) {
       setState(() {
         _levels = config.levelsOf(widget.game.id);
+        _modes = config.modesOf(widget.game.id);
         _clearedIds = cleared;
         _hasShop = items.isNotEmpty;
         _loading = false;
@@ -82,56 +85,14 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  void _openPicker({Match3Mode? initialMode}) {
+  /// 全关卡选关（无模式时使用）。
+  void _openPicker() {
     GameLevelPicker.show(
       context: context,
       game: widget.game,
       levels: _levels,
       clearedIds: _clearedIds,
-      initialMode: initialMode,
     );
-  }
-
-  /// 点选模式后的分流：
-  /// - 配置为「需要选关」（levelSelectable）：先选模式再选对应关卡——
-  ///   打开选关弹窗并预选该模式（弹窗顶部只展示该模式，无模式切换交互）。
-  /// - 配置为「不需要选关」：直接以该模式最新可挑战关卡（frontier）开局，
-  ///   不再二次弹窗（如旧 mode 网格直接进关的体验）。
-  void _startMode(Match3Mode mode) {
-    if (widget.game.levelSelectable) {
-      _openPicker(initialMode: mode);
-      return;
-    }
-    final list = _levelsOfMode(mode);
-    final GameLevelModel lv;
-    if (list.isEmpty) {
-      lv = GameLevelModel(
-        id: '',
-        gameId: widget.game.id,
-        levelNo: mode.index * 10 + 1,
-        name: '${mode.label} · 体验关',
-        config: <String, dynamic>{'mode': mode.code},
-        countForDailyClear: false,
-      );
-    } else {
-      var maxCleared = -1;
-      for (var i = 0; i < list.length; i++) {
-        if (_clearedIds.contains(list[i].id)) maxCleared = i;
-      }
-      lv = list[maxCleared + 1 < list.length ? maxCleared + 1 : 0];
-    }
-    Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GamePlayScreen(game: widget.game, level: lv)),
-    );
-  }
-
-  /// 某模式下的关卡（按 level_no 升序）
-  List<GameLevelModel> _levelsOfMode(Match3Mode mode) {
-    final list = _levels
-        .where((l) => parseMatch3Mode(l.config, l.levelNo) == mode)
-        .toList()
-      ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
-    return list;
   }
 
   void _showGuide() {
@@ -188,7 +149,6 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
-    final isMatch3 = game.code == 'match3';
     final startable = _startLevel != null;
 
     return Scaffold(
@@ -206,8 +166,8 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                       padding: const EdgeInsets.all(20),
                       child: Row(
                         children: <Widget>[
-                          Icon(gameIcon(game.icon),
-                              size: 44, color: AppTheme.primaryOrange),
+                          SvgPicture.asset(gameCoverAsset(game.icon),
+                              width: 44, height: 44),
                           const SizedBox(width: 16),
                           Expanded(
                             child: Column(
@@ -230,17 +190,21 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     ),
                   ),
 
-                  // 消消乐：6 模式网格（模式为主）
-                  if (game.code == 'match3') _modeGrid(),
+                  const SizedBox(height: 16),
+
+                  // 模式网格（三游戏统一：模式为主，点模式→选关/合成关）
+                  // 无尽模式无后台关卡，按 isEndless 特判保留可达，不被「有关卡」过滤剔除。
+                  if (_modes.isNotEmpty)
+                    _modeGridGeneric(_modes
+                        .where((m) =>
+                            m.isEndless ||
+                            _levels.any((l) => l.modeId == m.id))
+                        .toList()),
 
                   const SizedBox(height: 16),
 
-                  // 入口：
-                  // - 消消乐以「模式网格」为起点（点模式即进入选关/最新关）；
-                  // - 非消消乐且后台配置「可选关」(levelSelectable) 且关卡 >1：
-                  //   提供「选择关卡」入口，点击弹出选关弹窗（复用 match3 的 GameLevelPicker）；
-                  // - 非消消乐且不可选关：保留「开始游戏」直接以当前可挑战关卡开局。
-                  if (!isMatch3)
+                  // 入口（无后台模式时回落旧逻辑）
+                  if (_modes.isEmpty)
                     if (game.levelSelectable && _levels.length > 1)
                       _EntryTile(
                         icon: Icons.grid_view_rounded,
@@ -284,8 +248,8 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  /// 消消乐模式网格：6 张卡，点选深链到该模式选关
-  Widget _modeGrid() {
+  /// 统一模式网格（三游戏一致）：模式为主，点模式→选关/合成关。
+  Widget _modeGridGeneric(List<GameModeModel> modes) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
@@ -297,7 +261,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
         GridView.builder(
           shrinkWrap: true,
           physics: const NeverScrollableScrollPhysics(),
-          itemCount: Match3Mode.values.length,
+          itemCount: modes.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
             mainAxisSpacing: 12,
@@ -305,41 +269,46 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
             childAspectRatio: 1.7,
           ),
           itemBuilder: (_, idx) {
-            final mode = Match3Mode.values[idx];
-            final cleared = _modeCleared(mode);
+            final mode = modes[idx];
+            final cleared = _modeClearedById(mode);
+            final total = _levelsOfModeId(mode.id).length;
+            final color = modeColorOf(mode.playKind);
+            final subtitle = mode.isEndless
+                ? '无尽 · 随时挑战'
+                : '已通关 $cleared/$total';
             return InkWell(
-              onTap: () => _startMode(mode),
+              onTap: () => _onModeTap(mode),
               borderRadius: BorderRadius.circular(14),
               child: Card(
                 child: Padding(
                   padding: const EdgeInsets.all(14),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
+                  child: Row(
                     children: <Widget>[
-                      Row(
-                        children: <Widget>[
-                          Icon(mode.icon, color: mode.color, size: 22),
-                          const SizedBox(width: 8),
-                          Expanded(
-                            child: Text(mode.label,
+                      Container(
+                        width: 36,
+                        height: 36,
+                        decoration: BoxDecoration(
+                          color: color.withAlpha(26),
+                          borderRadius: BorderRadius.circular(10),
+                        ),
+                        child: SvgPicture.asset(modeIconAsset(mode.icon),
+                            width: 22, height: 22),
+                      ),
+                      const SizedBox(width: 8),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Text(mode.name,
                                 style: const TextStyle(
                                     fontSize: 15, fontWeight: FontWeight.bold)),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 6),
-                      Expanded(
-                        child: Text(
-                          mode.summary,
-                          maxLines: 2,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 12, color: AppTheme.neutral600),
+                            const SizedBox(height: 4),
+                            Text(subtitle,
+                                style: const TextStyle(
+                                    fontSize: 11, color: AppTheme.neutral500)),
+                          ],
                         ),
                       ),
-                      Text('已通关 $cleared/5',
-                          style: const TextStyle(
-                              fontSize: 11, color: AppTheme.neutral500)),
                     ],
                   ),
                 ),
@@ -351,12 +320,44 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  int _modeCleared(Match3Mode mode) {
-    final ids = _levels
-        .where((l) => parseMatch3Mode(l.config, l.levelNo) == mode)
-        .map((l) => l.id)
-        .toSet();
+  int _modeClearedById(GameModeModel mode) {
+    final ids = _levels.where((l) => l.modeId == mode.id).map((l) => l.id).toSet();
     return _clearedIds.where(ids.contains).length;
+  }
+
+  List<GameLevelModel> _levelsOfModeId(String modeId) {
+    return _levels.where((l) => l.modeId == modeId).toList()
+      ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
+  }
+
+  /// 模式点击分流：
+  /// - 无尽模式（endless）：无具体关，直接开合成无尽局；
+  /// - 其它：打开选关弹窗（按 mode_id 过滤该模式关卡）。
+  void _onModeTap(GameModeModel mode) {
+    if (mode.isEndless) {
+      final lv = GameLevelModel.endless2048(
+        gameId: widget.game.id,
+        modeId: mode.id,
+        size: 4,
+      );
+      Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GamePlayScreen(game: widget.game, level: lv),
+        ),
+      );
+      return;
+    }
+    _openPickerForMode(mode);
+  }
+
+  void _openPickerForMode(GameModeModel mode) {
+    GameLevelPicker.show(
+      context: context,
+      game: widget.game,
+      levels: _levels,
+      clearedIds: _clearedIds,
+      mode: mode,
+    );
   }
 }
 

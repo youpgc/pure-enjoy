@@ -130,6 +130,7 @@ class GameScoreService {
   Future<String?> submitScore({
     required String gameId,
     String? levelId,
+    String? modeId,
     required bool cleared,
     String? statusOverride,
     required int durationMs,
@@ -148,6 +149,7 @@ class GameScoreService {
         'user_id': userId,
         'game_id': gameId,
         'level_id': levelId,
+        'mode_id': modeId,
         'status': statusOverride ?? (cleared ? 'cleared' : 'failed'),
         'duration_ms': durationMs,
         'played_at': now.toIso8601String(),

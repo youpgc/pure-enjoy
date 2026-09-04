@@ -7,6 +7,7 @@ import '../../models/game_level_model.dart';
 import '../../models/match3_mode.dart';
 import '../../models/game_item_model.dart';
 import '../../services/game_item_service.dart';
+import '../../services/game_service.dart';
 import '../../shared/game_shell.dart';
 import 'match3_flame_game.dart';
 import 'match3_objective.dart';
@@ -55,12 +56,27 @@ class _Match3GameState extends State<Match3Game> {
     final levelNo = widget.level?.levelNo ?? 0;
     final rows = (cfg['rows'] as num?)?.toInt() ?? 8;
     final cols = (cfg['cols'] as num?)?.toInt() ?? 8;
-    _mode = parseMatch3Mode(cfg, levelNo);
+    // 优先按关卡 mode_id → game_modes.play_kind 解析引擎行为（v2 唯一真相源）；
+    // play_kind 缺失时回落 config 语义键 / level_no 百位兜底。
+    String? playKind;
+    final lvl = widget.level;
+    if (lvl != null && lvl.modeId.isNotEmpty) {
+      final mode = GameService.instance.cachedConfig.modes
+          .where((m) => m.id == lvl.modeId)
+          .firstOrNull;
+      playKind = mode?.playKind;
+    }
+    _mode = resolveMatch3Mode(
+      config: cfg,
+      levelNo: levelNo,
+      playKind: playKind,
+    );
     _objective = Match3Objective.fromConfig(
       cfg,
       levelNo,
       rows: rows,
       cols: cols,
+      mode: _mode,
     );
     _hudTick = ValueNotifier<int>(0);
     _game = Match3FlameGame(

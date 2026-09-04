@@ -504,9 +504,15 @@ class Match3FlameGame extends FlameGame
       GameAudio.instance.fail();
     }
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
+    // 已用步数 = 配置总步数 - 剩余步数（钳制到 [0, steps]，失败临界 movesLeft 可能为 0/负）
+    final usedMoves = (objective.steps - objective.movesLeft).clamp(0, objective.steps);
     onFinished(GamePlayOutcome(
       cleared: cleared,
-      values: <String, num>{'score': score, 'duration_ms': elapsed},
+      values: <String, num>{
+        'score': score,
+        'duration_ms': elapsed,
+        'moves': usedMoves,
+      },
       durationMs: elapsed,
     ));
   }

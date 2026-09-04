@@ -128,6 +128,9 @@ extension Match3ModeMeta on Match3Mode {
     }
   }
 
+  /// SVG 资源路径（与 App 端 assets/games/icons 同名文件；双端统一图标）。
+  String get svg => 'assets/games/icons/mode_${code}.svg';
+
   Color get color {
     switch (this) {
       case Match3Mode.score:
@@ -147,6 +150,12 @@ extension Match3ModeMeta on Match3Mode {
 }
 
 /// 从关卡 config / level_no 解析模式；无法识别时回落到 [Match3Mode.score]。
+///
+/// 解析优先级（v2 统一模式体系）：
+///   1. play_kind（后台 game_modes.play_kind，模式→引擎行为的唯一真相源）；
+///   2. config 语义键（04 种子直接携带，无需 mode 字段即可判定，鲁棒兜底）；
+///   3. level_no 百位（旧编码兜底）；
+///   4. score。
 Match3Mode parseMatch3Mode(Map<String, dynamic> config, int levelNo) {
   final raw = config['mode'];
   if (raw is String && raw.isNotEmpty) {
@@ -154,12 +163,40 @@ Match3Mode parseMatch3Mode(Map<String, dynamic> config, int levelNo) {
       if (m.code == raw) return m;
     }
   }
+  // 04 种子 config 携带语义键，无需 mode 字段即可判定（兜底鲁棒）
+  if (config.containsKey('time_limit')) return Match3Mode.timed;
+  if (config.containsKey('jelly_layers')) return Match3Mode.clear;
+  if (config.containsKey('ingredients') || config.containsKey('orders')) {
+    return Match3Mode.collect;
+  }
   // 兜底：level_no 百位即模式序号（101..150=计分，201..250=消除 ...）
   final idx = levelNo ~/ 100;
   if (idx >= 1 && idx <= Match3Mode.values.length) {
     return Match3Mode.values[idx - 1];
   }
   return Match3Mode.score;
+}
+
+/// 按 play_kind（引擎 6 行为码 score/clear/collect/obstacle/timed/boss）解析模式；
+/// 无/未知返回 null，交由 [parseMatch3Mode] 继续兜底。
+Match3Mode? match3ModeFromPlayKind(String? playKind) {
+  if (playKind == null || playKind.isEmpty) return null;
+  for (final m in Match3Mode.values) {
+    if (m.code == playKind) return m;
+  }
+  return null;
+}
+
+/// 综合解析：优先 play_kind（后台语义，唯一真相源），
+/// 回落 config 键检测 / level_no 百位 / score。引擎侧统一入口。
+Match3Mode resolveMatch3Mode({
+  required Map<String, dynamic> config,
+  int levelNo = 0,
+  String? playKind,
+}) {
+  final fromPk = match3ModeFromPlayKind(playKind);
+  if (fromPk != null) return fromPk;
+  return parseMatch3Mode(config, levelNo);
 }
 
 /// 每个 match3 模式的关卡数（编码 `模式序号 × 100 + 1..50` 的容量）。
@@ -189,4 +226,14 @@ String match3ModeLabelOf(String code) {
     if (m.code == code) return m.label;
   }
   return code;
+}
+
+/// 按 play_kind（模式语义编码）取统一模式网格的展示色。
+/// match3 六模式（score/clear/collect/obstacle/timed/boss）取各自配色；
+/// 其余（2048 / merge 等）回落默认棕，保证三游戏网格视觉一致。
+Color modeColorOf(String playKind) {
+  for (final m in Match3Mode.values) {
+    if (m.code == playKind) return m.color;
+  }
+  return const Color(0xFF5D4037);
 }

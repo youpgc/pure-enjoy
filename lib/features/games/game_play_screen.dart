@@ -27,7 +27,7 @@ class GamePlayScreen extends StatefulWidget {
 }
 
 class _GamePlayScreenState extends State<GamePlayScreen> {
-  late final GameLevelModel _level;
+  GameLevelModel? _level;
   late final DateTime _enterTime;
   GamePlayOutcome? _outcome;
   int _restartNonce = 0;
@@ -35,15 +35,24 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   @override
   void initState() {
     super.initState();
-    // 选关界面已指定关卡则直接用；否则回退到「第一个启用关卡」
-    _level = widget.level ?? resolveLevel(widget.game);
     _enterTime = DateTime.now();
+    // 选关界面已指定关卡则直接用；否则回退「第一个启用关卡」（顺序/选关均由后台配置驱动）
+    if (widget.level != null) {
+      _level = widget.level!;
+    } else {
+      _level = resolveLevel(widget.game);
+    }
   }
 
   /// 返回键拦截：对局进行中弹「放弃本局」确认；确认后上报 status=aborted
   /// （只记成绩不结算发分），再退出。结算页已弹出（_outcome != null）时直接放行。
   Future<void> _onPopInvokedWithResult(bool didPop, Object? result) async {
     if (didPop) return;
+    if (_level == null) {
+      // 尚未选完棋盘尺寸（尺寸选择弹窗途中）直接放行返回
+      Navigator.of(context).pop();
+      return;
+    }
     if (_outcome != null) {
       Navigator.of(context).pop();
       return;
@@ -82,8 +91,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await reportAndSettle(
       context: context,
       game: widget.game,
-      level: _level,
-      scoreValuesByCode: <String, num>{'level': _level.levelNo},
+      level: _level!,
+      scoreValuesByCode: <String, num>{'level': _level!.levelNo},
       durationMs: durationMs,
       cleared: false,
       aborted: true,
@@ -95,15 +104,15 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (_outcome != null) return; // 防重复结算
     setState(() => _outcome = outcome);
     // 注入关卡号维度（后台已配置则参与成绩/奖励判定）
-    final values = <String, num>{...outcome.values, 'level': _level.levelNo};
+    final values = <String, num>{...outcome.values, 'level': _level!.levelNo};
     // 结算弹窗内的「下一关 / 再玩一次 / 返回大厅」统一由结算页承载，
     // 不再另弹居中卡片，避免与结算页重复。
-    final next = nextLevelOf(widget.game, _level);
+    final next = nextLevelOf(widget.game, _level!, modeId: _level!.modeId);
     final canNext = outcome.cleared && next != null;
     await reportAndSettle(
       context: context,
       game: widget.game,
-      level: _level,
+      level: _level!,
       scoreValuesByCode: values,
       durationMs: outcome.durationMs,
       cleared: outcome.cleared,
@@ -129,19 +138,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         return SheepGame(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
-          level: _level,
+          level: _level!,
         );
       case 'g2048':
         return G2048Game(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
-          level: _level,
+          level: _level!,
         );
       case 'match3':
         return Match3Game(
           key: ValueKey(_restartNonce),
           onFinished: _onFinished,
-          level: _level,
+          level: _level!,
           onRestart: () => setState(() {
             _outcome = null;
             _restartNonce++;
@@ -167,7 +176,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
             ),
           ),
         ),
-        body: _buildGame(),
+        body: _level == null
+            ? const Center(child: CircularProgressIndicator())
+            : _buildGame(),
       ),
     );
   }

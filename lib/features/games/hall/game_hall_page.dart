@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import './game_total_dashboard.dart';
@@ -113,8 +114,8 @@ class _GameHallPageState extends State<GameHallPage> {
                               child: Column(
                                 mainAxisAlignment: MainAxisAlignment.center,
                                 children: <Widget>[
-                                  Icon(gameIcon(game.icon),
-                                      size: 48, color: AppTheme.primaryOrange),
+                                  SvgPicture.asset(gameCoverAsset(game.icon),
+                                      width: 48, height: 48),
                                   const SizedBox(height: 12),
                                   Text(game.name,
                                       style: const TextStyle(
