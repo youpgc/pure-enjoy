@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
 import 'game_reward_picker.dart';
+import 'game_reward_service.dart';
 import 'game_service.dart';
 
 /// 模式段位徽章服务（v2 徽章化 q-0：成就 = 纯荣誉，0 积分，仅记录解锁）。
@@ -40,6 +41,12 @@ class GameBadgeService {
       values: judgeValues,
     );
     if (topTier == null) return null;
+    if (topTier.rewardPoints > 0) {
+      final r = await GameRewardService.instance.claimAchievementPoints(topTier);
+      if (r.granted) return topTier;
+      if (r.reason != '该奖励已领取') return null; // 如达单日上限：不记解锁，下次重试
+      // already=true：积分此前已发，补记解锁记录
+    }
     final isNew = await recordAchievementBadge(achievement: topTier);
     return isNew ? topTier : null;
   }

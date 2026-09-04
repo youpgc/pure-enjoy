@@ -507,7 +507,14 @@ String _dimName(List<GameDimensionModel> dims, String code) {
   for (final d in dims) {
     if (d.code == code) return d.name;
   }
-  return code;
+  // 维度未配置时的中文兜底（如 match3 结算注入的 level 关序维度）
+  const fallback = <String, String>{
+    'level': '关卡',
+    'score': '得分',
+    'moves': '步数',
+    'duration_ms': '用时',
+  };
+  return fallback[code] ?? code;
 }
 
 /// 格式化维度值（用时转 mm:ss）

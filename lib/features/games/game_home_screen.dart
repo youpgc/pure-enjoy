@@ -12,7 +12,8 @@ import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'models/game_mode_model.dart';
 import 'models/match3_mode.dart';
-import 'play/game_single_dashboard.dart';
+import 'play/game_best_screen.dart';
+import 'play/game_history_screen.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
 
@@ -77,22 +78,25 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     return _levels.last;
   }
 
-  void _startGame() {
+  /// 进入对局；返回后刷新最新配置与通关进度（结算/成绩可能已变化）
+  Future<void> _startGame() async {
     final lv = _startLevel;
     if (lv == null) return;
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GamePlayScreen(game: widget.game, level: lv)),
     );
+    if (mounted) await _load();
   }
 
   /// 全关卡选关（无模式时使用）。
-  void _openPicker() {
-    GameLevelPicker.show(
+  Future<void> _openPicker() async {
+    await GameLevelPicker.show(
       context: context,
       game: widget.game,
       levels: _levels,
       clearedIds: _clearedIds,
     );
+    if (mounted) await _load();
   }
 
   void _showGuide() {
@@ -134,9 +138,15 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  void _openRecords() {
+  void _openBest() {
     Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GameSingleDashboard(game: widget.game)),
+      MaterialPageRoute(builder: (_) => GameBestScreen(game: widget.game)),
+    );
+  }
+
+  void _openHistory() {
+    Navigator.of(context).push(
+      MaterialPageRoute(builder: (_) => GameHistoryScreen(game: widget.game)),
     );
   }
 
@@ -231,9 +241,15 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                   ),
                   _EntryTile(
                     icon: Icons.bar_chart_rounded,
-                    label: '查看游戏记录',
-                    desc: '我的成绩与最佳记录',
-                    onTap: _openRecords,
+                    label: '最佳记录',
+                    desc: '各模式 / 各维度最佳成绩',
+                    onTap: _openBest,
+                  ),
+                  _EntryTile(
+                    icon: Icons.history_rounded,
+                    label: '游戏记录',
+                    desc: '历史对局明细',
+                    onTap: _openHistory,
                   ),
                   if (_hasShop)
                     _EntryTile(
@@ -333,31 +349,33 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   /// 模式点击分流：
   /// - 无尽模式（endless）：无具体关，直接开合成无尽局；
   /// - 其它：打开选关弹窗（按 mode_id 过滤该模式关卡）。
-  void _onModeTap(GameModeModel mode) {
+  Future<void> _onModeTap(GameModeModel mode) async {
     if (mode.isEndless) {
       final lv = GameLevelModel.endless2048(
         gameId: widget.game.id,
         modeId: mode.id,
         size: 4,
       );
-      Navigator.of(context).push(
+      await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => GamePlayScreen(game: widget.game, level: lv),
         ),
       );
+      if (mounted) await _load();
       return;
     }
-    _openPickerForMode(mode);
+    await _openPickerForMode(mode);
   }
 
-  void _openPickerForMode(GameModeModel mode) {
-    GameLevelPicker.show(
+  Future<void> _openPickerForMode(GameModeModel mode) async {
+    await GameLevelPicker.show(
       context: context,
       game: widget.game,
       levels: _levels,
       clearedIds: _clearedIds,
       mode: mode,
     );
+    if (mounted) await _load();
   }
 }
 

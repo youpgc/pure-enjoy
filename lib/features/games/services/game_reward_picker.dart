@@ -109,17 +109,21 @@ GameAchievementModel? pickTopScoreAchievement(
   Map<String, num> values,
 ) {
   GameAchievementModel? best;
-  num bestGte = -1;
+  num bestRank = -double.maxFinite.toInt();
   for (final ach in achievements) {
     if (achievementTypeOf(ach) != kAchievementTypeScore) continue;
     final dim = ach.condition['dimension']?.toString();
+    if (dim == null) continue;
     final gte = ach.condition['gte'];
-    if (dim == null || gte is! num) continue;
+    final lte = ach.condition['lte'];
+    if (gte is! num && lte is! num) continue;
     final v = values[dim];
     if (v == null) continue;
-    if (v < gte) continue;
-    if (gte > bestGte) {
-      bestGte = gte;
+    if (gte is num && v < gte) continue;
+    if (lte is num && v > lte) continue;
+    final rank = gte is num ? gte : -(lte as num);
+    if (rank > bestRank) {
+      bestRank = rank;
       best = ach;
     }
   }

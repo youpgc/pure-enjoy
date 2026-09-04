@@ -44,7 +44,7 @@ class AchievementIcon extends StatelessWidget {
         height: size,
       );
     }
-    final RegExpMatch? m = RegExp(r'^ach_([a-z0-9]+)_c(\d+)$').firstMatch(token);
+    final RegExpMatch? m = RegExp(r'^ach_([a-z0-9_]+?)_c(\d+)$').firstMatch(token);
     if (m != null) {
       final String el = m.group(1)!;
       final int rank = int.tryParse(m.group(2)!) ?? 1;

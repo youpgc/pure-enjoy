@@ -10,6 +10,7 @@ import '../../services/game_item_service.dart';
 import '../../services/game_service.dart';
 import '../../shared/game_shell.dart';
 import 'match3_flame_game.dart';
+import 'candy_component.dart';
 import 'match3_objective.dart';
 
 /// 消消乐 Flutter 承载组件。
@@ -209,14 +210,28 @@ class _Match3GameState extends State<Match3Game> {
       valueListenable: _hudTick,
       builder: (_, __, ___) {
         final stats = _objective.stats();
+        // 收集模式：状态栏最前展示目标糖果色块，明确「收集哪种颜色」
+        final showCollectTarget = _objective.collectTarget > 0;
+        final collectColor =
+            kCandyColors[_objective.collectType.clamp(0, kCandyColors.length - 1)];
+        final collectName =
+            kCandyColorNames[_objective.collectType.clamp(0, kCandyColorNames.length - 1)];
         return GameShell(
-          statusItems: stats
-              .map((s) => GameStatusItem(
-                    label: s.label,
-                    value: s.value,
-                    valueColor: s.alert ? AppTheme.error : null,
-                  ))
-              .toList(),
+          statusItems: <GameStatusItem>[
+            if (showCollectTarget)
+              GameStatusItem(
+                label: '目标糖果',
+                value: '●$collectName',
+                valueColor: collectColor,
+              ),
+            ...stats.map(
+              (s) => GameStatusItem(
+                label: s.label,
+                value: s.value,
+                valueColor: s.alert ? AppTheme.error : null,
+              ),
+            ),
+          ],
           banner: _buildBanner(),
           hint: _objective.hint,
           actions: <GameAction>[

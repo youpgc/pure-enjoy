@@ -324,7 +324,7 @@ class GameRewardService {
       items.add(GameSettlementItem(
         kind: 'achievement',
         label: '徽章解锁：${newBadge.name}',
-        points: 0,
+        points: newBadge.rewardPoints,
         granted: true,
       ));
     }
@@ -332,6 +332,20 @@ class GameRewardService {
     return GameSettlementResult(items: items);
   }
 
+
+  /// 段位徽章积分发放（v2 徽章化升级：mode_tier 成就带积分）。
+  ///
+  /// claim_key 沿用 `achievement:{code}`，幂等；计入单日上限（先到先拦）。
+  Future<GameRewardResult> claimAchievementPoints(
+    GameAchievementModel achievement,
+  ) {
+    return _tryClaim(
+      claimKey: 'achievement:${achievement.code}',
+      points: achievement.rewardPoints,
+      remark: '成就达成（${achievement.name}）',
+      gameId: achievement.gameId,
+    );
+  }
 
   /// 查询今日（北京自然日）已领取的游戏奖励积分。
   ///

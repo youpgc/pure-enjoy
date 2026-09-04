@@ -184,15 +184,22 @@ void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal
   }
 }
 
+/// 糖果基础色板（index 即 cell.type / 收集目标 collectType 的取值域），
+/// HUD「目标糖果」展示与绘制共用，保证颜色一致。
+const List<Color> kCandyColors = <Color>[
+  Color(0xFFEF5350),
+  Color(0xFF42A5F5),
+  Color(0xFF66BB6A),
+  Color(0xFFFFEE58),
+  Color(0xFFAB47BC),
+  Color(0xFFFFA726),
+];
+
+/// 色板对应的中文名（收集模式 HUD 展示用）
+const List<String> kCandyColorNames = <String>['红', '蓝', '绿', '黄', '紫', '橙'];
+
 void _drawBomb(Canvas canvas, double cx, double cy, double r, double a) {
-  final colors = <Color>[
-    const Color(0xFFEF5350),
-    const Color(0xFF42A5F5),
-    const Color(0xFF66BB6A),
-    const Color(0xFFFFEE58),
-    const Color(0xFFAB47BC),
-    const Color(0xFFFFA726),
-  ];
+  final colors = kCandyColors;
   for (var i = 0; i < colors.length; i++) {
     canvas.drawArc(
       Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.7),

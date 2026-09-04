@@ -6,7 +6,8 @@ import 'games/match3/match3_game.dart';
 import 'games/sheep/sheep_game.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
-import 'play/game_single_dashboard.dart';
+import 'play/game_best_screen.dart';
+import 'play/game_history_screen.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
 /// 不结算发分，避免拉低正常通关率等统计数据。
@@ -167,14 +168,29 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       canPop: false,
       onPopInvokedWithResult: _onPopInvokedWithResult,
       child: Scaffold(
-        appBar: buildGameAppBar(
-          context,
-          widget.game,
-          () => Navigator.of(context).push(
-            MaterialPageRoute(
-              builder: (_) => GameSingleDashboard(game: widget.game),
+        // 游戏记录与最佳记录拆分为两个独立入口（原成绩看板聚合页已拆分）
+        appBar: AppBar(
+          title: Text(widget.game.name),
+          actions: <Widget>[
+            IconButton(
+              icon: const Icon(Icons.emoji_events_outlined),
+              tooltip: '最佳记录',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GameBestScreen(game: widget.game),
+                ),
+              ),
             ),
-          ),
+            IconButton(
+              icon: const Icon(Icons.history),
+              tooltip: '游戏记录',
+              onPressed: () => Navigator.of(context).push(
+                MaterialPageRoute(
+                  builder: (_) => GameHistoryScreen(game: widget.game),
+                ),
+              ),
+            ),
+          ],
         ),
         body: _level == null
             ? const Center(child: CircularProgressIndicator())
