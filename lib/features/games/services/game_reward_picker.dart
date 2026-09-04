@@ -76,8 +76,8 @@ GameRewardRuleModel? pickTopScoreRangeRule(
 
 /// 挑选本局「关卡里程碑」成就：满足 `min_level_no <= [levelNo]` 的最高档（至多 1 条）。
 ///
-/// [levelNo] 需传**折算后的全局关序**（match3 由 match3LevelIndex 换算），
-/// 与后台 min_level_no 同一口径。
+/// [levelNo] 需传**折算后的全局关序**（match3 由 `game_reward_service` 的
+/// _match3GlobalLevelIndex 按后台配置动态推导），与后台 min_level_no 同一口径。
 GameAchievementModel? pickTopLevelAchievement(
   List<GameAchievementModel> achievements,
   int levelNo,

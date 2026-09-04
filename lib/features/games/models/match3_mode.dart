@@ -2,14 +2,15 @@ import 'package:flutter/material.dart';
 
 /// 消消乐玩法模式（对标市场主流三消手游的 6 类关卡目标）。
 ///
-/// 落库方式（**无 DDL**）：模式写在 `game_levels.config.mode`，同时用
-/// `level_no` 编码 `模式序号 × 100 + 模式内关序(1~50)`（如 201..250 =
-/// 消除模式 1~50 关），使 `(game_id, level_no)` 唯一约束天然容纳
-/// 「每模式 50 关 / 共 300 关」，且后台关卡管理页无需改造即可维护。
-/// config 缺 mode 时按 level_no **百位**兜底推导。
+/// 模式由 `game_modes`（play_kind）驱动，关卡存 `game_levels`（mode_id + level_no），
+/// 与 2048 / 羊 统一为「游戏 → 模式 → 关卡」三级结构；App 端不硬编码模式数/关数。
+/// [parseMatch3Mode] / [resolveMatch3Mode] 仅负责把 `config` / `play_kind` / `level_no`
+/// 解析为引擎 6 行为码（score/clear/collect/obstacle/timed/boss）。
 ///
-/// ⚠️ 该编码由 `/d/workspace/sql/feature_reseed_match3_levels_300.sql` 落库，
-/// 改动编码规则必须同步 [parseMatch3Mode] 与 [match3LevelIndex]。
+/// ⚠️ 消消乐「全局关序」（成就「累计通关至第 N 关」比对用）**不再硬编码**，
+/// 改为按 `GameConfigSnapshot` 中该游戏各模式真实关数动态累加（见
+/// `game_reward_service.dart` 的 `_match3GlobalLevelIndex`），与后台
+/// `game_levels` 实际数据一致，避免 50/100 口径漂移。
 enum Match3Mode {
   /// 步数计分：限定步数内达到目标分（经典关）
   score,
@@ -199,25 +200,8 @@ Match3Mode resolveMatch3Mode({
   return parseMatch3Mode(config, levelNo);
 }
 
-/// 每个 match3 模式的关卡数（编码 `模式序号 × 100 + 1..50` 的容量）。
-const int match3LevelsPerMode = 50;
-
-/// 关卡的**全局关序**（1~300）：把 `level_no` 的
-/// 「模式序号 × 100 + 模式内关序(1~50)」编码折算为跨模式连续关序。
-///
-/// 该口径用于成就「累计通关至第 N 关」判定：`game_achievements.condition`
-/// 的 `min_level_no` 阈值为 5/10/20/30/50/70/100/150/200/300，其中
-/// 300 恰为「第 6 模式第 50 关」（最后一关），故必须按全局关序比对，
-/// 不能用原始 level_no（101 会被当成第 101 关而误判达成多档成就），
-/// 也不能只取模式内关序（最大 50，会让 70 以上的成就永不可达）。
-///
-/// 旧数据（未编码、`level_no < 100`）原样返回，保证兼容。
-int match3LevelIndex(int levelNo) {
-  final mode = levelNo ~/ 100; // 1..6
-  final unit = levelNo % 100; // 1..50
-  if (mode < 1 || mode > Match3Mode.values.length || unit < 1) return levelNo;
-  return (mode - 1) * match3LevelsPerMode + unit;
-}
+/// 消消乐全局关序（成就「累计通关至第 N 关」比对用）改为按后台配置动态推导，
+/// 见 `game_reward_service.dart` 的 `_match3GlobalLevelIndex`（不再硬编码 50/模式）。
 
 /// 模式编码 → 中文展示名（未知编码原样返回）。
 /// 供道具商城/道具管理等展示 `game_items.mode`（如 timed → 限时模式）。

@@ -8,10 +8,27 @@ import '../../profile/services/point_service_utils.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
 import '../models/game_model.dart';
-import '../models/match3_mode.dart';
 import '../models/game_reward_rule_model.dart';
 import 'game_reward_picker.dart';
 import 'game_service.dart';
+
+/// 按后台配置动态推导 match3 关卡的「全局关序」（配置驱动，不硬编码 50/100）。
+///
+/// 全局关序 = 排在本模式之前的所有模式实际关数之和 + 本模式内关序(levelNo)，
+/// 与后台 `game_levels` 实际数据一致，供成就「累计通关至第 N 关」与 score_range
+/// 规则的 'level' 维度比对（须与 `min_level_no` / 规则阈值同一口径）。
+int _match3GlobalLevelIndex(GameConfigSnapshot config, GameLevelModel level) {
+  final modes = config.modesOf(level.gameId);
+  int offset = 0;
+  for (final m in modes) {
+    if (m.id == level.modeId) {
+      return offset + (level.levelNo > 0 ? level.levelNo : 0);
+    }
+    offset += config.levels.where((l) => l.modeId == m.id).length;
+  }
+  // 找不到对应模式（数据异常）：回退原始 levelNo，保证不崩溃
+  return level.levelNo;
+}
 
 /// 奖励发放结果
 class GameRewardResult {
@@ -236,15 +253,17 @@ class GameRewardService {
     final items = <GameSettlementItem>[];
     final config = await GameService.instance.fetchConfig();
 
-    // 判定专用取值：match3 的 level_no 是「模式序号×100 + 模式内关序(1~50)」编码，
-    // 若后台把 'level' 配成 score_range 规则或成就的比对维度，必须先折算为
-    // 全局关序(1~300) 再比对，否则 101（第 1 关）会被当成第 101 关而误发高档奖励。
-    // 仅用于判定；成绩上报（game_scores）由调用方使用原始 level_no，不受影响。
+    // 判定专用取值：match3 关卡全局关序按后台配置动态推导（_match3GlobalLevelIndex，
+    // 累加各模式真实关数），与 `game_levels` 实际数据一致，供 'level' 维度的
+    // score_range 规则 / 成就比对。仅用于判定；成绩上报用原始 level_no，不受影响。
+    final match3GlobalIndex = game.code == 'match3'
+        ? _match3GlobalLevelIndex(config, level)
+        : level.levelNo;
     final judgeValues =
         game.code == 'match3' && scoreValuesByCode.containsKey('level')
             ? <String, num>{
                 ...scoreValuesByCode,
-                'level': match3LevelIndex(scoreValuesByCode['level']!.toInt()),
+                'level': match3GlobalIndex,
               }
             : scoreValuesByCode;
 
@@ -308,13 +327,9 @@ class GameRewardService {
       ...config.achievements.where((a) => a.gameId == null && a.enabled),
     ];
 
-    // 消消乐的 level_no 采用「模式序号×100 + 模式内关序(1~50)」编码
-    // （如 201=消除模式第 1 关，即全局第 51 关）。直接用原始 level_no 比对
-    // min_level_no 会把「第 1 关」误判为已满足「通关第 100/150/200 关」。
-    // 需折算为跨模式的全局关序(1~300)（match3LevelIndex）再比对，
-    // 成就阈值 10..300 正是按全局关序配置的（300=第 6 模式第 50 关）。
-    final effectiveLevelNo =
-        game.code == 'match3' ? match3LevelIndex(level.levelNo) : level.levelNo;
+    // 消消乐全局关序按后台配置动态推导（见 _match3GlobalLevelIndex），
+    // 与后台 `game_levels` 实际关数一致，成就 `min_level_no` 阈值按同一口径比对。
+    final effectiveLevelNo = match3GlobalIndex;
 
     // 3a) 「首次通关」类成就：账号终身唯一、全局与单游戏可叠加，
     //     已领取由 claim_key 唯一索引幂等拦截（不二次计算发放）。
@@ -425,7 +440,7 @@ class GameRewardService {
         );
       }
 
-      // 1b) 单游戏单日上限（如 sheep/g2048/match3 各 100 分）。
+      // 1b) 单游戏单日上限（如 sheep/g2048/match3 各 50 分，见参考文档 §7/§13 D8）。
       //     与全局上限取「先到先拦」——两者独立约束，任一超限即止。
       if (gameId != null) {
         final gameLimit = config.dailyLimitPerGame(gameId);
