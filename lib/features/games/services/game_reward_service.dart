@@ -9,8 +9,15 @@ import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 import '../models/game_reward_rule_model.dart';
+import 'game_badge_service.dart';
 import 'game_reward_picker.dart';
 import 'game_service.dart';
+
+// 结算模型类（GameRewardResult / GameSettlementItem / GameSettlementResult）
+// 已拆至 game_settlement_models.dart；import 供本文件使用，export 保持调用方
+// 原有 import 路径（from game_reward_service.dart）不变。
+import 'game_settlement_models.dart';
+export 'game_settlement_models.dart';
 
 /// 按后台配置动态推导 match3 关卡的「全局关序」（配置驱动，不硬编码 50/100）。
 ///
@@ -29,74 +36,6 @@ int _match3GlobalLevelIndex(GameConfigSnapshot config, GameLevelModel level) {
   // 找不到对应模式（数据异常）：回退原始 levelNo，保证不崩溃
   return level.levelNo;
 }
-
-/// 奖励发放结果
-class GameRewardResult {
-  /// 是否实际发放
-  final bool granted;
-
-  /// 发放积分（未发放为 0）
-  final int points;
-
-  /// 未发放原因（发放成功为 null）
-  final String? reason;
-
-  const GameRewardResult._({
-    required this.granted,
-    this.points = 0,
-    this.reason,
-  });
-
-  /// 发放成功。
-  factory GameRewardResult.granted({required int points}) =>
-      GameRewardResult._(granted: true, points: points);
-
-  /// 未发放（含原因，便于 UI 提示）。
-  factory GameRewardResult.notGranted({String? reason}) =>
-      GameRewardResult._(granted: false, reason: reason);
-}
-
-/// 单条奖励明细（供结算页展示）
-class GameSettlementItem {
-  /// 奖励种类：daily_first_clear / score_range / achievement
-  final String kind;
-
-  /// 展示名
-  final String label;
-
-  /// 发放积分（未发放为 0）
-  final int points;
-
-  /// 是否实际发放
-  final bool granted;
-
-  /// 未发放原因（发放成功为 null）
-  final String? reason;
-
-  const GameSettlementItem({
-    required this.kind,
-    required this.label,
-    required this.points,
-    required this.granted,
-    this.reason,
-  });
-}
-
-/// 一次结算的全部奖励明细
-class GameSettlementResult {
-  /// 明细列表
-  final List<GameSettlementItem> items;
-
-  const GameSettlementResult({required this.items});
-
-  /// 实际发放总积分
-  int get totalPoints =>
-      items.where((e) => e.granted).fold(0, (sum, e) => sum + e.points);
-
-  /// 是否有任意一项发放成功
-  bool get hasGranted => items.any((e) => e.granted);
-}
-
 /// 游戏积分奖励服务
 ///
 /// 职责：在防刷 A 方案下发放游戏奖励（每日首次通关 / 成就达成 / 成绩区间首次达成）。
@@ -372,94 +311,27 @@ class GameRewardService {
     }
 
     // 4) 模式段位徽章（v2 徽章化 q-0：成就=纯荣誉，0 积分，仅记录解锁）。
-    //    按本局维度值（score/level）取该游戏该模式满足阈值的最高档，
-    //    写 user_game_achievements（唯一索引幂等），不受单日上限约束。
-    final modeCode = _resolveModeCode(config, game.id, level);
-    if (modeCode != null) {
-      final topTier = pickTopModeTierAchievement(
-        achievements,
-        gameCode: game.code,
-        modeCode: modeCode,
-        values: judgeValues,
-      );
-      if (topTier != null) {
-        final isNew = await recordAchievementBadge(achievement: topTier);
-        if (isNew) {
-          items.add(GameSettlementItem(
-            kind: 'achievement',
-            label: '徽章解锁：${topTier.name}',
-            points: 0,
-            granted: true,
-          ));
-        }
-      }
+    //    判定与落库见 GameBadgeService（体量拆分），此处只编排结果展示。
+    final newBadge = await GameBadgeService.instance.unlockTopTier(
+      config: config,
+      gameId: game.id,
+      gameCode: game.code,
+      level: level,
+      achievements: achievements,
+      judgeValues: judgeValues,
+    );
+    if (newBadge != null) {
+      items.add(GameSettlementItem(
+        kind: 'achievement',
+        label: '徽章解锁：${newBadge.name}',
+        points: 0,
+        granted: true,
+      ));
     }
 
     return GameSettlementResult(items: items);
   }
 
-  /// 由关卡反解模式编码（mode_tier 徽章匹配用）。
-  ///
-  /// 优先按 `level.modeId` 查配置缓存；endless 合成关（无 server 关）按
-  /// `isEndless` 兜底。找不到返回 null（数据异常时跳过徽章判定，不崩溃）。
-  String? _resolveModeCode(
-    GameConfigSnapshot config,
-    String gameId,
-    GameLevelModel level,
-  ) {
-    for (final m in config.modesOf(gameId)) {
-      if (m.id == level.modeId) return m.code;
-    }
-    if (level.id.startsWith('endless_2048')) {
-      for (final m in config.modesOf(gameId)) {
-        if (m.isEndless) return m.code;
-      }
-    }
-    return null;
-  }
-
-  /// 记录徽章解锁（v2 徽章化：0 积分成就仅写 user_game_achievements，不发分）。
-  ///
-  /// 幂等：先查后插（`uk_user_game_achievements` 唯一索引双兜底）。
-  /// 返回 true 表示本次为新解锁；false 表示已解锁或写入失败（静默，best-effort）。
-  Future<bool> recordAchievementBadge({
-    required GameAchievementModel achievement,
-  }) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return false;
-    try {
-      final existing = await ApiClient.get(
-        'user_game_achievements',
-        filters: <String, String>{
-          'user_id': 'eq.$userId',
-          'achievement_id': 'eq.${achievement.id}',
-        },
-        select: 'id',
-        limit: 1,
-        note: 'games:badge_check',
-      );
-      if (existing.isSuccess &&
-          ((existing.data as List<dynamic>?)?.isNotEmpty ?? false)) {
-        return false; // 已解锁，幂等返回
-      }
-      final inserted = await ApiClient.post(
-        'user_game_achievements',
-        <String, dynamic>{
-          'id': const Uuid().v4(),
-          'user_id': userId,
-          'achievement_id': achievement.id,
-          'unlocked_at': DateTime.now().toUtc().toIso8601String(),
-          'created_at': DateTime.now().toUtc().toIso8601String(),
-        },
-        returnRepresentation: false,
-        note: 'games:badge_unlock',
-      );
-      return inserted.isSuccess;
-    } catch (e) {
-      debugPrint('[GameRewardService] 徽章记录失败：${achievement.code} $e');
-      return false;
-    }
-  }
 
   /// 查询今日（北京自然日）已领取的游戏奖励积分。
   ///

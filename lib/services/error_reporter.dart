@@ -27,12 +27,22 @@ class ErrorReporter {
   }
 
   /// 在 WidgetsFlutterBinding.ensureInitialized() 之后调用，接管全局异常。
+  ///
+  /// ⚠️ 必须先走 FlutterError.presentError / reportError 把异常打印到控制台，
+  /// 再做静默上报——若只静默 report，首帧/启动期异常会被吞掉，
+  /// 表现为「无报错的卡死/白屏」，无法从日志定位（2026-09-04 审查确认隐患）。
   static void init() {
     FlutterError.onError = (details) {
+      FlutterError.presentError(details);
       report(details.exception, details.stack, module: 'flutter');
     };
     // 捕获异步/平台层未处理错误（如原生回调异常）
     PlatformDispatcher.instance.onError = (error, stack) {
+      FlutterError.reportError(FlutterErrorDetails(
+        exception: error,
+        stack: stack,
+        library: 'platform dispatcher',
+      ));
       report(error, stack, module: 'platform');
       return true;
     };
