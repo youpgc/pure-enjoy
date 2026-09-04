@@ -10,6 +10,9 @@ const String kAchievementTypeLevel = 'level';
 /// 成就条件类型：单局得分里程碑（dimension + gte）
 const String kAchievementTypeScore = 'score';
 
+/// 成就条件类型：模式段位徽章（v2 徽章化：mode_tier，不发积分仅解锁）
+const String kAchievementTypeModeTier = 'mode_tier';
+
 /// 成就/规则达成档位挑选器（纯函数，无状态、无 IO）。
 ///
 /// 解决「里程碑分档被循环发放」问题：后台把关卡/得分里程碑按阈值切成 10 档
@@ -117,6 +120,45 @@ GameAchievementModel? pickTopScoreAchievement(
     if (v < gte) continue;
     if (gte > bestGte) {
       bestGte = gte;
+      best = ach;
+    }
+  }
+  return best;
+}
+
+/// 挑选本局达成的「模式段位」最高档（v2 徽章化，至多 1 条）。
+///
+/// condition 形如 `{'type':'mode_tier','game':'g2048','mode':'classic','tier':1,
+/// 'threshold':{'score':5145}}`（sheep 用 `{'level':14}`）。threshold 全部键
+/// 在 [values] 中达标（`值 >= 阈值`）才算达成；返回 tier 最大的一条。
+/// [modeCode] 为空时不按模式过滤（用于无法确定模式的数据兜底，正常不会发生）。
+GameAchievementModel? pickTopModeTierAchievement(
+  List<GameAchievementModel> achievements, {
+  required String gameCode,
+  String? modeCode,
+  required Map<String, num> values,
+}) {
+  GameAchievementModel? best;
+  num bestTier = -1;
+  for (final ach in achievements) {
+    if (achievementTypeOf(ach) != kAchievementTypeModeTier) continue;
+    if (ach.condition['game']?.toString() != gameCode) continue;
+    if (modeCode != null &&
+        ach.condition['mode']?.toString() != modeCode) {
+      continue;
+    }
+    final threshold = ach.condition['threshold'];
+    if (threshold is! Map) continue;
+    var ok = true;
+    threshold.forEach((key, value) {
+      final val = values[key.toString()];
+      if (val == null || (value is num && val < value)) ok = false;
+    });
+    if (!ok) continue;
+    final tier = ach.condition['tier'];
+    final t = tier is num ? tier : 0;
+    if (t > bestTier) {
+      bestTier = t;
       best = ach;
     }
   }

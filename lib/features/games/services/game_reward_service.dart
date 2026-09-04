@@ -371,7 +371,94 @@ class GameRewardService {
       ));
     }
 
+    // 4) 模式段位徽章（v2 徽章化 q-0：成就=纯荣誉，0 积分，仅记录解锁）。
+    //    按本局维度值（score/level）取该游戏该模式满足阈值的最高档，
+    //    写 user_game_achievements（唯一索引幂等），不受单日上限约束。
+    final modeCode = _resolveModeCode(config, game.id, level);
+    if (modeCode != null) {
+      final topTier = pickTopModeTierAchievement(
+        achievements,
+        gameCode: game.code,
+        modeCode: modeCode,
+        values: judgeValues,
+      );
+      if (topTier != null) {
+        final isNew = await recordAchievementBadge(achievement: topTier);
+        if (isNew) {
+          items.add(GameSettlementItem(
+            kind: 'achievement',
+            label: '徽章解锁：${topTier.name}',
+            points: 0,
+            granted: true,
+          ));
+        }
+      }
+    }
+
     return GameSettlementResult(items: items);
+  }
+
+  /// 由关卡反解模式编码（mode_tier 徽章匹配用）。
+  ///
+  /// 优先按 `level.modeId` 查配置缓存；endless 合成关（无 server 关）按
+  /// `isEndless` 兜底。找不到返回 null（数据异常时跳过徽章判定，不崩溃）。
+  String? _resolveModeCode(
+    GameConfigSnapshot config,
+    String gameId,
+    GameLevelModel level,
+  ) {
+    for (final m in config.modesOf(gameId)) {
+      if (m.id == level.modeId) return m.code;
+    }
+    if (level.id.startsWith('endless_2048')) {
+      for (final m in config.modesOf(gameId)) {
+        if (m.isEndless) return m.code;
+      }
+    }
+    return null;
+  }
+
+  /// 记录徽章解锁（v2 徽章化：0 积分成就仅写 user_game_achievements，不发分）。
+  ///
+  /// 幂等：先查后插（`uk_user_game_achievements` 唯一索引双兜底）。
+  /// 返回 true 表示本次为新解锁；false 表示已解锁或写入失败（静默，best-effort）。
+  Future<bool> recordAchievementBadge({
+    required GameAchievementModel achievement,
+  }) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return false;
+    try {
+      final existing = await ApiClient.get(
+        'user_game_achievements',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'achievement_id': 'eq.${achievement.id}',
+        },
+        select: 'id',
+        limit: 1,
+        note: 'games:badge_check',
+      );
+      if (existing.isSuccess &&
+          ((existing.data as List<dynamic>?)?.isNotEmpty ?? false)) {
+        return false; // 已解锁，幂等返回
+      }
+      final inserted = await ApiClient.post(
+        'user_game_achievements',
+        <String, dynamic>{
+          'id': const Uuid().v4(),
+          'user_id': userId,
+          'achievement_id': achievement.id,
+          'unlocked_at': DateTime.now().toUtc().toIso8601String(),
+          'created_at': DateTime.now().toUtc().toIso8601String(),
+        },
+        returnRepresentation: false,
+        note: 'games:badge_unlock',
+      );
+      return inserted.isSuccess;
+    } catch (e) {
+      debugPrint('[GameRewardService] 徽章记录失败：${achievement.code} $e');
+      return false;
+    }
   }
 
   /// 查询今日（北京自然日）已领取的游戏奖励积分。

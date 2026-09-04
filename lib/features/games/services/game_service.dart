@@ -232,22 +232,37 @@ class GameService {
   }
 
   /// 查询启用行；失败返回空列表并记日志（配置表为全局表，不按用户过滤）。
+  ///
+  /// **分页拉全量**：PostgREST 服务端默认单次最多返回 1000 行（db-max-rows），
+  /// `limit:null` 且无 Range 头会被静默截断（game_levels 1200 关只拿到前 1000，
+  /// 选关/下一关/关序折算全部失真）。这里按 1000/页循环拉取直至不足一页。
   Future<List<dynamic>> _fetchRows(
     String table, {
     required String order,
   }) async {
-    final result = await ApiClient.get(
-      table,
-      filters: <String, String>{'enabled': 'eq.true'},
-      order: order,
-      limit: null, // 配置表行数有限，取全量（避免默认 limit=10 截断）
-      note: 'games:$table',
-    );
-    if (!result.isSuccess) {
-      debugPrint('[GameService] 拉取 $table 失败：${result.errorMessage}');
-      return <dynamic>[];
+    const pageSize = 1000;
+    final all = <dynamic>[];
+    var offset = 0;
+    while (true) {
+      final result = await ApiClient.get(
+        table,
+        filters: <String, String>{'enabled': 'eq.true'},
+        order: order,
+        limit: pageSize,
+        offset: offset,
+        note: 'games:$table',
+      );
+      if (!result.isSuccess) {
+        debugPrint('[GameService] 拉取 $table 失败：${result.errorMessage}');
+        // 首页失败返回空；后续页失败保留已拉到的部分（优于整体放弃）
+        return offset == 0 ? <dynamic>[] : all;
+      }
+      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+      all.addAll(rows);
+      if (rows.length < pageSize) break;
+      offset += pageSize;
     }
-    return (result.data as List<dynamic>?) ?? <dynamic>[];
+    return all;
   }
 
   /// 将原始行列表转为模型列表（跳过结构异常行，避免单行脏数据导致整页崩溃）。
