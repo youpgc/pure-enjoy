@@ -1,11 +1,8 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import '../services/achievement_service.dart';
-
-/// 成就图标资源路径（App 端按 code 派生，不依赖 game_achievements.icon 旧名）。
-String _achAssetPath(String code) => 'assets/games/achievements/ach_$code.svg';
+import '../shared/achievement_icon.dart';
 
 /// 我的成就页
 ///
@@ -82,11 +79,7 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
                           child: Column(
                             mainAxisAlignment: MainAxisAlignment.center,
                             children: <Widget>[
-                              SvgPicture.asset(
-                                _achAssetPath(view.achievement.code),
-                                width: 64,
-                                height: 64,
-                              ),
+                              AchievementIcon(view.achievement.icon, size: 64),
                               const SizedBox(height: 10),
                               Text(
                                 view.achievement.name,
@@ -197,11 +190,7 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      SvgPicture.asset(
-                        _achAssetPath(view.achievement.code),
-                        width: 96,
-                        height: 96,
-                      ),
+                      AchievementIcon(view.achievement.icon, size: 96),
                       const SizedBox(height: 16),
                       Text(
                         view.achievement.name,
