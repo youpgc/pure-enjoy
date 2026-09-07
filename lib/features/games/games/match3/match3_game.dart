@@ -10,7 +10,7 @@ import '../../services/game_item_service.dart';
 import '../../services/game_service.dart';
 import '../../shared/game_shell.dart';
 import 'match3_flame_game.dart';
-import 'candy_component.dart';
+import 'goal_banner.dart';
 import 'match3_objective.dart';
 
 /// 消消乐 Flutter 承载组件。
@@ -172,8 +172,11 @@ class _Match3GameState extends State<Match3Game> {
     super.dispose();
   }
 
-  /// Boss 模式的血条 / 其他模式的目标进度条
+  /// 顶部横幅：Boss 血条 / 收集与破冰的「目标达成条件」chips
   Widget? _buildBanner() {
+    if (_mode == Match3Mode.collect || _mode == Match3Mode.obstacle) {
+      return Match3GoalBanner(objective: _objective);
+    }
     if (_mode != Match3Mode.boss) return null;
     final ratio = _objective.bossHp <= 0
         ? 0.0
@@ -212,28 +215,18 @@ class _Match3GameState extends State<Match3Game> {
       valueListenable: _hudTick,
       builder: (_, __, ___) {
         final stats = _objective.stats();
-        // 收集模式：状态栏最前展示目标糖果色块，明确「收集哪种颜色」
-        final showCollectTarget = _objective.collectTarget > 0;
-        final collectColor =
-            kCandyColors[_objective.collectType.clamp(0, kCandyColors.length - 1)];
-        final collectName =
-            kCandyColorNames[_objective.collectType.clamp(0, kCandyColorNames.length - 1)];
+        // 目标糖果不再放 HUD 状态栏：收集/破冰的「目标达成条件」统一在
+        // 游戏容器内上方 banner 展示（图标×N、居中、实时减少，2026-09-07 拍板）
         return GameShell(
-          statusItems: <GameStatusItem>[
-            if (showCollectTarget)
-              GameStatusItem(
-                label: '目标糖果',
-                value: '●$collectName',
-                valueColor: collectColor,
-              ),
-            ...stats.map(
-              (s) => GameStatusItem(
-                label: s.label,
-                value: s.value,
-                valueColor: s.alert ? AppTheme.error : null,
-              ),
-            ),
-          ],
+          statusItems: stats
+              .map(
+                (s) => GameStatusItem(
+                  label: s.label,
+                  value: s.value,
+                  valueColor: s.alert ? AppTheme.error : null,
+                ),
+              )
+              .toList(),
           banner: _buildBanner(),
           hint: _objective.hint,
           actions: <GameAction>[

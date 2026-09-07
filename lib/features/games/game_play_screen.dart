@@ -9,6 +9,7 @@ import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'play/game_best_screen.dart';
 import 'play/game_history_screen.dart';
+import 'services/game_service.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
 /// 不结算发分，避免拉低正常通关率等统计数据。
@@ -272,15 +273,37 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     );
   }
 
+  /// 对局页标题：游戏名 + 模式名 + 第 N 关（合成关显示「无尽」；无模式段省略）
+  String get _titleText {
+    final g = widget.game;
+    final level = _level;
+    if (level == null) return g.name;
+    final parts = <String>[g.name];
+    if (level.id.startsWith('endless_2048')) {
+      parts.add('无尽');
+    } else if (level.modeId.isNotEmpty) {
+      String? modeName;
+      for (final m in GameService.instance.cachedConfig.modesOf(g.id)) {
+        if (m.id == level.modeId) {
+          modeName = m.name;
+          break;
+        }
+      }
+      if (modeName != null) parts.add(modeName);
+    }
+    if (level.levelNo > 0 && level.levelNo < 10000) parts.add('第${level.levelNo}关');
+    return parts.join(' · ');
+  }
+
   @override
   Widget build(BuildContext context) {
     return PopScope(
       canPop: false,
       onPopInvokedWithResult: _onPopInvokedWithResult,
       child: Scaffold(
-        // 游戏记录与最佳记录拆分为两个独立入口（原成绩看板聚合页已拆分）
+        // 标题：游戏名+模式+第N关（不展示额外信息，避免溢出）
         appBar: AppBar(
-          title: Text(widget.game.name),
+          title: Text(_titleText),
           actions: <Widget>[
             IconButton(
               icon: const Icon(Icons.emoji_events_outlined),

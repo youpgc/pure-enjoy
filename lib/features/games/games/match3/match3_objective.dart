@@ -14,6 +14,27 @@ class ClearedCell {
   const ClearedCell(this.row, this.col, this.type, {this.special = false});
 }
 
+/// 单个颜色收集目标（collect / obstacle 模式，2026-09-07 多目标扩展）
+///
+/// config 形态：
+/// - 数组多目标：`"collect": [{"type":1,"count":15},{"type":3,"count":10}]`
+/// - 旧单值：`"collect": 20` + `"collectType": 1` → 归一为单目标
+class CollectGoal {
+  final int type;
+  final int count;
+
+  /// 已收集数（由 [Match3Objective.onCleared] 累计）
+  int collected = 0;
+
+  CollectGoal({required this.type, required this.count});
+
+  /// 剩余待收集数（实时减少，供目标 banner 展示）
+  int get remaining => (count - collected).clamp(0, count);
+
+  /// 是否已达成
+  bool get done => collected >= count;
+}
+
 /// HUD 展示项
 class ObjectiveStat {
   final String label;
@@ -68,8 +89,11 @@ class Match3Objective {
   /// 冰层：2 = 完整冰块，1 = 已裂开，0 = 已清除（[initBoard] 前为空）
   List<List<int>> ice = <List<int>>[];
 
-  /// 已收集数量（collect）
-  int collected = 0;
+  /// 颜色收集目标（collect 模式全部；obstacle 模式可选附加条件）
+  final List<CollectGoal> collectGoals;
+
+  /// 已收集数量（旧单目标口径兼容读取，= 首目标 collected）
+  int get collected => collectGoals.isEmpty ? 0 : collectGoals.first.collected;
 
   /// Boss 剩余血量（boss）
   int bossLeft = 0;
@@ -95,6 +119,7 @@ class Match3Objective {
     this.jellyCount = 14,
     this.iceCount = 16,
     this.bossHp = 260,
+    this.collectGoals = const <CollectGoal>[],
   });
 
   /// 从关卡 config 构造（缺省值按模式给合理默认，保证无配置也能玩）
@@ -120,6 +145,38 @@ class Match3Objective {
       return fallback;
     }
 
+    // 颜色收集目标解析（多目标数组优先，旧单值兜底）：
+    // - collect 模式读 `collect`；obstacle 模式读 `iceCollect`（也可复用 `collect`）
+    // - 数组形态 [{"type":1,"count":15},...]；旧单值 collect+collectType 归一单目标
+    List<CollectGoal> parseGoals(String listKey) {
+      final raw = config[listKey] ?? config['collect'];
+      if (raw is List && raw.isNotEmpty) {
+        final goals = <CollectGoal>[];
+        for (final item in raw) {
+          if (item is Map) {
+            final t = (item['type'] as num?)?.toInt();
+            final c = (item['count'] as num?)?.toInt();
+            if (t != null && c != null && c > 0) {
+              goals.add(CollectGoal(type: t, count: c));
+            }
+          }
+        }
+        return goals;
+      }
+      // 旧单值口径（仅 collect 模式历史数据）
+      final single = intOf('collect', 0, ['ingredients', 'orders']);
+      if (single > 0) {
+        return <CollectGoal>[CollectGoal(type: intOf('collectType', 0), count: single)];
+      }
+      return <CollectGoal>[];
+    }
+
+    final goals = resolved == Match3Mode.collect
+        ? parseGoals('collect')
+        : resolved == Match3Mode.obstacle
+            ? parseGoals('iceCollect')
+            : <CollectGoal>[];
+
     return Match3Objective(
       mode: resolved,
       rows: rows,
@@ -132,6 +189,7 @@ class Match3Objective {
       jellyCount: intOf('jelly', 14, ['jelly_layers']),
       iceCount: intOf('ice', 16),
       bossHp: intOf('bossHp', 260),
+      collectGoals: goals,
     );
   }
 
@@ -143,7 +201,9 @@ class Match3Objective {
     jelly = List.generate(rows, (_) => List<int>.filled(cols, 0));
     ice = List.generate(rows, (_) => List<int>.filled(cols, 0));
     bossLeft = bossHp;
-    collected = 0;
+    for (final g in collectGoals) {
+      g.collected = 0;
+    }
 
     if (mode == Match3Mode.clear) {
       _scatter(rng, jellyCount, (r, c) => jelly[r][c] = 1);
@@ -180,11 +240,17 @@ class Match3Objective {
       case Match3Mode.obstacle:
         for (final cell in cells) {
           if (ice[cell.row][cell.col] > 0) ice[cell.row][cell.col] -= 1;
+          // 破冰模式附加颜色目标（iceCollect）：同步累计
+          for (final g in collectGoals) {
+            if (cell.type == g.type && g.collected < g.count) g.collected++;
+          }
         }
         break;
       case Match3Mode.collect:
         for (final cell in cells) {
-          if (cell.type == collectType) collected++;
+          for (final g in collectGoals) {
+            if (cell.type == g.type && g.collected < g.count) g.collected++;
+          }
         }
         break;
       case Match3Mode.boss:
@@ -230,9 +296,14 @@ class Match3Objective {
       case Match3Mode.clear:
         return jellyLeft == 0;
       case Match3Mode.collect:
-        return collected >= collectTarget;
+        // 多目标：全部满足才通关；无配置目标时退回旧单值口径
+        return collectGoals.isNotEmpty
+            ? collectGoals.every((g) => g.done)
+            : collected >= collectTarget;
       case Match3Mode.obstacle:
-        return iceLeft == 0;
+        // 冰块全碎 + 附加颜色目标（若有）全部满足
+        if (iceLeft > 0) return false;
+        return collectGoals.isEmpty || collectGoals.every((g) => g.done);
       case Match3Mode.boss:
         return bossLeft <= 0;
     }
@@ -265,14 +336,13 @@ class Match3Objective {
           moveStat,
         ];
       case Match3Mode.collect:
+        // 目标进度改由顶部「目标达成条件」banner 展示（图标×N 实时减少）
         return <ObjectiveStat>[
-          ObjectiveStat('已收集', '$collected/$collectTarget'),
           ObjectiveStat('得分', '$score'),
           moveStat,
         ];
       case Match3Mode.obstacle:
         return <ObjectiveStat>[
-          ObjectiveStat('剩余冰块', '$iceLeft'),
           ObjectiveStat('得分', '$score'),
           moveStat,
         ];
