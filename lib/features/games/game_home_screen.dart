@@ -4,17 +4,16 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import 'game_guide.dart';
 import 'game_level_picker.dart';
+import 'flow/game_flow_runner.dart';
 import 'game_play_helpers.dart';
 import 'game_play_screen.dart';
 import 'game_item_shop_screen.dart';
-import 'services/game_item_service.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'models/game_mode_model.dart';
 import 'models/match3_mode.dart';
 import 'play/game_best_screen.dart';
 import 'play/game_history_screen.dart';
-import 'services/game_score_service.dart';
 import 'services/game_service.dart';
 
 /// 游戏主界面（大厅点击游戏入口后的落地页）。
@@ -34,10 +33,8 @@ class GameHomeScreen extends StatefulWidget {
 }
 
 class _GameHomeScreenState extends State<GameHomeScreen> {
-  List<GameLevelModel> _levels = <GameLevelModel>[];
-  List<GameModeModel> _modes = <GameModeModel>[];
-  Set<String> _clearedIds = const <String>{};
-  bool _hasShop = false;
+  /// 流程编排结果（模式/关卡/进度/商城 + 节点状态），数据决策唯一来源
+  GameHomeFlow? _flow;
   bool _loading = true;
 
   @override
@@ -46,46 +43,38 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     _load();
   }
 
+  /// 首页加载 = 流程体系「配置→模式→关卡→进度→商城」节点编排；
+  /// 各节点异常/关闭时 runner 内部已降级，本页只消费结果（参考文档 §16.1）。
   Future<void> _load() async {
+    // 防闪 0：先以本地缓存快照预渲染关卡区，再走 runner 强拉最新配置
     final cached = await GameService.instance.loadCachedConfig();
-    if (mounted) {
-      setState(() {
-        _levels = cached?.levelsOf(widget.game.id) ?? <GameLevelModel>[];
-      });
+    if (mounted && cached != null) {
+      setState(() {});
     }
-    // force：进入游戏主界面/下拉刷新都取最新配置（后台改动即时可见，
-    // TTL 缓存仍保护其余页面的按需加载）
-    final config = await GameService.instance.fetchConfig(force: true);
-    final cleared = await GameScoreService.instance.fetchClearedLevelIds(widget.game.id);
-    final items = await GameItemService.instance.fetchItems(gameCode: widget.game.code);
+    final flow = await GameFlowRunner.instance.loadHome(widget.game, force: true);
     if (mounted) {
       setState(() {
-        _levels = config.levelsOf(widget.game.id);
-        _modes = config.modesOf(widget.game.id);
-        _clearedIds = cleared;
-        _hasShop = items.isNotEmpty;
+        _flow = flow;
         _loading = false;
       });
     }
   }
 
-  /// 开始游戏的目标关卡：gated 取第一个未通关（frontier），全通关取末关；
-  /// free / 单关取首关；无配置返回 null。
-  GameLevelModel? get _startLevel {
-    if (_levels.isEmpty) return null;
-    if (widget.game.levelSelectMode != 'gated') return _levels.first;
-    for (final lv in _levels) {
-      if (!_clearedIds.contains(lv.id)) return lv;
-    }
-    return _levels.last;
-  }
+  List<GameLevelModel> get _levels => _flow?.levels ?? const <GameLevelModel>[];
+  List<GameModeModel> get _modes => _flow?.modes ?? const <GameModeModel>[];
+  Set<String> get _clearedIds => _flow?.clearedIds ?? const <String>{};
 
   /// 进入对局；返回后刷新最新配置与通关进度（结算/成绩可能已变化）
   Future<void> _startGame() async {
-    final lv = _startLevel;
-    if (lv == null) return;
+    final plan = GameFlowRunner.instance.resolvePlayPlan(
+      widget.game,
+      levels: _levels,
+      clearedIds: _clearedIds,
+    );
     await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GamePlayScreen(game: widget.game, level: lv)),
+      MaterialPageRoute(
+        builder: (_) => GamePlayScreen(game: widget.game, level: plan.level),
+      ),
     );
     if (mounted) await _load();
   }
@@ -161,7 +150,8 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   @override
   Widget build(BuildContext context) {
     final game = widget.game;
-    final startable = _startLevel != null;
+    // startable：frontier 有可用配置关（默认流程下 _startLevel 恒可用，不受此限制）
+    final startable = _levels.isNotEmpty;
 
     return Scaffold(
       appBar: AppBar(title: Text(game.name)),
@@ -207,6 +197,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                   // 模式网格（三游戏统一：模式为主，点模式→选关/合成关）
                   // 无尽模式无后台关卡，按 isEndless 特判保留可达，不被「有关卡」过滤剔除。
                   // 加载中：模式区展示骨架占位（静默请求），不回落「选择关卡」旧态。
+                  // 模式网格：由流程体系判定（modeGrid 节点关闭/无模式时隐藏）
                   if (_loading)
                     _modeGridPlaceholder()
                   else if (_modes.isNotEmpty)
@@ -218,11 +209,20 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 入口（加载完成且无后台模式时回落旧逻辑）：
-                  // - levelSelectable 且多关 → 展示「选择关卡」入口；
-                  // - 关闭选关 / 仅一关 → 「开始游戏」直接进（关卡=第一个未通关）。
+                  // 无模式网格时的入口（流程体系降级路径）：
+                  // - 默认流程（总开关关/无任何配置）→ 「开始游戏」直接进内置经典模式；
+                  // - levelSelect 开启且多关 → 「选择关卡」；
+                  // - 其余 → 「开始游戏」按 frontier 推进。
                   if (!_loading && _modes.isEmpty)
-                    if (game.levelSelectable && _levels.length > 1)
+                    if (_flow!.defaultPlayOnly)
+                      _EntryTile(
+                        icon: Icons.play_arrow_rounded,
+                        label: '开始游戏',
+                        desc: '经典模式 · 默认流程（不发积分）',
+                        primary: true,
+                        onTap: _startGame,
+                      )
+                    else if (game.levelSelectable && _flow!.levelSelectAvailable)
                       _EntryTile(
                         icon: Icons.grid_view_rounded,
                         label: '选择关卡',
@@ -258,7 +258,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     desc: '历史对局明细',
                     onTap: _openHistory,
                   ),
-                  if (_hasShop)
+                  if (_flow?.hasShop ?? false)
                     _EntryTile(
                       icon: Icons.wallet_giftcard_rounded,
                       label: '道具商城',

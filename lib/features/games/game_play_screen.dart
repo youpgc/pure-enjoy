@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
+import 'flow/game_flow_runner.dart';
+import 'flow/game_registry.dart';
 import 'game_play_helpers.dart';
-import 'games/g2048/g2048_game.dart';
-import 'games/match3/match3_game.dart';
-import 'games/sheep/sheep_game.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'play/game_best_screen.dart';
@@ -13,12 +12,14 @@ import 'play/game_history_screen.dart';
 /// 不结算发分，避免拉低正常通关率等统计数据。
 const int _minRecordDurationMs = 10000; // 10s
 
-/// 游戏承载页：按 game.code 分发对应游戏组件，统一处理结算与重玩。
+/// 游戏承载页：流程体系（GameFlow）统一承载选关/结算/降级，
+/// 引擎视图由 [GameFlowRegistry] 按游戏适配器构建——本页不再按 game.code 分叉。
 class GamePlayScreen extends StatefulWidget {
   /// 要游玩的游戏
   final GameModel game;
 
-  /// 指定关卡（选关界面传入）；为 null 时自动取第一个启用关卡。
+  /// 指定关卡（选关/模式入口传入）；为 null 时由流程体系解析默认关
+  /// （frontier 或内置经典模式合成关，见 GameFlowRunner.resolvePlayPlan）。
   final GameLevelModel? level;
 
   const GamePlayScreen({super.key, required this.game, this.level});
@@ -29,6 +30,10 @@ class GamePlayScreen extends StatefulWidget {
 
 class _GamePlayScreenState extends State<GamePlayScreen> {
   GameLevelModel? _level;
+
+  /// 结算门禁（开局时解析）：false = 默认流程，只记成绩不发分不发成就。
+  bool _rewardsAllowed = true;
+
   late final DateTime _enterTime;
   GamePlayOutcome? _outcome;
   int _restartNonce = 0;
@@ -37,12 +42,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   void initState() {
     super.initState();
     _enterTime = DateTime.now();
-    // 选关界面已指定关卡则直接用；否则回退「第一个启用关卡」（顺序/选关均由后台配置驱动）
-    if (widget.level != null) {
-      _level = widget.level!;
-    } else {
-      _level = resolveLevel(widget.game);
-    }
+    final plan = GameFlowRunner.instance.resolvePlayPlan(
+      widget.game,
+      explicit: widget.level,
+    );
+    _level = plan.level;
+    _rewardsAllowed = plan.rewardsAllowed;
   }
 
   /// 返回键拦截：对局进行中弹「放弃本局」确认；确认后上报 status=aborted
@@ -50,7 +55,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Future<void> _onPopInvokedWithResult(bool didPop, Object? result) async {
     if (didPop) return;
     if (_level == null) {
-      // 尚未选完棋盘尺寸（尺寸选择弹窗途中）直接放行返回
+      // 尚未完成开局解析（理论上不会发生：解析为同步兜底）直接放行返回
       Navigator.of(context).pop();
       return;
     }
@@ -117,6 +122,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       scoreValuesByCode: values,
       durationMs: outcome.durationMs,
       cleared: outcome.cleared,
+      rewardsAllowed: _rewardsAllowed,
       onReplay: () => setState(() {
         _outcome = null;
         _restartNonce++;
@@ -134,32 +140,21 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   Widget _buildGame() {
-    switch (widget.game.code) {
-      case 'sheep':
-        return SheepGame(
-          key: ValueKey(_restartNonce),
-          onFinished: _onFinished,
-          level: _level!,
-        );
-      case 'g2048':
-        return G2048Game(
-          key: ValueKey(_restartNonce),
-          onFinished: _onFinished,
-          level: _level!,
-        );
-      case 'match3':
-        return Match3Game(
-          key: ValueKey(_restartNonce),
-          onFinished: _onFinished,
-          level: _level!,
-          onRestart: () => setState(() {
-            _outcome = null;
-            _restartNonce++;
-          }),
-        );
-      default:
-        return const Center(child: Text('该游戏暂未实现'));
+    final adapter = GameFlowRegistry.adapterOf(widget.game.code);
+    if (adapter == null) {
+      return const Center(child: Text('该游戏暂未实现'));
     }
+    // 引擎 Key 随重玩 nonce 变化、随普通 setState 稳定（重建语义由本页控制）
+    return adapter.buildEngine(
+      key: ValueKey<int>(_restartNonce),
+      game: widget.game,
+      level: _level!,
+      onFinished: _onFinished,
+      onRestart: () => setState(() {
+        _outcome = null;
+        _restartNonce++;
+      }),
+    );
   }
 
   @override
