@@ -46,13 +46,17 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
   /// 首页加载 = 流程体系「配置→模式→关卡→进度→商城」节点编排；
   /// 各节点异常/关闭时 runner 内部已降级，本页只消费结果（参考文档 §16.1）。
-  Future<void> _load() async {
-    // 防闪 0：先以本地缓存快照预渲染关卡区，再走 runner 强拉最新配置
+  ///
+  /// [force] 语义：进入页面 = false（TTL 30s 缓存内零请求，配置快照
+  /// 未过期直接复用）；**下拉刷新 = true**（强拉全量 + ETag 304 校验）——
+  /// 后台改配置至多 30s 生效、下拉立即生效（接口提速的关键）。
+  Future<void> _load({bool force = false}) async {
+    // 防闪 0：先以本地缓存快照预渲染关卡区，再走 runner 拉配置
     final cached = await GameService.instance.loadCachedConfig();
     if (mounted && cached != null) {
       setState(() {});
     }
-    final flow = await GameFlowRunner.instance.loadHome(widget.game, force: true);
+    final flow = await GameFlowRunner.instance.loadHome(widget.game, force: force);
     if (mounted) {
       setState(() {
         _flow = flow;
@@ -158,7 +162,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
       appBar: AppBar(title: Text(game.name)),
       // 规范：禁止整页 loading——页面骨架立即渲染，模式区内部骨架占位
       body: RefreshIndicator(
-              onRefresh: _load,
+              onRefresh: () => _load(force: true),
               child: ListView(
                 padding: const EdgeInsets.all(16),
                 children: <Widget>[

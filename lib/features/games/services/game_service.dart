@@ -235,29 +235,49 @@ class GameService {
   ///
   /// **分页拉全量**：PostgREST 服务端默认单次最多返回 1000 行（db-max-rows），
   /// `limit:null` 且无 Range 头会被静默截断（game_levels 1200 关只拿到前 1000，
-  /// 选关/下一关/关序折算全部失真）。这里按 1000/页循环拉取直至不足一页。
+  /// 选关/下一关/关序折算全部失真）。按 1000/页拉取直至不足一页。
+  ///
+  /// **性能优化（2026-09-07）**：
+  /// - **ETag/304 缓存**：配置表低频变更，force 拉取时后台未改的表返回 304
+  ///   （无 body 传输，几乎瞬时），大幅缩短游戏主界面进入与下拉刷新耗时；
+  /// - **前两页并发**：game_levels（1200 关）常态为 2 页，并发探测将串行
+  ///   2 个 RTT 压成 1 个；超过 2 页时后续页仍串行（罕见路径）。
   Future<List<dynamic>> _fetchRows(
     String table, {
     required String order,
   }) async {
     const pageSize = 1000;
-    final all = <dynamic>[];
-    var offset = 0;
-    while (true) {
+    Future<List<dynamic>> page(int offset) async {
       final result = await ApiClient.get(
         table,
         filters: <String, String>{'enabled': 'eq.true'},
         order: order,
         limit: pageSize,
         offset: offset,
+        useETag: true,
         note: 'games:$table',
       );
       if (!result.isSuccess) {
         debugPrint('[GameService] 拉取 $table 失败：${result.errorMessage}');
-        // 首页失败返回空；后续页失败保留已拉到的部分（优于整体放弃）
-        return offset == 0 ? <dynamic>[] : all;
+        return <dynamic>[];
       }
-      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+      return (result.data as List<dynamic>?) ?? <dynamic>[];
+    }
+
+    // 首两页并发探测
+    final pages = await Future.wait<List<dynamic>>([page(0), page(pageSize)]);
+    final first = pages[0];
+    final second = pages[1];
+    if (first.isEmpty) return <dynamic>[]; // 首页空：无启用行或失败
+    if (first.length < pageSize) return first; // 单页即全量
+    final all = <dynamic>[...first, ...second];
+    if (second.length < pageSize) return all;
+
+    // 超过 2 页（罕见）：后续页串行补拉
+    var offset = 2 * pageSize;
+    while (true) {
+      final rows = await page(offset);
+      if (rows.isEmpty) break; // 失败或到尾：保留已拉到的部分（优于整体放弃）
       all.addAll(rows);
       if (rows.length < pageSize) break;
       offset += pageSize;

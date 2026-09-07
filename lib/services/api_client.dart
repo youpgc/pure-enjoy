@@ -44,6 +44,7 @@ class ApiClient {
     Duration? timeout,
     CancelToken? cancelToken,
     String? note,
+    bool useETag = false, // 低频变更数据的 304 缓存（如游戏配置表），默认关闭
   }) async {
     try {
       final url = buildApiUrl(
@@ -62,6 +63,7 @@ class ApiClient {
         timeout: timeout ?? RequestTimeout.list,
         cancelToken: cancelToken,
         note: note ?? table,
+        useETag: useETag,
       );
 
       return handleApiResponse(response);

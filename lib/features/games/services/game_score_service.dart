@@ -196,32 +196,43 @@ class GameScoreService {
   ///
   /// 供「需通关后选关(gated)」模式判断锁状态：已通关关卡可重挑战，
   /// 最新未通关关卡（frontier）可解锁，其余上锁。未登录返回空集合。
+  ///
+  /// **性能优化（2026-09-07）**：`select` 仅取 `level_id`（原全列返回，载荷随
+  /// 对局历史线性膨胀）；**分页拉全量**——原 `limit:null` 被 PostgREST 静默截断
+  /// 1000 行，通关数超限后 cleared 集合缺失会导致 frontier/锁状态失真。
   Future<Set<String>> fetchClearedLevelIds(String gameId) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return <String>{};
 
-    final result = await ApiClient.get(
-      'game_scores',
-      filters: <String, String>{
-        'user_id': 'eq.$userId',
-        'game_id': 'eq.$gameId',
-        'status': 'eq.cleared',
-      },
-      order: 'played_at.desc',
-      limit: null,
-      note: 'games:cleared_levels',
-    );
-    if (!result.isSuccess) {
-      debugPrint('[GameScoreService] 已通关关卡查询失败：${result.errorMessage}');
-      return <String>{};
-    }
-    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+    const pageSize = 1000;
     final set = <String>{};
-    for (final row in rows) {
-      if (row is Map<String, dynamic>) {
-        final lv = row['level_id'] as String?;
-        if (lv != null) set.add(lv);
+    var offset = 0;
+    while (true) {
+      final result = await ApiClient.get(
+        'game_scores',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'game_id': 'eq.$gameId',
+          'status': 'eq.cleared',
+        },
+        select: 'level_id',
+        limit: pageSize,
+        offset: offset,
+        note: 'games:cleared_levels',
+      );
+      if (!result.isSuccess) {
+        debugPrint('[GameScoreService] 已通关关卡查询失败：${result.errorMessage}');
+        return offset == 0 ? <String>{} : set; // 后续页失败保留已拉到的部分
       }
+      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+      for (final row in rows) {
+        if (row is Map<String, dynamic>) {
+          final lv = row['level_id'] as String?;
+          if (lv != null) set.add(lv);
+        }
+      }
+      if (rows.length < pageSize) break;
+      offset += pageSize;
     }
     return set;
   }
