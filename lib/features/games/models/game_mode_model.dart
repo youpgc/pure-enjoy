@@ -32,6 +32,9 @@ class GameModeModel {
   /// 模式默认配置（jsonb）：如默认尺寸/限时/步数等，关卡可覆盖
   final Map<String, dynamic> config;
 
+  /// 玩法说明（后台模式配置维护；说明页按模式展示，空则回退内置文案）
+  final String guide;
+
   const GameModeModel({
     required this.id,
     required this.gameId,
@@ -42,6 +45,7 @@ class GameModeModel {
     this.sortOrder = 0,
     this.enabled = true,
     this.config = const <String, dynamic>{},
+    this.guide = '',
   });
 
   /// 从 Supabase 行解析。
@@ -56,6 +60,7 @@ class GameModeModel {
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       enabled: json['enabled'] as bool? ?? true,
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
+      guide: json['guide'] as String? ?? '',
     );
   }
 

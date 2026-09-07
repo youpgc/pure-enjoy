@@ -56,7 +56,10 @@ class Match3FlameGame extends FlameGame
   late double _offsetY;
   final Random _rng = Random();
 
-  final List<Color> _palette = <Color>[
+  /// 方块类型数（难度配置项）：config['types']，钳制 3..6；决定单局渲染几种糖果
+  final int typeCount;
+
+  late final List<Color> _palette = <Color>[
     const Color(0xFFEF5350),
     const Color(0xFF42A5F5),
     const Color(0xFF66BB6A),
@@ -68,7 +71,7 @@ class Match3FlameGame extends FlameGame
   static const Duration _anim = Duration(milliseconds: 220);
 
   /// 消除（弹出+淡出）动画时长（秒），与 [_anim] 对齐，确保方块淡出后再移除。
-  static const double _dieDur = 0.22;
+  static const double _dieDur = 0.38;
 
   /// 棋盘左右留白（逻辑像素），让糖块不贴边、视觉更透气（2~4px）。
   static const double _padX = 3.0;
@@ -79,6 +82,7 @@ class Match3FlameGame extends FlameGame
     required this.hudTick,
     this.rows = 8,
     this.cols = 8,
+    this.typeCount = 6,
   });
 
   // ---------- 滑动手势（Match3SwipeMixin 接线）----------
@@ -240,7 +244,7 @@ class Match3FlameGame extends FlameGame
     grid = newBoard(
       rows: rows,
       cols: cols,
-      nextType: () => _rng.nextInt(_palette.length),
+      nextType: () => _rng.nextInt(typeCount.clamp(3, _palette.length)),
       offsetX: _offsetX,
       offsetY: _offsetY,
       cell: _cell,
@@ -489,7 +493,7 @@ class Match3FlameGame extends FlameGame
         offsetY: _offsetY,
         cell: _cell,
         spawn: (r, c, x, y) =>
-            Candy(_rng.nextInt(_palette.length), r, c, x, y),
+            Candy(_rng.nextInt(typeCount.clamp(3, _palette.length)), r, c, x, y),
       );
 
   /// 按当前模式的目标判定通关/失败并结算

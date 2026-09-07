@@ -86,6 +86,8 @@ class _Match3GameState extends State<Match3Game> {
       hudTick: _hudTick,
       rows: rows,
       cols: cols,
+      // 方块类型数：难度配置项（config['types']，3..6），决定单局渲染几种糖果
+      typeCount: (cfg['types'] is num ? (cfg['types'] as num).toInt() : 6),
     );
     if (_mode == Match3Mode.timed) _loadAddTime();
   }

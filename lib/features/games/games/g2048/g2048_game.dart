@@ -67,6 +67,9 @@ class _G2048GameState extends State<G2048Game> {
   int? _timeLimit;
   int? _scoreTarget;
   bool _reachedTarget = false;
+
+  /// 目标语义：true = config.target 是分数门槛（限时/挑战）；false = 方块数值（经典）
+  bool _isScoreGoal = false;
   Timer? _tickTimer;
   int _nextId = 1;
   late final DateTime _startTime;
@@ -100,6 +103,12 @@ class _G2048GameState extends State<G2048Game> {
     _timeLimit = cfgTime is int ? cfgTime : null;
     final cfgScore = widget.level.config['scoreTarget'];
     _scoreTarget = cfgScore is int ? cfgScore : null;
+    // 目标语义判定：限时/挑战模式（带 timeLimit/moves）的 config.target 是
+    // **分数门槛**（如 690），并非方块数值——方块只可能是 2 的幂，按方块判定
+    // 会永远无法通关（2026-09-07 修复「得分 2472 仍判失败」）。
+    _isScoreGoal =
+        widget.level.config.containsKey('moves') ||
+        widget.level.config.containsKey('timeLimit');
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
@@ -291,9 +300,13 @@ class _G2048GameState extends State<G2048Game> {
     }
     _rebuildGrid();
     _animating = true;
-    // 通关 = 合成到目标方块 且 (未设分数门槛 或 累计分已达标)
+    // 通关判定（双语义）：
+    // - 分数目标模式（限时/挑战）：累计分达到 config.target 即通关；
+    // - 方块目标模式（经典）：合成到目标方块 且 (未设分数门槛 或 累计分已达标)。
     final scoreTarget = _scoreTarget;
-    _pendingWin = _reachedTarget && (scoreTarget == null || _score >= scoreTarget);
+    _pendingWin = _isScoreGoal
+        ? (_score >= _target)
+        : (_reachedTarget && (scoreTarget == null || _score >= scoreTarget));
     // 无尽模式：无论是否达成目标都不通关，仅棋盘卡死时结束
     if (_noClear) _pendingWin = false;
     setState(() {});

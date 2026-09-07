@@ -53,7 +53,9 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
         _levels = cached?.levelsOf(widget.game.id) ?? <GameLevelModel>[];
       });
     }
-    final config = await GameService.instance.fetchConfig();
+    // force：进入游戏主界面/下拉刷新都取最新配置（后台改动即时可见，
+    // TTL 缓存仍保护其余页面的按需加载）
+    final config = await GameService.instance.fetchConfig(force: true);
     final cleared = await GameScoreService.instance.fetchClearedLevelIds(widget.game.id);
     final items = await GameItemService.instance.fetchItems(gameCode: widget.game.code);
     if (mounted) {
@@ -204,7 +206,10 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   // 模式网格（三游戏统一：模式为主，点模式→选关/合成关）
                   // 无尽模式无后台关卡，按 isEndless 特判保留可达，不被「有关卡」过滤剔除。
-                  if (_modes.isNotEmpty)
+                  // 加载中：模式区展示骨架占位（静默请求），不回落「选择关卡」旧态。
+                  if (_loading)
+                    _modeGridPlaceholder()
+                  else if (_modes.isNotEmpty)
                     _modeGridGeneric(_modes
                         .where((m) =>
                             m.isEndless ||
@@ -213,8 +218,10 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
                   const SizedBox(height: 16),
 
-                  // 入口（无后台模式时回落旧逻辑）
-                  if (_modes.isEmpty)
+                  // 入口（加载完成且无后台模式时回落旧逻辑）：
+                  // - levelSelectable 且多关 → 展示「选择关卡」入口；
+                  // - 关闭选关 / 仅一关 → 「开始游戏」直接进（关卡=第一个未通关）。
+                  if (!_loading && _modes.isEmpty)
                     if (game.levelSelectable && _levels.length > 1)
                       _EntryTile(
                         icon: Icons.grid_view_rounded,
@@ -264,6 +271,40 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
+  /// 模式区加载占位：配置请求期间展示骨架卡（静默请求，不回落旧态）
+  Widget _modeGridPlaceholder() {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: <Widget>[
+        const Padding(
+          padding: EdgeInsets.only(left: 4, top: 4, bottom: 8),
+          child: Text('玩法模式',
+              style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
+        ),
+        GridView.builder(
+          shrinkWrap: true,
+          physics: const NeverScrollableScrollPhysics(),
+          itemCount: 4,
+          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            crossAxisCount: 2,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.6,
+          ),
+          itemBuilder: (_, __) => Card(
+            child: Center(
+              child: SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2),
+              ),
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
   /// 统一模式网格（三游戏一致）：模式为主，点模式→选关/合成关。
   Widget _modeGridGeneric(List<GameModeModel> modes) {
     return Column(
@@ -280,9 +321,9 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
           itemCount: modes.length,
           gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
             crossAxisCount: 2,
-            mainAxisSpacing: 12,
-            crossAxisSpacing: 12,
-            childAspectRatio: 1.7,
+            mainAxisSpacing: 10,
+            crossAxisSpacing: 10,
+            childAspectRatio: 2.6,
           ),
           itemBuilder: (_, idx) {
             final mode = modes[idx];
@@ -297,7 +338,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
               borderRadius: BorderRadius.circular(14),
               child: Card(
                 child: Padding(
-                  padding: const EdgeInsets.all(14),
+                  padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
                   child: Row(
                     children: <Widget>[
                       Container(

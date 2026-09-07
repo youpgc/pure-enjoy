@@ -55,16 +55,20 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
   canvas.drawPath(
     path,
     Paint()
+      ..isAntiAlias = true
       ..color = Colors.black.withValues(alpha: 0.35 * a)
       ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
   );
 
   // 主体
-  canvas.drawPath(path, Paint()..color = color.withValues(alpha: a));
+  canvas.drawPath(path, Paint()
+      ..isAntiAlias = true
+      ..color = color.withValues(alpha: a));
   // 加粗描边：清晰界定形状、提升辨识度（对比深色底板）
   canvas.drawPath(
     path,
     Paint()
+      ..isAntiAlias = true
       ..color = color.darken(0.3).withValues(alpha: a)
       ..style = PaintingStyle.stroke
       ..strokeWidth = cell * 0.08,
@@ -77,7 +81,9 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
       width: r * 0.5,
       height: r * 0.7,
     ),
-    Paint()..color = const Color(0xFFFFFFFF).withValues(alpha: 0.55 * a),
+    Paint()
+      ..isAntiAlias = true
+      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.55 * a),
   );
 
   // 特殊糖标识
@@ -96,6 +102,7 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
         Offset(cx, cy),
         r * 0.9,
         Paint()
+      ..isAntiAlias = true
           ..color = Colors.white.withValues(alpha: 0.85 * a)
           ..style = PaintingStyle.stroke
           ..strokeWidth = cell * 0.06,
@@ -164,6 +171,7 @@ Path _shapePath(int type, double cx, double cy, double r) {
 
 void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal, double a) {
   final paint = Paint()
+      ..isAntiAlias = true
     ..color = Colors.white.withValues(alpha: 0.8 * a)
     ..strokeWidth = r * 0.18
     ..strokeCap = StrokeCap.round;
@@ -206,13 +214,17 @@ void _drawBomb(Canvas canvas, double cx, double cy, double r, double a) {
       i * 2 * pi / colors.length,
       2 * pi / colors.length,
       true,
-      Paint()..color = colors[i].withValues(alpha: a),
+      Paint()
+      ..isAntiAlias = true
+      ..color = colors[i].withValues(alpha: a),
     );
   }
   canvas.drawCircle(
     Offset(cx, cy),
     r * 0.32,
-    Paint()..color = Colors.white.withValues(alpha: a),
+    Paint()
+      ..isAntiAlias = true
+      ..color = Colors.white.withValues(alpha: a),
   );
 }
 

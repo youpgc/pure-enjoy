@@ -242,14 +242,14 @@ class _Particle {
 }
 
 class _Burst {
-  static const double dur = 0.42;
+  static const double dur = 0.6;
   final List<_Particle> parts;
   double t = 0;
   _Burst(this.parts);
 }
 
 class _Beam {
-  static const double dur = 0.34;
+  static const double dur = 0.5;
   final bool horizontal;
 
   /// 扫描方向的中心坐标
@@ -273,7 +273,7 @@ class _Beam {
 }
 
 class _Shock {
-  static const double dur = 0.36;
+  static const double dur = 0.55;
   final Offset center;
   final double radius;
   final Color color;
