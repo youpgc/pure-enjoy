@@ -20,6 +20,9 @@ class GameScoreModel {
   /// 模式 id（无模式玩法可为 null）
   final String? modeId;
 
+  /// 单局得分（仅游戏记录查询填充：从嵌入 game_score_values 提取 score 维度值）
+  final num? score;
+
   /// 结果：'cleared'（通关） | 'failed'（失败） | 'aborted'（中途退出）
   final String status;
 
@@ -38,6 +41,7 @@ class GameScoreModel {
     required this.gameId,
     this.levelId,
     this.modeId,
+    this.score,
     this.status = 'cleared',
     this.durationMs,
     this.playedAt,
@@ -48,13 +52,26 @@ class GameScoreModel {
   bool get isCleared => status == 'cleared';
 
   /// 从 Supabase 行解析。
-  factory GameScoreModel.fromJson(Map<String, dynamic> json) {
+  factory GameScoreModel.fromJson(Map<String, dynamic> json,
+      {String? scoreDimId}) {
+    // 嵌入的 game_score_values 提取 score 维度值（游戏记录列表展示/会话聚合用）
+    num? scoreVal;
+    if (scoreDimId != null) {
+      final vals = json['game_score_values'] as List<dynamic>?;
+      for (final v in vals ?? <dynamic>[]) {
+        if (v is Map<String, dynamic> && v['dimension_id'] == scoreDimId) {
+          scoreVal = v['value'] as num?;
+          break;
+        }
+      }
+    }
     return GameScoreModel(
       id: json['id'] as String? ?? '',
       userId: json['user_id'] as String? ?? '',
       gameId: json['game_id'] as String? ?? '',
       levelId: json['level_id'] as String?,
       modeId: json['mode_id'] as String?,
+      score: scoreVal,
       status: json['status'] as String? ?? 'cleared',
       durationMs: (json['duration_ms'] as num?)?.toInt(),
       playedAt: json['played_at'] != null

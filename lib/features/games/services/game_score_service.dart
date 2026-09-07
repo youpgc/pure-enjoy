@@ -320,8 +320,10 @@ class GameScoreService {
         // App 端看板不展示「放弃」记录（通关/失败仍展示；放弃仅后台可见）
         'status': 'neq.aborted',
       },
-      // 按需 select：记录列表仅消费 时间/用时/通关状态 三项（排除 score 等未展示列）
-      select: 'id,status,duration_ms,played_at,level_id,mode_id',
+      // 按需 select：记录列表消费 时间/用时/通关状态/归属 + 嵌入取单局得分
+      // （无尽会话聚合展示「总局数+累积分数」需要 score 值，2026-09-07）
+      select:
+          'id,status,duration_ms,played_at,level_id,mode_id,game_score_values(value,dimension_id)',
       order: 'played_at.desc',
       limit: limit,
       offset: offset,
@@ -333,10 +335,20 @@ class GameScoreService {
       return <GameScoreModel>[];
     }
 
+    // score 维度 id（用于从嵌入 values 提取单局得分）
+    String? scoreDimId;
+    for (final d
+        in GameService.instance.cachedConfig.dimensionsOf(gameId)) {
+      if (d.code == 'score') {
+        scoreDimId = d.id;
+        break;
+      }
+    }
+
     final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
     return rows
         .whereType<Map<String, dynamic>>()
-        .map(GameScoreModel.fromJson)
+        .map((r) => GameScoreModel.fromJson(r, scoreDimId: scoreDimId))
         .toList();
   }
 

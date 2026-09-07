@@ -7,6 +7,7 @@ import 'flow/game_registry.dart';
 import 'game_play_helpers.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
+import 'services/game_score_service.dart';
 import 'services/game_service.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
@@ -40,6 +41,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   bool get _isEndless => _level?.id.startsWith('endless_2048') ?? false;
   int _endlessTotal = 0; // 已完成局的累计得分
   int _endlessRounds = 0; // 已完成局数
+
+  /// 链式局数上限（后台 games.config.endlessMaxRounds 可配，默认 30）：
+  /// 达到上限后本局结束不再询问，直接进入总结算。
+  int get _maxRounds {
+    final v = widget.game.config['endlessMaxRounds'];
+    final n = v is num ? v.toInt() : 30;
+    return n >= 1 ? n : 30;
+  }
 
   late final DateTime _enterTime;
   GamePlayOutcome? _outcome;
@@ -122,6 +131,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   /// （重开新局、成绩滚入累计）或「结束并结算」（以累计总分一次性上报结算）。
   Future<void> _showEndlessIntermission(GamePlayOutcome outcome) async {
     final roundScore = (outcome.values['score'] ?? 0).toInt();
+    // 每局明细上报（时间/步数/分数，供后台统计；仅记录不发分）
+    await _submitEndlessRound(outcome);
+    // 达到后台配置的局数上限：不再询问，直接进入总结算
+    if (_endlessRounds + 1 >= _maxRounds) {
+      await _finishEndlessSession(roundScore);
+      return;
+    }
     final choice = await showModalBottomSheet<String>(
       context: context,
       isScrollControlled: true,
@@ -191,6 +207,23 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     }
     // 结束并结算：以累计总分一次性上报（多局成绩累加总结算）
     await _finishEndlessSession(roundScore);
+  }
+
+  /// 上传单局明细（时间/步数/分数）供后台统计：直接 submitScore（仅记录，
+  /// 不走奖励结算不发分）。合成关 levelId 由 submitScore 的 uuid 校验置 null。
+  Future<void> _submitEndlessRound(GamePlayOutcome outcome) async {
+    await GameScoreService.instance.submitScore(
+      gameId: widget.game.id,
+      levelId: null,
+      modeId: _level!.modeId.isEmpty ? null : _level!.modeId,
+      cleared: true,
+      durationMs: outcome.durationMs,
+      values: <String, num>{
+        'score': outcome.values['score'] ?? 0,
+        'moves': outcome.values['moves'] ?? 0,
+        'duration_ms': outcome.durationMs,
+      },
+    );
   }
 
   /// 无尽会话终局：score = 各局累加总分；duration = 本次会话总时长；

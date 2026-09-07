@@ -134,6 +134,79 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     return parts.join(' · ');
   }
 
+  /// 无尽模式 id 集合（该游戏的 endless 模式）
+  Set<String> get _endlessModeIds {
+    final ids = <String>{};
+    for (final m in GameService.instance.cachedConfig.modesOf(widget.game.id)) {
+      if (m.isEndless) ids.add(m.id);
+    }
+    return ids;
+  }
+
+  /// 一条记录是否属于无尽会话（levelId=null 且 modeId 为无尽模式）
+  bool _isEndlessRecord(GameScoreModel h) =>
+      _endlessModeIds.contains(h.modeId) &&
+      (h.levelId == null || h.levelId!.isEmpty);
+
+  /// 聚合后的展示项：无尽会话（相邻间隔 ≤30 分钟的连续无尽记录）合并为
+  /// 一项——总局数 + 累积分数（2026-09-07 拍板）；其余记录逐条展示。
+  List<GameScoreModel> get _displayItems {
+    final items = <GameScoreModel>[];
+    var i = 0;
+    while (i < _history.length) {
+      final h = _history[i];
+      if (!_isEndlessRecord(h)) {
+        items.add(h);
+        i++;
+        continue;
+      }
+      // 收集连续的无尽会话记录（列表按 played_at 倒序；相邻间隔 ≤30 分钟视为同会话）
+      final session = <GameScoreModel>[h];
+      var j = i + 1;
+      while (j < _history.length &&
+          _isEndlessRecord(_history[j]) &&
+          h.playedAt != null &&
+          _history[j].playedAt != null &&
+          h.playedAt!.difference(_history[j].playedAt!).inMinutes <= 30) {
+        session.add(_history[j]);
+        j++;
+      }
+      if (session.length == 1) {
+        items.add(h);
+      } else {
+        num total = 0;
+        for (final r in session) {
+          total += r.score ?? 0;
+        }
+        // 会话聚合项：score=累积、durationMs=会话总时长（末条 played - 首条开始）
+        final last = session.first;
+        final first = session.last;
+        final totalDur = (first.playedAt != null && last.playedAt != null)
+            ? last.playedAt!
+                .difference(
+                    first.playedAt!.subtract(Duration(milliseconds: first.durationMs ?? 0)))
+                .inMilliseconds
+            : last.durationMs ?? 0;
+        items.add(GameScoreModel(
+          id: last.id,
+          userId: last.userId,
+          gameId: last.gameId,
+          modeId: last.modeId,
+          score: total,
+          status: 'cleared',
+          durationMs: totalDur,
+          playedAt: last.playedAt,
+        ));
+        // 会话局数挂在静态 map 供 itemBuilder 读取
+        _sessionRounds[last.id] = session.length;
+      }
+      i = j;
+    }
+    return items;
+  }
+
+  final Map<String, int> _sessionRounds = <String, int>{};
+
   Widget _buildHistorySection() {
     // 列表区局部 loading（规范：禁止整页 loading）
     if (_loading) {
@@ -142,14 +215,15 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     if (_history.isEmpty) {
       return const Text('暂无记录', style: TextStyle(color: AppTheme.neutral500));
     }
+    final items = _displayItems;
     return Card(
       child: ListView.separated(
         shrinkWrap: true,
         physics: const NeverScrollableScrollPhysics(),
-        itemCount: _history.length + (_hasMore ? 1 : 0),
+        itemCount: items.length + (_hasMore ? 1 : 0),
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (ctx, i) {
-          if (i >= _history.length) {
+          if (i >= items.length) {
             return const Padding(
               padding: EdgeInsets.symmetric(vertical: 16),
               child: Center(
@@ -161,25 +235,36 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
               ),
             );
           }
-          final h = _history[i];
+          final h = items[i];
           final sec = ((h.durationMs ?? 0) / 1000).floor();
+          final clock =
+              '${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}';
           final scope = _scopeLabel(h);
+          final isSession = _sessionRounds.containsKey(h.id);
+          final subtitle = isSession
+              ? '无尽模式 · ${_sessionRounds[h.id]} 局 · 累计 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
+              : (scope.isEmpty
+                  ? '用时 $clock'
+                  : '$scope · 用时 $clock');
           return ListTile(
             dense: true,
             leading: Icon(
-              h.isCleared ? Icons.check_circle : Icons.cancel,
-              color: h.isCleared ? AppTheme.success : AppTheme.neutral500,
+              (isSession || h.isCleared)
+                  ? Icons.check_circle
+                  : Icons.cancel,
+              color: (isSession || h.isCleared)
+                  ? AppTheme.success
+                  : AppTheme.neutral500,
               size: 18,
             ),
             title: Text(_fmtDate(h.playedAt)),
-            subtitle: Text(
-              scope.isEmpty
-                  ? '用时 ${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}'
-                  : '$scope · 用时 ${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}',
-            ),
-            trailing: h.isCleared
-                ? const Text('通关', style: TextStyle(color: AppTheme.success))
-                : const Text('未通关'),
+            subtitle: Text(subtitle),
+            trailing: isSession
+                ? const Text('无尽会话',
+                    style: TextStyle(color: AppTheme.success))
+                : (h.isCleared
+                    ? const Text('通关', style: TextStyle(color: AppTheme.success))
+                    : const Text('未通关')),
           );
         },
       ),
