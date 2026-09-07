@@ -3,6 +3,7 @@ import 'dart:math';
 import 'package:flame/game.dart';
 import 'package:flame/events.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter/scheduler.dart';
 
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
@@ -126,11 +127,28 @@ class Match3FlameGame extends FlameGame
     _loaded = true;
   }
 
-  /// 把引擎侧的分数/步数同步进目标状态机，并通知 Flutter 层刷新 HUD
+  /// 上次 HUD 时钟显示秒（秒级节流：mm:ss 展示只在整秒变化时重建）
+  int _lastClockSecond = -1;
+
+  /// 把引擎侧的分数/步数同步进目标状态机，并通知 Flutter 层刷新 HUD。
+  ///
+  /// 通知统一调度：Flame 首帧 update 发生在 GameWidget build 期间，同步
+  /// notifyListeners 会触发「setState during build」断言（2026-09-07）——
+  /// 处于 build 阶段时推迟到帧末，其余直接通知。
   void _syncHud() {
     objective.score = score;
     objective.movesLeft = movesLeft;
-    hudTick.value++;
+    notifyHud();
+  }
+
+  void notifyHud() {
+    final phase = SchedulerBinding.instance.schedulerPhase;
+    if (phase == SchedulerPhase.persistentCallbacks) {
+      // build 阶段：推迟到帧末再通知
+      SchedulerBinding.instance.addPostFrameCallback((_) => hudTick.value++);
+    } else {
+      hudTick.value++;
+    }
   }
 
   /// 加时卡：限时模式追加秒数（由游戏外壳在消耗 add_time 道具后调用）。
@@ -209,7 +227,12 @@ class Match3FlameGame extends FlameGame
         objective.secondsLeft = 0;
         _finishByObjective();
       } else {
-        hudTick.value++;
+        // mm:ss 展示秒级粒度：仅整秒变化时通知（避免每帧 60 次无效重建）
+        final sec = objective.secondsLeft.ceil();
+        if (sec != _lastClockSecond) {
+          _lastClockSecond = sec;
+          notifyHud();
+        }
       }
     }
     // 降低缓动速率（14→8），下落/交换更舒缓、过渡更自然，不再「生硬」。
