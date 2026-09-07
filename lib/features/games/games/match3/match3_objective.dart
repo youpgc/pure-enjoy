@@ -101,8 +101,11 @@ class Match3Objective {
   /// 当前分数（由引擎同步）
   int score = 0;
 
-  /// 剩余步数（由引擎同步）
+  /// 剩余步数（由引擎同步；steps<=0 = 不限步数，仅展示不计减）
   int movesLeft = 0;
+
+  /// 已用步数（全模式统计，含限时——结算成绩 moves 维度来源）
+  int movesUsed = 0;
 
   /// 剩余秒数（由引擎同步，仅 timed）
   double secondsLeft = 0;
@@ -211,7 +214,8 @@ class Match3Objective {
       // 冰块需消除两次，撒在中下部区域（避免顶部补充糖果时视觉突兀）
       _scatter(rng, iceCount, (r, c) => ice[r][c] = 2);
     }
-    movesLeft = steps;
+    movesLeft = steps > 0 ? steps : 0;
+    movesUsed = 0;
     secondsLeft = seconds.toDouble();
   }
 
@@ -309,17 +313,26 @@ class Match3Objective {
     }
   }
 
-  /// 资源是否耗尽（步数用尽 / 倒计时归零）
+  /// 资源是否耗尽（步数用尽 / 倒计时归零）。
+  /// steps<=0 = 不限步数（前置关卡），永不因步数判负。
   bool get exhausted =>
-      isTimed ? secondsLeft <= 0 : movesLeft <= 0;
+      isTimed ? secondsLeft <= 0 : (steps > 0 && movesLeft <= 0);
 
-  /// HUD 三项（按模式给最关键的三个指标）
+  /// 秒 → mm:ss（时间展示统一格式）
+  static String fmtClock(num seconds) {
+    final s = seconds.ceil();
+    return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
+  }
+
+  /// HUD 指标（按模式给最关键项；steps<=0 不限步时不展示步数项）
   List<ObjectiveStat> stats() {
-    final movesAlert = !isTimed && movesLeft <= 3;
+    final movesAlert = !isTimed && steps > 0 && movesLeft <= 3;
     final timeAlert = isTimed && secondsLeft <= 10;
     final moveStat = isTimed
-        ? ObjectiveStat('剩余时间', '${secondsLeft.ceil()}s', alert: timeAlert)
-        : ObjectiveStat('剩余步数', '$movesLeft', alert: movesAlert);
+        ? ObjectiveStat('剩余时间', fmtClock(secondsLeft), alert: timeAlert)
+        : (steps > 0
+            ? ObjectiveStat('剩余步数', '$movesLeft', alert: movesAlert)
+            : const ObjectiveStat('步数', '不限'));
 
     switch (mode) {
       case Match3Mode.score:

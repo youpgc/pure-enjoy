@@ -45,11 +45,6 @@ class GameShell extends StatelessWidget {
   /// 游戏视图（独立容器）
   final Widget content;
 
-  /// 游戏容器（深色区）内部顶端的横幅插槽：如收集/破冰的「目标达成条件」
-  /// 图标×N、Boss 血条——与棋盘同一深色底，不覆盖游戏视图
-  /// （2026-09-07 修复：原 banner 字段从未被 build 渲染，横幅从未显示）。
-  final Widget? contentHeader;
-
   /// 底部控制栏操作（游戏内置按钮统一放这里）
   final List<GameAction> actions;
 
@@ -60,7 +55,6 @@ class GameShell extends StatelessWidget {
     super.key,
     required this.content,
     this.statusItems = const <Widget>[],
-    this.contentHeader,
     this.actions = const <GameAction>[],
     this.hint,
   });
@@ -80,19 +74,11 @@ class GameShell extends StatelessWidget {
                   .toList(),
             ),
           ),
-        // 游戏视图：独立容器，内部不含任何按钮；[contentHeader] 渲染在
-        // 容器内部顶端（与引擎同一深色底，由 header 自带背景色）
+        // 游戏视图：独立容器，内部不含任何按钮
         Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 8),
-            child: contentHeader != null
-                ? Column(
-                    children: <Widget>[
-                      contentHeader!,
-                      Expanded(child: content),
-                    ],
-                  )
-                : content,
+            child: content,
           ),
         ),
         if (hint != null)

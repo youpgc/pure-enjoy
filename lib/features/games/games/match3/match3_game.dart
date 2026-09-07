@@ -227,7 +227,7 @@ class _Match3GameState extends State<Match3Game> {
                 ),
               )
               .toList(),
-          contentHeader: _buildBanner(),
+          
           hint: _objective.hint,
           actions: <GameAction>[
             if (_mode == Match3Mode.timed && _addTimeItem != null)
@@ -251,13 +251,21 @@ class _Match3GameState extends State<Match3Game> {
           ],
           content: LayoutBuilder(
             builder: (ctx, constraints) {
-              // 画布铺满内容区，正方形网格在内部居中，深色底板自然填满上下留白
+              // 画布铺满内容区，正方形网格在内部居中，深色底板自然填满上下留白。
+              // 目标达成条件横幅（收集/破冰）置于同一 ClipRRect 深色圆角容器内
+              // 顶端——与棋盘一体，消除两个模块间的白色裁剪裸露（2026-09-07）。
+              final banner = _buildBanner();
               return SizedBox(
                 width: constraints.maxWidth,
                 height: constraints.maxHeight,
                 child: ClipRRect(
                   borderRadius: BorderRadius.circular(12),
-                  child: GameWidget(game: _game),
+                  child: Column(
+                    children: <Widget>[
+                      if (banner != null) banner,
+                      Expanded(child: GameWidget(game: _game)),
+                    ],
+                  ),
                 ),
               );
             },

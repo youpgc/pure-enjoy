@@ -306,8 +306,10 @@ class Match3FlameGame extends FlameGame
           if (isMounted) _busy = false;
         });
       } else {
-        // 限时模式不限步数，仅倒计时约束
-        if (!objective.isTimed) movesLeft--;
+        // 全模式统计已用步数（结算 moves 维度）；限步模式同步递减剩余，
+        // 限时/不限步（steps<=0）不递减
+        objective.movesUsed++;
+        if (!objective.isTimed && objective.steps > 0) movesLeft--;
         _syncHud();
         combo = 1;
         _resolveCascade(r1, c1, r2, c2);
@@ -508,8 +510,8 @@ class Match3FlameGame extends FlameGame
       GameAudio.instance.fail();
     }
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    // 已用步数 = 配置总步数 - 剩余步数（钳制到 [0, steps]，失败临界 movesLeft 可能为 0/负）
-    final usedMoves = (objective.steps - objective.movesLeft).clamp(0, objective.steps);
+    // 已用步数：全模式由引擎累计（限时此前恒 0 的根因修复）
+    final usedMoves = objective.movesUsed;
     onFinished(GamePlayOutcome(
       cleared: cleared,
       values: <String, num>{
