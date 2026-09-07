@@ -64,6 +64,37 @@ class _PickerBody extends StatefulWidget {
 }
 
 class _PickerBodyState extends State<_PickerBody> {
+  final ScrollController _scroll = ScrollController();
+
+  /// 关卡清单与初始定位项（frontier）在 initState 一次算定
+  late final List<GameLevelModel> _list;
+  late final int _frontierIdx;
+
+  /// ListTile 默认高度（56）；用于打开时滚动定位的偏移估算
+  static const double _itemExtent = 56.0;
+
+  @override
+  void initState() {
+    super.initState();
+    _list = widget.mode != null
+        ? _levelsOfModeId(widget.mode!.id)
+        : widget.levels;
+    _frontierIdx = _frontierIdxOf(_list);
+    // 打开弹窗后把滚动条定位到最新关卡（居中显示，钳制在可滚动范围内）
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || !_scroll.hasClients) return;
+      final target =
+          _frontierIdx * _itemExtent - _scroll.position.viewportDimension / 2 + _itemExtent / 2;
+      _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
+    });
+  }
+
+  @override
+  void dispose() {
+    _scroll.dispose();
+    super.dispose();
+  }
+
   /// 指定模式下的关卡（按 level_no 升序）
   List<GameLevelModel> _levelsOfModeId(String modeId) {
     final list = widget.levels
@@ -80,7 +111,7 @@ class _PickerBodyState extends State<_PickerBody> {
   }
 
   /// 列表中「最新可挑战关卡(frontier)」索引（gated 用）
-  int _frontierIdx(List<GameLevelModel> list) {
+  int _frontierIdxOf(List<GameLevelModel> list) {
     int maxCleared = -1;
     for (int i = 0; i < list.length; i++) {
       if (widget.clearedIds.contains(list[i].id)) maxCleared = i;
@@ -99,10 +130,8 @@ class _PickerBodyState extends State<_PickerBody> {
 
   @override
   Widget build(BuildContext context) {
-    final list = widget.mode != null
-        ? _levelsOfModeId(widget.mode!.id)
-        : widget.levels;
-    final frontierIdx = _frontierIdx(list);
+    final list = _list;
+    final frontierIdx = _frontierIdx;
 
     bool canSelect(int i) {
       if (widget.game.levelSelectMode == 'free') return true; // 直接选关
@@ -133,6 +162,7 @@ class _PickerBodyState extends State<_PickerBody> {
               maxHeight: MediaQuery.of(context).size.height * 0.62,
             ),
             child: ListView(
+              controller: _scroll,
               padding: const EdgeInsets.symmetric(horizontal: 12),
               children: list.asMap().entries.map((entry) {
                 final i = entry.key;
