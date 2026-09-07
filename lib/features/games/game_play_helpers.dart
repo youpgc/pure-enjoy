@@ -88,6 +88,9 @@ Future<GameSettlementResult?> reportAndSettle({
   bool cleared = true,
   bool aborted = false,
   bool rewardsAllowed = true,
+
+  /// 无尽模式会话结算：弹窗标题「无尽模式 · 结算」，无通关/失败语义。
+  bool endless = false,
   VoidCallback? onReplay,
   VoidCallback? onNext,
   bool canNext = false,
@@ -161,6 +164,7 @@ Future<GameSettlementResult?> reportAndSettle({
         scoreValuesByCode: scoreValuesByCode,
         settleFuture: settleFuture,
         scoreOnly: !rewardsAllowed,
+        endless: endless,
         onDismiss: (r) {
           if (!completer.isCompleted) completer.complete(r);
         },

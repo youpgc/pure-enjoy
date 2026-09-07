@@ -24,6 +24,10 @@ class GameSettlementSheet extends StatefulWidget {
 
   /// 默认流程标记：true = 隐藏奖励明细，仅展示成绩。
   final bool scoreOnly;
+
+  /// 无尽模式会话结算：标题显示「无尽模式 · 结算」（无通关/失败语义），
+  /// 成绩区不显示「未达成通关条件」提示。
+  final bool endless;
   final VoidCallback? onReplay;
   final VoidCallback? onNext;
   final bool canNext;
@@ -37,6 +41,7 @@ class GameSettlementSheet extends StatefulWidget {
     required this.scoreValuesByCode,
     required this.settleFuture,
     this.scoreOnly = false,
+    this.endless = false,
     this.onReplay,
     this.onNext,
     this.canNext = false,
@@ -90,6 +95,17 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
   Widget _buildTitle() {
     final result = _result;
     final settled = !_loading && !_errored && result != null;
+    // 无尽模式会话结算：无通关/失败语义，固定绿色「无尽模式 · 结算」
+    if (widget.endless) {
+      return Row(
+        children: <Widget>[
+          const Icon(Icons.check_circle, color: AppTheme.success),
+          const SizedBox(width: 8),
+          Text('无尽模式 · 结算',
+              style: Theme.of(context).textTheme.titleLarge),
+        ],
+      );
+    }
     return Row(
       children: <Widget>[
         Icon(

@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import 'package:pure_enjoy/core/theme/app_theme.dart';
+
 import 'flow/game_flow_runner.dart';
 import 'flow/game_registry.dart';
 import 'game_play_helpers.dart';
@@ -33,6 +35,12 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
 
   /// 结算门禁（开局时解析）：false = 默认流程，只记成绩不发分不发成就。
   bool _rewardsAllowed = true;
+
+  /// 无尽模式链式会话：局间不结算，多局成绩累加，用户选择「结束」时
+  /// 以累计总分一次性上报并结算（参考用户 2026-09-07 拍板）。
+  bool get _isEndless => _level?.id.startsWith('endless_2048') ?? false;
+  int _endlessTotal = 0; // 已完成局的累计得分
+  int _endlessRounds = 0; // 已完成局数
 
   late final DateTime _enterTime;
   GamePlayOutcome? _outcome;
@@ -94,11 +102,16 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       if (mounted) Navigator.of(context).pop();
       return;
     }
+    // 无尽模式合成关不注入 level 维度（合成关号 10000+size 是内部隔离值，
+    // 非真实关卡，展示/统计都会失真）
+    final abandonValues = _isEndless
+        ? <String, num>{}
+        : <String, num>{'level': _level!.levelNo};
     await reportAndSettle(
       context: context,
       game: widget.game,
       level: _level!,
-      scoreValuesByCode: <String, num>{'level': _level!.levelNo},
+      scoreValuesByCode: abandonValues,
       durationMs: durationMs,
       cleared: false,
       aborted: true,
@@ -106,9 +119,111 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (mounted) Navigator.of(context).pop();
   }
 
+  /// 无尽模式局间结算：展示本局成绩与累计，由用户选择「继续下一局」
+  /// （重开新局、成绩滚入累计）或「结束并结算」（以累计总分一次性上报结算）。
+  Future<void> _showEndlessIntermission(GamePlayOutcome outcome) async {
+    final roundScore = (outcome.values['score'] ?? 0).toInt();
+    final choice = await showModalBottomSheet<String>(
+      context: context,
+      isScrollControlled: true,
+      isDismissible: false,
+      enableDrag: false,
+      shape: const RoundedRectangleBorder(
+        borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
+      ),
+      builder: (ctx) => PopScope(
+        canPop: false, // 局间必须二选一，不允许点遮罩/返回关闭
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: <Widget>[
+              Row(
+                children: <Widget>[
+                  const Icon(Icons.check_circle, color: AppTheme.success),
+                  const SizedBox(width: 8),
+                  Text('第 ${_endlessRounds + 1} 局结束',
+                      style: Theme.of(ctx).textTheme.titleLarge),
+                ],
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 8,
+                runSpacing: 8,
+                children: <Widget>[
+                  Chip(label: Text('本局得分  $roundScore')),
+                  Chip(label: Text('累计得分  ${_endlessTotal + roundScore}')),
+                  Chip(label: Text('已玩  ${_endlessRounds + 1} 局')),
+                ],
+              ),
+              const SizedBox(height: 20),
+              Row(
+                children: <Widget>[
+                  Expanded(
+                    child: OutlinedButton(
+                      onPressed: () => Navigator.of(ctx).pop('continue'),
+                      child: const Text('继续下一局'),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: FilledButton(
+                      onPressed: () => Navigator.of(ctx).pop('finish'),
+                      child: const Text('结束并结算'),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+    if (!mounted) return;
+    if (choice == 'continue') {
+      setState(() {
+        _endlessTotal += roundScore;
+        _endlessRounds += 1;
+        _outcome = null; // 解锁结算门禁，重开下一局
+        _restartNonce++;
+      });
+      return;
+    }
+    // 结束并结算：以累计总分一次性上报（多局成绩累加总结算）
+    await _finishEndlessSession(roundScore);
+  }
+
+  /// 无尽会话终局：score = 各局累加总分；duration = 本次会话总时长；
+  /// 不注入 level 维度（合成关号非真实关卡）；cleared=true（正常结束）。
+  Future<void> _finishEndlessSession(int lastRoundScore) async {
+    final totalScore = _endlessTotal + lastRoundScore;
+    final totalDurationMs = DateTime.now().difference(_enterTime).inMilliseconds;
+    await reportAndSettle(
+      context: context,
+      game: widget.game,
+      level: _level!,
+      scoreValuesByCode: <String, num>{
+        'score': totalScore,
+        'duration_ms': totalDurationMs,
+      },
+      durationMs: totalDurationMs,
+      cleared: true,
+      rewardsAllowed: _rewardsAllowed,
+      endless: true,
+      onExit: () => Navigator.of(context).pop(),
+    );
+  }
+
   void _onFinished(GamePlayOutcome outcome) async {
     if (_outcome != null) return; // 防重复结算
     setState(() => _outcome = outcome);
+    // 无尽模式：局间不结算——弹「继续下一局 / 结束并结算」选择，
+    // 多局成绩累加，结束时以总分一次性上报（不发本局 N 次奖励）。
+    if (_isEndless) {
+      await _showEndlessIntermission(outcome);
+      return;
+    }
     // 注入关卡号维度（后台已配置则参与成绩/奖励判定）
     final values = <String, num>{...outcome.values, 'level': _level!.levelNo};
     // 结算弹窗内的「下一关 / 再玩一次 / 返回大厅」统一由结算页承载，
