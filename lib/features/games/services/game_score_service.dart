@@ -304,6 +304,8 @@ class GameScoreService {
         // App 端看板不展示「放弃」记录（通关/失败仍展示；放弃仅后台可见）
         'status': 'neq.aborted',
       },
+      // 按需 select：记录列表仅消费 时间/用时/通关状态 三项（排除 score 等未展示列）
+      select: 'id,status,duration_ms,played_at',
       order: 'played_at.desc',
       limit: limit,
       offset: offset,
@@ -326,54 +328,64 @@ class GameScoreService {
   ///
   /// 通过 PostgREST 嵌入 game_score_values，避免逐条查维度值；维度编码由
   /// 缓存的维度定义反查。未登录或失败返回空列表。
+  ///
+  /// **按需查询（2026-09-07）**：分页拉全量——原 `limit:null` 被 PostgREST
+  /// 静默截断 1000 行，成绩超限后各模式最佳成绩聚合会静默缺失。
   Future<List<GameScoreEntry>> fetchScoresWithValues(String gameId) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return <GameScoreEntry>[];
 
-    final result = await ApiClient.get(
-      'game_scores',
-      select:
-          'id,level_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
-      filters: <String, String>{
-        'user_id': 'eq.$userId',
-        'game_id': 'eq.$gameId',
-        'status': 'neq.aborted',
-      },
-      order: 'played_at.desc',
-      limit: null,
-      note: 'games:scores_with_values',
-    );
-
-    if (!result.isSuccess) {
-      debugPrint('[GameScoreService] 成绩维度值查询失败：${result.errorMessage}');
-      return <GameScoreEntry>[];
-    }
-
+    const pageSize = 1000;
     final dims = GameService.instance.cachedConfig.dimensionsOf(gameId);
-    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
     final list = <GameScoreEntry>[];
-    for (final raw in rows) {
-      if (raw is! Map<String, dynamic>) continue;
-      final score = GameScoreModel.fromJson(raw);
-      final values = <String, num>{};
-      final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
-      for (final v in vals) {
-        if (v is! Map<String, dynamic>) continue;
-        final dim = dims
-            .where((d) => d.id == (v['dimension_id'] as String?))
-            .firstOrNull;
-        final numVal = (v['value'] as num?) ?? 0;
-        if (dim != null) {
-          values[dim.code] = numVal;
-        } else {
-          values[v['dimension_id'].toString()] = numVal;
-        }
+    var offset = 0;
+    while (true) {
+      final result = await ApiClient.get(
+        'game_scores',
+        select:
+            'id,level_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'game_id': 'eq.$gameId',
+          'status': 'neq.aborted',
+        },
+        order: 'played_at.desc',
+        limit: pageSize,
+        offset: offset,
+        note: 'games:scores_with_values',
+      );
+
+      if (!result.isSuccess) {
+        debugPrint('[GameScoreService] 成绩维度值查询失败：${result.errorMessage}');
+        return offset == 0 ? <GameScoreEntry>[] : list; // 保留已聚合部分
       }
-      list.add(GameScoreEntry(
-        score: score,
-        values: values,
-        dimensions: dims,
-      ));
+
+      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
+      for (final raw in rows) {
+        if (raw is! Map<String, dynamic>) continue;
+        final score = GameScoreModel.fromJson(raw);
+        final values = <String, num>{};
+        final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
+        for (final v in vals) {
+          if (v is! Map<String, dynamic>) continue;
+          final dim = dims
+              .where((d) => d.id == (v['dimension_id'] as String?))
+              .firstOrNull;
+          final numVal = (v['value'] as num?) ?? 0;
+          if (dim != null) {
+            values[dim.code] = numVal;
+          } else {
+            values[v['dimension_id'].toString()] = numVal;
+          }
+        }
+        list.add(GameScoreEntry(
+          score: score,
+          values: values,
+          dimensions: dims,
+        ));
+      }
+      if (rows.length < pageSize) break;
+      offset += pageSize;
     }
     return list;
   }

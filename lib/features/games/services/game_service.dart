@@ -231,6 +231,24 @@ class GameService {
     await CacheHelper.instance.clear(CacheHelper.keyGames);
   }
 
+  /// 各配置表的按需 select 列清单（**只查模型与逻辑实际消费的列**，
+  /// 排除 created_at/updated_at/logical 无消费列如 game_levels.target，
+  /// 压缩快照载荷——1200 关为主载荷，每行省一字段都是量级收益）。
+  static const Map<String, String> _tableSelects = <String, String>{
+    'games':
+        'id,code,name,icon,description,intro,rules,engine,enabled,sort_order,config,version,level_selectable,level_select_mode',
+    'game_dimensions':
+        'id,game_id,code,name,unit,value_type,aggregate,is_primary,sort_order',
+    'game_levels':
+        'id,game_id,mode_id,level_no,name,config,enabled,count_for_daily_clear,reward_points,reward_repeatable,sort_order,difficulty',
+    'game_achievements':
+        'id,game_id,code,name,description,icon,condition,reward_points,enabled,sort_order',
+    'game_reward_rules':
+        'id,game_id,rule_type,name,condition,points,enabled,sort_order',
+    'game_modes':
+        'id,game_id,code,name,icon,description,summary,guide,play_kind,config,sort_order,enabled',
+  };
+
   /// 查询启用行；失败返回空列表并记日志（配置表为全局表，不按用户过滤）。
   ///
   /// **分页拉全量**：PostgREST 服务端默认单次最多返回 1000 行（db-max-rows），
@@ -238,6 +256,7 @@ class GameService {
   /// 选关/下一关/关序折算全部失真）。按 1000/页拉取直至不足一页。
   ///
   /// **性能优化（2026-09-07）**：
+  /// - **按需 select**：仅查询模型消费列（见 [_tableSelects]）；
   /// - **ETag/304 缓存**：配置表低频变更，force 拉取时后台未改的表返回 304
   ///   （无 body 传输，几乎瞬时），大幅缩短游戏主界面进入与下拉刷新耗时；
   /// - **前两页并发**：game_levels（1200 关）常态为 2 页，并发探测将串行
@@ -247,10 +266,12 @@ class GameService {
     required String order,
   }) async {
     const pageSize = 1000;
+    final select = _tableSelects[table];
     Future<List<dynamic>> page(int offset) async {
       final result = await ApiClient.get(
         table,
         filters: <String, String>{'enabled': 'eq.true'},
+        select: select,
         order: order,
         limit: pageSize,
         offset: offset,

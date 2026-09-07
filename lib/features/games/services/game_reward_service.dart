@@ -365,6 +365,8 @@ class GameRewardService {
     final result = await ApiClient.get(
       'game_reward_claims',
       filters: filters,
+      // 按需 select：仅求和消费 points（排除 claim_key/remark 等长文本列）
+      select: 'points',
       limit: null,
       note: 'games:today_claimed',
     );
