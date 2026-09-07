@@ -30,6 +30,7 @@ class ProfilePageContent extends StatelessWidget {
     required this.onThemeSettingsTap,
     required this.achievementCount,
     required this.onAchievementsTap,
+    this.onRefresh,
   });
 
   final String? currentUserName;
@@ -50,10 +51,11 @@ class ProfilePageContent extends StatelessWidget {
   final int achievementCount;
   final VoidCallback onAchievementsTap;
 
+  /// 下拉刷新回调（null 时不启用下拉刷新）
+  final Future<void> Function()? onRefresh;
+
   @override
   Widget build(BuildContext context) {
-    final colorScheme = Theme.of(context).colorScheme;
-
     return Scaffold(
       appBar: AppBar(
         title: const Text('我的'),
@@ -64,7 +66,17 @@ class ProfilePageContent extends StatelessWidget {
           ),
         ],
       ),
-      body: ListView(
+      // 下拉刷新实时更新（SWR 静默请求的强制版）
+      body: onRefresh != null
+          ? RefreshIndicator(onRefresh: () => onRefresh!(), child: _buildList(context))
+          : _buildList(context),
+    );
+  }
+
+  /// 内容列表（原 body ListView 抽出）
+  Widget _buildList(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return ListView(
         children: [
           ProfileHeaderCard(
             currentUserName: currentUserName,
@@ -134,8 +146,7 @@ class ProfilePageContent extends StatelessWidget {
           const Divider(),
           ProfileSignOutListTile(onSignOut: onSignOut),
         ],
-      ),
-    );
+      );
   }
 }
 

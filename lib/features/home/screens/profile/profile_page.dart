@@ -8,6 +8,7 @@ import '../../../games/services/achievement_service.dart';
 import '../../../games/screens/achievement_list_screen.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../../services/version_check_service.dart';
+import '../../../../utils/cache_helper.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../profile/screens/point_records/checkin_screen.dart';
 import '../edit_profile/edit_profile_screen.dart';
@@ -45,11 +46,30 @@ class _ProfilePageState extends State<ProfilePage> {
   @override
   void initState() {
     super.initState();
+    // SWR：先读持久缓存（积分/成就数/头像 URL）命中即渲染（打开即呈现，
+    // 头像 URL 命中 CachedNetworkImage 磁盘缓存后无需网络），随后静默更新。
+    _restoreCachedStats();
     // 先用会话内已有头像值，避免首帧空白；随后 _loadUserData 会从 users 表校正
     _avatarUrl = SupabaseService.instance.currentUserAvatar;
     _loadUserData();
     _loadAppVersion();
     _checkUpdate();
+  }
+
+  /// 恢复「我的」页头部统计缓存（未登录/无缓存时静默跳过）。
+  Future<void> _restoreCachedStats() async {
+    final cached = await CacheHelper.instance.loadMap(CacheHelper.keyProfileStats);
+    if (!mounted || cached == null || cached.isEmpty) return;
+    // 已登录用户切换账号时缓存可能属于他人：会话内存已有头像值则跳过恢复头像
+    setState(() {
+      _totalPoints = (cached['totalPoints'] as num?)?.toInt() ?? _totalPoints;
+      _achievementCount =
+          (cached['achievementCount'] as num?)?.toInt() ?? _achievementCount;
+      if (SupabaseService.instance.currentUserAvatar == null) {
+        final url = cached['avatarUrl'];
+        if (url is String && url.isNotEmpty) _avatarUrl = url;
+      }
+    });
   }
 
   /// 读取当前应用版本号，用于在版本信息右侧展示
@@ -118,6 +138,12 @@ class _ProfilePageState extends State<ProfilePage> {
         _achievementCount = achievementCount;
         _avatarUrl = avatarUrl;
       });
+      // 回写持久缓存（下次打开秒渲染；头像 URL 命中磁盘缓存即现）
+      await CacheHelper.instance.saveMap(CacheHelper.keyProfileStats, <String, dynamic>{
+        'totalPoints': points,
+        'achievementCount': achievementCount,
+        'avatarUrl': avatarUrl ?? '',
+      });
     }
   }
 
@@ -134,6 +160,8 @@ class _ProfilePageState extends State<ProfilePage> {
       appVersion: _appVersion,
       hasUpdate: _hasUpdate,
       avatarUrl: _avatarUrl,
+      // 下拉刷新实时更新（静默请求的强制版）
+      onRefresh: _loadUserData,
       onSettingsTap: () {
         Navigator.push(
           context,

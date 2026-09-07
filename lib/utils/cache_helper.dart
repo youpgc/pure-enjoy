@@ -23,6 +23,8 @@ class CacheHelper {
   static const String keyGames = 'cache_games';
   /// 游戏成绩看板缓存（按用户隔离，切换账号须清除）。
   static const String keyGameScores = 'cache_game_scores';
+  /// 「我的」页头部统计缓存（积分/成就数/头像 URL，按用户隔离，切换账号须清除）。
+  static const String keyProfileStats = 'cache_profile_stats';
 
   /// 保存 JSON 列表缓存
   Future<void> saveList(String key, List<dynamic> data) async {

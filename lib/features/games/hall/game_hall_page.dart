@@ -29,18 +29,34 @@ class _GameHallPageState extends State<GameHallPage> {
     _load();
   }
 
-  Future<void> _load() async {
-    final cached = await GameService.instance.loadCachedConfig();
-    if (mounted) setState(() => _config = cached);
-    final config = await GameService.instance.fetchConfig();
-    final best = await GameScoreService.instance.fetchBestScores();
-    if (mounted) {
-      setState(() {
-        _config = config;
-        _best = best;
-        _loading = false;
-      });
+  /// SWR 加载（2026-09-07）：缓存命中立即展示（不等网络），随后静默请求
+  /// 更新缓存与展示；[refresh]（下拉刷新）时配置强拉并让 Future 供指示器等待。
+  ///
+  /// 静默失败保留已展示的旧数据（空快照不覆盖非空缓存）。
+  Future<void> _load({bool refresh = false}) async {
+    // 1) 缓存先行：仅当页面尚无数据（未命中）时读持久缓存，命中即渲染
+    if (_config == null && _best.isEmpty) {
+      final cachedConfig = await GameService.instance.loadCachedConfig();
+      final cachedBest = await GameScoreService.instance.loadCachedBestScores();
+      if (mounted && (cachedConfig != null || cachedBest.isNotEmpty)) {
+        setState(() {
+          if (cachedConfig != null) _config = cachedConfig;
+          if (cachedBest.isNotEmpty) _best = cachedBest;
+          _loading = false;
+        });
+      }
     }
+
+    // 2) 静默请求 / 下拉强拉：成功后更新缓存（service 内部已回写）与展示
+    final config = await GameService.instance.fetchConfig(force: refresh);
+    final best = await GameScoreService.instance.fetchBestScores();
+    if (!mounted) return;
+    setState(() {
+      // 静默失败（空快照）不覆盖已展示的非空缓存，避免刷新把页面打空
+      if (config.games.isNotEmpty || _config == null) _config = config;
+      if (best.isNotEmpty || _best.isEmpty) _best = best;
+      _loading = false;
+    });
   }
 
   GameBestScore? _primaryBest(String gameId) {
@@ -90,7 +106,7 @@ class _GameHallPageState extends State<GameHallPage> {
         ],
       ),
       body: RefreshIndicator(
-              onRefresh: _load,
+              onRefresh: () => _load(refresh: true),
               child: games.isEmpty
                   ? (_loading
                       // 网格区局部 loading（规范：禁止整页 loading）

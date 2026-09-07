@@ -240,12 +240,16 @@ class GameScoreService {
   /// 查询最佳成绩（服务端聚合）。
   ///
   /// [gameId] 为 null 时返回全部游戏最佳成绩（总看板用）；
-  /// 否则只返回该游戏（单游戏看板用）。失败时回退本地缓存。
+  /// 否则只返回该游戏（单游戏看板用）。
+  ///
+  /// SWR 语义（2026-09-07）：非 force 时先返回持久缓存（调用方秒渲染），
+  /// 但本方法**始终发起网络请求**更新缓存——此前无参调用在进程内永远命中
+  /// 内存缓存不发请求，导致返回大厅后最佳成绩永不更新。失败时返回持久
+  /// 缓存兜底（调用方无法区分新旧，由结果内容自然一致）。
   Future<List<GameBestScore>> fetchBestScores({
     String? gameId,
     bool force = false,
   }) async {
-    if (!force && gameId == null && _memoryBest != null) return _memoryBest!;
 
     final result = await ApiClient.rpc(
       'get_game_best_scores',
