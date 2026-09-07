@@ -110,6 +110,11 @@ class GameBestScore {
 /// 职责：上报游玩成绩、查询成绩记录、查询最佳成绩（经 RPC 服务端聚合）。
 /// 所有读写走 [ApiClient]；用户过滤一律用 [AuthService.instance.currentUserId]
 /// 直接匹配业务 ID 列（game_scores.user_id 存业务 ID，非 UUID）。
+/// uuid v4 格式（合成关 id 如 endless_2048_4 非法，上报前置 null）
+final RegExp _uuidRe = RegExp(
+  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
+);
+
 class GameScoreService {
   GameScoreService._();
 
@@ -138,6 +143,13 @@ class GameScoreService {
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return null;
+
+    // level_id/mode_id 列为 uuid 类型：合成关（endless_2048_N、GameFlow 默认关）
+    // 的非 uuid id 一律置 null，否则 PostgREST 22P02 上报失败（2026-09-07）
+    String? sanitizeUuid(String? v) =>
+        (v != null && _uuidRe.hasMatch(v)) ? v : null;
+    levelId = sanitizeUuid(levelId);
+    modeId = sanitizeUuid(modeId);
 
     final scoreId = const Uuid().v4();
     final now = DateTime.now().toUtc();
