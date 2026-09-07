@@ -8,6 +8,7 @@ import 'flow/game_flow_runner.dart';
 import 'game_play_helpers.dart';
 import 'game_play_screen.dart';
 import 'game_item_shop_screen.dart';
+import 'shared/game_local_loading.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'models/game_mode_model.dart';
@@ -270,36 +271,17 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
-  /// 模式区加载占位：配置请求期间展示骨架卡（静默请求，不回落旧态）
+  /// 模式区加载占位：单个局部 loading（静默请求，不回落旧态；规范禁骨架屏）
   Widget _modeGridPlaceholder() {
-    return Column(
+    return const Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: <Widget>[
-        const Padding(
+        Padding(
           padding: EdgeInsets.only(left: 4, top: 4, bottom: 8),
           child: Text('玩法模式',
               style: TextStyle(fontSize: 15, fontWeight: FontWeight.bold)),
         ),
-        GridView.builder(
-          shrinkWrap: true,
-          physics: const NeverScrollableScrollPhysics(),
-          itemCount: 4,
-          gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-            crossAxisCount: 2,
-            mainAxisSpacing: 10,
-            crossAxisSpacing: 10,
-            childAspectRatio: 2.6,
-          ),
-          itemBuilder: (_, __) => Card(
-            child: Center(
-              child: SizedBox(
-                width: 18,
-                height: 18,
-                child: CircularProgressIndicator(strokeWidth: 2),
-              ),
-            ),
-          ),
-        ),
+        GameLocalLoading(label: '玩法模式加载中…'),
       ],
     );
   }
@@ -388,7 +370,10 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
   /// 模式点击分流：
   /// - 无尽模式（endless）：无具体关，直接开合成无尽局；
-  /// - 其它：打开选关弹窗（按 mode_id 过滤该模式关卡）。
+  /// - 允许选关（后台 level_selectable=true 且 levelSelect 节点开启）：
+  ///   打开选关弹窗（按 mode_id 过滤该模式关卡）；
+  /// - 关闭选关：不弹选关，直接进该模式的最新关卡（frontier：
+  ///   第一个未通关，全通关取末关）。
   Future<void> _onModeTap(GameModeModel mode) async {
     if (mode.isEndless) {
       final lv = GameLevelModel.endless2048(
@@ -399,6 +384,23 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
       await Navigator.of(context).push(
         MaterialPageRoute(
           builder: (_) => GamePlayScreen(game: widget.game, level: lv),
+        ),
+      );
+      if (mounted) await _load();
+      return;
+    }
+    final selectable =
+        widget.game.levelSelectable && (_flow?.levelSelectAvailable ?? false);
+    if (!selectable) {
+      final plan = GameFlowRunner.instance.resolvePlayPlan(
+        widget.game,
+        modeId: mode.id,
+        levels: _levels,
+        clearedIds: _clearedIds,
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GamePlayScreen(game: widget.game, level: plan.level),
         ),
       );
       if (mounted) await _load();
