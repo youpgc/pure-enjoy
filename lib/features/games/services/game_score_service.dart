@@ -305,7 +305,7 @@ class GameScoreService {
         'status': 'neq.aborted',
       },
       // 按需 select：记录列表仅消费 时间/用时/通关状态 三项（排除 score 等未展示列）
-      select: 'id,status,duration_ms,played_at',
+      select: 'id,status,duration_ms,played_at,level_id,mode_id',
       order: 'played_at.desc',
       limit: limit,
       offset: offset,

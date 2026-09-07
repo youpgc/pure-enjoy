@@ -5,6 +5,7 @@ import '../shared/game_local_loading.dart';
 import '../models/game_model.dart';
 import '../models/game_score_model.dart';
 import '../services/game_score_service.dart';
+import '../services/game_service.dart';
 
 /// 游戏记录页（从原成绩看板拆分）：对局历史列表，滚动到底自动加载下一页。
 class GameHistoryScreen extends StatefulWidget {
@@ -104,6 +105,35 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     );
   }
 
+  /// 记录归属描述：「模式名 · 关卡名」（从配置缓存反查）。
+  /// 无模式/关卡（默认流程、被删配置）时逐段降级：合成关（endless_2048_N）
+  /// 显示「N×N 无尽」，全无则空串（不占位）。
+  String _scopeLabel(GameScoreModel h) {
+    final config = GameService.instance.cachedConfig;
+    final parts = <String>[];
+    if (h.modeId != null && h.modeId!.isNotEmpty) {
+      for (final m in config.modesOf(widget.game.id)) {
+        if (m.id == h.modeId) {
+          parts.add(m.name);
+          break;
+        }
+      }
+    }
+    if (h.levelId != null && h.levelId!.isNotEmpty) {
+      if (h.levelId!.startsWith('endless_2048')) {
+        parts.add('无尽模式');
+      } else {
+        for (final l in config.levelsOf(widget.game.id)) {
+          if (l.id == h.levelId) {
+            parts.add(l.name.isEmpty ? '第 ${l.levelNo} 关' : l.name);
+            break;
+          }
+        }
+      }
+    }
+    return parts.join(' · ');
+  }
+
   Widget _buildHistorySection() {
     // 列表区局部 loading（规范：禁止整页 loading）
     if (_loading) {
@@ -133,6 +163,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
           }
           final h = _history[i];
           final sec = ((h.durationMs ?? 0) / 1000).floor();
+          final scope = _scopeLabel(h);
           return ListTile(
             dense: true,
             leading: Icon(
@@ -142,7 +173,9 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             ),
             title: Text(_fmtDate(h.playedAt)),
             subtitle: Text(
-              '用时 ${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}',
+              scope.isEmpty
+                  ? '用时 ${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}'
+                  : '$scope · 用时 ${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}',
             ),
             trailing: h.isCleared
                 ? const Text('通关', style: TextStyle(color: AppTheme.success))

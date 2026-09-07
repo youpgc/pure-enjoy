@@ -61,11 +61,13 @@ class _GameHallPageState extends State<GameHallPage> {
   /// 点击游戏入口：统一进入该游戏的「主界面」([GameHomeScreen])。
   /// 主界面内再决定「开始游戏 / 选关 / 查看说明 / 查看记录」，
   /// 选关逻辑已抽到 [GameLevelPicker]，按 [GameModel.levelSelectMode] 决定锁状态。
+  /// 返回后刷新（对局可能产生新成绩 → 最佳记录需更新）。
   Future<void> _openGame(GameModel game) async {
     if (!mounted) return;
-    Navigator.of(context).push(
+    await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GameHomeScreen(game: game)),
     );
+    if (mounted) await _load();
   }
 
   @override

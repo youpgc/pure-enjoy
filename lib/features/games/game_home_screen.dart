@@ -81,7 +81,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
         builder: (_) => GamePlayScreen(game: widget.game, level: plan.level),
       ),
     );
-    if (mounted) await _load();
+    if (mounted) await _load(force: true);
   }
 
   /// 全关卡选关（无模式时使用）。
@@ -92,7 +92,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
       levels: _levels,
       clearedIds: _clearedIds,
     );
-    if (mounted) await _load();
+    if (mounted) await _load(force: true);
   }
 
   void _showGuide() {
@@ -390,7 +390,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
           builder: (_) => GamePlayScreen(game: widget.game, level: lv),
         ),
       );
-      if (mounted) await _load();
+      if (mounted) await _load(force: true);
       return;
     }
     final selectable =
@@ -407,7 +407,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
           builder: (_) => GamePlayScreen(game: widget.game, level: plan.level),
         ),
       );
-      if (mounted) await _load();
+      if (mounted) await _load(force: true);
       return;
     }
     await _openPickerForMode(mode);
@@ -421,7 +421,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
       clearedIds: _clearedIds,
       mode: mode,
     );
-    if (mounted) await _load();
+    if (mounted) await _load(force: true);
   }
 }
 

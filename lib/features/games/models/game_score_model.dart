@@ -17,6 +17,9 @@ class GameScoreModel {
   /// 关卡 id（无关卡玩法可为 null）
   final String? levelId;
 
+  /// 模式 id（无模式玩法可为 null）
+  final String? modeId;
+
   /// 结果：'cleared'（通关） | 'failed'（失败） | 'aborted'（中途退出）
   final String status;
 
@@ -34,6 +37,7 @@ class GameScoreModel {
     required this.userId,
     required this.gameId,
     this.levelId,
+    this.modeId,
     this.status = 'cleared',
     this.durationMs,
     this.playedAt,
@@ -50,6 +54,7 @@ class GameScoreModel {
       userId: json['user_id'] as String? ?? '',
       gameId: json['game_id'] as String? ?? '',
       levelId: json['level_id'] as String?,
+      modeId: json['mode_id'] as String?,
       status: json['status'] as String? ?? 'cleared',
       durationMs: (json['duration_ms'] as num?)?.toInt(),
       playedAt: json['played_at'] != null
