@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
@@ -61,6 +62,11 @@ class _SheepGameState extends State<SheepGame> {
   late int _perType;
   late double _overlap;
 
+  /// 限时模式倒计时（秒）；0 = 经典不限时。config 键：time_limit
+  late int _timeLimit;
+  int _secondsLeft = 0;
+  Timer? _clockTimer;
+
   /// 开局牌堆包围盒快照：视图缩放固定用它。若跟随消除动态重算，
   /// 边缘方块被消除后包围盒变小 → scale 变大 → 表现为「自动放大局部视图」。
   double _initMinX = 0, _initMinY = 0, _initMaxX = 1, _initMaxY = 1;
@@ -75,8 +81,38 @@ class _SheepGameState extends State<SheepGame> {
     _perType = (((cfg['perType'] as int?) ?? 3) ~/ 3) * 3;
     if (_perType < 3) _perType = 3;
     _overlap = ((cfg['overlap'] as num?)?.toDouble() ?? 0.78).clamp(0.55, 0.95);
+    // 限时模式倒计时（键名双兼容 time_limit / timeLimit；0 = 不限时）
+    final cfgTime = cfg['time_limit'] ?? cfg['timeLimit'];
+    _timeLimit = cfgTime is int ? cfgTime : (cfgTime is num ? cfgTime.toInt() : 0);
+    if (_timeLimit > 0) {
+      _secondsLeft = _timeLimit;
+      _startClock();
+    }
     _generate();
     _loadInventory();
+  }
+
+  /// 限时模式秒级倒计时：归零判负（时间耗尽）；结算/页面销毁时取消。
+  void _startClock() {
+    _clockTimer = Timer.periodic(const Duration(seconds: 1), (timer) {
+      if (!mounted || _finished) {
+        timer.cancel();
+        return;
+      }
+      setState(() {
+        _secondsLeft--;
+        if (_secondsLeft <= 0) {
+          _secondsLeft = 0;
+          timer.cancel();
+          _finish(false); // 倒计时归零未清空棋盘即失败
+        }
+      });
+    });
+  }
+
+  String get _clockText {
+    final s = _secondsLeft.clamp(0, _timeLimit);
+    return '${(s ~/ 60).toString().padLeft(2, '0')}:${(s % 60).toString().padLeft(2, '0')}';
   }
 
   /// 开局载入三道具：先免费用 free_per_game 次，超出部分消耗购买库存（最多 per_game_limit 次/局）。
@@ -355,6 +391,12 @@ class _SheepGameState extends State<SheepGame> {
     setState(() {});
   }
 
+  @override
+  void dispose() {
+    _clockTimer?.cancel();
+    super.dispose();
+  }
+
   void _finish(bool cleared) {
     if (_finished) return;
     _finished = true;
@@ -388,6 +430,13 @@ class _SheepGameState extends State<SheepGame> {
           valueColor: nearFull ? AppTheme.error : null,
         ),
         GameStatusItem(label: '层数', value: '$_layers'),
+        // 限时模式：层数右侧展示倒计时（mm:ss），≤10s 标红告急
+        if (_timeLimit > 0)
+          GameStatusItem(
+            label: '倒计时',
+            value: _clockText,
+            valueColor: _secondsLeft <= 10 ? AppTheme.error : null,
+          ),
       ],
       hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
       // 三道具统一收纳到底部控制栏，不再叠在牌堆上方
