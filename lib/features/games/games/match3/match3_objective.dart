@@ -326,13 +326,15 @@ class Match3Objective {
 
   /// HUD 指标（按模式给最关键项；steps<=0 不限步时不展示步数项）
   List<ObjectiveStat> stats() {
+    // 只渲染本关实际生效的条件项：steps<=0（不限步）时不渲染步数项；
+    // 限时渲染剩余时间。无关条件数据一律不展示（2026-09-07）。
     final movesAlert = !isTimed && steps > 0 && movesLeft <= 3;
     final timeAlert = isTimed && secondsLeft <= 10;
-    final moveStat = isTimed
+    final ObjectiveStat? moveStat = isTimed
         ? ObjectiveStat('剩余时间', fmtClock(secondsLeft), alert: timeAlert)
         : (steps > 0
             ? ObjectiveStat('剩余步数', '$movesLeft', alert: movesAlert)
-            : const ObjectiveStat('步数', '不限'));
+            : null);
 
     switch (mode) {
       case Match3Mode.score:
@@ -340,30 +342,31 @@ class Match3Objective {
         return <ObjectiveStat>[
           ObjectiveStat('得分', '$score'),
           ObjectiveStat('目标', '$goalScore'),
-          moveStat,
+          if (moveStat != null) moveStat,
         ];
       case Match3Mode.clear:
         return <ObjectiveStat>[
           ObjectiveStat('剩余果冻', '$jellyLeft'),
           ObjectiveStat('得分', '$score'),
-          moveStat,
+          if (moveStat != null) moveStat,
         ];
       case Match3Mode.collect:
         // 目标进度改由顶部「目标达成条件」banner 展示（图标×N 实时减少）
         return <ObjectiveStat>[
           ObjectiveStat('得分', '$score'),
-          moveStat,
+          if (moveStat != null) moveStat,
         ];
       case Match3Mode.obstacle:
+        // 冰块进度由 banner 展示（❄ ×剩余）
         return <ObjectiveStat>[
           ObjectiveStat('得分', '$score'),
-          moveStat,
+          if (moveStat != null) moveStat,
         ];
       case Match3Mode.boss:
         return <ObjectiveStat>[
           ObjectiveStat('Boss 血量', '$bossLeft/$bossHp'),
           ObjectiveStat('得分', '$score'),
-          moveStat,
+          if (moveStat != null) moveStat,
         ];
     }
   }

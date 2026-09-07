@@ -378,7 +378,12 @@ class Match3FlameGame extends FlameGame
           (cell) => swapped.contains(cell),
           orElse: () => run.cells[run.cells.length ~/ 2],
         );
-        created[spot] = sp;
+        // 目标位已是特殊糖（道具方块）：优先消耗旧道具（留在 toClear 触发
+        // 引爆），不覆盖生成新道具——防止旧道具免爆换皮（2026-09-07）
+        final existing = grid[spot.$1][spot.$2];
+        if (existing == null || existing.special.isEmpty) {
+          created[spot] = sp;
+        }
       }
     }
 
@@ -395,7 +400,12 @@ class Match3FlameGame extends FlameGame
       }
     }
     for (final cell in hCells) {
-      if (vCells.contains(cell)) created[cell] = 'wrap';
+      if (!vCells.contains(cell)) continue;
+      // 目标位已是特殊糖：不覆盖生成，按普通消除引爆旧道具
+      final existing = grid[cell.$1][cell.$2];
+      if (existing == null || existing.special.isEmpty) {
+        created[cell] = 'wrap';
+      }
     }
 
     for (final cell in created.keys) {
