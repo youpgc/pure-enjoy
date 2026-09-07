@@ -35,6 +35,9 @@ class GameModeModel {
   /// 玩法说明（后台模式配置维护；说明页按模式展示，空则回退内置文案）
   final String guide;
 
+  /// 模式简介（后台配置的一句话说明；说明页模式段首行展示，空则忽略）
+  final String summary;
+
   const GameModeModel({
     required this.id,
     required this.gameId,
@@ -46,6 +49,7 @@ class GameModeModel {
     this.enabled = true,
     this.config = const <String, dynamic>{},
     this.guide = '',
+    this.summary = '',
   });
 
   /// 从 Supabase 行解析。
@@ -61,6 +65,7 @@ class GameModeModel {
       enabled: json['enabled'] as bool? ?? true,
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       guide: json['guide'] as String? ?? '',
+      summary: json['summary'] as String? ?? '',
     );
   }
 
@@ -76,6 +81,8 @@ class GameModeModel {
       'sort_order': sortOrder,
       'enabled': enabled,
       'config': config,
+      'summary': summary,
+      'guide': guide,
     };
   }
 

@@ -21,6 +21,12 @@ class GameModel {
   /// 游戏简介
   final String? description;
 
+  /// 游戏介绍（后台配置；说明页顶部展示，空则回退内置文案）
+  final String? intro;
+
+  /// 游戏规则（后台配置；说明页「基础规则」段展示，空则回退内置文案）
+  final String? rules;
+
   /// 渲染引擎：'widget' | 'flame'
   final String engine;
 
@@ -58,6 +64,8 @@ class GameModel {
     required this.name,
     this.icon,
     this.description,
+    this.intro,
+    this.rules,
     this.engine = 'widget',
     this.enabled = true,
     this.sortOrder = 0,
@@ -77,6 +85,8 @@ class GameModel {
       name: json['name'] as String? ?? '',
       icon: json['icon'] as String?,
       description: json['description'] as String?,
+      intro: json['intro'] as String?,
+      rules: json['rules'] as String?,
       engine: json['engine'] as String? ?? 'widget',
       enabled: json['enabled'] as bool? ?? true,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
@@ -101,6 +111,8 @@ class GameModel {
       'name': name,
       'icon': icon,
       'description': description,
+      'intro': intro,
+      'rules': rules,
       'engine': engine,
       'enabled': enabled,
       'sort_order': sortOrder,
@@ -120,6 +132,8 @@ class GameModel {
     String? name,
     String? icon,
     String? description,
+    String? intro,
+    String? rules,
     String? engine,
     bool? enabled,
     int? sortOrder,
@@ -136,6 +150,8 @@ class GameModel {
       name: name ?? this.name,
       icon: icon ?? this.icon,
       description: description ?? this.description,
+      intro: intro ?? this.intro,
+      rules: rules ?? this.rules,
       engine: engine ?? this.engine,
       enabled: enabled ?? this.enabled,
       sortOrder: sortOrder ?? this.sortOrder,
