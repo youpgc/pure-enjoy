@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../services/achievement_service.dart';
 import '../shared/achievement_icon.dart';
+import '../shared/game_local_loading.dart';
 
 /// 我的成就页
 ///
@@ -51,8 +52,9 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(title: const Text('我的成就')),
+      // 网格区局部 loading（规范：禁止整页 loading）
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? ListView(children: const <Widget>[GameLocalLoading(label: '成就加载中…')])
           : _items.isEmpty
               ? _buildEmpty(colorScheme)
               : GridView.builder(

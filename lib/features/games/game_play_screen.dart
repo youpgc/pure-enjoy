@@ -187,9 +187,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
             ),
           ],
         ),
-        body: _level == null
-            ? const Center(child: CircularProgressIndicator())
-            : _buildGame(),
+        // 开局解析（resolvePlayPlan）为同步兜底，_level 恒非空——无 loading 态
+        body: _buildGame(),
       ),
     );
   }

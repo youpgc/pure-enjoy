@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../shared/game_local_loading.dart';
 import '../models/game_model.dart';
 import '../models/game_score_model.dart';
 import '../services/game_score_service.dart';
@@ -90,9 +91,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.game.name} · 游戏记录')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 controller: _scrollController,
@@ -106,6 +105,10 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
   }
 
   Widget _buildHistorySection() {
+    // 列表区局部 loading（规范：禁止整页 loading）
+    if (_loading) {
+      return const GameLocalLoading(label: '记录加载中…');
+    }
     if (_history.isEmpty) {
       return const Text('暂无记录', style: TextStyle(color: AppTheme.neutral500));
     }

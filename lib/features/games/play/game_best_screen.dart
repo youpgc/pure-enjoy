@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../shared/game_local_loading.dart';
 import '../models/game_model.dart';
 import '../models/match3_mode.dart';
 import '../services/game_score_service.dart';
@@ -84,9 +85,7 @@ class _GameBestScreenState extends State<GameBestScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.game.name} · 最佳记录')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -95,7 +94,11 @@ class _GameBestScreenState extends State<GameBestScreen> {
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.bold)),
                   const SizedBox(height: 8),
-                  _buildBestSection(),
+                  // 数据区局部 loading（规范：禁止整页 loading）
+                  if (_loading)
+                    const GameLocalLoading(label: '成绩加载中…')
+                  else
+                    _buildBestSection(),
                 ],
               ),
             ),

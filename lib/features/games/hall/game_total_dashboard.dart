@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../shared/game_local_loading.dart';
 import '../services/game_score_service.dart';
 
 /// 全部游戏最佳成绩看板（游戏栏右上角入口）。
@@ -47,11 +48,12 @@ class _GameTotalDashboardState extends State<GameTotalDashboard> {
 
     return Scaffold(
       appBar: AppBar(title: const Text('全部最佳成绩')),
-      body: _loading && _best.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : byGame.isEmpty
-              ? const Center(child: Text('暂无成绩记录'))
-              : ListView.builder(
+      body: byGame.isEmpty
+          ? (_loading
+              // 列表区局部 loading（规范：禁止整页 loading）
+              ? const GameLocalLoading(label: '成绩加载中…')
+              : const Center(child: Text('暂无成绩记录')))
+          : ListView.builder(
                   padding: const EdgeInsets.all(16),
                   itemCount: byGame.length,
                   itemBuilder: (ctx, i) {

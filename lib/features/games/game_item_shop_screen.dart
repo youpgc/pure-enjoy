@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'shared/game_local_loading.dart';
 import 'models/game_item_model.dart';
 import 'models/game_model.dart';
 import 'models/match3_mode.dart';
@@ -73,9 +74,7 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.game.name} · 道具商城')),
-      body: _loading
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
@@ -108,7 +107,10 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
                     ),
                   ),
                   const SizedBox(height: 12),
-                  if (_items.isEmpty)
+                  // 道具区局部 loading（规范：禁止整页 loading）
+                  if (_loading)
+                    const GameLocalLoading(label: '道具加载中…')
+                  else if (_items.isEmpty)
                     const Padding(
                       padding: EdgeInsets.symmetric(vertical: 48),
                       child: Center(

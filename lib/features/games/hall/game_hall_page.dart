@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import './game_total_dashboard.dart';
 import '../game_home_screen.dart';
+import '../shared/game_local_loading.dart';
 import '../game_play_helpers.dart';
 import '../models/game_model.dart';
 import '../services/game_score_service.dart';
@@ -86,12 +87,13 @@ class _GameHallPageState extends State<GameHallPage> {
           ),
         ],
       ),
-      body: _loading && games.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      body: RefreshIndicator(
               onRefresh: _load,
               child: games.isEmpty
-                  ? const Center(child: Text('暂无可用游戏'))
+                  ? (_loading
+                      // 网格区局部 loading（规范：禁止整页 loading）
+                      ? const GameLocalLoading(label: '游戏加载中…')
+                      : const Center(child: Text('暂无可用游戏')))
                   : GridView.builder(
                       padding: const EdgeInsets.all(16),
                       itemCount: games.length,

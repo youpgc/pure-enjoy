@@ -155,9 +155,8 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
 
     return Scaffold(
       appBar: AppBar(title: Text(game.name)),
-      body: _loading && _levels.isEmpty
-          ? const Center(child: CircularProgressIndicator())
-          : RefreshIndicator(
+      // 规范：禁止整页 loading——页面骨架立即渲染，模式区内部骨架占位
+      body: RefreshIndicator(
               onRefresh: _load,
               child: ListView(
                 padding: const EdgeInsets.all(16),
