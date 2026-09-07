@@ -7,8 +7,6 @@ import 'flow/game_registry.dart';
 import 'game_play_helpers.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
-import 'play/game_best_screen.dart';
-import 'play/game_history_screen.dart';
 import 'services/game_service.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
@@ -301,30 +299,9 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       canPop: false,
       onPopInvokedWithResult: _onPopInvokedWithResult,
       child: Scaffold(
-        // 标题：游戏名+模式+第N关（不展示额外信息，避免溢出）
-        appBar: AppBar(
-          title: Text(_titleText),
-          actions: <Widget>[
-            IconButton(
-              icon: const Icon(Icons.emoji_events_outlined),
-              tooltip: '最佳记录',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => GameBestScreen(game: widget.game),
-                ),
-              ),
-            ),
-            IconButton(
-              icon: const Icon(Icons.history),
-              tooltip: '游戏记录',
-              onPressed: () => Navigator.of(context).push(
-                MaterialPageRoute(
-                  builder: (_) => GameHistoryScreen(game: widget.game),
-                ),
-              ),
-            ),
-          ],
-        ),
+        // 标题：游戏名+模式+第N关（不展示额外信息，避免溢出）；
+        // 右上角不放任何入口（记录/最佳记录入口只保留在游戏主界面，2026-09-07 拍板）
+        appBar: AppBar(title: Text(_titleText)),
         // 开局解析（resolvePlayPlan）为同步兜底，_level 恒非空——无 loading 态
         body: _buildGame(),
       ),

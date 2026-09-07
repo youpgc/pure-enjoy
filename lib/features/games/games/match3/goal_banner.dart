@@ -41,8 +41,11 @@ class Match3GoalBanner extends StatelessWidget {
     }
     if (chips.isEmpty) return const SizedBox.shrink();
 
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 4),
+    // 与引擎盘面同底色（游戏容器深色区内上方，视觉一体化）
+    return Container(
+      width: double.infinity,
+      color: const Color(0xFF26263A),
+      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 6),
       child: Center(
         child: Wrap(
           alignment: WrapAlignment.center,

@@ -227,7 +227,7 @@ class _Match3GameState extends State<Match3Game> {
                 ),
               )
               .toList(),
-          banner: _buildBanner(),
+          contentHeader: _buildBanner(),
           hint: _objective.hint,
           actions: <GameAction>[
             if (_mode == Match3Mode.timed && _addTimeItem != null)
