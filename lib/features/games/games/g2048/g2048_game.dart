@@ -96,19 +96,26 @@ class _G2048GameState extends State<G2048Game> {
     // 无通关条件：config['noClear'] == true 时永不通关（仅棋盘卡死结束）
     final cfgNoClear = widget.level.config['noClear'];
     _noClear = cfgNoClear == true;
-    // 扩展维度（无则该维不限制）：步数上限 / 时间上限(秒) / 分数达标
-    final cfgMoves = widget.level.config['moves'];
-    _movesLimit = cfgMoves is int ? cfgMoves : null;
-    final cfgTime = widget.level.config['timeLimit'];
-    _timeLimit = cfgTime is int ? cfgTime : null;
+    // 扩展维度（无则该维不限制）：步数上限 / 时间上限(秒) / 分数达标。
+    // 键名双兼容：DB 实配键为 snake_case（max_moves/time_limit），引擎历史键为
+    // camelCase（moves/timeLimit）——两套都认（match3 同款别名惯例）。
+    final cfgMoves =
+        widget.level.config['moves'] ?? widget.level.config['max_moves'];
+    _movesLimit = cfgMoves is int
+        ? cfgMoves
+        : (cfgMoves is num ? cfgMoves.toInt() : null);
+    final cfgTime =
+        widget.level.config['timeLimit'] ?? widget.level.config['time_limit'];
+    _timeLimit =
+        cfgTime is int ? cfgTime : (cfgTime is num ? cfgTime.toInt() : null);
     final cfgScore = widget.level.config['scoreTarget'];
     _scoreTarget = cfgScore is int ? cfgScore : null;
-    // 目标语义判定：限时/挑战模式（带 timeLimit/moves）的 config.target 是
-    // **分数门槛**（如 690），并非方块数值——方块只可能是 2 的幂，按方块判定
-    // 会永远无法通关（2026-09-07 修复「得分 2472 仍判失败」）。
-    _isScoreGoal =
-        widget.level.config.containsKey('moves') ||
-        widget.level.config.containsKey('timeLimit');
+    // 目标语义判定：带步数/时间限制的关卡（挑战/限时）config.target 是
+    // **分数门槛**（如 690），并非方块数值——方块只可能是 2 的幂。
+    // （2026-09-07 二次修复：此前用 containsKey('moves'/'timeLimit') 判定，
+    // 而 DB 实配键为 max_moves/time_limit，判定落空 → 挑战/限时永远按方块
+    // 判定、永远无法通关；现以别名解析结果为准）
+    _isScoreGoal = _movesLimit != null || _timeLimit != null;
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
@@ -156,7 +163,8 @@ class _G2048GameState extends State<G2048Game> {
     }
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     if (elapsed >= _timeLimit! * 1000) {
-      _finish(false);
+      // 归零时若分数目标已达成则判胜（最后一滑恰好达标、轮询先到的情况）
+      _finish(_isScoreGoal && _score >= _target);
       return;
     }
     if (mounted) setState(() {});
@@ -458,8 +466,12 @@ class _G2048GameState extends State<G2048Game> {
         GameStatusItem(label: '得分', value: '$_score'),
         if (_noClear)
           const GameStatusItem(label: '模式', value: '无尽')
+        else if (_isScoreGoal)
+          // 分数门槛（挑战/限时）：明确标注单位，避免与「合成方块」混淆
+          GameStatusItem(label: '目标', value: '$_target 分')
         else
-          GameStatusItem(label: '目标', value: '$_target'),
+          // 经典模式：目标为合成方块数值
+          GameStatusItem(label: '合成', value: '$_target'),
         if (_movesLimit != null)
           GameStatusItem(
             label: '剩余步数',
