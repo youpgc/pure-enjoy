@@ -41,6 +41,15 @@ class Match3FlameGame extends FlameGame
   int movesLeft = 0;
   int combo = 1;
 
+  /// 本局最高连击（达到过的最大连锁波数，结算 max_combo 维度）
+  int maxCombo = 0;
+
+  /// 本局单次操作最高分（一次交换的整段连锁累计，结算 max_single 维度）
+  int maxSingle = 0;
+
+  /// 当前交换动作的累计得分（连锁结束即计入 maxSingle）
+  int _moveScore = 0;
+
   final DateTime _startTime = DateTime.now();
   bool _over = false;
   bool _busy = false;
@@ -335,6 +344,7 @@ class Match3FlameGame extends FlameGame
         if (!objective.isTimed && objective.steps > 0) movesLeft--;
         _syncHud();
         combo = 1;
+        _moveScore = 0;
         _resolveCascade(r1, c1, r2, c2);
       }
     });
@@ -349,6 +359,9 @@ class Match3FlameGame extends FlameGame
     }
     final runs = findRuns(grid, rows, cols);
     if (runs.isEmpty) {
+      // 本步连锁结束：单次操作得分计入最高纪录
+      if (_moveScore > maxSingle) maxSingle = _moveScore;
+      _moveScore = 0;
       _syncHud();
       // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败
       if (objective.achieved || objective.exhausted) {
@@ -414,6 +427,8 @@ class Match3FlameGame extends FlameGame
     _applySpecials(toClear, created);
 
     score += toClear.length * 10 * combo;
+    _moveScore += toClear.length * 10 * combo;
+    if (combo > maxCombo) maxCombo = combo;
 
     // 目标进度累计（果冻清除 / 冰块削层 / 收集计数 / Boss 掉血）
     final clearedCells = <ClearedCell>[];
@@ -545,12 +560,17 @@ class Match3FlameGame extends FlameGame
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     // 已用步数：全模式由引擎累计（限时此前恒 0 的根因修复）
     final usedMoves = objective.movesUsed;
+    // 限时等路径可能跳过连锁收尾分支：结算前补记单次最高分
+    if (_moveScore > maxSingle) maxSingle = _moveScore;
+    _moveScore = 0;
     onFinished(GamePlayOutcome(
       cleared: cleared,
       values: <String, num>{
         'score': score,
         'duration_ms': elapsed,
         'moves': usedMoves,
+        'max_combo': maxCombo,
+        'max_single': maxSingle,
       },
       durationMs: elapsed,
     ));
