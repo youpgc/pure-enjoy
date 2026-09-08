@@ -32,9 +32,15 @@ class AchievementGroupView {
   /// 该类目下已获取的全部等级（升序）
   final List<UserAchievementView> obtained;
 
+  /// 该类目全部等级定义（含未获取，sort_order 升序）。
+  /// v2 结算只解锁最高档，仅靠已获取集合无法支撑详情弹窗的左右切换
+  /// 与「未获取档位」的条件展示，故由配置快照补全。
+  final List<GameAchievementModel> tiers;
+
   const AchievementGroupView({
     required this.groupKey,
     required this.obtained,
+    this.tiers = const <GameAchievementModel>[],
   });
 
   /// 最高级别（列表末尾）。
@@ -76,8 +82,9 @@ class AchievementService {
 
     // 成就定义映射（id -> GameAchievementModel），复用游戏配置缓存（仅启用项）。
     // 已解锁成就必然来自结算时启用的成就，禁用项不会写入 user_game_achievements。
+    final config = await GameService.instance.fetchConfig();
     final achMap = <String, GameAchievementModel>{};
-    for (final a in (await GameService.instance.fetchConfig()).achievements) {
+    for (final a in config.achievements) {
       achMap[a.id] = a;
     }
 
@@ -105,10 +112,25 @@ class AchievementService {
           .add(UserAchievementView(achievement: ach, unlockedAt: entry.value));
     }
 
+    // 类目全部等级定义（含未获取）：v2 结算只解锁最高档，单看已获取集合
+    // 无法支撑详情弹窗的左右切换与「未获取档位」的条件展示，故从配置补全。
+    final tiersByGroup = <String, List<GameAchievementModel>>{};
+    for (final a in config.achievements) {
+      tiersByGroup
+          .putIfAbsent(_groupKey(a.code), () => <GameAchievementModel>[])
+          .add(a);
+    }
+
     final groups = byGroup.entries.map((e) {
       e.value.sort((a, b) =>
           a.achievement.sortOrder.compareTo(b.achievement.sortOrder));
-      return AchievementGroupView(groupKey: e.key, obtained: e.value);
+      final tiers = tiersByGroup[e.key] ?? const <GameAchievementModel>[];
+      tiers.sort((a, b) => a.sortOrder.compareTo(b.sortOrder));
+      return AchievementGroupView(
+        groupKey: e.key,
+        obtained: e.value,
+        tiers: tiers,
+      );
     }).toList();
 
     // 组间按最高级别的 sort_order 升序，保持展示稳定。

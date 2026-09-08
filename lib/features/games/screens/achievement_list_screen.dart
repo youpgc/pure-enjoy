@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
+import '../models/game_achievement_model.dart';
 import '../services/achievement_service.dart';
 import '../shared/achievement_icon.dart';
 import '../shared/game_local_loading.dart';
@@ -8,8 +9,8 @@ import '../shared/game_local_loading.dart';
 /// 我的成就页
 ///
 /// 展示当前用户已获得的成就（按类目合并为最高级别），网格呈现图标 + 名称；
-/// 点击某项弹窗展示大图标、成就名称与获取时间（北京时区，YYYY-MM-DD HH:mm:ss）。
-/// 同类（重复类型）已获取的不同等级可通过左右按钮切换查看。
+/// 点击某项弹窗展示大图标、成就名称、达成条件与获取时间（北京时区）。
+/// 同类全部档位（含未获取）可通过左右按钮切换浏览，未获取档位置灰展示。
 class AchievementListScreen extends StatefulWidget {
   /// {@macro achievement_list_screen}
   const AchievementListScreen({super.key});
@@ -132,8 +133,10 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
 
 /// 成就详情弹窗（透明背景）。
 ///
-/// 同类（重复类型）已获取的多个等级可通过左右按钮切换；仅展示已获取成就，
-/// 未获取等级不展示（预留分支见下方注释）。底部按钮居中、文案「关闭」。
+/// 浏览该类目全部档位（含未获取，配置快照补全）：已获取展示图标 + 名称 +
+/// 达成条件（DB description）+ 获取时间；未获取档位图标置灰、标注「未获取」。
+/// v2 结算只解锁最高档（每类目常仅 1 条已获取记录），左右切换必须基于
+/// 全档位列表而非已获取集合，否则按钮结构性消失。
 class _AchievementDetailDialog extends StatefulWidget {
   final AchievementGroupView group;
   const _AchievementDetailDialog({required this.group});
@@ -146,16 +149,34 @@ class _AchievementDetailDialog extends StatefulWidget {
 class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
   late int _index;
 
+  /// 全档位列表（配置缺失时兜底退回已获取集合）。
+  List<GameAchievementModel> get _tiers => widget.group.tiers.isNotEmpty
+      ? widget.group.tiers
+      : widget.group.obtained.map((o) => o.achievement).toList();
+
+  /// 已获取档位的解锁时间（achievement_id → 时间）。
+  Map<String, DateTime> get _unlockedAt => <String, DateTime>{
+        for (final o in widget.group.obtained) o.achievement.id: o.unlockedAt,
+      };
+
   @override
   void initState() {
     super.initState();
-    // 默认展示最高等级（列表末尾）。
-    _index = widget.group.obtained.length - 1;
+    // 默认展示最高已获取档；无匹配（兜底）取末位。
+    final unlocked = _unlockedAt;
+    var index = _tiers.length - 1;
+    for (var i = _tiers.length - 1; i >= 0; i--) {
+      if (unlocked.containsKey(_tiers[i].id)) {
+        index = i;
+        break;
+      }
+    }
+    _index = index;
   }
 
   void _step(int delta) {
     final next = _index + delta;
-    if (next >= 0 && next < widget.group.obtained.length) {
+    if (next >= 0 && next < _tiers.length) {
       setState(() => _index = next);
     }
   }
@@ -163,11 +184,12 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    final obtained = widget.group.obtained;
-    final view = obtained[_index];
-    final showArrows = obtained.length > 1;
+    final tiers = _tiers;
+    final achievement = tiers[_index];
+    final unlockedAt = _unlockedAt[achievement.id];
+    final showArrows = tiers.length > 1;
     final canPrev = _index > 0;
-    final canNext = _index < obtained.length - 1;
+    final canNext = _index < tiers.length - 1;
 
     return Dialog(
       backgroundColor: Colors.transparent,
@@ -192,25 +214,46 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      AchievementIcon(view.achievement.icon, size: 96),
+                      // 未获取档位图标置灰。
+                      Opacity(
+                        opacity: unlockedAt != null ? 1 : 0.35,
+                        child: AchievementIcon(achievement.icon, size: 96),
+                      ),
                       const SizedBox(height: 16),
                       Text(
-                        view.achievement.name,
+                        achievement.name,
                         style: theme.textTheme.titleMedium,
                         textAlign: TextAlign.center,
                       ),
+                      const SizedBox(height: 8),
+                      // 达成条件（DB description，与真实判定口径一致）。
+                      if (achievement.description != null &&
+                          achievement.description!.isNotEmpty)
+                        Text(
+                          achievement.description!,
+                          style: theme.textTheme.bodySmall?.copyWith(
+                            color: theme.colorScheme.onSurfaceVariant,
+                          ),
+                          textAlign: TextAlign.center,
+                          maxLines: 3,
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       const SizedBox(height: 10),
-                      // 仅展示获取时间（文案仅时间，不带「获取时间：」前缀）。
+                      // 已获取：获取时间（仅时间，不带前缀）；未获取：标注。
                       Text(
-                        formatBeijing(view.unlockedAt),
+                        unlockedAt != null
+                            ? formatBeijing(unlockedAt)
+                            : '未获取',
                         style: theme.textTheme.bodySmall?.copyWith(
-                          color: theme.colorScheme.onSurfaceVariant,
+                          color: unlockedAt != null
+                              ? theme.colorScheme.onSurfaceVariant
+                              : theme.colorScheme.secondary,
+                          fontWeight: unlockedAt != null
+                              ? null
+                              : FontWeight.bold,
                         ),
                         textAlign: TextAlign.center,
                       ),
-                      // 预留：未获取等级的展示分支（文案「未获取」）。
-                      // 当前仅展示已获取成就（obtained），故此分支不触发：
-                      // if (!obtained) ... const Text('未获取')
                     ],
                   ),
                 ),
