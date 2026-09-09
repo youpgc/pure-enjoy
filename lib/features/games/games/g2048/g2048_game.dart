@@ -290,9 +290,13 @@ class _G2048GameState extends State<G2048Game> {
       }
     }
 
-    if (!changed) return;
+    if (!changed) {
+      // 无变化：不推进步数、不调度动画回调（此前 debugPrint 误放在 return
+      // 之后，有变化时反而打印「无变化」，日志与实际路径相反、误导排查）
+      return;
+    }
     _movesUsed++;
-    debugPrint('[G2048] _move 无变化，未移动 dir=$dir');
+    debugPrint('[G2048] _move 已移动 dir=$dir gain=$gain');
 
     if (gain > 0) {
       GameAudio.instance.merge();
@@ -362,11 +366,15 @@ class _G2048GameState extends State<G2048Game> {
   bool _hasMoves() {
     for (var r = 0; r < _size; r++) {
       for (var c = 0; c < _size; c++) {
-        if (_grid[r][c] == null) return true;
-        if (c + 1 < _size && _grid[r][c]!.value == _grid[r][c + 1]!.value) {
+        // 空格存在即可动；邻居比较必须空安全——相邻格为空时 `!` 会崩
+        // （Null check operator on null value），且异常被回调 catch 吞掉后
+        // 连带跳过 lost 判定/结算/缓冲补执行
+        final v = _grid[r][c]?.value;
+        if (v == null) return true;
+        if (c + 1 < _size && _grid[r][c + 1]?.value == v) {
           return true;
         }
-        if (r + 1 < _size && _grid[r][c]!.value == _grid[r + 1][c]!.value) {
+        if (r + 1 < _size && _grid[r + 1][c]?.value == v) {
           return true;
         }
       }
