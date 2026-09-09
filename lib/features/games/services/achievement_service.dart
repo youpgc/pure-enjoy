@@ -101,23 +101,25 @@ class AchievementService {
       if (prev == null || ts.isBefore(prev)) unlockedByAch[aid] = ts;
     }
 
-    // 按类目分组，收集该类目下【已获取】的全部等级（升序排列）。
+    // 按分组键归组（group_key 由 DB 按达成条件类型维护；空 = 独立成就框），
+    // 收集该组下【已获取】的全部等级（升序排列）。
+    String groupOf(GameAchievementModel a) =>
+        a.groupKey.isNotEmpty ? a.groupKey : 'solo:${a.code}';
     final byGroup = <String, List<UserAchievementView>>{};
     for (final entry in unlockedByAch.entries) {
       final ach = achMap[entry.key];
       if (ach == null) continue;
-      final group = _groupKey(ach.code);
       byGroup
-          .putIfAbsent(group, () => <UserAchievementView>[])
+          .putIfAbsent(groupOf(ach), () => <UserAchievementView>[])
           .add(UserAchievementView(achievement: ach, unlockedAt: entry.value));
     }
 
-    // 类目全部等级定义（含未获取）：v2 结算只解锁最高档，单看已获取集合
+    // 组全部等级定义（含未获取）：v2 结算只解锁最高档，单看已获取集合
     // 无法支撑详情弹窗的左右切换与「未获取档位」的条件展示，故从配置补全。
     final tiersByGroup = <String, List<GameAchievementModel>>{};
     for (final a in config.achievements) {
       tiersByGroup
-          .putIfAbsent(_groupKey(a.code), () => <GameAchievementModel>[])
+          .putIfAbsent(groupOf(a), () => <GameAchievementModel>[])
           .add(a);
     }
 
@@ -137,18 +139,6 @@ class AchievementService {
     groups.sort((a, b) => a.highest.achievement.sortOrder
         .compareTo(b.highest.achievement.sortOrder));
     return groups;
-  }
-
-  /// 类目分组键：剥离 code 尾部的「档位后缀」，同族合并。
-  /// 覆盖两种形态：
-  /// - 下划线+纯数字结尾：level_sheep_10 → level_sheep、tier_g2048_classic_1
-  /// - 数字+量词汉字结尾（无下划线）：sp_match3_果冻征服2层 → sp_match3_果冻征服、
-  ///   sp_sheep_速通45秒 → sp_sheep_速通、sp_g2048_挑战100步通关 → sp_g2048_挑战
-  /// 无档位后缀（first_clear_sheep / sp_g2048_小有成就）原样返回。
-  String _groupKey(String code) {
-    final m = RegExp(r'_?[0-9]+[\u4e00-\u9fa5]{0,2}$').firstMatch(code);
-    if (m != null && m.start > 0) return code.substring(0, m.start);
-    return code;
   }
 }
 

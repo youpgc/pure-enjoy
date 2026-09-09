@@ -242,7 +242,7 @@ class GameService {
     'game_levels':
         'id,game_id,mode_id,level_no,name,config,enabled,count_for_daily_clear,reward_points,reward_repeatable,sort_order,difficulty',
     'game_achievements':
-        'id,game_id,code,name,description,icon,condition,reward_points,enabled,sort_order',
+        'id,game_id,code,name,description,icon,condition,reward_points,group_key,enabled,sort_order',
     'game_reward_rules':
         'id,game_id,rule_type,name,condition,points,enabled,sort_order',
     'game_modes':

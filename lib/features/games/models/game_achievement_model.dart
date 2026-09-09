@@ -27,6 +27,10 @@ class GameAchievementModel {
   /// 达成奖励积分
   final int rewardPoints;
 
+  /// 成就分组键（枚举，按达成条件类型归组；空 = 独立成就框）。
+  /// 同组成就由「我的成就」合并展示：网格仅显最高档，详情弹窗可切换全档位。
+  final String groupKey;
+
   /// 是否启用
   final bool enabled;
 
@@ -48,6 +52,7 @@ class GameAchievementModel {
     this.icon,
     this.condition = const <String, dynamic>{},
     this.rewardPoints = 0,
+    this.groupKey = '',
     this.enabled = true,
     this.sortOrder = 0,
     this.createdAt,
@@ -66,6 +71,7 @@ class GameAchievementModel {
       condition:
           (json['condition'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
       rewardPoints: (json['reward_points'] as num?)?.toInt() ?? 0,
+      groupKey: json['group_key'] as String? ?? '',
       enabled: json['enabled'] as bool? ?? true,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       createdAt: json['created_at'] != null
