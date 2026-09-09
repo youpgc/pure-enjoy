@@ -50,14 +50,13 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     return n >= 1 ? n : 30;
   }
 
-  late final DateTime _enterTime;
+  DateTime _enterTime = DateTime.now();
   GamePlayOutcome? _outcome;
   int _restartNonce = 0;
 
   @override
   void initState() {
     super.initState();
-    _enterTime = DateTime.now();
     final plan = GameFlowRunner.instance.resolvePlayPlan(
       widget.game,
       explicit: widget.level,
@@ -271,10 +270,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       cleared: outcome.cleared,
       failReason: outcome.reason,
       rewardsAllowed: _rewardsAllowed,
-      onReplay: () => setState(() {
-        _outcome = null;
-        _restartNonce++;
-      }),
+      onReplay: _restartGame,
       onNext: canNext
           ? () => Navigator.of(context).pushReplacement(
                 MaterialPageRoute(
@@ -298,11 +294,48 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       game: widget.game,
       level: _level!,
       onFinished: _onFinished,
-      onRestart: () => setState(() {
+      onRestart: _restartGame,
+    );
+  }
+
+  /// 对局进行中的「重新开始/新游戏」= 放弃本局：先按 aborted 上报（时长
+  /// 达到记录阈值的，与返回键放弃同口径），再重建引擎。三游戏统一：
+  /// 消消乐「重新开始」、2048「新游戏」（sheep 无重开按钮，走返回键）。
+  /// 已结算（_outcome != null）的「再玩一次」成绩已记录，不重复上报。
+  Future<void> _restartGame() async {
+    if (_outcome != null) {
+      if (mounted) {
+        setState(() {
+          _outcome = null;
+          _restartNonce++;
+              });
+      }
+      return;
+    }
+    if (_level != null) {
+      final durationMs = DateTime.now().difference(_enterTime).inMilliseconds;
+      if (durationMs >= _minRecordDurationMs) {
+        final abandonValues = _isEndless
+            ? <String, num>{}
+            : <String, num>{'level': _level!.levelNo};
+        await reportAndSettle(
+          context: context,
+          game: widget.game,
+          level: _level!,
+          scoreValuesByCode: abandonValues,
+          durationMs: durationMs,
+          cleared: false,
+          aborted: true,
+        );
+      }
+    }
+    if (mounted) {
+      setState(() {
         _outcome = null;
         _restartNonce++;
-      }),
-    );
+        _enterTime = DateTime.now(); // 重开后本局计时归零
+      });
+    }
   }
 
   /// 对局页标题：游戏名 + 模式名 + 第 N 关（合成关显示「无尽」；无模式段省略）
