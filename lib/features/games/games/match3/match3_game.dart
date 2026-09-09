@@ -117,6 +117,28 @@ class _Match3GameState extends State<Match3Game> {
     }
   }
 
+  /// 重新开始前二次确认，避免误触丢失当前进度（与 g2048「新游戏」同口径）。
+  Future<void> _confirmRestart() async {
+    final sure = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('放弃当前对局？'),
+        content: const Text('点击「重新开始」将放弃当前进度（步数与得分不保留），确定要重新开始吗？'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: const Text('放弃并重新开始'),
+          ),
+        ],
+      ),
+    );
+    if (sure == true) widget.onRestart?.call();
+  }
+
   /// 使用加时卡前弹窗确认（免费次数或购买库存均先确认，避免误触消耗）。
   Future<void> _confirmAddTime() async {
     if (_addTimeItem == null) return;
@@ -246,7 +268,7 @@ class _Match3GameState extends State<Match3Game> {
               icon: Icons.refresh,
               label: '重新开始',
               primary: true,
-              onPressed: widget.onRestart,
+              onPressed: widget.onRestart == null ? null : _confirmRestart,
             ),
           ],
           content: LayoutBuilder(
