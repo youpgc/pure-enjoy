@@ -40,6 +40,12 @@ class Match3Game extends StatefulWidget {
 }
 
 class _Match3GameState extends State<Match3Game> {
+  /// 道具商城扩展总开关（2026-09-09 预留，暂不开放）：
+  /// 开启后死局时优先询问使用洗牌券、控制栏追加「提示/破坏/洗牌」三道具。
+  /// 引擎能力（doShuffle/smashAt/highlightHint/stalemateHandler）已全部就绪，
+  /// 开放仅需：置 true + 后台 game_items 配置 shuffle/hammer 道具行。
+  static const bool kPropShopEnabled = false;
+
   late final ValueNotifier<int> _hudTick;
   late final Match3Objective _objective;
   late final Match3FlameGame _game;
@@ -49,6 +55,14 @@ class _Match3GameState extends State<Match3Game> {
   GameItemModel? _addTimeItem;
   int _addTimeFree = 0;
   int _addTimeOwned = 0;
+
+  /// 洗牌 / 局部破坏道具状态（道具商城扩展预留，开关关闭时不加载）
+  GameItemModel? _shuffleItem;
+  int _shuffleFree = 0;
+  int _shuffleOwned = 0;
+  GameItemModel? _hammerItem;
+  int _hammerFree = 0;
+  int _hammerOwned = 0;
 
   @override
   void initState() {
@@ -90,6 +104,11 @@ class _Match3GameState extends State<Match3Game> {
       typeCount: (cfg['types'] is num ? (cfg['types'] as num).toInt() : 6),
     );
     if (_mode == Match3Mode.timed) _loadAddTime();
+    // 道具商城扩展预留：死局处理器注入 + 洗牌/破坏道具加载（开关关闭时不生效）
+    if (kPropShopEnabled) {
+      _game.stalemateHandler = _handleStalemate;
+      _loadSmashProps();
+    }
   }
 
   /// 限时模式开局：载入 add_time 道具，先免费用 free_per_game 次，再消耗购买库存。
@@ -188,6 +207,132 @@ class _Match3GameState extends State<Match3Game> {
     if (mounted) setState(() {});
   }
 
+  // ---------- 道具商城扩展预留（kPropShopEnabled 暂为 false，未开放） ----------
+
+  /// 加载洗牌/局部破坏道具（免费额度 + 购买库存），模式同加时卡。
+  Future<void> _loadSmashProps() async {
+    try {
+      final items =
+          await GameItemService.instance.fetchItems(gameCode: 'match3');
+      final inv = await GameItemService.instance.fetchInventory();
+      void load(String itemType, void Function(GameItemModel?, int, int) set) {
+        final item =
+            items.where((it) => it.itemType == itemType).firstOrNull;
+        if (item == null) return;
+        final owned = inv[item.id] ?? 0;
+        final free = item.freePerGame;
+        final limit = item.perGameLimit;
+        final budget = (limit - free).clamp(0, limit);
+        set(item, free, owned < budget ? owned : budget);
+      }
+
+      if (!mounted) return;
+      setState(() {
+        load('shuffle', (it, f, o) {
+          _shuffleItem = it;
+          _shuffleFree = f;
+          _shuffleOwned = o;
+        });
+        load('hammer', (it, f, o) {
+          _hammerItem = it;
+          _hammerFree = f;
+          _hammerOwned = o;
+        });
+      });
+    } catch (e) {
+      // 载入失败不影响对局
+    }
+  }
+
+  /// 死局处理器（引擎 stalemateHandler 回调）：优先询问使用洗牌券，
+  /// 用券洗牌成功返回 true（对局继续）；无券/取消/洗牌失败返回 false
+  /// （引擎判负结算）。
+  Future<bool> _handleStalemate() async {
+    final available = _shuffleItem != null && (_shuffleFree + _shuffleOwned) > 0;
+    if (!available) return false;
+    final useFree = _shuffleFree > 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('无可消组合'),
+        content: Text(
+          useFree
+              ? '盘面已无可消交换。使用 1 次免费洗牌（剩余 $_shuffleFree 次）重排盘面吗？'
+              : '盘面已无可消交换。使用 1 张洗牌券（库存剩余 $_shuffleOwned 张）重排盘面吗？',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('放弃对局'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('使用洗牌'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return false;
+    return _useShuffle();
+  }
+
+  /// 使用洗牌：先免费用完再消耗库存，成功后引擎重排盘面（缓存对局继续）。
+  Future<bool> _useShuffle() async {
+    if (_shuffleItem == null) return false;
+    if (_shuffleFree > 0) {
+      if (mounted) setState(() => _shuffleFree -= 1);
+    } else {
+      final ok = await GameItemService.instance.consumeItem(_shuffleItem!.id);
+      if (!ok) {
+        if (mounted) setState(() => _shuffleOwned = 0);
+        return false;
+      }
+      if (mounted) setState(() => _shuffleOwned -= 1);
+    }
+    return _game.doShuffle();
+  }
+
+  /// 确认使用局部破坏（锤子）：确认即消耗，进入待命中——下一次点击盘面
+  /// 格执行破坏（引擎 smashArmed）。
+  Future<void> _confirmHammer() async {
+    if (_hammerItem == null) return;
+    if (_hammerFree <= 0 && _hammerOwned <= 0) return;
+    final useFree = _hammerFree > 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('使用破坏锤？'),
+        content: Text(
+          useFree
+              ? '确定要使用「破坏锤」吗？将消耗 1 次免费次数（剩余 $_hammerFree 次），点击后任意点击盘面一颗糖直接消除。'
+              : '确定要使用「破坏锤」吗？将消耗 1 张道具卡（库存剩余 $_hammerOwned 张），点击后任意点击盘面一颗糖直接消除。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定使用'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (_hammerFree > 0) {
+      if (mounted) setState(() => _hammerFree -= 1);
+    } else {
+      final ok = await GameItemService.instance.consumeItem(_hammerItem!.id);
+      if (!ok) {
+        if (mounted) setState(() => _hammerOwned = 0);
+        return;
+      }
+      if (mounted) setState(() => _hammerOwned -= 1);
+    }
+    _game.smashArmed = true;
+  }
+
   @override
   void dispose() {
     _hudTick.dispose();
@@ -264,6 +409,36 @@ class _Match3GameState extends State<Match3Game> {
                       }
                     : null,
               ),
+            // 道具商城扩展预留三道具（kPropShopEnabled 暂 false 不渲染）
+            if (kPropShopEnabled) ...<GameAction>[
+              GameAction(
+                icon: Icons.lightbulb_outline,
+                label: '提示',
+                onPressed: _game.highlightHint,
+              ),
+              GameAction(
+                icon: Icons.construction_outlined,
+                label: '破坏',
+                badge: '${_hammerFree + _hammerOwned}',
+                extraTag: _hammerFree > 0 ? '免$_hammerFree' : null,
+                onPressed: (_hammerFree + _hammerOwned) > 0
+                    ? () {
+                        _confirmHammer();
+                      }
+                    : null,
+              ),
+              GameAction(
+                icon: Icons.shuffle_outlined,
+                label: '洗牌',
+                badge: '${_shuffleFree + _shuffleOwned}',
+                extraTag: _shuffleFree > 0 ? '免$_shuffleFree' : null,
+                onPressed: (_shuffleFree + _shuffleOwned) > 0
+                    ? () async {
+                        await _useShuffle();
+                      }
+                    : null,
+              ),
+            ],
             GameAction(
               icon: Icons.refresh,
               label: '重新开始',

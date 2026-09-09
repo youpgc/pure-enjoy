@@ -23,6 +23,10 @@ class Candy {
   /// 消除动画已过去时长（秒），用于计算 [dyingAlpha] 与 [scale] 弹出曲线。
   double dyingT = 0.0;
 
+  /// 提示高亮剩余秒数（>0 时叠加白色脉动描边），由提示道具设置，
+  /// 引擎 update 逐帧递减（道具商城扩展预留，2026-09-09）。
+  double hintT = 0.0;
+
   Candy(
     this.type,
     this.row,
@@ -85,6 +89,19 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
       ..isAntiAlias = true
       ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.55 * a),
   );
+
+  // 提示高亮：白色脉动描边（hintT 为剩余秒数，兼作脉动相位）
+  if (candy.hintT > 0) {
+    final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);
+    canvas.drawPath(
+      path,
+      Paint()
+        ..isAntiAlias = true
+        ..color = Colors.white.withValues(alpha: 0.35 + 0.45 * pulse)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = cell * (0.10 + 0.05 * pulse),
+    );
+  }
 
   // 特殊糖标识
   switch (candy.special) {

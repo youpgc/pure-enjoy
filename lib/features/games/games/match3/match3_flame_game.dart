@@ -55,6 +55,15 @@ class Match3FlameGame extends FlameGame
   bool _busy = false;
   bool _loaded = false;
 
+  /// 残局处理器（宿主页注入，道具商城扩展预留，2026-09-09）：
+  /// 死局（无可消交换）时调用，返回 true 表示已处理（如用洗牌券洗牌），
+  /// false 则判负结算。未注入（null）时直接判负——当前默认行为。
+  Future<bool> Function()? stalemateHandler;
+
+  /// 局部破坏（锤子）待命中：宿主道具按钮确认消耗后置 true，
+  /// 玩家下一次点击盘面格执行 [smashAt]（道具商城扩展预留）。
+  bool smashArmed = false;
+
   int? _selectedR;
   int? _selectedC;
 
@@ -111,6 +120,8 @@ class Match3FlameGame extends FlameGame
   /// 滑动即交换：目标格越界则忽略，并清掉点选态避免与点选标记冲突。
   @override
   void onSwipe(int r, int c, int dr, int dc) {
+    // 局部破坏（锤子）待命中：滑动手势不触发交换，留给点击执行破坏
+    if (smashArmed) return;
     final tr = r + dr;
     final tc = c + dc;
     if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
@@ -254,6 +265,7 @@ class Match3FlameGame extends FlameGame
         final ty = _offsetY + cand.row * _cell;
         cand.px += (tx - cand.px) * k;
         cand.py += (ty - cand.py) * k;
+        if (cand.hintT > 0) cand.hintT = max(0.0, cand.hintT - dt);
         if (cand.dying) {
           // 弹出曲线：先轻微放大(1→1.25)再缩小归零，配合透明度淡出，手感更柔和。
           cand.dyingT += dt;
@@ -300,6 +312,13 @@ class Match3FlameGame extends FlameGame
     final c = ((event.canvasPosition.x - _offsetX) / _cell).floor();
     final r = ((event.canvasPosition.y - _offsetY) / _cell).floor();
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
+
+    // 局部破坏（锤子）待命中：本次点击即执行破坏（道具商城扩展预留）
+    if (smashArmed) {
+      smashArmed = false;
+      smashAt(r, c);
+      return;
+    }
 
     if (_selectedR == null) {
       _selectedR = r;
@@ -370,12 +389,24 @@ class Match3FlameGame extends FlameGame
       _moveScore = 0;
       _syncHud();
       // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败；
-      // 残局判定：盘面无任何可消交换 → 立即判负（用户 2026-09-09 拍板）
+      // 残局判定：盘面无任何可消交换 → 交残局处理器（洗牌道具等，未注入
+      // 则判负，用户 2026-09-09 拍板 B 方案）
       if (objective.achieved || objective.exhausted) {
         _finishByObjective();
       } else if (!hasAnyMove(grid, rows, cols)) {
-        // 失败音效由 _finishByObjective 统一播放
-        _finishByObjective(failReason: '无可消组合，对局结束');
+        final handler = stalemateHandler;
+        if (handler == null) {
+          _finishByObjective(failReason: '无可消组合，对局结束');
+        } else {
+          // 释放操作锁：洗牌路径 doShuffle 需要可执行；处理器弹窗为模态，
+          // 期间玩家触不到盘面，拒绝处理后立即判负
+          _busy = false;
+          handler().then((handled) {
+            if (!handled && isMounted && !_over) {
+              _finishByObjective(failReason: '无可消组合，对局结束');
+            }
+          });
+        }
       } else {
         _busy = false;
       }
@@ -555,6 +586,89 @@ class Match3FlameGame extends FlameGame
         spawn: (r, c, x, y) =>
             Candy(_rng.nextInt(typeCount.clamp(3, _palette.length)), r, c, x, y),
       );
+
+  // ---------- 道具能力（道具商城扩展预留，2026-09-09；入口开关见宿主页） ----------
+
+  /// 洗牌：特殊糖原位保留，普通糖随机重排直至「无现成三连且有解」。
+  ///
+  /// 成功后糖果经 px/py 缓动自动滑到新格（无需额外动画）；失败（200 次
+  /// 重排仍无解，极小概率）返回 false，盘面保持原状，由调用方回退处理。
+  bool doShuffle() {
+    if (_over || _busy) return false;
+    if (!shuffleGrid(grid, rows, cols, _rng)) return false;
+    _busy = true;
+    GameAudio.instance.select();
+    _syncHud();
+    Future.delayed(_anim, () {
+      if (isMounted) _busy = false;
+    });
+    return true;
+  }
+
+  /// 局部破坏（锤子）：直接清除指定格（特殊糖按效果引爆），目标进度/
+  /// 得分/特效与普通消除同口径，随后下落补位并连锁检测。不计步数。
+  void smashAt(int r, int c) {
+    if (_over || _busy) return;
+    final cand = grid[r][c];
+    if (cand == null) return;
+    _busy = true;
+    final toClear = <(int, int)>{(r, c)};
+    _applySpecials(toClear, const {});
+    score += toClear.length * 10;
+    final clearedCells = <ClearedCell>[];
+    for (final cell in toClear) {
+      final o = grid[cell.$1][cell.$2];
+      if (o == null) continue;
+      clearedCells.add(ClearedCell(
+        cell.$1,
+        cell.$2,
+        o.type,
+        special: o.special.isNotEmpty,
+      ));
+    }
+    objective.onCleared(clearedCells);
+    _syncHud();
+    GameAudio.instance.match();
+    GameAudio.instance.haptic(GameHaptic.medium);
+    for (final cell in toClear) {
+      final o = grid[cell.$1][cell.$2];
+      if (o == null) continue;
+      o.dying = true;
+      effects.burst(
+        center: _cellCenter(cell.$1, cell.$2),
+        color: _palette[o.type],
+        cell: _cell,
+        power: o.special.isNotEmpty ? 1.8 : 1.0,
+      );
+    }
+    combo = 1;
+    Future.delayed(_anim, () {
+      if (!isMounted) return;
+      _removeCleared(toClear);
+      _applyGravity();
+      // (-1,-1,-1,-1)：swapped 空集——连锁特殊糖生成位置取 run 中位
+      Future.delayed(_anim, () => _resolveCascade(-1, -1, -1, -1));
+    });
+  }
+
+  /// 提示：随机高亮一组可消交换的两颗糖（各 2.5 秒脉动描边）。
+  /// 无可消交换（死局）时飘字提示，不产生高亮。
+  void highlightHint() {
+    if (_over || _busy) return;
+    final moves = findAllMoves(grid, rows, cols);
+    if (moves.isEmpty) {
+      effects.float(
+        center: Offset(size.x / 2, _offsetY + rows * _cell * 0.42),
+        text: '无可消组合',
+        color: Colors.white,
+        fontSize: _cell * 0.6,
+      );
+      return;
+    }
+    final (r1, c1, r2, c2) = moves[_rng.nextInt(moves.length)];
+    grid[r1][c1]?.hintT = 2.5;
+    grid[r2][c2]?.hintT = 2.5;
+  }
 
   /// 按当前模式的目标判定通关/失败并结算。
   ///

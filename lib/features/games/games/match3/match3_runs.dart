@@ -1,3 +1,5 @@
+import 'dart:math';
+
 import 'candy_component.dart';
 
 /// 消消乐一次连线（用于生成特殊糖与消除判定）。
@@ -228,6 +230,105 @@ bool hasAnyMove(List<List<Candy?>> grid, int rows, int cols) {
         grid[r2][c2] = b;
         if (ok) return true;
       }
+    }
+  }
+  return false;
+}
+
+/// 收集盘面上全部可消交换（(r1,c1,r2,c2) 四元组列表）。
+///
+/// 纯函数：临时交换后检测、随即换回，不改变任何状态。判定口径与
+/// [hasAnyMove] 一致——特殊糖按颜色 [Candy.type] 参与三连匹配。
+List<(int, int, int, int)> findAllMoves(
+  List<List<Candy?>> grid,
+  int rows,
+  int cols,
+) {
+  bool makesRun(int r, int c) {
+    final t = grid[r][c]?.type;
+    if (t == null) return false;
+    var n = 1;
+    for (var cc = c - 1; cc >= 0 && grid[r][cc]?.type == t; cc--) {
+      n++;
+    }
+    for (var cc = c + 1; cc < cols && grid[r][cc]?.type == t; cc++) {
+      n++;
+    }
+    if (n >= 3) return true;
+    n = 1;
+    for (var rr = r - 1; rr >= 0 && grid[rr][c]?.type == t; rr--) {
+      n++;
+    }
+    for (var rr = r + 1; rr < rows && grid[rr][c]?.type == t; rr++) {
+      n++;
+    }
+    return n >= 3;
+  }
+
+  final moves = <(int, int, int, int)>[];
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      for (final (dr, dc) in const [(0, 1), (1, 0)]) {
+        final r2 = r + dr;
+        final c2 = c + dc;
+        if (r2 >= rows || c2 >= cols) continue;
+        final a = grid[r][c];
+        final b = grid[r2][c2];
+        if (a == null || b == null) continue;
+        grid[r][c] = b;
+        grid[r2][c2] = a;
+        final ok = makesRun(r, c) || makesRun(r2, c2);
+        grid[r][c] = a;
+        grid[r2][c2] = b;
+        if (ok) moves.add((r, c, r2, c2));
+      }
+    }
+  }
+  return moves;
+}
+
+/// 洗牌（纯盘面运算）：特殊糖保留原位，普通糖随机重排到普通糖原位置，
+/// 直至「无现成三连 且 存在可消交换」（开局同款约束）。
+///
+/// [rng] 为宿主随机源；最多尝试 [maxAttempts] 次（默认 200），全部失败时
+/// 盘面停留在最后一次排列（可能仍无解）并返回 false，由调用方决定回退
+/// （如判负）。成功返回 true——调用方随后更新糖果像素坐标触发缓动滑动。
+bool shuffleGrid(
+  List<List<Candy?>> grid,
+  int rows,
+  int cols,
+  Random rng, {
+  int maxAttempts = 200,
+}) {
+  final normalCells = <(int, int)>[];
+  final normalCandies = <Candy>[];
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      final cand = grid[r][c];
+      if (cand == null) continue;
+      if (cand.special.isNotEmpty) continue; // 特殊糖原位保留
+      normalCells.add((r, c));
+      normalCandies.add(cand);
+    }
+  }
+  if (normalCandies.length < 2) return false;
+  for (var attempt = 0; attempt < maxAttempts; attempt++) {
+    // Fisher-Yates 打乱后按序填回原位置集合
+    for (var i = normalCandies.length - 1; i > 0; i--) {
+      final j = rng.nextInt(i + 1);
+      final tmp = normalCandies[i];
+      normalCandies[i] = normalCandies[j];
+      normalCandies[j] = tmp;
+    }
+    for (var i = 0; i < normalCells.length; i++) {
+      final (r, c) = normalCells[i];
+      final cand = normalCandies[i];
+      cand.row = r;
+      cand.col = c;
+      grid[r][c] = cand;
+    }
+    if (findRuns(grid, rows, cols).isEmpty && findAllMoves(grid, rows, cols).isNotEmpty) {
+      return true;
     }
   }
   return false;
