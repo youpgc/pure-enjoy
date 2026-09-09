@@ -200,7 +200,9 @@ class _PropButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: action.onPressed,
           child: Padding(
-            padding: const EdgeInsets.symmetric(vertical: 6),
+            // 压缩纵向内边距：图标+单行文字（约 34px）在 PropBar 内高 40 减去
+            // 此 padding 后的 34px 内恰好放下，FittedBox 兜底极端字体缩放
+            padding: const EdgeInsets.symmetric(vertical: 3),
             child: _ActionLabel(action: action),
           ),
         ),
@@ -265,32 +267,27 @@ class _ActionLabel extends StatelessWidget {
             height: 18,
           )
         : Icon(action.icon, size: 16);
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: <Widget>[
-        iconWidget,
-        const SizedBox(height: 1),
-        Text(
-          action.badge == null
-              ? action.label
-              : '${action.label} ×${action.badge}',
-          style: const TextStyle(fontSize: 11),
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-        ),
-        if (action.extraTag != null)
-          Padding(
-            padding: const EdgeInsets.only(top: 1),
-            child: Text(
-              action.extraTag!,
-              style: const TextStyle(
-                fontSize: 10,
-                color: AppTheme.success,
-              ),
-              maxLines: 1,
-            ),
+    // 角标信息合并为单行文字（「名称 ×3 免1」），避免多行导致 PropBar 纵向溢出
+    var label = action.label;
+    if (action.badge != null) label += ' ×${action.badge}';
+    if (action.extraTag != null) label += ' ${action.extraTag}';
+    return FittedBox(
+      // 兜底：字体缩放/长文案超宽时等比缩小，杜绝 RenderFlex overflow
+      fit: BoxFit.scaleDown,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: <Widget>[
+          iconWidget,
+          const SizedBox(height: 1),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
           ),
-      ],
+        ],
+      ),
     );
   }
 }
