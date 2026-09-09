@@ -49,8 +49,7 @@ class _SheepGameState extends State<SheepGame> {
   final Map<SheepProp, String> _itemIds = <SheepProp, String>{};
   /// 道具 -> 单局使用上限（来自 game_items.per_game_limit）
   final Map<SheepProp, int> _perGameLimits = <SheepProp, int>{};
-  final List<Map<int, (SheepTileState, int)>> _snapshots =
-      <Map<int, (SheepTileState, int)>>[];
+  final List<Map<int, (SheepTile, SheepTileState, int)>> _snapshots = [];
   bool _finished = false;
   bool _busy = false;
   late final DateTime _startTime;
@@ -190,9 +189,11 @@ class _SheepGameState extends State<SheepGame> {
   // ---------- 交互 ----------
 
   void _pushSnapshot() {
-    final m = <int, (SheepTileState, int)>{};
+    // 快照持有 tile 对象引用：撤回可能跨越一次消除（卡已从 _tiles 移除），
+    // 无引用则被删卡无法恢复（2026-09-09 闭环修复）
+    final m = <int, (SheepTile, SheepTileState, int)>{};
     for (final t in _tiles) {
-      m[t.id] = (t.state, t.slotIndex);
+      m[t.id] = (t, t.state, t.slotIndex);
     }
     _snapshots.add(m);
     if (_snapshots.length > 30) _snapshots.removeAt(0);
@@ -340,11 +341,18 @@ class _SheepGameState extends State<SheepGame> {
   }
 
   void _removeProp() {
+    // 「移出」= 把槽位前 3 张**放回盘面**（非删除）：
+    // 全清玩法下每类卡总数为 3 的倍数，直接删除会令该类剩余数非 3 倍数，
+    // 永远凑不齐三连导致必然死局（2026-09-09 用户报告）。放回时抬升到
+    // 当前最高层之上，保证立即可见可点。
     final take = _slots.take(3).toList();
     if (take.isEmpty) return;
+    final maxLayer = _tiles.fold<int>(0, (m, t) => t.layer > m ? t.layer : m);
     for (final t in take) {
-      t.state = SheepTileState.removing;
-      _tiles.remove(t);
+      t.state = SheepTileState.board;
+      t.slotIndex = -1;
+      t.covered = false;
+      t.layer = maxLayer + 1;
     }
     _slots.removeWhere((t) => take.contains(t));
     _reindexSlots();
@@ -355,12 +363,12 @@ class _SheepGameState extends State<SheepGame> {
   void _undo() {
     if (_snapshots.isEmpty) return;
     final m = _snapshots.removeLast();
-    for (final t in _tiles) {
-      final s = m[t.id];
-      if (s != null) {
-        t.state = s.$1;
-        t.slotIndex = s.$2;
-      }
+    for (final e in m.values) {
+      final (t, st, idx) = e;
+      // 被消除的卡补回 _tiles（对象引用恢复）
+      if (!_tiles.contains(t)) _tiles.add(t);
+      t.state = st;
+      t.slotIndex = idx;
     }
     _rebuildSlotsFromTiles();
     _reindexSlots();

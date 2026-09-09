@@ -10,9 +10,6 @@ enum SheepTileState {
 
   /// 已放入底部槽位
   slot,
-
-  /// 被道具移出（临时移除，不参与渲染）
-  removing,
 }
 
 /// 羊了个羊单块数据模型。
@@ -22,7 +19,9 @@ enum SheepTileState {
 class SheepTile {
   final int id;
   int type;
-  final int layer;
+
+  /// 堆叠层级（越大越靠上）。可变：移出卡把卡放回盘面顶层时抬升。
+  int layer;
   final double x;
   final double y;
 
