@@ -296,6 +296,10 @@ class _Match3GameState extends State<Match3Game> {
             if (_mode == Match3Mode.timed && _addTimeItem != null)
               GameAction(
                 icon: Icons.timer_outlined,
+                // 定版图标走 game_items.icon 口子（与道具栏一致，后台可配）
+                iconAsset: (_addTimeItem!.icon != null && _addTimeItem!.icon!.isNotEmpty)
+                    ? _addTimeItem!.icon
+                    : null,
                 label: '加时卡',
                 badge: '${_addTimeFree + _addTimeOwned}',
                 extraTag: _addTimeFree > 0 ? '免$_addTimeFree' : null,

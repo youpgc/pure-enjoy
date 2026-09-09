@@ -47,6 +47,9 @@ class _SheepGameState extends State<SheepGame> {
   final Map<SheepProp, int> _ownedLeft = <SheepProp, int>{};
   /// 道具 -> 目录 item_id（消耗库存用）
   final Map<SheepProp, String> _itemIds = <SheepProp, String>{};
+  /// 道具 -> 图标文件名（来自 game_items.icon，空 = 内置图标）
+  final Map<SheepProp, String> _itemIcons = <SheepProp, String>{};
+
   /// 道具 -> 单局使用上限（来自 game_items.per_game_limit）
   final Map<SheepProp, int> _perGameLimits = <SheepProp, int>{};
   final List<Map<int, (SheepTile, SheepTileState, int)>> _snapshots = [];
@@ -127,6 +130,7 @@ class _SheepGameState extends State<SheepGame> {
         if (prop == null) continue;
         _itemIds[prop] = it.id;
         _perGameLimits[prop] = it.perGameLimit;
+        if (it.icon != null && it.icon!.isNotEmpty) _itemIcons[prop] = it.icon!;
         final free = it.freePerGame;
         final limit = it.perGameLimit;
         // 本局可购买额度 = 单局上限 - 免费次数（保底 0）
@@ -453,6 +457,7 @@ class _SheepGameState extends State<SheepGame> {
         final free = _freeLeft[p] ?? 0;
         return GameAction(
           icon: p.icon,
+          iconAsset: _itemIcons[p],
           label: p.label,
           badge: '$avail',
           // 免费次数用角标区分：有免费剩余时提示「免」，否则显示可用数
