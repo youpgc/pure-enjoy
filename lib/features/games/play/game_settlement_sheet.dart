@@ -19,6 +19,9 @@ import '../shared/game_local_loading.dart';
 class GameSettlementSheet extends StatefulWidget {
   final GameModel game;
   final bool cleared;
+
+  /// 失败原因（如残局判负「无可消组合」）；非空时失败文案优先展示。
+  final String? failReason;
   final Map<String, num> scoreValuesByCode;
   final Future<GameSettlementResult> settleFuture;
 
@@ -38,6 +41,7 @@ class GameSettlementSheet extends StatefulWidget {
     super.key,
     required this.game,
     required this.cleared,
+    this.failReason,
     required this.scoreValuesByCode,
     required this.settleFuture,
     this.scoreOnly = false,
@@ -146,7 +150,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
           Padding(
             padding: const EdgeInsets.only(top: 4),
             child: Text(
-              '未达成通关条件，本次无奖励',
+              widget.failReason ?? '未达成通关条件，本次无奖励',
               style: TextStyle(color: AppTheme.error, fontSize: 13),
             ),
           ),

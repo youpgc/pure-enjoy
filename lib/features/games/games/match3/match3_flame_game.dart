@@ -273,15 +273,21 @@ class Match3FlameGame extends FlameGame
 
   /// 生成初始棋盘（盘面运算下沉至 match3_runs.newBoard）
   void _newBoard() {
-    grid = newBoard(
-      rows: rows,
-      cols: cols,
-      nextType: () => _rng.nextInt(typeCount.clamp(3, _palette.length)),
-      offsetX: _offsetX,
-      offsetY: _offsetY,
-      cell: _cell,
-      make: (t, r, c, x, y) => Candy(t, r, c, x, y),
-    );
+    // 开局生成后校验残局：newBoard 只保证无初始连线、不保证有解，
+    // 死局开局直接判负全然是 RNG 惩罚，故重生成直至有解（上限 50 次，
+    // 6 色 56 格下首次即有解的概率极高，循环仅为理论兜底）
+    for (var attempt = 0; attempt < 50; attempt++) {
+      grid = newBoard(
+        rows: rows,
+        cols: cols,
+        nextType: () => _rng.nextInt(typeCount.clamp(3, _palette.length)),
+        offsetX: _offsetX,
+        offsetY: _offsetY,
+        cell: _cell,
+        make: (t, r, c, x, y) => Candy(t, r, c, x, y),
+      );
+      if (hasAnyMove(grid, rows, cols)) return;
+    }
   }
 
   // ---------- 交换 ----------
@@ -363,9 +369,13 @@ class Match3FlameGame extends FlameGame
       if (_moveScore > maxSingle) maxSingle = _moveScore;
       _moveScore = 0;
       _syncHud();
-      // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败
+      // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败；
+      // 残局判定：盘面无任何可消交换 → 立即判负（用户 2026-09-09 拍板）
       if (objective.achieved || objective.exhausted) {
         _finishByObjective();
+      } else if (!hasAnyMove(grid, rows, cols)) {
+        // 失败音效由 _finishByObjective 统一播放
+        _finishByObjective(failReason: '无可消组合，对局结束');
       } else {
         _busy = false;
       }
@@ -546,8 +556,11 @@ class Match3FlameGame extends FlameGame
             Candy(_rng.nextInt(typeCount.clamp(3, _palette.length)), r, c, x, y),
       );
 
-  /// 按当前模式的目标判定通关/失败并结算
-  void _finishByObjective() {
+  /// 按当前模式的目标判定通关/失败并结算。
+  ///
+  /// [failReason] 非残局外的自定义失败原因（当前仅残局判负传入），
+  /// 透传至结算弹窗展示（null 时弹窗显示默认失败文案）。
+  void _finishByObjective({String? failReason}) {
     if (_over) return;
     _over = true;
     _syncHud();
@@ -565,6 +578,7 @@ class Match3FlameGame extends FlameGame
     _moveScore = 0;
     onFinished(GamePlayOutcome(
       cleared: cleared,
+      reason: failReason,
       values: <String, num>{
         'score': score,
         'duration_ms': elapsed,

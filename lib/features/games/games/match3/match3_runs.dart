@@ -183,3 +183,52 @@ void applyGravity({
     }
   }
 }
+
+/// 残局判定：盘面上是否还存在至少一个可形成三连的相邻交换。
+///
+/// 纯函数：临时交换后检测、随即换回，不改变任何状态。
+/// 特殊糖按其颜色 [Candy.type] 参与匹配（与对局规则一致——特殊糖由
+/// 三连引爆，没有独立的交换引爆入口）；空格视为不可交换。
+bool hasAnyMove(List<List<Candy?>> grid, int rows, int cols) {
+  // (r, c) 交换入的新糖是否形成 >=3 连线（含自身向四向延伸计数）
+  bool makesRun(int r, int c) {
+    final t = grid[r][c]?.type;
+    if (t == null) return false;
+    var n = 1;
+    for (var cc = c - 1; cc >= 0 && grid[r][cc]?.type == t; cc--) {
+      n++;
+    }
+    for (var cc = c + 1; cc < cols && grid[r][cc]?.type == t; cc++) {
+      n++;
+    }
+    if (n >= 3) return true;
+    n = 1;
+    for (var rr = r - 1; rr >= 0 && grid[rr][c]?.type == t; rr--) {
+      n++;
+    }
+    for (var rr = r + 1; rr < rows && grid[rr][c]?.type == t; rr++) {
+      n++;
+    }
+    return n >= 3;
+  }
+
+  for (var r = 0; r < rows; r++) {
+    for (var c = 0; c < cols; c++) {
+      for (final (dr, dc) in const [(0, 1), (1, 0)]) {
+        final r2 = r + dr;
+        final c2 = c + dc;
+        if (r2 >= rows || c2 >= cols) continue;
+        final a = grid[r][c];
+        final b = grid[r2][c2];
+        if (a == null || b == null) continue;
+        grid[r][c] = b;
+        grid[r2][c2] = a;
+        final ok = makesRun(r, c) || makesRun(r2, c2);
+        grid[r][c] = a;
+        grid[r2][c2] = b;
+        if (ok) return true;
+      }
+    }
+  }
+  return false;
+}

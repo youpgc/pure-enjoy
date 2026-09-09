@@ -15,6 +15,10 @@ class GamePlayOutcome {
   /// 是否通关
   final bool cleared;
 
+  /// 失败原因（可选）：如残局判负的「无可消组合，对局结束」；
+  /// 非空且 [cleared] 为 false 时结算弹窗优先展示该文案。
+  final String? reason;
+
   /// 成绩维度取值（维度编码 → 数值），如 {'score': 2048, 'duration_ms': 12345}
   final Map<String, num> values;
 
@@ -23,6 +27,7 @@ class GamePlayOutcome {
 
   const GamePlayOutcome({
     required this.cleared,
+    this.reason,
     required this.values,
     required this.durationMs,
   });
@@ -88,6 +93,9 @@ Future<GameSettlementResult?> reportAndSettle({
   bool cleared = true,
   bool aborted = false,
   bool rewardsAllowed = true,
+
+  /// 失败原因（来自引擎 outcome.reason，如残局判负），结算弹窗展示。
+  String? failReason,
 
   /// 无尽模式会话结算：弹窗标题「无尽模式 · 结算」，无通关/失败语义。
   bool endless = false,
@@ -161,6 +169,7 @@ Future<GameSettlementResult?> reportAndSettle({
       builder: (ctx) => GameSettlementSheet(
         game: game,
         cleared: cleared,
+        failReason: failReason,
         scoreValuesByCode: scoreValuesByCode,
         settleFuture: settleFuture,
         scoreOnly: !rewardsAllowed,

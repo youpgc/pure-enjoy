@@ -269,6 +269,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       scoreValuesByCode: values,
       durationMs: outcome.durationMs,
       cleared: outcome.cleared,
+      failReason: outcome.reason,
       rewardsAllowed: _rewardsAllowed,
       onReplay: () => setState(() {
         _outcome = null;
