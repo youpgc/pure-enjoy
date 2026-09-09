@@ -327,6 +327,21 @@ class GameRewardService {
         points: newBadge.rewardPoints,
         granted: true,
       ));
+
+      // 4b) 复合荣誉（all_modes_tier）：集齐该游戏全部段位后解锁
+      //    （如「消消乐之神」= 消消乐全部模式全部段位）。
+      final composite = await GameBadgeService.instance.unlockAllModesTier(
+        gameCode: game.code,
+        achievements: achievements,
+      );
+      if (composite != null) {
+        items.add(GameSettlementItem(
+          kind: 'achievement',
+          label: '成就：${composite.name}',
+          points: composite.rewardPoints,
+          granted: true,
+        ));
+      }
     }
 
     return GameSettlementResult(items: items);

@@ -51,6 +51,77 @@ class GameBadgeService {
     return isNew ? topTier : null;
   }
 
+  /// 复合荣誉成就（all_modes_tier）：某游戏全部模式全部段位集齐后解锁。
+  ///
+  /// condition 形如 `{"type":"all_modes_tier","game":"match3"}`——该类型 v2
+  /// 种子遗留、引擎原本不支持（当时落 level 兜底），现于结算链路补真实判定：
+  /// 本局新增段位解锁后，核对该游戏全部 mode_tier 段位是否均已解锁，集齐则
+  /// 记录并按 rewardPoints 发分（claim_key 幂等）。
+  ///
+  /// 仅在「本次有新段位解锁」时触发（否则不可能新集齐）；静默 best-effort。
+  Future<GameAchievementModel?> unlockAllModesTier({
+    required String gameCode,
+    required List<GameAchievementModel> achievements,
+  }) async {
+    final composites = achievements
+        .where((a) =>
+            a.condition['type']?.toString() == 'all_modes_tier' &&
+            a.condition['game']?.toString() == gameCode)
+        .toList();
+    if (composites.isEmpty) return null;
+
+    // 该游戏全部段位成就 id
+    final tierIds = achievements
+        .where((a) =>
+            a.condition['type']?.toString() == 'mode_tier' &&
+            a.condition['game']?.toString() == gameCode)
+        .map((a) => a.id)
+        .toList();
+    if (tierIds.isEmpty) return null;
+
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return null;
+
+    try {
+      final res = await ApiClient.get(
+        'user_game_achievements',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'achievement_id': 'in.(${tierIds.join(',')})',
+        },
+        select: 'achievement_id',
+        note: 'games:all_tier_check',
+      );
+      if (!res.isSuccess) return null;
+      final unlockedIds = ((res.data as List<dynamic>?) ?? <dynamic>[])
+          .map((r) =>
+              r is Map<String, dynamic> ? r['achievement_id']?.toString() : null)
+          .whereType<String>()
+          .toSet();
+      final allUnlocked = tierIds.every(unlockedIds.contains);
+      if (!allUnlocked) return null;
+
+      // 集齐：记录并按积分口径发放（与段位徽章同 claim 幂等口径）；
+      // 任一因单日上限未发分则跳过记录，下次结算重试
+      GameAchievementModel? newly;
+      for (final composite in composites) {
+        var claimable = true;
+        if (composite.rewardPoints > 0) {
+          final r =
+              await GameRewardService.instance.claimAchievementPoints(composite);
+          claimable = r.granted || r.reason == '该奖励已领取';
+        }
+        if (!claimable) continue;
+        final isNew = await recordAchievementBadge(achievement: composite);
+        if (isNew) newly ??= composite;
+      }
+      return newly;
+    } catch (e) {
+      debugPrint('[GameBadgeService] 复合荣誉判定失败：$e');
+      return null;
+    }
+  }
+
   /// 由关卡反解模式编码（mode_tier 徽章匹配用）。
   ///
   /// 优先按 `level.modeId` 查配置缓存；endless 合成关（无 server 关）按
