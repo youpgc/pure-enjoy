@@ -139,11 +139,15 @@ class AchievementService {
     return groups;
   }
 
-  /// 类目分组键：去掉 code 尾部数字段（level_sheep_5 -> level_sheep）。
-  /// 无尾部数字（如 first_clear_sheep）原样返回。
+  /// 类目分组键：剥离 code 尾部的「档位后缀」，同族合并。
+  /// 覆盖两种形态：
+  /// - 下划线+纯数字结尾：level_sheep_10 → level_sheep、tier_g2048_classic_1
+  /// - 数字+量词汉字结尾（无下划线）：sp_match3_果冻征服2层 → sp_match3_果冻征服、
+  ///   sp_sheep_速通45秒 → sp_sheep_速通、sp_g2048_挑战100步通关 → sp_g2048_挑战
+  /// 无档位后缀（first_clear_sheep / sp_g2048_小有成就）原样返回。
   String _groupKey(String code) {
-    final m = RegExp(r'_\d+$').firstMatch(code);
-    if (m != null) return code.substring(0, m.start);
+    final m = RegExp(r'_?[0-9]+[\u4e00-\u9fa5]{0,2}$').firstMatch(code);
+    if (m != null && m.start > 0) return code.substring(0, m.start);
     return code;
   }
 }
