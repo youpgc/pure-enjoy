@@ -44,13 +44,13 @@ String gameCoverAsset(String? code) {
   const Set<String> known = <String>{'g2048', 'sheep', 'match3'};
   final String c = (code != null && code.isNotEmpty) ? code : 'g2048';
   final String name = known.contains(c) ? c : (legacy[c] ?? 'g2048');
-  return 'assets/games/icons/$name.svg';
+  return 'lib/assets/games/icons/$name.svg';
 }
 
 /// 模式图标 SVG 资源路径（game_modes.icon 存 SVG 文件名，如 'mode_classic'）。
 String modeIconAsset(String? code) {
   final String c = (code != null && code.isNotEmpty) ? code : 'mode_classic';
-  return 'assets/games/icons/$c.svg';
+  return 'lib/assets/games/icons/$c.svg';
 }
 
 /// 取当前关卡的下一个启用关卡（按 sort_order 升序）；无后续则返回 null。

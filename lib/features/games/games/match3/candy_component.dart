@@ -133,7 +133,7 @@ Future<void> precacheCandyPictures() async {
   for (var t = 0; t < 6; t++) {
     try {
       final info =
-          await vg.loadPicture(SvgAssetLoader('assets/games/match3/candy_$t.svg'), null);
+          await vg.loadPicture(SvgAssetLoader('lib/assets/games/match3/candy_$t.svg'), null);
       _candyPictureCache[t] = info.picture;
     } catch (e) {
       _candyPictureCache[t] = null;
