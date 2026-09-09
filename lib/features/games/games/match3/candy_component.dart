@@ -1,6 +1,9 @@
 import 'dart:math';
+import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:vector_graphics/vector_graphics_compat.dart';
 
 /// 消消乐方块数据模型（纯数据，由 FlameGame 统一绘制与驱动动画）。
 ///
@@ -42,148 +45,100 @@ class Candy {
   double get cy => py;
 }
 
-/// 在指定格绘制一个卡通糖块（矢量自绘，无位图）。
+/// 在指定格绘制一个动物头像糖块（定版 SVG 资产，按 type 渲染）。
 ///
-/// [cell] 为格子边长；方块中心位于 (px+cell/2, py+cell/2)。
+/// SVG 以 [vg.loadPicture] 同步解析并缓存为 [ui.Picture]（每种类型仅解析一次），
+/// 渲染时缩放平移到目标格。特殊糖标识（条纹/彩爆/包装）、提示高亮与消除
+/// 动画在 SVG 之上叠加绘制，与旧版矢量自绘完全同口径。
 void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
   final a = candy.dying ? candy.dyingAlpha.clamp(0.0, 1.0) : 1.0;
   if (a <= 0.01) return;
-  final r = cell * 0.42 * candy.scale;
+  final size = cell * 0.84 * candy.scale;
+  if (size <= 0) return;
   final cx = candy.px + cell / 2;
   final cy = candy.py + cell / 2;
-  if (r <= 0) return;
+  final topLeft = Offset(cx - size / 2, cy - size / 2);
+  final picture = _candyPicture(candy.type);
 
-  final Path path = _shapePath(candy.type, cx, cy, r);
-
-  // 投影：让糖块从深色底板浮起，避免与背景糊在一起（缓解久看眼累）
-  canvas.drawPath(
-    path,
-    Paint()
-      ..isAntiAlias = true
-      ..color = Colors.black.withValues(alpha: 0.35 * a)
-      ..maskFilter = const MaskFilter.blur(BlurStyle.normal, 3),
-  );
-
-  // 主体
-  canvas.drawPath(path, Paint()
-      ..isAntiAlias = true
-      ..color = color.withValues(alpha: a));
-  // 加粗描边：清晰界定形状、提升辨识度（对比深色底板）
-  canvas.drawPath(
-    path,
-    Paint()
-      ..isAntiAlias = true
-      ..color = color.darken(0.3).withValues(alpha: a)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = cell * 0.08,
-  );
-
-  // 高光：更亮、更聚焦的椭圆，增强立体与清晰感
-  canvas.drawOval(
-    Rect.fromCenter(
-      center: Offset(cx - r * 0.3, cy - r * 0.35),
-      width: r * 0.5,
-      height: r * 0.7,
-    ),
-    Paint()
-      ..isAntiAlias = true
-      ..color = const Color(0xFFFFFFFF).withValues(alpha: 0.55 * a),
-  );
-
-  // 提示高亮：白色脉动描边（hintT 为剩余秒数，兼作脉动相位）
-  if (candy.hintT > 0) {
-    final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);
-    canvas.drawPath(
-      path,
-      Paint()
-        ..isAntiAlias = true
-        ..color = Colors.white.withValues(alpha: 0.35 + 0.45 * pulse)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = cell * (0.10 + 0.05 * pulse),
+  canvas.save();
+  // 消除淡出：saveLayer 包 alpha（drawPicture 不支持 paint.alpha）
+  if (a < 0.999) {
+    canvas.saveLayer(
+      topLeft & Size(size, size),
+      Paint()..color = Colors.white.withValues(alpha: a),
     );
   }
-
-  // 特殊糖标识
+  canvas.translate(topLeft.dx, topLeft.dy);
+  canvas.scale(size / 64, size / 64);
+  if (picture != null) {
+    canvas.drawPicture(picture);
+  } else {
+    // 资产缺失兜底：回退纯色圆形（不应发生）
+    canvas.drawCircle(
+      const Offset(32, 32),
+      22,
+      Paint()..color = color,
+    );
+  }
+  // 特殊糖叠加（几何位置以 64 逻辑坐标计，已在 scale 变换内）
   switch (candy.special) {
     case 'row':
-      _drawStripes(canvas, cx, cy, r, true, a);
+      _drawStripes(canvas, 32, 32, 26, true, a);
       break;
     case 'col':
-      _drawStripes(canvas, cx, cy, r, false, a);
+      _drawStripes(canvas, 32, 32, 26, false, a);
       break;
     case 'bomb':
-      _drawBomb(canvas, cx, cy, r, a);
+      _drawBomb(canvas, 32, 32, 22, a);
       break;
     case 'wrap':
       canvas.drawCircle(
-        Offset(cx, cy),
-        r * 0.9,
+        Offset(32, 32),
+        27,
         Paint()
-      ..isAntiAlias = true
+          ..isAntiAlias = true
           ..color = Colors.white.withValues(alpha: 0.85 * a)
           ..style = PaintingStyle.stroke
-          ..strokeWidth = cell * 0.06,
+          ..strokeWidth = 4,
       );
       break;
   }
+  // 提示高亮：白色脉动描边（hintT 为剩余秒数，兼作脉动相位）
+  if (candy.hintT > 0) {
+    final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(
+        Rect.fromLTWH(3, 3, 58, 58),
+        Radius.circular(14),
+      ),
+      Paint()
+        ..isAntiAlias = true
+        ..color = Colors.white.withValues(alpha: (0.35 + 0.45 * pulse) * a)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 3.5 + 1.5 * pulse,
+    );
+  }
+  if (a < 0.999) canvas.restore();
+  canvas.restore();
 }
 
-Path _shapePath(int type, double cx, double cy, double r) {
-  final p = Path();
-  switch (type % 6) {
-    case 0: // 圆
-      p.addOval(Rect.fromCircle(center: Offset(cx, cy), radius: r));
-      break;
-    case 1: // 圆角方块
-      p.addRRect(
-        RRect.fromRectAndRadius(
-          Rect.fromCenter(center: Offset(cx, cy), width: r * 1.9, height: r * 1.9),
-          Radius.circular(r * 0.4),
-        ),
-      );
-      break;
-    case 2: // 三角
-      p.moveTo(cx, cy - r);
-      p.lineTo(cx + r * 0.92, cy + r * 0.7);
-      p.lineTo(cx - r * 0.92, cy + r * 0.7);
-      p.close();
-      break;
-    case 3: // 六边形
-      for (var i = 0; i < 6; i++) {
-        final a = pi / 6 + i * pi / 3;
-        final x = cx + r * cos(a);
-        final y = cy + r * sin(a);
-        if (i == 0) {
-          p.moveTo(x, y);
-        } else {
-          p.lineTo(x, y);
-        }
-      }
-      p.close();
-      break;
-    case 4: // 星形
-      for (var i = 0; i < 10; i++) {
-        final rr = i.isEven ? r : r * 0.45;
-        final a = -pi / 2 + i * pi / 5;
-        final x = cx + rr * cos(a);
-        final y = cy + rr * sin(a);
-        if (i == 0) {
-          p.moveTo(x, y);
-        } else {
-          p.lineTo(x, y);
-        }
-      }
-      p.close();
-      break;
-    default: // 菱形
-      p.moveTo(cx, cy - r);
-      p.lineTo(cx + r, cy);
-      p.lineTo(cx, cy + r);
-      p.lineTo(cx - r, cy);
-      p.close();
-      break;
+/// 六种动物头像 SVG 的 picture 缓存（按 type id 索引；资产缺失为 null）。
+final Map<int, ui.Picture?> _candyPictureCache = <int, ui.Picture?>{};
+
+ui.Picture? _candyPicture(int type) => _candyPictureCache[type];
+
+/// 预加载六种动物头像 SVG（引擎 onLoad 触发，异步解析后写入缓存；
+/// 未就绪的帧由 drawCandy 绘制纯色兜底圆，Flame 每帧重绘自动补上）。
+Future<void> precacheCandyPictures() async {
+  for (var t = 0; t < 6; t++) {
+    try {
+      final info =
+          await vg.loadPicture(SvgAssetLoader('assets/games/match3/candy_$t.svg'), null);
+      _candyPictureCache[t] = info.picture;
+    } catch (e) {
+      _candyPictureCache[t] = null;
+    }
   }
-  return p;
 }
 
 void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal, double a) {

@@ -1,5 +1,6 @@
 library match3_flame_game;
 
+import 'dart:async';
 import 'dart:math';
 
 import 'package:flame/game.dart';
@@ -171,6 +172,8 @@ class Match3FlameGame extends FlameGame
   @override
   Future<void> onLoad() async {
     await super.onLoad();
+    // 预加载动物头像 SVG（异步；未就绪帧先画纯色兜底圆，Flame 每帧重绘自动补）
+    unawaited(precacheCandyPictures());
     // 横向留出 _padX 左右边距；网格在剩余空间内居中，纵向居中。
     _recomputeLayout();
     _newBoard();

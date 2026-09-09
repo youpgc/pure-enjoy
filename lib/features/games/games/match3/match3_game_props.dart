@@ -223,9 +223,11 @@ extension _Match3GameProps on _Match3GameState {
       final s = _props.slot(itemType)!;
       if (s.item == null) return; // 未启用/未解锁：不渲染
       actions.add(GameAction(
-        // 道具图标口子：icon 字段暂用内置 Material icon，统一设计图标
-        // 文件后按 games.icon 机制接入文件资产
+        // 道具图标：game_items.icon 定版 SVG 资产优先（后台可配），空则内置 icon
         icon: icon,
+        iconAsset: (s.item!.icon != null && s.item!.icon!.isNotEmpty)
+            ? s.item!.icon
+            : null,
         label: selected ? (selectedLabel ?? label) : label,
         badge: '${s.total}',
         extraTag: s.free > 0 ? '免${s.free}' : null,

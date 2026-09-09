@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 
@@ -26,6 +27,10 @@ class GameAction {
   /// 「道具已选中，去盘面点击目标」（道具商城扩展，2026-09-09）。
   final bool selected;
 
+  /// 图标资产文件名（game_items.icon 口子，2026-09-09）：非空时渲染
+  /// `assets/games/items/<iconAsset>.svg` 定版图标，null 用内置 [icon]。
+  final String? iconAsset;
+
   const GameAction({
     required this.icon,
     required this.label,
@@ -34,6 +39,7 @@ class GameAction {
     this.onPressed,
     this.primary = false,
     this.selected = false,
+    this.iconAsset,
   });
 }
 
@@ -228,10 +234,17 @@ class _ActionLabel extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final Widget iconWidget = (action.iconAsset != null && action.iconAsset!.isNotEmpty)
+        ? SvgPicture.asset(
+            'assets/games/items/${action.iconAsset}.svg',
+            width: 20,
+            height: 20,
+          )
+        : Icon(action.icon, size: 18);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
-        Icon(action.icon, size: 18),
+        iconWidget,
         const SizedBox(height: 2),
         Text(
           action.badge == null
