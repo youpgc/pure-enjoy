@@ -14,6 +14,10 @@ class GameItemModel {
   final bool enabled;
   final int sortOrder;
 
+  /// 道具图标文件名（预留口子）：非空时优先用文件图标（参考 games.icon /
+  /// 成就 icon 的文件选择机制）；空 = App 使用内置 Material icon。
+  final String? icon;
+
   const GameItemModel({
     required this.id,
     required this.gameCode,
@@ -26,6 +30,7 @@ class GameItemModel {
     this.freePerGame = 0,
     required this.enabled,
     required this.sortOrder,
+    this.icon,
   });
 
   factory GameItemModel.fromJson(Map<String, dynamic> json) {
@@ -41,6 +46,7 @@ class GameItemModel {
       freePerGame: (json['free_per_game'] as num?)?.toInt() ?? 0,
       enabled: json['enabled'] as bool? ?? true,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
+      icon: json['icon'] as String?,
     );
   }
 
@@ -56,6 +62,7 @@ class GameItemModel {
         'free_per_game': freePerGame,
         'enabled': enabled,
         'sort_order': sortOrder,
+        if (icon != null) 'icon': icon,
       };
 }
 

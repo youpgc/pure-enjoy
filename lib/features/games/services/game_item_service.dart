@@ -39,7 +39,7 @@ class GameItemService {
         filters: filters,
         // 按需 select：仅模型消费列（排除 created_at/updated_at）
         select:
-            'id,game_code,mode,item_type,name,description,point_cost,per_game_limit,free_per_game,enabled,sort_order',
+            'id,game_code,mode,item_type,name,description,icon,point_cost,per_game_limit,free_per_game,enabled,sort_order',
         order: 'sort_order.asc',
         limit: null,
       );

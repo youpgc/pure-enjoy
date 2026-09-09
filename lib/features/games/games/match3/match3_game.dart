@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
+import '../../game_item_shop_screen.dart';
 import '../../models/game_level_model.dart';
+import '../../models/game_model.dart';
 import '../../models/match3_mode.dart';
 import '../../models/game_item_model.dart';
 import '../../services/game_item_service.dart';
@@ -22,6 +24,9 @@ class Match3Game extends StatefulWidget {
   /// 结束回调
   final void Function(GamePlayOutcome) onFinished;
 
+  /// 所属游戏（道具商城跳转、道具目录 game_code 来源）
+  final GameModel game;
+
   /// 关卡（读取 config 的 mode/steps/goal 等决定模式与目标；为 null 用默认）
   final GameLevelModel? level;
 
@@ -31,6 +36,7 @@ class Match3Game extends StatefulWidget {
   const Match3Game({
     super.key,
     required this.onFinished,
+    required this.game,
     this.level,
     this.onRestart,
   });
@@ -40,12 +46,6 @@ class Match3Game extends StatefulWidget {
 }
 
 class _Match3GameState extends State<Match3Game> {
-  /// 道具商城扩展总开关（2026-09-09 预留，暂不开放）：
-  /// 开启后死局时优先询问使用洗牌券、控制栏追加「提示/破坏/洗牌」三道具。
-  /// 引擎能力（doShuffle/smashAt/highlightHint/stalemateHandler）已全部就绪，
-  /// 开放仅需：置 true + 后台 game_items 配置 shuffle/hammer 道具行。
-  static const bool kPropShopEnabled = false;
-
   late final ValueNotifier<int> _hudTick;
   late final Match3Objective _objective;
   late final Match3FlameGame _game;
@@ -56,13 +56,18 @@ class _Match3GameState extends State<Match3Game> {
   int _addTimeFree = 0;
   int _addTimeOwned = 0;
 
-  /// 洗牌 / 局部破坏道具状态（道具商城扩展预留，开关关闭时不加载）
+  /// 通用道具状态（洗牌/破坏/提示），**数据驱动**：
+  /// game_items.enabled 控制是否存在（后台可测），level.config.propUnlock
+  /// 控制关卡通关数解锁（{item_type: 解锁关号}，未配置 = 允许）。
   GameItemModel? _shuffleItem;
   int _shuffleFree = 0;
   int _shuffleOwned = 0;
   GameItemModel? _hammerItem;
   int _hammerFree = 0;
   int _hammerOwned = 0;
+  GameItemModel? _hintItem;
+  int _hintFree = 0;
+  int _hintOwned = 0;
 
   @override
   void initState() {
@@ -104,11 +109,10 @@ class _Match3GameState extends State<Match3Game> {
       typeCount: (cfg['types'] is num ? (cfg['types'] as num).toInt() : 6),
     );
     if (_mode == Match3Mode.timed) _loadAddTime();
-    // 道具商城扩展预留：死局处理器注入 + 洗牌/破坏道具加载（开关关闭时不生效）
-    if (kPropShopEnabled) {
-      _game.stalemateHandler = _handleStalemate;
-      _loadSmashProps();
-    }
+    // 道具商城（数据驱动）：死局处理器常驻注入；道具目录由
+    // game_items.enabled 控制是否生效（后台可测），propUnlock 控制关卡解锁
+    _game.stalemateHandler = _handleStalemate;
+    _loadMatchProps();
   }
 
   /// 限时模式开局：载入 add_time 道具，先免费用 free_per_game 次，再消耗购买库存。
@@ -207,77 +211,162 @@ class _Match3GameState extends State<Match3Game> {
     if (mounted) setState(() {});
   }
 
-  // ---------- 道具商城扩展预留（kPropShopEnabled 暂为 false，未开放） ----------
+  // ---------- 道具商城（洗牌/破坏/提示，数据驱动） ----------
 
-  /// 加载洗牌/局部破坏道具（免费额度 + 购买库存），模式同加时卡。
-  Future<void> _loadSmashProps() async {
+  /// 加载通用道具目录与库存。
+  ///
+  /// 渲染条件（三者同时满足）：
+  /// ① game_items.enabled=true（后台数据开关，测试/开放入口）；
+  /// ② level.config.propUnlock 解锁（{item_type: 解锁关号}，level_no 达标；
+  ///    未配置该键 = 允许，配置粒度见参考文档 §19）；
+  /// ③ 模式适配（hint/shuffle/hammer 为通用道具 mode=''，全模式可用）。
+  Future<void> _loadMatchProps() async {
     try {
-      final items =
-          await GameItemService.instance.fetchItems(gameCode: 'match3');
+      final items = await GameItemService.instance
+          .fetchItems(gameCode: widget.game.code);
       final inv = await GameItemService.instance.fetchInventory();
-      void load(String itemType, void Function(GameItemModel?, int, int) set) {
-        final item =
-            items.where((it) => it.itemType == itemType).firstOrNull;
-        if (item == null) return;
-        final owned = inv[item.id] ?? 0;
-        final free = item.freePerGame;
-        final limit = item.perGameLimit;
-        final budget = (limit - free).clamp(0, limit);
-        set(item, free, owned < budget ? owned : budget);
+      final levelNo = widget.level?.levelNo ?? 0;
+      final unlock =
+          (widget.level?.config ?? const <String, dynamic>{})['propUnlock'];
+      bool allowed(String itemType) {
+        if (unlock is Map) {
+          final v = unlock[itemType];
+          if (v is num) return levelNo >= v.toInt();
+        }
+        return true; // 未配置 = 允许
       }
 
       if (!mounted) return;
       setState(() {
-        load('shuffle', (it, f, o) {
-          _shuffleItem = it;
-          _shuffleFree = f;
-          _shuffleOwned = o;
-        });
-        load('hammer', (it, f, o) {
-          _hammerItem = it;
-          _hammerFree = f;
-          _hammerOwned = o;
-        });
+        for (final it in items) {
+          if (!allowed(it.itemType)) continue;
+          final owned = inv[it.id] ?? 0;
+          final free = it.freePerGame;
+          final budget = (it.perGameLimit - free).clamp(0, it.perGameLimit);
+          final o = owned < budget ? owned : budget;
+          switch (it.itemType) {
+            case 'shuffle':
+              _shuffleItem = it;
+              _shuffleFree = free;
+              _shuffleOwned = o;
+            case 'hammer':
+              _hammerItem = it;
+              _hammerFree = free;
+              _hammerOwned = o;
+            case 'hint':
+              _hintItem = it;
+              _hintFree = free;
+              _hintOwned = o;
+          }
+        }
       });
     } catch (e) {
       // 载入失败不影响对局
     }
   }
 
-  /// 死局处理器（引擎 stalemateHandler 回调）：优先询问使用洗牌券，
-  /// 用券洗牌成功返回 true（对局继续）；无券/取消/洗牌失败返回 false
-  /// （引擎判负结算）。
+  /// 死局处理器（引擎 stalemateHandler 回调）：
+  ///
+  /// 有洗牌券 → 弹「使用洗牌 / 去商城 / 放弃对局」；无券 → 弹「去商城
+  /// 购买 / 放弃对局」。选择商城则跳转购买，**返回后对局状态保持**
+  /// （引擎位于下层路由未被销毁），刷新库存后重新进入询问——购买不自动
+  /// 使用，需再次确认消耗（用户拍板的独立消耗流程）。返回 true = 已处理
+  /// （对局继续），false = 判负结算。
   Future<bool> _handleStalemate() async {
-    final available = _shuffleItem != null && (_shuffleFree + _shuffleOwned) > 0;
-    if (!available) return false;
+    while (true) {
+      final available =
+          _shuffleItem != null && (_shuffleFree + _shuffleOwned) > 0;
+      final choice = await showDialog<String>(
+        context: context,
+        barrierDismissible: false,
+        builder: (ctx) => PopScope(
+          canPop: false,
+          child: AlertDialog(
+            title: const Text('无可消组合'),
+            content: Text(available
+                ? '盘面已无可消交换。使用洗牌卡重排盘面（特殊糖保留原位），或前往道具商城补货。'
+                : '盘面已无可消交换，且没有洗牌卡。可前往道具商城购买，或放弃本局。'),
+            actions: <Widget>[
+              if (available)
+                TextButton(
+                  onPressed: () => Navigator.pop(ctx, 'use'),
+                  child: Text(_shuffleFree > 0
+                      ? '使用洗牌（免费剩 $_shuffleFree 次）'
+                      : '使用洗牌（库存剩 $_shuffleOwned 张）'),
+                ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'shop'),
+                child: const Text('道具商城'),
+              ),
+              TextButton(
+                onPressed: () => Navigator.pop(ctx, 'quit'),
+                child: const Text('放弃对局'),
+              ),
+            ],
+          ),
+        ),
+      );
+      if (choice == 'use') {
+        // 独立确认消耗流程：弹窗确认后才扣券执行
+        final confirm = await _confirmConsumeShuffle();
+        if (confirm != true) continue; // 取消消耗 → 回到询问
+        final ok = await _consumeShuffleAndApply();
+        if (ok) return true;
+        // 洗牌执行失败（200 次重排仍无解，概率极低）：券已消耗无法回退，
+        // 判负闭环，避免「返回 true 但盘面仍死局」的卡死场景
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('洗牌失败，本局结束')),
+          );
+        }
+        return false;
+      }
+      if (choice == 'shop') {
+        // 跳转商城购买：push 保留下层路由，Flame 引擎与对局状态原样保留；
+        // 返回后刷新库存，回到询问（购买后需单独确认消耗，不自动使用）
+        if (!mounted) return false;
+        await Navigator.push(
+          context,
+          MaterialPageRoute(
+            builder: (_) => GameItemShopScreen(game: widget.game),
+          ),
+        );
+        await _loadMatchProps();
+        continue;
+      }
+      return false; // 放弃对局 / 未登录等异常
+    }
+  }
+
+  /// 消耗前确认（独立消耗流程，购买后同样必须经过此步）。
+  Future<bool> _confirmConsumeShuffle() async {
     final useFree = _shuffleFree > 0;
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
-        title: const Text('无可消组合'),
+        title: const Text('使用洗牌卡？'),
         content: Text(
           useFree
-              ? '盘面已无可消交换。使用 1 次免费洗牌（剩余 $_shuffleFree 次）重排盘面吗？'
-              : '盘面已无可消交换。使用 1 张洗牌券（库存剩余 $_shuffleOwned 张）重排盘面吗？',
+              ? '确定要使用 1 次免费洗牌（剩余 $_shuffleFree 次）吗？重排后不保证立即出现消除机会以外的额外收益。'
+              : '确定要消耗 1 张洗牌卡（库存剩余 $_shuffleOwned 张）吗？',
         ),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('放弃对局'),
+            child: const Text('取消'),
           ),
           FilledButton(
             onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('使用洗牌'),
+            child: const Text('确定使用'),
           ),
         ],
       ),
     );
-    if (confirm != true) return false;
-    return _useShuffle();
+    return confirm == true;
   }
 
-  /// 使用洗牌：先免费用完再消耗库存，成功后引擎重排盘面（缓存对局继续）。
-  Future<bool> _useShuffle() async {
+  /// 消耗洗牌并执行：先免费用完再消耗库存；执行成功才计数生效。
+  Future<bool> _consumeShuffleAndApply() async {
     if (_shuffleItem == null) return false;
     if (_shuffleFree > 0) {
       if (mounted) setState(() => _shuffleFree -= 1);
@@ -289,11 +378,13 @@ class _Match3GameState extends State<Match3Game> {
       }
       if (mounted) setState(() => _shuffleOwned -= 1);
     }
-    return _game.doShuffle();
+    final applied = _game.doShuffle();
+    if (applied) _syncPropsAfterUse();
+    return applied;
   }
 
-  /// 确认使用局部破坏（锤子）：确认即消耗，进入待命中——下一次点击盘面
-  /// 格执行破坏（引擎 smashArmed）。
+  /// 确认使用局部破坏（锤子）：确认即消耗，进入待命中（按钮选中高亮）——
+  /// 下一次点击盘面格执行破坏；再次点击道具按钮可取消待命（券不退）。
   Future<void> _confirmHammer() async {
     if (_hammerItem == null) return;
     if (_hammerFree <= 0 && _hammerOwned <= 0) return;
@@ -304,8 +395,8 @@ class _Match3GameState extends State<Match3Game> {
         title: const Text('使用破坏锤？'),
         content: Text(
           useFree
-              ? '确定要使用「破坏锤」吗？将消耗 1 次免费次数（剩余 $_hammerFree 次），点击后任意点击盘面一颗糖直接消除。'
-              : '确定要使用「破坏锤」吗？将消耗 1 张道具卡（库存剩余 $_hammerOwned 张），点击后任意点击盘面一颗糖直接消除。',
+              ? '确定要使用 1 次免费破坏（剩余 $_hammerFree 次）吗？确认后点击盘面任意一颗糖直接消除（特殊糖按效果引爆）。'
+              : '确定要消耗 1 张破坏锤（库存剩余 $_hammerOwned 张）吗？确认后点击盘面任意一颗糖直接消除（特殊糖按效果引爆）。',
         ),
         actions: <Widget>[
           TextButton(
@@ -331,6 +422,53 @@ class _Match3GameState extends State<Match3Game> {
       if (mounted) setState(() => _hammerOwned -= 1);
     }
     _game.smashArmed = true;
+    _syncPropsAfterUse();
+  }
+
+  /// 确认使用提示卡：确认即消耗，高亮一组可消交换位置。
+  Future<void> _confirmHint() async {
+    if (_hintItem == null) return;
+    if (_hintFree <= 0 && _hintOwned <= 0) return;
+    final useFree = _hintFree > 0;
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('使用提示卡？'),
+        content: Text(
+          useFree
+              ? '确定要使用 1 次免费提示（剩余 $_hintFree 次）吗？将高亮一组可消交换的糖果。'
+              : '确定要消耗 1 张提示卡（库存剩余 $_hintOwned 张）吗？将高亮一组可消交换的糖果。',
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('取消'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定使用'),
+          ),
+        ],
+      ),
+    );
+    if (confirm != true) return;
+    if (_hintFree > 0) {
+      if (mounted) setState(() => _hintFree -= 1);
+    } else {
+      final ok = await GameItemService.instance.consumeItem(_hintItem!.id);
+      if (!ok) {
+        if (mounted) setState(() => _hintOwned = 0);
+        return;
+      }
+      if (mounted) setState(() => _hintOwned -= 1);
+    }
+    _game.highlightHint();
+    _syncPropsAfterUse();
+  }
+
+  /// 道具消耗/购买后的库存同步（引擎状态在 smasher 等路径外不受影响）。
+  void _syncPropsAfterUse() {
+    if (mounted) setState(() {});
   }
 
   @override
@@ -409,24 +547,46 @@ class _Match3GameState extends State<Match3Game> {
                       }
                     : null,
               ),
-            // 道具商城扩展预留三道具（kPropShopEnabled 暂 false 不渲染）
-            if (kPropShopEnabled) ...<GameAction>[
+            GameAction(
+              icon: Icons.refresh,
+              label: '重新开始',
+              primary: true,
+              onPressed: widget.onRestart == null ? null : _confirmRestart,
+            ),
+          ],
+          // 道具栏：独立一行，渲染于主控制栏（重新开始）上方；
+          // 渲染与否由 game_items.enabled + level.config.propUnlock 数据驱动
+          propActions: <GameAction>[
+            if (_hintItem != null)
               GameAction(
+                // 道具图标口子：icon 字段暂用内置 Material icon，
+                // 统一设计图标文件后按 games.icon 机制接入文件资产
                 icon: Icons.lightbulb_outline,
                 label: '提示',
-                onPressed: _game.highlightHint,
+                badge: '${_hintFree + _hintOwned}',
+                extraTag: _hintFree > 0 ? '免$_hintFree' : null,
+                onPressed: (_hintFree + _hintOwned) > 0 ? _confirmHint : null,
               ),
+            if (_hammerItem != null)
               GameAction(
                 icon: Icons.construction_outlined,
-                label: '破坏',
+                label: _game.smashArmed ? '点击目标' : '破坏',
                 badge: '${_hammerFree + _hammerOwned}',
                 extraTag: _hammerFree > 0 ? '免$_hammerFree' : null,
+                selected: _game.smashArmed,
                 onPressed: (_hammerFree + _hammerOwned) > 0
                     ? () {
+                        // 待命中再次点击 = 取消（券不退，库存已扣）
+                        if (_game.smashArmed) {
+                          _game.smashArmed = false;
+                          _syncPropsAfterUse();
+                          return;
+                        }
                         _confirmHammer();
                       }
                     : null,
               ),
+            if (_shuffleItem != null)
               GameAction(
                 icon: Icons.shuffle_outlined,
                 label: '洗牌',
@@ -434,17 +594,18 @@ class _Match3GameState extends State<Match3Game> {
                 extraTag: _shuffleFree > 0 ? '免$_shuffleFree' : null,
                 onPressed: (_shuffleFree + _shuffleOwned) > 0
                     ? () async {
-                        await _useShuffle();
+                        // 即时入口也走独立确认消耗流程（与死局路径一致）
+                        if (await _confirmConsumeShuffle()) {
+                          final ok = await _consumeShuffleAndApply();
+                          if (!ok && mounted) {
+                            ScaffoldMessenger.of(this.context).showSnackBar(
+                              const SnackBar(content: Text('洗牌失败，请重试')),
+                            );
+                          }
+                        }
                       }
                     : null,
               ),
-            ],
-            GameAction(
-              icon: Icons.refresh,
-              label: '重新开始',
-              primary: true,
-              onPressed: widget.onRestart == null ? null : _confirmRestart,
-            ),
           ],
           content: LayoutBuilder(
             builder: (ctx, constraints) {

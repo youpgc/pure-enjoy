@@ -22,6 +22,10 @@ class GameAction {
   /// 是否使用强调样式（主操作，如「新游戏」「重新开始」）
   final bool primary;
 
+  /// 选中高亮态（如破坏锤待命中）：强调描边 + 高亮底色，提示玩家
+  /// 「道具已选中，去盘面点击目标」（道具商城扩展，2026-09-09）。
+  final bool selected;
+
   const GameAction({
     required this.icon,
     required this.label,
@@ -29,6 +33,7 @@ class GameAction {
     this.extraTag,
     this.onPressed,
     this.primary = false,
+    this.selected = false,
   });
 }
 
@@ -48,6 +53,10 @@ class GameShell extends StatelessWidget {
   /// 底部控制栏操作（游戏内置按钮统一放这里）
   final List<GameAction> actions;
 
+  /// 道具栏操作（渲染在 [actions] 上方的独立一行；道具商城扩展）。
+  /// 与主控制栏分离：道具更常变动（解锁/库存），且视觉层级弱于主操作。
+  final List<GameAction> propActions;
+
   /// 底部操作提示文案（如「滑动合并相同数字」）
   final String? hint;
 
@@ -56,6 +65,7 @@ class GameShell extends StatelessWidget {
     required this.content,
     this.statusItems = const <Widget>[],
     this.actions = const <GameAction>[],
+    this.propActions = const <GameAction>[],
     this.hint,
   });
 
@@ -91,8 +101,80 @@ class GameShell extends StatelessWidget {
               style: const TextStyle(fontSize: 14, color: AppTheme.neutral600),
             ),
           ),
+        if (propActions.isNotEmpty) _PropBar(actions: propActions),
         if (actions.isNotEmpty) _ControlBar(actions: actions),
       ],
+    );
+  }
+}
+
+/// 道具栏（独立行，渲染于主控制栏上方；支持选中高亮态）
+class _PropBar extends StatelessWidget {
+  final List<GameAction> actions;
+
+  const _PropBar({required this.actions});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    return SafeArea(
+      top: false,
+      child: Container(
+        margin: const EdgeInsets.fromLTRB(10, 4, 10, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        decoration: BoxDecoration(
+          color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
+          borderRadius: BorderRadius.circular(16),
+        ),
+        child: Row(
+          children: actions.map((a) {
+            return Expanded(
+              child: Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 4),
+                child: _PropButton(action: a),
+              ),
+            );
+          }).toList(),
+        ),
+      ),
+    );
+  }
+}
+
+/// 道具按钮：tonal 底 + 选中高亮描边（selected 时强调色边框 + 底色）
+class _PropButton extends StatelessWidget {
+  final GameAction action;
+
+  const _PropButton({required this.action});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final selected = action.selected;
+    final enabled = action.onPressed != null;
+    final cs = theme.colorScheme;
+    return Opacity(
+      opacity: enabled ? 1.0 : 0.45,
+      child: Material(
+        color: selected
+            ? cs.primary.withValues(alpha: 0.18)
+            : cs.surfaceContainerHighest,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(12),
+          side: BorderSide(
+            color: selected ? cs.primary : Colors.transparent,
+            width: selected ? 2 : 0,
+          ),
+        ),
+        child: InkWell(
+          borderRadius: BorderRadius.circular(12),
+          onTap: action.onPressed,
+          child: Padding(
+            padding: const EdgeInsets.symmetric(vertical: 6),
+            child: _ActionLabel(action: action),
+          ),
+        ),
+      ),
     );
   }
 }

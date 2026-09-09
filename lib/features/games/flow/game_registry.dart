@@ -116,6 +116,7 @@ class _Match3Adapter extends GameFlowAdapter {
   }) {
     return Match3Game(
       key: key,
+      game: game,
       onFinished: onFinished,
       level: level,
       onRestart: onRestart,
