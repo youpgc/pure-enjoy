@@ -303,7 +303,9 @@ class _SheepGameState extends State<SheepGame> {
     final free = _freeLeft[p] ?? 0;
     final owned = _ownedLeft[p] ?? 0;
     if (free <= 0 && owned <= 0) return;
-    final confirm = await confirmUsePropDialog(context, p, free, owned);
+    final confirm =
+        await confirmUsePropDialog(context, p, free, owned,
+            iconAsset: _itemIcons[p]);
     if (confirm == true) {
       await _useProp(p);
     }

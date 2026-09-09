@@ -336,3 +336,56 @@ class GameStatusItem extends StatelessWidget {
     );
   }
 }
+
+/// 道具图标组件（2026-09-09 定版图标接入）：[iconAsset] 非空渲染
+/// `assets/games/items/<iconAsset>.svg` 定版图标，空回退内置 [icon]。
+/// 供确认弹窗、商城卡片等非 GameAction 场景复用，保证与道具栏图标一致。
+class PropIcon extends StatelessWidget {
+  final IconData icon;
+  final String? iconAsset;
+  final double size;
+
+  const PropIcon({
+    super.key,
+    required this.icon,
+    this.iconAsset,
+    this.size = 40,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    if (iconAsset != null && iconAsset!.isNotEmpty) {
+      return SvgPicture.asset(
+        'assets/games/items/$iconAsset.svg',
+        width: size,
+        height: size,
+      );
+    }
+    return Icon(icon, size: size);
+  }
+}
+
+/// 道具类型 → 内置兜底图标（iconAsset 缺失时的统一兜底，与道具栏口径一致）。
+IconData itemIconFor(String itemType) {
+  switch (itemType) {
+    case 'shuffle':
+      return Icons.shuffle_outlined;
+    case 'hammer':
+      return Icons.construction_outlined;
+    case 'hint':
+      return Icons.lightbulb_outline;
+    case 'force_swap':
+      return Icons.swap_horiz_outlined;
+    case 'magic_wand':
+      return Icons.auto_fix_high_outlined;
+    case 'add_steps':
+      return Icons.exposure_plus_1;
+    case 'add_time':
+      return Icons.timer_outlined;
+    case 'remove':
+      return Icons.push_pin_outlined;
+    case 'undo':
+      return Icons.undo_outlined;
+  }
+  return Icons.extension_outlined;
+}

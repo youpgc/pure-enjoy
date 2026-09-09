@@ -185,6 +185,10 @@ class _Match3GameState extends State<Match3Game> {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        icon: PropIcon(
+          icon: Icons.timer_outlined,
+          iconAsset: _addTimeItem?.icon,
+        ),
         title: const Text('使用加时卡？'),
         content: Text(
           useFree

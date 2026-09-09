@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../shared/game_shell.dart';
+
 /// 羊了个羊道具（每局各可用一次）
 enum SheepProp {
   /// 移出：把槽位中最先的 3 块移出场，腾出槽位
@@ -57,17 +59,20 @@ SheepProp? sheepPropFromType(String type) {
 /// 使用道具前的确认弹窗：免费次数与购买库存均先确认，避免误触消耗。
 ///
 /// 返回 `true` 表示用户确认使用；`false` / `null` 表示取消。
-/// [free] / [owned] 分别为本局剩余免费次数与购买库存（用于文案展示）。
+/// [free] / [owned] 分别为本局剩余免费次数与购买库存（用于文案展示）；
+/// [iconAsset] 为定版图标文件名（game_items.icon，空用内置图标）。
 Future<bool?> confirmUsePropDialog(
   BuildContext context,
   SheepProp p,
   int free,
-  int owned,
-) async {
+  int owned, {
+  String? iconAsset,
+}) async {
   final useFree = free > 0;
   return showDialog<bool>(
     context: context,
     builder: (ctx) => AlertDialog(
+      icon: PropIcon(icon: p.icon, iconAsset: iconAsset),
       title: Text('使用${p.label}？'),
       content: Text(
         useFree

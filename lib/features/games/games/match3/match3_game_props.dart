@@ -63,6 +63,7 @@ extension _Match3GameProps on _Match3GameState {
           shuffle.free > 0
               ? '确定要使用 1 次免费洗牌（剩余 ${shuffle.free} 次）吗？盘面将重排，特殊糖保留原位。'
               : '确定要消耗 1 张洗牌卡（库存剩余 ${shuffle.owned} 张）吗？盘面将重排，特殊糖保留原位。',
+          itemType: 'shuffle',
         )) {
           final ok = await _props.consume(shuffle);
           if (ok) {
@@ -98,10 +99,18 @@ extension _Match3GameProps on _Match3GameState {
   }
 
   /// 道具消耗前通用确认弹窗。返回 true = 确认使用。
-  Future<bool> _confirmUseProp(String title, String body) async {
+  /// [itemType] 用于渲染定版图标头（iconAsset 优先，空回退内置图标）。
+  Future<bool> _confirmUseProp(String title, String body,
+      {String? itemType}) async {
     final confirm = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
+        icon: itemType == null
+            ? null
+            : PropIcon(
+                icon: itemIconFor(itemType),
+                iconAsset: _props.slot(itemType)?.item?.icon,
+              ),
         title: Text(title),
         content: Text(body),
         actions: <Widget>[
@@ -139,7 +148,10 @@ extension _Match3GameProps on _Match3GameState {
           ? '确定要使用 1 次免费加步（剩余 ${s.free} 次）吗？剩余步数 +5。'
           : '确定要消耗 1 张加步卡（库存剩余 ${s.owned} 张）吗？剩余步数 +5。',
     };
-    if (!await _confirmUseProp(titles[itemType]!, bodies[itemType]!)) return;
+    if (!await _confirmUseProp(titles[itemType]!, bodies[itemType]!,
+        itemType: itemType)) {
+      return;
+    }
     if (!await _props.consume(s)) {
       if (mounted) setState(() {});
       return;
@@ -196,7 +208,10 @@ extension _Match3GameProps on _Match3GameState {
           ? '确定要使用 1 次免费魔法（剩余 ${s.free} 次）吗？确认后点击盘面任意一颗普通糖，将其变为横向条纹特效。'
           : '确定要消耗 1 张魔法棒（库存剩余 ${s.owned} 张）吗？确认后点击盘面任意一颗普通糖，将其变为横向条纹特效。',
     };
-    if (!await _confirmUseProp(titles[itemType]!, bodies[itemType]!)) return;
+    if (!await _confirmUseProp(titles[itemType]!, bodies[itemType]!,
+        itemType: itemType)) {
+      return;
+    }
     switch (itemType) {
       case 'hammer':
         _game.smashArmed = true;

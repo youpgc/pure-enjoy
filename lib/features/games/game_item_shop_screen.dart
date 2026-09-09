@@ -6,6 +6,7 @@ import 'models/game_item_model.dart';
 import 'models/game_model.dart';
 import 'models/match3_mode.dart';
 import 'services/game_item_service.dart';
+import 'shared/game_shell.dart';
 import '../../features/profile/services/point_service.dart';
 
 /// 游戏道具商城页。
@@ -160,6 +161,13 @@ class _ItemCard extends StatelessWidget {
           padding: const EdgeInsets.all(16),
           child: Row(
             children: <Widget>[
+              // 道具定版图标（game_items.icon 口子），空回退内置图标
+              PropIcon(
+                icon: itemIconFor(item.itemType),
+                iconAsset: item.icon,
+                size: 44,
+              ),
+              const SizedBox(width: 12),
               Expanded(
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
