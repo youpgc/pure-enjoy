@@ -63,6 +63,10 @@ class GameShell extends StatelessWidget {
   /// 与主控制栏分离：道具更常变动（解锁/库存），且视觉层级弱于主操作。
   final List<GameAction> propActions;
 
+  /// 道具栏空态占位文案（2026-09-09）：[propActions] 为空时渲染固定高度
+  /// 的占位行，防止布局因无道具而高度坍塌。传空字符串关闭占位。
+  final String propPlaceholder;
+
   /// 底部操作提示文案（如「滑动合并相同数字」）
   final String? hint;
 
@@ -72,6 +76,7 @@ class GameShell extends StatelessWidget {
     this.statusItems = const <Widget>[],
     this.actions = const <GameAction>[],
     this.propActions = const <GameAction>[],
+    this.propPlaceholder = '当前对局无道具可用',
     this.hint,
   });
 
@@ -99,7 +104,7 @@ class GameShell extends StatelessWidget {
         ),
         if (hint != null)
           Padding(
-            padding: const EdgeInsets.only(top: 8),
+            padding: const EdgeInsets.only(top: 4),
             child: Text(
               hint!,
               textAlign: TextAlign.center,
@@ -107,7 +112,10 @@ class GameShell extends StatelessWidget {
               style: const TextStyle(fontSize: 14, color: AppTheme.neutral600),
             ),
           ),
-        if (propActions.isNotEmpty) _PropBar(actions: propActions),
+        _PropBar(
+          actions: propActions,
+          placeholder: propActions.isEmpty ? propPlaceholder : null,
+        ),
         if (actions.isNotEmpty) _ControlBar(actions: actions),
       ],
     );
@@ -118,7 +126,10 @@ class GameShell extends StatelessWidget {
 class _PropBar extends StatelessWidget {
   final List<GameAction> actions;
 
-  const _PropBar({required this.actions});
+  /// 非空 = 空态占位（无道具），固定高度防布局坍塌。
+  final String? placeholder;
+
+  const _PropBar({required this.actions, this.placeholder});
 
   @override
   Widget build(BuildContext context) {
@@ -126,21 +137,34 @@ class _PropBar extends StatelessWidget {
     return SafeArea(
       top: false,
       child: Container(
-        margin: const EdgeInsets.fromLTRB(10, 4, 10, 0),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        margin: const EdgeInsets.fromLTRB(10, 2, 10, 0),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
         ),
-        child: Row(
-          children: actions.map((a) {
-            return Expanded(
-              child: Padding(
-                padding: const EdgeInsets.symmetric(horizontal: 4),
-                child: _PropButton(action: a),
-              ),
-            );
-          }).toList(),
+        height: 46,
+        child: Center(
+          child: placeholder != null
+              ? Text(
+                  placeholder!,
+                  style: TextStyle(
+                    fontSize: 11.5,
+                    color: theme.colorScheme.onSurface.withValues(alpha: 0.45),
+                  ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                )
+              : Row(
+                  children: actions.map((a) {
+                    return Expanded(
+                      child: Padding(
+                        padding: const EdgeInsets.symmetric(horizontal: 4),
+                        child: _PropButton(action: a),
+                      ),
+                    );
+                  }).toList(),
+                ),
         ),
       ),
     );
@@ -198,8 +222,8 @@ class _ControlBar extends StatelessWidget {
       top: false,
       child: Container(
         // 压缩纵向内边距 + 上间距，降低「重新开始」等控制按钮整体高度占比
-        margin: const EdgeInsets.fromLTRB(10, 4, 10, 8),
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+        margin: const EdgeInsets.fromLTRB(10, 2, 10, 6),
+        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 3),
         decoration: BoxDecoration(
           color: theme.colorScheme.surfaceContainerHighest,
           borderRadius: BorderRadius.circular(16),
@@ -237,20 +261,20 @@ class _ActionLabel extends StatelessWidget {
     final Widget iconWidget = (action.iconAsset != null && action.iconAsset!.isNotEmpty)
         ? SvgPicture.asset(
             'assets/games/items/${action.iconAsset}.svg',
-            width: 20,
-            height: 20,
+            width: 18,
+            height: 18,
           )
-        : Icon(action.icon, size: 18);
+        : Icon(action.icon, size: 16);
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
         iconWidget,
-        const SizedBox(height: 2),
+        const SizedBox(height: 1),
         Text(
           action.badge == null
               ? action.label
               : '${action.label} ×${action.badge}',
-          style: const TextStyle(fontSize: 12),
+          style: const TextStyle(fontSize: 11),
           maxLines: 1,
           overflow: TextOverflow.ellipsis,
         ),

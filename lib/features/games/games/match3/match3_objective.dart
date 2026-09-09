@@ -1,4 +1,5 @@
 import 'dart:math';
+import 'package:flutter/material.dart';
 
 import '../../models/match3_mode.dart';
 
@@ -40,10 +41,13 @@ class ObjectiveStat {
   final String label;
   final String value;
 
-  /// 是否告急（剩余步数/时间不足时标红）
+  /// 是否告急（剩余步数/时间不足时标红；alert 优先于 [color]）
   final bool alert;
 
-  const ObjectiveStat(this.label, this.value, {this.alert = false});
+  /// 语义色（各标识不同颜色表达不同含义，2026-09-09；null = 跟随主题前景）
+  final Color? color;
+
+  const ObjectiveStat(this.label, this.value, {this.alert = false, this.color});
 }
 
 /// 消消乐关卡目标状态机：统一承载 6 种模式的**目标初始化、进度累计、
@@ -94,6 +98,10 @@ class Match3Objective {
 
   /// 已收集数量（旧单目标口径兼容读取，= 首目标 collected）
   int get collected => collectGoals.isEmpty ? 0 : collectGoals.first.collected;
+
+  /// 全部目标的已收集合计（HUD 合计进度项用）
+  int get collectedTotal =>
+      collectGoals.fold(0, (sum, g) => sum + g.collected);
 
   /// Boss 剩余血量（boss）
   int bossLeft = 0;
@@ -330,62 +338,98 @@ class Match3Objective {
     // 限时渲染剩余时间。无关条件数据一律不展示（2026-09-07）。
     final movesAlert = !isTimed && steps > 0 && movesLeft <= 3;
     final timeAlert = isTimed && secondsLeft <= 10;
+    // 语义色：得分琥珀 / 步数蓝 / 时间绿(告急红) / 果冻紫 / 收集绿 / Boss 红
+    const scoreColor = Color(0xFFFFB300);
+    const movesColor = Color(0xFF64B5F6);
+    const timeColor = Color(0xFF66BB6A);
+    const jellyColor = Color(0xFFCE93D8);
+    const collectColor = Color(0xFF66BB6A);
+    const bossColor = Color(0xFFEF5350);
     final ObjectiveStat? moveStat = isTimed
-        ? ObjectiveStat('剩余时间', fmtClock(secondsLeft), alert: timeAlert)
+        ? ObjectiveStat('剩余时间', fmtClock(secondsLeft),
+            alert: timeAlert, color: timeColor)
         : (steps > 0
-            ? ObjectiveStat('剩余步数', '$movesLeft', alert: movesAlert)
+            ? ObjectiveStat('剩余步数', '$movesLeft',
+                alert: movesAlert, color: movesColor)
             : null);
 
     switch (mode) {
       case Match3Mode.score:
       case Match3Mode.timed:
         return <ObjectiveStat>[
-          ObjectiveStat('得分', '$score'),
-          ObjectiveStat('目标', '$goalScore'),
+          ObjectiveStat('得分', '$score', color: scoreColor),
+          ObjectiveStat('目标', '$goalScore', color: scoreColor),
           if (moveStat != null) moveStat,
         ];
       case Match3Mode.clear:
         return <ObjectiveStat>[
-          ObjectiveStat('剩余果冻', '$jellyLeft'),
-          ObjectiveStat('得分', '$score'),
+          ObjectiveStat('剩余果冻', '$jellyLeft', color: jellyColor),
+          ObjectiveStat('得分', '$score', color: scoreColor),
           if (moveStat != null) moveStat,
         ];
       case Match3Mode.collect:
-        // 目标进度改由顶部「目标达成条件」banner 展示（图标×N 实时减少）
+        // 收集进度由顶部「目标达成条件」banner 展示（图标×N 实时减少），
+        // HUD 侧补充一个合计进度项（绿色 = 收集语义）
         return <ObjectiveStat>[
-          ObjectiveStat('得分', '$score'),
+          ObjectiveStat('已收集', '$collectedTotal', color: collectColor),
+          ObjectiveStat('得分', '$score', color: scoreColor),
           if (moveStat != null) moveStat,
         ];
       case Match3Mode.obstacle:
         // 冰块进度由 banner 展示（❄ ×剩余）
         return <ObjectiveStat>[
-          ObjectiveStat('得分', '$score'),
+          ObjectiveStat('剩余冰块', '$iceLeft', color: const Color(0xFF4FC3F7)),
+          ObjectiveStat('得分', '$score', color: const Color(0xFFFFB300)),
           if (moveStat != null) moveStat,
         ];
       case Match3Mode.boss:
         return <ObjectiveStat>[
-          ObjectiveStat('Boss 血量', '$bossLeft/$bossHp'),
-          ObjectiveStat('得分', '$score'),
+          ObjectiveStat('Boss 血量', '$bossLeft/$bossHp',
+              color: const Color(0xFFEF5350)),
+          ObjectiveStat('得分', '$score', color: const Color(0xFFFFB300)),
           if (moveStat != null) moveStat,
         ];
     }
   }
 
-  /// 本局操作提示（底部一行）
-  String get hint {
+  /// 本局通关条件（底部一行，**按本关实际 config 动态生成**，2026-09-09）：
+  /// 列出真实的数量/颜色/步数/时限，替代旧版静态玩法说明。
+  String get conditionHint {
+    // 目标色中文名（与糖果绘制色板同序）
+    const names = <String>['红', '蓝', '绿', '黄', '紫', '橙'];
+    final stepText = isTimed
+        ? '限时 ${seconds} 秒'
+        : (steps > 0 ? '本局 ${steps} 步' : '不限步数');
+
     switch (mode) {
       case Match3Mode.score:
-        return '点选两个相邻糖果交换，三连即消，步数内达到 $goalScore 分';
-      case Match3Mode.clear:
-        return '在带果冻的格子上消除糖果即可清除果冻，清空全部果冻通关';
-      case Match3Mode.collect:
-        return '消除指定颜色糖果累计收集，凑满 $collectTarget 个即通关';
-      case Match3Mode.obstacle:
-        return '冰封格需在其上消除两次才会碎裂，敲碎全部冰块通关';
       case Match3Mode.timed:
-        return '倒计时进行中，抓紧制造连锁，$seconds 秒内达到 $goalScore 分';
+        return '${stepText}，达到 $goalScore 分即通关';
+      case Match3Mode.clear:
+        return '${stepText}，清除全部 $jellyLeft 块果冻即通关';
+      case Match3Mode.collect:
+        // 多目标：列出各色实际数量（与 collect 数组一一对应）
+        if (collectGoals.isEmpty) {
+          return '${stepText}，收集 $collectTarget 个指定糖果即通关';
+        }
+        final parts = <String>[
+          for (final g in collectGoals)
+            '${names[g.type % names.length]}色×${g.count}',
+        ];
+        return '${stepText}，收集 ${parts.join('、')}';
+      case Match3Mode.obstacle:
+        // 冰块（全碎）+ 附加颜色目标（如有）
+        final extra = <String>[
+          for (final g in collectGoals)
+            '${names[g.type % names.length]}色×${g.count}',
+        ];
+        final base = '${stepText}，击碎全部冰块即通关';
+        return extra.isEmpty ? base : '${stepText}，击碎全部冰块并收集 ${extra.join('、')}';
       case Match3Mode.boss:
-        return '每消除 1 个糖果造成 1 点伤害，特殊糖翻倍，打光 Boss 血量通关';
+        return '${stepText}，每次消除造成 1 点伤害（特殊糖翻倍），击破 $bossHp 血量 Boss';
     }
   }
+
+  /// 兼容旧调用点：返回动态通关条件文案。
+  String get hint => conditionHint;
 }

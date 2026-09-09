@@ -283,7 +283,10 @@ class _Match3GameState extends State<Match3Game> {
                 (s) => GameStatusItem(
                   label: s.label,
                   value: s.value,
-                  valueColor: s.alert ? AppTheme.error : null,
+                  // 各标识语义色（objective 定义）；告急时优先红色
+                  valueColor: s.alert
+                      ? AppTheme.error
+                      : s.color,
                 ),
               )
               .toList(),

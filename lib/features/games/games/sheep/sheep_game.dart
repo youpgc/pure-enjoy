@@ -447,8 +447,8 @@ class _SheepGameState extends State<SheepGame> {
           ),
       ],
       hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
-      // 三道具统一收纳到底部控制栏，不再叠在牌堆上方
-      actions: SheepProp.values.map((p) {
+      // 三道具统一收纳到道具栏（主控制栏上方，与其他游戏布局一致）
+      propActions: SheepProp.values.map((p) {
         final avail = (_freeLeft[p] ?? 0) + (_ownedLeft[p] ?? 0);
         final free = _freeLeft[p] ?? 0;
         return GameAction(
