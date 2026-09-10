@@ -264,7 +264,12 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
                     style: TextStyle(color: AppTheme.success))
                 : (h.isCleared
                     ? const Text('通关', style: TextStyle(color: AppTheme.success))
-                    : const Text('未通关')),
+                    // 未通关区分语义：放弃=灰 / 挑战失败=红（2026-09-10）
+                    : (h.status == 'aborted'
+                        ? const Text('放弃',
+                            style: TextStyle(color: AppTheme.neutral500))
+                        : const Text('挑战失败',
+                            style: TextStyle(color: AppTheme.error)))),
           );
         },
       ),

@@ -27,7 +27,8 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
   Map<String, int> _inventory = const <String, int>{};
   int _availablePoints = 0;
   bool _loading = true;
-  bool _busy = false;
+  /// 正在购买中的道具 id（null = 无进行中的购买请求）
+  String? _buyingId;
 
   @override
   void initState() {
@@ -50,18 +51,25 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
   }
 
   Future<void> _buy(GameItemModel item) async {
-    if (_busy) return;
-    setState(() => _busy = true);
+    // 同步购买限制：已有任一购买请求进行中时，点其他按钮仅提示不排队
+    if (_buyingId != null) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('正在购买中...')),
+      );
+      return;
+    }
+    setState(() => _buyingId = item.id);
     final res = await GameItemService.instance.purchase(item);
     if (mounted) {
-      setState(() => _busy = false);
+      final messenger = ScaffoldMessenger.of(context);
+      setState(() => _buyingId = null);
       if (res['success'] == true) {
         await _load();
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(content: Text(res['message'] ?? '购买成功')),
         );
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
+        messenger.showSnackBar(
           SnackBar(
             content: Text(res['message'] ?? '购买失败'),
             backgroundColor: AppTheme.error,
@@ -124,7 +132,7 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
                           item: it,
                           owned: _inventory[it.id] ?? 0,
                           canAfford: _availablePoints >= it.pointCost,
-                          busy: _busy,
+                          buyingId: _buyingId,
                           onBuy: () => _buy(it),
                         )),
                 ],
@@ -138,14 +146,17 @@ class _ItemCard extends StatelessWidget {
   final GameItemModel item;
   final int owned;
   final bool canAfford;
-  final bool busy;
+
+  /// 正在购买中的道具 id：等于本道具 → 按钮转圈；其他道具按钮**不禁用**，
+  /// 点击时由调用方提示「正在购买中...」（2026-09-10 用户拍板）。
+  final String? buyingId;
   final VoidCallback onBuy;
 
   const _ItemCard({
     required this.item,
     required this.owned,
     required this.canAfford,
-    required this.busy,
+    required this.buyingId,
     required this.onBuy,
   });
 
@@ -153,7 +164,9 @@ class _ItemCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final modeLabel =
         item.mode.isEmpty ? '通用' : match3ModeLabelOf(item.mode);
-    final disabled = busy || !canAfford || item.pointCost <= 0;
+    final isBuying = buyingId == item.id;
+    // 仅「买不起/0积分」禁用；其他道具购买中不禁用本按钮（点击提示排队中）
+    final disabled = !canAfford || item.pointCost <= 0;
     return Padding(
       padding: const EdgeInsets.only(bottom: 12),
       child: Card(
@@ -214,7 +227,14 @@ class _ItemCard extends StatelessWidget {
                   const SizedBox(height: 8),
                   FilledButton(
                     onPressed: disabled ? null : onBuy,
-                    child: const Text('购买'),
+                    child: isBuying
+                        ? const SizedBox(
+                            width: 16,
+                            height: 16,
+                            child: CircularProgressIndicator(
+                                strokeWidth: 2, color: Colors.white),
+                          )
+                        : const Text('购买'),
                   ),
                 ],
               ),

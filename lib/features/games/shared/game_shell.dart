@@ -145,7 +145,7 @@ class _PropBar extends StatelessWidget {
           color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
         ),
-        height: 46,
+        height: 56,
         child: Center(
           child: placeholder != null
               ? Text(
@@ -202,9 +202,7 @@ class _PropButton extends StatelessWidget {
           borderRadius: BorderRadius.circular(12),
           onTap: action.onPressed,
           child: Padding(
-            // 压缩纵向内边距：图标+单行文字（约 34px）在 PropBar 内高 40 减去
-            // 此 padding 后的 34px 内恰好放下，FittedBox 兜底极端字体缩放
-            padding: const EdgeInsets.symmetric(vertical: 3),
+            padding: const EdgeInsets.symmetric(vertical: 5),
             child: _ActionLabel(action: action),
           ),
         ),
@@ -240,10 +238,23 @@ class _ControlBar extends StatelessWidget {
                 child: a.primary
                     ? FilledButton(
                         onPressed: a.onPressed,
+                        style: FilledButton.styleFrom(
+                          // 压低主控制按钮高度（2026-09-10：道具栏调高后主栏让出空间）
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: _ActionLabel(action: a),
                       )
                     : FilledButton.tonal(
                         onPressed: a.onPressed,
+                        style: FilledButton.styleFrom(
+                          minimumSize: const Size(0, 40),
+                          padding: const EdgeInsets.symmetric(
+                              horizontal: 8, vertical: 2),
+                          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                        ),
                         child: _ActionLabel(action: a),
                       ),
               ),
@@ -286,7 +297,7 @@ class _ActionLabel extends StatelessWidget {
           const SizedBox(height: 1),
           Text(
             label,
-            style: const TextStyle(fontSize: 11),
+            style: const TextStyle(fontSize: 12),
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
           ),
