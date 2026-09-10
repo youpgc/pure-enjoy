@@ -1,4 +1,5 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 
@@ -31,10 +32,10 @@ class Match3GoalBanner extends StatelessWidget {
       ));
     }
     for (final g in objective.collectGoals) {
-      final color =
-          kCandyColors[g.type.clamp(0, kCandyColors.length - 1)];
+      // 定版动物头像图标（与盘面同源 SVG），替代旧色点——色点在深底上
+      // 辨识度差且与新版图标脱节（2026-09-10 用户反馈「全是黑点」）
       chips.add(_chip(
-        icon: _candyDot(color),
+        icon: _candyIcon(g.type),
         remaining: g.remaining,
         done: g.done,
       ));
@@ -90,16 +91,13 @@ class Match3GoalBanner extends StatelessWidget {
     );
   }
 
-  /// 糖果色块图标（与引擎绘制同源色板）
-  Widget _candyDot(Color color) {
-    return Container(
-      width: 14,
-      height: 14,
-      decoration: BoxDecoration(
-        color: color,
-        shape: BoxShape.circle,
-        border: Border.all(color: Colors.white24, width: 1),
-      ),
+  /// 糖果图标：定版动物头像 SVG（candy_<type>.svg，与盘面渲染同源）
+  Widget _candyIcon(int type) {
+    final t = type.clamp(0, 5);
+    return SvgPicture.asset(
+      'assets/games/match3/candy_$t.svg',
+      width: 22,
+      height: 22,
     );
   }
 }

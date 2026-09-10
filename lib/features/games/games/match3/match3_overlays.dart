@@ -6,9 +6,9 @@ import 'package:flutter/material.dart';
 /// 网格底 → 果冻（糖果**下方**，底层装饰）→ 糖果 → 冰封（糖果**上方**，
 /// 遮罩感）→ 选中框。
 class Match3Overlays {
-  /// 网格底：深色圆角格底 + 浅色细描边（2026-09-10 定版动物头像接入后，
-  /// 白底与彩色头像对比过强刺眼）。格底比底板略亮形成分区，浅色描边
-  /// （白 @10%）勾勒格界突显方块间距；低饱和深底久看不疲劳。
+  /// 网格底：表格样式（2026-09-10 二次调整）——整片深色格底 + 贯通网格线，
+  /// 相邻方格间共享一条线（去圆角、去逐格描边），如同一张表格。
+  /// 内线白 @12% 宽 1、外框白 @20% 宽 1.5；低饱和深底久看不疲劳。
   static void drawGrid(
     Canvas canvas,
     double offsetX,
@@ -18,25 +18,31 @@ class Match3Overlays {
     int cols,
   ) {
     final fill = Paint()..color = const Color(0xFF34344E);
-    final border = Paint()
-      ..color = Colors.white.withValues(alpha: 0.10)
-      ..style = PaintingStyle.stroke
-      ..strokeWidth = 1.2;
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        final rrect = RRect.fromRectAndRadius(
-          Rect.fromLTWH(
-            offsetX + c * cell + cell * 0.03,
-            offsetY + r * cell + cell * 0.03,
-            cell * 0.94,
-            cell * 0.94,
-          ),
-          Radius.circular(cell * 0.18),
-        );
-        canvas.drawRRect(rrect, fill);
-        canvas.drawRRect(rrect, border);
-      }
+    final board = Rect.fromLTWH(offsetX, offsetY, cell * cols, cell * rows);
+    // 整片格底
+    canvas.drawRect(board, fill);
+    // 内部网格线（相邻格共享一条线；宽 1 防半像素发虚）
+    final line = Paint()
+      ..color = Colors.white.withValues(alpha: 0.12)
+      ..strokeWidth = 1;
+    for (var r = 1; r < rows; r++) {
+      final y = offsetY + r * cell;
+      canvas.drawLine(
+          Offset(offsetX, y), Offset(offsetX + cell * cols, y), line);
     }
+    for (var c = 1; c < cols; c++) {
+      final x = offsetX + c * cell;
+      canvas.drawLine(
+          Offset(x, offsetY), Offset(x, offsetY + cell * rows), line);
+    }
+    // 外框（稍亮稍粗，收束边界）
+    canvas.drawRect(
+      board,
+      Paint()
+        ..color = Colors.white.withValues(alpha: 0.20)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 1.5,
+    );
   }
 
   /// 选中高亮：白色描边方框，标出当前待交换的糖块。
