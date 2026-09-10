@@ -90,8 +90,8 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
     );
   }
   // 特殊糖叠加（几何位置以 64 逻辑坐标计，已在 scale 变换内）
-  // 特殊糖表现（2026-09-10 定版样式 B）已上移至格底层：由引擎 render 循环
-  // 调 Match3Overlays.drawSpecialBase 画光带/光环/缎带，不再压在头像脸上。
+  // 特殊糖表现（2026-09-10 定版方案 A「霓虹描边环」）由引擎 render 循环
+  // 在糖果之上调 Match3Overlays.drawSpecialRing 绘制（贴图标圆板外缘）。
   // 提示高亮：白色脉动描边（hintT 为剩余秒数，兼作脉动相位）
   if (candy.hintT > 0) {
     final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);

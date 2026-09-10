@@ -47,12 +47,13 @@ class Match3Overlays {
     );
   }
 
-  /// 特殊糖格底光效（2026-09-10 定版样式 B，画在糖果**下方**的格底层）：
-  /// - row/col：半透明白色光带贯穿整格（圆角 + 细描边）
-  /// - bomb：彩虹六色光环环绕
-  /// - wrap：金色礼盒缎带框（外框 + 十字缎带）
+  /// 特殊糖描边环（2026-09-10 定版方案 A「霓虹描边环」，画在糖果**上方**）：
+  /// 环贴图标圆形底板外缘（r≈0.49 格），不被放大后的图标遮挡。
+  /// - row/col：青色霓虹环（低透明宽环打底 + 细亮环）+ 横/竖白色方向箭头
+  /// - bomb：彩虹六色分段环
+  /// - wrap：金色环 + 四角星光点
   /// [alpha] 跟随糖果消除淡出，保证光效与糖果同生命周期。
-  static void drawSpecialBase(
+  static void drawSpecialRing(
     Canvas canvas,
     double left,
     double top,
@@ -61,27 +62,71 @@ class Match3Overlays {
     double alpha,
   ) {
     if (alpha <= 0.01) return;
+    final center = Offset(left + cell / 2, top + cell / 2);
     switch (special) {
       case 'row':
       case 'col':
         final horizontal = special == 'row';
-        final band = RRect.fromRectAndRadius(
-          horizontal
-              ? Rect.fromLTWH(left + 2, top + cell * 0.30, cell - 4, cell * 0.40)
-              : Rect.fromLTWH(left + cell * 0.30, top + 2, cell * 0.40, cell - 4),
-          const Radius.circular(13),
-        );
-        canvas.drawRRect(
-          band,
-          Paint()..color = Colors.white.withValues(alpha: 0.14 * alpha),
-        );
-        canvas.drawRRect(
-          band,
-          Paint()
-            ..color = Colors.white.withValues(alpha: 0.35 * alpha)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 1.2,
-        );
+        final glow = Paint()
+          ..color = const Color(0xFF4DE1FF).withValues(alpha: 0.25 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.09;
+        final ring = Paint()
+          ..color = const Color(0xFF4DE1FF).withValues(alpha: 0.95 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.04;
+        canvas.drawCircle(center, cell * 0.49, glow);
+        canvas.drawCircle(center, cell * 0.49, ring);
+        final arrow = Paint()
+          ..color = Colors.white.withValues(alpha: alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.04
+          ..strokeCap = StrokeCap.round
+          ..strokeJoin = StrokeJoin.round;
+        // 横条纹：左右外向箭头；竖条纹：上下外向箭头（指示消除方向）
+        if (horizontal) {
+          canvas.drawLine(
+            Offset(left + cell * 0.22, top + cell * 0.42),
+            Offset(left + cell * 0.12, top + cell * 0.50),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.12, top + cell * 0.50),
+            Offset(left + cell * 0.22, top + cell * 0.58),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.78, top + cell * 0.42),
+            Offset(left + cell * 0.88, top + cell * 0.50),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.88, top + cell * 0.50),
+            Offset(left + cell * 0.78, top + cell * 0.58),
+            arrow,
+          );
+        } else {
+          canvas.drawLine(
+            Offset(left + cell * 0.42, top + cell * 0.22),
+            Offset(left + cell * 0.50, top + cell * 0.12),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.50, top + cell * 0.12),
+            Offset(left + cell * 0.58, top + cell * 0.22),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.42, top + cell * 0.78),
+            Offset(left + cell * 0.50, top + cell * 0.88),
+            arrow,
+          );
+          canvas.drawLine(
+            Offset(left + cell * 0.50, top + cell * 0.88),
+            Offset(left + cell * 0.58, top + cell * 0.78),
+            arrow,
+          );
+        }
         break;
       case 'bomb':
         const colors = <Color>[
@@ -92,8 +137,7 @@ class Match3Overlays {
           Color(0xFFAB47BC),
           Color(0xFFFFEE58),
         ];
-        final radius = cell * 0.46;
-        final center = Offset(left + cell / 2, top + cell / 2);
+        final radius = cell * 0.49;
         final sweep = 2 * pi / colors.length;
         for (var i = 0; i < colors.length; i++) {
           canvas.drawArc(
@@ -102,38 +146,47 @@ class Match3Overlays {
             sweep,
             false,
             Paint()
-              ..color = colors[i].withValues(alpha: 0.8 * alpha)
+              ..color = colors[i].withValues(alpha: 0.9 * alpha)
               ..style = PaintingStyle.stroke
-              ..strokeWidth = cell * 0.055
+              ..strokeWidth = cell * 0.045
               ..strokeCap = StrokeCap.round,
           );
         }
         break;
       case 'wrap':
-        final frame = RRect.fromRectAndRadius(
-          Rect.fromLTWH(left + 3, top + 3, cell - 6, cell - 6),
-          Radius.circular(cell * 0.10),
-        );
-        canvas.drawRRect(
-          frame,
-          Paint()
-            ..color = const Color(0xFFFFD54F).withValues(alpha: 0.45 * alpha)
-            ..style = PaintingStyle.stroke
-            ..strokeWidth = 3,
-        );
-        final ribbon = Paint()
-          ..color = const Color(0xFFFFD54F).withValues(alpha: 0.25 * alpha)
-          ..strokeWidth = 3;
-        canvas.drawLine(
-          Offset(left + cell / 2, top + 3),
-          Offset(left + cell / 2, top + cell - 3),
-          ribbon,
-        );
-        canvas.drawLine(
-          Offset(left + 3, top + cell / 2),
-          Offset(left + cell - 3, top + cell / 2),
-          ribbon,
-        );
+        final glow = Paint()
+          ..color = const Color(0xFFFFD54F).withValues(alpha: 0.30 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.09;
+        final ring = Paint()
+          ..color = const Color(0xFFFFD54F).withValues(alpha: 0.95 * alpha)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = cell * 0.04;
+        canvas.drawCircle(center, cell * 0.49, glow);
+        canvas.drawCircle(center, cell * 0.49, ring);
+        // 四角星光点（45° 方位，落在图标圆板外的四角空隙）
+        const double d = 0.346; // 0.5 * cos45°，星点到格心距离系数
+        const double s = 0.05; // 星点半对角
+        final star = Paint()
+          ..color = const Color(0xFFFFF9E1).withValues(alpha: alpha);
+        for (final (dx, dy) in const <(double, double)>[
+          (-d, -d),
+          (d, -d),
+          (-d, d),
+          (d, d),
+        ]) {
+          final cx = left + cell * (0.5 + dx);
+          final cy = top + cell * (0.5 + dy);
+          canvas.drawPath(
+            Path()
+              ..moveTo(cx, cy - cell * s)
+              ..lineTo(cx + cell * s, cy)
+              ..lineTo(cx, cy + cell * s)
+              ..lineTo(cx - cell * s, cy)
+              ..close(),
+            star,
+          );
+        }
         break;
     }
   }

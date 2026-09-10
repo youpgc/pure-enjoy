@@ -239,23 +239,6 @@ class Match3FlameGame extends FlameGame
     );
     if (!_loaded) return; // 盘面/目标层尚未就绪
     Match3Overlays.drawGrid(canvas, _offsetX, _offsetY, _cell, rows, cols);
-    // 特殊糖格底光效（2026-09-10 定版样式 B：光带/光环/缎带，在糖果下方）
-    for (var r = 0; r < rows; r++) {
-      for (var c = 0; c < cols; c++) {
-        final cand = grid[r][c];
-        if (cand == null || cand.special.isEmpty) continue;
-        final alpha =
-            cand.dying ? cand.dyingAlpha.clamp(0.0, 1.0) : 1.0;
-        Match3Overlays.drawSpecialBase(
-          canvas,
-          _offsetX + c * _cell,
-          _offsetY + r * _cell,
-          _cell,
-          cand.special,
-          alpha,
-        );
-      }
-    }
     // 果冻底层（在糖果下方）
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
@@ -269,6 +252,24 @@ class Match3FlameGame extends FlameGame
       for (var c = 0; c < cols; c++) {
         final cand = grid[r][c];
         if (cand != null) drawCandy(canvas, cand, _cell, _palette[cand.type]);
+      }
+    }
+    // 特殊糖描边环（2026-09-10 定版方案 A「霓虹描边环」：贴图标圆形底板外缘，
+    // 画在糖果上方——格底层方案会被放大后占满整格的图标完全遮挡）
+    for (var r = 0; r < rows; r++) {
+      for (var c = 0; c < cols; c++) {
+        final cand = grid[r][c];
+        if (cand == null || cand.special.isEmpty) continue;
+        final alpha =
+            cand.dying ? cand.dyingAlpha.clamp(0.0, 1.0) : 1.0;
+        Match3Overlays.drawSpecialRing(
+          canvas,
+          _offsetX + c * _cell,
+          _offsetY + r * _cell,
+          _cell,
+          cand.special,
+          alpha,
+        );
       }
     }
     // 冰封盖层（在糖果上方）
