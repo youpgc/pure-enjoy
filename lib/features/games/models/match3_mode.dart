@@ -160,9 +160,8 @@ extension Match3ModeMeta on Match3Mode {
 Match3Mode parseMatch3Mode(Map<String, dynamic> config, int levelNo) {
   final raw = config['mode'];
   if (raw is String && raw.isNotEmpty) {
-    for (final m in Match3Mode.values) {
-      if (m.code == raw) return m;
-    }
+    final m = match3ModeFromAnyCode(raw);
+    if (m != null) return m;
   }
   // 04 种子 config 携带语义键，无需 mode 字段即可判定（兜底鲁棒）
   if (config.containsKey('time_limit')) return Match3Mode.timed;
@@ -186,6 +185,22 @@ Match3Mode? match3ModeFromPlayKind(String? playKind) {
     if (m.code == playKind) return m;
   }
   return null;
+}
+
+/// 兼容早期占位命名的模式编码（game_modes.code / config.mode 可能残留）：
+/// match=计分 / jelly=消除 / ingredient=收集 / order=破冰(obstacle) /
+/// blended=Boss(boss)（2026-09-07 实证：DB code 是早期占位命名，勿按字面推断）。
+/// 引擎 6 行为码本身也原样可解析。无法识别返回 null。
+Match3Mode? match3ModeFromAnyCode(String? code) {
+  if (code == null || code.isEmpty) return null;
+  const Map<String, Match3Mode> legacy = <String, Match3Mode>{
+    'match': Match3Mode.score,
+    'jelly': Match3Mode.clear,
+    'ingredient': Match3Mode.collect,
+    'order': Match3Mode.obstacle,
+    'blended': Match3Mode.boss,
+  };
+  return legacy[code] ?? match3ModeFromPlayKind(code);
 }
 
 /// 综合解析：优先 play_kind（后台语义，唯一真相源），

@@ -371,7 +371,8 @@ class GameScoreService {
       final result = await ApiClient.get(
         'game_scores',
         select:
-            'id,level_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
+            // mode_id 供「各模式最佳成绩」分组（无尽合成局 level_id 为 null，须靠主记录 mode_id）
+            'id,level_id,mode_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
         filters: <String, String>{
           'user_id': 'eq.$userId',
           'game_id': 'eq.$gameId',
