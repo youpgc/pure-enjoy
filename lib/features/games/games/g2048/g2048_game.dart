@@ -28,7 +28,16 @@ class G2048Game extends StatefulWidget {
   /// 当前关卡（含 size / target 配置）
   final GameLevelModel level;
 
-  G2048Game({super.key, required this.onFinished, required this.level});
+  /// 宿主重开回调（2026-09-10 审查补接线：走 GamePlayScreen._restartGame，
+  /// aborted 上报 + 引擎重建，与消消乐同口径；null 时重开按钮禁用）
+  final VoidCallback? onRestart;
+
+  G2048Game({
+    super.key,
+    required this.onFinished,
+    required this.level,
+    this.onRestart,
+  });
 
   @override
   State<G2048Game> createState() => _G2048GameState();
@@ -87,7 +96,10 @@ class _G2048GameState extends State<G2048Game> {
 
   Timer? _tickTimer;
   int _nextId = 1;
-  late final DateTime _startTime;
+
+  /// 本局起始时刻（**非 final**：重开必须重置——否则限时关重开时 elapsed
+  /// 已超限立即判负、duration_ms 含上一局时长，2026-09-10 审查修复）
+  DateTime _startTime = DateTime.now();
   final Random _rng = Random();
 
   /// 最高分持久化 key（按关卡号区分，避免不同关卡共用同一最高分）
@@ -175,6 +187,7 @@ class _G2048GameState extends State<G2048Game> {
     _reachedTarget = false;
     _bonusSeconds = 0; // 道具加时不跨局保留
     _movesBonus = 0; // 道具加步不跨局保留
+    _startTime = DateTime.now(); // 计时基准随新局重置（限时判定/duration 口径）
     _startTimer();
     _spawn();
     _spawn();
@@ -496,7 +509,8 @@ class _G2048GameState extends State<G2048Game> {
   }
 
   /// 重新开始按钮：进行中需二次确认，避免误触丢失当前进度。
-  Future<void> _confirmNewGame() async {
+  /// 确认后交宿主 [_restartGame]（aborted 上报 + nonce 重建引擎），与消消乐同口径。
+  Future<void> _confirmRestartViaHost() async {
     final sure = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -514,7 +528,7 @@ class _G2048GameState extends State<G2048Game> {
         ],
       ),
     );
-    if (sure == true && mounted) setState(_reset);
+    if (sure == true && mounted) widget.onRestart?.call();
   }
 
   /// 按累计位移判定滑动方向。
@@ -601,7 +615,9 @@ class _G2048GameState extends State<G2048Game> {
           // 三游戏统一文案（2026-09-10）：原「新游戏」与消消乐「重新开始」不一致
           label: '重新开始',
           primary: true,
-          onPressed: _finished ? () => setState(_reset) : _confirmNewGame,
+          // 重开统一走宿主 _restartGame（aborted 上报 + 引擎重建），与消消乐同口径；
+          // 未接宿主时禁用（GameFlow 体系恒传入，防御性兜底）
+          onPressed: widget.onRestart == null ? null : _confirmRestartViaHost,
         ),
       ],
       content: LayoutBuilder(

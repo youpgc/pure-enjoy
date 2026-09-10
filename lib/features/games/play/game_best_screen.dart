@@ -91,12 +91,15 @@ class _GameBestScreenState extends State<GameBestScreen> {
     final levelById = <String, GameLevelModel>{
       for (final lv in snapshot.levelsOf(widget.game.id)) lv.id: lv,
     };
-    // 主维度（最佳成绩取值维度）：优先 isPrimary，缺失回落第一个维度
+    // 主维度（最佳成绩取值维度）：优先 isPrimary，缺失回落第一个维度；
+    // 维度未配置时置 null（后台漏配维度防崩，仅展示通关次数）
     final dims = snapshot.dimensionsOf(widget.game.id);
-    final GameDimensionModel primary = dims.firstWhere(
-      (d) => d.isPrimary,
-      orElse: () => dims.first,
-    );
+    final GameDimensionModel? primary = dims.isEmpty
+        ? null
+        : dims.firstWhere(
+            (d) => d.isPrimary,
+            orElse: () => dims.first,
+          );
 
     final entries =
         await GameScoreService.instance.fetchScoresWithValues(widget.game.id);
@@ -124,15 +127,15 @@ class _GameBestScreenState extends State<GameBestScreen> {
                 fallbackIcon: Icons.grid_view_rounded,
               ),
       );
-      final v = e.valueOf(primary.code);
-      if (v != null) {
-        if (!mb.hasValue) {
-          mb.bestValue = v;
-          mb.hasValue = true;
-        } else if (primary.isLowerBetter
-            ? v < mb.bestValue
-            : v > mb.bestValue) {
-          mb.bestValue = v;
+      if (primary != null) {
+        final v = e.valueOf(primary.code);
+        if (v != null) {
+          if (!mb.hasValue) {
+            mb.bestValue = v;
+            mb.hasValue = true;
+          } else if (primary.isLowerBetter ? v < mb.bestValue : v > mb.bestValue) {
+            mb.bestValue = v;
+          }
         }
       }
       if (e.score.isCleared) mb.clears++;
@@ -202,10 +205,12 @@ class _GameBestScreenState extends State<GameBestScreen> {
     }
     final snapshot = GameService.instance.cachedConfig;
     final dims = snapshot.dimensionsOf(widget.game.id);
-    final GameDimensionModel primary = dims.firstWhere(
-      (d) => d.isPrimary,
-      orElse: () => dims.first,
-    );
+    final GameDimensionModel? primary = dims.isEmpty
+        ? null
+        : dims.firstWhere(
+            (d) => d.isPrimary,
+            orElse: () => dims.first,
+          );
     return Card(
       child: Padding(
         padding: const EdgeInsets.all(16),
@@ -222,13 +227,14 @@ class _GameBestScreenState extends State<GameBestScreen> {
                               style: const TextStyle(
                                   fontWeight: FontWeight.bold)),
                         ),
-                        Text(
-                          '${primary.isLowerBetter ? '最快' : '最高'} ${_fmtBest(m, primary)}',
-                          style: const TextStyle(
-                            fontWeight: FontWeight.bold,
-                            color: AppTheme.success,
+                        if (primary != null)
+                          Text(
+                            '${primary.isLowerBetter ? '最快' : '最高'} ${_fmtBest(m, primary)}',
+                            style: const TextStyle(
+                              fontWeight: FontWeight.bold,
+                              color: AppTheme.success,
+                            ),
                           ),
-                        ),
                         const SizedBox(width: 12),
                         Text('通关 ${m.clears} 次',
                             style: const TextStyle(

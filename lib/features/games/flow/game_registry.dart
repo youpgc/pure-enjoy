@@ -53,7 +53,6 @@ class _SheepAdapter extends GameFlowAdapter {
       );
 
   @override
-  @override
   Widget buildEngine({
     required Key key,
     required GameModel game,
@@ -80,7 +79,6 @@ class _G2048Adapter extends GameFlowAdapter {
       );
 
   @override
-  @override
   Widget buildEngine({
     required Key key,
     required GameModel game,
@@ -88,7 +86,14 @@ class _G2048Adapter extends GameFlowAdapter {
     required ValueChanged<GamePlayOutcome> onFinished,
     required VoidCallback onRestart,
   }) {
-    return G2048Game(key: key, onFinished: onFinished, level: level);
+    // onRestart 接线（2026-09-10 审查修复）：引擎内「重新开始」统一走宿主
+    // _restartGame（aborted 上报 + 重建），此前缺失导致 2048 重开不上报放弃。
+    return G2048Game(
+      key: key,
+      onFinished: onFinished,
+      level: level,
+      onRestart: onRestart,
+    );
   }
 }
 
@@ -105,7 +110,6 @@ class _Match3Adapter extends GameFlowAdapter {
         name: '计分模式',
       );
 
-  @override
   @override
   Widget buildEngine({
     required Key key,

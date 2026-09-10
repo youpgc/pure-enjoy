@@ -46,27 +46,29 @@ class _GameHallPageState extends State<GameHallPage> {
   /// 静默失败保留已展示的旧数据（空快照不覆盖非空缓存）。
   Future<void> _load({bool refresh = false}) async {
     // 1) 缓存先行：仅当页面尚无数据（未命中）时读持久缓存，命中即渲染
-    if (_config == null && _best.isEmpty) {
+    if (_games.isEmpty && _best.isEmpty) {
       final cachedConfig = await GameService.instance.loadCachedConfig();
       final cachedBest = await GameScoreService.instance.loadCachedBestScores();
-      if (mounted && (cachedConfig != null || cachedBest.isNotEmpty)) {
+      if (cachedConfig != null || cachedBest.isNotEmpty) {
         final games = cachedConfig != null
             ? await _filterVisibleGames(cachedConfig.games)
             : <GameModel>[];
-        setState(() {
-          if (cachedConfig != null) _games = games;
-          if (cachedBest.isNotEmpty) _best = cachedBest;
-          _loading = false;
-        });
+        if (mounted) {
+          setState(() {
+            if (cachedConfig != null) _games = games;
+            if (cachedBest.isNotEmpty) _best = cachedBest;
+            _loading = false;
+          });
+        }
       }
     }
 
     // 2) 静默请求 / 下拉强拉：成功后更新缓存（service 内部已回写）与展示
     final config = await GameService.instance.fetchConfig(force: refresh);
     final best = await GameScoreService.instance.fetchBestScores();
+    final games = await _filterVisibleGames(config.games);
     if (!mounted) return;
     // 静默失败（空快照）不覆盖已展示的非空缓存，避免刷新把页面打空
-    final games = await _filterVisibleGames(config.games);
     setState(() {
       if (games.isNotEmpty || _games.isEmpty) _games = games;
       if (best.isNotEmpty || _best.isEmpty) _best = best;
