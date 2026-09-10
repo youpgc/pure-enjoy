@@ -236,7 +236,7 @@ class GameService {
   /// 压缩快照载荷——1200 关为主载荷，每行省一字段都是量级收益）。
   static const Map<String, String> _tableSelects = <String, String>{
     'games':
-        'id,code,name,icon,description,intro,rules,engine,enabled,sort_order,config,version,level_selectable,level_select_mode',
+        'id,code,name,icon,description,intro,rules,engine,enabled,sort_order,config,version,level_selectable,level_select_mode,test_only',
     'game_dimensions':
         'id,game_id,code,name,unit,value_type,aggregate,is_primary,sort_order',
     'game_levels':

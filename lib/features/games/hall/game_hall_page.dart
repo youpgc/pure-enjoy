@@ -19,7 +19,8 @@ class GameHallPage extends StatefulWidget {
 }
 
 class _GameHallPageState extends State<GameHallPage> {
-  GameConfigSnapshot? _config;
+  /// 大厅展示的游戏（已按 test_only + 资源匹配过滤）
+  List<GameModel> _games = <GameModel>[];
   List<GameBestScore> _best = <GameBestScore>[];
   bool _loading = true;
 
@@ -27,6 +28,16 @@ class _GameHallPageState extends State<GameHallPage> {
   void initState() {
     super.initState();
     _load();
+  }
+
+  /// 测试游戏过滤（2026-09-10）：test_only=true 且本包**没有**匹配到该游戏
+  /// 的图标资源 → 隐藏（生产包）；资源能匹配 = 测试/开发包 → 展示。
+  Future<List<GameModel>> _filterVisibleGames(List<GameModel> all) async {
+    final out = <GameModel>[];
+    for (final g in all) {
+      if (!g.testOnly || await hasBundledGameAsset(g.icon)) out.add(g);
+    }
+    return out;
   }
 
   /// SWR 加载（2026-09-07）：缓存命中立即展示（不等网络），随后静默请求
@@ -39,8 +50,11 @@ class _GameHallPageState extends State<GameHallPage> {
       final cachedConfig = await GameService.instance.loadCachedConfig();
       final cachedBest = await GameScoreService.instance.loadCachedBestScores();
       if (mounted && (cachedConfig != null || cachedBest.isNotEmpty)) {
+        final games = cachedConfig != null
+            ? await _filterVisibleGames(cachedConfig.games)
+            : <GameModel>[];
         setState(() {
-          if (cachedConfig != null) _config = cachedConfig;
+          if (cachedConfig != null) _games = games;
           if (cachedBest.isNotEmpty) _best = cachedBest;
           _loading = false;
         });
@@ -51,9 +65,10 @@ class _GameHallPageState extends State<GameHallPage> {
     final config = await GameService.instance.fetchConfig(force: refresh);
     final best = await GameScoreService.instance.fetchBestScores();
     if (!mounted) return;
+    // 静默失败（空快照）不覆盖已展示的非空缓存，避免刷新把页面打空
+    final games = await _filterVisibleGames(config.games);
     setState(() {
-      // 静默失败（空快照）不覆盖已展示的非空缓存，避免刷新把页面打空
-      if (config.games.isNotEmpty || _config == null) _config = config;
+      if (games.isNotEmpty || _games.isEmpty) _games = games;
       if (best.isNotEmpty || _best.isEmpty) _best = best;
       _loading = false;
     });
@@ -88,7 +103,7 @@ class _GameHallPageState extends State<GameHallPage> {
 
   @override
   Widget build(BuildContext context) {
-    final games = _config?.games ?? <GameModel>[];
+    final games = _games;
 
     return Scaffold(
       appBar: AppBar(

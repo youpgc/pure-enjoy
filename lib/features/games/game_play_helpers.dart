@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:flutter/services.dart';
 
 import 'models/game_dimension_model.dart';
 import 'models/game_level_model.dart';
@@ -9,6 +10,31 @@ import 'play/game_settlement_sheet.dart';
 import 'services/game_reward_service.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
+
+/// 打包进本 App 的资源清单缓存（进程内一次加载）。
+Set<String>? _bundledAssetCache;
+
+/// 判断本 App 是否打包了某游戏的图标资源（`assets/games/icons/<icon>.svg`）。
+///
+/// 用途：**测试环境判定**（2026-09-10）——后台 games.test_only=true 的游戏
+/// 只在「打包了对应资源」的测试/开发包里展示（资源能匹配 = 本包是为该游戏
+/// 打的测试包）；生产包未打包其资源 → 不展示。
+/// [icon] 为 games.icon 原始文件名（不做 legacy 回退——回退会让资源判定失真）。
+Future<bool> hasBundledGameAsset(String? icon) async {
+  if (icon == null || icon.isEmpty) return false;
+  final asset = 'assets/games/icons/$icon.svg';
+  final cache = _bundledAssetCache;
+  if (cache == null) {
+    try {
+      final manifest = await AssetManifest.loadFromAssetBundle(rootBundle);
+      _bundledAssetCache = manifest.listAssets().toSet();
+    } catch (e) {
+      debugPrint('[game_play_helpers] 资源清单加载失败：$e');
+      _bundledAssetCache = <String>{};
+    }
+  }
+  return _bundledAssetCache!.contains(asset);
+}
 
 /// 游戏结果（供游戏页回传结算）
 class GamePlayOutcome {

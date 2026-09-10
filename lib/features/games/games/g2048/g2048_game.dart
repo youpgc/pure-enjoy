@@ -207,6 +207,26 @@ class _G2048GameState extends State<G2048Game> {
     return max(0, _timeLimit! + _bonusSeconds - elapsed ~/ 1000);
   }
 
+  /// 道具按钮构建（与消消乐同口径）：目录已载入即渲染（0 库存禁用态），
+  /// 有额度才可点击。
+  GameAction _buildPropAction(
+    String itemType, {
+    required IconData icon,
+    required String label,
+  }) {
+    final s = _props.slot(itemType);
+    return GameAction(
+      icon: icon,
+      iconAsset: (s?.item?.icon != null && s!.item!.icon!.isNotEmpty)
+          ? s.item!.icon
+          : null,
+      label: label,
+      badge: '${s?.total ?? 0}',
+      extraTag: (s?.free ?? 0) > 0 ? '免${s!.free}' : null,
+      onPressed: (s?.available ?? false) ? () => _confirmProp(itemType) : null,
+    );
+  }
+
   /// 使用道具前的确认弹窗（即时型：确认即执行并扣券）。
   Future<void> _confirmProp(String itemType) async {
     final s = _props.slot(itemType);
@@ -558,29 +578,21 @@ class _G2048GameState extends State<G2048Game> {
           ),
       ],
       hint: '在棋盘上朝上下左右拖动，相同数字相撞即合并（无需点击）',
-      // 道具栏（2026-09-10）：限时模式加时卡 / 挑战模式加步卡，数据驱动
+      // 道具栏（2026-09-10）：限时模式加时卡 / 挑战模式加步卡，数据驱动。
+      // 渲染条件与消消乐同口径：目录已载入即展示（0 库存为禁用态，引导购买），
+      // 经典/无尽无时间/步数概念 → 道具栏为空 → 仅空白占位行。
       propActions: <GameAction>[
-        if (_timeLimit != null && (_props.slot('add_time')?.available ?? false))
-          GameAction(
+        if (_timeLimit != null)
+          _buildPropAction(
+            'add_time',
             icon: Icons.timer_outlined,
-            iconAsset: _props.slot('add_time')!.item?.icon,
             label: '加时卡',
-            badge: '${_props.slot('add_time')!.total}',
-            extraTag: _props.slot('add_time')!.free > 0
-                ? '免${_props.slot('add_time')!.free}'
-                : null,
-            onPressed: () => _confirmProp('add_time'),
           ),
-        if (_movesLimit != null && (_props.slot('add_steps')?.available ?? false))
-          GameAction(
+        if (_movesLimit != null)
+          _buildPropAction(
+            'add_steps',
             icon: Icons.exposure_plus_1,
-            iconAsset: _props.slot('add_steps')!.item?.icon,
             label: '加步卡',
-            badge: '${_props.slot('add_steps')!.total}',
-            extraTag: _props.slot('add_steps')!.free > 0
-                ? '免${_props.slot('add_steps')!.free}'
-                : null,
-            onPressed: () => _confirmProp('add_steps'),
           ),
       ],
       actions: <GameAction>[
