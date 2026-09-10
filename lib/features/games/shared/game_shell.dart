@@ -265,6 +265,8 @@ class _ActionLabel extends StatelessWidget {
             'assets/games/items/${action.iconAsset}.svg',
             width: 18,
             height: 18,
+            // 资产缺失兜底：回退内置图标（后台 icon 配错文件名时防崩）
+            errorBuilder: (_, __, ___) => Icon(action.icon, size: 16),
           )
         : Icon(action.icon, size: 16);
     // 角标信息合并为单行文字（「名称 ×3 免1」），避免多行导致 PropBar 纵向溢出
@@ -356,6 +358,8 @@ class PropIcon extends StatelessWidget {
         'assets/games/items/$iconAsset.svg',
         width: size,
         height: size,
+        // 资产缺失兜底：回退内置图标（后台 icon 配错文件名时防崩）
+        errorBuilder: (_, __, ___) => Icon(icon, size: size),
       );
     }
     return Icon(icon, size: size);
