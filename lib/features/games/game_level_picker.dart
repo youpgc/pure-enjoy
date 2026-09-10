@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import 'game_play_helpers.dart';
+import 'services/game_score_service.dart';
 import 'game_play_screen.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
@@ -68,7 +69,12 @@ class _PickerBodyState extends State<_PickerBody> {
 
   /// 关卡清单与初始定位项（frontier）在 initState 一次算定
   late final List<GameLevelModel> _list;
-  late final int _frontierIdx;
+  late int _frontierIdx;
+
+  /// 已通关关卡集合：以调用方传入集合为初值，**弹窗打开时强制重拉**——
+  /// 对局完成返回后主界面虽会 force 刷新，但结算上报与刷新可能竞态，
+  /// 选关打开时再拉一次保证已通关/锁状态数据最新（2026-09-10 用户反馈）。
+  late Set<String> _cleared;
 
   /// ListTile 默认高度（56）；用于打开时滚动定位的偏移估算
   static const double _itemExtent = 56.0;
@@ -76,6 +82,7 @@ class _PickerBodyState extends State<_PickerBody> {
   @override
   void initState() {
     super.initState();
+    _cleared = {...widget.clearedIds};
     _list = widget.mode != null
         ? _levelsOfModeId(widget.mode!.id)
         : widget.levels;
@@ -87,6 +94,29 @@ class _PickerBodyState extends State<_PickerBody> {
           _frontierIdx * _itemExtent - _scroll.position.viewportDimension / 2 + _itemExtent / 2;
       _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
     });
+    _refreshCleared();
+  }
+
+  /// 强制重拉已通关集合；合并成功后重算 frontier 并重新居中定位
+  Future<void> _refreshCleared() async {
+    try {
+      final fresh =
+          await GameScoreService.instance.fetchClearedLevelIds(widget.game.id);
+      if (!mounted || fresh.isEmpty) return;
+      setState(() {
+        _cleared.addAll(fresh);
+        _frontierIdx = _frontierIdxOf(_list);
+      });
+      // frontier 前移时重新居中
+      if (_scroll.hasClients) {
+        final target = _frontierIdx * _itemExtent -
+            _scroll.position.viewportDimension / 2 +
+            _itemExtent / 2;
+        _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
+      }
+    } catch (_) {
+      // 刷新失败保持调用方传入的集合（不影响弹窗展示）
+    }
   }
 
   @override
@@ -107,14 +137,14 @@ class _PickerBodyState extends State<_PickerBody> {
   /// 指定模式已通关数量
   int _modeClearedById(String modeId) {
     final ids = _levelsOfModeId(modeId).map((l) => l.id).toSet();
-    return widget.clearedIds.where(ids.contains).length;
+    return _cleared.where(ids.contains).length;
   }
 
   /// 列表中「最新可挑战关卡(frontier)」索引（gated 用）
   int _frontierIdxOf(List<GameLevelModel> list) {
     int maxCleared = -1;
     for (int i = 0; i < list.length; i++) {
-      if (widget.clearedIds.contains(list[i].id)) maxCleared = i;
+      if (_cleared.contains(list[i].id)) maxCleared = i;
     }
     return maxCleared < 0 ? 0 : maxCleared + 1;
   }
@@ -135,7 +165,7 @@ class _PickerBodyState extends State<_PickerBody> {
 
     bool canSelect(int i) {
       if (widget.game.levelSelectMode == 'free') return true; // 直接选关
-      if (widget.clearedIds.contains(list[i].id)) return true; // 已通关可重挑战
+      if (_cleared.contains(list[i].id)) return true; // 已通关可重挑战
       return i == frontierIdx; // 最新可挑战关卡
     }
 
@@ -168,7 +198,7 @@ class _PickerBodyState extends State<_PickerBody> {
                 final i = entry.key;
                 final lv = entry.value;
                 final selectable = canSelect(i);
-                final cleared = widget.clearedIds.contains(lv.id);
+                final cleared = _cleared.contains(lv.id);
                 return ListTile(
                   leading: !selectable
                       ? const Icon(Icons.lock_outline, color: AppTheme.neutral500)

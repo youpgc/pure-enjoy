@@ -1,3 +1,5 @@
+import 'dart:math' show pi;
+
 import 'package:flutter/material.dart';
 
 /// 关卡目标叠加层与盘面底衬绘制（网格底 / 果冻底 / 冰封盖 / 选中框）。
@@ -43,6 +45,97 @@ class Match3Overlays {
         ..style = PaintingStyle.stroke
         ..strokeWidth = 1.5,
     );
+  }
+
+  /// 特殊糖格底光效（2026-09-10 定版样式 B，画在糖果**下方**的格底层）：
+  /// - row/col：半透明白色光带贯穿整格（圆角 + 细描边）
+  /// - bomb：彩虹六色光环环绕
+  /// - wrap：金色礼盒缎带框（外框 + 十字缎带）
+  /// [alpha] 跟随糖果消除淡出，保证光效与糖果同生命周期。
+  static void drawSpecialBase(
+    Canvas canvas,
+    double left,
+    double top,
+    double cell,
+    String special,
+    double alpha,
+  ) {
+    if (alpha <= 0.01) return;
+    switch (special) {
+      case 'row':
+      case 'col':
+        final horizontal = special == 'row';
+        final band = RRect.fromRectAndRadius(
+          horizontal
+              ? Rect.fromLTWH(left + 2, top + cell * 0.30, cell - 4, cell * 0.40)
+              : Rect.fromLTWH(left + cell * 0.30, top + 2, cell * 0.40, cell - 4),
+          const Radius.circular(13),
+        );
+        canvas.drawRRect(
+          band,
+          Paint()..color = Colors.white.withValues(alpha: 0.14 * alpha),
+        );
+        canvas.drawRRect(
+          band,
+          Paint()
+            ..color = Colors.white.withValues(alpha: 0.35 * alpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 1.2,
+        );
+        break;
+      case 'bomb':
+        const colors = <Color>[
+          Color(0xFFEF5350),
+          Color(0xFFFFA726),
+          Color(0xFF66BB6A),
+          Color(0xFF42A5F5),
+          Color(0xFFAB47BC),
+          Color(0xFFFFEE58),
+        ];
+        final radius = cell * 0.46;
+        final center = Offset(left + cell / 2, top + cell / 2);
+        final sweep = 2 * pi / colors.length;
+        for (var i = 0; i < colors.length; i++) {
+          canvas.drawArc(
+            Rect.fromCircle(center: center, radius: radius),
+            -pi / 2 + i * sweep,
+            sweep,
+            false,
+            Paint()
+              ..color = colors[i].withValues(alpha: 0.8 * alpha)
+              ..style = PaintingStyle.stroke
+              ..strokeWidth = cell * 0.055
+              ..strokeCap = StrokeCap.round,
+          );
+        }
+        break;
+      case 'wrap':
+        final frame = RRect.fromRectAndRadius(
+          Rect.fromLTWH(left + 3, top + 3, cell - 6, cell - 6),
+          Radius.circular(cell * 0.10),
+        );
+        canvas.drawRRect(
+          frame,
+          Paint()
+            ..color = const Color(0xFFFFD54F).withValues(alpha: 0.45 * alpha)
+            ..style = PaintingStyle.stroke
+            ..strokeWidth = 3,
+        );
+        final ribbon = Paint()
+          ..color = const Color(0xFFFFD54F).withValues(alpha: 0.25 * alpha)
+          ..strokeWidth = 3;
+        canvas.drawLine(
+          Offset(left + cell / 2, top + 3),
+          Offset(left + cell / 2, top + cell - 3),
+          ribbon,
+        );
+        canvas.drawLine(
+          Offset(left + 3, top + cell / 2),
+          Offset(left + cell - 3, top + cell / 2),
+          ribbon,
+        );
+        break;
+    }
   }
 
   /// 选中高亮：白色描边方框，标出当前待交换的糖块。

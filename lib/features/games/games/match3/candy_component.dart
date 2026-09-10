@@ -90,28 +90,8 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
     );
   }
   // 特殊糖叠加（几何位置以 64 逻辑坐标计，已在 scale 变换内）
-  switch (candy.special) {
-    case 'row':
-      _drawStripes(canvas, 32, 32, 26, true, a);
-      break;
-    case 'col':
-      _drawStripes(canvas, 32, 32, 26, false, a);
-      break;
-    case 'bomb':
-      _drawBomb(canvas, 32, 32, 22, a);
-      break;
-    case 'wrap':
-      canvas.drawCircle(
-        Offset(32, 32),
-        27,
-        Paint()
-          ..isAntiAlias = true
-          ..color = Colors.white.withValues(alpha: 0.85 * a)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 4,
-      );
-      break;
-  }
+  // 特殊糖表现（2026-09-10 定版样式 B）已上移至格底层：由引擎 render 循环
+  // 调 Match3Overlays.drawSpecialBase 画光带/光环/缎带，不再压在头像脸上。
   // 提示高亮：白色脉动描边（hintT 为剩余秒数，兼作脉动相位）
   if (candy.hintT > 0) {
     final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);
@@ -150,28 +130,6 @@ Future<void> precacheCandyPictures() async {
   }
 }
 
-void _drawStripes(Canvas canvas, double cx, double cy, double r, bool horizontal, double a) {
-  final paint = Paint()
-      ..isAntiAlias = true
-    ..color = Colors.white.withValues(alpha: 0.8 * a)
-    ..strokeWidth = r * 0.18
-    ..strokeCap = StrokeCap.round;
-  for (var i = -1; i <= 1; i++) {
-    if (horizontal) {
-      canvas.drawLine(
-        Offset(cx - r * 0.7, cy + i * r * 0.4),
-        Offset(cx + r * 0.7, cy + i * r * 0.4),
-        paint,
-      );
-    } else {
-      canvas.drawLine(
-        Offset(cx + i * r * 0.4, cy - r * 0.7),
-        Offset(cx + i * r * 0.4, cy + r * 0.7),
-        paint,
-      );
-    }
-  }
-}
 
 /// 糖果基础色板（index 即 cell.type / 收集目标 collectType 的取值域），
 /// HUD「目标糖果」展示与绘制共用，保证颜色一致。
@@ -187,27 +145,6 @@ const List<Color> kCandyColors = <Color>[
 /// 色板对应的中文名（收集模式 HUD 展示用）
 const List<String> kCandyColorNames = <String>['红', '蓝', '绿', '黄', '紫', '橙'];
 
-void _drawBomb(Canvas canvas, double cx, double cy, double r, double a) {
-  final colors = kCandyColors;
-  for (var i = 0; i < colors.length; i++) {
-    canvas.drawArc(
-      Rect.fromCircle(center: Offset(cx, cy), radius: r * 0.7),
-      i * 2 * pi / colors.length,
-      2 * pi / colors.length,
-      true,
-      Paint()
-      ..isAntiAlias = true
-      ..color = colors[i].withValues(alpha: a),
-    );
-  }
-  canvas.drawCircle(
-    Offset(cx, cy),
-    r * 0.32,
-    Paint()
-      ..isAntiAlias = true
-      ..color = Colors.white.withValues(alpha: a),
-  );
-}
 
 extension _ColorDarken on Color {
   Color darken(double amount) {
