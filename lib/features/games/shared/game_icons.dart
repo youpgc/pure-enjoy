@@ -4,7 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 /// 统一卡通图标集（矢量 SVG，无位图资源、无版权）。
 ///
 /// 图标文件由两端共用：
-/// - App 端：`lib/assets/games/icons/*.svg`（pubspec 已注册 `lib/assets/games/icons/`）
+/// - App 端：`assets/games/icons/*.svg`（pubspec 已注册 `assets/games/icons/`）
 /// - 管理后台：`public/game-icons/*.svg`（Vite 静态目录，按需引用）
 ///
 /// 风格规范：100×100 viewBox、`#5D4037` 粗描边、白色高光、圆角卡通。
@@ -16,7 +16,7 @@ class GameIcons {
   GameIcons._();
 
   /// 资源目录（pubspec 注册路径）
-  static const String _dir = 'lib/assets/games/icons';
+  static const String _dir = 'assets/games/icons';
 
   /// 羊了个羊图块：10 款牧场元素（按索引取，超出循环）
   static const List<String> fruits = <String>[

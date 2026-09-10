@@ -39,7 +39,7 @@ class AchievementIcon extends StatelessWidget {
     final String token = iconToken ?? '';
     if (token.startsWith('badge_') || token.startsWith('ach_global_')) {
       return SvgPicture.asset(
-        'lib/assets/games/achievements/$token.svg',
+        'assets/games/achievements/$token.svg',
         width: size,
         height: size,
       );
@@ -82,7 +82,7 @@ class _ElementColorIconState extends State<_ElementColorIcon> {
   }
 
   Future<void> _load() async {
-    final String path = 'lib/assets/games/achievements/ach_${widget.el}.svg';
+    final String path = 'assets/games/achievements/ach_${widget.el}.svg';
     final String raw =
         AchievementIcon._elementCache[path] ?? await rootBundle.loadString(path);
     AchievementIcon._elementCache[path] = raw;

@@ -130,7 +130,7 @@ extension Match3ModeMeta on Match3Mode {
   }
 
   /// SVG 资源路径（与 App 端 assets/games/icons 同名文件；双端统一图标）。
-  String get svg => 'lib/assets/games/icons/mode_${code}.svg';
+  String get svg => 'assets/games/icons/mode_${code}.svg';
 
   Color get color {
     switch (this) {

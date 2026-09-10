@@ -28,7 +28,7 @@ class GameAction {
   final bool selected;
 
   /// 图标资产文件名（game_items.icon 口子，2026-09-09）：非空时渲染
-  /// `lib/assets/games/items/<iconAsset>.svg` 定版图标，null 用内置 [icon]。
+  /// `assets/games/items/<iconAsset>.svg` 定版图标，null 用内置 [icon]。
   final String? iconAsset;
 
   const GameAction({
@@ -262,7 +262,7 @@ class _ActionLabel extends StatelessWidget {
   Widget build(BuildContext context) {
     final Widget iconWidget = (action.iconAsset != null && action.iconAsset!.isNotEmpty)
         ? SvgPicture.asset(
-            'lib/assets/games/items/${action.iconAsset}.svg',
+            'assets/games/items/${action.iconAsset}.svg',
             width: 18,
             height: 18,
           )
@@ -335,7 +335,7 @@ class GameStatusItem extends StatelessWidget {
 }
 
 /// 道具图标组件（2026-09-09 定版图标接入）：[iconAsset] 非空渲染
-/// `lib/assets/games/items/<iconAsset>.svg` 定版图标，空回退内置 [icon]。
+/// `assets/games/items/<iconAsset>.svg` 定版图标，空回退内置 [icon]。
 /// 供确认弹窗、商城卡片等非 GameAction 场景复用，保证与道具栏图标一致。
 class PropIcon extends StatelessWidget {
   final IconData icon;
@@ -353,7 +353,7 @@ class PropIcon extends StatelessWidget {
   Widget build(BuildContext context) {
     if (iconAsset != null && iconAsset!.isNotEmpty) {
       return SvgPicture.asset(
-        'lib/assets/games/items/$iconAsset.svg',
+        'assets/games/items/$iconAsset.svg',
         width: size,
         height: size,
       );

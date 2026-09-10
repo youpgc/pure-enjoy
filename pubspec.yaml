@@ -87,12 +87,13 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # 静态资源统一存放 lib/assets（2026-09-09 规则）；唯一例外 assets/audio/：
-  # audioplayers 源码硬编码 'assets/' + path 前缀（audio_cache.dart），无法迁移
+  # 静态资源统一存放根 assets/（2026-09-09 二次拍板，按使用场景分目录）：
+  # games/icons 共享图标、games/achievements 成就、games/items 道具、
+  # games/match3 方块头像、audio 音效、images 图片
   assets:
-    - lib/assets/images/logo.jpg
+    - assets/images/logo.jpg
     - assets/audio/
-    - lib/assets/games/icons/
-    - lib/assets/games/achievements/
-    - lib/assets/games/match3/
-    - lib/assets/games/items/
+    - assets/games/icons/
+    - assets/games/achievements/
+    - assets/games/match3/
+    - assets/games/items/

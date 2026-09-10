@@ -12,8 +12,8 @@
 ///   用单条「色相」滑动条自由调整背景色（hex 写入 URL，随头像一起保存）；主色调即滑动条锚点。
 ///
 /// 未来扩展（预留，当前未启用）：
-/// - 本地内置资源：将一批授权清晰的通用头像 PNG/SVG 放入 `lib/assets/avatars/`，
-///   用 `AssetImage('lib/assets/avatars/xxx.png')` 展示，零网络依赖。
+/// - 本地内置资源：将一批授权清晰的通用头像 PNG/SVG 放入 `assets/avatars/`，
+///   用 `AssetImage('assets/avatars/xxx.png')` 展示，零网络依赖。
 /// - 阿里巴巴矢量图库（Iconfont）：通过项目 CDN 链接接入，预留常量 [kIconfontCdnBase]
 ///   与函数 [getIconfontPresets]（当前返回空，待填项目 ID）。
 ///
