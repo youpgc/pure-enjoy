@@ -17,7 +17,7 @@ class Match3Overlays {
     int rows,
     int cols,
   ) {
-    const fill = Paint()..color = Color(0xFF34344E);
+    final fill = Paint()..color = const Color(0xFF34344E);
     final border = Paint()
       ..color = Colors.white.withValues(alpha: 0.10)
       ..style = PaintingStyle.stroke
