@@ -108,7 +108,9 @@ class GameShell extends StatelessWidget {
             child: Text(
               hint!,
               textAlign: TextAlign.center,
-              // 通关条件（操作提示）文案字号调大，提升可读性
+              // 通关条件单行展示：超宽时整体缩小而非换行（2026-09-10 简化文案）
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
               style: const TextStyle(fontSize: 14, color: AppTheme.neutral600),
             ),
           ),

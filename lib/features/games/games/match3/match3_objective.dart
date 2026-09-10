@@ -392,41 +392,46 @@ class Match3Objective {
     }
   }
 
-  /// 本局通关条件（底部一行，**按本关实际 config 动态生成**，2026-09-09）：
-  /// 列出真实的数量/颜色/步数/时限，替代旧版静态玩法说明。
+  /// 本局通关条件（底部一行，**按本关实际 config 动态生成**，2026-09-10 简化）：
+  /// 只展示硬性通关限制（步数/时限 + 目标量），「不限步数」等非限制内容
+  /// 不展示；单行短文案防换行。示例：
+  /// 「38步内清除36块果冻」「38步内收集黄色×51、蓝色×42」
+  /// 「击碎冰块并收集黄色×15」「60s内达成7030分」「39步内击破357血量Boss」。
   String get conditionHint {
     // 目标色中文名（与糖果绘制色板同序）
     const names = <String>['红', '蓝', '绿', '黄', '紫', '橙'];
+    // 步数/时限前缀：仅在有硬性限制时展示；不限步不加任何前缀
     final stepText = isTimed
-        ? '限时 ${seconds} 秒'
-        : (steps > 0 ? '本局 ${steps} 步' : '不限步数');
+        ? '${seconds}s内'
+        : (steps > 0 ? '$steps步内' : '');
 
     switch (mode) {
       case Match3Mode.score:
       case Match3Mode.timed:
-        return '${stepText}，达到 $goalScore 分即通关';
+        return '$stepText达成$goalScore分';
       case Match3Mode.clear:
-        return '${stepText}，清除全部 $jellyLeft 块果冻即通关';
+        return '$stepText清除$jellyLeft块果冻';
       case Match3Mode.collect:
         // 多目标：列出各色实际数量（与 collect 数组一一对应）
         if (collectGoals.isEmpty) {
-          return '${stepText}，收集 $collectTarget 个指定糖果即通关';
+          return '$stepText收集$collectTarget个指定糖果';
         }
         final parts = <String>[
           for (final g in collectGoals)
-            '${names[g.type % names.length]}色×${g.count}',
+            '${names[g.type % names.length]}×${g.count}',
         ];
-        return '${stepText}，收集 ${parts.join('、')}';
+        return '$stepText收集${parts.join('、')}';
       case Match3Mode.obstacle:
         // 冰块（全碎）+ 附加颜色目标（如有）
         final extra = <String>[
           for (final g in collectGoals)
-            '${names[g.type % names.length]}色×${g.count}',
+            '${names[g.type % names.length]}×${g.count}',
         ];
-        final base = '${stepText}，击碎全部冰块即通关';
-        return extra.isEmpty ? base : '${stepText}，击碎全部冰块并收集 ${extra.join('、')}';
+        return extra.isEmpty
+            ? '$stepText击碎冰块'
+            : '${stepText}击碎冰块并收集${extra.join('、')}';
       case Match3Mode.boss:
-        return '${stepText}，每次消除造成 1 点伤害（特殊糖翻倍），击破 $bossHp 血量 Boss';
+        return '$stepText击破$bossHp血量Boss';
     }
   }
 

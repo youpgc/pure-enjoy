@@ -118,17 +118,25 @@ Future<GameSettlementResult?> reportAndSettle({
     if (dim != null) valuesById[dim.id] = entry.value;
   }
 
+  // 失败记录门槛（2026-09-10 用户拍板）：非通关对局，当局步数 <5 不计入
+  // 成绩记录（防秒败刷记录）。以 moves 维度取值为准——无 moves 维度的
+  // 游戏（sheep 等）不适用此门槛；放弃路径另有 ≥10s 时长门槛。
+  final failedMoves = cleared ? null : scoreValuesByCode['moves'];
+  final belowMoveFloor = !cleared && failedMoves != null && failedMoves < 5;
+
   // 放弃：只上报成绩，不结算不弹窗（放弃不发分，防止刷分）
   if (aborted) {
-    await GameScoreService.instance.submitScore(
-      gameId: game.id,
-      levelId: level.id.isEmpty ? null : level.id,
-      modeId: level.modeId.isEmpty ? null : level.modeId,
-      cleared: cleared,
-      statusOverride: 'aborted',
-      durationMs: durationMs,
-      values: valuesById,
-    );
+    if (!belowMoveFloor) {
+      await GameScoreService.instance.submitScore(
+        gameId: game.id,
+        levelId: level.id.isEmpty ? null : level.id,
+        modeId: level.modeId.isEmpty ? null : level.modeId,
+        cleared: cleared,
+        statusOverride: 'aborted',
+        durationMs: durationMs,
+        values: valuesById,
+      );
+    }
     return null;
   }
 
@@ -136,15 +144,18 @@ Future<GameSettlementResult?> reportAndSettle({
   // 加载完成前展示 loading，期间弹窗不可点遮罩关闭/拖拽（禁其他操作）。
   final completer = Completer<GameSettlementResult?>();
   final settleFuture = () async {
-    // 成绩上报始终执行（默认流程也记录成绩，仅不发奖励）
-    await GameScoreService.instance.submitScore(
-      gameId: game.id,
-      levelId: level.id.isEmpty ? null : level.id,
-      modeId: level.modeId.isEmpty ? null : level.modeId,
-      cleared: cleared,
-      durationMs: durationMs,
-      values: valuesById,
-    );
+    // 成绩上报：通关 / 达标失败局始终记录；步数 <5 的失败局不计入
+    //（默认流程也记录成绩，仅不发奖励）
+    if (!belowMoveFloor) {
+      await GameScoreService.instance.submitScore(
+        gameId: game.id,
+        levelId: level.id.isEmpty ? null : level.id,
+        modeId: level.modeId.isEmpty ? null : level.modeId,
+        cleared: cleared,
+        durationMs: durationMs,
+        values: valuesById,
+      );
+    }
     // 奖励结算门禁：默认流程跳过（claim_key 体系不触发 = 不发分不发成就）
     if (!rewardsAllowed) {
       return const GameSettlementResult(items: <GameSettlementItem>[]);
