@@ -45,6 +45,13 @@ class Candy {
   double get cy => py;
 }
 
+/// 定版 SVG 的实际内容占比：图标设计在 64 逻辑坐标内，内容（含底板圆）
+/// 约 52/64，四周为透明留白。用于按「格内视觉间隙」反推绘制尺寸。
+const double kCandyContentRatio = 0.8125;
+
+/// 图标内容与格边的目标间隙（px）：1-3px，取中值 2。
+const double kCandyGap = 2.0;
+
 /// 在指定格绘制一个动物头像糖块（定版 SVG 资产，按 type 渲染）。
 ///
 /// SVG 以 [vg.loadPicture] 同步解析并缓存为 [ui.Picture]（每种类型仅解析一次），
@@ -53,7 +60,9 @@ class Candy {
 void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
   final a = candy.dying ? candy.dyingAlpha.clamp(0.0, 1.0) : 1.0;
   if (a <= 0.01) return;
-  final size = cell * 0.84 * candy.scale;
+  // 放大：按「内容距格边 ≈ [kCandyGap] px」反推绘制尺寸——SVG 透明留白
+  // 会略超出格界（透明无视觉影响），内容本体保持在格内。
+  final size = (cell - 2 * kCandyGap) / kCandyContentRatio * candy.scale;
   if (size <= 0) return;
   final cx = candy.px + cell / 2;
   final cy = candy.py + cell / 2;

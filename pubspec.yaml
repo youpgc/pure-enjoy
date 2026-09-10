@@ -87,11 +87,10 @@ dev_dependencies:
 
 flutter:
   uses-material-design: true
-  # 静态资源统一存放根 assets/（2026-09-09 二次拍板，按使用场景分目录）：
+  # 静态资源统一存放根 assets/（2026-09-10 拍板，按使用场景分目录）：
   # games/icons 共享图标、games/achievements 成就、games/items 道具、
-  # games/match3 方块头像、audio 音效、images 图片
+  # games/match3 方块头像、audio 音效
   assets:
-    - assets/images/logo.jpg
     - assets/audio/
     - assets/games/icons/
     - assets/games/achievements/

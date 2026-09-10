@@ -6,8 +6,9 @@ import 'package:flutter/material.dart';
 /// 网格底 → 果冻（糖果**下方**，底层装饰）→ 糖果 → 冰封（糖果**上方**，
 /// 遮罩感）→ 选中框。
 class Match3Overlays {
-  /// 网格底：白色圆角格底，糖块画在白底上与深色底板形成强对比，
-  /// 边缘清晰不发虚（缓解「看久了眼睛不舒服」）。
+  /// 网格底：深色圆角格底 + 浅色细描边（2026-09-10 定版动物头像接入后，
+  /// 白底与彩色头像对比过强刺眼）。格底比底板略亮形成分区，浅色描边
+  /// （白 @10%）勾勒格界突显方块间距；低饱和深底久看不疲劳。
   static void drawGrid(
     Canvas canvas,
     double offsetX,
@@ -16,21 +17,24 @@ class Match3Overlays {
     int rows,
     int cols,
   ) {
-    final paint = Paint()..color = const Color(0xFFFFFFFF);
+    const fill = Paint()..color = Color(0xFF34344E);
+    final border = Paint()
+      ..color = Colors.white.withValues(alpha: 0.10)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.2;
     for (var r = 0; r < rows; r++) {
       for (var c = 0; c < cols; c++) {
-        canvas.drawRRect(
-          RRect.fromRectAndRadius(
-            Rect.fromLTWH(
-              offsetX + c * cell + cell * 0.03,
-              offsetY + r * cell + cell * 0.03,
-              cell * 0.94,
-              cell * 0.94,
-            ),
-            Radius.circular(cell * 0.18),
+        final rrect = RRect.fromRectAndRadius(
+          Rect.fromLTWH(
+            offsetX + c * cell + cell * 0.03,
+            offsetY + r * cell + cell * 0.03,
+            cell * 0.94,
+            cell * 0.94,
           ),
-          paint,
+          Radius.circular(cell * 0.18),
         );
+        canvas.drawRRect(rrect, fill);
+        canvas.drawRRect(rrect, border);
       }
     }
   }
