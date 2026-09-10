@@ -453,6 +453,10 @@ class _SheepGameState extends State<SheepGame> {
           ),
       ],
       hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
+      // 道具栏加大（2026-09-10 用户需求）：高度 68、图标 24、文案 14
+      propBarHeight: 68,
+      propIconSize: 24,
+      propFontSize: 14,
       // 三道具统一收纳到道具栏（主控制栏上方，与其他游戏布局一致）
       propActions: SheepProp.values.map((p) {
         final avail = (_freeLeft[p] ?? 0) + (_ownedLeft[p] ?? 0);

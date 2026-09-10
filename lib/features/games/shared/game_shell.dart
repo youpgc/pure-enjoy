@@ -70,6 +70,16 @@ class GameShell extends StatelessWidget {
   /// 底部操作提示文案（如「滑动合并相同数字」）
   final String? hint;
 
+  /// 道具栏高度（2026-09-10 参数化）：默认 56（消消乐/2048 定版尺寸），
+  /// 羊了个羊传入更大值（道具内容调大需求）。
+  final double propBarHeight;
+
+  /// 道具图标尺寸（与 [propBarHeight] 配套调大）
+  final double propIconSize;
+
+  /// 道具文案字号（与 [propBarHeight] 配套调大）
+  final double propFontSize;
+
   const GameShell({
     super.key,
     required this.content,
@@ -78,6 +88,9 @@ class GameShell extends StatelessWidget {
     this.propActions = const <GameAction>[],
     this.propPlaceholder = '当前对局无道具可用',
     this.hint,
+    this.propBarHeight = 56,
+    this.propIconSize = 18,
+    this.propFontSize = 12,
   });
 
   @override
@@ -117,6 +130,9 @@ class GameShell extends StatelessWidget {
         _PropBar(
           actions: propActions,
           placeholder: propActions.isEmpty ? propPlaceholder : null,
+          height: propBarHeight,
+          iconSize: propIconSize,
+          fontSize: propFontSize,
         ),
         if (actions.isNotEmpty) _ControlBar(actions: actions),
       ],
@@ -124,14 +140,25 @@ class GameShell extends StatelessWidget {
   }
 }
 
-/// 道具栏（独立行，渲染于主控制栏上方；支持选中高亮态）
+/// 道具栏（独立行，渲染于主控制栏上方；支持选中高亮态）。
+/// 高度/图标/字号可调（2026-09-10 参数化：羊了个羊传入更大尺寸）。
 class _PropBar extends StatelessWidget {
   final List<GameAction> actions;
 
   /// 非空 = 空态占位（无道具），固定高度防布局坍塌。
   final String? placeholder;
 
-  const _PropBar({required this.actions, this.placeholder});
+  final double height;
+  final double iconSize;
+  final double fontSize;
+
+  const _PropBar({
+    required this.actions,
+    this.placeholder,
+    this.height = 56,
+    this.iconSize = 18,
+    this.fontSize = 12,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -145,7 +172,7 @@ class _PropBar extends StatelessWidget {
           color: theme.colorScheme.surfaceContainerHighest.withValues(alpha: 0.6),
           borderRadius: BorderRadius.circular(16),
         ),
-        height: 56,
+        height: height,
         child: Center(
           child: placeholder != null
               ? Text(
@@ -162,7 +189,11 @@ class _PropBar extends StatelessWidget {
                     return Expanded(
                       child: Padding(
                         padding: const EdgeInsets.symmetric(horizontal: 4),
-                        child: _PropButton(action: a),
+                        child: _PropButton(
+                          action: a,
+                          iconSize: iconSize,
+                          fontSize: fontSize,
+                        ),
                       ),
                     );
                   }).toList(),
@@ -176,8 +207,14 @@ class _PropBar extends StatelessWidget {
 /// 道具按钮：tonal 底 + 选中高亮描边（selected 时强调色边框 + 底色）
 class _PropButton extends StatelessWidget {
   final GameAction action;
+  final double iconSize;
+  final double fontSize;
 
-  const _PropButton({required this.action});
+  const _PropButton({
+    required this.action,
+    this.iconSize = 18,
+    this.fontSize = 12,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -203,7 +240,11 @@ class _PropButton extends StatelessWidget {
           onTap: action.onPressed,
           child: Padding(
             padding: const EdgeInsets.symmetric(vertical: 5),
-            child: _ActionLabel(action: action),
+            child: _ActionLabel(
+              action: action,
+              iconSize: iconSize,
+              fontSize: fontSize,
+            ),
           ),
         ),
       ),
@@ -239,23 +280,22 @@ class _ControlBar extends StatelessWidget {
                     ? FilledButton(
                         onPressed: a.onPressed,
                         style: FilledButton.styleFrom(
-                          // 压低主控制按钮高度（2026-09-10：道具栏调高后主栏让出空间）
-                          minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                          // 固定高度 40（2026-09-10 二次修正：minimumSize 被
+                          // 内容撑高无效果，改 fixedSize 锁死实际渲染高度）
+                          fixedSize: const Size.fromHeight(40),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: _ActionLabel(action: a),
+                        child: _ActionLabel(action: a, inline: true),
                       )
                     : FilledButton.tonal(
                         onPressed: a.onPressed,
                         style: FilledButton.styleFrom(
-                          minimumSize: const Size(0, 40),
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 8, vertical: 2),
+                          fixedSize: const Size.fromHeight(40),
+                          padding: const EdgeInsets.symmetric(horizontal: 8),
                           tapTargetSize: MaterialTapTargetSize.shrinkWrap,
                         ),
-                        child: _ActionLabel(action: a),
+                        child: _ActionLabel(action: a, inline: true),
                       ),
               ),
             );
@@ -269,40 +309,66 @@ class _ControlBar extends StatelessWidget {
 class _ActionLabel extends StatelessWidget {
   final GameAction action;
 
-  const _ActionLabel({required this.action});
+  /// true = 图标与文案同行（主控制栏用，压低整体高度）；
+  /// false = 图标上、文案下（道具栏默认纵向布局）。
+  final bool inline;
+
+  /// 图标尺寸（道具栏可调大，2026-09-10）
+  final double iconSize;
+
+  /// 文案字号（道具栏可调大，2026-09-10）
+  final double fontSize;
+
+  const _ActionLabel({
+    required this.action,
+    this.inline = false,
+    this.iconSize = 18,
+    this.fontSize = 12,
+  });
 
   @override
   Widget build(BuildContext context) {
     final Widget iconWidget = (action.iconAsset != null && action.iconAsset!.isNotEmpty)
         ? SvgPicture.asset(
             'assets/games/items/${action.iconAsset}.svg',
-            width: 18,
-            height: 18,
+            width: inline ? 18 : iconSize,
+            height: inline ? 18 : iconSize,
             // 资产缺失兜底：回退内置图标（后台 icon 配错文件名时防崩）
-            errorBuilder: (_, __, ___) => Icon(action.icon, size: 16),
+            errorBuilder: (_, __, ___) =>
+                Icon(action.icon, size: inline ? 16 : iconSize),
           )
-        : Icon(action.icon, size: 16);
+        : Icon(action.icon, size: inline ? 16 : iconSize);
     // 角标信息合并为单行文字（「名称 ×3 免1」），避免多行导致 PropBar 纵向溢出
     var label = action.label;
     if (action.badge != null) label += ' ×${action.badge}';
     if (action.extraTag != null) label += ' ${action.extraTag}';
+    final text = Text(
+      label,
+      style: TextStyle(fontSize: inline ? 12 : fontSize),
+      maxLines: 1,
+      overflow: TextOverflow.ellipsis,
+    );
     return FittedBox(
       // 兜底：字体缩放/长文案超宽时等比缩小，杜绝 RenderFlex overflow
       fit: BoxFit.scaleDown,
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          iconWidget,
-          const SizedBox(height: 1),
-          Text(
-            label,
-            style: const TextStyle(fontSize: 12),
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-          ),
-        ],
-      ),
+      child: inline
+          ? Row(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                iconWidget,
+                const SizedBox(width: 5),
+                text,
+              ],
+            )
+          : Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.center,
+              children: <Widget>[
+                iconWidget,
+                const SizedBox(height: 1),
+                text,
+              ],
+            ),
     );
   }
 }

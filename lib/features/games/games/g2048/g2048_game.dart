@@ -8,6 +8,7 @@ import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
 import '../../models/game_level_model.dart';
+import 'g2048_props.dart';
 import 'g2048_tile.dart';
 
 /// 2048（成熟手感版）
@@ -70,6 +71,20 @@ class _G2048GameState extends State<G2048Game> {
 
   /// 目标语义：true = config.target 是分数门槛（限时/挑战）；false = 方块数值（经典）
   bool _isScoreGoal = false;
+
+  /// 道具域（2026-09-10）：加时卡（限时）/ 加步卡（挑战），数据驱动
+  final G2048Props _props = G2048Props();
+
+  /// 加时卡累计加时（秒）：新开局归零，叠加到限时上限
+  int _bonusSeconds = 0;
+
+  /// 加步卡累计加步：新开局归零，叠加到步数上限
+  int _movesBonus = 0;
+
+  /// 本局有效步数上限（配置值 + 道具加步）
+  int? get _effectiveMovesLimit =>
+      _movesLimit == null ? null : _movesLimit! + _movesBonus;
+
   Timer? _tickTimer;
   int _nextId = 1;
   late final DateTime _startTime;
@@ -119,6 +134,20 @@ class _G2048GameState extends State<G2048Game> {
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
+    // 道具目录/库存异步加载（失败静默，不影响对局）
+    _loadProps();
+  }
+
+  /// 加载道具：按本局模式过滤（限时→加时卡、挑战→加步卡）。
+  Future<void> _loadProps() async {
+    await _props.load(
+      hasTimeLimit: _timeLimit != null,
+      hasMovesLimit: _movesLimit != null,
+      modeCode: _timeLimit != null
+          ? 'timed'
+          : (_movesLimit != null ? 'challenge' : ''),
+    );
+    if (mounted) setState(() {});
   }
 
   Future<void> _loadBest() async {
@@ -144,6 +173,8 @@ class _G2048GameState extends State<G2048Game> {
     _pendingDir = null;
     _movesUsed = 0;
     _reachedTarget = false;
+    _bonusSeconds = 0; // 道具加时不跨局保留
+    _movesBonus = 0; // 道具加步不跨局保留
     _startTimer();
     _spawn();
     _spawn();
@@ -162,7 +193,7 @@ class _G2048GameState extends State<G2048Game> {
       return;
     }
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    if (elapsed >= _timeLimit! * 1000) {
+    if (elapsed >= (_timeLimit! + _bonusSeconds) * 1000) {
       // 归零时若分数目标已达成则判胜（最后一滑恰好达标、轮询先到的情况）
       _finish(_isScoreGoal && _score >= _target);
       return;
@@ -170,10 +201,45 @@ class _G2048GameState extends State<G2048Game> {
     if (mounted) setState(() {});
   }
 
-  /// 限时模式剩余秒数（用于状态栏展示）。
+  /// 限时模式剩余秒数（用于状态栏展示，含加时卡加时）。
   int _remainingSeconds() {
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    return max(0, _timeLimit! - elapsed ~/ 1000);
+    return max(0, _timeLimit! + _bonusSeconds - elapsed ~/ 1000);
+  }
+
+  /// 使用道具前的确认弹窗（即时型：确认即执行并扣券）。
+  Future<void> _confirmProp(String itemType) async {
+    final s = _props.slot(itemType);
+    if (s == null || !s.available || _finished) return;
+    final isTime = itemType == 'add_time';
+    final sure = await confirmG2048PropDialog(
+      context,
+      label: isTime ? '加时卡' : '加步卡',
+      effectText: isTime ? '本局剩余时间 +15 秒' : '剩余步数 +5',
+      free: s.free,
+      owned: s.owned,
+      icon: isTime ? Icons.timer_outlined : Icons.exposure_plus_1,
+      iconAsset: s.item?.icon,
+    );
+    if (sure == true) await _useProp(itemType);
+  }
+
+  /// 使用道具：先免费用完再消耗库存，成功后应用效果。
+  Future<void> _useProp(String itemType) async {
+    final s = _props.slot(itemType);
+    if (s == null || !s.available || _finished) return;
+    final ok = await _props.consume(s);
+    if (!ok) {
+      if (mounted) setState(() {});
+      return;
+    }
+    if (itemType == 'add_time') {
+      _bonusSeconds += 15; // 与消消乐加时卡同口径
+    } else {
+      _movesBonus += 5; // 与消消乐加步卡同口径
+    }
+    GameAudio.instance.prop();
+    if (mounted) setState(() {});
   }
 
   void _rebuildGrid() {
@@ -325,7 +391,7 @@ class _G2048GameState extends State<G2048Game> {
 
     Future.delayed(_slide + const Duration(milliseconds: 20), () {
       if (!mounted) return;
-      final movesLimit = _movesLimit;
+      final movesLimit = _effectiveMovesLimit;
       try {
         _tiles.removeWhere((t) => t.toRemove);
         _rebuildGrid();
@@ -409,13 +475,13 @@ class _G2048GameState extends State<G2048Game> {
     ));
   }
 
-  /// 新游戏按钮：进行中需二次确认，避免误触丢失当前进度。
+  /// 重新开始按钮：进行中需二次确认，避免误触丢失当前进度。
   Future<void> _confirmNewGame() async {
     final sure = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('放弃当前游戏？'),
-        content: const Text('点击「新游戏」将放弃当前进度，确定要重新开始吗？'),
+        content: const Text('点击「重新开始」将放弃当前进度，确定要重新开始吗？'),
         actions: <Widget>[
           TextButton(
             onPressed: () => Navigator.of(ctx).pop(false),
@@ -483,7 +549,7 @@ class _G2048GameState extends State<G2048Game> {
         if (_movesLimit != null)
           GameStatusItem(
             label: '剩余步数',
-            value: '${max(0, _movesLimit! - _movesUsed)}',
+            value: '${max(0, _effectiveMovesLimit! - _movesUsed)}',
           ),
         if (_timeLimit != null)
           GameStatusItem(
@@ -492,10 +558,36 @@ class _G2048GameState extends State<G2048Game> {
           ),
       ],
       hint: '在棋盘上朝上下左右拖动，相同数字相撞即合并（无需点击）',
+      // 道具栏（2026-09-10）：限时模式加时卡 / 挑战模式加步卡，数据驱动
+      propActions: <GameAction>[
+        if (_timeLimit != null && (_props.slot('add_time')?.available ?? false))
+          GameAction(
+            icon: Icons.timer_outlined,
+            iconAsset: _props.slot('add_time')!.item?.icon,
+            label: '加时卡',
+            badge: '${_props.slot('add_time')!.total}',
+            extraTag: _props.slot('add_time')!.free > 0
+                ? '免${_props.slot('add_time')!.free}'
+                : null,
+            onPressed: () => _confirmProp('add_time'),
+          ),
+        if (_movesLimit != null && (_props.slot('add_steps')?.available ?? false))
+          GameAction(
+            icon: Icons.exposure_plus_1,
+            iconAsset: _props.slot('add_steps')!.item?.icon,
+            label: '加步卡',
+            badge: '${_props.slot('add_steps')!.total}',
+            extraTag: _props.slot('add_steps')!.free > 0
+                ? '免${_props.slot('add_steps')!.free}'
+                : null,
+            onPressed: () => _confirmProp('add_steps'),
+          ),
+      ],
       actions: <GameAction>[
         GameAction(
           icon: Icons.refresh,
-          label: '新游戏',
+          // 三游戏统一文案（2026-09-10）：原「新游戏」与消消乐「重新开始」不一致
+          label: '重新开始',
           primary: true,
           onPressed: _finished ? () => setState(_reset) : _confirmNewGame,
         ),
