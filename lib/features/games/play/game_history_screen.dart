@@ -232,14 +232,22 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
         separatorBuilder: (_, __) => const Divider(height: 1),
         itemBuilder: (ctx, i) {
           if (i >= items.length) {
-            return const Padding(
-              padding: EdgeInsets.symmetric(vertical: 16),
+            // 分页 footer：仅在加载下一页时转圈；空闲时显示静态提示
+            //（此前无条件渲染 spinner，只要还有下一页就一直转，2026-09-11 用户反馈）
+            return Padding(
+              padding: const EdgeInsets.symmetric(vertical: 16),
               child: Center(
-                child: SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                ),
+                child: _loadingMore
+                    ? const SizedBox(
+                        width: 18,
+                        height: 18,
+                        child: CircularProgressIndicator(strokeWidth: 2),
+                      )
+                    : const Text(
+                        '上拉加载更多',
+                        style: TextStyle(
+                            fontSize: 12, color: AppTheme.neutral500),
+                      ),
               ),
             );
           }
@@ -267,17 +275,17 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             ),
             title: Text(_fmtDate(h.playedAt)),
             subtitle: Text(subtitle),
-            trailing: isSession
-                ? const Text('无尽会话',
-                    style: TextStyle(color: AppTheme.success))
-                : (h.isCleared
+            trailing: // 对局结果统一状态语义（通关绿/放弃灰/失败红）：
+                // 无尽会话聚合项（旧模型多局合并）也属正常结束 → 显示「通关」，
+                // 会话归属信息已在副标题（无尽模式 · N 局 · 累计 X 分）
+                (isSession || h.isCleared)
                     ? const Text('通关', style: TextStyle(color: AppTheme.success))
                     // 未通关区分语义：放弃=灰 / 挑战失败=红（2026-09-10）
                     : (h.status == 'aborted'
                         ? const Text('放弃',
                             style: TextStyle(color: AppTheme.neutral500))
                         : const Text('挑战失败',
-                            style: TextStyle(color: AppTheme.error)))),
+                            style: TextStyle(color: AppTheme.error))),
           );
         },
       ),
