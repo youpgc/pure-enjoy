@@ -65,6 +65,49 @@ class AuthService {
     if (restored) {
       SecureLogger.log(
           '🔐 Supabase Auth 会话已恢复: ${_session.currentUserId}');
+      // 恢复的会话可能缺业务 ID（新注册后未重启的旧会话），补齐
+      await _ensureBusinessId();
+    }
+  }
+
+  /// 注册/登录后确保业务 ID（public.users.id）已解析进会话。
+  ///
+  /// 根因（2026-09-11）：云端触发器在 auth.users 插入后创建 public.users 行，
+  /// 并把业务 ID 回写 auth.users.raw_user_meta_data.app_user_id；但 GoTrue 的
+  /// signup 响应在内存中构建、**不含触发器写入** → 新注册用户的会话 metadata
+  /// 缺 app_user_id，currentUserId 曾回落成 auth UUID，导致 game_scores RLS
+  /// （user_id = get_user_business_id()）与 grant_game_reward RPC（p_user_id
+  /// 校验）全部失配——「新注册用户无法记成绩/领积分」。此处按 auth_id 反查
+  /// users 表补齐；users 行缺失时保持 null（功能暂不可用，不写错误归属）。
+  Future<void> _ensureBusinessId() async {
+    final authUser = _session.authUser;
+    if (authUser == null) return;
+    final meta = authUser['user_metadata'];
+    if (meta is Map && (meta['app_user_id'] as String?)?.isNotEmpty == true) {
+      return; // 已有业务 ID（老用户 / 已解析）
+    }
+    final authUuid = authUser['id'] as String?;
+    if (authUuid == null || authUuid.isEmpty) return;
+    try {
+      final res = await ApiClient.get(
+        'users',
+        filters: {'auth_id': 'eq.$authUuid', 'is_deleted': 'eq.false'},
+        columns: 'id',
+        limit: 1,
+        note: 'auth:resolve_business_id',
+      );
+      final rows = res.data;
+      final bid = (rows != null && rows.isNotEmpty)
+          ? rows.first['id'] as String?
+          : null;
+      if (bid != null && bid.isNotEmpty) {
+        await _session.setBusinessId(bid);
+        SecureLogger.log('🆔 业务 ID 已解析: $bid');
+      } else {
+        SecureLogger.log('⚠️ 未能解析业务 ID（users 行缺失？）auth=$authUuid');
+      }
+    } catch (e) {
+      SecureLogger.log('⚠️ 业务 ID 解析失败: ${SecureLogger.extractError(e)}');
     }
   }
 
@@ -78,6 +121,8 @@ class AuthService {
         refreshToken: result.refreshToken!,
         authUser: result.user!,
       );
+      // 注册响应不含触发器回写的业务 ID（登录响应通常已含），补齐
+      await _ensureBusinessId();
     }
   }
 
@@ -294,7 +339,7 @@ class AuthService {
             'is_deleted': 'eq.false',
           },
           columns:
-              'points,available_points,effective_points,expiring_points,avatar_url',
+              'id,points,available_points,effective_points,expiring_points,avatar_url',
           limit: 1,
         );
         if (statsRes.isSuccess &&
@@ -310,6 +355,16 @@ class AuthService {
           metadata['expiring_points'] = row['expiring_points'];
           // 同步头像URL（public.users.avatar_url），修复"我的"页头像已上传却不渲染
           metadata['avatar_url'] = row['avatar_url'] ?? metadata['avatar_url'];
+          // 业务 ID 自愈（2026-09-11）：metadata 缺 app_user_id 时回写，
+          // 与 _ensureBusinessId 同目的——保障游戏成绩/积分链路的 user_id 归属
+          final bid = row['id'] as String?;
+          if (bid != null && bid.isNotEmpty) {
+            metadata['app_user_id'] =
+                metadata['app_user_id'] ?? bid;
+            if (_session.currentUserId != bid) {
+              await _session.setBusinessId(bid);
+            }
+          }
           user['user_metadata'] = metadata;
           await _session.updateAuthUser(user);
         }
