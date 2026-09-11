@@ -9,6 +9,7 @@ import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
+import '../../../services/supabase_service.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
 /// 不结算发分，避免拉低正常通关率等统计数据。
@@ -41,6 +42,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   bool get _isEndless => _level?.id.startsWith('endless_2048') ?? false;
   int _endlessTotal = 0; // 已完成局的累计得分
   int _endlessRounds = 0; // 已完成局数
+
+  /// 每局明细（2026-09-11 改造）：过程中仅本地暂存不上传，用户选择
+  /// 「结束并结算」时随会话主记录一次性上传 game_endless_rounds 表。
+  final List<GameEndlessRound> _endlessRoundList = <GameEndlessRound>[];
 
   /// 链式局数上限（后台 games.config.endlessMaxRounds 可配，默认 30）：
   /// 达到上限后本局结束不再询问，直接进入总结算。
@@ -109,6 +114,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       if (mounted) Navigator.of(context).pop();
       return;
     }
+    // 无尽会话中途放弃：本地暂存的局明细一并丢弃（未总结算不上传）
+    _endlessRoundList.clear();
     // 无尽模式合成关不注入 level 维度（合成关号 10000+size 是内部隔离值，
     // 非真实关卡，展示/统计都会失真）
     final abandonValues = _isEndless
@@ -130,8 +137,14 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   /// （重开新局、成绩滚入累计）或「结束并结算」（以累计总分一次性上报结算）。
   Future<void> _showEndlessIntermission(GamePlayOutcome outcome) async {
     final roundScore = (outcome.values['score'] ?? 0).toInt();
-    // 每局明细上报（时间/步数/分数，供后台统计；仅记录不发分）
-    await _submitEndlessRound(outcome);
+    // 每局明细仅本地暂存（2026-09-11 改造）：不上传单局记录，
+    // 由「结束并结算」随会话主记录一次性上传 game_endless_rounds
+    _endlessRoundList.add(GameEndlessRound(
+      roundNo: _endlessRounds + 1,
+      score: roundScore,
+      moves: outcome.values['moves']?.toInt(),
+      durationMs: outcome.durationMs,
+    ));
     // 达到后台配置的局数上限：不再询问，直接进入总结算
     if (_endlessRounds + 1 >= _maxRounds) {
       await _finishEndlessSession(roundScore);
@@ -208,32 +221,20 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     await _finishEndlessSession(roundScore);
   }
 
-  /// 上传单局明细（时间/步数/分数）供后台统计：直接 submitScore（仅记录，
-  /// 不走奖励结算不发分）。合成关 levelId 由 submitScore 的 uuid 校验置 null。
-  Future<void> _submitEndlessRound(GamePlayOutcome outcome) async {
-    await GameScoreService.instance.submitScore(
-      gameId: widget.game.id,
-      levelId: null,
-      modeId: _level!.modeId.isEmpty ? null : _level!.modeId,
-      cleared: true,
-      durationMs: outcome.durationMs,
-      values: <String, num>{
-        'score': outcome.values['score'] ?? 0,
-        'moves': outcome.values['moves'] ?? 0,
-        'duration_ms': outcome.durationMs,
-      },
-    );
-  }
-
   /// 无尽会话终局：score = 各局累加总分；duration = 本次会话总时长；
   /// 不注入 level 维度（合成关号非真实关卡）；cleared=true（正常结束）。
+  /// 会话主记录上报成功后，把本地暂存的各局明细数组一次性上传
+  /// game_endless_rounds（挂 score_id，供后台局明细展开表展示）。
   Future<void> _finishEndlessSession(int lastRoundScore) async {
     final totalScore = _endlessTotal + lastRoundScore;
     final totalDurationMs = DateTime.now().difference(_enterTime).inMilliseconds;
+    final rounds = List<GameEndlessRound>.from(_endlessRoundList);
+    final game = widget.game;
+    final level = _level!;
     await reportAndSettle(
       context: context,
-      game: widget.game,
-      level: _level!,
+      game: game,
+      level: level,
       scoreValuesByCode: <String, num>{
         'score': totalScore,
         'duration_ms': totalDurationMs,
@@ -242,6 +243,19 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       cleared: true,
       rewardsAllowed: _rewardsAllowed,
       endless: true,
+      onScoreReported: (scoreId) async {
+        if (scoreId == null || scoreId.isEmpty || rounds.isEmpty) return;
+        final userId = AuthService.instance.currentUserId;
+        if (userId == null) return;
+        final ok = await GameScoreService.instance.submitEndlessRounds(
+          scoreId: scoreId,
+          userId: userId,
+          gameId: game.id,
+          modeId: level.modeId.isEmpty ? null : level.modeId,
+          rounds: rounds,
+        );
+        debugPrint('[GamePlayScreen] 无尽局明细上传：$ok/${rounds.length} 局');
+      },
       onExit: () => Navigator.of(context).pop(),
     );
   }
@@ -315,6 +329,8 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
     if (_level != null) {
       final durationMs = DateTime.now().difference(_enterTime).inMilliseconds;
       if (durationMs >= _minRecordDurationMs) {
+        // 无尽会话中途放弃：本地暂存的局明细一并丢弃（未总结算不上传）
+        _endlessRoundList.clear();
         final abandonValues = _isEndless
             ? <String, num>{}
             : <String, num>{'level': _level!.levelNo};

@@ -106,6 +106,45 @@ class GameBestScore {
       };
 }
 
+/// 无尽模式单局明细（本地暂存，总结算时随会话主记录一次性上传）。
+class GameEndlessRound {
+  /// 局号（从 1 起）
+  final int roundNo;
+
+  /// 本局得分
+  final int score;
+
+  /// 本局步数（引擎未上报时为 null）
+  final int? moves;
+
+  /// 本局用时（毫秒）
+  final int durationMs;
+
+  const GameEndlessRound({
+    required this.roundNo,
+    required this.score,
+    required this.durationMs,
+    this.moves,
+  });
+
+  Map<String, dynamic> toRow({
+    required String scoreId,
+    required String userId,
+    required String gameId,
+    String? modeId,
+  }) =>
+      <String, dynamic>{
+        'score_id': scoreId,
+        'user_id': userId,
+        'game_id': gameId,
+        'mode_id': modeId,
+        'round_no': roundNo,
+        'score': score,
+        'moves': moves,
+        'duration_ms': durationMs,
+      };
+}
+
 /// 游戏成绩服务
 ///
 /// 职责：上报游玩成绩、查询成绩记录、查询最佳成绩（经 RPC 服务端聚合）。
@@ -447,6 +486,43 @@ class GameScoreService {
       offset += pageSize;
     }
     return list;
+  }
+
+  /// 上传无尽会话的局明细数组（2026-09-11）：挂在会话主记录 score_id 下，
+  /// 供后台「无尽局明细展开表」展示。逐条插入（上限 endlessMaxRounds≤30），
+  /// 单条失败仅上报错误日志不中断其余局。返回成功写入条数。
+  Future<int> submitEndlessRounds({
+    required String scoreId,
+    required String userId,
+    required String gameId,
+    String? modeId,
+    required List<GameEndlessRound> rounds,
+  }) async {
+    var ok = 0;
+    for (final round in rounds) {
+      final result = await ApiClient.post(
+        'game_endless_rounds',
+        round.toRow(
+          scoreId: scoreId,
+          userId: userId,
+          gameId: gameId,
+          modeId: modeId,
+        ),
+        returnRepresentation: false,
+        note: 'games:endless_round',
+      );
+      if (result.isSuccess) {
+        ok += 1;
+      } else {
+        debugPrint(
+            '[GameScoreService] 无尽局明细写入失败（round=${round.roundNo}）：${result.errorMessage}');
+        ErrorReporter.reportMessage(
+          '无尽局明细写入失败：${result.errorMessage}（score=$scoreId, round=${round.roundNo}）',
+          module: 'games',
+        );
+      }
+    }
+    return ok;
   }
 
   /// 清空成绩缓存（切换账号或下拉刷新用）。
