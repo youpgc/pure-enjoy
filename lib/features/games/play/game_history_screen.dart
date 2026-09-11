@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../shared/duration_format.dart';
 import '../shared/game_local_loading.dart';
 import '../models/game_model.dart';
 import '../models/game_score_model.dart';
@@ -256,9 +257,8 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
             );
           }
           final h = items[i];
-          final sec = ((h.durationMs ?? 0) / 1000).floor();
-          final clock =
-              '${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}';
+          // 进阶时间单位（2026-09-11）：秒→分秒→时分秒，双端同口径
+          final clock = formatDurationSmart(h.durationMs ?? 0);
           final scope = _scopeLabel(h);
           final isSession = _sessionRounds.containsKey(h.id);
           final subtitle = isSession

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../shared/duration_format.dart';
 import '../shared/game_local_loading.dart';
 import '../services/game_score_service.dart';
 
@@ -32,8 +33,8 @@ class _GameTotalDashboardState extends State<GameTotalDashboard> {
 
   String _fmt(GameBestScore b) {
     if (b.isDuration) {
-      final sec = (b.bestValue / 1000).floor();
-      return '${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}';
+      // 进阶时间单位（2026-09-11）：秒→分秒→时分秒，双端同口径
+      return formatDurationSmart(b.bestValue);
     }
     return '${b.bestValue.toInt()}${b.unit ?? ''}';
   }

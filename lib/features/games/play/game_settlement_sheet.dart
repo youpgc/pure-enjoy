@@ -6,6 +6,7 @@ import '../models/game_dimension_model.dart';
 import '../models/game_model.dart';
 import '../services/game_reward_service.dart';
 import '../services/game_service.dart';
+import '../shared/duration_format.dart';
 import '../shared/game_local_loading.dart';
 
 /// 结算页（底部弹窗）：**成绩区立即渲染**，「积分结算」部分局部 loading，
@@ -88,8 +89,8 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
 
   String _fmtDim(List<GameDimensionModel> dims, String code, num value) {
     if (code == 'duration_ms') {
-      final sec = (value / 1000).floor();
-      return '${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}';
+      // 进阶时间单位（2026-09-11）：秒→分秒→时分秒，双端同口径
+      return formatDurationSmart(value);
     }
     final dim = dims.where((d) => d.code == code).firstOrNull;
     return '${value.toInt()}${dim?.unit ?? ''}';

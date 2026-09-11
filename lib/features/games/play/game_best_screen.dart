@@ -11,6 +11,7 @@ import '../models/game_score_model.dart';
 import '../models/match3_mode.dart';
 import '../services/game_score_service.dart';
 import '../services/game_service.dart';
+import '../shared/duration_format.dart';
 import '../shared/game_local_loading.dart';
 
 /// 最佳记录页（从原成绩看板拆分）：三游戏统一「各模式最佳成绩」。
@@ -166,12 +167,11 @@ class _GameBestScreenState extends State<GameBestScreen> {
     );
   }
 
-  /// 主维度取值格式化：时长 mm:ss，其余「值+单位」
+  /// 主维度取值格式化：时长进阶单位，其余「值+单位」
   String _fmtBest(_ModeBest m, GameDimensionModel primary) {
     if (!m.hasValue) return '—';
     if (primary.isDuration) {
-      final sec = (m.bestValue / 1000).floor();
-      return '${(sec ~/ 60).toString().padLeft(2, '0')}:${(sec % 60).toString().padLeft(2, '0')}';
+      return formatDurationSmart(m.bestValue);
     }
     return '${m.bestValue.toInt()}${primary.unit ?? ''}';
   }
