@@ -175,10 +175,15 @@ class GameRewardService {
     final claimKey = level.rewardRepeatable
         ? 'level_clear:${level.id}:${const Uuid().v4()}'
         : 'level_clear_once:${level.id}';
+    // 关卡名种子格式自带「游戏·模式」前缀（如「2048·经典模式 L001」），
+    // 直接引用即自含归因，不再拼 gameName（否则「2048·2048·…」重复展示）。
+    final levelLabel = level.name.isNotEmpty
+        ? level.name
+        : '$gameName·第${level.levelNo}关';
     return _tryClaim(
       claimKey: claimKey,
       points: level.rewardPoints,
-      remark: '通关奖励（$gameName·${level.name}）',
+      remark: '通关奖励（$levelLabel）',
       gameId: level.gameId,
     );
   }

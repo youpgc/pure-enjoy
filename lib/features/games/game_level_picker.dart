@@ -205,7 +205,10 @@ class _PickerBodyState extends State<_PickerBody> {
                       : (cleared
                           ? const Icon(Icons.check_circle, color: AppTheme.success)
                           : null),
-                  title: Text(lv.name),
+                  // 关卡名种子自带「游戏·模式」前缀（如「2048·经典模式 L001」），
+                  // 弹窗标题已含归属（模式深链=「选择关卡·模式名」，否则=游戏名），
+                  // 行内剥掉已展示的前缀避免重复：模式深链剩「L001」，无模式深链剩「经典模式 L001」。
+                  title: Text(_levelItemTitle(lv)),
                   subtitle: cleared
                       ? const Text('已通关 · 可重挑战')
                       : (selectable
@@ -224,10 +227,24 @@ class _PickerBodyState extends State<_PickerBody> {
     );
   }
 
+  /// 关卡行标题：剥掉关卡名里已在弹窗标题展示过的前缀，避免重复。
+  /// 种子格式「游戏·模式 L001」：模式深链（标题含模式名）→「L001」；
+  /// 无模式深链（标题仅游戏名）→「模式 L001」；非标准前缀原样返回。
+  String _levelItemTitle(GameLevelModel lv) {
+    var name = lv.name;
+    final gamePrefix = '${widget.game.name}·';
+    if (name.startsWith(gamePrefix)) name = name.substring(gamePrefix.length);
+    final mode = widget.mode;
+    if (mode != null) {
+      final modePrefix = '${mode.name} ';
+      if (name.startsWith(modePrefix)) name = name.substring(modePrefix.length);
+    }
+    return name;
+  }
+
   /// 模式顶部条（由主界面模式网格深链进入时已指定模式）
   Widget _modeHeaderGeneric() {
-    final mode = widget.mode!;
-    final cleared = _modeClearedById(mode.id);
+    final mode = widget.mode!;    final cleared = _modeClearedById(mode.id);
     final total = _levelsOfModeId(mode.id).length;
     return Padding(
       padding: const EdgeInsets.fromLTRB(20, 4, 20, 10),

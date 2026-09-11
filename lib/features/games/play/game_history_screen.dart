@@ -105,33 +105,41 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
     );
   }
 
-  /// 记录归属描述：「模式名 · 关卡名」（从配置缓存反查）。
-  /// 无模式/关卡（默认流程、被删配置）时逐段降级：合成关（endless_2048_N）
-  /// 显示「N×N 无尽」，全无则空串（不占位）。
+  /// 记录归属描述（从配置缓存反查）。
+  ///
+  /// 关卡名种子格式自带「游戏·模式」前缀（如「2048·经典模式 L001」），自含
+  /// 归因信息——有关卡名时**直接返回（剥游戏名前缀）**，不再重复拼模式段；
+  /// 无关卡名（无尽合成关 / 被删配置 / 默认流程）时降级：合成关显示「无尽模式」，
+  /// 其余回退模式名，全无则空串（不占位）。
   String _scopeLabel(GameScoreModel h) {
     final config = GameService.instance.cachedConfig;
-    final parts = <String>[];
+    String? modeName;
     if (h.modeId != null && h.modeId!.isNotEmpty) {
       for (final m in config.modesOf(widget.game.id)) {
         if (m.id == h.modeId) {
-          parts.add(m.name);
+          modeName = m.name;
           break;
         }
       }
     }
     if (h.levelId != null && h.levelId!.isNotEmpty) {
       if (h.levelId!.startsWith('endless_2048')) {
-        parts.add('无尽模式');
-      } else {
-        for (final l in config.levelsOf(widget.game.id)) {
-          if (l.id == h.levelId) {
-            parts.add(l.name.isEmpty ? '第 ${l.levelNo} 关' : l.name);
-            break;
-          }
+        return '无尽模式';
+      }
+      for (final l in config.levelsOf(widget.game.id)) {
+        if (l.id == h.levelId && l.name.isNotEmpty) {
+          return _stripGamePrefix(l.name);
         }
       }
     }
-    return parts.join(' · ');
+    return modeName ?? '';
+  }
+
+  /// 剥掉关卡名开头的「游戏名·」前缀（种子格式「2048·经典模式 L001」→
+  /// 「经典模式 L001」）；非该前缀开头（自定义关卡名 / 旧数据）原样返回。
+  String _stripGamePrefix(String name) {
+    final prefix = '${widget.game.name}·';
+    return name.startsWith(prefix) ? name.substring(prefix.length) : name;
   }
 
   /// 无尽模式 id 集合（该游戏的 endless 模式）
