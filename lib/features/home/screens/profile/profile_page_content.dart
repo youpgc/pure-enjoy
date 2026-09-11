@@ -228,7 +228,7 @@ class ProfileHeaderCard extends StatelessWidget {
   }
 }
 
-/// 用户信息展示列：角色 / 会员 / 积分
+/// 用户信息展示栏：角色 / 会员 / 成就 / 积分（整体一张卡片，内部竖线分割 4 格）
 class ProfileStatsRow extends StatelessWidget {
   const ProfileStatsRow({
     super.key,
@@ -259,90 +259,108 @@ class ProfileStatsRow extends StatelessWidget {
         defaultValue: '普通会员');
   }
 
+  /// 单个信息格：图标 + 值 + 标签纵排。
+  ///
+  /// 值文案（如「普通用户」）用 FittedBox 等比缩放完整展示——真机窄屏/字体
+  /// 缩放下旧版 ellipsis 会省略，用户拍板改为整体卡片+内部线条分割样式。
   Widget _buildStatItem(IconData icon, String label, String value,
       {required VoidCallback onTap,
       required ColorScheme colorScheme,
       required BuildContext context}) {
     return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: Card(
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(
-              UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius,
-            ),
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 8),
-              child: Column(
-                children: [
-                  Icon(icon, size: 20, color: colorScheme.primary),
-                  const SizedBox(height: 4),
-                  Text(
-                    value,
-                    style: Theme.of(context)
-                        .textTheme
-                        .titleSmall
-                        ?.copyWith(fontWeight: FontWeight.bold),
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    label,
-                    style: Theme.of(context)
-                        .textTheme
-                        .bodySmall
-                        ?.copyWith(color: colorScheme.onSurfaceVariant),
-                  ),
-                ],
+      child: InkWell(
+        onTap: onTap,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(vertical: 12, horizontal: 4),
+          child: Column(
+            children: [
+              Icon(icon, size: 20, color: colorScheme.primary),
+              const SizedBox(height: 4),
+              // FittedBox：值文案超宽时等比缩小，绝不省略（容纳所有文案）
+              FittedBox(
+                fit: BoxFit.scaleDown,
+                child: Text(
+                  value,
+                  style: Theme.of(context)
+                      .textTheme
+                      .titleSmall
+                      ?.copyWith(fontWeight: FontWeight.bold),
+                ),
               ),
-            ),
+              const SizedBox(height: 2),
+              Text(
+                label,
+                style: Theme.of(context)
+                    .textTheme
+                    .bodySmall
+                    ?.copyWith(color: colorScheme.onSurfaceVariant),
+              ),
+            ],
           ),
         ),
       ),
     );
   }
 
+  /// 格间竖向分割线（内部线条分割样式）
+  Widget _verticalDivider(ColorScheme colorScheme) {
+    return Container(
+      width: 1,
+      height: 36,
+      color: colorScheme.outlineVariant.withValues(alpha: 0.6),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final radius = UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius;
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 16),
-      child: Row(
-        children: [
-          _buildStatItem(
-            Icons.stars_outlined,
-            '角色',
-            _getRoleLabel(currentRole),
-            onTap: () {},
-            colorScheme: colorScheme,
-            context: context,
-          ),
-          _buildStatItem(
-            Icons.workspace_premium_outlined,
-            '会员',
-            _getMemberLevelLabel(currentMemberLevel),
-            onTap: () {},
-            colorScheme: colorScheme,
-            context: context,
-          ),
-          _buildStatItem(
-            Icons.emoji_events_outlined,
-            '成就',
-            '$achievementCount',
-            onTap: onAchievementsTap,
-            colorScheme: colorScheme,
-            context: context,
-          ),
-          _buildStatItem(
-            Icons.monetization_on_outlined,
-            '积分',
-            '$totalPoints',
-            onTap: onPointsTap,
-            colorScheme: colorScheme,
-            context: context,
-          ),
-        ],
+      child: Card(
+        margin: EdgeInsets.zero,
+        // 整体一张卡片：内部 4 格以竖线分割（替代旧版 4 张独立小卡片）
+        clipBehavior: Clip.antiAlias,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(radius)),
+        child: Row(
+          children: [
+            _buildStatItem(
+              Icons.stars_outlined,
+              '角色',
+              _getRoleLabel(currentRole),
+              onTap: () {},
+              colorScheme: colorScheme,
+              context: context,
+            ),
+            _verticalDivider(colorScheme),
+            _buildStatItem(
+              Icons.workspace_premium_outlined,
+              '会员',
+              _getMemberLevelLabel(currentMemberLevel),
+              onTap: () {},
+              colorScheme: colorScheme,
+              context: context,
+            ),
+            _verticalDivider(colorScheme),
+            _buildStatItem(
+              Icons.emoji_events_outlined,
+              '成就',
+              '$achievementCount',
+              onTap: onAchievementsTap,
+              colorScheme: colorScheme,
+              context: context,
+            ),
+            _verticalDivider(colorScheme),
+            _buildStatItem(
+              Icons.monetization_on_outlined,
+              '积分',
+              '$totalPoints',
+              onTap: onPointsTap,
+              colorScheme: colorScheme,
+              context: context,
+            ),
+          ],
+        ),
       ),
     );
   }
