@@ -355,6 +355,19 @@ class GameRewardService {
           granted: true,
         ));
       }
+
+      // 4c) 全局复合成就（all_games_tier）：跨游戏段位判定——
+      //    「全能得分王」（三游戏均达黄金段位+）与「全能游戏大师」（全部段位集齐）。
+      final globalTier = await GameBadgeService.instance
+          .unlockGlobalTierAchievements(achievements: achievements);
+      if (globalTier != null) {
+        items.add(GameSettlementItem(
+          kind: 'achievement',
+          label: '成就：${globalTier.name}',
+          points: globalTier.rewardPoints,
+          granted: true,
+        ));
+      }
     }
 
     return GameSettlementResult(items: items);

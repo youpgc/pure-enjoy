@@ -123,6 +123,95 @@ class GameBadgeService {
     }
   }
 
+  /// 全局复合成就（all_games_tier）：跨游戏段位达成判定。
+  ///
+  /// condition 形如 `{"type":"all_games_tier"}`（无 min_tier = 三款游戏全部
+  /// 模式段位集齐 →「全能游戏大师」）或 `{"type":"all_games_tier","min_tier":3}`
+  /// （三款游戏各自已有 tier ≥ 3 的段位解锁 →「全能得分王」，2026-09-11 语义
+  /// 修正：原 daily_streak 为 App 未实现的死条件）。
+  ///
+  /// 仅在「本次有新段位解锁」时触发（与 [unlockAllModesTier] 同点），静默
+  /// best-effort；解锁走 claim 幂等 + 解锁记录，与段位徽章同口径。
+  Future<GameAchievementModel?> unlockGlobalTierAchievements({
+    required List<GameAchievementModel> achievements,
+  }) async {
+    final globals = achievements
+        .where((a) => a.condition['type']?.toString() == 'all_games_tier')
+        .toList();
+    if (globals.isEmpty) return null;
+
+    // 全部段位成就（按游戏分组）；三款游戏缺一则无法判定
+    final tiersByGame = <String, List<GameAchievementModel>>{};
+    for (final a in achievements) {
+      if (a.condition['type']?.toString() != 'mode_tier') continue;
+      final game = a.condition['game']?.toString();
+      if (game == null || game.isEmpty || game == 'null') continue;
+      tiersByGame.putIfAbsent(game, () => <GameAchievementModel>[]).add(a);
+    }
+    if (tiersByGame.length < 3) return null;
+
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null) return null;
+
+    try {
+      final allTierIds =
+          tiersByGame.values.expand((list) => list.map((a) => a.id)).toList();
+      final res = await ApiClient.get(
+        'user_game_achievements',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'achievement_id': 'in.(${allTierIds.join(',')})',
+        },
+        select: 'achievement_id',
+        note: 'games:global_tier_check',
+      );
+      if (!res.isSuccess) return null;
+      final unlockedIdSet = ((res.data as List<dynamic>?) ?? <dynamic>[])
+          .map((r) =>
+              r is Map<String, dynamic> ? r['achievement_id']?.toString() : null)
+          .whereType<String>()
+          .toSet();
+
+      // 逐条评估全局成就条件
+      final satisfied = <GameAchievementModel>[];
+      for (final g in globals) {
+        final minTier = g.condition['min_tier'];
+        if (minTier is num) {
+          // 各游戏均已有 tier >= minTier 的段位解锁
+          final ok = tiersByGame.values.every((tiers) => tiers.any((t) {
+                final tier = t.condition['tier'];
+                return tier is num &&
+                    tier >= minTier &&
+                    unlockedIdSet.contains(t.id);
+              }));
+          if (ok) satisfied.add(g);
+        } else {
+          // 三款游戏全部模式段位集齐
+          final ok = tiersByGame.values
+              .every((tiers) => tiers.every((t) => unlockedIdSet.contains(t.id)));
+          if (ok) satisfied.add(g);
+        }
+      }
+      if (satisfied.isEmpty) return null;
+
+      GameAchievementModel? newly;
+      for (final g in satisfied) {
+        var claimable = true;
+        if (g.rewardPoints > 0) {
+          final r = await GameRewardService.instance.claimAchievementPoints(g);
+          claimable = r.granted || r.reason == '该奖励已领取';
+        }
+        if (!claimable) continue;
+        final isNew = await recordAchievementBadge(achievement: g);
+        if (isNew) newly ??= g;
+      }
+      return newly;
+    } catch (e) {
+      debugPrint('[GameBadgeService] 全局复合成就判定失败：$e');
+      return null;
+    }
+  }
+
   /// 由关卡反解模式编码（mode_tier 徽章匹配用）。
   ///
   /// 优先按 `level.modeId` 查配置缓存；endless 合成关（无 server 关）按
