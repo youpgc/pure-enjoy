@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/cache_helper.dart';
 import '../models/game_score_model.dart';
@@ -173,6 +174,11 @@ class GameScoreService {
 
     if (!result.isSuccess) {
       debugPrint('[GameScoreService] 成绩上报失败：${result.errorMessage}');
+      // 错误上报（2026-09-11）：成绩提交失败直接影响用户数据，须后台可见
+      ErrorReporter.reportMessage(
+        '游戏成绩上报失败：${result.errorMessage}（game=$gameId, level=$levelId, mode=$modeId, status=${statusOverride ?? (cleared ? 'cleared' : 'failed')}）',
+        module: 'games',
+      );
       return null;
     }
 
@@ -194,6 +200,10 @@ class GameScoreService {
         if (!rowResult.isSuccess) {
           debugPrint(
               '[GameScoreService] 维度 ${entry.key} 写入失败：${rowResult.errorMessage}');
+          ErrorReporter.reportMessage(
+            '游戏成绩维度值写入失败：${rowResult.errorMessage}（score=$scoreId, dim=${entry.key}, value=${entry.value}）',
+            module: 'games',
+          );
         }
       }));
     }
@@ -234,6 +244,11 @@ class GameScoreService {
       );
       if (!result.isSuccess) {
         debugPrint('[GameScoreService] 已通关关卡查询失败：${result.errorMessage}');
+        ErrorReporter.reportMessage(
+          '已通关关卡集合查询失败：${result.errorMessage}（offset=$offset）',
+          module: 'games',
+          level: 'warning',
+        );
         return offset == 0 ? <String>{} : set; // 后续页失败保留已拉到的部分
       }
       final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
@@ -271,6 +286,11 @@ class GameScoreService {
 
     if (!result.isSuccess) {
       debugPrint('[GameScoreService] 最佳成绩查询失败：${result.errorMessage}');
+      ErrorReporter.reportMessage(
+        '最佳成绩 RPC 查询失败：${result.errorMessage}（game=$gameId）',
+        module: 'games',
+        level: 'warning',
+      );
       return loadCachedBestScores();
     }
 
@@ -332,6 +352,11 @@ class GameScoreService {
 
     if (!result.isSuccess) {
       debugPrint('[GameScoreService] 成绩记录查询失败：${result.errorMessage}');
+      ErrorReporter.reportMessage(
+        '成绩记录查询失败：${result.errorMessage}（game=$gameId, offset=$offset）',
+        module: 'games',
+        level: 'warning',
+      );
       return <GameScoreModel>[];
     }
 
@@ -386,6 +411,11 @@ class GameScoreService {
 
       if (!result.isSuccess) {
         debugPrint('[GameScoreService] 成绩维度值查询失败：${result.errorMessage}');
+        ErrorReporter.reportMessage(
+          '成绩维度值查询失败：${result.errorMessage}（game=$gameId, offset=$offset）',
+          module: 'games',
+          level: 'warning',
+        );
         return offset == 0 ? <GameScoreEntry>[] : list; // 保留已聚合部分
       }
 

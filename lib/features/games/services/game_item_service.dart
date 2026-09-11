@@ -2,6 +2,7 @@ import 'package:uuid/uuid.dart';
 
 import 'package:pure_enjoy/core/utils/event_bus.dart';
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../../../features/profile/services/point_service.dart';
 import '../models/game_item_model.dart';
@@ -43,7 +44,15 @@ class GameItemService {
         order: 'sort_order.asc',
         limit: null,
       );
-      if (!result.isSuccess || result.data == null) return <GameItemModel>[];
+      if (!result.isSuccess || result.data == null) {
+        // 目录拉取失败：对局内表现为无道具可用，上报后台便于发现（2026-09-11）
+        ErrorReporter.reportMessage(
+          '道具目录查询失败：${result.errorMessage ?? '空数据'}（game=$gameCode）',
+          module: 'games',
+          level: 'warning',
+        );
+        return <GameItemModel>[];
+      }
       final items = result.data!
           .map((j) => GameItemModel.fromJson(j))
           .where((it) => mode == null || it.mode.isEmpty || it.mode == mode)
@@ -104,6 +113,10 @@ class GameItemService {
         remark: '购买道具:${item.name}',
       );
       if (!spent) {
+        ErrorReporter.reportMessage(
+          '道具购买扣分失败：${item.name}（item=${item.id}, cost=${item.pointCost}, user=$userId）',
+          module: 'games',
+        );
         return {'success': false, 'message': '积分扣减失败，请稍后重试'};
       }
 
@@ -115,6 +128,11 @@ class GameItemService {
           delta: item.pointCost,
           type: 'earn',
           remark: '购买道具回退:${item.name}',
+        );
+        // 错误上报（2026-09-11）：扣分/回退/入库的中间态失败涉及资金一致性
+        ErrorReporter.reportMessage(
+          '道具购买入库失败：${item.name}（item=${item.id}, user=$userId, 积分回退=${refunded ? '成功' : '失败需人工核对'}）',
+          module: 'games',
         );
         return {
           'success': false,
@@ -167,6 +185,11 @@ class GameItemService {
       }
       return false; // 无库存行即视为不足
     } catch (e) {
+      // 错误上报（2026-09-11）：道具消耗异常会导致玩家扣不到/白扣券
+      ErrorReporter.reportMessage(
+        '道具消耗异常：$e（item=$itemId, user=$userId）',
+        module: 'games',
+      );
       return false;
     }
   }

@@ -4,6 +4,7 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
+import '../../../../services/error_reporter.dart';
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
@@ -455,6 +456,8 @@ class _G2048GameState extends State<G2048Game> {
         // 兜底：任何异常都强制释放 _animating，避免棋盘永久冻结（滑动无响应）。
         debugPrint('[G2048] 动画回调异常，强制释放 _animating：$e');
         debugPrint('[G2048] $st');
+        // 错误上报（2026-09-11）：此类异常会被静默吞掉、只表现为卡死，须后台可见
+        ErrorReporter.report(e, st, module: 'games');
       } finally {
         _animating = false;
         if (mounted) setState(() {});

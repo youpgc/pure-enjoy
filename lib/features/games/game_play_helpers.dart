@@ -10,6 +10,7 @@ import 'play/game_settlement_sheet.dart';
 import 'services/game_reward_service.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
+import '../../../services/error_reporter.dart';
 
 /// 打包进本 App 的资源清单缓存（进程内一次加载）。
 Set<String>? _bundledAssetCache;
@@ -170,28 +171,36 @@ Future<GameSettlementResult?> reportAndSettle({
   // 加载完成前展示 loading，期间弹窗不可点遮罩关闭/拖拽（禁其他操作）。
   final completer = Completer<GameSettlementResult?>();
   final settleFuture = () async {
-    // 成绩上报：通关 / 达标失败局始终记录；步数 <5 的失败局不计入
-    //（默认流程也记录成绩，仅不发奖励）
-    if (!belowMoveFloor) {
-      await GameScoreService.instance.submitScore(
-        gameId: game.id,
-        levelId: level.id.isEmpty ? null : level.id,
-        modeId: level.modeId.isEmpty ? null : level.modeId,
+    try {
+      // 成绩上报：通关 / 达标失败局始终记录；步数 <5 的失败局不计入
+      //（默认流程也记录成绩，仅不发奖励）
+      if (!belowMoveFloor) {
+        await GameScoreService.instance.submitScore(
+          gameId: game.id,
+          levelId: level.id.isEmpty ? null : level.id,
+          modeId: level.modeId.isEmpty ? null : level.modeId,
+          cleared: cleared,
+          durationMs: durationMs,
+          values: valuesById,
+        );
+      }
+      // 奖励结算门禁：默认流程跳过（claim_key 体系不触发 = 不发分不发成就）
+      if (!rewardsAllowed) {
+        return const GameSettlementResult(items: <GameSettlementItem>[]);
+      }
+      return await GameRewardService.instance.settleGame(
+        game: game,
+        level: level,
+        scoreValuesByCode: scoreValuesByCode,
         cleared: cleared,
-        durationMs: durationMs,
-        values: valuesById,
       );
-    }
-    // 奖励结算门禁：默认流程跳过（claim_key 体系不触发 = 不发分不发成就）
-    if (!rewardsAllowed) {
+    } catch (e, st) {
+      // 结算链异常兜底（2026-09-11）：异常曾直接抛给弹窗 Future 消费者，
+      // 既让用户看不到结算结果，错误也不会进后台错误日志
+      ErrorReporter.report(e, st, module: 'games');
+      debugPrint('[GamePlayHelpers] 结算链异常：$e');
       return const GameSettlementResult(items: <GameSettlementItem>[]);
     }
-    return GameRewardService.instance.settleGame(
-      game: game,
-      level: level,
-      scoreValuesByCode: scoreValuesByCode,
-      cleared: cleared,
-    );
   }();
 
   if (context.mounted) {

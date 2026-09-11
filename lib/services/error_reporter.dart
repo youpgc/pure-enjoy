@@ -58,6 +58,20 @@ class ErrorReporter {
     _doReport(error, stack, module, level).catchError((_) {});
   }
 
+  /// 上报一条非异常的业务失败信息（如接口返回失败、写入被拦截等），fire-and-forget。
+  ///
+  /// 供各业务模块在「catch 住后仅 debugPrint」的失败分支调用，让后台错误日志
+  /// 可见（module 建议传业务域标识，如 'games'）。[level] 通常 'error'（写链路
+  /// 失败）或 'warning'（读链路降级）。
+  static void reportMessage(
+    String message, {
+    String module = 'app',
+    String level = 'error',
+    StackTrace? stack,
+  }) {
+    _doReport(StateError(message), stack, module, level).catchError((_) {});
+  }
+
   static Future<void> _doReport(
     Object error,
     StackTrace? stack,

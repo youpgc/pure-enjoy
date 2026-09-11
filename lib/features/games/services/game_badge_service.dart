@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
@@ -179,8 +180,14 @@ class GameBadgeService {
         note: 'games:badge_unlock',
       );
       return inserted.isSuccess;
-    } catch (e) {
+    } catch (e, st) {
       debugPrint('[GameBadgeService] 徽章记录失败：${achievement.code} $e');
+      // 错误上报（2026-09-11）：段位徽章解锁记录失败影响复合荣誉判定
+      ErrorReporter.report(
+        e,
+        st,
+        module: 'games',
+      );
       return false;
     }
   }

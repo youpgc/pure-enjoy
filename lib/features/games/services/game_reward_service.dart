@@ -3,6 +3,7 @@ import 'package:uuid/uuid.dart';
 
 import '../../../core/utils/event_bus.dart';
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../../profile/services/point_service_utils.dart';
 import '../models/game_achievement_model.dart';
@@ -113,10 +114,11 @@ class GameRewardService {
       gameId: achievement.gameId,
     );
     if (res.granted) {
-      // 记录用户成就（看板展示 + 终身唯一兜底）。best-effort，失败仅记日志。
+      // 记录用户成就（看板展示 + 终身唯一兜底）。失败上报后台（发分已成功，
+      // 记录失败会导致「积分已发但看板永不显示」的闭环缺口，2026-09-11）。
       final userId = AuthService.instance.currentUserId;
       if (userId != null) {
-        await ApiClient.post(
+        final rec = await ApiClient.post(
           'user_game_achievements',
           <String, dynamic>{
             'id': const Uuid().v4(),
@@ -128,6 +130,12 @@ class GameRewardService {
           returnRepresentation: false,
           note: 'games:user_achievement',
         );
+        if (!rec.isSuccess) {
+          ErrorReporter.reportMessage(
+            '用户成就记录写入失败（积分已发）：${rec.errorMessage}（achievement=${achievement.code}, user=$userId）',
+            module: 'games',
+          );
+        }
       }
     }
     return res;
@@ -388,6 +396,11 @@ class GameRewardService {
     if (!result.isSuccess) {
       debugPrint(
           '[GameRewardService] 今日已领积分查询失败：${result.errorMessage}');
+      ErrorReporter.reportMessage(
+        '今日已领积分查询失败：${result.errorMessage}（user=$userId, game=$gameId）',
+        module: 'games',
+        level: 'warning',
+      );
       return 0;
     }
 
@@ -463,6 +476,11 @@ class GameRewardService {
 
     if (!rpc.isSuccess) {
       debugPrint('[GameRewardService] 发奖 RPC 失败：$claimKey ${rpc.error}');
+      // 错误上报（2026-09-11）：发分失败直接影响用户权益，须后台可见
+      ErrorReporter.reportMessage(
+        '游戏奖励发放失败：${rpc.error}（claim=$claimKey, points=$points, user=$userId, game=$gameId）',
+        module: 'games',
+      );
       return GameRewardResult.notGranted(reason: '发放失败，请重试');
     }
 

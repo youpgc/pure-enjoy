@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../utils/cache_helper.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_dimension_model.dart';
@@ -280,6 +281,12 @@ class GameService {
       );
       if (!result.isSuccess) {
         debugPrint('[GameService] 拉取 $table 失败：${result.errorMessage}');
+        // 错误上报（2026-09-11）：配置拉取失败会让对局/结算整体降级
+        ErrorReporter.reportMessage(
+          '游戏配置拉取失败：${result.errorMessage}（table=$table, offset=$offset）',
+          module: 'games',
+          level: 'warning',
+        );
         return <dynamic>[];
       }
       return (result.data as List<dynamic>?) ?? <dynamic>[];
