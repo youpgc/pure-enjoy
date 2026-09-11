@@ -83,9 +83,13 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
 
   String _fmtDate(DateTime? dt) {
     if (dt == null) return '-';
-    // Supabase 返回 UTC（isUtc=true），须转本地时区再格式化，否则差 8 小时
-    final local = dt.toLocal();
-    return '${local.year}-${local.month.toString().padLeft(2, '0')}-${local.day.toString().padLeft(2, '0')} ${local.hour.toString().padLeft(2, '0')}:${local.minute.toString().padLeft(2, '0')}';
+    // 统一北京时间展示（2026-09-11）：此前 toLocal() 依赖设备时区，
+    // 非北京时区的设备（模拟器/出国真机）会偏差；改为固定 UTC+8，
+    // 与 achievement_service.formatBeijing 同口径。格式 YYYY-MM-DD HH:mm:ss。
+    final utc = dt.isUtc ? dt : dt.toUtc();
+    final bj = utc.add(const Duration(hours: 8));
+    return '${bj.year}-${bj.month.toString().padLeft(2, '0')}-${bj.day.toString().padLeft(2, '0')} '
+        '${bj.hour.toString().padLeft(2, '0')}:${bj.minute.toString().padLeft(2, '0')}:${bj.second.toString().padLeft(2, '0')}';
   }
 
   @override
