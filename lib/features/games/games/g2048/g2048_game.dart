@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../services/error_reporter.dart';
+import '../../../../services/supabase_config.dart';
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
@@ -147,12 +148,20 @@ class _G2048GameState extends State<G2048Game> {
     _grid = List.generate(_size, (_) => List.filled(_size, null));
     _loadBest();
     _reset();
-    // 道具目录/库存异步加载（失败静默，不影响对局）
+    // 道具目录/库存异步加载（失败不影响对局，错误上报后台可观测）
     _loadProps();
   }
 
   /// 加载道具：按本局模式过滤（限时→加时卡、挑战→加步卡）。
   Future<void> _loadProps() async {
+    // 模式解析诊断（2026-09-11 排查「道具栏全模式为空」）：time_limit/
+    // max_moves 任一解析成功才会构建对应道具按钮——若日志中 keys 缺键，
+    // 说明上游给的 level.config 非真实关卡配置（如 defaultLevel 兜底）
+    SecureLogger.log(
+      '[G2048][props] modeId=${widget.level.modeId} levelNo=${widget.level.levelNo} '
+      'configKeys=${widget.level.config.keys.toList()} '
+      'timeLimit=$_timeLimit movesLimit=$_movesLimit',
+    );
     await _props.load(
       hasTimeLimit: _timeLimit != null,
       hasMovesLimit: _movesLimit != null,
@@ -597,7 +606,8 @@ class _G2048GameState extends State<G2048Game> {
       hint: '在棋盘上朝上下左右拖动，相同数字相撞即合并（无需点击）',
       // 道具栏（2026-09-10）：限时模式加时卡 / 挑战模式加步卡，数据驱动。
       // 渲染条件与消消乐同口径：目录已载入即展示（0 库存为禁用态，引导购买），
-      // 经典/无尽无时间/步数概念 → 道具栏为空 → 仅空白占位行。
+      // 经典/无尽无时间/步数概念 → 道具栏为空 → 空白占位行（无文案，2026-09-11）
+      propPlaceholder: '',
       propActions: <GameAction>[
         if (_timeLimit != null)
           _buildPropAction(

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../../services/error_reporter.dart';
 import '../../models/game_item_model.dart';
 import '../../services/game_item_service.dart';
 import '../../shared/game_shell.dart';
@@ -63,7 +64,12 @@ class G2048Props {
         s.owned = owned < budget ? owned : budget;
       }
     } catch (e) {
-      // 载入失败不影响对局
+      // 载入失败不影响对局，但上报后台可观测（2026-09-11 排查道具栏空问题）
+      ErrorReporter.reportMessage(
+        '2048 道具目录/库存加载异常：$e',
+        module: 'games',
+        level: 'warning',
+      );
     }
   }
 
