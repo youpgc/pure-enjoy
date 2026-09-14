@@ -134,7 +134,13 @@ class AuthService {
     final result = await _auth.signInWithEmail(
         email: email, password: password);
     await _saveAuthResult(result);
-    _reportLogin(success: result.success, account: email);
+    // 传用户 JWT：RPC 内 auth.uid() 靠它反查用户——anon key 会导致
+    // 日志游离（user_id null）且 users.login_count 不自增（2026-09-11 修复）
+    _reportLogin(
+      success: result.success,
+      account: email,
+      token: result.success ? result.accessToken : null,
+    );
     return result;
   }
 
@@ -146,7 +152,11 @@ class AuthService {
     final result = await _auth.signInWithAccount(
         account: account, password: password);
     await _saveAuthResult(result);
-    _reportLogin(success: result.success, account: account);
+    _reportLogin(
+      success: result.success,
+      account: account,
+      token: result.success ? result.accessToken : null,
+    );
     return result;
   }
 
@@ -167,9 +177,11 @@ class AuthService {
     return _cachedAppVersion!;
   }
 
-  /// 触发一次登录日志记录（fire-and-forget）
-  void _reportLogin({required bool success, String? account}) {
-    _doReportLogin(success, account).catchError((_) {});
+  /// 触发一次登录日志记录（fire-and-forget）。
+  /// [token]：成功登录时传用户 JWT——record_login 内 auth.uid() 靠它反查
+  /// 用户并回写 login_count；失败/未认证传 null（anon 身份，仅记尝试账号）。
+  void _reportLogin({required bool success, String? account, String? token}) {
+    _doReportLogin(success, account, token).catchError((_) {});
   }
 
   /// 解析登录地点（best-effort）：依次尝试多个免费 GeoIP 接口，任一成功即返回。
@@ -211,7 +223,8 @@ class AuthService {
     return null;
   }
 
-  Future<void> _doReportLogin(bool success, String? account) async {
+  Future<void> _doReportLogin(
+      bool success, String? account, String? token) async {
     final location = await _resolveLocation();
 
     final ua = 'PureEnjoy/${await _appVersion} (${Platform.operatingSystem})';
@@ -220,7 +233,10 @@ class AuthService {
       method: 'POST',
       headers: {
         'apikey': SupabaseConfig.anonKey,
-        'Authorization': 'Bearer ${SupabaseConfig.anonKey}',
+        // 成功登录必须带用户 JWT：record_login 内 auth.uid() 取的是 Authorization
+        // 里的 sub，用 anon key 会得到 null → 日志 user_id 为空、login_count 不自增。
+        // 失败登录无 JWT，回落 anon（RPC 已授权 anon，仅记尝试账号）。
+        'Authorization': 'Bearer ${token ?? SupabaseConfig.anonKey}',
         'Content-Type': 'application/json',
       },
       body: {
@@ -249,6 +265,13 @@ class AuthService {
       phone: phone,
     );
     await _saveAuthResult(result);
+    // 注册即登录：signup 成功时已拿到会话（success 要求 accessToken 非空），
+    // 属真实鉴权事件，需与登录同口径埋点；否则新用户注册期日志全缺（2026-09-11 修复）
+    _reportLogin(
+      success: result.success,
+      account: email,
+      token: result.success ? result.accessToken : null,
+    );
     return result;
   }
 
