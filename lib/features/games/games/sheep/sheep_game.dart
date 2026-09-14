@@ -18,7 +18,8 @@ import './sheep_tile.dart';
 ///
 /// - 多层堆叠遮挡：上层方块盖住下层，仅「未遮挡」方块可点（原版核心机制）。
 /// - **紧凑团簇布局**：牌堆聚成一团、层间错半格形成遮挡（布局算法见 [SheepLayout]）。
-/// - 7 槽位 + 三连消除：凑齐 3 个同类自动消除；槽位溢出即失败；清空棋盘通关。
+/// - 7 槽位 + 三连消除：凑齐 3 个同类自动消除；槽位放满后不可再点击方块
+///   （仅道具可腾位）；清空棋盘通关。
 /// - 三道具（每局各 1 次）：移出 / 撤回 / 洗牌，统一收纳在底部控制栏。
 /// - 公平难度：按关卡 config 的「类型数/层数/每类数」程序化生成，并用贪心模拟
 ///   校验可解性（保证每类数量为 3 的倍数，存在可通关顺序）。
@@ -217,7 +218,14 @@ class _SheepGameState extends State<SheepGame> {
   }
 
   void _tapTile(SheepTile tile) {
-    if (_finished || _busy || tile.covered || tile.state != SheepTileState.board) {
+    if (_finished || _busy) return;
+    // 槽位已满（7/7）：不允许再放入任何方块，仅道具（移出/撤回）腾位后恢复点击。
+    // 无可用错误音效，重触感提示即可。
+    if (_slots.length >= _slotCapacity) {
+      GameAudio.instance.haptic(GameHaptic.heavy);
+      return;
+    }
+    if (tile.covered || tile.state != SheepTileState.board) {
       return;
     }
     _pushSnapshot();
@@ -452,7 +460,7 @@ class _SheepGameState extends State<SheepGame> {
             valueColor: _secondsLeft <= 10 ? AppTheme.error : null,
           ),
       ],
-      hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满即失败',
+      hint: '点击没被压住的方块送入下方槽位，凑齐 3 个同类自动消除；槽位放满后只能使用道具腾位',
       // 道具栏加大（2026-09-10 用户需求）：高度 68、图标 24、文案 14
       propBarHeight: 68,
       propIconSize: 24,
