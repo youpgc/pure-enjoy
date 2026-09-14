@@ -196,12 +196,14 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
   Future<void> _clearCache() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-      // 只清除非设置类的缓存，保留用户设置
+      // 只清除非设置类的缓存，保留用户设置与会话（sb_* 为登录态持久化，
+      // 误删会导致下次冷启动意外登出，2026-09-14 审查修复）
       final keysToRemove = prefs.getKeys().where((key) =>
         !key.startsWith('theme_') &&
         !key.startsWith('font_') &&
         !key.startsWith('color_') &&
         !key.startsWith('setting_') &&
+        !key.startsWith('sb_') &&
         key != 'user'
       ).toList();
       await Future.wait(keysToRemove.map((key) => prefs.remove(key)));

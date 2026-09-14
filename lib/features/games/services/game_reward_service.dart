@@ -440,6 +440,15 @@ class GameRewardService {
   int? _cachedGlobalClaimed;
   final Map<String, int> _cachedGameClaimed = <String, int>{};
 
+  /// 账号切换时清空「今日已领」链内缓存（2026-09-14 审查修复）：
+  /// 缓存值按用户统计，切号不清会导致新账号读到旧账号的已领积分，
+  /// 进而误判「已领取」/提前触发每日上限。
+  void resetForAccountSwitch() {
+    _claimedCacheDay = null;
+    _cachedGlobalClaimed = null;
+    _cachedGameClaimed.clear();
+  }
+
   /// 取「今日已领」缓存值（无缓存时回源查询一次）。
   Future<int> _claimedPointsCached({String? gameId}) async {
     final day = beijingDateKey(DateTime.now());

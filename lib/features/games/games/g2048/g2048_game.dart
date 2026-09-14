@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../../../services/error_reporter.dart';
-import '../../../../services/supabase_config.dart';
+import '../../../../services/supabase_service.dart';
 import '../../game_play_helpers.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
@@ -104,8 +104,11 @@ class _G2048GameState extends State<G2048Game> {
   DateTime _startTime = DateTime.now();
   final Random _rng = Random();
 
-  /// 最高分持久化 key（按关卡号区分，避免不同关卡共用同一最高分）
-  String get _bestKey => 'g2048_best_${widget.level.levelNo}';
+  /// 最高分持久化 key（按「用户 + 关卡号」区分：避免不同关卡/不同账号共用同一最高分；
+  /// 2026-09-14 审查修复——旧键无 userId，切号后新用户看到旧账号最高分。
+  /// 未登录传 guest，登录后各自隔离）
+  String get _bestKey =>
+      'g2048_best_${AuthService.instance.currentUserId ?? 'guest'}_${widget.level.levelNo}';
 
   @override
   void initState() {

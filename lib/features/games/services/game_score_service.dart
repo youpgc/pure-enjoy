@@ -164,6 +164,12 @@ class GameScoreService {
   /// 内存缓存：最佳成绩（避免看板重复请求）
   List<GameBestScore>? _memoryBest;
 
+  /// 账号切换时清空最佳成绩内存缓存（2026-09-14 审查修复）：
+  /// 缓存按用户统计，切号不清会导致新账号看到旧账号的最佳成绩。
+  void resetForAccountSwitch() {
+    _memoryBest = null;
+  }
+
   /// 上报一次游玩成绩。
   ///
   /// [values] 为「维度 id → 取值」，按配置维度传入（如分数、用时）。

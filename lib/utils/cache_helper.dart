@@ -86,6 +86,9 @@ class CacheHelper {
       keyHabits,
       keyPointStats,
       keyGameScores,
+      // 「我的」页头部统计（积分/成就数/头像 URL）：2026-09-14 审查修复，
+      // 之前声明「须清除」却遗漏在列表外，导致切号后新用户读到旧账号统计
+      keyProfileStats,
       // 注：keyGames 是全局配置（非用户数据），故意不在此清除
     ];
     for (final key in keysToRemove) {
@@ -108,6 +111,20 @@ class CacheHelper {
     final anniversaryKeys =
         allKeys.where((k) => k.startsWith('cached_anniversaries_'));
     for (final key in anniversaryKeys) {
+      await prefs.remove(key);
+    }
+
+    // 首页聚合缓存（习惯/打卡 + RequestCache 的 __ts 时间戳键）：
+    // 2026-09-14 审查修复，此前未清导致切号后首页秒开旧账号习惯与打卡数据
+    final homeKeys = allKeys.where((k) => k.startsWith('cache_home_'));
+    for (final key in homeKeys) {
+      await prefs.remove(key);
+    }
+
+    // 2048 本地最高分（g2048_best_<关卡号>，无 userId 前缀的历史键）：
+    // 2026-09-14 审查修复；新键已含 userId，此处同时清旧格式键
+    final bestKeys = allKeys.where((k) => k.startsWith('g2048_best'));
+    for (final key in bestKeys) {
       await prefs.remove(key);
     }
 

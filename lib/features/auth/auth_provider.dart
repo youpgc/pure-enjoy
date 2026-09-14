@@ -2,8 +2,12 @@ import 'dart:async';
 
 import 'package:flutter/foundation.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../services/http_client.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
+import '../../utils/cache_helper.dart';
+import '../games/services/game_reward_service.dart';
+import '../games/services/game_score_service.dart';
 import '../../constants/app_constants.dart';
 
 /// 认证状态
@@ -83,6 +87,34 @@ class AuthNotifier extends StateNotifier<AuthState> {
         .catchError((_) {}));
   }
 
+  /// 账号切换/会话失效时统一清理本地用户数据（2026-09-14 审查修复）。
+  ///
+  /// 覆盖四条路径：登出、登录成功（含未登出直接顶号）、注册成功、
+  /// 冷启动时未登录（会话过期强制登出后的孤儿数据）。
+  /// - SharedPreferences 用户态缓存（CacheHelper.clearAllUserData）
+  /// - ETag 请求缓存（同 URL 304 会把旧账号响应体还给新账号）
+  /// - 已调度的本地横幅提醒（顶号登录时旧账号提醒仍在）
+  /// - 游戏单例内存缓存（今日已领积分 / 最佳成绩）
+  Future<void> _clearLocalUserData() async {
+    try {
+      await CacheHelper.instance.clearAllUserData();
+    } catch (e) {
+      if (kDebugMode) debugPrint('清理本地缓存失败: $e');
+    }
+    try {
+      await HttpClient.instance.clearEtagCache();
+    } catch (e) {
+      if (kDebugMode) debugPrint('清理 ETag 缓存失败: $e');
+    }
+    try {
+      await NotificationService.instance.cancelAllNotifications();
+    } catch (e) {
+      if (kDebugMode) debugPrint('清理本地提醒失败: $e');
+    }
+    GameRewardService.instance.resetForAccountSwitch();
+    GameScoreService.instance.resetForAccountSwitch();
+  }
+
   /// 初始化：检查当前登录状态
   void _init() {
     // 注册 Token 刷新成功回调：401→刷新后重同步 Riverpod 鉴权镜像，闭合 refreshUser 钩子。
@@ -97,6 +129,11 @@ class AuthNotifier extends StateNotifier<AuthState> {
         email: user?['email'] as String?,
         role: role,
       );
+    } else {
+      // 未登录冷启动（含 180 天会话过期强制登出）：清掉上次会话的孤儿缓存，
+      // 避免登录新账号后「秒开旧账号数据」（SessionManager 在 services 层，
+      // 无法反向依赖 features 层服务，故在此收口）
+      unawaited(_clearLocalUserData());
     }
   }
 
@@ -116,6 +153,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       if (kDebugMode) debugPrint('🔐 [Provider] 结果: success=${response.success}, error=${response.error}');
 
       if (response.success) {
+        // 登录成功先清场（未登出直接顶号时，旧账号的本地缓存/内存/提醒都在）
+        await _clearLocalUserData();
         final user = SupabaseService.instance.currentUser;
         final role = _resolveRole(user);
         state = AuthState(
@@ -152,6 +191,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
       );
 
       if (response.success) {
+        // 注册成功先清场（同登录，防孤儿缓存串号）
+        await _clearLocalUserData();
         final user = SupabaseService.instance.currentUser;
         final role = _resolveRole(user);
         // 注册成功但当前 UX 为「需手动登录」（技能 §4.5 产品决策），
@@ -177,6 +218,9 @@ class AuthNotifier extends StateNotifier<AuthState> {
   /// 登出
   Future<void> signOut() async {
     await SupabaseService.instance.signOut();
+    // 内存态单例缓存收口（SupabaseService.signOut 已清 SharedPreferences/ETag/通知，
+    // 这里统一兜底幂等清理，防后续新增清理项遗漏）
+    await _clearLocalUserData();
     state = const AuthState();
   }
 
