@@ -65,18 +65,20 @@ extension _Match3GameProps on _Match3GameState {
               : '确定要消耗 1 张洗牌卡（库存剩余 ${shuffle.owned} 张）吗？盘面将重排，特殊糖保留原位。',
           itemType: 'shuffle',
         )) {
-          final ok = await _props.consume(shuffle);
-          if (ok) {
+          final r = await _props.consume(shuffle);
+          if (r.ok) {
             if (_game.doShuffle()) {
               if (mounted) setState(() {});
               return true;
             }
-            // 洗牌执行失败（200 次重排仍无解，概率极低）：判负兜底防卡死
+            // 洗牌执行失败（200 次重排仍无解，概率极低）：按消耗来源退券 +
+            // 判负兜底防卡死（回询问会形成死循环，故直接判负）
+            _props.refund(shuffle, r.source);
             if (mounted) {
-              ScaffoldMessenger.of(context).showSnackBar(
-                const SnackBar(content: Text('洗牌失败，本局结束')),
-              );
+              setState(() {});
+              showSnackBar(context, '洗牌失败，洗牌卡已退回', isError: true);
             }
+            return false;
           }
         }
         continue; // 消耗失败/取消 → 回到询问
@@ -152,19 +154,18 @@ extension _Match3GameProps on _Match3GameState {
         itemType: itemType)) {
       return;
     }
-    if (!await _props.consume(s)) {
+    final r = await _props.consume(s);
+    if (!r.ok) {
       if (mounted) setState(() {});
       return;
     }
     switch (itemType) {
       case 'shuffle':
         if (!_game.doShuffle()) {
-          // 执行失败（概率极低）：额度已扣，提示并回补免费额度或库存
-          s.owned += 1;
+          // 执行失败（概率极低）：按实际消耗来源退回免费额度或库存
+          _props.refund(s, r.source);
           if (mounted) {
-            ScaffoldMessenger.of(context).showSnackBar(
-              const SnackBar(content: Text('洗牌失败，道具已退回')),
-            );
+            showSnackBar(context, '洗牌失败，道具已退回', isError: true);
           }
         }
       case 'hint':

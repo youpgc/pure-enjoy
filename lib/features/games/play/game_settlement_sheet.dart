@@ -38,6 +38,10 @@ class GameSettlementSheet extends StatefulWidget {
   final VoidCallback? onExit;
   final void Function(GameSettlementResult? result) onDismiss;
 
+  /// 结算失败后的重试回调（L1）：成绩已记录，仅重跑奖励发放；
+  /// 为 null 时不展示重试入口（如默认流程 scoreOnly）。
+  final Future<GameSettlementResult> Function()? onRetry;
+
   const GameSettlementSheet({
     super.key,
     required this.game,
@@ -52,6 +56,7 @@ class GameSettlementSheet extends StatefulWidget {
     this.canNext = false,
     this.onExit,
     required this.onDismiss,
+    this.onRetry,
   });
 
   @override
@@ -66,7 +71,12 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
   @override
   void initState() {
     super.initState();
-    widget.settleFuture.then((r) {
+    _listen(widget.settleFuture);
+  }
+
+  /// 订阅结算 Future：完成渲染明细 / 异常进错误态（成绩已记录不回滚）。
+  void _listen(Future<GameSettlementResult> future) {
+    future.then((r) {
       if (!mounted) return;
       setState(() {
         _result = r;
@@ -80,6 +90,18 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
         _loading = false;
       });
     });
+  }
+
+  /// 重试结算（仅奖励发放；成绩上报不重复执行，防止重复记录）
+  void _retry() {
+    final retry = widget.onRetry;
+    if (retry == null || _loading) return;
+    setState(() {
+      _loading = true;
+      _errored = false;
+      _result = null;
+    });
+    _listen(retry());
   }
 
   void _dismiss() {
@@ -181,6 +203,16 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
               ),
             ],
           ),
+          // 重试仅重跑奖励发放（成绩已记录，不重复上报），提供方为 null 时隐藏
+          if (widget.onRetry != null)
+            Align(
+              alignment: Alignment.centerLeft,
+              child: TextButton.icon(
+                onPressed: _retry,
+                icon: const Icon(Icons.refresh, size: 18),
+                label: const Text('重试结算'),
+              ),
+            ),
         ],
       );
     }

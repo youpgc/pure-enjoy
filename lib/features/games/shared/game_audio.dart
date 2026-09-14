@@ -1,6 +1,8 @@
 import 'package:audioplayers/audioplayers.dart';
 import 'package:flutter/services.dart';
 
+import '../../../../services/error_reporter.dart';
+
 /// 游戏音效 + 触感反馈统一封装。
 ///
 /// 所有音效为程序合成 WAV（assets/audio/），无版权、体积小、不含 BGM。
@@ -12,6 +14,8 @@ class GameAudio {
 
   final AudioPlayer _player = AudioPlayer();
   bool _muted = false;
+  // 播放失败只上报一次：资源缺失属全局性问题，逐次上报会刷屏
+  bool _playFailureReported = false;
 
   /// 是否静音（UI 开关写回）
   bool get muted => _muted;
@@ -24,8 +28,12 @@ class GameAudio {
     try {
       await _player.stop();
       await _player.play(AssetSource('audio/$file'));
-    } catch (_) {
-      // 资源缺失或播放失败时静默降级，不影响游戏逻辑
+    } catch (e, st) {
+      // 资源缺失或播放失败时静默降级，不影响游戏逻辑；仅首次上报便于发现打包遗漏
+      if (!_playFailureReported) {
+        _playFailureReported = true;
+        ErrorReporter.report(e, st, module: 'games', level: 'warning');
+      }
     }
   }
 

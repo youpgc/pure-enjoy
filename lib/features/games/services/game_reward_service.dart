@@ -432,6 +432,40 @@ class GameRewardService {
     return total;
   }
 
+  /// 今日已领积分链内缓存（M5）：一次结算链会触发多次 [fetchTodayClaimedPoints]
+  /// （全局 + 单游戏，每次领奖各一遍），逐次 HTTP 查询既慢又浪费。
+  /// 按「北京日期键」缓存，[_tryClaim] 发分成功后增量回写——游戏奖励唯一写入方
+  /// 就是本服务，缓存不会失真；跨天自动失效。
+  String? _claimedCacheDay;
+  int? _cachedGlobalClaimed;
+  final Map<String, int> _cachedGameClaimed = <String, int>{};
+
+  /// 取「今日已领」缓存值（无缓存时回源查询一次）。
+  Future<int> _claimedPointsCached({String? gameId}) async {
+    final day = beijingDateKey(DateTime.now());
+    if (_claimedCacheDay != day) {
+      _claimedCacheDay = day;
+      _cachedGlobalClaimed = null;
+      _cachedGameClaimed.clear();
+    }
+    if (gameId == null) {
+      _cachedGlobalClaimed ??= await fetchTodayClaimedPoints();
+      return _cachedGlobalClaimed!;
+    }
+    if (!_cachedGameClaimed.containsKey(gameId)) {
+      _cachedGameClaimed[gameId] = await fetchTodayClaimedPoints(gameId: gameId);
+    }
+    return _cachedGameClaimed[gameId]!;
+  }
+
+  /// 发分成功后把本次积分累加进缓存，保持后续校验实时性。
+  void _bumpClaimedCache(int points, String? gameId) {
+    _cachedGlobalClaimed = (_cachedGlobalClaimed ?? 0) + points;
+    if (gameId != null) {
+      _cachedGameClaimed[gameId] = (_cachedGameClaimed[gameId] ?? 0) + points;
+    }
+  }
+
   /// 通用领取流程：上限校验 → 调 grant_game_reward RPC（原子占坑 + 发分，幂等）→ 刷新积分。
   ///
   /// [bypassDailyLimit] 为 true 时跳过单日上限校验（成就奖励独立于单日上限）。
@@ -454,7 +488,7 @@ class GameRewardService {
 
       // 1a) 全局单日上限（跨游戏合计，默认 200 分）
       final limit = config.dailyLimit;
-      final claimed = await fetchTodayClaimedPoints();
+      final claimed = await _claimedPointsCached();
       if (claimed + points > limit) {
         return GameRewardResult.notGranted(
           reason: '今日游戏奖励已达上限（$limit 分）',
@@ -465,7 +499,7 @@ class GameRewardService {
       //     与全局上限取「先到先拦」——两者独立约束，任一超限即止。
       if (gameId != null) {
         final gameLimit = config.dailyLimitPerGame(gameId);
-        final gameClaimed = await fetchTodayClaimedPoints(gameId: gameId);
+        final gameClaimed = await _claimedPointsCached(gameId: gameId);
         if (gameClaimed + points > gameLimit) {
           return GameRewardResult.notGranted(
             reason: '本游戏今日奖励已达上限（$gameLimit 分）',
@@ -521,7 +555,8 @@ class GameRewardService {
       return GameRewardResult.notGranted(reason: '该奖励已领取');
     }
 
-    // 3) 发分成功，刷新积分展示
+    // 3) 发分成功，刷新积分展示；已领缓存增量回写，保持同链后续校验实时
+    _bumpClaimedCache(points, gameId);
     EventBus.instance.fire(EventType.pointsUpdated);
     return GameRewardResult.granted(points: points);
   }

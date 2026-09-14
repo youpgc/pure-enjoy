@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import '../../services/error_reporter.dart';
 import 'game_play_helpers.dart';
 import 'services/game_score_service.dart';
 import 'game_play_screen.dart';
@@ -114,8 +115,9 @@ class _PickerBodyState extends State<_PickerBody> {
             _itemExtent / 2;
         _scroll.jumpTo(target.clamp(0.0, _scroll.position.maxScrollExtent));
       }
-    } catch (_) {
-      // 刷新失败保持调用方传入的集合（不影响弹窗展示）
+    } catch (e, st) {
+      // 刷新失败保持调用方传入的集合（不影响弹窗展示）；读链路降级 → warning 上报
+      ErrorReporter.report(e, st, module: 'games', level: 'warning');
     }
   }
 

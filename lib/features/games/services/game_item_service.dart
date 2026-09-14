@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 
 import 'package:pure_enjoy/core/utils/event_bus.dart';
@@ -68,19 +69,32 @@ class GameItemService {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return <String, int>{};
     try {
-      final result = await ApiClient.get(
-        'user_game_items',
-        filters: {'user_id': 'eq.$userId'},
-        columns: 'id,item_id,owned',
-        limit: null,
-      );
+      // PostgREST 单次默认上限 1000 行：全量拉取必须按 offset 分页循环，
+      // 且按 item_id 排序保证分页窗口稳定（user_game_items 对单用户按道具唯一）
       final map = <String, int>{};
-      if (result.isSuccess && result.data != null) {
-        for (final row in result.data!) {
+      var offset = 0;
+      while (true) {
+        final result = await ApiClient.get(
+          'user_game_items',
+          filters: {'user_id': 'eq.$userId'},
+          columns: 'id,item_id,owned',
+          order: 'item_id',
+          limit: 1000,
+          offset: offset,
+        );
+        if (!result.isSuccess) {
+          debugPrint(
+              '[GameItemService] 库存查询失败：${result.errorMessage}');
+          return <String, int>{};
+        }
+        final rows = result.data ?? <dynamic>[];
+        for (final row in rows) {
           final itemId = row['item_id'] as String? ?? '';
           final owned = (row['owned'] as num?)?.toInt() ?? 0;
           if (itemId.isNotEmpty) map[itemId] = owned;
         }
+        if (rows.length < 1000) break;
+        offset += 1000;
       }
       return map;
     } catch (e) {

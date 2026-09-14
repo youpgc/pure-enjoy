@@ -201,13 +201,29 @@ Future<GameSettlementResult?> reportAndSettle({
         cleared: cleared,
       );
     } catch (e, st) {
-      // 结算链异常兜底（2026-09-11）：异常曾直接抛给弹窗 Future 消费者，
-      // 既让用户看不到结算结果，错误也不会进后台错误日志
+      // 结算链异常：上报后台后上抛，由结算页错误态承接（L1 重试入口），
+      // 不再吞成空明细——那会让用户误以为「无奖励」而非「发放异常」。
       ErrorReporter.report(e, st, module: 'games');
       debugPrint('[GamePlayHelpers] 结算链异常：$e');
-      return const GameSettlementResult(items: <GameSettlementItem>[]);
+      rethrow;
     }
   }();
+
+  // 重试回调（L1）：仅重跑奖励发放（成绩已记录，不重复上报防止重复记录）。
+  // 异常上报后继续上抛 → 结算页回到错误态，可再次重试。
+  Future<GameSettlementResult> retryRewards() async {
+    try {
+      return await GameRewardService.instance.settleGame(
+        game: game,
+        level: level,
+        scoreValuesByCode: scoreValuesByCode,
+        cleared: cleared,
+      );
+    } catch (e, st) {
+      ErrorReporter.report(e, st, module: 'games');
+      rethrow;
+    }
+  }
 
   if (context.mounted) {
     unawaited(showModalBottomSheet<GameSettlementResult?>(
@@ -226,6 +242,7 @@ Future<GameSettlementResult?> reportAndSettle({
         settleFuture: settleFuture,
         scoreOnly: !rewardsAllowed,
         endless: endless,
+        onRetry: rewardsAllowed ? retryRewards : null,
         onDismiss: (r) {
           if (!completer.isCompleted) completer.complete(r);
         },
@@ -237,7 +254,11 @@ Future<GameSettlementResult?> reportAndSettle({
     ));
   } else {
     // 上下文已失效（如页面被回收），仍尝试结算以发放奖励，但不再弹窗
-    await settleFuture;
+    try {
+      await settleFuture;
+    } catch (_) {
+      // 异常已在 settleFuture 内上报；无弹窗可承接，仅防未处理异常
+    }
     if (!completer.isCompleted) completer.complete(null);
   }
   return completer.future;

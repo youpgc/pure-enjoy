@@ -261,6 +261,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   }
 
   void _onFinished(GamePlayOutcome outcome) async {
+    if (!mounted) return; // 连锁收尾回调可能晚于页面销毁（动画期间退出），防 setState 落在 unmounted
     if (_outcome != null) return; // 防重复结算
     setState(() => _outcome = outcome);
     // 无尽模式：局间不结算——弹「继续下一局 / 结束并结算」选择，
@@ -315,15 +316,26 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   /// 对局进行中的「重新开始/新游戏」= 放弃本局：先按 aborted 上报（时长
   /// 达到记录阈值的，与返回键放弃同口径），再重建引擎。三游戏统一：
   /// 消消乐「重新开始」、2048「新游戏」（sheep 无重开按钮，走返回键）。
-  /// 已结算（_outcome != null）的「再玩一次」成绩已记录，不重复上报。
+  /// 重开/再玩：无尽会话状态归零（累加总分/局数/局明细），防止跨会话累加。
+  void _resetEndlessSession() {
+    _endlessTotal = 0;
+    _endlessRounds = 0;
+    _endlessRoundList.clear();
+  }
+
+  /// 已结算（_outcome != null）的「再玩一次」成绩已记录，不重复上报，
+  /// 但计时基准与无尽会话状态须归零——否则后续放弃的 duration 会累计
+  /// 上一局时长、新无尽会话得分会叠加旧会话。
   Future<void> _restartGame() async {
     if (_outcome != null) {
+      _resetEndlessSession();
       if (mounted) {
         setState(() {
           _outcome = null;
           _restartNonce++;
-              });
+        });
       }
+      _enterTime = DateTime.now();
       return;
     }
     if (_level != null) {
@@ -351,6 +363,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
         _restartNonce++;
         _enterTime = DateTime.now(); // 重开后本局计时归零
       });
+      _resetEndlessSession(); // 无尽会话状态归零，防跨会话累加
     }
   }
 

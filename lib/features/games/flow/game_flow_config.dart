@@ -1,3 +1,4 @@
+import '../../../services/error_reporter.dart';
 import '../models/game_mode_model.dart';
 import '../models/game_model.dart';
 
@@ -56,7 +57,9 @@ class GameFlowConfig {
         nodesRaw.forEach((key, value) => nodes[key] = value != false);
       }
       return GameFlowConfig(enabled: true, nodes: nodes);
-    } catch (_) {
+    } catch (e, st) {
+      // 配置坏 ≠ 功能禁用：回落全开，同时上报 warning 便于发现后台误配
+      ErrorReporter.report(e, st, module: 'games', level: 'warning');
       return allEnabled;
     }
   }
@@ -72,7 +75,8 @@ class GameFlowConfig {
 bool modeFlowEnabled(GameModeModel mode) {
   try {
     return mode.config['flow_enabled'] != false;
-  } catch (_) {
+  } catch (e, st) {
+    ErrorReporter.report(e, st, module: 'games', level: 'warning');
     return true;
   }
 }

@@ -66,20 +66,29 @@ class AchievementService {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return const <AchievementGroupView>[];
 
-    final result = await ApiClient.get(
-      'user_game_achievements',
-      filters: <String, String>{'user_id': 'eq.$userId'},
-      select: 'id,user_id,achievement_id,unlocked_at',
-      limit: null,
-      note: 'games:user_achievements',
-    );
-    if (!result.isSuccess) {
-      debugPrint('[AchievementService] 拉取失败：${result.errorMessage}');
-      return const <AchievementGroupView>[];
+    // PostgREST 单次默认上限 1000 行：全量拉取按 offset 分页循环，
+    // 按主键 id 排序保证分页窗口稳定（limit:null 只是省略参数，仍受服务端 max-rows 限制）
+    final rows = <dynamic>[];
+    var offset = 0;
+    while (true) {
+      final result = await ApiClient.get(
+        'user_game_achievements',
+        filters: <String, String>{'user_id': 'eq.$userId'},
+        select: 'id,user_id,achievement_id,unlocked_at',
+        order: 'id',
+        limit: 1000,
+        offset: offset,
+        note: 'games:user_achievements',
+      );
+      if (!result.isSuccess) {
+        debugPrint('[AchievementService] 拉取失败：${result.errorMessage}');
+        return const <AchievementGroupView>[];
+      }
+      final page = (result.data as List<dynamic>?) ?? <dynamic>[];
+      rows.addAll(page);
+      if (page.length < 1000) break;
+      offset += 1000;
     }
-
-    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
-
     // 成就定义映射（id -> GameAchievementModel），复用游戏配置缓存（仅启用项）。
     // 已解锁成就必然来自结算时启用的成就，禁用项不会写入 user_game_achievements。
     final config = await GameService.instance.fetchConfig();

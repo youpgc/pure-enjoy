@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'package:pure_enjoy/core/widgets/widgets.dart';
 import 'shared/game_local_loading.dart';
 import 'models/game_item_model.dart';
 import 'models/game_model.dart';
@@ -53,28 +54,18 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
   Future<void> _buy(GameItemModel item) async {
     // 同步购买限制：已有任一购买请求进行中时，点其他按钮仅提示不排队
     if (_buyingId != null) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('正在购买中...')),
-      );
+      if (mounted) showSnackBar(context, '正在购买中...');
       return;
     }
     setState(() => _buyingId = item.id);
     final res = await GameItemService.instance.purchase(item);
     if (mounted) {
-      final messenger = ScaffoldMessenger.of(context);
       setState(() => _buyingId = null);
       if (res['success'] == true) {
         await _load();
-        messenger.showSnackBar(
-          SnackBar(content: Text(res['message'] ?? '购买成功')),
-        );
+        showSnackBar(context, res['message'] ?? '购买成功');
       } else {
-        messenger.showSnackBar(
-          SnackBar(
-            content: Text(res['message'] ?? '购买失败'),
-            backgroundColor: AppTheme.error,
-          ),
-        );
+        showSnackBar(context, res['message'] ?? '购买失败', isError: true);
       }
     }
   }

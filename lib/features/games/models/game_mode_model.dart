@@ -88,4 +88,33 @@ class GameModeModel {
 
   /// 是否为无尽模式（无关卡、由 App 合成无尽局）。
   bool get isEndless => code == 'endless' || playKind == '2048_endless';
+
+  /// 拷贝并覆盖指定字段（不可变模型派生用；config 为浅引用，深拷贝由调用方负责）。
+  GameModeModel copyWith({
+    String? id,
+    String? gameId,
+    String? code,
+    String? name,
+    String? icon,
+    String? playKind,
+    int? sortOrder,
+    bool? enabled,
+    Map<String, dynamic>? config,
+    String? guide,
+    String? summary,
+  }) {
+    return GameModeModel(
+      id: id ?? this.id,
+      gameId: gameId ?? this.gameId,
+      code: code ?? this.code,
+      name: name ?? this.name,
+      icon: icon ?? this.icon,
+      playKind: playKind ?? this.playKind,
+      sortOrder: sortOrder ?? this.sortOrder,
+      enabled: enabled ?? this.enabled,
+      config: config ?? this.config,
+      guide: guide ?? this.guide,
+      summary: summary ?? this.summary,
+    );
+  }
 }
