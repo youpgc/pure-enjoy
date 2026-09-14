@@ -52,6 +52,10 @@ class Match3FlameGame extends FlameGame
   /// 本局单次操作最高分（一次交换的整段连锁累计，结算 max_single 维度）
   int maxSingle = 0;
 
+  /// 本局累计消除方块数（含连锁与道具引爆，结算 cleared_blocks 维度，
+  /// 供「糖块富豪」累计型成就计数 GameCumulativeService）
+  int _clearedBlocks = 0;
+
   /// 当前交换动作的累计得分（连锁结束即计入 maxSingle）
   int _moveScore = 0;
 
@@ -563,6 +567,7 @@ class Match3FlameGame extends FlameGame
       toClear.remove(cell);
     }
     _applySpecials(toClear, created);
+    _clearedBlocks += toClear.length;
 
     score += toClear.length * 10 * combo;
     _moveScore += toClear.length * 10 * combo;
@@ -714,6 +719,11 @@ class Match3FlameGame extends FlameGame
         'moves': usedMoves,
         'max_combo': maxCombo,
         'max_single': maxSingle,
+        'cleared_blocks': _clearedBlocks,
+        // 本局清除的果冻块数（仅果冻/消除类玩法有果冻层；其余模式恒 0）
+        'jelly_cleared': objective.jelly.isEmpty
+            ? 0
+            : objective.jellyCount - objective.jellyLeft,
       },
       durationMs: elapsed,
     ));

@@ -11,6 +11,7 @@ import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 import '../models/game_reward_rule_model.dart';
 import 'game_badge_service.dart';
+import 'game_cumulative_service.dart';
 import 'game_reward_picker.dart';
 import 'game_service.dart';
 
@@ -94,6 +95,37 @@ class GameRewardService {
       gameId: gameId,
       ruleId: rule.id.isEmpty ? null : rule.id,
     );
+  }
+
+  /// 批量查询已领取的成就 claim_key（claim_key 体系落 game_reward_claims 表）。
+  ///
+  /// 用于累计型成就发放前过滤已领档位，避免每次结算对全部达标档做无效
+  /// claim RPC；查询失败返回空集合（失败时退化为逐档幂等 claim，不阻塞发放）。
+  Future<Set<String>> _fetchClaimedAchievementKeys(
+    List<GameAchievementModel> achievements,
+  ) async {
+    final userId = AuthService.instance.currentUserId;
+    if (userId == null || achievements.isEmpty) return <String>{};
+    try {
+      final res = await ApiClient.get(
+        'game_reward_claims',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'claim_key':
+              'in.(${achievements.map((a) => 'achievement:${a.code}').join(',')})',
+        },
+        select: 'claim_key',
+        note: 'games:cumulative_claimed_check',
+      );
+      if (!res.isSuccess) return <String>{};
+      return ((res.data as List<dynamic>?) ?? <dynamic>[])
+          .map((r) => r is Map<String, dynamic> ? r['claim_key']?.toString() : null)
+          .whereType<String>()
+          .toSet();
+    } catch (e) {
+      debugPrint('[GameRewardService] 已领档位批量查询失败：$e');
+      return <String>{};
+    }
   }
 
   /// 领取成就达成奖励。
@@ -310,9 +342,9 @@ class GameRewardService {
       ));
     }
 
-    // 3c) 「单局得分里程碑」成就：单局至多一条（本局分数对应的最高档）。
-    final topScore = pickTopScoreAchievement(achievements, judgeValues);
-    if (topScore != null) {
+    // 3c) 「单局得分里程碑」成就：按维度分桶，每维度至多一条
+    //    （本局该维度取值对应的最高档）；得分/用时/步数/连击互不遮蔽。
+    for (final topScore in pickTopScoreAchievements(achievements, judgeValues)) {
       final r = await claimAchievement(achievement: topScore);
       items.add(GameSettlementItem(
         kind: 'achievement',
@@ -321,6 +353,30 @@ class GameRewardService {
         granted: r.granted,
         reason: r.reason,
       ));
+    }
+
+    // 3d) 「终身累计达成」成就：跨局累计指标（游玩局数/通关次数/合成次数/
+    //    消除方块数）达标的每一档都发放。计数由 reportAndSettle 在主流程
+    //    记录一次（重试不重放），此处只读总量判定；先批量查已领取档位，
+    //    避免每次结算对全部达标档做无效 claim RPC。
+    final cumTotals =
+        await GameCumulativeService.instance.totalsFor(gameCode: game.code);
+    if (cumTotals.isNotEmpty) {
+      final met = pickCumulativeAchievements(achievements, cumTotals);
+      if (met.isNotEmpty) {
+        final claimedKeys = await _fetchClaimedAchievementKeys(met);
+        for (final ach in met) {
+          if (claimedKeys.contains('achievement:${ach.code}')) continue;
+          final r = await claimAchievement(achievement: ach);
+          items.add(GameSettlementItem(
+            kind: 'achievement',
+            label: '成就：${ach.name}',
+            points: r.points,
+            granted: r.granted,
+            reason: r.reason,
+          ));
+        }
+      }
     }
 
     // 4) 模式段位徽章（v2 徽章化 q-0：成就=纯荣誉，0 积分，仅记录解锁）。

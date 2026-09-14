@@ -6,6 +6,7 @@ import '../../services/http_client.dart';
 import '../../services/notification_service.dart';
 import '../../services/supabase_service.dart';
 import '../../utils/cache_helper.dart';
+import '../games/services/game_cumulative_service.dart';
 import '../games/services/game_reward_service.dart';
 import '../games/services/game_score_service.dart';
 import '../../constants/app_constants.dart';
@@ -113,6 +114,7 @@ class AuthNotifier extends StateNotifier<AuthState> {
     }
     GameRewardService.instance.resetForAccountSwitch();
     GameScoreService.instance.resetForAccountSwitch();
+    GameCumulativeService.instance.resetForAccountSwitch();
   }
 
   /// 初始化：检查当前登录状态

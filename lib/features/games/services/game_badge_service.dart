@@ -35,11 +35,19 @@ class GameBadgeService {
   }) async {
     final modeCode = _resolveModeCode(config, gameId, level);
     if (modeCode == null) return null;
+    // 段位阈值一律按「模式内关号」比对（2026-09-11 v3 段位 level 化：
+    // threshold.level = 模式内关号 20/35/…/100）。judgeValues 的 'level'
+    // 对 match3 是全局关序（第二模式起恒 > 模式内阈值，会让全档位立即
+    // 误解锁），此处还原为 level.levelNo 后再判定。
+    final tierValues = <String, num>{
+      ...judgeValues,
+      'level': level.levelNo > 0 ? level.levelNo : 0,
+    };
     final topTier = pickTopModeTierAchievement(
       achievements,
       gameCode: gameCode,
       modeCode: modeCode,
-      values: judgeValues,
+      values: tierValues,
     );
     if (topTier == null) return null;
     if (topTier.rewardPoints > 0) {

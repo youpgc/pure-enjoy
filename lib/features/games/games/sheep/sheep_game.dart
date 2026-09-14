@@ -56,6 +56,10 @@ class _SheepGameState extends State<SheepGame> {
   final List<Map<int, (SheepTile, SheepTileState, int)>> _snapshots = [];
   bool _finished = false;
   bool _busy = false;
+
+  /// 本局「失误」次数：槽位达到 7/7 满槽的次数（结算 values 上报 'mistakes'，
+  /// 供「火眼金睛」= mistakes ≤ 0 即满槽零失误通关的成就判定）。
+  int _mistakes = 0;
   late final DateTime _startTime;
   final Random _rng = Random();
 
@@ -176,6 +180,7 @@ class _SheepGameState extends State<SheepGame> {
     _tiles = result!;
     _slots.clear();
     _snapshots.clear();
+    _mistakes = 0;
     // 道具数量改为开局从库存载入（见 _loadInventory），此处先清空
     _freeLeft.clear();
     _ownedLeft.clear();
@@ -240,6 +245,10 @@ class _SheepGameState extends State<SheepGame> {
     }
     _slots.insert(insertAt, tile);
     _reindexSlots();
+    // 满槽（7/7）记一次失误：火眼金睛成就判定口径（mistakes ≤ 0 通关）
+    if (_slots.length >= _slotCapacity) {
+      _mistakes++;
+    }
     GameAudio.instance.select();
     GameAudio.instance.haptic(GameHaptic.light);
     _computeCoverage();
@@ -430,7 +439,7 @@ class _SheepGameState extends State<SheepGame> {
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     widget.onFinished(GamePlayOutcome(
       cleared: cleared,
-      values: <String, num>{'duration_ms': elapsed},
+      values: <String, num>{'duration_ms': elapsed, 'mistakes': _mistakes},
       durationMs: elapsed,
     ));
   }

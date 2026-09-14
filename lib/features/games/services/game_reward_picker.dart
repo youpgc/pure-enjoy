@@ -13,6 +13,9 @@ const String kAchievementTypeScore = 'score';
 /// 成就条件类型：模式段位徽章（v2 徽章化：mode_tier，不发积分仅解锁）
 const String kAchievementTypeModeTier = 'mode_tier';
 
+/// 成就条件类型：终身累计达成（metric + value，跨局累加）
+const String kAchievementTypeCumulative = 'cumulative';
+
 /// 成就/规则达成档位挑选器（纯函数，无状态、无 IO）。
 ///
 /// 解决「里程碑分档被循环发放」问题：后台把关卡/得分里程碑按阈值切成 10 档
@@ -100,16 +103,21 @@ GameAchievementModel? pickTopLevelAchievement(
   return best;
 }
 
-/// 挑选本局「得分里程碑」成就：满足 `gte <= 本局取值` 的最高档（至多 1 条）。
+/// 挑选本局「得分里程碑」成就：**按维度分桶**，每个维度满足 `gte <= 本局取值`
+/// 的最高档各一条（至多 1 条/维度）。
 ///
 /// condition 形如 `{'type':'score','dimension':'score','gte':2048}`；
 /// [values] 中无对应维度取值时该成就不参与挑选。
-GameAchievementModel? pickTopScoreAchievement(
+///
+/// 为什么按维度分桶：score 维度族（单局得分/用时/步数/连击）是互不相关的
+/// 单局里程碑，此前全局只取 rank 最高一条，会让低 rank 维度（速通/连击）
+/// 被高 rank 的得分档永久遮蔽、终身无法解锁。
+List<GameAchievementModel> pickTopScoreAchievements(
   List<GameAchievementModel> achievements,
   Map<String, num> values,
 ) {
-  GameAchievementModel? best;
-  num bestRank = -double.maxFinite.toInt();
+  final bestByDim = <String, GameAchievementModel>{};
+  final bestRankByDim = <String, num>{};
   for (final ach in achievements) {
     if (achievementTypeOf(ach) != kAchievementTypeScore) continue;
     final dim = ach.condition['dimension']?.toString();
@@ -122,12 +130,12 @@ GameAchievementModel? pickTopScoreAchievement(
     if (gte is num && v < gte) continue;
     if (lte is num && v > lte) continue;
     final rank = gte is num ? gte : -(lte as num);
-    if (rank > bestRank) {
-      bestRank = rank;
-      best = ach;
+    if (rank > (bestRankByDim[dim] ?? -double.maxFinite)) {
+      bestRankByDim[dim] = rank;
+      bestByDim[dim] = ach;
     }
   }
-  return best;
+  return bestByDim.values.toList();
 }
 
 /// 挑选本局达成的「模式段位」最高档（v2 徽章化，至多 1 条）。
@@ -167,4 +175,31 @@ GameAchievementModel? pickTopModeTierAchievement(
     }
   }
   return best;
+}
+
+/// 挑选达标的「终身累计」成就：返回**全部**满足 `value <= 累计总量` 的档位。
+///
+/// condition 形如 `{'type':'cumulative','metric':'clear_blocks','value':8000}`；
+/// [totals] 为 `metric → 终身累计值`（GameCumulativeService 提供）。
+///
+/// 为什么返回全部档位（与 level/score 的「本局最高档」不同）：累计指标是
+/// 终身单调进度，单局可能一次跨越多档（如一局消除 9000 方块从 0 跨过
+/// 2000/5000/8000），只发最高档会永久漏发中间档；未达标档由 claim_key
+/// 幂等拦截，不会重复发放。
+List<GameAchievementModel> pickCumulativeAchievements(
+  List<GameAchievementModel> achievements,
+  Map<String, int> totals,
+) {
+  final met = <GameAchievementModel>[];
+  for (final ach in achievements) {
+    if (achievementTypeOf(ach) != kAchievementTypeCumulative) continue;
+    final metric = ach.condition['metric']?.toString();
+    if (metric == null) continue;
+    final value = ach.condition['value'];
+    if (value is! num) continue;
+    final total = totals[metric];
+    if (total == null) continue;
+    if (total >= value) met.add(ach);
+  }
+  return met;
 }

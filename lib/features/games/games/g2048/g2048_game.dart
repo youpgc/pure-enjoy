@@ -75,6 +75,10 @@ class _G2048GameState extends State<G2048Game> {
   bool _finished = false;
   bool _pendingWin = false;
   int _movesUsed = 0;
+
+  /// 本局合成次数（每次两块合并 +1）：结算 values 上报 'merges'，
+  /// 供「合成达人」累计型成就计数（GameCumulativeService）。
+  int _mergeCount = 0;
   int? _movesLimit;
   int? _timeLimit;
   int? _scoreTarget;
@@ -374,6 +378,7 @@ class _G2048GameState extends State<G2048Game> {
           lineTiles[i].value *= 2;
           lineTiles[i].merged = true;
           gain += lineTiles[i].value;
+          _mergeCount++;
           if (lineTiles[i].value >= _target) {
             _reachedTarget = true;
           }
@@ -518,6 +523,7 @@ class _G2048GameState extends State<G2048Game> {
         'score': _score,
         'duration_ms': elapsed,
         'moves': _movesUsed,
+        'merges': _mergeCount,
       },
       durationMs: elapsed,
     ));

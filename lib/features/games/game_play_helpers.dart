@@ -7,6 +7,7 @@ import 'models/game_dimension_model.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'play/game_settlement_sheet.dart';
+import 'services/game_cumulative_service.dart';
 import 'services/game_reward_service.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
@@ -176,6 +177,16 @@ Future<GameSettlementResult?> reportAndSettle({
   final completer = Completer<GameSettlementResult?>();
   final settleFuture = () async {
     try {
+      // 累计型成就计数：每局在主流程至多记录一次（L1 重试只重跑发放、
+      // 不重放计数，防重复累加）。放弃局不计；<5 步秒败局不计（与成绩
+      // 记录同门槛）。计数与 rewardsAllowed 无关——奖励门禁只管发放。
+      if (!belowMoveFloor) {
+        await GameCumulativeService.instance.recordSettle(
+          gameCode: game.code,
+          cleared: cleared,
+          values: scoreValuesByCode,
+        );
+      }
       // 成绩上报：通关 / 达标失败局始终记录；步数 <5 的失败局不计入
       //（默认流程也记录成绩，仅不发奖励）
       if (!belowMoveFloor) {
