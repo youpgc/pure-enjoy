@@ -29,7 +29,7 @@ part 'match3_props_engine.dart';
 /// - 双交互：点选两格交换 + 按住某格朝相邻格滑动交换（按**起始格**判定）。
 /// - 特效层 [Match3Effects]：碎片迸发、条纹光束、冲击波、连击飘字。
 class Match3FlameGame extends FlameGame
-    with TapCallbacks, PanDetector, Match3SwipeMixin {
+    with TapCallbacks, MultiTouchDragDetector, Match3SwipeMixin {
   final void Function(GamePlayOutcome) onFinished;
 
   /// 关卡目标状态机（模式、进度、达成判定、HUD 数据）
@@ -154,11 +154,37 @@ class Match3FlameGame extends FlameGame
   /// 滑动即交换：目标格越界则忽略，并清掉点选态避免与点选标记冲突。
   @override
   void onSwipe(int r, int c, int dr, int dc) {
-    // 任一道具待命中：滑动手势不触发交换，留给点击执行道具目标
+    // 任一道具待命中：滑动手势不触发交换也不缓冲，留给点击执行道具目标
     if (smashArmed || forceSwapArmed || magicArmed) return;
+    // 输入缓冲（2026-09-14 审查修复）：动画/锁定期开始的滑动不再整条丢弃，
+    // 记录待执行，_busy 解除瞬间在 update() 里补执行（主流三消标准做法）。
+    // 后到的滑动覆盖先前的缓冲（最新意图优先）。
+    if (!canInteract) {
+      _pendingSwipe = (r, c, dr, dc);
+      return;
+    }
     final tr = r + dr;
     final tc = c + dc;
     if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
+    _selectedR = null;
+    _selectedC = null;
+    _trySwap(r, c, tr, tc);
+  }
+
+  /// 待执行滑动缓冲（起始行, 起始列, 行增量, 列增量）；null = 无
+  (int, int, int, int)? _pendingSwipe;
+
+  /// 每帧检查：锁定期结束后补执行缓冲的滑动。
+  /// 执行前复验目标格仍有效（动画期间盘面可能已变化）。
+  void _flushPendingSwipe() {
+    final pending = _pendingSwipe;
+    if (pending == null || !canInteract) return;
+    _pendingSwipe = null;
+    final (r, c, dr, dc) = pending;
+    final tr = r + dr;
+    final tc = c + dc;
+    if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
+    if (grid[r][c] == null || grid[tr][tc] == null) return;
     _selectedR = null;
     _selectedC = null;
     _trySwap(r, c, tr, tc);
@@ -294,6 +320,8 @@ class Match3FlameGame extends FlameGame
   void update(double dt) {
     super.update(dt);
     effects.update(dt);
+    // 锁定期结束后补执行缓冲的滑动（输入缓冲，见 onSwipe 注释）
+    _flushPendingSwipe();
     // 限时模式：倒计时推进，归零即结算
     if (objective.isTimed && _loaded && !_over) {
       objective.secondsLeft -= dt;
@@ -663,6 +691,7 @@ class Match3FlameGame extends FlameGame
   void _finishByObjective({String? failReason}) {
     if (_over) return;
     _over = true;
+    _pendingSwipe = null; // 对局结束，丢弃未执行的缓冲滑动
     _syncHud();
     final cleared = objective.achieved;
     if (cleared) {
