@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../../../../core/widgets/widgets.dart';
+
 /// 工具项定义
 class ToolItem {
   final String id;
@@ -53,13 +55,10 @@ class ToolConfigSheetState extends State<ToolConfigSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        24,
-        16,
-        24,
-        MediaQuery.of(context).viewInsets.bottom + 24,
-      ),
+    // SheetContainer：键盘避让 + 手势条 SafeArea + 滚动兜底（统一容器规范）
+    return SheetContainer(
+      padding: const EdgeInsets.fromLTRB(24, 16, 24, 0),
+      bottomSpacing: 24,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,

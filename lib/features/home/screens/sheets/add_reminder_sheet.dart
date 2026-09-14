@@ -53,14 +53,8 @@ class AddReminderSheetState extends State<AddReminderSheet> {
 
   @override
   Widget build(BuildContext context) {
-    // 外层包裹 SingleChildScrollView：键盘弹出压缩可视高度时可滚动，避免底部溢出
-    return SingleChildScrollView(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
+    // SheetContainer：键盘避让 + 手势条 SafeArea + 滚动兜底（统一容器规范）
+    return SheetContainer(
       child: Form(
         key: _formKey,
         child: Column(

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'package:pure_enjoy/core/widgets/widgets.dart';
 
 import 'flow/game_flow_runner.dart';
 import 'flow/game_registry.dart';
@@ -160,8 +161,10 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       ),
       builder: (ctx) => PopScope(
         canPop: false, // 局间必须二选一，不允许点遮罩/返回关闭
-        child: Padding(
-          padding: const EdgeInsets.all(20),
+        // SheetContainer：手势条 SafeArea（统一容器规范；无输入框，键盘项为 0）
+        child: SheetContainer(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+          bottomSpacing: 20,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,

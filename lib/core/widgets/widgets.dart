@@ -245,3 +245,90 @@ class _AsyncSubmitButtonState extends State<AsyncSubmitButton> {
     return button;
   }
 }
+
+/// 底部弹层（showModalBottomSheet）统一内容容器。
+///
+/// 解决两类历史兼容问题（2026-09-14 容器审查）：
+/// 1. **键盘**：BottomSheet 无自动避让，必须手动按 `viewInsets.bottom` 抬升；
+/// 2. **手势条**：旧写法 `viewInsets.bottom + 常数` 在键盘收起后把手势导航条
+///    （home indicator）高度算丢，底部按钮被遮挡。SafeArea 在键盘弹出时
+///    bottom 会随 `padding = viewPadding - viewInsets` 自动归零（键盘本身盖住
+///    手势条），收起后恢复——因此「viewInsets + SafeArea」组合在两种状态下都正确。
+///
+/// 结构：
+/// ```
+/// Padding(bottom: viewInsets.bottom)   ← 键盘抬升（无键盘时为 0）
+/// └─ SafeArea(top: false)              ← 手势条高度（键盘弹出时自动归零）
+///    └─ [ConstrainedBox(maxHeightFactor)]
+///       └─ [SingleChildScrollView]     ← scrollable=false 时省略（内容自带滚动）
+///          └─ child
+/// ```
+///
+/// 用法：弹层 builder 直接返回本组件（调用方仍需 `isScrollControlled: true`）：
+/// ```dart
+/// showModalBottomSheet(
+///   context: context,
+///   isScrollControlled: true,
+///   builder: (_) => SheetContainer(child: Column(mainAxisSize: MainAxisSize.min, ...)),
+/// );
+/// ```
+class SheetContainer extends StatelessWidget {
+  final Widget child;
+
+  /// 内容内边距；底部不在此设置，统一由 [bottomSpacing] 追加在 SafeArea 之内
+  final EdgeInsetsGeometry padding;
+
+  /// 内容与底部安全区之间的间距（键盘弹出时同样生效，压在键盘上方）
+  final double bottomSpacing;
+
+  /// 内容最大高度占屏幕比例（如 0.85）；null = 不限制，由内容 + 滚动兜底
+  final double? maxHeightFactor;
+
+  /// 内容是否包 SingleChildScrollView；内容自带 ListView（如选关列表、
+  /// DraggableScrollableSheet）时传 false，避免嵌套滚动冲突
+  final bool scrollable;
+
+  /// 透传给内部 SingleChildScrollView 的控制器（scrollable=true 时生效）
+  final ScrollController? scrollController;
+
+  const SheetContainer({
+    super.key,
+    required this.child,
+    this.padding = const EdgeInsets.all(16),
+    this.bottomSpacing = 16,
+    this.maxHeightFactor,
+    this.scrollable = true,
+    this.scrollController,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final contentPadding = padding.add(EdgeInsets.only(bottom: bottomSpacing));
+    Widget content = SingleChildScrollView(
+      controller: scrollController,
+      padding: contentPadding,
+      child: child,
+    );
+    if (!scrollable) {
+      content = Padding(
+        padding: contentPadding,
+        child: child,
+      );
+    }
+    final factor = maxHeightFactor;
+    if (factor != null) {
+      // 键盘弹出时父级可用高度 (屏高 - 键盘) 小于该约束，父级约束优先生效，
+      // 内容靠内部滚动保证完整可达——不会溢出
+      content = ConstrainedBox(
+        constraints: BoxConstraints(
+          maxHeight: MediaQuery.of(context).size.height * factor,
+        ),
+        child: content,
+      );
+    }
+    return Padding(
+      padding: EdgeInsets.only(bottom: MediaQuery.of(context).viewInsets.bottom),
+      child: SafeArea(top: false, child: content),
+    );
+  }
+}

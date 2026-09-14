@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'package:pure_enjoy/core/widgets/widgets.dart';
 import 'game_guide.dart';
 import 'game_level_picker.dart';
 import 'flow/game_flow_runner.dart';
@@ -103,14 +104,19 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
       shape: const RoundedRectangleBorder(
         borderRadius: BorderRadius.vertical(top: Radius.circular(16)),
       ),
-      builder: (ctx) => DraggableScrollableSheet(
-        initialChildSize: 0.7,
-        minChildSize: 0.4,
-        maxChildSize: 0.92,
-        expand: false,
-        builder: (_, scroll) => ListView(
-          controller: scroll,
-          padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
+      builder: (ctx) => SheetContainer(
+        // 手势条 SafeArea（统一容器规范）；内容自带可拖拽滚动，scrollable=false
+        scrollable: false,
+        padding: EdgeInsets.zero,
+        bottomSpacing: 0,
+        child: DraggableScrollableSheet(
+          initialChildSize: 0.7,
+          minChildSize: 0.4,
+          maxChildSize: 0.92,
+          expand: false,
+          builder: (_, scroll) => ListView(
+            controller: scroll,
+            padding: const EdgeInsets.fromLTRB(20, 20, 20, 24),
           children: <Widget>[
             Text(guide.title,
                 style: const TextStyle(fontSize: 20, fontWeight: FontWeight.bold)),
@@ -129,6 +135,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
               ),
             ),
           ],
+          ),
         ),
       ),
     );

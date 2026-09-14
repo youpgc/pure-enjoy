@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'package:pure_enjoy/core/widgets/widgets.dart';
 import '../../services/error_reporter.dart';
 import 'game_play_helpers.dart';
 import 'services/game_score_service.dart';
@@ -171,10 +172,11 @@ class _PickerBodyState extends State<_PickerBody> {
       return i == frontierIdx; // 最新可挑战关卡
     }
 
-    return Container(
-      constraints: BoxConstraints(
-        maxHeight: MediaQuery.of(context).size.height * 0.82,
-      ),
+    // SheetContainer：手势条 SafeArea（统一容器规范；列表自带滚动，scrollable=false）
+    return SheetContainer(
+      scrollable: false,
+      bottomSpacing: 8,
+      maxHeightFactor: 0.82,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -223,12 +225,10 @@ class _PickerBodyState extends State<_PickerBody> {
               }).toList(),
             ),
           ),
-          const SizedBox(height: 8),
         ],
       ),
     );
   }
-
   /// 关卡行标题：剥掉关卡名里已在弹窗标题展示过的前缀，避免重复。
   /// 种子格式「游戏·模式 L001」：模式深链（标题含模式名）→「L001」；
   /// 无模式深链（标题仅游戏名）→「模式 L001」；非标准前缀原样返回。

@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
+import 'package:pure_enjoy/core/widgets/widgets.dart';
 
 import '../models/game_dimension_model.dart';
 import '../models/game_model.dart';
@@ -330,8 +331,11 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
   Widget build(BuildContext context) {
     final dims = GameService.instance.cachedConfig.dimensionsOf(widget.game.id);
 
-    return Padding(
-      padding: const EdgeInsets.all(20),
+    // SheetContainer：手势条 SafeArea + 超高滚动兜底（统一容器规范；无输入框，键盘项为 0）
+    return SheetContainer(
+      padding: const EdgeInsets.fromLTRB(20, 20, 20, 0),
+      bottomSpacing: 20,
+      maxHeightFactor: 0.85,
       child: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,

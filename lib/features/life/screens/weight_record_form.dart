@@ -157,13 +157,9 @@ class RecordFormState extends State<RecordForm> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
+    // SheetContainer：键盘避让 + 手势条 SafeArea + 滚动兜底（统一容器规范）
+    return SheetContainer(
+      maxHeightFactor: 0.85,
       child: Form(
         key: _formKey,
         child: Column(

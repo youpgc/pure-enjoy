@@ -54,22 +54,13 @@ class AddHabitSheetState extends State<AddHabitSheet> {
 
   @override
   Widget build(BuildContext context) {
-    return Padding(
-      padding: EdgeInsets.fromLTRB(
-        16,
-        16,
-        16,
-        MediaQuery.of(context).viewInsets.bottom + 16,
-      ),
-      child: ConstrainedBox(
-        constraints: BoxConstraints(
-          maxHeight: MediaQuery.of(context).size.height * 0.7,
-        ),
-        child: SingleChildScrollView(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.stretch,
-            children: [
+    // SheetContainer：键盘避让 + 手势条 SafeArea + 滚动兜底（统一容器规范）
+    return SheetContainer(
+      maxHeightFactor: 0.7,
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
             Text('添加习惯', style: Theme.of(context).textTheme.titleLarge),
             const SizedBox(height: 16),
             TextField(
@@ -102,8 +93,6 @@ class AddHabitSheetState extends State<AddHabitSheet> {
             const SizedBox(height: 16),
             AsyncSubmitButton(label: '保存', onPressed: _save),
           ],
-        ),
-      ),
       ),
     );
   }
