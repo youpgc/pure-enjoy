@@ -12,6 +12,7 @@ import '../models/game_model.dart';
 import '../models/game_reward_rule_model.dart';
 import 'game_badge_service.dart';
 import 'game_cumulative_service.dart';
+import 'game_mode_resolver.dart';
 import 'game_reward_picker.dart';
 import 'game_service.dart';
 
@@ -251,6 +252,10 @@ class GameRewardService {
               }
             : scoreValuesByCode;
 
+    // 本局模式编码：供「模式限定」成就判定（score 条件可选 `mode` 键）。
+    // 解析失败为 null 时，带 mode 限定的成就一律跳过（见 pickTopScoreAchievements）。
+    final modeCode = resolveGameModeCode(config, game.id, level);
+
     // 0) 每关通关奖励（rewardPoints<=0 时跳过，结算页不展示无效行）
     if (level.rewardPoints > 0) {
       final levelReward = await claimLevelReward(
@@ -342,9 +347,24 @@ class GameRewardService {
       ));
     }
 
-    // 3c) 「单局得分里程碑」成就：按维度分桶，每维度至多一条
-    //    （本局该维度取值对应的最高档）；得分/用时/步数/连击互不遮蔽。
-    for (final topScore in pickTopScoreAchievements(achievements, judgeValues)) {
+    // 3c) 「单局得分里程碑」成就：按维度分桶（同维度再按模式分桶），每桶至多一条
+    //    （本局该维度取值对应的最高档）；得分/用时/步数/连击/收集互不遮蔽。
+    //    `streak_days` 是跨游戏的全局维度（连续签到天数），按需注入：只有真的
+    //    存在用该维度的成就时才查询，避免每局多打一次 point_records 请求。
+    var scoreJudgeValues = judgeValues;
+    if (achievements
+        .any((a) => a.condition['dimension']?.toString() == kDimensionStreakDays)) {
+      final uid = AuthService.instance.currentUserId;
+      if (uid != null) {
+        scoreJudgeValues = <String, num>{
+          ...judgeValues,
+          kDimensionStreakDays:
+              await calcConsecutiveStreak(uid, beijingToday()),
+        };
+      }
+    }
+    for (final topScore in pickTopScoreAchievements(achievements, scoreJudgeValues,
+        modeCode: modeCode)) {
       final r = await claimAchievement(achievement: topScore);
       items.add(GameSettlementItem(
         kind: 'achievement',

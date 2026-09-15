@@ -6,6 +6,7 @@ import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../models/game_achievement_model.dart';
 import '../models/game_level_model.dart';
+import 'game_mode_resolver.dart';
 import 'game_reward_picker.dart';
 import 'game_reward_service.dart';
 import 'game_service.dart';
@@ -33,7 +34,7 @@ class GameBadgeService {
     required List<GameAchievementModel> achievements,
     required Map<String, num> judgeValues,
   }) async {
-    final modeCode = _resolveModeCode(config, gameId, level);
+    final modeCode = resolveGameModeCode(config, gameId, level);
     if (modeCode == null) return null;
     // 段位阈值一律按「模式内关号」比对（2026-09-11 v3 段位 level 化：
     // threshold.level = 模式内关号 20/35/…/100）。judgeValues 的 'level'
@@ -220,25 +221,8 @@ class GameBadgeService {
     }
   }
 
-  /// 由关卡反解模式编码（mode_tier 徽章匹配用）。
-  ///
-  /// 优先按 `level.modeId` 查配置缓存；endless 合成关（无 server 关）按
-  /// `isEndless` 兜底。找不到返回 null（数据异常时跳过徽章判定，不崩溃）。
-  String? _resolveModeCode(
-    GameConfigSnapshot config,
-    String gameId,
-    GameLevelModel level,
-  ) {
-    for (final m in config.modesOf(gameId)) {
-      if (m.id == level.modeId) return m.code;
-    }
-    if (level.id.startsWith('endless_2048')) {
-      for (final m in config.modesOf(gameId)) {
-        if (m.isEndless) return m.code;
-      }
-    }
-    return null;
-  }
+  // 模式反解已抽到 `game_mode_resolver.dart` 的 resolveGameModeCode（2026-09-15）：
+  // 结算链路的「模式限定得分成就」与段位徽章需同一口径，避免两处各写一份。
 
   /// 记录徽章解锁（0 积分成就仅写 user_game_achievements，不发分）。
   ///

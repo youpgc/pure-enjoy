@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../game_play_helpers.dart';
+import '../../services/game_reward_picker.dart';
 import '../../shared/game_audio.dart';
 import 'candy_component.dart';
 import 'match3_effects.dart';
@@ -724,6 +725,10 @@ class Match3FlameGame extends FlameGame
         'jelly_cleared': objective.jelly.isEmpty
             ? 0
             : objective.jellyCount - objective.jellyLeft,
+        // 本局「收集/破冰」完成数：收集模式=已收集糖果数，破冰模式=已破冰格数
+        // （Match3Objective.collectedTotal 跨多目标累加）。供成就 dimension
+        // `collect_done` 判定「单局完成 N 个收集/破冰目标」（2026-09-15 新增）。
+        kDimensionCollectDone: objective.collectedTotal,
       },
       durationMs: elapsed,
     ));

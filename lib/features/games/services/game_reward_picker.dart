@@ -16,6 +16,35 @@ const String kAchievementTypeModeTier = 'mode_tier';
 /// 成就条件类型：终身累计达成（metric + value，跨局累加）
 const String kAchievementTypeCumulative = 'cumulative';
 
+/// 全局注入维度：连续签到天数（跨游戏通用；结算时由 App 从积分模块读取注入）。
+const String kDimensionStreakDays = 'streak_days';
+
+/// match3 维度：本局「收集/破冰」完成数（`Match3Objective.collectedTotal`）。
+const String kDimensionCollectDone = 'collect_done';
+
+/// sheep 维度：本关层数（关卡 config.layers）。
+const String kDimensionLayers = 'layers';
+
+/// ── 成就条件词汇表（**唯一契约**）────────────────────────────────
+/// 三方必须同口径：本文件（判定器）/ `gen/game_module_v2/06_seed_achievements.sql`（种子）
+/// / `游戏模块配置参考文档.md` §7。新增 type / dimension / metric 必须三处同步。
+///
+/// `type`：
+///   · `first_clear`  无键 ·············· 首次通关（账号终身一次）
+///   · `level`        `min_level_no` ···· 单局通关至第 N 关（match3 用全局关序）
+///   · `score`        `dimension` + (`gte`|`lte`) + 可选 `mode` ·· 单局某维度达到/不超过阈值
+///   · `mode_tier`    `game`+`mode`+`tier`+`threshold{}` ········ 模式段位徽章
+///   · `cumulative`   `metric` + `value` ······················· 终身累计
+///
+/// `dimension`（引擎结算上报值，见各 onFinished）：
+///   · match3: score / duration_ms / moves / max_combo / max_single /
+///             cleared_blocks / jelly_cleared / collect_done(收集·破冰完成数)
+///   · g2048 : score / duration_ms / moves / merges
+///   · sheep : duration_ms / mistakes / layers(本关层数)
+///   · 全局注入: streak_days（连续签到天数，结算时由 App 补齐）
+///
+/// `metric`（cumulative）：play / clear / merge / clear_blocks
+
 /// 成就/规则达成档位挑选器（纯函数，无状态、无 IO）。
 ///
 /// 解决「里程碑分档被循环发放」问题：后台把关卡/得分里程碑按阈值切成 10 档
@@ -107,21 +136,28 @@ GameAchievementModel? pickTopLevelAchievement(
 /// 的最高档各一条（至多 1 条/维度）。
 ///
 /// condition 形如 `{'type':'score','dimension':'score','gte':2048}`；
+/// 可选 `'mode':'timed'` → **仅在该模式内判定**（无 mode 键 = 全模式通用）；
 /// [values] 中无对应维度取值时该成就不参与挑选。
+///
+/// [modeCode]：本局实际模式编码。为 null（模式解析失败）时，**带 mode 限定的
+/// 成就一律跳过**——宁可不解锁，也不能把「限时模式 4096 分」发到经典模式头上。
 ///
 /// 为什么按维度分桶：score 维度族（单局得分/用时/步数/连击）是互不相关的
 /// 单局里程碑，此前全局只取 rank 最高一条，会让低 rank 维度（速通/连击）
 /// 被高 rank 的得分档永久遮蔽、终身无法解锁。
 List<GameAchievementModel> pickTopScoreAchievements(
   List<GameAchievementModel> achievements,
-  Map<String, num> values,
-) {
+  Map<String, num> values, {
+  String? modeCode,
+}) {
   final bestByDim = <String, GameAchievementModel>{};
   final bestRankByDim = <String, num>{};
   for (final ach in achievements) {
     if (achievementTypeOf(ach) != kAchievementTypeScore) continue;
     final dim = ach.condition['dimension']?.toString();
     if (dim == null) continue;
+    final condMode = ach.condition['mode']?.toString();
+    if (condMode != null && condMode != modeCode) continue;
     final gte = ach.condition['gte'];
     final lte = ach.condition['lte'];
     if (gte is! num && lte is! num) continue;
@@ -129,10 +165,13 @@ List<GameAchievementModel> pickTopScoreAchievements(
     if (v == null) continue;
     if (gte is num && v < gte) continue;
     if (lte is num && v > lte) continue;
+    // 分桶键必须带上模式：同维度可同时存在「全模式通用」与「仅限某模式」两族
+    // （如 score 通用档 + 破冰模式专用档），否则后一档会被前一族遮蔽。
+    final bucket = condMode == null ? dim : '$dim@$condMode';
     final rank = gte is num ? gte : -(lte as num);
-    if (rank > (bestRankByDim[dim] ?? -double.maxFinite)) {
-      bestRankByDim[dim] = rank;
-      bestByDim[dim] = ach;
+    if (rank > (bestRankByDim[bucket] ?? -double.maxFinite)) {
+      bestRankByDim[bucket] = rank;
+      bestByDim[bucket] = ach;
     }
   }
   return bestByDim.values.toList();

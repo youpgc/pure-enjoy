@@ -7,6 +7,7 @@ import 'package:pure_enjoy/core/theme/app_theme.dart';
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
 import '../../services/game_item_service.dart';
+import '../../services/game_reward_picker.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_icons.dart';
 import '../../shared/game_shell.dart';
@@ -439,7 +440,13 @@ class _SheepGameState extends State<SheepGame> {
     final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
     widget.onFinished(GamePlayOutcome(
       cleared: cleared,
-      values: <String, num>{'duration_ms': elapsed, 'mistakes': _mistakes},
+      values: <String, num>{
+        'duration_ms': elapsed,
+        'mistakes': _mistakes,
+        // 本关层数（关卡 config.layers，见 onLoad 的 _layers）。
+        // 供成就 dimension `layers` 判定「通关 N 层关卡」（2026-09-15 新增）。
+        kDimensionLayers: _layers,
+      },
       durationMs: elapsed,
     ));
   }
