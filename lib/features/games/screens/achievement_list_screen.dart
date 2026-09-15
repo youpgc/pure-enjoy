@@ -278,20 +278,19 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
                 child: AchievementIcon(achievement.icon, size: 96),
               ),
               const SizedBox(height: 16),
-              // 主名 + 档位徽标：折行只发生在「主名 / 档位」结构边界，
-              // 不再出现名称中间断字
-              Wrap(
-                alignment: WrapAlignment.center,
-                crossAxisAlignment: WrapCrossAlignment.center,
-                spacing: 8,
-                runSpacing: 4,
+              // 主名 + 档位：**上下两行、水平居中**（2026-09-15 按需求调整）。
+              // 此前用 Wrap 同行排布，「连锁大师」与「5连锁」挤在一行；
+              // 档位本质是名称的语义后缀（·5连锁 / ·王者段位），单独成行更易读。
+              Column(
+                mainAxisSize: MainAxisSize.min,
                 children: <Widget>[
                   Text(
                     parts.base,
                     style: theme.textTheme.titleMedium,
                     textAlign: TextAlign.center,
                   ),
-                  if (parts.tier != null)
+                  if (parts.tier != null) ...<Widget>[
+                    const SizedBox(height: 6),
                     Container(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 10,
@@ -309,6 +308,7 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
                         ),
                       ),
                     ),
+                  ],
                 ],
               ),
               const SizedBox(height: 8),
