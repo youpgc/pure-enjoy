@@ -298,12 +298,12 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
               children: <Widget>[
                 Icon(Icons.info_outline, color: AppTheme.warning, size: 18),
                 const SizedBox(width: 8),
-                const Expanded(
-                  child: Text(
-                    '今日游戏奖励已达上限，本次积分暂未发放；明日上限刷新后，重新通关即可获得',
-                    style: TextStyle(color: AppTheme.warning, fontSize: 13),
+                  const Expanded(
+                    child: Text(
+                      '今日游戏奖励已达上限，超限部分未发放；明日上限刷新后，重新通关即可获得',
+                      style: TextStyle(color: AppTheme.warning, fontSize: 13),
+                    ),
                   ),
-                ),
               ],
             ),
           ),

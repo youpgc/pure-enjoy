@@ -236,6 +236,21 @@ Future<GameSettlementResult?> reportAndSettle({
     }
   }
 
+  // 结算弹窗成绩区展示用映射（2026-09-15 用户反馈修复）：
+  // 仅保留「后台 game_dimensions 已配置的成绩维度」（与成绩上报 valuesById 同口径）。
+  // 引擎注入的判定专用维度（match3 cleared_blocks/jelly_cleared/collect_done、
+  // g2048 merges、sheep mistakes——供成就与累计计数判定）不属成绩展示内容，
+  // 不下发弹窗，避免出现未转译的维度编码标签。
+  // level 为三游戏通用展示项（关序，弹窗有中文兜底），保留；
+  // 维度配置异常（空）时退化为展示原值，避免成绩区空白。
+  final displayValues = dims.isEmpty
+      ? scoreValuesByCode
+      : <String, num>{
+          for (final e in scoreValuesByCode.entries)
+            if (dims.any((d) => d.code == e.key) || e.key == 'level')
+              e.key: e.value,
+        };
+
   if (context.mounted) {
     unawaited(showModalBottomSheet<GameSettlementResult?>(
       context: context,
@@ -249,7 +264,7 @@ Future<GameSettlementResult?> reportAndSettle({
         game: game,
         cleared: cleared,
         failReason: failReason,
-        scoreValuesByCode: scoreValuesByCode,
+        scoreValuesByCode: displayValues,
         settleFuture: settleFuture,
         scoreOnly: !rewardsAllowed,
         endless: endless,

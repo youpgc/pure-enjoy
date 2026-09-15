@@ -238,6 +238,24 @@ class GameRewardService {
     final items = <GameSettlementItem>[];
     final config = await GameService.instance.fetchConfig();
 
+    // 上限止付（2026-09-15 用户反馈修复）：本局一旦有奖励因「今日上限」被拦，
+    // 后续项目全部止付、不再尝试发放。此前逐项独立校验会出现「大分项被拦
+    // （结算页已提示达到上限）、小分项仍通过校验继续发」的割裂体验。
+    // 止付与拦截都不占坑（claim 未触发），次日上限刷新后重新通关可重获。
+    bool capHit = false;
+    Future<GameRewardResult> guardedClaim(
+      Future<GameRewardResult> Function() run,
+    ) async {
+      if (capHit) {
+        return GameRewardResult.notGranted(
+          reason: '今日游戏奖励已达上限，本局不再发放',
+        );
+      }
+      final r = await run();
+      if (!r.granted && (r.reason?.contains('上限') ?? false)) capHit = true;
+      return r;
+    }
+
     // 判定专用取值：match3 关卡全局关序按后台配置动态推导（_match3GlobalLevelIndex，
     // 累加各模式真实关数），与 `game_levels` 实际数据一致，供 'level' 维度的
     // score_range 规则 / 成就比对。仅用于判定；成绩上报用原始 level_no，不受影响。
@@ -258,9 +276,8 @@ class GameRewardService {
 
     // 0) 每关通关奖励（rewardPoints<=0 时跳过，结算页不展示无效行）
     if (level.rewardPoints > 0) {
-      final levelReward = await claimLevelReward(
-        gameName: game.name,
-        level: level,
+      final levelReward = await guardedClaim(
+        () => claimLevelReward(gameName: game.name, level: level),
       );
       items.add(GameSettlementItem(
         kind: 'level_clear',
@@ -272,10 +289,12 @@ class GameRewardService {
     }
 
     // 1) 每日首次通关（仅后台标记为计入的关卡）
-    final daily = await claimDailyFirstClear(
-      gameId: game.id,
-      gameName: game.name,
-      level: level,
+    final daily = await guardedClaim(
+      () => claimDailyFirstClear(
+        gameId: game.id,
+        gameName: game.name,
+        level: level,
+      ),
     );
     items.add(GameSettlementItem(
       kind: 'daily_first_clear',
@@ -297,7 +316,9 @@ class GameRewardService {
         .toList();
     final topRule = pickTopScoreRangeRule(scoreRules, judgeValues);
     if (topRule != null) {
-      final r = await claimScoreRange(rule: topRule, gameCode: game.code);
+      final r = await guardedClaim(
+        () => claimScoreRange(rule: topRule, gameCode: game.code),
+      );
       items.add(GameSettlementItem(
         kind: 'score_range',
         label: topRule.name ?? '成绩达标',
@@ -324,7 +345,7 @@ class GameRewardService {
     //     已领取由 claim_key 唯一索引幂等拦截（不二次计算发放）。
     for (final ach in achievements) {
       if (achievementTypeOf(ach) != kAchievementTypeFirstClear) continue;
-      final r = await claimAchievement(achievement: ach);
+      final r = await guardedClaim(() => claimAchievement(achievement: ach));
       items.add(GameSettlementItem(
         kind: 'achievement',
         label: '成就：${ach.name}',
@@ -337,7 +358,8 @@ class GameRewardService {
     // 3b) 「关卡里程碑」成就：单局至多一条（本局关序对应的最高档）。
     final topLevel = pickTopLevelAchievement(achievements, effectiveLevelNo);
     if (topLevel != null) {
-      final r = await claimAchievement(achievement: topLevel);
+      final r =
+          await guardedClaim(() => claimAchievement(achievement: topLevel));
       items.add(GameSettlementItem(
         kind: 'achievement',
         label: '成就：${topLevel.name}',
@@ -365,7 +387,8 @@ class GameRewardService {
     }
     for (final topScore in pickTopScoreAchievements(achievements, scoreJudgeValues,
         modeCode: modeCode)) {
-      final r = await claimAchievement(achievement: topScore);
+      final r =
+          await guardedClaim(() => claimAchievement(achievement: topScore));
       items.add(GameSettlementItem(
         kind: 'achievement',
         label: '成就：${topScore.name}',
@@ -387,7 +410,8 @@ class GameRewardService {
         final claimedKeys = await _fetchClaimedAchievementKeys(met);
         for (final ach in met) {
           if (claimedKeys.contains('achievement:${ach.code}')) continue;
-          final r = await claimAchievement(achievement: ach);
+          final r =
+              await guardedClaim(() => claimAchievement(achievement: ach));
           items.add(GameSettlementItem(
             kind: 'achievement',
             label: '成就：${ach.name}',
@@ -401,7 +425,11 @@ class GameRewardService {
 
     // 4) 模式段位徽章（v2 徽章化 q-0：成就=纯荣誉，0 积分，仅记录解锁）。
     //    判定与落库见 GameBadgeService（体量拆分），此处只编排结果展示。
-    final newBadge = await GameBadgeService.instance.unlockTopTier(
+    //    上限止付命中时整段跳过：徽章发分同样计入单日上限，此时尝试必然被拦
+    //    （不占坑、下次重试），直接跳过省去无效 RPC。
+    final newBadge = capHit
+        ? null
+        : await GameBadgeService.instance.unlockTopTier(
       config: config,
       gameId: game.id,
       gameCode: game.code,
