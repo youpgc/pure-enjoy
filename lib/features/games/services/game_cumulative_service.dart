@@ -52,6 +52,7 @@ class GameCumulativeService {
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
+    await _migrateLegacyIfNeeded(userId);
 
     final deltas = <String, int>{
       GameCumulativeMetrics.play: 1,
@@ -73,6 +74,7 @@ class GameCumulativeService {
   Future<Map<String, int>> totalsFor({required String gameCode}) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return const <String, int>{};
+    await _migrateLegacyIfNeeded(userId);
     final totals = <String, int>{};
     for (final metric in GameCumulativeMetrics.all) {
       totals[metric] = await _read(userId, gameCode, metric);
@@ -83,6 +85,44 @@ class GameCumulativeService {
   /// 账号切换时清空内存缓存（键含 userId，磁盘数据天然隔离）。
   void resetForAccountSwitch() {
     _cache.clear();
+  }
+
+  /// 已完成旧键迁移的新 userId（内存防重；旧键迁后即删，重启重跑天然幂等）
+  String? _migratedFor;
+
+  /// 2026-09-14 双 ID 统一的一次性本地键迁移：
+  /// 把旧业务 ID（U 前缀）的累计计数并入 auth uuid 键下。
+  /// 旧 id 只存在于升级前的持久化会话（SessionManager.legacyBusinessId）；
+  /// 升级后重新登录拿不到旧值 → 计数从 0 开始，与「卸载重装」同一降级口径
+  /// （已解锁档位由服务端 claim_key 幂等保护，不重发）。
+  Future<void> _migrateLegacyIfNeeded(String newUserId) async {
+    if (_migratedFor == newUserId) return;
+    _migratedFor = newUserId;
+    final legacy = AuthService.instance.legacyBusinessId;
+    if (legacy == null || legacy == newUserId) return;
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final oldPrefix = '$_keyPrefix${legacy}_';
+      final newPrefix = '$_keyPrefix${newUserId}_';
+      final legacyKeys =
+          prefs.getKeys().where((k) => k.startsWith(oldPrefix)).toList();
+      for (final k in legacyKeys) {
+        final v = prefs.getInt(k);
+        if (v == null) continue;
+        final target = '$newPrefix${k.substring(oldPrefix.length)}';
+        final existing = prefs.getInt(target) ?? 0;
+        // 取 max：保留升级后已产生的新计数，不回退
+        if (v > existing) await prefs.setInt(target, v);
+        await prefs.remove(k);
+      }
+      if (legacyKeys.isNotEmpty) {
+        _cache.clear();
+        debugPrint('[GameCumulativeService] 已迁移 ${legacyKeys.length} 条旧累计'
+            '计数（$legacy → $newUserId）');
+      }
+    } catch (e) {
+      debugPrint('[GameCumulativeService] 旧累计计数迁移失败：$e');
+    }
   }
 
   String _cacheKey(String userId, String gameCode, String metric) =>

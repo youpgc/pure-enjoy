@@ -117,7 +117,7 @@ class _ProfilePageState extends State<ProfilePage> {
         final res = await ApiClient.get(
           'users',
           filters: {
-            ApiClient.userKey(userId): 'eq.$userId',
+            'id': 'eq.$userId',
             'is_deleted': 'eq.false',
           },
           columns: 'avatar_url',

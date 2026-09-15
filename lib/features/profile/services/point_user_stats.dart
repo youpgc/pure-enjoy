@@ -9,7 +9,7 @@ Future<Map<String, dynamic>?> fetchUserStats(String userId) async {
   final result = await ApiClient.get(
     'users',
     filters: {
-      ApiClient.userKey(userId): 'eq.$userId',
+      'id': 'eq.$userId',
       'is_deleted': 'eq.false',
     },
     columns:
@@ -49,7 +49,7 @@ Future<bool> updateUserStats(
 
   final result = await ApiClient.patchByFilter(
     'users',
-    filters: {ApiClient.userKey(userId): 'eq.$userId'},
+    filters: {'id': 'eq.$userId'},
     body: body,
   );
   if (!result.isSuccess) {

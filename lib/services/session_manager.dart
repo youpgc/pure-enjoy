@@ -31,10 +31,11 @@ class SessionManager {
   /// 当前 Supabase Auth 用户信息
   Map<String, dynamic>? _authUser;
 
-  /// 业务 ID（public.users.id，如 U17789397932M453781）。
-  /// 注册响应不含云端触发器回写的 app_user_id（GoTrue 在内存中构建响应），
-  /// 由 AuthService._ensureBusinessId 按 auth_id 反查 users 表补齐（2026-09-11）。
-  String? _businessId;
+  /// 旧业务 ID（U 前缀）。
+  /// 2026-09-14 双 ID 统一后 currentUserId ≡ auth uuid；此字段仅用于把升级前
+  /// 持久化会话里的旧 app_user_id 交给 GameCumulativeService 做一次性本地键
+  /// 迁移（内存态，不持久化、不参与任何业务请求）。
+  String? _legacyBusinessId;
 
   /// 登录时间戳（本地管理，用于 180 天有效期检查）
   DateTime? _loginAt;
@@ -46,28 +47,15 @@ class SessionManager {
   Map<String, dynamic>? get authUser => _authUser;
   DateTime? get loginAt => _loginAt;
 
-  /// 返回 public.users 的自定义 ID（如 U17789397932M453781），而非 auth UUID。
+  /// 当前用户唯一标识 = auth.users.id（uuid）。
   ///
-  /// 2026-09-11 修复：移除「回落 auth UUID」的旧兜底——UUID 作为 user_id 落库
-  /// 时 game_scores RLS（user_id = get_user_business_id()）与 grant_game_reward
-  /// RPC（p_user_id 校验）全部失配，正是「新注册用户无法记成绩/领积分」的根因。
-  /// 业务 ID 缺失时由 [_setBusinessId] 解析补齐，解析前返回 null（功能暂不可用
-  /// 优于写入错误归属数据）。
-  String? get currentUserId =>
-      _authUser?['user_metadata']?['app_user_id'] as String? ?? _businessId;
+  /// 2026-09-14 双 ID 统一：public.users.id 已与 auth uuid 合一（迁移
+  /// migrate_unify_user_id_v1），RLS（get_user_business_id() ≡ auth.uid()）
+  /// 与本值天然一致；旧 metadata.app_user_id 口径废弃。
+  String? get currentUserId => _authUser?['id'] as String?;
 
-  /// 解析业务 ID 后写入会话（内存 + 合并进持久化的 user_metadata）。
-  Future<void> setBusinessId(String id) async {
-    _businessId = id;
-    if (_authUser != null) {
-      final metadata = Map<String, dynamic>.from(
-        _authUser!['user_metadata'] as Map<dynamic, dynamic>? ?? {},
-      );
-      metadata['app_user_id'] = id;
-      _authUser!['user_metadata'] = metadata;
-    }
-    await _persist();
-  }
+  /// 升级前会话里的旧业务 ID（U 前缀），仅供本地累计计数一次性迁移；无则 null。
+  String? get legacyBusinessId => _legacyBusinessId;
   String? get currentUserEmail => _authUser?['email'] as String?;
 
   String? get currentUserName {
@@ -132,8 +120,9 @@ class SessionManager {
         _accessToken = token;
         _refreshToken = refresh;
         _authUser = jsonDecode(userJson) as Map<String, dynamic>;
-        // 恢复业务 ID（新注册会话此值可能为空，由 _ensureBusinessId 补齐）
-        _businessId =
+        // 捕获升级前会话里的旧业务 ID（U 前缀），供 game_cum 本地键一次性迁移；
+        // 重新登录/刷新用户信息后该值不复存在，故仅在恢复持久化会话时取一次
+        _legacyBusinessId =
             _authUser?['user_metadata']?['app_user_id'] as String?;
 
         // 恢复登录时间戳
@@ -172,7 +161,7 @@ class SessionManager {
     _refreshToken = null;
     _authUser = null;
     _loginAt = null;
-    _businessId = null;
+    _legacyBusinessId = null;
 
     HttpClient.instance.setAccessToken(null);
 

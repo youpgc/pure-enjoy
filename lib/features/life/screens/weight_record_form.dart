@@ -65,7 +65,7 @@ class RecordFormState extends State<RecordForm> {
       if (userId == null) return;
       final result = await ApiClient.get(
         'users',
-        filters: {ApiClient.userKey(userId): 'eq.$userId', 'is_deleted': 'eq.false'},
+        filters: {'id': 'eq.$userId', 'is_deleted': 'eq.false'},
         limit: 1,
       );
       if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {

@@ -83,7 +83,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       final result = await ApiClient.get(
         'users',
         filters: {
-          ApiClient.userKey(userId): 'eq.$userId',
+          'id': 'eq.$userId',
           'is_deleted': 'eq.false',
         },
       );
@@ -249,7 +249,7 @@ class _EditProfileScreenState extends State<EditProfileScreen>
 
       final result = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: {'id': 'eq.$_userId'},
         body: updateData,
       );
 

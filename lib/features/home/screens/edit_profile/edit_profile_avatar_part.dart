@@ -51,7 +51,7 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
       // 更新用户头像URL
       final updateResult = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: {'id': 'eq.$_userId'},
         body: {
           'avatar_url': publicUrl,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -90,7 +90,7 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
     try {
       final updateResult = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: {'id': 'eq.$_userId'},
         body: {
           'avatar_url': selected,
           'updated_at': DateTime.now().toUtc().toIso8601String(),
@@ -133,7 +133,7 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
     try {
       final updateResult = await ApiClient.patchByFilter(
         'users',
-        filters: {ApiClient.userKey(_userId!): 'eq.$_userId'},
+        filters: {'id': 'eq.$_userId'},
         body: {
           'avatar_url': url,
           'updated_at': DateTime.now().toUtc().toIso8601String(),

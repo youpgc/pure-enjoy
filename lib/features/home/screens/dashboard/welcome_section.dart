@@ -36,7 +36,7 @@ class _WelcomeSectionState extends State<WelcomeSection> {
         final result = await ApiClient.get(
           'users',
           filters: {
-            ApiClient.userKey(userId): 'eq.$userId',
+            'id': 'eq.$userId',
             'is_deleted': 'eq.false',
           },
           limit: 1,
