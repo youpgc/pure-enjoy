@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 
 import '../models/game_achievement_model.dart';
 import '../services/achievement_service.dart';
+import '../services/game_service.dart';
 import '../shared/achievement_icon.dart';
 import '../shared/game_local_loading.dart';
 
@@ -43,6 +44,11 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
   List<AchievementGroupView> _items = const <AchievementGroupView>[];
   bool _loading = true;
 
+  /// 游戏名映射（game_id → 显示名）：详情弹窗据此标注成就归属游戏。
+  /// 部分成就的名称/描述看不出属于哪个游戏（如「连锁大师·3连锁 / 单局触发 3 连锁」、
+  /// 累计类），需显式补齐（2026-09-15 需求）。
+  Map<String, String> _gameNames = const <String, String>{};
+
   @override
   void initState() {
     super.initState();
@@ -52,7 +58,23 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
   Future<void> _load() async {
     try {
       final list = await AchievementService.instance.fetchUserAchievements();
-      if (mounted) setState(() => _items = list);
+      // 游戏名映射：走配置快照（命中本地缓存，不额外打网络）。
+      // 单独兜底——映射拿不到不应拖垮成就列表展示。
+      var names = const <String, String>{};
+      try {
+        final config = await GameService.instance.fetchConfig();
+        names = <String, String>{for (final g in config.games) g.id: g.name};
+      } catch (e) {
+        if (kDebugMode) {
+          debugPrint('[AchievementListScreen] 游戏名映射加载失败：$e');
+        }
+      }
+      if (mounted) {
+        setState(() {
+          _items = list;
+          _gameNames = names;
+        });
+      }
     } catch (e) {
       if (kDebugMode) debugPrint('[AchievementListScreen] 加载失败：$e');
     } finally {
@@ -64,7 +86,8 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
     showDialog<void>(
       context: context,
       barrierColor: Colors.black54,
-      builder: (ctx) => _AchievementDetailDialog(group: group),
+      builder: (ctx) =>
+          _AchievementDetailDialog(group: group, gameNames: _gameNames),
     );
   }
 
@@ -201,7 +224,11 @@ class _AchievementListScreenState extends State<AchievementListScreen> {
 /// 全档位列表而非已获取集合，否则按钮结构性消失。
 class _AchievementDetailDialog extends StatefulWidget {
   final AchievementGroupView group;
-  const _AchievementDetailDialog({required this.group});
+
+  /// 游戏名映射（game_id → 显示名）；缺失时不展示归属标签（不猜、不写死）。
+  final Map<String, String> gameNames;
+
+  const _AchievementDetailDialog({required this.group, required this.gameNames});
 
   @override
   State<_AchievementDetailDialog> createState() =>
@@ -243,12 +270,36 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
     }
   }
 
+  /// 归属游戏名（作为达成条件描述的**前缀**统一展示）。
+  ///
+  /// 口径（2026-09-15 用户确认）：
+  /// - DB 的 `description` **只写条件本身、不含游戏名**（后台配置同理）；
+  ///   游戏名由 App 在「我的成就」详情里按「<游戏名> <描述>」拼出
+  ///   （如「2048 单局得分突破 20000」），保证同族各档文案结构完全一致；
+  /// - `gameId` 为空 = 全局成就 → **不展示游戏名**；
+  /// - 兼容历史格式：**仅当描述本身以游戏名开头**（旧数据「消消乐单局得分突破 …」）
+  ///   才跳过，避免叠成「消消乐 消消乐单局…」；
+  /// - **不拿 name 参与判断**：详情弹窗会把 name 的「游戏名·」前缀拆掉显示
+  ///   （`消消乐·计分模式·青铜段位` → 主名「计分模式」），用 name 判断会误以为
+  ///   游戏名已展示；也不做朴素子串匹配——纯数字游戏名「2048」会撞描述里的
+  ///   数值（「单局得分突破 2048」被误判为已含游戏名，正是此处的坑）；
+  /// - 映射缺失（配置未就绪）→ 不显示，宁可不显示也不写死游戏名。
+  String? _resolveGameLabel(GameAchievementModel a) {
+    final id = a.gameId;
+    if (id == null || id.isEmpty) return null;
+    final label = widget.gameNames[id];
+    if (label == null || label.isEmpty) return null;
+    if ((a.description ?? '').startsWith(label)) return null;
+    return label;
+  }
+
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final cs = theme.colorScheme;
     final tiers = _tiers;
     final achievement = tiers[_index];
+    final gameLabel = _resolveGameLabel(achievement);
     final unlockedAt = _unlockedAt[achievement.id];
     final showArrows = tiers.length > 1;
     final canPrev = _index > 0;
@@ -312,14 +363,30 @@ class _AchievementDetailDialogState extends State<_AchievementDetailDialog> {
                 ],
               ),
               const SizedBox(height: 8),
-              // 达成条件（DB description，与真实判定口径一致），自然换行不截断
+              // 达成条件行：**「游戏名 + 描述」统一结构**（2026-09-15 需求）。
+              // DB 描述不含游戏名（配置侧只写条件），游戏名由 App 拼做前缀，
+              // 于是同族各档文案结构一致（不会出现「有的带游戏名、有的不带」）；
+              // 全局成就/描述已含游戏名时不加前缀。Text.rich 保证自然换行、水平居中。
               if (achievement.description != null &&
                   achievement.description!.isNotEmpty)
-                Text(
-                  achievement.description!,
-                  style: theme.textTheme.bodySmall?.copyWith(
-                    color: cs.onSurfaceVariant,
+                Text.rich(
+                  TextSpan(
+                    children: <InlineSpan>[
+                      if (gameLabel != null)
+                        TextSpan(
+                          text: '$gameLabel ',
+                          style: TextStyle(
+                            color: cs.primary,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      TextSpan(
+                        text: achievement.description!,
+                        style: TextStyle(color: cs.onSurfaceVariant),
+                      ),
+                    ],
                   ),
+                  style: theme.textTheme.bodySmall,
                   textAlign: TextAlign.center,
                 ),
               const SizedBox(height: 10),
