@@ -108,6 +108,9 @@ class _PetAssetCardState extends State<PetAssetCard> {
 
   @override
   Widget build(BuildContext context) {
+    // 3D 系统开关关闭 → 整卡隐藏（2D 为默认渲染层，不向普通用户暴露
+    // 「暂未开放」占位噪音；POC 工作台走 debug 入口不受影响）
+    if (!_loading && !_systemEnabled) return const SizedBox.shrink();
     final colorScheme = Theme.of(context).colorScheme;
     return Card(
       child: Padding(

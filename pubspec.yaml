@@ -102,3 +102,5 @@ flutter:
     - assets/games/items/
     # 宠物 3D POC 素材（月萤底模 yueying.glb / skybox.jpg 就位后生效；空目录由占位文件兜底）
     - assets/pets_poc/
+    # 宠物 2D 立绘（随包本地：月萤三阶 cat_ssr1_01/02/03）
+    - assets/pets/

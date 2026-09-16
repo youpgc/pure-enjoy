@@ -5,6 +5,7 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../services/pet_service.dart';
 import '../widgets/pet_asset_card.dart';
+import '../utils/pet_art.dart';
 import 'pet_poc_screen.dart';
 
 /// 宠物主页（B2 骨架占位版）
@@ -87,6 +88,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     }
     final summary = _summary!;
     final pet = summary.primaryPet;
+    // 2D 立绘按 speciesCode+stage 解析（未登记种属返回 null → 回退占位图标）
+    final artAsset =
+        pet == null ? null : petStageArtAsset(pet.speciesCode, pet.stage);
     return RefreshIndicator(
       onRefresh: () => _load(force: true),
       child: ListView(
@@ -104,11 +108,37 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               ),
             ),
           if (pet != null) ...[
+            // 2D 立绘卡（随包资产；3D 底模未达正式工程标准前，2D 为默认渲染层）
             Card(
-              child: ListTile(
-                leading: Icon(Icons.pets, color: colorScheme.primary),
-                title: Text('${pet.name} · Lv.${pet.level}'),
-                subtitle: Text('${pet.speciesCode} · ${pet.rarity} · 一阶 ${pet.stage}'),
+              child: Padding(
+                padding: const EdgeInsets.all(12),
+                child: Column(
+                  children: [
+                    ClipRRect(
+                      borderRadius: BorderRadius.circular(8),
+                      child: artAsset != null
+                          ? Image.asset(
+                              artAsset,
+                              height: 200,
+                              fit: BoxFit.contain,
+                            )
+                          : Padding(
+                              padding: const EdgeInsets.symmetric(vertical: 24),
+                              child: Icon(Icons.pets,
+                                  size: 64, color: colorScheme.primary),
+                            ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text('${pet.name} · Lv.${pet.level}'),
+                    Text(
+                      '${pet.speciesCode} · ${pet.rarity} · 形态阶位 ${pet.stage}',
+                      style: TextStyle(
+                        fontSize: 12,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
               ),
             ),
             const SizedBox(height: 12),
@@ -180,8 +210,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           ),
           const SizedBox(height: 24),
           Text(
-            'B3 批次将在此实装 3D 主页（model-viewer + skybox + 手势 + 2D 覆盖层），'
-            '当前为模块骨架占位页。',
+            '当前为 2D 立绘版骨架页；3D 渲染待正式工程资产（重拓扑+绑定+动画）'
+            '就绪后按三层开关矩阵灰度开放。',
             textAlign: TextAlign.center,
             style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
           ),
