@@ -13,6 +13,7 @@ import '../../../../services/request_cache.dart';
 import '../../../life/models/habit_model.dart';
 import '../../../life/models/reminder_model.dart';
 import '../../../life/screens/reminders_screen.dart';
+import '../../../pets/services/pet_service.dart';
 import '../notification_center_screen.dart';
 import '../sheets/sheets.dart';
 import './dashboard_helpers.dart';

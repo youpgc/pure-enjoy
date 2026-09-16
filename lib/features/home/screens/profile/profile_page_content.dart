@@ -30,6 +30,7 @@ class ProfilePageContent extends StatelessWidget {
     required this.onThemeSettingsTap,
     required this.achievementCount,
     required this.onAchievementsTap,
+    required this.onWalletTap,
     this.onRefresh,
   });
 
@@ -50,6 +51,9 @@ class ProfilePageContent extends StatelessWidget {
   final VoidCallback onThemeSettingsTap;
   final int achievementCount;
   final VoidCallback onAchievementsTap;
+
+  /// 金币钱包入口（null 时隐藏——pet_enabled 关闭或门控未加载完成）
+  final VoidCallback? onWalletTap;
 
   /// 下拉刷新回调（null 时不启用下拉刷新）
   final Future<void> Function()? onRefresh;
@@ -115,6 +119,15 @@ class ProfilePageContent extends StatelessWidget {
               );
             },
           ),
+          // 金币钱包入口（宠物系统；pet_enabled 关闭时不渲染）
+          if (onWalletTap != null)
+            ListTile(
+              leading: const Icon(Icons.savings_outlined),
+              title: const Text('金币钱包'),
+              subtitle: const Text('宠物金币余额与流水'),
+              trailing: const Icon(Icons.chevron_right),
+              onTap: onWalletTap,
+            ),
           ListTile(
             leading: const Icon(Icons.info_outline),
             title: const Text('关于与法律'),

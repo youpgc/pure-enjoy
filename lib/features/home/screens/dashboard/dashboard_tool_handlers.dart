@@ -7,6 +7,7 @@ import '../../../../core/widgets/widgets.dart';
 import '../../../../services/api_client.dart';
 import '../../../../services/notification_service.dart';
 import '../../../../core/utils/event_bus.dart';
+import '../../../pets/screens/pet_home_screen.dart';
 import './dashboard_helpers.dart';
 import '../sheets/sheets.dart';
 import '../sheets/tool_config_sheet.dart';
@@ -177,6 +178,14 @@ void dashboardHandleToolTap(
             }
           }
         },
+      );
+      break;
+    case 'pet':
+      // 宠物主页落点；pet_enabled 门控在 PetHomeScreen 内兜底
+      // （关闭态展示「暂未开放」，主页状态卡已按门控隐藏本工具）
+      Navigator.push(
+        context,
+        MaterialPageRoute(builder: (_) => const PetHomeScreen()),
       );
       break;
   }

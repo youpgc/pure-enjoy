@@ -25,6 +25,8 @@ class CacheHelper {
   static const String keyGameScores = 'cache_game_scores';
   /// 「我的」页头部统计缓存（积分/成就数/头像 URL，按用户隔离，切换账号须清除）。
   static const String keyProfileStats = 'cache_profile_stats';
+  /// 宠物总览缓存（rpc_pet_summary，按用户隔离，切换账号须清除）。
+  static const String keyPetSummary = 'cache_pet_summary';
 
   /// 保存 JSON 列表缓存
   Future<void> saveList(String key, List<dynamic> data) async {
@@ -89,6 +91,8 @@ class CacheHelper {
       // 「我的」页头部统计（积分/成就数/头像 URL）：2026-09-14 审查修复，
       // 之前声明「须清除」却遗漏在列表外，导致切号后新用户读到旧账号统计
       keyProfileStats,
+      // 宠物总览（rpc_pet_summary 结果，含用户宠物/钱包数据）：切号须清除
+      keyPetSummary,
       // 注：keyGames 是全局配置（非用户数据），故意不在此清除
     ];
     for (final key in keysToRemove) {

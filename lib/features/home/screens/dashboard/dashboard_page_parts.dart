@@ -65,6 +65,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
       _loadToolConfig(),
       _loadHabitsForCheckin(),
       _loadAnnouncements(),
+      _loadPetGate(),
     ]);
   }
 
@@ -90,7 +91,10 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
 
   @override
   Widget build(BuildContext context) {
-    final visibleTools = allTools.where((t) => _visibleToolIds.contains(t.id)).toList();
+    final visibleTools = allTools
+        .where((t) =>
+            _visibleToolIds.contains(t.id) && (t.id != 'pet' || _petEnabled))
+        .toList();
 
     return Scaffold(
       appBar: AppBar(
@@ -124,6 +128,8 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
               onViewAll: _loadAnnouncements,
             ),
             const WelcomeSection(),
+            // 宠物常驻状态卡（主入口；pet_enabled 关闭时自身不渲染）
+            const PetStatusCardSection(),
             TodoReminderSection(
               reminders: _pendingReminders,
               onTap: _goToReminderDetail,

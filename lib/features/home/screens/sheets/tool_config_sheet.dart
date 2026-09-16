@@ -25,6 +25,7 @@ const List<ToolItem> allTools = [
   ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Color(0xFFF26522)),
   ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Color(0xFFFFB300)),
   ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Color(0xFFFF9800)),
+  ToolItem(id: 'pet', label: '宠物', icon: Icons.pets_outlined, color: Color(0xFF8D6E63)),
 ];
 
 /// 工具配置底部弹窗

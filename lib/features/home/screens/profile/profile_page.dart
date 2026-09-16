@@ -6,6 +6,8 @@ import '../../../../services/api_client.dart';
 import '../../../profile/services/point_service.dart';
 import '../../../games/services/achievement_service.dart';
 import '../../../games/screens/achievement_list_screen.dart';
+import '../../../pets/screens/pet_home_screen.dart';
+import '../../../pets/services/pet_service.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../../services/version_check_service.dart';
 import '../../../../utils/cache_helper.dart';
@@ -43,6 +45,9 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 不依赖 auth user_metadata 的异步同步，避免「我的」页经常显示默认头像。
   String? _avatarUrl;
 
+  /// 宠物系统总开关（金币钱包入口门控；关闭时入口隐藏）
+  bool _petEnabled = false;
+
   @override
   void initState() {
     super.initState();
@@ -54,6 +59,15 @@ class _ProfilePageState extends State<ProfilePage> {
     _loadUserData();
     _loadAppVersion();
     _checkUpdate();
+    _loadPetGate();
+  }
+
+  /// 加载宠物系统总开关（pet_config 轻量查询，短缓存；与状态卡共享 PetService 缓存）
+  Future<void> _loadPetGate() async {
+    final enabled = await PetService.instance.isPetEnabled();
+    if (mounted) {
+      setState(() => _petEnabled = enabled);
+    }
   }
 
   /// 恢复「我的」页头部统计缓存（未登录/无缓存时静默跳过）。
@@ -189,6 +203,16 @@ class _ProfilePageState extends State<ProfilePage> {
           MaterialPageRoute(builder: (_) => const AchievementListScreen()),
         ).then((_) => _loadUserData());
       },
+      onWalletTap: _petEnabled
+          ? () {
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (_) => const PetHomeScreen(initialTab: 'wallet'),
+                ),
+              );
+            }
+          : null,
       onVersionTap: () async {
         // 走不受「稍后更新」影响的手动检查通道，确保即便已忽略也能更新
         final versionInfo =

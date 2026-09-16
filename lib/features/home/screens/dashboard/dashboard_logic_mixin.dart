@@ -36,6 +36,10 @@ mixin _DashboardLogic on State<DashboardPage> {
 
   List<String> _visibleToolIds = [];
 
+  /// 宠物系统总开关（pet_config.pet_enabled，关闭时宠物工具从网格隐藏）。
+  /// 初始 true 仅作占位：加载完成后未开启即过滤，状态卡自身另有门控。
+  bool _petEnabled = true;
+
   // 习惯打卡数据
   List<HabitModel> _habits = [];
   Map<String, List<HabitCheckinModel>> _checkinHistory = {};
@@ -170,6 +174,12 @@ mixin _DashboardLogic on State<DashboardPage> {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setStringList(_prefsKeyTools, ids);
     if (mounted) setState(() => _visibleToolIds = ids);
+  }
+
+  /// 加载宠物系统总开关（pet_config 轻量查询，短缓存；与状态卡共享 PetService 缓存）
+  Future<void> _loadPetGate() async {
+    final enabled = await PetService.instance.isPetEnabled();
+    if (mounted) setState(() => _petEnabled = enabled);
   }
 
   /// 从 Supabase 加载最近活动记录（带本地缓存：先秒开，后台静默刷新）
