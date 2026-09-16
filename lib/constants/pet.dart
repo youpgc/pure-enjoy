@@ -185,3 +185,38 @@ enum PetAssetPackStatus {
   final String code;
   final String label;
 }
+
+/// ==================== S1 素材验收规范（命名即契约，来源《3D展现与交互实现方案》§3.1） ====================
+
+/// 8 标准动画命名（全局统一；命名变更 = 破坏性变更，须走验收页校验）
+const List<String> kPetStandardAnimations = <String>[
+  'idle', 'eat', 'petted', 'happy', 'sad', 'sleep', 'walk', 'evolve',
+];
+
+/// 标准骨骼 rig 命名（每系共享一套）
+const List<String> kPetStandardBones = <String>[
+  'root', 'hips', 'spine', 'head', 'ear_L', 'ear_R', 'tail',
+  'mount_head', 'mount_neck', 'mount_back',
+];
+
+/// 标准评级 variants（glTF material variants 命名）
+const List<String> kPetStandardVariants = <String>['N', 'R', 'SR', 'SSR'];
+
+/// 素材验收阈值（S1 POC 定版；仅约束资产标准，非业务数值，不违反"数值走后台配置"铁律）
+class PetAssetThresholds {
+  const PetAssetThresholds._();
+
+  /// 单只 GLB 体积上限（Draco+KTX2 压缩后）
+  static const int maxGlbBytes = 3 * 1024 * 1024;
+
+  /// 单只三角面数上限
+  static const int maxTriangleCount = 15000;
+
+  /// 全景天空盒体积上限（4096×2048 等距柱状）
+  static const int maxSkyboxBytes = 1536 * 1024;
+
+  /// species code 文件名规范：`<family>_<rarity><序号>[_s<阶段>]`，如 cat_n1 / cat_ssr1_s2
+  static final RegExp speciesCodePattern =
+      RegExp(r'^[a-z]+_(n|r|sr|ssr)\d+(_s[0-9]+)?$');
+}
+

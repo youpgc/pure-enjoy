@@ -79,6 +79,8 @@ dependencies:
   # 网络状态监听
   connectivity_plus: ^5.0.0
   crop_your_image: ^2.0.0
+  # 宠物 3D 渲染（model-viewer 全属性封装：skybox/shadow/exposure/animationName；POC 用）
+  model_viewer_plus: ^1.10.0
 
 dev_dependencies:
   flutter_test:
@@ -98,3 +100,5 @@ flutter:
     - assets/games/achievements/
     - assets/games/match3/
     - assets/games/items/
+    # 宠物 3D POC 素材（月萤底模 yueying.glb / skybox.jpg 就位后生效；空目录由占位文件兜底）
+    - assets/pets_poc/

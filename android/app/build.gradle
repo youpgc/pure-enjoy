@@ -43,7 +43,8 @@ android {
 
     defaultConfig {
         applicationId "com.pureenjoy.app"
-        minSdkVersion flutter.minSdkVersion
+        // S1 3D POC：model_viewer_plus 硬性要求 minSdk >= 24（默认 flutter.minSdkVersion=21）
+        minSdkVersion 24
         targetSdk 36
         versionCode flutterVersionCode.toInteger()
         versionName flutterVersionName

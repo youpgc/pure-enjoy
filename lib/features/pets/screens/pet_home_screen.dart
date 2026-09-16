@@ -1,9 +1,11 @@
+import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../services/pet_service.dart';
 import '../widgets/pet_asset_card.dart';
+import 'pet_poc_screen.dart';
 
 /// 宠物主页（B2 骨架占位版）
 ///
@@ -59,6 +61,18 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.initialTab == null ? '宠物' : '宠物 · ${widget.initialTab}'),
+        // S1 3D POC 工作台入口：仅 debug 包显示（release 无此图标）
+        actions: [
+          if (kDebugMode)
+            IconButton(
+              tooltip: '3D POC 工作台',
+              icon: const Icon(Icons.science_outlined),
+              onPressed: () => Navigator.push(
+                context,
+                MaterialPageRoute(builder: (_) => const PetPocScreen()),
+              ),
+            ),
+        ],
       ),
       body: _buildBody(colorScheme),
     );

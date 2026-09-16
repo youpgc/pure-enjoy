@@ -1,0 +1,9 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- S1 3D POC：model_viewer_plus 内部经 http://localhost:PORT 加载资产，
+     仅放行本机回环地址的明文流量，不放开全局 cleartext（Android 9+ 默认禁止）。 -->
+<network-security-config>
+    <domain-config cleartextTrafficPermitted="true">
+        <domain includeSubdomains="true">localhost</domain>
+        <domain includeSubdomains="true">127.0.0.1</domain>
+    </domain-config>
+</network-security-config>
