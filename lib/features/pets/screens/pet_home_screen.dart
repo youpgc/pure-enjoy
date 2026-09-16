@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../services/pet_service.dart';
+import '../widgets/pet_asset_card.dart';
 
 /// 宠物主页（B2 骨架占位版）
 ///
@@ -132,6 +133,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                 ),
               ),
             ),
+          const SizedBox(height: 12),
+          // 3D 资源包状态卡（B3 前置：按系懒加载 + 三层开关 + 用户可感知下载）
+          if (pet != null) PetAssetCard(family: pet.family),
           const SizedBox(height: 12),
           Card(
             child: Padding(

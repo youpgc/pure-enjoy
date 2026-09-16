@@ -167,3 +167,21 @@ enum PetPickMode {
     return null;
   }
 }
+
+/// 3D 资源包本地状态机（App 端自有状态，非 DDL 枚举；按系 family 独立流转）
+///
+/// 流转：missing → downloading → verifying → ready；
+/// 校验失败/文件缺失 → corrupt（可重下）；下载异常 → error（可重试）。
+enum PetAssetPackStatus {
+  missing('missing', '未下载'),
+  downloading('downloading', '下载中'),
+  verifying('verifying', '校验中'),
+  ready('ready', '已就绪'),
+  corrupt('corrupt', '已损坏'),
+  error('error', '下载失败');
+
+  const PetAssetPackStatus(this.code, this.label);
+
+  final String code;
+  final String label;
+}

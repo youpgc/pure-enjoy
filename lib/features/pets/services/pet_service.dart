@@ -31,23 +31,41 @@ class PetService {
   /// 未登录返回 false（三处入口全部隐藏）；查询失败按关闭处理（兜底不崩溃）。
   Future<bool> isPetEnabled({bool forceRefresh = false}) async {
     if (SupabaseService.instance.currentUserId == null) return false;
+    final (data, _) = await gateConfig(forceRefresh: forceRefresh);
+    return data?['pet_enabled'] as bool? ?? false;
+  }
+
+  /// 门控配置读取（pet_config 三列一次取回，SWR 共享 keyGate 缓存）：
+  /// `pet_enabled` 总开关 / `render3d_enabled` 3D 系统开关 / `asset_manifest`
+  /// 资源包清单。旧缓存缺新列时返回 map 中无对应键，调用方按缺省兜底。
+  Future<(Map<String, dynamic>?, bool)> gateConfig({
+    bool forceRefresh = false,
+    Duration? ttl,
+  }) async {
     try {
-      final (data, _) = await PetCache.getMap(
+      return await PetCache.getMap(
         PetCache.keyGate,
         () => ApiClient.get(
           'pet_config',
-          select: 'pet_enabled',
+          select: 'pet_enabled,render3d_enabled,asset_manifest',
           limit: 1,
-          note: 'pet_config 门控查询',
+          note: 'pet_config 门控/3D 开关/资源清单查询',
         ),
-        ttl: _gateTtl,
+        ttl: ttl ?? _gateTtl,
         forceRefresh: forceRefresh,
       );
-      return data?['pet_enabled'] as bool? ?? false;
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 门控查询失败: $e');
-      return false;
+      return (null, false);
     }
+  }
+
+  /// 3D 渲染系统开关（pet_config.render3d_enabled；未配置按关闭兜底，
+  /// 与用户开关、资源包就绪态三者与运算决定 effective_3d）。
+  Future<bool> isRender3dSystemEnabled({bool forceRefresh = false}) async {
+    if (SupabaseService.instance.currentUserId == null) return false;
+    final (data, _) = await gateConfig(forceRefresh: forceRefresh);
+    return data?['render3d_enabled'] as bool? ?? false;
   }
 
   /// 拉取宠物总览（rpc_pet_summary；SWR：缓存秒开 + 静默刷新）。

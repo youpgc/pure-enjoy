@@ -74,6 +74,8 @@ dependencies:
   # 本地 SQLite 数据库（批注离线同步）
   sqflite: ^2.3.0
   path: ^1.8.0
+  # 宠物 3D 资源包解压（纯 Dart，无原生二进制；按系 zip 下载后流式解压）
+  archive: ^3.6.1
   # 网络状态监听
   connectivity_plus: ^5.0.0
   crop_your_image: ^2.0.0
