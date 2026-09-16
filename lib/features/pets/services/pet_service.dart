@@ -38,6 +38,10 @@ class PetService {
   /// 门控配置读取（pet_config 三列一次取回，SWR 共享 keyGate 缓存）：
   /// `pet_enabled` 总开关 / `render3d_enabled` 3D 系统开关 / `asset_manifest`
   /// 资源包清单。旧缓存缺新列时返回 map 中无对应键，调用方按缺省兜底。
+  ///
+  /// 降级路径：若 3D 增量列尚未迁移（asset SQL 未执行），PostgREST 对整条
+  /// select 报 42703 → 回退为只查 `pet_enabled`，保证总开关不受增量列缺失
+  /// 拖垮（此时 3D 开关按缺省关闭，符合分层开关语义）。
   Future<(Map<String, dynamic>?, bool)> gateConfig({
     bool forceRefresh = false,
     Duration? ttl,
@@ -45,12 +49,7 @@ class PetService {
     try {
       return await PetCache.getMap(
         PetCache.keyGate,
-        () => ApiClient.get(
-          'pet_config',
-          select: 'pet_enabled,render3d_enabled,asset_manifest',
-          limit: 1,
-          note: 'pet_config 门控/3D 开关/资源清单查询',
-        ),
+        _fetchGateConfig,
         ttl: ttl ?? _gateTtl,
         forceRefresh: forceRefresh,
       );
@@ -58,6 +57,27 @@ class PetService {
       if (kDebugMode) debugPrint('[PetService] 门控查询失败: $e');
       return (null, false);
     }
+  }
+
+  /// 门控配置拉取器（三列优先，失败降级单列）
+  Future<ApiResponse> _fetchGateConfig() async {
+    final full = await ApiClient.get(
+      'pet_config',
+      select: 'pet_enabled,render3d_enabled,asset_manifest',
+      limit: 1,
+      note: 'pet_config 门控/3D 开关/资源清单查询',
+    );
+    if (full.isSuccess) return full;
+    if (kDebugMode) {
+      debugPrint('[PetService] 三列门控查询失败，降级仅查 pet_enabled: '
+          '${full.errorMessage}');
+    }
+    return ApiClient.get(
+      'pet_config',
+      select: 'pet_enabled',
+      limit: 1,
+      note: 'pet_config 门控降级查询（仅总开关）',
+    );
   }
 
   /// 3D 渲染系统开关（pet_config.render3d_enabled；未配置按关闭兜底，

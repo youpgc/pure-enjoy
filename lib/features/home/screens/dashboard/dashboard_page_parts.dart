@@ -146,6 +146,7 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
                 context,
                 visibleIds: _visibleToolIds,
                 onSave: _saveToolConfig,
+                petEnabled: _petEnabled,
               ),
               onToolTap: _onToolTap,
             ),

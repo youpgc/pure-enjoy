@@ -43,10 +43,24 @@ class PetCache {
     }
   }
 
+  /// 从 ApiResponse 提取单对象 Map：
+  /// - RPC 单对象 / 标量响应 → 承载于 raw；
+  /// - 表查询（PostgREST 数组响应，如 pet_config limit=1）→ 数据在 data 列表，
+  ///   取首元素。此前仅认 raw，导致表查询门控永远拿到 null（isPetEnabled 恒 false）。
+  static Map<String, dynamic>? _extractMap(ApiResponse resp) {
+    final raw = resp.raw;
+    if (raw is Map) return Map<String, dynamic>.from(raw);
+    final data = resp.data;
+    if (data != null && data.isNotEmpty) {
+      return Map<String, dynamic>.from(data.first);
+    }
+    return null;
+  }
+
   /// 带缓存的 Map 读取。
   ///
   /// 返回 `(data, cached)`：cached=true 表示本次直接用了本地缓存（后台已在刷新）。
-  /// [fetcher] 返回 [ApiResponse]，成功时取其 `raw`（单对象响应承载处）缓存。
+  /// [fetcher] 返回 [ApiResponse]，成功时经 [_extractMap] 取单对象缓存。
   static Future<(Map<String, dynamic>?, bool)> getMap(
     String key,
     Future<ApiResponse> Function() fetcher, {
@@ -65,11 +79,9 @@ class PetCache {
     }
 
     final refresh = fetcher().then((resp) async {
-      if (resp.isSuccess && resp.raw is Map) {
-        await CacheHelper.instance.saveMap(
-          key,
-          Map<String, dynamic>.from(resp.raw as Map),
-        );
+      final map = resp.isSuccess ? _extractMap(resp) : null;
+      if (map != null) {
+        await CacheHelper.instance.saveMap(key, map);
         await _writeTs(key);
       }
       return resp;
@@ -83,10 +95,7 @@ class PetCache {
 
     // 无缓存：必须等网络
     final resp = await refresh;
-    if (resp.isSuccess && resp.raw is Map) {
-      return (Map<String, dynamic>.from(resp.raw as Map), false);
-    }
-    return (null, false);
+    return (resp.isSuccess ? _extractMap(resp) : null, false);
   }
 
   /// 失效单个缓存键（数据 + 时间戳）
