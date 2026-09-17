@@ -35,7 +35,9 @@ class _PetPocScreenState extends State<PetPocScreen> {
 
   // ---- 渲染参数 ----
   bool _skyboxOn = false;
-  double _shadowIntensity = 0.6;
+  // 注意：model_viewer_plus 1.10.0（最新版）html_builder.dart:311 拼接
+  // shadow-intensity 时多写了一个 "}"（属性值非法），暂不传该参数，
+  // 使用 <model-viewer> 默认阴影；待上游修复后恢复滑杆。
   double _exposure = 1.0;
   bool _autoRotate = false;
   bool _autoPlay = true;
@@ -57,7 +59,9 @@ class _PetPocScreenState extends State<PetPocScreen> {
   double _fps = 0;
   int _rssMb = 0;
   int _frames = 0;
-  Duration _windowStart = Duration.zero;
+  // 用 Stopwatch 计窗口：TimingsCallback 由 _reportTimings 异步派发，
+  // 回调内访问 SchedulerBinding.currentFrameTimeStamp 可能为 null（断言崩溃），不可用。
+  final Stopwatch _windowStopwatch = Stopwatch();
   bool _monitoring = false;
 
   // ---- 生命周期演练 ----
@@ -83,22 +87,21 @@ class _PetPocScreenState extends State<PetPocScreen> {
   void _startMonitor() {
     SchedulerBinding.instance.addTimingsCallback(_onTimings);
     _monitoring = true;
-    _windowStart = SchedulerBinding.instance.currentFrameTimeStamp;
+    _windowStopwatch.start();
   }
 
   void _onTimings(List<FrameTiming> timings) {
     _frames += timings.length;
-    final now = SchedulerBinding.instance.currentFrameTimeStamp;
-    final elapsed = now - _windowStart;
-    if (elapsed.inMilliseconds >= 1000) {
+    final elapsedMs = _windowStopwatch.elapsedMilliseconds;
+    if (elapsedMs >= 1000) {
       if (mounted) {
         setState(() {
-          _fps = _frames * 1000 / elapsed.inMilliseconds;
+          _fps = _frames * 1000 / elapsedMs;
           _rssMb = ProcessInfo.currentRss ~/ (1024 * 1024);
         });
       }
       _frames = 0;
-      _windowStart = now;
+      _windowStopwatch.reset();
     }
   }
 
@@ -149,10 +152,15 @@ class _PetPocScreenState extends State<PetPocScreen> {
           Icon(Icons.memory, size: 18, color: cs.primary),
           const SizedBox(width: 4),
           Text('RSS $_rssMb MB', style: const TextStyle(fontSize: 13)),
-          const Spacer(),
-          Text(
-            'WebView 内部帧率请用系统工具复测',
-            style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+          const SizedBox(width: 8),
+          Flexible(
+            child: Text(
+              'WebView 内部帧率请用系统工具复测',
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              textAlign: TextAlign.right,
+              style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
+            ),
           ),
         ],
       ),
@@ -172,7 +180,6 @@ class _PetPocScreenState extends State<PetPocScreen> {
       autoRotate: _autoRotate,
       animationName: _animCtrl.text.trim().isEmpty ? null : _animCtrl.text.trim(),
       skyboxImage: _skyboxOn ? _defaultAssetSkybox : null,
-      shadowIntensity: _shadowIntensity,
       exposure: _exposure,
       cameraControls: true,
       disableZoom: _disableZoom,
@@ -300,7 +307,6 @@ class _PetPocScreenState extends State<PetPocScreen> {
           value: _skyboxOn,
           onChanged: (v) => setState(() => _skyboxOn = v),
         ),
-        _sliderRow('阴影强度', _shadowIntensity, 0, 1, (v) => _shadowIntensity = v),
         _sliderRow('曝光', _exposure, 0.2, 2, (v) => _exposure = v),
         SwitchListTile(
           dense: true, title: const Text('autoRotate 自转'),
