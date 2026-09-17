@@ -28,6 +28,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   bool _loading = true;
   bool _enabled = false;
   PetSummaryModel? _summary;
+  String? _error;
 
   @override
   void initState() {
@@ -51,6 +52,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       setState(() {
         _enabled = true;
         _summary = summary;
+        // summary 为 null = RPC 拉取失败（区别于功能关闭），UI 分态展示
+        _error = summary == null ? '总览拉取失败（rpc_pet_summary）' : null;
         _loading = false;
       });
     }
@@ -83,8 +86,41 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     if (_loading) {
       return const Center(child: LoadingWidget());
     }
-    if (!_enabled || _summary == null) {
-      return const EmptyWidget(message: '宠物功能暂未开放，敬请期待');
+    if (!_enabled) {
+      return const EmptyWidget(message: '宠物功能暂未开放');
+    }
+    if (_summary == null) {
+      // 开关已开但总览拉取失败：可重试（真实原因看统一请求日志 rpc_pet_summary 条目）
+      return Center(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            const Text('宠物数据加载失败，请稍后重试'),
+            if (kDebugMode && _error != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 24),
+                child: Text(
+                  _error!,
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                    fontSize: 11,
+                    color: Theme.of(context).colorScheme.error,
+                  ),
+                ),
+              ),
+            ],
+            const SizedBox(height: 12),
+            FilledButton(
+              onPressed: () {
+                setState(() => _loading = true);
+                _load(force: true);
+              },
+              child: const Text('重试'),
+            ),
+          ],
+        ),
+      );
     }
     final summary = _summary!;
     final pet = summary.primaryPet;

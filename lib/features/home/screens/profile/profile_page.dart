@@ -6,7 +6,7 @@ import '../../../../services/api_client.dart';
 import '../../../profile/services/point_service.dart';
 import '../../../games/services/achievement_service.dart';
 import '../../../games/screens/achievement_list_screen.dart';
-import '../../../pets/screens/pet_home_screen.dart';
+import '../../../pets/screens/pet_wallet_screen.dart';
 import '../../../pets/services/pet_service.dart';
 import '../../../auth/screens/login_screen.dart';
 import '../../../../services/version_check_service.dart';
@@ -208,7 +208,7 @@ class _ProfilePageState extends State<ProfilePage> {
               Navigator.push(
                 context,
                 MaterialPageRoute(
-                  builder: (_) => const PetHomeScreen(initialTab: 'wallet'),
+                  builder: (_) => const PetWalletScreen(),
                 ),
               );
             }
