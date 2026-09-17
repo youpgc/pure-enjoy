@@ -10,6 +10,8 @@ String petRpcErrorText(String? error) {
   const map = <String, String>{
     'PET_FREE_FEED_LIMIT': '今日免费喂养次数已用完，可使用背包中的食物',
     'PET_FEED_COOLDOWN': '喂得太快啦，休息一会儿再来',
+    'PET_INTERACT_LIMIT': '今天陪它玩够久啦，明天再来互动吧',
+    'PET_INTERACT_COOLDOWN': '它还在回味刚才的抚摸，稍等一下',
     'PET_ITEM_NOT_FEED': '该道具不能用于喂养',
     'PET_ITEM_NOT_USABLE': '该道具无法直接使用',
     'PET_NOT_FOUND': '未找到宠物',

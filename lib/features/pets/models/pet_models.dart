@@ -65,6 +65,10 @@ class PetBriefModel {
     required this.mood,
     required this.intimacy,
     required this.status,
+    this.todayFreeFeedCount = 0,
+    this.lastFeedAt,
+    this.todayInteractCount = 0,
+    this.lastInteractAt,
     this.render3d,
     this.render2d,
   });
@@ -83,6 +87,14 @@ class PetBriefModel {
   final int mood;
   final int intimacy;
   final PetPetStatus? status;
+
+  /// 今日已用免费喂养次数 / 最近喂养时间（冷却倒计时数据源，rpc_pet_summary 2026-09-17 扩展）
+  final int todayFreeFeedCount;
+  final DateTime? lastFeedAt;
+
+  /// 今日已互动次数 / 最近互动时间（抚摸冷却与次数上限数据源）
+  final int todayInteractCount;
+  final DateTime? lastInteractAt;
 
   /// 种属渲染配置块（pet_species.render3d / render2d，B3 渲染层消费）
   final Map<String, dynamic>? render3d;
@@ -104,6 +116,10 @@ class PetBriefModel {
       mood: (json['mood'] as num?)?.toInt() ?? 0,
       intimacy: (json['intimacy'] as num?)?.toInt() ?? 0,
       status: PetPetStatus.fromCode(json['status'] as String?),
+      todayFreeFeedCount: (json['today_free_feed_count'] as num?)?.toInt() ?? 0,
+      lastFeedAt: DateTime.tryParse(json['last_feed_at'] as String? ?? ''),
+      todayInteractCount: (json['today_interact_count'] as num?)?.toInt() ?? 0,
+      lastInteractAt: DateTime.tryParse(json['last_interact_at'] as String? ?? ''),
       render3d: json['render3d'] is Map
           ? Map<String, dynamic>.from(json['render3d'] as Map)
           : null,

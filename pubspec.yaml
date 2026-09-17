@@ -104,3 +104,5 @@ flutter:
     - assets/pets_poc/
     # 宠物 2D 立绘（随包本地：月萤三阶 cat_ssr1_01/02/03）
     - assets/pets/
+    # 宠物帧动画（gif 式 idle 帧序列：月萤基础形眨眼/尾摆）
+    - assets/pets/frames/

@@ -296,7 +296,7 @@ class PetRpc {
     return err;
   }
 
-  /// 丢弃道具 rows: [{id, quantity}]
+  /// 丢弃道具 rows: [{slot_index, quantity}]（按格位定位，rpc_pet_discard_items 契约）
   static Future<String?> discardItems(
     List<Map<String, dynamic>> rows,
   ) async {

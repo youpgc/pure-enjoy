@@ -20,3 +20,22 @@ String? petStageArtAsset(String speciesCode, int stage) {
   if (arts == null || stage < 0 || stage >= arts.length) return null;
   return arts[stage];
 }
+
+/// gif 式帧动画帧序列注册表（同形态多帧轮播，按基础形 speciesCode 登记）
+///
+/// - 帧源：assets/pets/frames/<code>_idle_N.png（程序合成：眨眼 + 尾摆，
+///   白底融为柔光月晕边缘，与浅色/深色页面背景均可融合）；
+/// - 未登记种属返回空列表，调用方回退单帧立绘（petStageArtAsset）；
+/// - 目前仅月萤基础形登记；一阶/二阶沿用单帧静态展示。
+const Map<String, List<String>> _kPetIdleFrames = {
+  'cat_ssr1': [
+    'assets/pets/frames/cat_ssr1_idle_1.png',
+    'assets/pets/frames/cat_ssr1_idle_2.png',
+    'assets/pets/frames/cat_ssr1_idle_3.png',
+    'assets/pets/frames/cat_ssr1_idle_4.png',
+  ],
+};
+
+/// 解析种属的 idle 帧序列；未登记返回空列表（回退单帧静态）
+List<String> petIdleFrames(String speciesCode) =>
+    _kPetIdleFrames[speciesCode] ?? const <String>[];
