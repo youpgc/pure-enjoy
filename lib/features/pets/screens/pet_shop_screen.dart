@@ -4,6 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_item_icon.dart';
 
 /// 宠物商城页（分类 + 物品格 + 悬浮窗购买）
 ///
@@ -270,8 +271,12 @@ class _PetShopScreenState extends State<PetShopScreen> {
                       color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(_iconFor(item),
-                        size: 28, color: cs.primary),
+                    child: PetItemIcon(
+                      iconKey: item.iconKey,
+                      fallback: _iconFor(item),
+                      size: 28,
+                      color: cs.primary,
+                    ),
                   ),
                   const SizedBox(width: 12),
                   Expanded(

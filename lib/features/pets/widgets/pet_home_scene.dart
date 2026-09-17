@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/pet_models.dart';
+import 'pet_item_icon.dart';
 
 /// 宠物主页场景层（2026-09-17 美化重做 + 拍板背景接入）
 ///
@@ -9,7 +10,7 @@ import '../models/pet_models.dart';
 ///   assets/pets/scenes/scene_dream.png 梦幻夜空·山/水/宠物屋/小路，
 ///   BoxFit.cover 竖版适配；程序化白日草地版本归档于文末注释，可回退）；
 /// - [PetGoldBadge]：右上角金币胶囊；
-/// - [PetBottomStatusCard]：沉底状态卡（名牌行 + 四维横排），状态类内容沉底展示。
+/// - [PetBottomStatusCard]：沉底状态卡（名牌行 + 四维独立行），状态类内容沉底展示。
 
 /// 独立场景背景（不随 App 主题变化，营造"宠物世界"界面感）
 class PetSceneBackground extends StatelessWidget {
@@ -27,6 +28,9 @@ class PetSceneBackground extends StatelessWidget {
 }
 
 /// 右上角金币胶囊（与返回键分离）
+///
+/// 2026-09-17：有宠物时按钮列贴顶，金币核心 [PetGoldBadgeCore] 内联至右列
+/// 首位避免重叠；本外壳仅无宠物分支使用。
 class PetGoldBadge extends StatelessWidget {
   const PetGoldBadge({super.key, required this.gold});
 
@@ -40,34 +44,47 @@ class PetGoldBadge extends StatelessWidget {
       child: Padding(
         padding:
             EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6, right: 8),
-        child: Container(
-          padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-          decoration: BoxDecoration(
-            color: Colors.white.withValues(alpha: 0.88),
-            borderRadius: BorderRadius.circular(16),
-            boxShadow: const [
-              BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2)),
-            ],
-          ),
-          child: Row(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              const Icon(Icons.paid_outlined, size: 15, color: Color(0xFFF0A020)),
-              const SizedBox(width: 4),
-              Text('$gold',
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w700,
-                      color: Color(0xFF5A4632))),
-            ],
-          ),
-        ),
+        child: PetGoldBadgeCore(gold: gold),
       ),
     );
   }
 }
 
-/// 沉底状态卡：名牌行 + 四维横排（饱食/心情/亲密/经验）
+/// 金币胶囊核心（白底圆角，可内联进按钮列）
+class PetGoldBadgeCore extends StatelessWidget {
+  const PetGoldBadgeCore({super.key, required this.gold});
+
+  final int gold;
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.88),
+        borderRadius: BorderRadius.circular(16),
+        boxShadow: const [
+          BoxShadow(color: Color(0x22000000), blurRadius: 6, offset: Offset(0, 2)),
+        ],
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const PetItemIcon(
+              iconKey: 'ui_coin', fallback: Icons.paid_outlined, size: 15),
+          const SizedBox(width: 4),
+          Text('$gold',
+              style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF5A4632))),
+        ],
+      ),
+    );
+  }
+}
+
+/// 沉底状态卡：名牌行 + 四维独立行（饱食/心情/亲密/经验，每条一行不并行）
 class PetBottomStatusCard extends StatelessWidget {
   const PetBottomStatusCard({super.key, required this.pet});
 
@@ -77,7 +94,7 @@ class PetBottomStatusCard extends StatelessWidget {
   Widget build(BuildContext context) {
     return Container(
       margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 10),
+      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
       decoration: BoxDecoration(
         color: const Color(0xCC2E2A24),
         borderRadius: BorderRadius.circular(18),
@@ -102,46 +119,53 @@ class PetBottomStatusCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Expanded(child: _stat('饱食', Icons.restaurant, pet.hunger)),
-              Expanded(child: _stat('心情', Icons.mood, pet.mood)),
-              Expanded(child: _stat('亲密', Icons.favorite, pet.intimacy)),
-              Expanded(child: _stat('经验', Icons.trending_up, pet.exp)),
-            ],
-          ),
+          _statRow('饱食', 'ui_hunger', Icons.restaurant, pet.hunger),
+          const SizedBox(height: 6),
+          _statRow('心情', 'ui_mood', Icons.mood, pet.mood),
+          const SizedBox(height: 6),
+          _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
+          const SizedBox(height: 6),
+          _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp),
         ],
       ),
     );
   }
 
-  Widget _stat(String label, IconData icon, int value) {
+  /// 单条状态行：图标 + 标签 + 进度条 + 数值（独占一行）
+  Widget _statRow(String label, String iconKey, IconData fallback, int value) {
     const accent = Color(0xFFFFD37E);
-    return Padding(
-      padding: const EdgeInsets.symmetric(horizontal: 6),
-      child: Column(
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Icon(icon, size: 12, color: accent),
-              const SizedBox(width: 3),
-              Text('$label $value',
-                  style: const TextStyle(fontSize: 11, color: Color(0xFFE8E0D0))),
-            ],
-          ),
-          const SizedBox(height: 4),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(2),
+    return Row(
+      children: [
+        PetItemIcon(iconKey: iconKey, fallback: fallback, size: 14),
+        const SizedBox(width: 6),
+        SizedBox(
+          width: 26,
+          child: Text(label,
+              style: const TextStyle(fontSize: 11, color: Color(0xFFE8E0D0))),
+        ),
+        const SizedBox(width: 8),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
               value: (value / 100).clamp(0.0, 1.0),
-              minHeight: 4,
+              minHeight: 5,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation(accent),
             ),
           ),
-        ],
-      ),
+        ),
+        const SizedBox(width: 8),
+        SizedBox(
+          width: 26,
+          child: Text('$value',
+              textAlign: TextAlign.right,
+              style: const TextStyle(
+                  fontSize: 11,
+                  fontWeight: FontWeight.w600,
+                  color: Color(0xFFF5EFE4))),
+        ),
+      ],
     );
   }
 }

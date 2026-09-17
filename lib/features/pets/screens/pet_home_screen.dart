@@ -23,14 +23,14 @@ import 'pet_wallet_screen.dart';
 /// 宠物主页（场景舞台版 2.0，2026-09-17 美化重做）
 ///
 /// 布局原则：宠物是唯一主角（垂直水平居中），其余信息各归其位——
-/// - 场景背景：独立界面感的白日草地场景（与 App 主题解耦，PetSceneBackground）；
+/// - 场景背景：梦幻夜空场景图（与 App 主题解耦，PetSceneBackground）；
 /// - 顶部通知横幅：历险进行中/已结束（点击进历险页处理），仅在有宠物时出现；
-/// - 左上返回，右上金币胶囊；
-/// - 左侧入口列：背包 / 商城 / 钱包 / 寄养（寄养未开放禁用占位）；
-/// - 右侧操作列：喂食 / 抚摸 / 历险 / 任务（冷却倒计时角标；次数耗尽提示上限；
-///   正常状态不显示角标文案）；
-/// - 底部状态区：名牌 + 四维横排沉底（PetBottomStatusCard），历险中附去向提示；
-/// - 无任何宠物时孵化引导卡垂直水平居中。
+/// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
+///   寄养（寄养未开放禁用占位）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务；
+///   按钮文案内置（图标上方、文案下方），冷却时黑色透明蒙层白色字体居中倒计时
+///   （次数耗尽提示上限，正常态无蒙层）；
+/// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
+/// - 无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
 /// 浮层组件见 pet_home_overlays.dart / pet_home_scene.dart，冷却派生见 PetActionBudget。
 ///
 /// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留），
@@ -174,9 +174,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       fit: StackFit.expand,
       children: [
         const PetSceneBackground(),
-        // 左上返回 / 右上金币（无宠物也常驻）
-        PetBackButton(onBack: () => Navigator.maybePop(context)),
-        PetGoldBadge(gold: _summary?.wallet.goldBalance ?? 0),
         if (_stagePets.isNotEmpty) ...[
           _stage(),
           ..._switchArrows(),
@@ -184,12 +181,15 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           _bottomPanel(cs),
           _leftRail(),
           _rightRail(),
-        ] else
-          // 无任何宠物：孵化引导卡垂直水平居中
+        ] else ...[
+          // 无任何宠物：返回键/金币常驻顶部角落 + 孵化引导卡垂直水平居中
+          PetBackButton(onBack: () => Navigator.maybePop(context)),
+          PetGoldBadge(gold: _summary?.wallet.goldBalance ?? 0),
           Center(
             child: PetHatchGuide(
                 hasEgg: _summary!.eggsReadyInstant > 0, busy: _busy, onHatch: _hatchFirstEgg),
           ),
+        ],
       ],
     );
   }
@@ -244,7 +244,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       child: SafeArea(
         bottom: false,
         child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 68, vertical: 4),
+          padding: const EdgeInsets.symmetric(horizontal: 76, vertical: 4),
           child: Center(child: PetAdventureBanner(adv: adv, onTap: _openAdventure)),
         ),
       ),
@@ -278,51 +278,51 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     );
   }
 
-  // ---------- 左侧入口列（背包/商城/钱包/寄养） ----------
+  // ---------- 左侧入口列（返回键 + 背包/商城/钱包/寄养，贴顶） ----------
 
   Widget _leftRail() {
     return Positioned(
       left: 8,
       top: 0,
-      bottom: 0,
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PetEdgeButton(
-                  icon: Icons.inventory_2_outlined,
-                  label: '背包',
-                  onTap: _openBag),
-              const SizedBox(height: 14),
-              PetEdgeButton(
-                  icon: Icons.storefront_outlined,
-                  label: '商城',
-                  onTap: () => _openShop(_summary?.wallet.goldBalance ?? 0)),
-              const SizedBox(height: 14),
-              PetEdgeButton(
-                  icon: Icons.account_balance_wallet_outlined,
-                  label: '钱包',
-                  onTap: _openWallet),
-              const SizedBox(height: 14),
-              // 寄养未开放：禁用置灰占位，点击提示
-              PetEdgeButton(
-                  icon: Icons.luggage_outlined,
-                  label: '寄养',
-                  disabled: true,
-                  onTap: () => showFosterComingSoon(context)),
-            ],
-          ),
+      child: Padding(
+        // 贴顶：安全区下方留些许间距；返回键内联列首（避免与独立浮层重叠）
+        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PetBackButtonCore(onBack: () => Navigator.maybePop(context)),
+            const SizedBox(height: 10),
+            PetEdgeButton(
+                icon: Icons.inventory_2_outlined,
+                label: '背包',
+                onTap: _openBag),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.storefront_outlined,
+                label: '商城',
+                onTap: () => _openShop(_summary?.wallet.goldBalance ?? 0)),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.account_balance_wallet_outlined,
+                label: '钱包',
+                onTap: _openWallet),
+            const SizedBox(height: 14),
+            // 寄养未开放：禁用置灰占位，点击提示
+            PetEdgeButton(
+                icon: Icons.luggage_outlined,
+                label: '寄养',
+                disabled: true,
+                onTap: () => showFosterComingSoon(context)),
+          ],
         ),
       ),
     );
   }
 
-  // ---------- 右侧操作列（喂食/抚摸/历险/任务） ----------
+  // ---------- 右侧操作列（金币 + 喂食/抚摸/历险/任务，贴顶） ----------
 
-  /// 角标策略：正常态不显示文案；冷却中显示倒计时；当日次数耗尽提示上限
-  String? _badge(Duration? cool, int? remain) {
+  /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时；当日次数耗尽提示上限
+  String? _overlay(Duration? cool, int? remain) {
     if (cool != null) return _budget.coolText(cool);
     if (remain != null && remain <= 0) return '已达上限';
     return null;
@@ -344,42 +344,42 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     return Positioned(
       right: 8,
       top: 0,
-      bottom: 0,
-      child: Center(
-        child: Padding(
-          padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 48),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              PetEdgeButton(
-                  icon: Icons.restaurant,
-                  label: '喂食',
-                  badge: _badge(feedCool, _budget.feedRemain),
-                  onTap: feedOff
-                      ? null
-                      : () => _run(() => PetRpc.feed(pet.id),
-                          successMsg: '喂饱啦', celebrate: true)),
-              const SizedBox(height: 14),
-              PetEdgeButton(
-                  icon: Icons.touch_app_outlined,
-                  label: '抚摸',
-                  badge: _badge(interactCool, _budget.interactRemain),
-                  onTap: interactOff
-                      ? null
-                      : () => _run(() => PetRpc.interact(pet.id),
-                          celebrate: true)),
-              const SizedBox(height: 14),
-              PetEdgeButton(
-                  icon: Icons.explore_outlined,
-                  label: '历险',
-                  onTap: _openAdventure),
-              const SizedBox(height: 14),
-              PetEdgeButton(
-                  icon: Icons.task_alt_outlined,
-                  label: '任务',
-                  onTap: _openQuests),
-            ],
-          ),
+      child: Padding(
+        // 贴顶：安全区下方留些许间距；金币胶囊内联列首（避免与独立浮层重叠）
+        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            PetGoldBadgeCore(gold: _summary?.wallet.goldBalance ?? 0),
+            const SizedBox(height: 10),
+            PetEdgeButton(
+                icon: Icons.restaurant,
+                label: '喂食',
+                overlay: _overlay(feedCool, _budget.feedRemain),
+                onTap: feedOff
+                    ? null
+                    : () => _run(() => PetRpc.feed(pet.id),
+                        successMsg: '喂饱啦', celebrate: true)),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.touch_app_outlined,
+                label: '抚摸',
+                overlay: _overlay(interactCool, _budget.interactRemain),
+                onTap: interactOff
+                    ? null
+                    : () => _run(() => PetRpc.interact(pet.id),
+                        celebrate: true)),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.explore_outlined,
+                label: '历险',
+                onTap: _openAdventure),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.task_alt_outlined,
+                label: '任务',
+                onTap: _openQuests),
+          ],
         ),
       ),
     );

@@ -15,6 +15,7 @@ class PetBagItemModel {
     required this.name,
     required this.category,
     this.subType,
+    this.icon,
     this.effect = const {},
     this.stackLimit = 99,
   });
@@ -27,6 +28,7 @@ class PetBagItemModel {
   final String name;
   final String category; // egg / consumable / tool
   final String? subType; // food/clean/toy/rescue...
+  final String? icon; // pet_items.icon，形如 icon/<key>
   final Map<String, dynamic> effect;
   final int stackLimit;
 
@@ -34,6 +36,13 @@ class PetBagItemModel {
   String get effectType => effect['type'] as String? ?? '';
 
   bool get isEgg => category == 'egg';
+
+  /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
+  String? get iconKey {
+    final v = icon;
+    if (v == null || v.isEmpty) return null;
+    return v.startsWith('icon/') ? v.substring(5) : v;
+  }
 
   factory PetBagItemModel.fromJson(Map<String, dynamic> json) {
     final item = (json['item'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -46,6 +55,7 @@ class PetBagItemModel {
       name: item['name'] as String? ?? '',
       category: item['category'] as String? ?? '',
       subType: item['sub_type'] as String?,
+      icon: item['icon'] as String?,
       effect: item['effect'] is Map
           ? Map<String, dynamic>.from(item['effect'] as Map)
           : const {},
@@ -182,6 +192,7 @@ class PetShopItemModel {
     required this.category,
     required this.priceCoin,
     this.subType,
+    this.icon,
     this.pricePoints,
     this.pointsPurchasable = false,
     this.ladderKey,
@@ -193,11 +204,19 @@ class PetShopItemModel {
   final String name;
   final String category;
   final String? subType; // food/clean/toy/rescue/expand...
+  final String? icon; // pet_items.icon，形如 icon/<key>
   final int priceCoin;
   final int? pricePoints;
   final bool pointsPurchasable;
   final String? ladderKey; // 扩容阶梯道具（购买即生效）
   final String? description;
+
+  /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
+  String? get iconKey {
+    final v = icon;
+    if (v == null || v.isEmpty) return null;
+    return v.startsWith('icon/') ? v.substring(5) : v;
+  }
 
   bool get isExpansion => ladderKey != null;
 
@@ -220,6 +239,7 @@ class PetShopItemModel {
       name: json['name'] as String? ?? '',
       category: json['category'] as String? ?? '',
       subType: json['sub_type'] as String?,
+      icon: json['icon'] as String?,
       priceCoin: (json['price_coin'] as num?)?.toInt() ?? 0,
       pricePoints: (json['price_points'] as num?)?.toInt(),
       pointsPurchasable: json['points_purchasable'] as bool? ?? false,

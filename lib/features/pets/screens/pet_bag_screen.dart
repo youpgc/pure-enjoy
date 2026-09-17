@@ -4,6 +4,7 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_item_icon.dart';
 import 'pet_shop_screen.dart';
 
 /// 宠物背包页（分类 + 物品格 + 悬浮窗操作）
@@ -305,8 +306,9 @@ class _PetBagScreenState extends State<PetBagScreen> {
               : Stack(
                   alignment: Alignment.center,
                   children: [
-                    Icon(
-                      _iconFor(item),
+                    PetItemIcon(
+                      iconKey: item.iconKey,
+                      fallback: _iconFor(item),
                       size: 26,
                       color: item.isEgg ? cs.tertiary : cs.primary,
                     ),
@@ -362,8 +364,9 @@ class _PetBagScreenState extends State<PetBagScreen> {
                       color: cs.surfaceContainerHighest,
                       borderRadius: BorderRadius.circular(12),
                     ),
-                    child: Icon(
-                      _iconFor(item),
+                    child: PetItemIcon(
+                      iconKey: item.iconKey,
+                      fallback: _iconFor(item),
                       size: 28,
                       color: item.isEgg ? cs.tertiary : cs.primary,
                     ),

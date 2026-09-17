@@ -135,7 +135,8 @@ class PetAdventureBanner extends StatelessWidget {
   }
 }
 
-/// 边缘浮动圆钮（可选角标：冷却倒计时 / 当日剩余次数）
+/// 边缘浮动操作钮（2026-09-17 改版：文案内置——图标在上、文案在下方按钮内；
+/// [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时/已达上限）
 ///
 /// [disabled] 仅控制置灰视觉（功能未开放的占位入口），onTap 仍可传入用于点击提示。
 class PetEdgeButton extends StatelessWidget {
@@ -143,14 +144,17 @@ class PetEdgeButton extends StatelessWidget {
     super.key,
     required this.icon,
     required this.label,
-    this.badge,
+    this.overlay,
     this.disabled = false,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
-  final String? badge;
+
+  /// 蒙层文案：冷却倒计时（如「2分30秒」）/「已达上限」；null 表示正常态
+  final String? overlay;
+
   final bool disabled;
   final VoidCallback? onTap;
 
@@ -158,41 +162,57 @@ class PetEdgeButton extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     final enabled = onTap != null && !disabled;
-    return Column(
-      mainAxisSize: MainAxisSize.min,
-      children: [
-        if (badge != null) ...[
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: cs.surfaceContainerHighest.withValues(alpha: 0.92),
-              borderRadius: BorderRadius.circular(8),
-            ),
-            child: Text(badge!,
-                style: TextStyle(fontSize: 10, color: cs.onSurfaceVariant)),
-          ),
-          const SizedBox(height: 3),
-        ],
-        Material(
-          color: enabled ? cs.primaryContainer : cs.surfaceContainerHighest,
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onTap,
-            child: SizedBox(
-              width: 52,
-              height: 52,
-              child: Icon(icon,
-                  size: 24,
-                  color: enabled ? cs.onPrimaryContainer : cs.outline),
-            ),
+    final contentColor = enabled ? cs.onPrimaryContainer : cs.outline;
+    return Material(
+      color: enabled ? cs.primaryContainer : cs.surfaceContainerHighest,
+      borderRadius: BorderRadius.circular(16),
+      child: InkWell(
+        borderRadius: BorderRadius.circular(16),
+        onTap: onTap,
+        child: SizedBox(
+          width: 64,
+          height: 64,
+          child: Stack(
+            children: [
+              Center(
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Icon(icon, size: 22, color: contentColor),
+                    const SizedBox(height: 3),
+                    Text(label,
+                        style: TextStyle(
+                            fontSize: 10,
+                            fontWeight: FontWeight.w600,
+                            color: contentColor)),
+                  ],
+                ),
+              ),
+              if (overlay != null)
+                Positioned.fill(
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withValues(alpha: 0.54),
+                      borderRadius: BorderRadius.circular(16),
+                    ),
+                    alignment: Alignment.center,
+                    padding: const EdgeInsets.symmetric(horizontal: 2),
+                    child: Text(
+                      overlay!,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      textAlign: TextAlign.center,
+                      style: const TextStyle(
+                          fontSize: 10,
+                          fontWeight: FontWeight.w700,
+                          color: Colors.white),
+                    ),
+                  ),
+                ),
+            ],
           ),
         ),
-        const SizedBox(height: 3),
-        Text(label,
-            style: TextStyle(
-                fontSize: 11, color: enabled ? cs.onSurface : cs.outline)),
-      ],
+      ),
     );
   }
 }
@@ -277,6 +297,9 @@ class PetLoadErrorView extends StatelessWidget {
 }
 
 /// 左上角浮动返回键（金币已独立为 PetGoldBadge，置于右上角场景层）
+///
+/// 2026-09-17：有宠物时按钮列贴顶，返回键核心 [PetBackButtonCore] 内联至左列
+/// 首位避免重叠；本外壳仅无宠物分支使用。
 class PetBackButton extends StatelessWidget {
   const PetBackButton({super.key, required this.onBack});
 
@@ -290,18 +313,30 @@ class PetBackButton extends StatelessWidget {
       child: Padding(
         padding:
             EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 2, left: 4),
-        child: Material(
-          color: Colors.white.withValues(alpha: 0.88),
-          shape: const CircleBorder(),
-          child: InkWell(
-            customBorder: const CircleBorder(),
-            onTap: onBack,
-            child: const SizedBox(
-              width: 38,
-              height: 38,
-              child: Icon(Icons.arrow_back_ios_new, size: 18),
-            ),
-          ),
+        child: PetBackButtonCore(onBack: onBack),
+      ),
+    );
+  }
+}
+
+/// 返回键核心（白底圆形 38px，可内联进按钮列）
+class PetBackButtonCore extends StatelessWidget {
+  const PetBackButtonCore({super.key, this.onBack});
+
+  final VoidCallback? onBack;
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.white.withValues(alpha: 0.88),
+      shape: const CircleBorder(),
+      child: InkWell(
+        customBorder: const CircleBorder(),
+        onTap: onBack,
+        child: const SizedBox(
+          width: 38,
+          height: 38,
+          child: Icon(Icons.arrow_back_ios_new, size: 18),
         ),
       ),
     );
