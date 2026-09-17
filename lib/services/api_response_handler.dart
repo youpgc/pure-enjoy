@@ -43,17 +43,32 @@ ApiResponse handleApiResponse(dynamic response) {
     }
   } else if (statusCode == 401) {
     return ApiResponse.error('未授权，请重新登录', statusCode: statusCode);
-  } else if (statusCode == 404) {
-    return ApiResponse.error('资源不存在', statusCode: statusCode);
-  } else if (statusCode == 409) {
-    return ApiResponse.error('数据冲突', statusCode: statusCode);
-  } else if (statusCode == 429) {
-    return ApiResponse.error('请求过于频繁，请稍后再试', statusCode: statusCode);
   } else {
-    ApiLogger.error('❌ HTTP 错误 [$statusCode]: ${response.body}');
-    return ApiResponse.error(
-      '服务器响应异常 (HTTP $statusCode)',
-      statusCode: statusCode,
-    );
+    // 4xx/5xx：优先透传服务端 message（PostgREST/RPC 业务错误，如 PET_REARING_FULL、
+    // 唯一/外键冲突详情），便于上层 petRpcErrorText 等映射为中文；取不到再降级通用文案。
+    var msg = '服务器响应异常 (HTTP $statusCode)';
+    if (statusCode == 404) {
+      msg = '资源不存在';
+    } else if (statusCode == 409) {
+      msg = '数据冲突';
+    } else if (statusCode == 429) {
+      msg = '请求过于频繁，请稍后再试';
+    }
+    try {
+      final body = response.body;
+      if (body.isNotEmpty) {
+        final decoded = jsonDecode(body);
+        if (decoded is Map) {
+          final m = decoded['message'];
+          if (m is String && m.isNotEmpty) msg = m;
+        }
+      }
+    } catch (_) {
+      // 非 JSON body，保留通用文案
+    }
+    if (statusCode >= 500) {
+      ApiLogger.error('❌ HTTP 错误 [$statusCode]: ${response.body}');
+    }
+    return ApiResponse.error(msg, statusCode: statusCode);
   }
 }

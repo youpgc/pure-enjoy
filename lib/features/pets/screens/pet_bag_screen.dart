@@ -6,11 +6,14 @@ import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 import 'pet_shop_screen.dart';
 
-/// 宠物背包页（道具列表 + 使用/丢弃/整理 + 蛋孵化）
+/// 宠物背包页（分类 + 物品格 + 悬浮窗操作）
 ///
-/// - 蛋条目：即开蛋直接孵化（成功弹结果卡）；等待型仅展示（P1 无等待型蛋池）；
+/// - 布局（2026-09-17 定版）：顶部分类页签（全部/蛋/消耗品/工具），
+///   物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与操作按钮；
+/// - 蛋条目：悬浮窗内「立即孵化」（成功弹结果卡）；等待型仅展示（P1 无等待型蛋池）；
 /// - 消耗品：feed/clean/toy 对在养宠物使用；
-/// - 丢弃走 rpc_pet_discard_items（append-only 流水可对账，丢弃不可恢复）；
+/// - 丢弃走 rpc_pet_discard_items（入参按 slot_index + quantity，服务端契约），
+///   append-only 流水可对账，丢弃不可恢复；
 /// - 整理走 rpc_pet_compact_bag（压缩空洞格位）。
 class PetBagScreen extends StatefulWidget {
   const PetBagScreen({super.key, required this.petId});
@@ -26,7 +29,17 @@ class _PetBagScreenState extends State<PetBagScreen> {
   bool _loading = true;
   String? _error;
   List<PetBagItemModel> _items = const [];
+
+  /// 当前分类（all / egg / consumable / tool）
+  String _category = 'all';
   String? _busyId;
+
+  static const _tabs = <(String, String, IconData)>[
+    ('all', '全部', Icons.grid_view_outlined),
+    ('egg', '蛋', Icons.egg_outlined),
+    ('consumable', '消耗品', Icons.restaurant),
+    ('tool', '工具', Icons.build_outlined),
+  ];
 
   @override
   void initState() {
@@ -46,7 +59,13 @@ class _PetBagScreenState extends State<PetBagScreen> {
     }
   }
 
+  List<PetBagItemModel> get _filtered {
+    if (_category == 'all') return _items;
+    return _items.where((e) => e.category == _category).toList();
+  }
+
   Future<void> _hatchEgg(PetBagItemModel egg) async {
+    Navigator.of(context).pop(); // 关闭悬浮窗
     await _busy(() async {
       final (eggs, err) = await PetRpc.fetchEggs();
       if (err != null) return _toast(petRpcErrorText(err));
@@ -103,6 +122,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   Future<void> _useItem(PetBagItemModel item) async {
+    Navigator.of(context).pop();
     if (widget.petId == null) return _toast('当前没有在养宠物');
     await _busy(() async {
       final err = await PetRpc.useItem(item.itemId, widget.petId!);
@@ -114,6 +134,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   Future<void> _discard(PetBagItemModel item) async {
+    Navigator.of(context).pop();
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -131,8 +152,9 @@ class _PetBagScreenState extends State<PetBagScreen> {
     );
     if (confirmed != true) return;
     await _busy(() async {
+      // 服务端契约：p_rows 为 [{slot_index, quantity}]（rpc_pet_discard_items 定义）
       final err = await PetRpc.discardItems([
-        {'id': item.id, 'quantity': item.quantity},
+        {'slot_index': item.slotIndex, 'quantity': item.quantity},
       ]);
       if (!mounted) return;
       if (err != null) return _toast(petRpcErrorText(err));
@@ -192,6 +214,59 @@ class _PetBagScreenState extends State<PetBagScreen> {
         ),
       );
     }
+    return Column(
+      children: [
+        // 分类页签
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              for (final (key, label, icon) in _tabs) ...[
+                Expanded(
+                  child: ChoiceChip(
+                    avatar: Icon(
+                      icon,
+                      size: 16,
+                      color: _category == key ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+                    ),
+                    label: Text(label),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      color: _category == key ? cs.onSecondaryContainer : cs.onSurface,
+                    ),
+                    selected: _category == key,
+                    onSelected: (_) => setState(() => _category = key),
+                  ),
+                ),
+                if (key != _tabs.last.$1) const SizedBox(width: 6),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: _filtered.isEmpty
+              ? _emptyView(cs)
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    // 每行 6 格、正方形物品格（2026-09-17 定版）
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      childAspectRatio: 1,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemCount: _filtered.length,
+                    itemBuilder: (context, i) => _buildCell(_filtered[i], cs),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  Widget _emptyView(ColorScheme cs) {
     if (_items.isEmpty) {
       return Center(
         child: Column(
@@ -209,93 +284,157 @@ class _PetBagScreenState extends State<PetBagScreen> {
         ),
       );
     }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: GridView.builder(
-        padding: const EdgeInsets.all(12),
-        gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-          crossAxisCount: 3,
-          childAspectRatio: 0.82,
-          mainAxisSpacing: 10,
-          crossAxisSpacing: 10,
-        ),
-        itemCount: _items.length,
-        itemBuilder: (context, i) {
-          final item = _items[i];
-          final busy = _busyId == item.id;
-          return InkWell(
-            onTap: busy ? null : () => _onTap(item),
-            borderRadius: BorderRadius.circular(12),
-            child: Card(
-              margin: EdgeInsets.zero,
-              child: Padding(
-                padding: const EdgeInsets.all(8),
-                child: Column(
-                  mainAxisAlignment: MainAxisAlignment.center,
+    return const EmptyWidget(message: '该分类下暂无物品');
+  }
+
+  /// 物品格（正方形）：图标 + 数量角标
+  Widget _buildCell(PetBagItemModel item, ColorScheme cs) {
+    final busy = _busyId == item.id;
+    return InkWell(
+      onTap: busy ? null : () => _showItemFloat(item),
+      borderRadius: BorderRadius.circular(10),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Stack(
+                  alignment: Alignment.center,
                   children: [
-                    if (busy)
-                      const SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    else
-                      Icon(_iconFor(item), size: 40, color: cs.primary),
-                    const SizedBox(height: 6),
-                    Text(
-                      item.name,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(fontSize: 12),
+                    Icon(
+                      _iconFor(item),
+                      size: 26,
+                      color: item.isEgg ? cs.tertiary : cs.primary,
                     ),
-                    Text(
-                      item.isEgg
-                          ? (item.effectType.isEmpty ? '蛋' : '蛋 · 点击孵化')
-                          : '×${item.quantity}',
-                      style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
-                    ),
+                    if (!item.isEgg && item.quantity > 1)
+                      Positioned(
+                        right: 3,
+                        bottom: 3,
+                        child: Container(
+                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+                          decoration: BoxDecoration(
+                            color: cs.primaryContainer,
+                            borderRadius: BorderRadius.circular(8),
+                          ),
+                          child: Text(
+                            '${item.quantity}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onPrimaryContainer,
+                            ),
+                          ),
+                        ),
+                      ),
                   ],
                 ),
-              ),
-            ),
-          );
-        },
+        ),
       ),
     );
   }
 
-  Future<void> _onTap(PetBagItemModel item) async {
-    if (item.isEgg) return _hatchEgg(item);
-    // 消耗品：长按/弹层提供 使用/丢弃；这里弹操作面板
-    await showModalBottomSheet<void>(
+  // ---------- 物品悬浮窗（信息 + 操作按钮） ----------
+
+  void _showItemFloat(PetBagItemModel item) {
+    final cs = Theme.of(context).colorScheme;
+    final usable = widget.petId != null && _usable(item);
+    showDialog<void>(
       context: context,
-      builder: (ctx) => SafeArea(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            ListTile(
-              leading: const Icon(Icons.info_outline),
-              title: Text(item.name),
-              subtitle: Text('${item.category} · ×${item.quantity}'),
-            ),
-            if (widget.petId != null && _usable(item))
-              ListTile(
-                leading: const Icon(Icons.touch_app_outlined),
-                title: const Text('使用'),
-                onTap: () {
-                  Navigator.pop(ctx);
-                  _useItem(item);
-                },
+      builder: (ctx) => Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(
+                      _iconFor(item),
+                      size: 28,
+                      color: item.isEgg ? cs.tertiary : cs.primary,
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${_categoryLabel(item.category)} · 数量 ${item.quantity}',
+                          style:
+                              TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-            ListTile(
-              leading: const Icon(Icons.delete_outline),
-              title: const Text('丢弃'),
-              onTap: () {
-                Navigator.pop(ctx);
-                _discard(item);
-              },
-            ),
-          ],
+              if (_effectDesc(item).isNotEmpty) ...[
+                const SizedBox(height: 12),
+                Text(
+                  _effectDesc(item),
+                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
+                ),
+              ],
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  if (item.isEgg)
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: _busyId == null ? () => _hatchEgg(item) : null,
+                        icon: const Icon(Icons.auto_awesome, size: 18),
+                        label: const Text('立即孵化'),
+                      ),
+                    )
+                  else ...[
+                    if (usable)
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _busyId == null ? () => _useItem(item) : null,
+                          icon: const Icon(Icons.touch_app_outlined, size: 18),
+                          label: const Text('使用'),
+                        ),
+                      ),
+                    if (usable) const SizedBox(width: 10),
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: cs.error,
+                          side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
+                        ),
+                        onPressed: _busyId == null ? () => _discard(item) : null,
+                        icon: const Icon(Icons.delete_outline, size: 18),
+                        label: const Text('丢弃'),
+                      ),
+                    ),
+                  ],
+                ],
+              ),
+            ],
+          ),
         ),
       ),
     );
@@ -304,6 +443,41 @@ class _PetBagScreenState extends State<PetBagScreen> {
   bool _usable(PetBagItemModel item) =>
       item.category == 'consumable' &&
       const {'feed', 'clean', 'toy'}.contains(item.effectType);
+
+  String _categoryLabel(String category) => switch (category) {
+        'egg' => '蛋',
+        'consumable' => '消耗品',
+        'tool' => '工具',
+        _ => '物品',
+      };
+
+  /// 效果描述（依据 pet_items.effect 结构化字段生成，不臆测数值）
+  String _effectDesc(PetBagItemModel item) {
+    final parts = <String>[];
+    void addNum(String key, String label) {
+      final v = (item.effect[key] as num?)?.toInt();
+      if (v != null && v > 0) parts.add('$label+$v');
+    }
+
+    switch (item.effectType) {
+      case 'feed':
+        addNum('hunger', '饱食');
+        addNum('mood', '心情');
+        addNum('exp', '经验');
+      case 'clean':
+        parts.add('清洁宠物');
+        addNum('mood', '心情');
+      case 'toy':
+        parts.add('陪它玩耍');
+        addNum('mood', '心情');
+        addNum('exp', '经验');
+      case 'rescue':
+        parts.add('历险遇险时立即救回宠物');
+      default:
+        if (item.isEgg) parts.add('点击立即孵化，见证新伙伴诞生');
+    }
+    return parts.join(' · ');
+  }
 
   IconData _iconFor(PetBagItemModel item) {
     if (item.isEgg) return Icons.egg_outlined;

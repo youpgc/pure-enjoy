@@ -181,6 +181,7 @@ class PetShopItemModel {
     required this.name,
     required this.category,
     required this.priceCoin,
+    this.subType,
     this.pricePoints,
     this.pointsPurchasable = false,
     this.ladderKey,
@@ -191,6 +192,7 @@ class PetShopItemModel {
   final String itemCode;
   final String name;
   final String category;
+  final String? subType; // food/clean/toy/rescue/expand...
   final int priceCoin;
   final int? pricePoints;
   final bool pointsPurchasable;
@@ -199,12 +201,25 @@ class PetShopItemModel {
 
   bool get isExpansion => ladderKey != null;
 
+  /// 分类页签归属：食物 / 清洁 / 玩具 / 救援 / 扩容
+  String get categoryLabel {
+    if (isExpansion) return '扩容';
+    return switch (subType) {
+      'food' => '食物',
+      'clean' => '清洁',
+      'toy' => '玩具',
+      'rescue' => '救援',
+      _ => '其他',
+    };
+  }
+
   factory PetShopItemModel.fromJson(Map<String, dynamic> json) {
     return PetShopItemModel(
       id: json['id'] as String? ?? '',
       itemCode: json['item_code'] as String? ?? '',
       name: json['name'] as String? ?? '',
       category: json['category'] as String? ?? '',
+      subType: json['sub_type'] as String?,
       priceCoin: (json['price_coin'] as num?)?.toInt() ?? 0,
       pricePoints: (json['price_points'] as num?)?.toInt(),
       pointsPurchasable: json['points_purchasable'] as bool? ?? false,

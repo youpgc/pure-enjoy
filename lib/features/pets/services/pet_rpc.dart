@@ -129,7 +129,7 @@ class PetRpc {
       final resp = await ApiClient.get(
         'pet_items',
         select:
-            'id,item_code,name,description,category,price_coin,price_points,points_purchasable,ladder_key,ladder_step',
+            'id,item_code,name,description,category,sub_type,price_coin,price_points,points_purchasable,ladder_key,ladder_step',
         filters: {'on_shelf': 'eq.true', 'channels': 'in.(shop,both)'},
         order: 'ladder_step.asc.nullslast,price_coin.asc',
         limit: 100,

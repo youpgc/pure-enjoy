@@ -5,8 +5,10 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 
-/// 宠物商城页（在售道具 + 购买）
+/// 宠物商城页（分类 + 物品格 + 悬浮窗购买）
 ///
+/// 布局（2026-09-17 定版）：分类页签（全部/食物/清洁/玩具/救援/扩容），
+/// 物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与购买按钮。
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
 class PetShopScreen extends StatefulWidget {
@@ -24,6 +26,18 @@ class _PetShopScreenState extends State<PetShopScreen> {
   List<PetShopItemModel> _items = const [];
   final Set<String> _buying = {};
   late int _gold = widget.goldBalance;
+
+  /// 当前分类（all / 食物 / 清洁 / 玩具 / 救援 / 扩容，与 categoryLabel 对应）
+  String _category = 'all';
+
+  static const _tabs = <(String, IconData)>[
+    ('all', Icons.grid_view_outlined),
+    ('食物', Icons.restaurant),
+    ('清洁', Icons.shower_outlined),
+    ('玩具', Icons.toys_outlined),
+    ('救援', Icons.health_and_safety_outlined),
+    ('扩容', Icons.unfold_more),
+  ];
 
   @override
   void initState() {
@@ -43,7 +57,12 @@ class _PetShopScreenState extends State<PetShopScreen> {
     }
   }
 
-  Future<void> _buy(PetShopItemModel item) async {
+  List<PetShopItemModel> get _filtered {
+    if (_category == 'all') return _items;
+    return _items.where((e) => e.categoryLabel == _category).toList();
+  }
+
+  Future<void> _buy(PetShopItemModel item, {bool fromDialog = false}) async {
     if (_buying.contains(item.id)) return;
     if (_gold < item.priceCoin) {
       ScaffoldMessenger.of(context).showSnackBar(
@@ -70,10 +89,12 @@ class _PetShopScreenState extends State<PetShopScreen> {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(item.isExpansion ? '扩容已生效' : '已购买「${item.name}」')),
     );
+    if (fromDialog && mounted) Navigator.of(context).pop();
   }
 
   @override
   Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
     return Scaffold(
       appBar: AppBar(
         title: const Text('宠物商城'),
@@ -93,11 +114,11 @@ class _PetShopScreenState extends State<PetShopScreen> {
           ),
         ],
       ),
-      body: _buildBody(),
+      body: _buildBody(cs),
     );
   }
 
-  Widget _buildBody() {
+  Widget _buildBody(ColorScheme cs) {
     if (_loading) return const Center(child: LoadingWidget());
     if (_error != null && _items.isEmpty) {
       return Center(
@@ -111,52 +132,204 @@ class _PetShopScreenState extends State<PetShopScreen> {
         ),
       );
     }
-    if (_items.isEmpty) {
-      return const EmptyWidget(message: '商城暂无在售道具');
-    }
-    return RefreshIndicator(
-      onRefresh: _load,
-      child: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: _items.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 10),
-        itemBuilder: (context, i) {
-          final item = _items[i];
-          final affordable = _gold >= item.priceCoin;
-          return Card(
-            child: ListTile(
-              leading: CircleAvatar(
-                child: Icon(_iconFor(item)),
+    return Column(
+      children: [
+        // 分类页签
+        Padding(
+          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
+          child: Row(
+            children: [
+              for (final (label, icon) in _tabs) ...[
+                Expanded(
+                  child: ChoiceChip(
+                    avatar: Icon(
+                      icon,
+                      size: 15,
+                      color: _category == label
+                          ? cs.onSecondaryContainer
+                          : cs.onSurfaceVariant,
+                    ),
+                    label: Text(label == 'all' ? '全部' : label),
+                    labelStyle: TextStyle(
+                      fontSize: 12,
+                      color: _category == label
+                          ? cs.onSecondaryContainer
+                          : cs.onSurface,
+                    ),
+                    selected: _category == label,
+                    onSelected: (_) => setState(() => _category = label),
+                  ),
+                ),
+                if (label != _tabs.last.$1) const SizedBox(width: 4),
+              ],
+            ],
+          ),
+        ),
+        Expanded(
+          child: _filtered.isEmpty
+              ? (_items.isEmpty
+                  ? const EmptyWidget(message: '商城暂无在售道具')
+                  : const EmptyWidget(message: '该分类下暂无道具'))
+              : RefreshIndicator(
+                  onRefresh: _load,
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    // 每行 6 格、正方形物品格（2026-09-17 定版）
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      childAspectRatio: 1,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemCount: _filtered.length,
+                    itemBuilder: (context, i) => _buildCell(_filtered[i], cs),
+                  ),
+                ),
+        ),
+      ],
+    );
+  }
+
+  /// 物品格（正方形）：图标 + 金币价角标
+  Widget _buildCell(PetShopItemModel item, ColorScheme cs) {
+    final busy = _buying.contains(item.id);
+    final affordable = _gold >= item.priceCoin;
+    return InkWell(
+      onTap: busy ? null : () => _showItemFloat(item),
+      borderRadius: BorderRadius.circular(10),
+      child: Card(
+        margin: EdgeInsets.zero,
+        child: Center(
+          child: busy
+              ? const SizedBox(
+                  width: 18,
+                  height: 18,
+                  child: CircularProgressIndicator(strokeWidth: 2),
+                )
+              : Stack(
+                  alignment: Alignment.center,
+                  children: [
+                    Icon(
+                      _iconFor(item),
+                      size: 26,
+                      color: affordable ? cs.primary : cs.outline,
+                    ),
+                    Positioned(
+                      right: 2,
+                      bottom: 2,
+                      child: Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.paid_outlined,
+                              size: 10,
+                              color: affordable
+                                  ? cs.onSurfaceVariant
+                                  : cs.error),
+                          const SizedBox(width: 1),
+                          Text(
+                            '${item.priceCoin}',
+                            style: TextStyle(
+                              fontSize: 9,
+                              color: affordable ? cs.onSurfaceVariant : cs.error,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ],
+                ),
+        ),
+      ),
+    );
+  }
+
+  // ---------- 物品悬浮窗（信息 + 购买） ----------
+
+  void _showItemFloat(PetShopItemModel item) {
+    final cs = Theme.of(context).colorScheme;
+    final affordable = _gold >= item.priceCoin;
+    final busy = _buying.contains(item.id);
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => Dialog(
+        backgroundColor: cs.surface,
+        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
+        child: Padding(
+          padding: const EdgeInsets.all(20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: cs.surfaceContainerHighest,
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Icon(_iconFor(item),
+                        size: 28, color: cs.primary),
+                  ),
+                  const SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          item.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                              fontSize: 16, fontWeight: FontWeight.w600),
+                        ),
+                        const SizedBox(height: 2),
+                        Text(
+                          '${item.categoryLabel} · ${item.priceCoin} 金币',
+                          style: TextStyle(
+                              fontSize: 12, color: cs.onSurfaceVariant),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
               ),
-              title: Text(item.name),
-              subtitle: Text(
+              const SizedBox(height: 12),
+              Text(
                 item.description?.isNotEmpty == true
                     ? item.description!
                     : (item.isExpansion ? '购买后立即生效' : '购买后放入背包'),
-                maxLines: 1,
-                overflow: TextOverflow.ellipsis,
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
-              trailing: FilledButton.tonal(
-                onPressed: affordable ? () => _buy(item) : null,
-                child: Text(
-                  _buying.contains(item.id)
-                      ? '购买中'
-                      : '${item.priceCoin} 金币',
-                  style: const TextStyle(fontSize: 13),
+              const SizedBox(height: 18),
+              SizedBox(
+                width: double.infinity,
+                child: FilledButton.icon(
+                  onPressed: affordable && !busy
+                      ? () => _buy(item, fromDialog: true)
+                      : null,
+                  icon: const Icon(Icons.paid_outlined, size: 18),
+                  label: Text(
+                    busy ? '购买中' : (affordable ? '购买' : '金币不足'),
+                  ),
                 ),
               ),
-            ),
-          );
-        },
+            ],
+          ),
+        ),
       ),
     );
   }
 
   IconData _iconFor(PetShopItemModel item) {
     if (item.isExpansion) return Icons.unfold_more;
-    return switch (item.category) {
-      'consumable' => Icons.restaurant,
-      'tool' => Icons.build_outlined,
+    return switch (item.subType) {
+      'food' => Icons.restaurant,
+      'clean' => Icons.shower_outlined,
+      'toy' => Icons.toys_outlined,
+      'rescue' => Icons.health_and_safety_outlined,
       _ => Icons.inventory_2_outlined,
     };
   }
