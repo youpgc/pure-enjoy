@@ -73,15 +73,14 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     super.dispose();
   }
 
-  /// 在养宠物列表（历险中/寄养中的不参与舞台展示与切换）
-  List<PetBriefModel> get _rearingPets =>
-      (_summary?.pets ?? const <PetBriefModel>[])
-          .where((p) => p.status == PetPetStatus.rearing)
-          .toList();
+  /// 舞台宠物列表：在养 + 历险中（历险派遣后原宠物保留原位，寄养/繁育中不展示）
+  List<PetBriefModel> get _stagePets => (_summary?.pets ?? const <PetBriefModel>[])
+      .where((p) => p.status == PetPetStatus.rearing || p.status == PetPetStatus.adventuring)
+      .toList();
 
-  /// 当前选中的宠物（无在养宠物返回 null）
+  /// 当前选中的宠物（无舞台宠物返回 null）
   PetBriefModel? get _currentPet {
-    final pets = _rearingPets;
+    final pets = _stagePets;
     if (pets.isEmpty) return null;
     if (_petIndex < 0 || _petIndex >= pets.length) return pets.first;
     return pets[_petIndex];
@@ -110,14 +109,14 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         _error = summary == null ? '总览拉取失败（rpc_pet_summary）' : null;
         _loading = false;
         // 多宠切换下标防越界（列表变短时回第一只）
-        final count = _rearingPets.length;
+        final count = _stagePets.length;
         if (_petIndex >= count) _petIndex = 0;
       });
     }
   }
 
   void _switchPet(int delta) {
-    final pets = _rearingPets;
+    final pets = _stagePets;
     if (pets.length < 2) return;
     setState(() {
       _petIndex = (_petIndex + delta + pets.length) % pets.length;
@@ -172,10 +171,15 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       fit: StackFit.expand,
       children: [
         _background(cs),
-        if (_rearingPets.isNotEmpty) ...[
+        if (_stagePets.isNotEmpty) ...[
           _stage(cs),
           ..._switchArrows(cs),
-        ],
+        ] else
+          // 无任何宠物：孵化引导卡垂直水平居中
+          Center(
+            child: PetHatchGuide(
+                hasEgg: _summary!.eggsReadyInstant > 0, busy: _busy, onHatch: _hatchFirstEgg),
+          ),
         _topHints(cs),
         _leftRail(cs),
         _rightRail(cs),
@@ -224,25 +228,20 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
 
   List<Widget> _switchArrows(ColorScheme cs) => [
         Positioned(
-          left: _edgeInset - 4,
-          top: 0,
-          bottom: 0,
+          left: _edgeInset - 4, top: 0, bottom: 0,
           child: Center(
             child: PetSwitchArrow(
                 icon: Icons.chevron_left, onTap: () => _switchPet(-1)),
           ),
         ),
         Positioned(
-          right: _edgeInset - 4,
-          top: 0,
-          bottom: 0,
+          right: _edgeInset - 4, top: 0, bottom: 0,
           child: Center(
             child: PetSwitchArrow(
                 icon: Icons.chevron_right, onTap: () => _switchPet(1)),
           ),
         ),
       ];
-
   // ---------- 顶部提示信息 ----------
 
   Widget _topHints(ColorScheme cs) {
@@ -262,16 +261,16 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               PetNamePill(pet: pet),
               const SizedBox(height: 6),
               PetStatusCard(pet: pet),
+              // 历险派遣后宠物保留舞台原位（横幅展示倒计时/待救助）
+              if (pet.status == PetPetStatus.adventuring) ...[
+                const SizedBox(height: 6),
+                const PetAdventureNote(),
+              ],
               if (adv != null) ...[
                 const SizedBox(height: 8),
                 PetAdventureBanner(adv: adv, onTap: _openAdventure),
               ],
-            ] else
-              PetHatchGuide(
-                hasEgg: _summary!.eggsReadyInstant > 0,
-                busy: _busy,
-                onHatch: _hatchFirstEgg,
-              ),
+            ],
           ],
         ),
       ),
@@ -281,7 +280,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   // ---------- 左侧入口列（背包/商城/钱包） ----------
 
   Widget _leftRail(ColorScheme cs) {
-    final s = _summary;
     return Positioned(
       left: 8,
       top: 0,
@@ -300,12 +298,20 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               PetEdgeButton(
                   icon: Icons.storefront_outlined,
                   label: '商城',
-                  onTap: () => _openShop(s?.wallet.goldBalance ?? 0)),
+                  onTap: () =>
+                      _openShop(_summary?.wallet.goldBalance ?? 0)),
               const SizedBox(height: 14),
               PetEdgeButton(
                   icon: Icons.account_balance_wallet_outlined,
                   label: '钱包',
                   onTap: _openWallet),
+              const SizedBox(height: 14),
+              // 寄养未开放：禁用置灰占位，点击提示
+              PetEdgeButton(
+                  icon: Icons.luggage_outlined,
+                  label: '寄养',
+                  disabled: true,
+                  onTap: () => showFosterComingSoon(context)),
             ],
           ),
         ),
@@ -319,10 +325,14 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     final pet = _currentPet;
     final feedCool = _budget.feedCooldown;
     final interactCool = _budget.interactCooldown;
-    final feedOff =
-        pet == null || _busy || _budget.blocked(feedCool, _budget.feedRemain);
+    // 历险中的宠物不在场，喂食/抚摸禁用（服务端同样拦截 PET_NOT_REARING）
+    final feedOff = pet == null ||
+        _busy ||
+        pet.status == PetPetStatus.adventuring ||
+        _budget.blocked(feedCool, _budget.feedRemain);
     final interactOff = pet == null ||
         _busy ||
+        pet.status == PetPetStatus.adventuring ||
         _budget.blocked(interactCool, _budget.interactRemain);
     return Positioned(
       right: 8,

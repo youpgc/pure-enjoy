@@ -135,24 +135,28 @@ class PetAdventureBanner extends StatelessWidget {
 }
 
 /// 边缘浮动圆钮（可选角标：冷却倒计时 / 当日剩余次数）
+///
+/// [disabled] 仅控制置灰视觉（功能未开放的占位入口），onTap 仍可传入用于点击提示。
 class PetEdgeButton extends StatelessWidget {
   const PetEdgeButton({
     super.key,
     required this.icon,
     required this.label,
     this.badge,
+    this.disabled = false,
     this.onTap,
   });
 
   final IconData icon;
   final String label;
   final String? badge;
+  final bool disabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final enabled = onTap != null;
+    final enabled = onTap != null && !disabled;
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -390,3 +394,19 @@ String _genderGlyph(String? code) => switch (code) {
       'female' => '♀',
       _ => '·',
     };
+
+/// 历险中提示行（宠物保留舞台原位时展示去向文案）
+class PetAdventureNote extends StatelessWidget {
+  const PetAdventureNote({super.key});
+
+  @override
+  Widget build(BuildContext context) => Text(
+      '🐾 出去历险了，归来后自动结算奖励',
+      style: TextStyle(
+          fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant));
+}
+
+/// 寄养功能未开放提示（左侧列禁用占位按钮的点击反馈）
+void showFosterComingSoon(BuildContext context) =>
+    ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('寄养功能即将开放，敬请期待')));
