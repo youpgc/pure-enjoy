@@ -11,6 +11,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_art.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
+import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
 import '../widgets/pet_living_art.dart';
@@ -24,14 +25,14 @@ import 'pet_wallet_screen.dart';
 ///
 /// 布局原则：宠物是唯一主角（垂直水平居中），其余信息各归其位——
 /// - 场景背景：梦幻夜空场景图（与 App 主题解耦，PetSceneBackground）；
-/// - 顶部通知横幅：历险进行中/已结束（点击进历险页处理），仅在有宠物时出现；
+/// - 顶部通知横幅：历险归来待领取 / 待救助时出现（进行中不展示），
+///   归来点击直接弹窗结算（claim → 奖励 / 遇险提示），不跳历险页；
 /// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
-///   寄养（寄养未开放禁用占位）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务；
-///   按钮文案内置（图标上方、文案下方），冷却时黑色透明蒙层白色字体居中倒计时
-///   （次数耗尽提示上限，正常态无蒙层）；
+///   寄养（寄养未开放禁用占位）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
+///   （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
 /// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
-/// - 无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
-/// 浮层组件见 pet_home_overlays.dart / pet_home_scene.dart，冷却派生见 PetActionBudget。
+///   无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
+/// 浮层组件见 pet_home_overlays / scene / adventure.dart，冷却派生见 PetActionBudget。
 ///
 /// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留），
 /// 数据库 render3d_enabled / asset_manifest 列保留，3D 转后期迭代。
@@ -245,7 +246,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 76, vertical: 4),
-          child: Center(child: PetAdventureBanner(adv: adv, onTap: _openAdventure)),
+          child: Center(child: PetAdventureBanner(adv: adv, onTap: _bannerTap())),
         ),
       ),
     );
@@ -370,10 +371,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                     : () => _run(() => PetRpc.interact(pet.id),
                         celebrate: true)),
             const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.explore_outlined,
-                label: '历险',
-                onTap: _openAdventure),
+            _adventureButton(),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.task_alt_outlined,
@@ -478,6 +476,29 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       ),
     ).then((_) => _load());
   }
+
+  // ---------- 主页历险交互（分流/动作/四态钮，helper 见 pet_home_adventure.dart） ----------
+
+  // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
+  // 横幅点击分流：待救助 → 历险页处理；归来待领取 → claim 弹窗结算
+  VoidCallback _bannerTap() =>
+      _summary?.ongoingAdventure?.status == 'awaiting_rescue'
+          ? _openAdventure
+          : () => _runAdventure(claimAdventureResult);
+
+  /// 历险动作统一入口：归来领取（弹窗）/ 召回确认（无奖励中断），完成后刷新
+  Future<void> _runAdventure(AdventureAction run) async {
+    final adv = _summary?.ongoingAdventure;
+    if (adv == null || _busy) return;
+    if (await run(context, adv.id) && mounted) _load();
+  }
+
+  /// 右列历险钮四态（历险/召回/领取/救助，分支逻辑见 petAdventureRailButton）
+  Widget _adventureButton() => petAdventureRailButton(
+      adv: _summary?.ongoingAdventure,
+      openAdventure: _openAdventure,
+      claimResult: () => _runAdventure(claimAdventureResult),
+      recall: () => _runAdventure(recallAdventureConfirmed));
 
   void _openWallet() {
     Navigator.push(

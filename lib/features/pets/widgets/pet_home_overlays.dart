@@ -121,12 +121,7 @@ class PetAdventureBanner extends StatelessWidget {
           ),
           subtitle: adv.status == 'awaiting_rescue'
               ? const Text('需要你的救援！', style: TextStyle(fontSize: 11))
-              : (finished
-                  ? null
-                  : Text(
-                      '预计 ${adv.endAt!.toLocal().difference(DateTime.now()).inMinutes} 分钟后归来',
-                      style: const TextStyle(fontSize: 11),
-                    )),
+              : null,
           trailing: const Icon(Icons.chevron_right, size: 18),
           onTap: onTap,
         ),
@@ -426,7 +421,7 @@ class PetAdventureNote extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
-          '🐾 出去历险了，归来后自动结算奖励',
+          '🐾 外出历险中，归来后记得查看结果领取奖励',
           style: TextStyle(
               fontSize: 12,
               color: Colors.brown.shade700,
