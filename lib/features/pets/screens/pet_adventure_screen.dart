@@ -159,6 +159,47 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     await _reloadSummary();
   }
 
+  /// 召回确认弹窗：进行中历险主动中断，无奖励（feature_pet_adventure_recall）
+  Future<void> _confirmRecall() async {
+    if (_adv == null) return;
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('召回宠物'),
+        content: Text(
+            '${widget.petName} 将立即结束本次历险返回家中，本次历险不会获得任何奖励。确定召回吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.pop(ctx, false),
+            child: const Text('再等等'),
+          ),
+          FilledButton(
+            onPressed: () => Navigator.pop(ctx, true),
+            child: const Text('确定召回'),
+          ),
+        ],
+      ),
+    );
+    if (ok != true) return;
+    if (_busy || _adv == null) return;
+    setState(() => _busy = true);
+    final err = await PetRpc.adventureRecall(_adv!.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      await _reloadSummary();
+      return;
+    }
+    if (mounted) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('已召回，宠物平安回家（本次历险无奖励）')),
+      );
+    }
+    await _reloadSummary();
+  }
+
   Future<void> _rescue({String? itemId}) async {
     if (_busy || _adv == null) return;
     setState(() => _busy = true);
@@ -314,6 +355,12 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               ),
               const SizedBox(height: 4),
               const Text('历险结束后回来查看结果', style: TextStyle(fontSize: 12)),
+              const SizedBox(height: 8),
+              TextButton.icon(
+                onPressed: _busy ? null : _confirmRecall,
+                icon: const Icon(Icons.undo_outlined, size: 16),
+                label: const Text('召回'),
+              ),
             ] else ...[
               FilledButton.icon(
                 onPressed: _busy ? null : _claim,

@@ -276,6 +276,15 @@ class PetRpc {
     return (data, err);
   }
 
+  /// 召回（进行中历险主动中断，无奖励）
+  static Future<String?> adventureRecall(String adventureId) async {
+    final (_, err) = await _call('rpc_pet_adventure_recall', {
+      'p_adventure_id': adventureId,
+    }, 'rpc_pet_adventure_recall 召回');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
   /// 救助（self=救援道具 / npc=超时兜底）
   static Future<String?> adventureRescue(
     String adventureId, {

@@ -34,6 +34,7 @@ String petRpcErrorText(String? error) {
     'PET_ADV_NOT_ONGOING': '历险已结束',
     'PET_ADV_NOT_FINISHED': '历险还在进行中',
     'PET_ADV_NOT_RESCUE': '当前无需救助',
+    'PET_ADV_NOT_RECALLABLE': '遇险中的宠物需先救助，无法召回',
     'PET_RESCUE_WINDOW_OPEN': '自救窗口内需使用救援道具',
     'PET_QUEST_NOT_FOUND': '任务不存在',
     'PET_QUEST_ALREADY_CLAIMED': '奖励已领取',
