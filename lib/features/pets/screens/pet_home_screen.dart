@@ -12,6 +12,7 @@ import '../utils/pet_art.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
 import '../widgets/pet_home_overlays.dart';
+import '../widgets/pet_home_scene.dart';
 import '../widgets/pet_living_art.dart';
 import 'pet_adventure_screen.dart';
 import 'pet_bag_screen.dart';
@@ -19,18 +20,20 @@ import 'pet_quests_screen.dart';
 import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
 
-/// 宠物主页（满屏舞台版，2026-09-17 定版）
+/// 宠物主页（场景舞台版 2.0，2026-09-17 美化重做）
 ///
-/// 布局：宠物帧动画 + 背景占满整页，其余内容浮动于四边——
-/// - 顶部提示信息：宠物名牌 + 四维状态 + 历险横幅 / 孵化引导；
-/// - 右侧操作列：喂食 / 抚摸 / 历险 / 任务（含冷却倒计时与当日剩余次数）；
-/// - 左侧入口列：背包 / 商城 / 钱包，左上角返回 + 金币胶囊；
-/// - 中央舞台：PetLivingArt 帧动画（多宠时舞台两侧切换箭头，单宠隐藏）；
-/// - 未登记帧序列的种属回退单帧立绘（petStageArtAsset）。
-/// 浮层展示组件见 pet_home_overlays.dart，冷却/次数派生见 PetActionBudget。
+/// 布局原则：宠物是唯一主角（垂直水平居中），其余信息各归其位——
+/// - 场景背景：独立界面感的白日草地场景（与 App 主题解耦，PetSceneBackground）；
+/// - 顶部通知横幅：历险进行中/已结束（点击进历险页处理），仅在有宠物时出现；
+/// - 左上返回，右上金币胶囊；
+/// - 左侧入口列：背包 / 商城 / 钱包 / 寄养（寄养未开放禁用占位）；
+/// - 右侧操作列：喂食 / 抚摸 / 历险 / 任务（冷却倒计时角标；次数耗尽提示上限；
+///   正常状态不显示角标文案）；
+/// - 底部状态区：名牌 + 四维横排沉底（PetBottomStatusCard），历险中附去向提示；
+/// - 无任何宠物时孵化引导卡垂直水平居中。
+/// 浮层组件见 pet_home_overlays.dart / pet_home_scene.dart，冷却派生见 PetActionBudget。
 ///
-/// 【3D 下线归档 2026-09】原 AppBar「3D POC 工作台」debug 入口与
-/// PetAssetCard 资源包状态卡随 3D 渲染层一并下线（源码注释保留）；
+/// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留），
 /// 数据库 render3d_enabled / asset_manifest 列保留，3D 转后期迭代。
 class PetHomeScreen extends StatefulWidget {
   const PetHomeScreen({super.key, this.initialTab});
@@ -43,7 +46,7 @@ class PetHomeScreen extends StatefulWidget {
 }
 
 class _PetHomeScreenState extends State<PetHomeScreen> {
-  /// 左右浮动列占位宽（52px 按钮 + 边距），舞台与提示内容避让
+  /// 左右浮动列占位宽（52px 按钮 + 边距）
   static const double _edgeInset = 64;
 
   bool _loading = true;
@@ -53,7 +56,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   bool _busy = false;
   bool _excited = false;
 
-  /// 当前展示的宠物下标（针对 [_rearingPets]；单宠时恒 0）
+  /// 当前展示的宠物下标（针对 [_stagePets]；单宠时恒 0）
   int _petIndex = 0;
 
   Timer? _tick; // 冷却倒计时逐秒刷新
@@ -170,49 +173,35 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     return Stack(
       fit: StackFit.expand,
       children: [
-        _background(cs),
+        const PetSceneBackground(),
+        // 左上返回 / 右上金币（无宠物也常驻）
+        PetBackButton(onBack: () => Navigator.maybePop(context)),
+        PetGoldBadge(gold: _summary?.wallet.goldBalance ?? 0),
         if (_stagePets.isNotEmpty) ...[
-          _stage(cs),
-          ..._switchArrows(cs),
+          _stage(),
+          ..._switchArrows(),
+          _topBanner(cs),
+          _bottomPanel(cs),
+          _leftRail(),
+          _rightRail(),
         ] else
           // 无任何宠物：孵化引导卡垂直水平居中
           Center(
             child: PetHatchGuide(
                 hasEgg: _summary!.eggsReadyInstant > 0, busy: _busy, onHatch: _hatchFirstEgg),
           ),
-        _topHints(cs),
-        _leftRail(cs),
-        _rightRail(cs),
-        PetTopLeftBar(
-          gold: _summary?.wallet.goldBalance ?? 0,
-          onBack: () => Navigator.maybePop(context),
-        ),
       ],
     );
   }
 
-  // ---------- 满屏背景 ----------
+  // ---------- 中央舞台（宠物主角，垂直水平居中） ----------
 
-  Widget _background(ColorScheme cs) => DecoratedBox(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [cs.primaryContainer.withValues(alpha: 0.30), cs.surface],
-          ),
-        ),
-      );
-
-  // ---------- 中央舞台（帧动画） ----------
-
-  Widget _stage(ColorScheme cs) {
+  Widget _stage() {
     final pet = _currentPet!;
-    final topInset = MediaQuery.paddingOf(context).top +
-        158 +
-        (_summary?.ongoingAdventure != null ? 66 : 0);
     return Positioned.fill(
+      // 底部让位状态面板（名牌+四维沉底），其余方向居中
       child: Padding(
-        padding: EdgeInsets.fromLTRB(_edgeInset, topInset, _edgeInset, 28),
+        padding: const EdgeInsets.fromLTRB(_edgeInset + 40, 0, _edgeInset + 40, 128),
         child: Center(
           child: PetLivingArt(
             frames: petIdleFrames(pet.speciesCode),
@@ -226,7 +215,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     );
   }
 
-  List<Widget> _switchArrows(ColorScheme cs) => [
+  List<Widget> _switchArrows() => [
         Positioned(
           left: _edgeInset - 4, top: 0, bottom: 0,
           child: Center(
@@ -242,44 +231,56 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           ),
         ),
       ];
-  // ---------- 顶部提示信息 ----------
 
-  Widget _topHints(ColorScheme cs) {
-    final pet = _currentPet;
+  // ---------- 顶部通知横幅（历险状态） ----------
+
+  Widget _topBanner(ColorScheme cs) {
     final adv = _summary?.ongoingAdventure;
+    if (adv == null) return const SizedBox.shrink();
     return Positioned(
       top: 0,
       left: 0,
       right: 0,
-      child: Padding(
-        padding: EdgeInsets.fromLTRB(_edgeInset + 8,
-            MediaQuery.paddingOf(context).top + 4, _edgeInset + 8, 0),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            if (pet != null) ...[
-              PetNamePill(pet: pet),
-              const SizedBox(height: 6),
-              PetStatusCard(pet: pet),
-              // 历险派遣后宠物保留舞台原位（横幅展示倒计时/待救助）
-              if (pet.status == PetPetStatus.adventuring) ...[
-                const SizedBox(height: 6),
-                const PetAdventureNote(),
-              ],
-              if (adv != null) ...[
-                const SizedBox(height: 8),
-                PetAdventureBanner(adv: adv, onTap: _openAdventure),
-              ],
-            ],
-          ],
+      child: SafeArea(
+        bottom: false,
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 68, vertical: 4),
+          child: Center(child: PetAdventureBanner(adv: adv, onTap: _openAdventure)),
         ),
       ),
     );
   }
 
-  // ---------- 左侧入口列（背包/商城/钱包） ----------
+  // ---------- 底部状态区（名牌 + 四维沉底） ----------
 
-  Widget _leftRail(ColorScheme cs) {
+  Widget _bottomPanel(ColorScheme cs) {
+    final pet = _currentPet!;
+    return Positioned(
+      left: 0,
+      right: 0,
+      bottom: 0,
+      child: SafeArea(
+        top: false,
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              if (pet.status == PetPetStatus.adventuring) ...[
+                const PetAdventureNote(),
+                const SizedBox(height: 6),
+              ],
+              PetBottomStatusCard(pet: pet),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  // ---------- 左侧入口列（背包/商城/钱包/寄养） ----------
+
+  Widget _leftRail() {
     return Positioned(
       left: 8,
       top: 0,
@@ -298,8 +299,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               PetEdgeButton(
                   icon: Icons.storefront_outlined,
                   label: '商城',
-                  onTap: () =>
-                      _openShop(_summary?.wallet.goldBalance ?? 0)),
+                  onTap: () => _openShop(_summary?.wallet.goldBalance ?? 0)),
               const SizedBox(height: 14),
               PetEdgeButton(
                   icon: Icons.account_balance_wallet_outlined,
@@ -321,7 +321,14 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
 
   // ---------- 右侧操作列（喂食/抚摸/历险/任务） ----------
 
-  Widget _rightRail(ColorScheme cs) {
+  /// 角标策略：正常态不显示文案；冷却中显示倒计时；当日次数耗尽提示上限
+  String? _badge(Duration? cool, int? remain) {
+    if (cool != null) return _budget.coolText(cool);
+    if (remain != null && remain <= 0) return '已达上限';
+    return null;
+  }
+
+  Widget _rightRail() {
     final pet = _currentPet;
     final feedCool = _budget.feedCooldown;
     final interactCool = _budget.interactCooldown;
@@ -347,11 +354,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               PetEdgeButton(
                   icon: Icons.restaurant,
                   label: '喂食',
-                  badge: feedCool != null
-                      ? _budget.coolText(feedCool)
-                      : (_budget.feedRemain != null
-                          ? '剩${_budget.feedRemain}'
-                          : null),
+                  badge: _badge(feedCool, _budget.feedRemain),
                   onTap: feedOff
                       ? null
                       : () => _run(() => PetRpc.feed(pet.id),
@@ -360,11 +363,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
               PetEdgeButton(
                   icon: Icons.touch_app_outlined,
                   label: '抚摸',
-                  badge: interactCool != null
-                      ? _budget.coolText(interactCool)
-                      : (_budget.interactRemain != null
-                          ? '剩${_budget.interactRemain}'
-                          : null),
+                  badge: _badge(interactCool, _budget.interactRemain),
                   onTap: interactOff
                       ? null
                       : () => _run(() => PetRpc.interact(pet.id),

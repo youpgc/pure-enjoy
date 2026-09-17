@@ -7,7 +7,8 @@ import '../models/pet_rpc_models.dart';
 ///
 /// 纯展示层：数据与回调由 pet_home_screen 传入，本文件不持有业务状态。
 /// 包含顶部提示信息（名牌/四维状态/历险横幅/孵化引导）、左右边缘浮动按钮、
-/// 左上角返回+金币胶囊、多宠切换箭头、加载失败视图与诞生弹窗。
+/// 左上角返回键（金币胶囊已移至场景层 PetGoldBadge 右上角）、
+/// 多宠切换箭头、加载失败视图与诞生弹窗。
 
 /// 宠物名牌胶囊（名字 / 等级 / 编号 / 形态）
 class PetNamePill extends StatelessWidget {
@@ -275,49 +276,32 @@ class PetLoadErrorView extends StatelessWidget {
   }
 }
 
-/// 左上角浮动条：返回按钮 + 金币胶囊
-class PetTopLeftBar extends StatelessWidget {
-  const PetTopLeftBar({super.key, required this.gold, this.onBack});
+/// 左上角浮动返回键（金币已独立为 PetGoldBadge，置于右上角场景层）
+class PetBackButton extends StatelessWidget {
+  const PetBackButton({super.key, required this.onBack});
 
-  final int gold;
   final VoidCallback? onBack;
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
     return Positioned(
       top: 0,
       left: 0,
       child: Padding(
         padding:
             EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 2, left: 4),
-        child: Row(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            IconButton(
-              icon: const Icon(Icons.arrow_back_ios_new, size: 18),
-              tooltip: '返回',
-              onPressed: onBack,
+        child: Material(
+          color: Colors.white.withValues(alpha: 0.88),
+          shape: const CircleBorder(),
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: onBack,
+            child: const SizedBox(
+              width: 38,
+              height: 38,
+              child: Icon(Icons.arrow_back_ios_new, size: 18),
             ),
-            const SizedBox(width: 2),
-            Container(
-              padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
-              decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.9),
-                borderRadius: BorderRadius.circular(16),
-              ),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.paid_outlined, size: 15, color: cs.primary),
-                  const SizedBox(width: 4),
-                  Text('$gold',
-                      style: const TextStyle(
-                          fontSize: 13, fontWeight: FontWeight.w700)),
-                ],
-              ),
-            ),
-          ],
+          ),
         ),
       ),
     );
@@ -395,15 +379,23 @@ String _genderGlyph(String? code) => switch (code) {
       _ => '·',
     };
 
-/// 历险中提示行（宠物保留舞台原位时展示去向文案）
+/// 历险中提示行（宠物保留舞台原位时展示去向文案，白底 pill 适配场景草地）
 class PetAdventureNote extends StatelessWidget {
   const PetAdventureNote({super.key});
 
   @override
-  Widget build(BuildContext context) => Text(
-      '🐾 出去历险了，归来后自动结算奖励',
-      style: TextStyle(
-          fontSize: 12, color: Theme.of(context).colorScheme.onSurfaceVariant));
+  Widget build(BuildContext context) => Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.82),
+        borderRadius: BorderRadius.circular(14),
+      ),
+      child: Text(
+          '🐾 出去历险了，归来后自动结算奖励',
+          style: TextStyle(
+              fontSize: 12,
+              color: Colors.brown.shade700,
+              fontWeight: FontWeight.w500)));
 }
 
 /// 寄养功能未开放提示（左侧列禁用占位按钮的点击反馈）

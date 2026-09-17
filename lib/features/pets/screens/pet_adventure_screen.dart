@@ -8,6 +8,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_claim_result_dialog.dart';
 
 /// 历险页
 ///
@@ -130,15 +131,29 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final gold = (data?['gold'] as num?)?.toInt() ?? 0;
     final exp = (data?['exp'] as num?)?.toInt() ?? 0;
     final result = data?['result_type'] as String? ?? 'play';
-    final resultText = switch (result) {
-      'play' => '玩得开心',
-      'help' => '帮到了别人',
-      'memory' => '收获满满回忆',
-      _ => result,
-    };
+    // 掉落明细（fix_pet_adventure_claim_items：claim 返回 items: [{code,name,qty}]）
+    final items = <({String name, int qty})>[];
+    final rawItems = data?['items'];
+    if (rawItems is List) {
+      for (final it in rawItems) {
+        if (it is Map) {
+          items.add((
+            name: (it['name'] as String?) ?? (it['code'] as String? ?? '道具'),
+            qty: (it['qty'] as num?)?.toInt() ?? 1,
+          ));
+        }
+      }
+    }
+    // 结算弹窗：结果类型 + 金币/经验 + 掉落明细，关闭后再刷新总览
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('平安归来（$resultText）：金币 +$gold，经验 +$exp')),
+      await showDialog<void>(
+        context: context,
+        builder: (ctx) => PetClaimResultDialog(
+          result: result,
+          gold: gold,
+          exp: exp,
+          items: items,
+        ),
       );
     }
     await _reloadSummary();
