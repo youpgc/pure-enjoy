@@ -106,3 +106,5 @@ flutter:
     - assets/pets/
     # 宠物帧动画（gif 式 idle 帧序列：月萤基础形眨眼/尾摆）
     - assets/pets/frames/
+    # 宠物场景背景（scene_dream.png 梦幻夜空山湖小屋小路，2026-09-17 拍板选定）
+    - assets/pets/scenes/
