@@ -1,19 +1,25 @@
-import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
+import '../models/pet_rpc_models.dart';
+import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
-import '../widgets/pet_asset_card.dart';
 import '../utils/pet_art.dart';
-import 'pet_poc_screen.dart';
+import '../utils/pet_errors.dart';
+import '../widgets/pet_living_art.dart';
+import 'pet_adventure_screen.dart';
+import 'pet_bag_screen.dart';
+import 'pet_quests_screen.dart';
+import 'pet_shop_screen.dart';
+import 'pet_wallet_screen.dart';
 
-/// 宠物主页（B2 骨架占位版）
+/// 宠物主页（2D 动画版，交互闭环）
 ///
-/// B3 批次将替换为 3D 主页（model-viewer + skybox + 手势 + 2D 覆盖层），
-/// 本页当前仅承接三处入口的落点与总览数据验证：
-/// - `pet_enabled` 关闭 → 展示未开放兜底态（入口门控的最后一道防线）；
-/// - [initialTab] 为通知深链预留（`?tab=`，无参进入时清信号——沿用既有约定）。
+/// 渲染层：静态立绘 + 呼吸/互动动效（PetLivingArt）；
+/// 3D 相关入口已按 2026-09 定调全部下线（代码注释保留，3D 转后期迭代）：
+/// - S1 POC 工作台入口（原 AppBar debug 图标）→ 见文件尾注释块；
+/// - 3D 资源包状态卡（原 PetAssetCard）→ 同上。
 class PetHomeScreen extends StatefulWidget {
   const PetHomeScreen({super.key, this.initialTab});
 
@@ -29,6 +35,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   bool _enabled = false;
   PetSummaryModel? _summary;
   String? _error;
+  bool _busy = false;
+  bool _excited = false;
 
   @override
   void initState() {
@@ -52,11 +60,37 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       setState(() {
         _enabled = true;
         _summary = summary;
-        // summary 为 null = RPC 拉取失败（区别于功能关闭），UI 分态展示
         _error = summary == null ? '总览拉取失败（rpc_pet_summary）' : null;
         _loading = false;
       });
     }
+  }
+
+  Future<void> _run(Future<String?> Function() action,
+      {String? successMsg, bool celebrate = false}) async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final err = await action();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      return;
+    }
+    if (celebrate) _celebrate();
+    if (successMsg != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(successMsg)));
+    }
+    _load();
+  }
+
+  void _celebrate() {
+    setState(() => _excited = true);
+    Future.delayed(const Duration(seconds: 3), () {
+      if (mounted) setState(() => _excited = false);
+    });
   }
 
   @override
@@ -65,18 +99,16 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     return Scaffold(
       appBar: AppBar(
         title: Text(widget.initialTab == null ? '宠物' : '宠物 · ${widget.initialTab}'),
-        // S1 3D POC 工作台入口：仅 debug 包显示（release 无此图标）
-        actions: [
-          if (kDebugMode)
-            IconButton(
-              tooltip: '3D POC 工作台',
-              icon: const Icon(Icons.science_outlined),
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PetPocScreen()),
-              ),
-            ),
-        ],
+        // 【3D 下线 2026-09】S1 POC 工作台入口注释保留，3D 转后期迭代：
+        // if (kDebugMode)
+        //   IconButton(
+        //     tooltip: '3D POC 工作台',
+        //     icon: const Icon(Icons.science_outlined),
+        //     onPressed: () => Navigator.push(
+        //       context,
+        //       MaterialPageRoute(builder: (_) => const PetPocScreen()),
+        //     ),
+        //   ),
       ),
       body: _buildBody(colorScheme),
     );
@@ -90,13 +122,12 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       return const EmptyWidget(message: '宠物功能暂未开放');
     }
     if (_summary == null) {
-      // 开关已开但总览拉取失败：可重试（真实原因看统一请求日志 rpc_pet_summary 条目）
       return Center(
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
             const Text('宠物数据加载失败，请稍后重试'),
-            if (kDebugMode && _error != null) ...[
+            if (_error != null) ...[
               const SizedBox(height: 8),
               Padding(
                 padding: const EdgeInsets.symmetric(horizontal: 24),
@@ -124,139 +155,90 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     }
     final summary = _summary!;
     final pet = summary.primaryPet;
-    // 2D 立绘按 speciesCode+stage 解析（未登记种属返回 null → 回退占位图标）
-    final artAsset =
-        pet == null ? null : petStageArtAsset(pet.speciesCode, pet.stage);
     return RefreshIndicator(
       onRefresh: () => _load(force: true),
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          if (widget.initialTab != null)
-            Padding(
-              padding: const EdgeInsets.only(bottom: 12),
-              child: Text(
-                '深链页签：${widget.initialTab}（对应页签将在后续批次实装）',
-                style: TextStyle(
-                  fontSize: 12,
-                  color: colorScheme.onSurfaceVariant,
-                ),
-              ),
-            ),
+          _walletCard(summary, colorScheme),
+          const SizedBox(height: 12),
           if (pet != null) ...[
-            // 2D 立绘卡（随包资产；3D 底模未达正式工程标准前，2D 为默认渲染层）
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(12),
-                child: Column(
-                  children: [
-                    ClipRRect(
-                      borderRadius: BorderRadius.circular(8),
-                      child: artAsset != null
-                          ? Image.asset(
-                              artAsset,
-                              height: 200,
-                              fit: BoxFit.contain,
-                            )
-                          : Padding(
-                              padding: const EdgeInsets.symmetric(vertical: 24),
-                              child: Icon(Icons.pets,
-                                  size: 64, color: colorScheme.primary),
-                            ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text('${pet.name} · Lv.${pet.level}'),
-                    Text(
-                      '${pet.speciesCode} · ${pet.rarity} · 形态阶位 ${pet.stage}',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _petCard(pet, summary, colorScheme),
             const SizedBox(height: 12),
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _statRow('饱食度', pet.hunger, colorScheme),
-                    _statRow('心情', pet.mood, colorScheme),
-                    _statRow('亲密度', pet.intimacy, colorScheme),
-                  ],
-                ),
-              ),
-            ),
+            if (summary.ongoingAdventure != null) ...[
+              _adventureBanner(summary.ongoingAdventure!, colorScheme),
+              const SizedBox(height: 12),
+            ],
+            _actionRow(pet, colorScheme),
+            const SizedBox(height: 12),
           ] else
-            Card(
-              child: Padding(
-                padding: const EdgeInsets.all(24),
-                child: Column(
-                  children: [
-                    Icon(Icons.pets_outlined,
-                        size: 48, color: colorScheme.primary),
-                    const SizedBox(height: 8),
-                    const Text('还没有宠物'),
-                    const SizedBox(height: 4),
-                    Text(
-                      '初始蛋已在背包中，孵化引导将在后续批次实装',
-                      style: TextStyle(
-                        fontSize: 12,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-            ),
+            _hatchGuide(summary, colorScheme),
           const SizedBox(height: 12),
-          // 3D 资源包状态卡（B3 前置：按系懒加载 + 三层开关 + 用户可感知下载）
-          if (pet != null) PetAssetCard(family: pet.family),
-          const SizedBox(height: 12),
-          Card(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text('背包', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text(
-                    '已用 ${summary.bagUsed}/${summary.capacities?.backpack ?? '-'} 格'
-                    ' · 可即开蛋 ${summary.eggsReadyInstant} 枚',
-                  ),
-                  const SizedBox(height: 12),
-                  Text('金币', style: Theme.of(context).textTheme.titleSmall),
-                  const SizedBox(height: 4),
-                  Text('${summary.wallet.goldBalance}'),
-                  if (summary.ongoingAdventure != null) ...[
-                    const SizedBox(height: 12),
-                    Text(
-                      '历险进行中（${summary.ongoingAdventure!.status}）',
-                      style: TextStyle(color: colorScheme.primary),
-                    ),
-                  ],
-                ],
-              ),
-            ),
-          ),
-          const SizedBox(height: 24),
-          Text(
-            '当前为 2D 立绘版骨架页；3D 渲染待正式工程资产（重拓扑+绑定+动画）'
-            '就绪后按三层开关矩阵灰度开放。',
-            textAlign: TextAlign.center,
-            style: TextStyle(fontSize: 12, color: colorScheme.onSurfaceVariant),
-          ),
+          _entryGrid(colorScheme),
         ],
       ),
     );
   }
 
-  Widget _statRow(String label, int value, ColorScheme colorScheme) {
+  // ---------- 金币卡 ----------
+
+  Widget _walletCard(PetSummaryModel s, ColorScheme cs) {
+    return Card(
+      child: ListTile(
+        leading: const Icon(Icons.paid_outlined),
+        title: const Text('金币'),
+        subtitle: Text('累计获得 ${s.wallet.totalEarned} · 累计消费 ${s.wallet.totalSpent}'),
+        trailing: Text(
+          '${s.wallet.goldBalance}',
+          style: TextStyle(fontSize: 20, fontWeight: FontWeight.w700, color: cs.primary),
+        ),
+      ),
+    );
+  }
+
+  // ---------- 宠物卡（2D 动画立绘 + 状态条） ----------
+
+  Widget _petCard(PetBriefModel pet, PetSummaryModel s, ColorScheme cs) {
+    final art = petStageArtAsset(pet.speciesCode, pet.stage);
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(12),
+        child: Column(
+          children: [
+            PetLivingArt(
+              assetPath: art,
+              excited: _excited,
+              onTap: () => _run(() => PetRpc.interact(pet.id),
+                  successMsg: '开心 +${s.config['interact_mood'] ?? 5}'),
+            ),
+            const SizedBox(height: 4),
+            Text('${pet.name} · Lv.${pet.level}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text(
+              '${pet.speciesCode} · ${pet.rarity} · ${_genderText(pet.gender)} · 形态 ${pet.stage}',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+            const SizedBox(height: 10),
+            _statRow('饱食度', pet.hunger, cs),
+            _statRow('心情', pet.mood, cs),
+            _statRow('亲密度', pet.intimacy, cs),
+            _statRow('经验', pet.exp, cs),
+          ],
+        ),
+      ),
+    );
+  }
+
+  String _genderText(dynamic gender) {
+    final code = gender?.code as String?;
+    return switch (code) {
+      'male' => '♂',
+      'female' => '♀',
+      _ => '·',
+    };
+  }
+
+  Widget _statRow(String label, int value, ColorScheme cs) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 4),
       child: Row(
@@ -265,7 +247,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
             width: 64,
             child: Text(
               label,
-              style: TextStyle(color: colorScheme.onSurfaceVariant, fontSize: 13),
+              style: TextStyle(color: cs.onSurfaceVariant, fontSize: 13),
             ),
           ),
           Expanded(
@@ -280,10 +262,262 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           const SizedBox(width: 8),
           SizedBox(
             width: 32,
-            child: Text('$value', textAlign: TextAlign.end, style: const TextStyle(fontSize: 13)),
+            child: Text('$value',
+                textAlign: TextAlign.end, style: const TextStyle(fontSize: 13)),
           ),
         ],
       ),
     );
   }
+
+  // ---------- 历险横幅 ----------
+
+  Widget _adventureBanner(PetAdventureBriefModel adv, ColorScheme cs) {
+    final finished =
+        adv.endAt == null || !DateTime.now().isBefore(adv.endAt!);
+    return Card(
+      color: finished ? cs.primaryContainer : cs.surfaceContainerHighest,
+      child: ListTile(
+        leading: Icon(
+          finished ? Icons.redeem_outlined : Icons.explore_outlined,
+          color: cs.primary,
+        ),
+        title: Text(
+          finished ? '历险已结束，点击查看结果' : '历险进行中 · ${adv.status == 'awaiting_rescue' ? '待救助' : '归来倒计时'}',
+          style: const TextStyle(fontSize: 14),
+        ),
+        subtitle: adv.status == 'awaiting_rescue'
+            ? const Text('需要你的救援！', style: TextStyle(fontSize: 12))
+            : Text(
+                finished ? '' : '预计 ${adv.endAt!.toLocal().difference(DateTime.now()).inMinutes} 分钟后归来',
+                style: const TextStyle(fontSize: 12),
+              ),
+        trailing: const Icon(Icons.chevron_right),
+        onTap: _openAdventure,
+      ),
+    );
+  }
+
+  // ---------- 交互按钮行 ----------
+
+  Widget _actionRow(PetBriefModel pet, ColorScheme cs) {
+    final freeExp = _summary?.config['free_feed_daily'];
+    return Row(
+      children: [
+        Expanded(
+          child: FilledButton.icon(
+            onPressed: _busy ? null : () => _run(() => PetRpc.feed(pet.id),
+                successMsg: '喂饱啦（今日免费 ${freeExp ?? '-'} 次）', celebrate: true),
+            icon: const Icon(Icons.restaurant),
+            label: const Text('喂食'),
+          ),
+        ),
+        const SizedBox(width: 12),
+        Expanded(
+          child: FilledButton.tonalIcon(
+            onPressed: _busy ? null : () => _run(() => PetRpc.interact(pet.id),
+                celebrate: true),
+            icon: const Icon(Icons.touch_app_outlined),
+            label: const Text('抚摸'),
+          ),
+        ),
+      ],
+    );
+  }
+
+  // ---------- 无宠物：孵化引导 ----------
+
+  Widget _hatchGuide(PetSummaryModel s, ColorScheme cs) {
+    final hasEgg = s.eggsReadyInstant > 0;
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.all(24),
+        child: Column(
+          children: [
+            Icon(Icons.egg_outlined, size: 48, color: cs.primary),
+            const SizedBox(height: 8),
+            Text(hasEgg ? '你的第一颗蛋已经就绪' : '还没有宠物'),
+            const SizedBox(height: 4),
+            Text(
+              hasEgg ? '点击下方按钮，立即见证新伙伴的诞生' : '初始蛋将在背包中发放，稍后回来试试',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
+            ),
+            if (hasEgg) ...[
+              const SizedBox(height: 16),
+              FilledButton.icon(
+                onPressed: _busy ? null : _hatchFirstEgg,
+                icon: const Icon(Icons.auto_awesome),
+                label: const Text('立即孵化'),
+              ),
+            ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _hatchFirstEgg() async {
+    final (eggs, err) = await PetRpc.fetchEggs();
+    if (err != null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      }
+      return;
+    }
+    PetEggModel? target;
+    for (final e in eggs) {
+      if (e.isInstant) {
+        target = e;
+        break;
+      }
+    }
+    if (target == null) {
+      if (mounted) {
+        ScaffoldMessenger.of(context)
+            .showSnackBar(const SnackBar(content: Text('没有可即开孵化的蛋')));
+      }
+      return;
+    }
+    final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
+    if (!mounted) return;
+    if (hatchErr != null || result == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(petRpcErrorText(hatchErr))));
+      return;
+    }
+    _celebrate();
+    await showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('🎉 新伙伴诞生！'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Text('名字：${result.name}',
+                style: const TextStyle(fontWeight: FontWeight.w600)),
+            Text('编号：${result.showNo}'),
+            Text('稀有度：${result.rarity}'),
+          ],
+        ),
+        actions: [
+          FilledButton(onPressed: () => Navigator.pop(ctx), child: const Text('太好了')),
+        ],
+      ),
+    );
+    _load();
+  }
+
+  // ---------- 功能入口 ----------
+
+  Widget _entryGrid(ColorScheme cs) {
+    final s = _summary;
+    final entries = [
+      ('背包', Icons.inventory_2_outlined, _openBag),
+      ('商城', Icons.storefront_outlined, () => _openShop(s?.wallet.goldBalance ?? 0)),
+      ('任务', Icons.task_alt_outlined, _openQuests),
+      ('历险', Icons.explore_outlined, _openAdventure),
+      ('钱包', Icons.account_balance_wallet_outlined, _openWallet),
+    ];
+    return Card(
+      child: Padding(
+        padding: const EdgeInsets.symmetric(vertical: 12),
+        child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+          children: [
+            for (final (label, icon, onTap) in entries)
+              InkWell(
+                onTap: onTap,
+                borderRadius: BorderRadius.circular(12),
+                child: Padding(
+                  padding: const EdgeInsets.all(8),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Icon(icon, color: cs.primary),
+                      const SizedBox(height: 4),
+                      Text(label, style: const TextStyle(fontSize: 12)),
+                    ],
+                  ),
+                ),
+              ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  // ---------- 页面跳转 ----------
+
+  void _openBag() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PetBagScreen(petId: _summary?.primaryPet?.id),
+      ),
+    ).then((_) => _load());
+  }
+
+  void _openShop(int gold) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => PetShopScreen(goldBalance: gold)),
+    ).then((_) => _load());
+  }
+
+  void _openQuests() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PetQuestsScreen()),
+    ).then((_) => _load());
+  }
+
+  void _openAdventure() {
+    final pet = _summary?.primaryPet;
+    if (pet == null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(const SnackBar(content: Text('先孵化一只宠物才能历险')));
+      return;
+    }
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (_) => PetAdventureScreen(
+          petId: pet.id,
+          petName: pet.name,
+          adventure: _summary?.ongoingAdventure,
+          tiers: _tierList(),
+          hunger: pet.hunger,
+          mood: pet.mood,
+        ),
+      ),
+    ).then((_) => _load());
+  }
+
+  void _openWallet() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(builder: (_) => const PetWalletScreen()),
+    ).then((_) => _load());
+  }
+
+  List<Map<String, dynamic>> _tierList() {
+    final raw = _summary?.config['adventure_tiers'];
+    if (raw is List) {
+      return raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList();
+    }
+    return const [];
+  }
 }
+
+/*
+ * 【3D 下线归档 2026-09】
+ * - 原 AppBar「3D POC 工作台」debug 入口：见 appBar actions 注释块；
+ * - 原 3D 资源包状态卡（PetAssetCard，按系懒加载下载）：本页 ListView 中
+ *   `if (pet != null) PetAssetCard(family: pet.family)` 一行随 3D 渲染层
+ *   一并下线；pet_asset_card / pet_asset_service / pet_poc_screen 源码
+ *   均注释保留，待 3D 后期迭代恢复；
+ * - 数据库 render3d_enabled / asset_manifest 列保留（默认关闭），门控
+ *   查询降级逻辑保留，不影响 2D 主链路。
+ */
