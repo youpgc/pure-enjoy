@@ -60,9 +60,11 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (_total <= 0 || _busy) return;
     setState(() => _busy = true);
     String? firstErr;
-    for (final e in _alloc.entries) {
+    var donePoints = 0;
+    for (final e in _alloc.entries.toList()) {
       if (e.value <= 0) continue;
-      // 服务端按维度逐次扣减 pending_attr_points；出错即中断（余额强一致）
+      // 服务端按维度逐次扣减 pending_attr_points；成功一维即从本地累积移除
+      // （断点续传：中断后重试只发未完成维度，杜绝已成功维度被重发多扣）
       final err = await PetRpc.allocateAttr(
         widget.pet.id,
         attrKey: e.key,
@@ -72,12 +74,20 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
         firstErr = err;
         break;
       }
+      donePoints += e.value;
+      _alloc.remove(e.key);
     }
     if (!mounted) return;
     setState(() => _busy = false);
     if (firstErr != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(firstErr))));
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(donePoints > 0
+            ? '已分配 $donePoints 点，其余未完成：${petRpcErrorText(firstErr)}'
+            : petRpcErrorText(firstErr)),
+      ));
+      // 部分成功也关闭并刷新——面板宠物快照过期，重开面板续传剩余点数
+      Navigator.pop(context);
+      widget.onChanged?.call();
       return;
     }
     Navigator.pop(context);
@@ -128,9 +138,11 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             const SizedBox(height: 10),
             // 可分配点提示
             Text(
-              pet.pendingAttrPoints > 0
-                  ? '升级获得了属性点，快为它加点吧（剩余 $_remain/${pet.pendingAttrPoints}）'
-                  : '宠物升级时会获得属性点',
+              pet.status == PetPetStatus.adventuring
+                  ? '历险中的宠物暂时无法加点，归来后再分配吧'
+                  : pet.pendingAttrPoints > 0
+                      ? '升级获得了属性点，快为它加点吧（剩余 $_remain/${pet.pendingAttrPoints}）'
+                      : '宠物升级时会获得属性点',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
@@ -168,7 +180,9 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     final pet = widget.pet;
     final base = pet.attr(key.code);
     final plus = _alloc[key.code] ?? 0;
-    final canAlloc = pet.pendingAttrPoints > 0;
+    // 历险中禁用加点（服务端 allocate 拦 PET_NOT_REARING，客户端前置禁更友好）
+    final canAlloc =
+        pet.pendingAttrPoints > 0 && pet.status != PetPetStatus.adventuring;
     return Row(
       children: [
         SizedBox(

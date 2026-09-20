@@ -455,7 +455,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   bool _usable(PetBagItemModel item) =>
       item.category == 'consumable' &&
-      const {'feed', 'clean', 'toy'}.contains(item.effectType);
+      const {'feed', 'clean', 'toy', 'heal'}.contains(item.effectType);
 
   String _categoryLabel(String category) => switch (category) {
         'egg' => '蛋',
@@ -486,6 +486,8 @@ class _PetBagScreenState extends State<PetBagScreen> {
         addNum('exp', '经验');
       case 'rescue':
         parts.add('历险遇险时立即救回宠物');
+      case 'heal':
+        parts.add('恢复宠物健康（历险受伤后使用）');
       case 'refine_reassign':
         parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
       default:
@@ -501,6 +503,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
       'clean' => Icons.shower_outlined,
       'toy' => Icons.toys_outlined,
       'rescue' => Icons.health_and_safety_outlined,
+      'heal' => Icons.healing_outlined,
       'refine_reassign' => Icons.auto_fix_high,
       _ => Icons.inventory_2_outlined,
     };

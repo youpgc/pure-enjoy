@@ -36,6 +36,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   static const Map<String, String> _sourceLabels = {
     'pet_shop_buy': '商城消费',
     'pet_system_reward': '系统发放',
+    'pet_adventure_penalty': '历险惩罚',
     'pet_achievement': '成就发放',
     'pet_exchange': '积分兑换',
     'pet_admin_grant': '客服调整',

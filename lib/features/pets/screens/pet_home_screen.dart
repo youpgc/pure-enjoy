@@ -91,6 +91,16 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     return pets[_petIndex];
   }
 
+  /// 当前宠物的进行中历险（多宠场景按 petId 过滤——A 宠历险不再错挂到
+  /// B 宠的历险钮/历险页；顶部横幅保留全局：归来/待救助是全局事件通知）
+  PetAdventureBriefModel? get _currentAdventure {
+    final adv = _summary?.ongoingAdventure;
+    if (adv == null) return null;
+    final pet = _currentPet;
+    if (pet != null && adv.petId == pet.id) return adv;
+    return null;
+  }
+
   /// 冷却与每日次数派生（逻辑见 [PetActionBudget]）
   PetActionBudget get _budget =>
       PetActionBudget(config: _summary?.config ?? const {}, pet: _currentPet);
@@ -464,7 +474,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     _push(PetAdventureScreen(
       petId: pet.id,
       petName: pet.name,
-      adventure: _summary?.ongoingAdventure,
+      adventure: _currentAdventure,
       tiers: _tierList(),
       petLevel: pet.level,
       petAttrs: pet.attributes,
@@ -489,9 +499,10 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     if (await run(context, adv.id) && mounted) _load();
   }
 
-  /// 右列历险钮四态（历险/召回/领取/救助，分支逻辑见 petAdventureRailButton）
+  /// 右列历险钮四态（历险/召回/领取/救助，分支逻辑见 petAdventureRailButton）；
+  /// adv 按当前宠过滤——B 宠在场时不再显示 A 宠历险的召回/领取态
   Widget _adventureButton() => petAdventureRailButton(
-      adv: _summary?.ongoingAdventure,
+      adv: _currentAdventure,
       openAdventure: _openAdventure,
       claimResult: () => _runAdventure(claimAdventureResult),
       recall: () => _runAdventure(recallAdventureConfirmed));
