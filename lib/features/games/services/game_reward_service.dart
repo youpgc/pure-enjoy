@@ -496,12 +496,18 @@ class GameRewardService {
   ///
   /// [gameId] 非空时仅统计该游戏的领取记录（用于单游戏单日上限校验）；
   /// 为 null（默认）时统计全部游戏（用于全局单日上限校验）。
-  Future<int> fetchTodayClaimedPoints({String? gameId}) async {
+  ///
+  /// 返回 null = 查询失败（网络/服务端异常）。2026-09-20 修复：
+  /// 此前失败返回 0，会被链内缓存一整天 → 上限预检失效；改由调用方
+  /// （[_claimedPointsCached]）对 null 不缓存、下次重查。另补
+  /// granted=eq.true 过滤，与 grant_game_reward 服务端统计口径完全对齐。
+  Future<int?> fetchTodayClaimedPoints({String? gameId}) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return 0;
 
     final filters = <String, String>{
       'user_id': 'eq.$userId',
+      'granted': 'eq.true',
       'claimed_at': 'gte.${beijingToday().toUtc().toIso8601String()}',
     };
     if (gameId != null) {
@@ -523,7 +529,7 @@ class GameRewardService {
         module: 'games',
         level: 'warning',
       );
-      return 0;
+      return null;
     }
 
     final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
@@ -554,6 +560,10 @@ class GameRewardService {
   }
 
   /// 取「今日已领」缓存值（无缓存时回源查询一次）。
+  ///
+  /// 查询失败（null）不缓存、按 0 放行：宁可让后续发分请求去触达
+  /// 服务端强校验（2026-09-20 起 RPC 错误已映射回上限 reason 触发止付），
+  /// 也不把失败值固化成全天的「已领 0」——那是上限预检失效的根因之一。
   Future<int> _claimedPointsCached({String? gameId}) async {
     final day = beijingDateKey(DateTime.now());
     if (_claimedCacheDay != day) {
@@ -562,11 +572,14 @@ class GameRewardService {
       _cachedGameClaimed.clear();
     }
     if (gameId == null) {
-      _cachedGlobalClaimed ??= await fetchTodayClaimedPoints();
-      return _cachedGlobalClaimed!;
+      final v = _cachedGlobalClaimed ?? await fetchTodayClaimedPoints();
+      if (v != null) _cachedGlobalClaimed = v;
+      return v ?? 0;
     }
     if (!_cachedGameClaimed.containsKey(gameId)) {
-      _cachedGameClaimed[gameId] = await fetchTodayClaimedPoints(gameId: gameId);
+      final v = await fetchTodayClaimedPoints(gameId: gameId);
+      if (v != null) _cachedGameClaimed[gameId] = v;
+      return v ?? 0;
     }
     return _cachedGameClaimed[gameId]!;
   }
@@ -646,6 +659,15 @@ class GameRewardService {
         '游戏奖励发放失败：${rpc.error}（claim=$claimKey, points=$points, user=$userId, game=$gameId）',
         module: 'games',
       );
+      // 服务端强校验拦截（2026-09-20 闭环修复）：预检缓存失真（查询失败/
+      // 换设备等）时客户端会放行，拦截落在服务端 grant_game_reward 的
+      // 'daily limit reached'——此前一律返回「发放失败，请重试」，上限
+      // 拦截对用户完全不可见、也不触发本局止付。现按原因分类，上限
+      // 拦截返回含「上限」的 reason，与客户端预检同路（capHit + banner）。
+      final errText = (rpc.error ?? '').toString();
+      if (errText.contains('daily limit')) {
+        return GameRewardResult.notGranted(reason: '今日游戏奖励已达上限');
+      }
       return GameRewardResult.notGranted(reason: '发放失败，请重试');
     }
 
