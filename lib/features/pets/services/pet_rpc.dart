@@ -108,7 +108,8 @@ class PetRpc {
     try {
       final resp = await ApiClient.get(
         'pet_adventure_spots',
-        select: 'id,code,name,unlock_conditions',
+        select:
+            'id,code,name,unlock_conditions,attr_requirements',
         filters: {'enabled': 'eq.true'},
         order: 'sort_order.asc',
         limit: 50,
@@ -323,5 +324,46 @@ class PetRpc {
     }, 'rpc_pet_exchange 积分兑换');
     if (err == null) await PetService.instance.invalidateSummary();
     return err;
+  }
+
+  /// 属性加点（升级获得的 pending_attr_points 分配到指定维度；
+  /// 一次可分多点，服务端校验余额与维度白名单）
+  static Future<String?> allocateAttr(
+    String petId, {
+    required String attrKey,
+    required int points,
+  }) async {
+    final (_, err) = await _call('rpc_pet_allocate_attr', {
+      'p_pet_id': petId,
+      'p_attr_key': attrKey,
+      'p_points': points,
+    }, 'rpc_pet_allocate_attr 属性加点');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
+  /// 洗练重掷（消耗 tool_refine 道具，随机重掷加点属性，总值守恒；
+  /// 孵化基础属性不受影响。返回 {before, after, attributes} 供演出对比）
+  static Future<(Map<String, dynamic>?, String?)> refineReassign(
+    String petId, {
+    required String itemId,
+  }) async {
+    final (data, err) = await _call('rpc_pet_refine_reassign', {
+      'p_pet_id': petId,
+      'p_item_id': itemId,
+    }, 'rpc_pet_refine_reassign 洗练重掷');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return (data, err);
+  }
+
+  /// 为你匹配（推荐制）：返回等级达标的候选历险地（含 attr_requirements），
+  /// 其中一个带 recommended=true 标记；服务端同时校验饱食/心情/健康门槛，
+  /// 不达标时返回错误（调用方可静默降级为无推荐）
+  static Future<(Map<String, dynamic>?, String?)> adventureMatch(
+    String petId,
+  ) async {
+    return _call('rpc_pet_adventure_match', {
+      'p_pet_id': petId,
+    }, 'rpc_pet_adventure_match 历险地匹配');
   }
 }

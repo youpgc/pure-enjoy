@@ -84,49 +84,65 @@ class PetGoldBadgeCore extends StatelessWidget {
   }
 }
 
-/// 沉底状态卡：名牌行 + 四维独立行（饱食/心情/亲密/经验，每条一行不并行）
+/// 沉底状态卡：名牌行 + 五维独立行（饱食/心情/亲密/经验/健康，每条一行不并行）
+///
+/// 点击整卡打开属性面板（属性系统 Phase 2：四维/健康/性格/加点，见
+/// pet_attributes_sheet.dart）。
 class PetBottomStatusCard extends StatelessWidget {
-  const PetBottomStatusCard({super.key, required this.pet});
+  const PetBottomStatusCard({super.key, required this.pet, this.onTap});
 
   final PetBriefModel pet;
 
+  /// 打开属性面板（null 时不可点）
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 12),
-      padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-      decoration: BoxDecoration(
-        color: const Color(0xCC2E2A24),
-        borderRadius: BorderRadius.circular(18),
-      ),
-      child: Column(
-        mainAxisSize: MainAxisSize.min,
-        children: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.center,
-            children: [
-              Flexible(
-                child: Text(
-                  '${pet.name} · Lv.${pet.level} · ${pet.showNo} · 形态${pet.stage}',
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                      fontSize: 13,
-                      fontWeight: FontWeight.w600,
-                      color: Color(0xFFF5EFE4)),
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        margin: const EdgeInsets.symmetric(horizontal: 12),
+        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+        decoration: BoxDecoration(
+          color: const Color(0xCC2E2A24),
+          borderRadius: BorderRadius.circular(18),
+        ),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    '${pet.name} · Lv.${pet.level} · ${pet.showNo} · 形态${pet.stage}',
+                    maxLines: 1,
+                    overflow: TextOverflow.ellipsis,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(
+                        fontSize: 13,
+                        fontWeight: FontWeight.w600,
+                        color: Color(0xFFF5EFE4)),
+                  ),
                 ),
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          _statRow('饱食', 'ui_hunger', Icons.restaurant, pet.hunger),
-          const SizedBox(height: 6),
-          _statRow('心情', 'ui_mood', Icons.mood, pet.mood),
-          const SizedBox(height: 6),
-          _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
-          const SizedBox(height: 6),
-          _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp),
-        ],
+                // 属性面板入口提示（整卡可点）
+                const Icon(Icons.keyboard_arrow_up,
+                    size: 16, color: Color(0xFFF5EFE4)),
+              ],
+            ),
+            const SizedBox(height: 8),
+            _statRow('饱食', 'ui_hunger', Icons.restaurant, pet.hunger),
+            const SizedBox(height: 6),
+            _statRow('心情', 'ui_mood', Icons.mood, pet.mood),
+            const SizedBox(height: 6),
+            _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
+            const SizedBox(height: 6),
+            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp),
+            const SizedBox(height: 6),
+            // 健康行（状态值：历险失败惩罚扣减，恢复途径后续配置）
+            _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
+                pet.health),
+          ],
+        ),
       ),
     );
   }

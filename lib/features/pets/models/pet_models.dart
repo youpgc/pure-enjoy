@@ -71,6 +71,12 @@ class PetBriefModel {
     this.lastInteractAt,
     this.render3d,
     this.render2d,
+    this.attributes = const {},
+    this.health = 100,
+    this.pendingAttrPoints = 0,
+    this.refinePoints = 0,
+    this.personalityCode,
+    this.personalityName,
   });
 
   final String id;
@@ -100,6 +106,25 @@ class PetBriefModel {
   final Map<String, dynamic>? render3d;
   final Map<String, dynamic>? render2d;
 
+  /// 四维属性当前值（base||bonus 合并，rpc_pet_summary 2026-09-17 属性系统扩展）
+  final Map<String, int> attributes;
+
+  /// 健康状态值 /100（历险失败惩罚扣减；药品/自然恢复可配，不参与成长）
+  final int health;
+
+  /// 升级获得的可分配属性点（rpc_pet_allocate_attr 消费）
+  final int pendingAttrPoints;
+
+  /// 洗练点储备（种属/评级/潜力三因子累计；暂仅展示，消费走洗练道具重掷）
+  final int refinePoints;
+
+  /// 性格（服务端按 pet_personalities join 回填；未匹配为 null）
+  final String? personalityCode;
+  final String? personalityName;
+
+  /// 读取四维属性值（未配置/未下发维度补 0）
+  int attr(String code) => attributes[code] ?? 0;
+
   factory PetBriefModel.fromJson(Map<String, dynamic> json) {
     return PetBriefModel(
       id: json['id'] as String? ?? '',
@@ -126,6 +151,15 @@ class PetBriefModel {
       render2d: json['render2d'] is Map
           ? Map<String, dynamic>.from(json['render2d'] as Map)
           : null,
+      attributes: json['attributes'] is Map
+          ? (json['attributes'] as Map).map(
+              (k, v) => MapEntry(k.toString(), (v as num?)?.toInt() ?? 0))
+          : const <String, int>{},
+      health: (json['health'] as num?)?.toInt() ?? 100,
+      pendingAttrPoints: (json['pending_attr_points'] as num?)?.toInt() ?? 0,
+      refinePoints: (json['refine_points'] as num?)?.toInt() ?? 0,
+      personalityCode: json['personality_code'] as String?,
+      personalityName: json['personality_name'] as String?,
     );
   }
 }

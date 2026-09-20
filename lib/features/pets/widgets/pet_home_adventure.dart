@@ -40,6 +40,12 @@ Future<bool> claimAdventureResult(
         context, deadline: data?['rescue_deadline'] as String?);
     return true;
   }
+  if (data?['status'] == 'failed') {
+    // 属性未达标结算：终态失败（宠物已回家），展示配置惩罚明细，无奖励
+    await showPetPenaltyDialog(
+        context, penalty: (data?['penalty'] as Map?)?.cast<String, dynamic>());
+    return true;
+  }
   if (data?['status'] == 'claimed') {
     // 掉落明细（fix_pet_adventure_claim_items：claim 返回 items: [{code,name,qty}]）
     final items = <({String name, int qty})>[];
@@ -119,6 +125,52 @@ Future<void> showPetDangerDialog(BuildContext context, {String? deadline}) {
       actions: [
         FilledButton(
             onPressed: () => Navigator.pop(ctx), child: const Text('知道了')),
+      ],
+    ),
+  );
+}
+
+/// 历险失败结算弹窗（claim 返回 status='failed'：属性未达标，惩罚明细
+/// 为服务端 penalty 配置实际生效项：health/mood/gold/lost_item，无奖励）
+Future<void> showPetPenaltyDialog(
+  BuildContext context, {
+  Map<String, dynamic>? penalty,
+}) {
+  final p = penalty ?? const {};
+  final rows = <String>[];
+  final health = (p['health'] as num?)?.toInt() ?? 0;
+  final mood = (p['mood'] as num?)?.toInt() ?? 0;
+  final gold = (p['gold'] as num?)?.toInt() ?? 0;
+  final lostItem = p['lost_item'] as String?;
+  if (health < 0) rows.add('健康 $health');
+  if (mood < 0) rows.add('心情 $mood');
+  if (gold < 0) rows.add('金币 $gold');
+  if (lostItem != null && lostItem.isNotEmpty) rows.add('丢失了「$lostItem」');
+  return showDialog<void>(
+    context: context,
+    builder: (ctx) => AlertDialog(
+      shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(24)),
+      title: const Row(children: [
+        Icon(Icons.sentiment_dissatisfied, color: Color(0xFFE05B4C)),
+        SizedBox(width: 8),
+        Text('历险失败…'),
+      ]),
+      content: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Text('这次历险的挑战超出了宠物的能力，它空手而归。'),
+          if (rows.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            Text('惩罚：${rows.join('，')}',
+                style: const TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w600)),
+          ],
+        ],
+      ),
+      actions: [
+        FilledButton(
+            onPressed: () => Navigator.pop(ctx), child: const Text('抱抱它')),
       ],
     ),
   );

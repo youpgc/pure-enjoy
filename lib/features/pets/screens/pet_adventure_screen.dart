@@ -8,12 +8,17 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_adventure_cards.dart';
 import '../widgets/pet_claim_result_dialog.dart';
+import '../widgets/pet_home_adventure.dart';
 
 /// 历险页
 ///
 /// 状态机（与 pet_adventures.status 对齐）：
 /// - 无进行中 → 历险地列表 → 选档位（config.adventure_tiers）→ 出发；
+///   等级 = 硬门槛（不达标灰置）；属性 = 结算判据（不达标红显「有风险」，
+///   仍可出发，claim 时判 failed 执行惩罚）；健康 = 出发门槛（阈值提示）；
+///   「为你匹配」推荐卡来自 rpc_pet_adventure_match（可忽略）；
 /// - ongoing  → 倒计时，结束出现「查看结果」（claim roll 四类结果）；
 /// - awaiting_rescue → 自救窗口内用救援道具 / 超时 NPC 兜底。
 class PetAdventureScreen extends StatefulWidget {
@@ -23,8 +28,10 @@ class PetAdventureScreen extends StatefulWidget {
     required this.petName,
     required this.adventure,
     required this.tiers,
-    required this.hunger,
-    required this.mood,
+    required this.petLevel,
+    required this.petAttrs,
+    required this.petHealth,
+    required this.healthThreshold,
   });
 
   final String petId;
@@ -35,8 +42,18 @@ class PetAdventureScreen extends StatefulWidget {
 
   /// pet_config.adventure_tiers：[{tier,minutes,label}]
   final List<Map<String, dynamic>> tiers;
-  final int hunger;
-  final int mood;
+
+  /// 宠物等级（历险地等级硬门槛灰置依据）
+  final int petLevel;
+
+  /// 四维属性当前值（属性要求行对比红显；最终结算在服务端 claim）
+  final Map<String, int> petAttrs;
+
+  /// 健康状态值（出发门槛提示数据源）
+  final int petHealth;
+
+  /// 健康出发门槛（config.adventure_health_threshold；0 = 未配置不提示）
+  final int healthThreshold;
 
   @override
   State<PetAdventureScreen> createState() => _PetAdventureScreenState();
@@ -50,15 +67,42 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Timer? _tick;
   bool _busy = false;
 
+  /// 「为你匹配」推荐历险地 id（rpc_pet_adventure_match；静默降级为 null）
+  String? _matchedSpotId;
+
   @override
   void initState() {
     super.initState();
     _adv = widget.adventure;
     _load();
+    _loadMatch();
     // 每分钟刷新倒计时（结束即触发领奖按钮出现）
     _tick = Timer.periodic(const Duration(minutes: 1), (_) {
       if (mounted) setState(() {});
     });
+  }
+
+  /// 为你匹配（静默）：门槛不达标/调用失败均降级为无推荐，不打扰用户
+  Future<void> _loadMatch() async {
+    final (data, err) = await PetRpc.adventureMatch(widget.petId);
+    if (err != null || data == null || !mounted) return;
+    final spots = data['spots'];
+    if (spots is List) {
+      for (final s in spots) {
+        if (s is Map && s['recommended'] == true) {
+          setState(() => _matchedSpotId = s['id'] as String?);
+          return;
+        }
+      }
+    }
+  }
+
+  PetSpotModel? get _matchedSpot {
+    if (_matchedSpotId == null) return null;
+    for (final s in _spots) {
+      if (s.id == _matchedSpotId) return s;
+    }
+    return null;
   }
 
   @override
@@ -128,6 +172,15 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
       }
       return;
     }
+    if (status == 'failed') {
+      // 属性未达标结算：终态失败（宠物已回家），展示实际生效惩罚明细
+      if (mounted) {
+        await showPetPenaltyDialog(context,
+            penalty: (data?['penalty'] as Map?)?.cast<String, dynamic>());
+      }
+      await _reloadSummary();
+      return;
+    }
     final gold = (data?['gold'] as num?)?.toInt() ?? 0;
     final exp = (data?['exp'] as num?)?.toInt() ?? 0;
     final result = data?['result_type'] as String? ?? 'play';
@@ -159,45 +212,12 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     await _reloadSummary();
   }
 
-  /// 召回确认弹窗：进行中历险主动中断，无奖励（feature_pet_adventure_recall）
+  /// 召回确认：复用主页共享 helper（AlertDialog 二次确认 → 无奖励中断），
+  /// 返回 true 表示状态已变化需刷新总览
   Future<void> _confirmRecall() async {
-    if (_adv == null) return;
-    final ok = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('召回宠物'),
-        content: Text(
-            '${widget.petName} 将立即结束本次历险返回家中，本次历险不会获得任何奖励。确定召回吗？'),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('再等等'),
-          ),
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确定召回'),
-          ),
-        ],
-      ),
-    );
-    if (ok != true) return;
     if (_busy || _adv == null) return;
-    setState(() => _busy = true);
-    final err = await PetRpc.adventureRecall(_adv!.id);
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
-      await _reloadSummary();
-      return;
-    }
-    if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('已召回，宠物平安回家（本次历险无奖励）')),
-      );
-    }
-    await _reloadSummary();
+    final changed = await recallAdventureConfirmed(context, _adv!.id);
+    if (changed && mounted) await _reloadSummary();
   }
 
   Future<void> _rescue({String? itemId}) async {
@@ -258,36 +278,36 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (_spots.isEmpty) {
       return const EmptyWidget(message: '暂无开放的历险地，敬请期待新地点');
     }
-    final thresholdLow = widget.hunger < 1 || widget.mood < 1;
+    // 健康出发门槛提示（历险失败惩罚会扣健康；阈值 0 = 未配置不提示）
+    final healthLow = widget.healthThreshold > 0 &&
+        widget.petHealth < widget.healthThreshold;
+    final matched = _matchedSpot;
+    final cards = <Widget>[
+      if (healthLow)
+        Card(
+          color: cs.errorContainer,
+          child: const Padding(
+            padding: EdgeInsets.all(12),
+            child: Text('宠物健康状况不佳，恢复健康后再出发吧'),
+          ),
+        ),
+      if (matched != null)
+        PetMatchBanner(
+            spotName: matched.name, onTap: () => _showTierSheet(matched)),
+      for (final spot in _spots)
+        petSpotCard(
+          context,
+          spot: spot,
+          petLevel: widget.petLevel,
+          petAttrs: widget.petAttrs,
+          onTap: () => _showTierSheet(spot),
+        ),
+    ];
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: _spots.length + (thresholdLow ? 1 : 0),
+      itemCount: cards.length,
       separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (context, i) {
-        if (thresholdLow && i == 0) {
-          return Card(
-            color: cs.errorContainer,
-            child: const Padding(
-              padding: EdgeInsets.all(12),
-              child: Text('宠物状态太差，喂食/互动恢复后再出发吧'),
-            ),
-          );
-        }
-        final spot = _spots[thresholdLow ? i - 1 : i];
-        final req = spot.requiredLevel;
-        final locked = req != null && widget.hunger < 0; // 等级校验在 UI 仅提示，服务端强校验
-        return Card(
-          child: ListTile(
-            leading: const Icon(Icons.explore_outlined),
-            title: Text(spot.name),
-            subtitle: req != null ? Text('建议等级 Lv.$req') : null,
-            trailing: locked
-                ? const Icon(Icons.lock_outline, size: 18)
-                : const Icon(Icons.chevron_right),
-            onTap: locked ? null : () => _showTierSheet(spot),
-          ),
-        );
-      },
+      itemBuilder: (_, i) => cards[i],
     );
   }
 

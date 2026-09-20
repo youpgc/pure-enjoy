@@ -4,6 +4,8 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_attributes_sheet.dart';
+import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_item_icon.dart';
 import 'pet_shop_screen.dart';
 
@@ -97,29 +99,25 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   void _showHatchResult(PetHatchResultModel r) {
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('🎉 新伙伴诞生！'),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('名字：${r.name}', style: const TextStyle(fontWeight: FontWeight.w600)),
-            Text('编号：${r.showNo}'),
-            Text('稀有度：${r.rarity}'),
-            Text('性别：${r.gender?.code ?? '-'}'),
-          ],
-        ),
-        actions: [
-          FilledButton(
-            onPressed: () => Navigator.pop(ctx),
-            child: const Text('太好了'),
-          ),
-        ],
-      ),
-    );
+    showPetBirthDialog(context, img: null, result: r); // 复用主页诞生弹窗
     _load();
+  }
+
+  /// 洗练剂（tool/refine_reassign）：对在养宠物重掷升级加点（总值守恒，
+  /// 孵化基础属性不动），结果经 before/after 演出展示
+  Future<void> _refineItem(PetBagItemModel item) async {
+    Navigator.of(context).pop();
+    if (widget.petId == null) return _toast('当前没有在养宠物');
+    await _busy(() async {
+      final (data, err) =
+          await PetRpc.refineReassign(widget.petId!, itemId: item.itemId);
+      if (!mounted) return;
+      if (err != null || data == null) return _toast(petRpcErrorText(err));
+      await showPetRefineResultDialog(context,
+          before: (data['before'] as Map?)?.cast<String, dynamic>() ?? const {},
+          after: (data['after'] as Map?)?.cast<String, dynamic>() ?? const {});
+      _load();
+    }, item.id);
   }
 
   Future<void> _useItem(PetBagItemModel item) async {
@@ -344,6 +342,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   void _showItemFloat(PetBagItemModel item) {
     final cs = Theme.of(context).colorScheme;
     final usable = widget.petId != null && _usable(item);
+    final isRefine = widget.petId != null && item.effectType == 'refine_reassign';
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -413,7 +412,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
                       ),
                     )
                   else ...[
-                    if (usable)
+                    if (usable) ...[
                       Expanded(
                         child: FilledButton.icon(
                           onPressed: _busyId == null ? () => _useItem(item) : null,
@@ -421,7 +420,18 @@ class _PetBagScreenState extends State<PetBagScreen> {
                           label: const Text('使用'),
                         ),
                       ),
-                    if (usable) const SizedBox(width: 10),
+                      const SizedBox(width: 10),
+                    ],
+                    if (isRefine) ...[
+                      Expanded(
+                        child: FilledButton.icon(
+                          onPressed: _busyId == null ? () => _refineItem(item) : null,
+                          icon: const Icon(Icons.auto_fix_high, size: 18),
+                          label: const Text('洗练'),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                    ],
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -476,6 +486,8 @@ class _PetBagScreenState extends State<PetBagScreen> {
         addNum('exp', '经验');
       case 'rescue':
         parts.add('历险遇险时立即救回宠物');
+      case 'refine_reassign':
+        parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
       default:
         if (item.isEgg) parts.add('点击立即孵化，见证新伙伴诞生');
     }
@@ -489,6 +501,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
       'clean' => Icons.shower_outlined,
       'toy' => Icons.toys_outlined,
       'rescue' => Icons.health_and_safety_outlined,
+      'refine_reassign' => Icons.auto_fix_high,
       _ => Icons.inventory_2_outlined,
     };
   }

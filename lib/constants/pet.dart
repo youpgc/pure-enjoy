@@ -168,6 +168,28 @@ enum PetPickMode {
   }
 }
 
+/// 成长四维属性（键域契约：rpc_pet_allocate_attr 白名单 / 洗练重掷四维，
+/// 见 feature_pet_attributes_20260917.sql；孵化基础属性不可洗练）
+enum PetAttrKey {
+  intellect('intellect', '智力'),
+  stamina('stamina', '体力'),
+  strength('strength', '力量'),
+  agility('agility', '敏捷');
+
+  const PetAttrKey(this.code, this.label);
+
+  /// 与 DDL/RPC 校验一致的存储键
+  final String code;
+  final String label;
+
+  static PetAttrKey? fromCode(String? code) {
+    for (final v in values) {
+      if (v.code == code) return v;
+    }
+    return null;
+  }
+}
+
 /// 3D 资源包本地状态机（App 端自有状态，非 DDL 枚举；按系 family 独立流转）
 ///
 /// 流转：missing → downloading → verifying → ready；

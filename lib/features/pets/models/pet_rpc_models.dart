@@ -154,6 +154,7 @@ class PetSpotModel {
     required this.code,
     required this.name,
     this.unlockConditions = const [],
+    this.attrRequirements = const [],
   });
 
   final String id;
@@ -163,6 +164,10 @@ class PetSpotModel {
   /// [{type:level,value:N}]（服务端 rpc_pet_adventure_start 亦校验）
   final List<Map<String, dynamic>> unlockConditions;
 
+  /// [{attr,value}] 结算判据：不达标仍可出发，claim 时判 failed 并执行惩罚
+  /// （feature_pet_attributes_20260917.sql rpc_pet_adventure_start / claim）
+  final List<Map<String, dynamic>> attrRequirements;
+
   int? get requiredLevel {
     for (final c in unlockConditions) {
       if (c['type'] == 'level') return (c['value'] as num?)?.toInt();
@@ -171,14 +176,15 @@ class PetSpotModel {
   }
 
   factory PetSpotModel.fromJson(Map<String, dynamic> json) {
-    final raw = json['unlock_conditions'];
+    List<Map<String, dynamic>> mapList(dynamic raw) => raw is List
+        ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
+        : const [];
     return PetSpotModel(
       id: json['id'] as String? ?? '',
       code: json['code'] as String? ?? '',
       name: json['name'] as String? ?? '',
-      unlockConditions: raw is List
-          ? raw.whereType<Map>().map((e) => Map<String, dynamic>.from(e)).toList()
-          : const [],
+      unlockConditions: mapList(json['unlock_conditions']),
+      attrRequirements: mapList(json['attr_requirements']),
     );
   }
 }

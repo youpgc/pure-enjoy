@@ -11,6 +11,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_art.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
+import '../widgets/pet_attributes_sheet.dart';
 import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
@@ -271,7 +272,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
                 const PetAdventureNote(),
                 const SizedBox(height: 6),
               ],
-              PetBottomStatusCard(pet: pet),
+              PetBottomStatusCard(pet: pet, onTap: _openAttributes),
             ],
           ),
         ),
@@ -301,7 +302,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
             PetEdgeButton(
                 icon: Icons.storefront_outlined,
                 label: '商城',
-                onTap: () => _openShop(_summary?.wallet.goldBalance ?? 0)),
+                onTap: _openShop),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.account_balance_wallet_outlined,
@@ -430,29 +431,27 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     _load();
   }
 
-  // ---------- 页面跳转 ----------
+  // ---------- 页面跳转（统一 _push 返回后刷新总览） ----------
 
-  void _openBag() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PetBagScreen(petId: _currentPet?.id),
-      ),
-    ).then((_) => _load());
+  void _push(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page))
+        .then((_) => _load());
   }
 
-  void _openShop(int gold) {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => PetShopScreen(goldBalance: gold)),
-    ).then((_) => _load());
-  }
+  void _openBag() => _push(PetBagScreen(petId: _currentPet?.id));
 
-  void _openQuests() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PetQuestsScreen()),
-    ).then((_) => _load());
+  void _openShop() =>
+      _push(PetShopScreen(goldBalance: _summary?.wallet.goldBalance ?? 0));
+
+  void _openQuests() => _push(const PetQuestsScreen());
+
+  void _openWallet() => _push(const PetWalletScreen());
+
+  /// 属性面板（四维/健康/性格/加点；加点成功回调刷新总览）
+  void _openAttributes() {
+    final pet = _currentPet;
+    if (pet == null) return;
+    showPetAttributesSheet(context, pet: pet, onChanged: _load);
   }
 
   void _openAdventure() {
@@ -462,19 +461,16 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           .showSnackBar(const SnackBar(content: Text('先孵化一只宠物才能历险')));
       return;
     }
-    Navigator.push(
-      context,
-      MaterialPageRoute(
-        builder: (_) => PetAdventureScreen(
-          petId: pet.id,
-          petName: pet.name,
-          adventure: _summary?.ongoingAdventure,
-          tiers: _tierList(),
-          hunger: pet.hunger,
-          mood: pet.mood,
-        ),
-      ),
-    ).then((_) => _load());
+    _push(PetAdventureScreen(
+      petId: pet.id,
+      petName: pet.name,
+      adventure: _summary?.ongoingAdventure,
+      tiers: _tierList(),
+      petLevel: pet.level,
+      petAttrs: pet.attributes,
+      petHealth: pet.health,
+      healthThreshold: _budget.cfg('adventure_health_threshold'),
+    ));
   }
 
   // ---------- 主页历险交互（分流/动作/四态钮，helper 见 pet_home_adventure.dart） ----------
@@ -499,13 +495,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       openAdventure: _openAdventure,
       claimResult: () => _runAdventure(claimAdventureResult),
       recall: () => _runAdventure(recallAdventureConfirmed));
-
-  void _openWallet() {
-    Navigator.push(
-      context,
-      MaterialPageRoute(builder: (_) => const PetWalletScreen()),
-    ).then((_) => _load());
-  }
 
   List<Map<String, dynamic>> _tierList() {
     final raw = _summary?.config['adventure_tiers'];
