@@ -342,11 +342,13 @@ class PetRpc {
     return err;
   }
 
-  /// 洗练重掷（消耗 tool_refine 道具，随机重掷加点属性，总值守恒；
-  /// 孵化基础属性不受影响。返回 {before, after, attributes} 供演出对比）
+  /// 洗练重掷（消耗 1 洗练点，随机重掷加点属性，总值守恒；
+  /// 孵化基础属性不受影响。返回 {before, after, refine_points, attributes} 供演出对比）
+  /// 2026-09-20 语义变更：不再消耗 tool_refine 道具（其已转 +1 洗练点补给品，
+  /// 走 use_item 通道）；[itemId] 参数保留兼容但服务端忽略
   static Future<(Map<String, dynamic>?, String?)> refineReassign(
     String petId, {
-    required String itemId,
+    String? itemId,
   }) async {
     final (data, err) = await _call('rpc_pet_refine_reassign', {
       'p_pet_id': petId,

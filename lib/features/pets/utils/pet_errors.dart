@@ -33,6 +33,7 @@ String petRpcErrorText(String? error) {
     'PET_INVALID_ATTR': '属性类型无效',
     'PET_ATTR_POINTS_INVALID': '可分配点数不足或数量无效',
     'PET_NOTHING_TO_REFINE': '这只宠物还没有升级加点，无可重掷的属性',
+    'PET_REFINE_POINTS_INSUFFICIENT': '洗练点不足，使用「属性洗练剂」可补充',
     'PET_ITEM_INSUFFICIENT': '道具数量不足',
     'PET_SPOT_NOT_FOUND': '历险地不可用',
     'PET_INVALID_TIER': '历险档位无效',

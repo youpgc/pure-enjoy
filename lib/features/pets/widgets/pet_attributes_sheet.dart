@@ -11,7 +11,8 @@ import '../utils/pet_errors.dart';
 ///   潜力为隐藏属性（服务端不下发），永不展示；
 /// - 加点：升级获得的可分配点 [PetBriefModel.pendingAttrPoints] 以步进器
 ///   累积，确认后逐维度调用 rpc_pet_allocate_attr（服务端校验余额/白名单）；
-/// - 洗练：背包 tool_refine 道具入口触发 rpc_pet_refine_reassign，
+/// - 洗练：属性面板内直接触发 rpc_pet_refine_reassign，每次消耗 1 洗练点
+///   （2026-09-20 语义变更：tool_refine 道具已转 +1 洗练点补给品），
 ///   结果经 [showPetRefineResultDialog] 做前后对比演出。
 ///   孵化基础属性不可洗练（仅重掷升级加点，总值守恒）。
 
@@ -94,6 +95,31 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     widget.onChanged?.call();
   }
 
+  /// 洗练：消耗 1 洗练点重掷升级加点（2026-09-20 语义）。
+  /// 演出弹窗叠在面板上方；关闭后一并收起面板并刷新——
+  /// 面板宠物快照含属性值，洗练后已过期
+  Future<void> _refine() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final (data, err) = await PetRpc.refineReassign(widget.pet.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null || data == null) {
+      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
+        content: Text(petRpcErrorText(err)),
+      ));
+      return;
+    }
+    await showPetRefineResultDialog(
+      context,
+      before: (data['before'] as Map?)?.cast<String, dynamic>() ?? const {},
+      after: (data['after'] as Map?)?.cast<String, dynamic>() ?? const {},
+    );
+    if (!mounted) return;
+    Navigator.pop(context);
+    widget.onChanged?.call();
+  }
+
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
@@ -155,11 +181,23 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             const SizedBox(height: 10),
             Text(
               pet.refinePoints > 0
-                  ? '洗练点 ${pet.refinePoints} · 使用洗练剂可重新分配升级获得的加点'
-                  : '使用洗练剂可重新分配升级获得的加点（基础属性不受影响）',
+                  ? '洗练点 ${pet.refinePoints} · 每次洗练消耗 1 点，随机重掷升级获得的加点'
+                  : '洗练点不足：使用「属性洗练剂」可获得洗练点',
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
-            const SizedBox(height: 12),
+            const SizedBox(height: 10),
+            // 洗练入口（2026-09-20 起：消耗洗练点；历险中禁用，服务端亦拦）
+            OutlinedButton.icon(
+              onPressed:
+                  !_busy &&
+                          pet.refinePoints > 0 &&
+                          pet.status != PetPetStatus.adventuring
+                      ? _refine
+                      : null,
+              icon: const Icon(Icons.auto_fix_high, size: 18),
+              label: Text(pet.refinePoints > 0 ? '洗练（消耗 1 点）' : '洗练（洗练点不足）'),
+            ),
+            const SizedBox(height: 4),
             FilledButton(
               onPressed: _total > 0 && !_busy ? _confirm : null,
               child: _busy

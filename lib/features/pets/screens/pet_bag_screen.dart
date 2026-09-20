@@ -4,7 +4,9 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
-import '../widgets/pet_attributes_sheet.dart';
+// 2026-09-20 洗练改消耗洗练点：道具直洗入口下线，showPetRefineResultDialog
+// 不再被背包引用（恢复道具直洗时一并取消注释）
+// import '../widgets/pet_attributes_sheet.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_item_icon.dart';
 import 'pet_shop_screen.dart';
@@ -14,7 +16,8 @@ import 'pet_shop_screen.dart';
 /// - 布局（2026-09-17 定版）：顶部分类页签（全部/蛋/消耗品/工具），
 ///   物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与操作按钮；
 /// - 蛋条目：悬浮窗内「立即孵化」（成功弹结果卡）；等待型仅展示（P1 无等待型蛋池）；
-/// - 消耗品：feed/clean/toy 对在养宠物使用；
+/// - 消耗品：feed/clean/toy/heal/refine_point 对在养宠物使用
+///   （2026-09-20 起 tool_refine 转洗练点补给品，走通用「使用」通道）；
 /// - 丢弃走 rpc_pet_discard_items（入参按 slot_index + quantity，服务端契约），
 ///   append-only 流水可对账，丢弃不可恢复；
 /// - 整理走 rpc_pet_compact_bag（压缩空洞格位）。
@@ -103,22 +106,25 @@ class _PetBagScreenState extends State<PetBagScreen> {
     _load();
   }
 
-  /// 洗练剂（tool/refine_reassign）：对在养宠物重掷升级加点（总值守恒，
-  /// 孵化基础属性不动），结果经 before/after 演出展示
-  Future<void> _refineItem(PetBagItemModel item) async {
-    Navigator.of(context).pop();
-    if (widget.petId == null) return _toast('当前没有在养宠物');
-    await _busy(() async {
-      final (data, err) =
-          await PetRpc.refineReassign(widget.petId!, itemId: item.itemId);
-      if (!mounted) return;
-      if (err != null || data == null) return _toast(petRpcErrorText(err));
-      await showPetRefineResultDialog(context,
-          before: (data['before'] as Map?)?.cast<String, dynamic>() ?? const {},
-          after: (data['after'] as Map?)?.cast<String, dynamic>() ?? const {});
-      _load();
-    }, item.id);
-  }
+  // 2026-09-20 洗练改消耗洗练点：tool_refine 转洗练点补给品（use_item 通道），
+  // 洗练入口移至属性面板；如需恢复道具直洗，取消本方法与悬浮窗 isRefine 按钮、
+  // 顶部 pet_attributes_sheet 导入的注释即可
+  // /// 洗练剂（tool/refine_reassign）：对在养宠物重掷升级加点（总值守恒，
+  // /// 孵化基础属性不动），结果经 before/after 演出展示
+  // Future<void> _refineItem(PetBagItemModel item) async {
+  //   Navigator.of(context).pop();
+  //   if (widget.petId == null) return _toast('当前没有在养宠物');
+  //   await _busy(() async {
+  //     final (data, err) =
+  //         await PetRpc.refineReassign(widget.petId!, itemId: item.itemId);
+  //     if (!mounted) return;
+  //     if (err != null || data == null) return _toast(petRpcErrorText(err));
+  //     await showPetRefineResultDialog(context,
+  //         before: (data['before'] as Map?)?.cast<String, dynamic>() ?? const {},
+  //         after: (data['after'] as Map?)?.cast<String, dynamic>() ?? const {});
+  //     _load();
+  //   }, item.id);
+  // }
 
   Future<void> _useItem(PetBagItemModel item) async {
     Navigator.of(context).pop();
@@ -342,7 +348,8 @@ class _PetBagScreenState extends State<PetBagScreen> {
   void _showItemFloat(PetBagItemModel item) {
     final cs = Theme.of(context).colorScheme;
     final usable = widget.petId != null && _usable(item);
-    final isRefine = widget.petId != null && item.effectType == 'refine_reassign';
+    // 2026-09-20 道具直洗入口下线（洗练点语义），按钮块一并注释保留
+    // final isRefine = widget.petId != null && item.effectType == 'refine_reassign';
     showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(
@@ -422,16 +429,17 @@ class _PetBagScreenState extends State<PetBagScreen> {
                       ),
                       const SizedBox(width: 10),
                     ],
-                    if (isRefine) ...[
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _busyId == null ? () => _refineItem(item) : null,
-                          icon: const Icon(Icons.auto_fix_high, size: 18),
-                          label: const Text('洗练'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
+                    // 2026-09-20 道具直洗入口下线（洗练点语义）
+                    // if (isRefine) ...[
+                    //   Expanded(
+                    //     child: FilledButton.icon(
+                    //       onPressed: _busyId == null ? () => _refineItem(item) : null,
+                    //       icon: const Icon(Icons.auto_fix_high, size: 18),
+                    //       label: const Text('洗练'),
+                    //     ),
+                    //   ),
+                    //   const SizedBox(width: 10),
+                    // ],
                     Expanded(
                       child: OutlinedButton.icon(
                         style: OutlinedButton.styleFrom(
@@ -455,7 +463,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   bool _usable(PetBagItemModel item) =>
       item.category == 'consumable' &&
-      const {'feed', 'clean', 'toy', 'heal'}.contains(item.effectType);
+      const {'feed', 'clean', 'toy', 'heal', 'refine_point'}.contains(item.effectType);
 
   String _categoryLabel(String category) => switch (category) {
         'egg' => '蛋',
@@ -488,6 +496,9 @@ class _PetBagScreenState extends State<PetBagScreen> {
         parts.add('历险遇险时立即救回宠物');
       case 'heal':
         parts.add('恢复宠物健康（历险受伤后使用）');
+      case 'refine_point':
+        parts.add('使用后获得 1 洗练点（洗练在属性面板进行，每次洗练消耗 1 点）');
+      // 旧洗练剂直洗语义（2026-09-20 下线；SQL 未执行时兜底展示）
       case 'refine_reassign':
         parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
       default:
@@ -504,6 +515,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
       'toy' => Icons.toys_outlined,
       'rescue' => Icons.health_and_safety_outlined,
       'heal' => Icons.healing_outlined,
+      'refine_point' => Icons.auto_fix_high,
       'refine_reassign' => Icons.auto_fix_high,
       _ => Icons.inventory_2_outlined,
     };
