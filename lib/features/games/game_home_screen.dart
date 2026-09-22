@@ -18,6 +18,8 @@ import 'play/game_best_screen.dart';
 import 'play/game_history_screen.dart';
 import 'services/game_service.dart';
 
+part 'game_home_screen_widgets.dart';
+
 /// 游戏主界面（大厅点击游戏入口后的落地页）。
 ///
 /// 三游戏统一入口层级（不再按 game.code 分叉）：
@@ -432,103 +434,3 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   }
 }
 
-/// 说明弹窗里的一段
-class _GuideSectionView extends StatelessWidget {
-  final GameGuideSection section;
-  const _GuideSectionView({required this.section});
-
-  @override
-  Widget build(BuildContext context) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          Row(
-            children: <Widget>[
-              if (section.icon != null) ...<Widget>[
-                Icon(section.icon, size: 18, color: AppTheme.primaryOrange),
-                const SizedBox(width: 8),
-              ],
-              Text(section.title,
-                  style: const TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
-            ],
-          ),
-          const SizedBox(height: 6),
-          Text(section.body, style: const TextStyle(fontSize: 14)),
-        ],
-      ),
-    );
-  }
-}
-
-/// 主界面入口行
-class _EntryTile extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final String desc;
-  final VoidCallback? onTap;
-  final bool primary;
-  final bool enabled;
-
-  const _EntryTile({
-    required this.icon,
-    required this.label,
-    required this.desc,
-    this.onTap,
-    this.primary = false,
-    this.enabled = true,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    final theme = Theme.of(context);
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 12),
-      child: InkWell(
-        onTap: enabled ? onTap : null,
-        borderRadius: BorderRadius.circular(14),
-        child: Opacity(
-          opacity: enabled ? 1 : 0.5,
-          child: Card(
-            child: Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
-              child: Row(
-                children: <Widget>[
-                  Container(
-                    width: 44,
-                    height: 44,
-                    decoration: BoxDecoration(
-                      color: primary
-                          ? AppTheme.primaryOrange.withAlpha(26)
-                          : theme.colorScheme.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: Icon(icon,
-                        color: primary ? AppTheme.primaryOrange : null, size: 22),
-                  ),
-                  const SizedBox(width: 14),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: <Widget>[
-                        Text(label,
-                            style: const TextStyle(
-                                fontSize: 16, fontWeight: FontWeight.bold)),
-                        const SizedBox(height: 2),
-                        Text(desc,
-                            style: const TextStyle(
-                                fontSize: 12, color: AppTheme.neutral600)),
-                      ],
-                    ),
-                  ),
-                  const Icon(Icons.chevron_right, color: AppTheme.neutral500),
-                ],
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-}

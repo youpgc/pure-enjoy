@@ -12,6 +12,7 @@ import '../../../utils/date_time_utils.dart';
 
 part 'point_service_impl.dart';
 part 'point_service_stats_part.dart';
+part 'point_service_makeup_part.dart';
 
 /// 积分服务
 ///
@@ -21,10 +22,11 @@ part 'point_service_stats_part.dart';
 /// - 不依赖数据库触发器（trg_maintain_user_points 已确认不存在）
 /// - 连续签到天数由 calcConsecutiveStreak 从 point_records 反推（users.consecutive_checkin_days 仅作展示缓存，不参与计算，详见 §4.5）
 ///
-/// 膨胀防御（治理 §1.5.5）：实例方法已拆入 point_service_impl.dart 的两个 mixin，
+/// 膨胀防御（治理 §1.5.5）：实例方法已拆入三个 mixin（point_service_impl.dart 签到域、
+/// point_service_stats_part.dart 统计/缓存域、point_service_makeup_part.dart 补签域），
 /// 本文件仅保留单例工厂、跨 mixin 共享的私有/静态成员，确保单文件 < 500 行。
 class PointService
-    with PointServiceCheckinMixin, PointServiceStatsMixin {
+    with PointServiceCheckinMixin, PointServiceStatsMixin, PointServiceMakeupMixin {
   static PointService? _instance;
 
   PointService._();
@@ -48,7 +50,7 @@ class PointService
 
   /// 判断目标日期是否仍在可补签的时间窗口内（最近 [maxMakeupMonthsBack] 个自然月 + 必须是过去日）。
   ///
-  /// 供 UI 前置禁用不可用日期的点击，以及 [PointServiceCheckinMixin.makeupCheckin] 服务端兜底校验。
+  /// 供 UI 前置禁用不可用日期的点击，以及 [PointServiceMakeupMixin.makeupCheckin] 服务端兜底校验。
   static bool isMakeupDateAllowed(DateTime date) {
     final today = beijingToday();
     final todayDay = DateTime(today.year, today.month, today.day);
