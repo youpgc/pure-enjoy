@@ -50,7 +50,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
 
   Widget _topBanner(ColorScheme cs) {
     final adv = _summary?.ongoingAdventure;
-    if (adv == null) return const SizedBox.shrink();
+    if (adv == null || !adv.usable) return const SizedBox.shrink();
     return Positioned(
       top: 0,
       left: 0,

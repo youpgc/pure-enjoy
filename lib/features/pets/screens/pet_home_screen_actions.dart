@@ -147,6 +147,11 @@ extension _PetHomeActions on _PetHomeScreenState {
   Future<void> _runAdventure(AdventureAction run) async {
     final adv = _summary?.ongoingAdventure;
     if (adv == null || _busy) return;
+    if (!adv.usable) {
+      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
+          content: Text('历险信息异常，请下拉刷新或重进宠物页重试')));
+      return;
+    }
     if (await run(context, adv.id) && mounted) _load();
   }
 

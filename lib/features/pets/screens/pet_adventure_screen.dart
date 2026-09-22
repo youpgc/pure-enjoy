@@ -148,7 +148,9 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _reloadSummary() async {
     final summary = await PetService.instance.fetchSummary();
     if (mounted) {
-      setState(() => _adv = summary?.ongoingAdventure);
+      final adv = summary?.ongoingAdventure;
+      // 空 id = 服务端概要形状异常，按「无进行中历险」处理，避免把空 uuid 发给后端
+      setState(() => _adv = (adv != null && adv.usable) ? adv : null);
     }
   }
 

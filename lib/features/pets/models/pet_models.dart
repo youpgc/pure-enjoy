@@ -175,18 +175,24 @@ class PetAdventureBriefModel {
   final String id;
   final String petId;
   final String spotId;
-  final int tier;
+  /// 历险档位（= pet_adventures.tier，text 值域 short/medium/long，
+  /// 与 config.adventure_tiers[].tier 同源；不是数字）
+  final String tier;
   final DateTime? endAt;
   /// 历险状态（pet_adventures.status 值域见 PetAdventureStatus；未知值→null）
   final PetAdventureStatus? status;
   final DateTime? rescueDeadline;
+
+  /// 是否可发起历险动作（payload 形状异常时 id 取不到，此时任何
+  /// claim/recall/rescue 都会把空串当 uuid 发给后端，必须先挡掉）
+  bool get usable => id.isNotEmpty;
 
   factory PetAdventureBriefModel.fromJson(Map<String, dynamic> json) {
     return PetAdventureBriefModel(
       id: json['id'] as String? ?? '',
       petId: json['pet_id'] as String? ?? '',
       spotId: json['spot_id'] as String? ?? '',
-      tier: (json['tier'] as num?)?.toInt() ?? 0,
+      tier: json['tier'] as String? ?? '',
       endAt: DateTime.tryParse(json['end_at'] as String? ?? ''),
       status: PetAdventureStatus.fromCode(json['status'] as String?),
       rescueDeadline:
