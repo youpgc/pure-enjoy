@@ -181,17 +181,15 @@ class _HabitsScreenState extends State<HabitsScreen> {
       showHabitError(context, '请先登录后再打卡');
       return;
     }
-    final today = DateTime.now();
-
     // 闭环：已达成目标天数则不再允许打卡（状态标记已完成，停止过程逻辑）
     if (isHabitCompleted(getTotalCheckins(_checkinHistory[habit.id] ?? []), habit.targetDays)) {
       showHabitError(context, '「${habit.name}」已达成目标天数，已自动完成');
       return;
     }
 
-    // 检查今天是否已经打卡
+    // 检查今天是否已经打卡（北京自然日口径，统一走 isCheckedInToday）
     final checkins = _checkinHistory[habit.id] ?? [];
-    if (checkins.any((c) => DateUtils.isSameDay(c.checkinAt, today))) {
+    if (isCheckedInToday(checkins)) {
       showHabitError(context, '今天已经打卡了');
       return;
     }

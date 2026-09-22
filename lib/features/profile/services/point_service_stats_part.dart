@@ -68,15 +68,10 @@ mixin PointServiceStatsMixin {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return {};
 
-    final nextMonth = month.month == 12 ? 1 : month.month + 1;
-    final nextYear = month.month == 12 ? month.year + 1 : month.year;
-
     // 以北京自然月为窗口：北京时间 [month-01 00:00, nextMonth-01 00:00)
-    // 中国不实行夏令时，固定 UTC+8，故直接对 UTC 零点边界减 8 小时即得对应 UTC 过滤边界。
-    final startUtc =
-        DateTime.utc(month.year, month.month, 1).subtract(const Duration(hours: 8));
-    final endUtc =
-        DateTime.utc(nextYear, nextMonth, 1).subtract(const Duration(hours: 8));
+    // 边界换算统一走 DateTimeUtils（固定 UTC+8，与设备时区无关）
+    final (startUtc, endUtc) =
+        DateTimeUtils.beijingMonthUtcRange(month.year, month.month);
 
     final result = await ApiClient.get(
       'point_records',

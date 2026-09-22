@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../../services/dict_service.dart';
+import '../../../../utils/date_time_utils.dart';
 import '../../../life/models/habit_model.dart';
 import './dashboard_helpers.dart';
 
@@ -86,16 +87,13 @@ List<HabitModel> computePendingHabits(
   List<HabitModel> habits,
   Map<String, List<HabitCheckinModel>> checkinHistory,
 ) {
-  final today = DateTime.now();
-  final todayStr = '${today.year}-${today.month.toString().padLeft(2, '0')}-${today.day.toString().padLeft(2, '0')}';
+  // checkin_at 为 UTC 时间戳，按北京自然日归一后比较（设备本地日在跨零点窗口会错位）
+  final todayStr = DateTimeUtils.todayBeijingKey();
 
   return habits.where((habit) {
     final checkins = checkinHistory[habit.id] ?? [];
     // 闭环：已达成目标天数的习惯不再出现在首页待打卡
     if (isHabitCompleted(checkins.length, habit.targetDays)) return false;
-    return !checkins.any((c) {
-      final dateStr = '${c.checkinAt.year}-${c.checkinAt.month.toString().padLeft(2, '0')}-${c.checkinAt.day.toString().padLeft(2, '0')}';
-      return dateStr == todayStr;
-    });
+    return !checkins.any((c) => DateTimeUtils.beijingDateKey(c.checkinAt) == todayStr);
   }).toList();
 }

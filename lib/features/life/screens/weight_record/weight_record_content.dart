@@ -240,8 +240,9 @@ class _WeightRecordTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     // date 与 created_at 日期相同时展示 created_at（含真实时分秒），不同时展示 date
-    // 注意：createdAt 为 UTC，需先转本地时区再比较日期
-    final createdAtLocal = record.createdAt?.toLocal();
+    // 注意：createdAt 为 UTC，需先转北京墙钟再比较日期（统一口径，不依赖设备时区）
+    final createdAtLocal =
+        record.createdAt == null ? null : DateTimeUtils.toBeijingWallClock(record.createdAt!);
     final isSameDate = createdAtLocal != null &&
         record.date.year == createdAtLocal.year &&
         record.date.month == createdAtLocal.month &&

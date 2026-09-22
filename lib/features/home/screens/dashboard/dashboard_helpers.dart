@@ -18,7 +18,8 @@ String formatDashboardDisplayDate(String? createdAt, String? selectedDate) {
     if (dt == null) return '';
     return DateTimeUtils.formatStandard(dt);
   }
-  final createdLocal = created.toLocal();
+  // 按北京墙钟比较是否同一天（设备为 UTC 时区时 toLocal() 会差一天）
+  final createdLocal = DateTimeUtils.toBeijingWallClock(created);
   if (selectedDate != null) {
     final selected = DateTime.tryParse(selectedDate);
     if (selected != null &&

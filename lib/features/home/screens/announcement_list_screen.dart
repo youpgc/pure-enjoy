@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import '../../../core/theme/app_theme.dart';
+import '../../../utils/date_time_utils.dart';
 import '../services/announcement_service.dart';
 
 /// 公告列表页
@@ -34,13 +35,10 @@ class _AnnouncementListScreenState extends State<AnnouncementListScreen> {
     }
   }
 
-  String _pad(int n) => n.toString().padLeft(2, '0');
-
-  /// 后台创建时间按北京时间展示；created_at 为 UTC，转北京(+8)
+  /// 后台创建时间按北京时间展示（统一走 DateTimeUtils，不再手写 +8h）
   String _format(DateTime? d) {
     if (d == null) return '长期有效';
-    final bj = d.toUtc().add(const Duration(hours: 8));
-    return '${bj.year}-${_pad(bj.month)}-${_pad(bj.day)} ${_pad(bj.hour)}:${_pad(bj.minute)}';
+    return DateTimeUtils.formatToMinute(d);
   }
 
   @override

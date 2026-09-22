@@ -1,8 +1,17 @@
 import 'package:intl/intl.dart';
 import 'package:timezone/timezone.dart' as tz;
+import 'package:timezone/data/latest.dart' as tz_data;
 
 /// 日期时间工具类
 /// 统一处理 App 内所有时间格式化和排序
+///
+/// **北京时区唯一口径（全 App 强制）**：所有「北京换算」逻辑一律走本类，
+/// 业务代码禁止再出现 `add(Duration(hours: 8))` / `subtract(Duration(hours: 8))` 手写偏移。
+/// 四类场景对应四个入口：
+/// - 展示时间戳 → [formatStandard] / [formatToMinute] / [formatMonthDayTime]
+/// - 按天分组/比较日期键 → [beijingDateKey] / [todayBeijingKey]
+/// - 服务端时间窗过滤（created_at gte/lt 的 UTC 边界）→ [beijingDayStartUtc]
+/// - 「今天」的自然日判断 → [nowBeijing] / [beijingTodayStart]
 ///
 /// 所有时间展示均固定使用北京时间（UTC+8），不依赖设备时区设置。
 /// 这样无论真机（北京时区）还是模拟器（UTC 时区）都展示一致的北京时间。
@@ -11,14 +20,31 @@ import 'package:timezone/timezone.dart' as tz;
 /// - TIMESTAMPTZ: created_at, updated_at, remind_at — 存储完整时间戳（UTC）
 /// - DATE: date (expenses, weight_records) — 仅存储日期 YYYY-MM-DD
 class DateTimeUtils {
-  /// 北京时区偏移（UTC+8）
+  /// 北京时区偏移（UTC+8，中国无夏令时，全 App 唯一偏移常量）
   static const Duration _beijingOffset = Duration(hours: 8);
 
+  /// 时区数据是否已初始化（本类自带惰性初始化，不依赖签到/通知模块先跑过）
+  static bool _tzReady = false;
+
   /// 北京时区定位（用于 tz 转换，避免依赖设备时区）
+  static tz.Location _beijing() {
+    if (!_tzReady) {
+      tz_data.initializeTimeZones();
+      _tzReady = true;
+    }
+    return _beijingLoc;
+  }
+
   static final tz.Location _beijingLoc = tz.getLocation('Asia/Shanghai');
 
   /// 标准日期时间格式：YYYY-MM-DD HH:mm:ss
   static final DateFormat _standardFormat = DateFormat('yyyy-MM-dd HH:mm:ss');
+
+  /// 到分钟格式：YYYY-MM-DD HH:mm
+  static final DateFormat _minuteFormat = DateFormat('yyyy-MM-dd HH:mm');
+
+  /// 紧凑格式：MM-DD HH:mm（列表等窄空间）
+  static final DateFormat _monthDayTimeFormat = DateFormat('MM-dd HH:mm');
 
   /// 日期格式：YYYY-MM-DD
   static final DateFormat _dateFormat = DateFormat('yyyy-MM-dd');
@@ -30,12 +56,13 @@ class DateTimeUtils {
   ///
   /// 统一按设备时区偏移换算到北京时间墙钟，保证真机（北京时区）与
   /// 模拟器（UTC 时区）展示一致，彻底解决模拟器 -8 小时的问题：
-  /// - UTC 时间：用 tz 直接转换到 Asia/Shanghai 墙钟
+  /// - 有明确瞬时值的时刻（UTC / TZDateTime）：用 tz 直接转换到 Asia/Shanghai 墙钟
   /// - 本地时间（如 DATE 字段 / 无时区后缀的时间戳）：按设备偏移换算到北京墙钟
   ///   （设备偏移=+8 时等价不变，设备偏移=0 时加 8 小时）
   static DateTime _toBeijingTime(DateTime dt) {
-    if (dt.isUtc) {
-      return tz.TZDateTime.from(dt, _beijingLoc);
+    if (dt.isUtc || dt is tz.TZDateTime) {
+      // TZDateTime 已自带正确瞬时值，走同一分支，避免被设备偏移二次叠加
+      return tz.TZDateTime.from(dt, _beijing());
     }
     // 本地时间：按设备时区偏移换算到北京墙钟
     final deviceOffset = DateTime.now().timeZoneOffset;
@@ -51,6 +78,18 @@ class DateTimeUtils {
   static String formatStandard(DateTime? dateTime) {
     if (dateTime == null) return '';
     return _standardFormat.format(_toBeijingTime(dateTime));
+  }
+
+  /// 格式化为到分钟：YYYY-MM-DD HH:mm（不需要秒的展示场景）
+  static String formatToMinute(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    return _minuteFormat.format(_toBeijingTime(dateTime));
+  }
+
+  /// 格式化为紧凑时间：MM-dd HH:mm（通知/消息列表等窄空间）
+  static String formatMonthDayTime(DateTime? dateTime) {
+    if (dateTime == null) return '';
+    return _monthDayTimeFormat.format(_toBeijingTime(dateTime));
   }
 
   /// 将时刻换算为北京墙钟（公开版，用于选择器初始值等交互场景，
@@ -135,10 +174,10 @@ class DateTimeUtils {
     return DateTime.now().toUtc().toIso8601String();
   }
 
-  /// 获取当前日期字符串（YYYY-MM-DD）
-  /// 用于 date 字段
+  /// 获取当前日期字符串（YYYY-MM-DD，北京时间）
+  /// 用于 date 字段：按北京自然日取值，避免 UTC 设备（模拟器）写入前一天日期
   static String nowDateString() {
-    return _dateFormat.format(DateTime.now());
+    return _dateFormat.format(nowBeijing());
   }
 
   /// 获取当前时间的标准格式字符串（北京时间）
@@ -149,6 +188,41 @@ class DateTimeUtils {
   /// 获取当前北京时间（Asia/Shanghai）
   /// 用于过期判断、连续天数等业务逻辑，避免使用设备本地时间导致时区偏差
   static DateTime nowBeijing() {
-    return tz.TZDateTime.now(_beijingLoc);
+    return tz.TZDateTime.now(_beijing());
+  }
+
+  /// 当前北京自然日零点（带 Asia/Shanghai 时区信息）。
+  /// 用于「昨天/明天」推导（中国无夏令时，直接加减整天安全）与日历锚点。
+  static DateTime beijingTodayStart() {
+    final now = nowBeijing();
+    return tz.TZDateTime(_beijing(), now.year, now.month, now.day);
+  }
+
+  /// 任意时刻 → 北京日历日键 `YYYY-MM-DD`。
+  /// 按天分组/去重/比较（连续签到、流水归日等）的唯一口径。
+  static String beijingDateKey(DateTime dateTime) {
+    return _dateFormat.format(_toBeijingTime(dateTime));
+  }
+
+  /// 当前北京日历日键 `YYYY-MM-DD`（如 pet_daily_quests.assign_date、日期类 DATE 过滤）
+  static String todayBeijingKey() => beijingDateKey(DateTime.now());
+
+  /// 北京时区某日 00:00 对应的 UTC 瞬间。
+  ///
+  /// 用于服务端 TIMESTAMPTZ 列的时间窗过滤（`created_at.gte./lt.`）：
+  /// 「北京自然日/自然月」的边界必须用本方法换算，固定 UTC+8 与设备时区无关；
+  /// 切勿用 `DateTime(本地).toUtc()`，非东八区设备会把本地零点误当北京零点。
+  static DateTime beijingDayStartUtc(int year, int month, [int day = 1]) {
+    return DateTime.utc(year, month, day).subtract(_beijingOffset);
+  }
+
+  /// 北京自然月窗口的 UTC 起止边界 `[month-01 00:00, nextMonth-01 00:00)`。
+  static (DateTime, DateTime) beijingMonthUtcRange(int year, int month) {
+    final nextYear = month == 12 ? year + 1 : year;
+    final nextMonth = month == 12 ? 1 : month + 1;
+    return (
+      beijingDayStartUtc(year, month),
+      beijingDayStartUtc(nextYear, nextMonth),
+    );
   }
 }

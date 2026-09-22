@@ -179,10 +179,11 @@ mixin PointServiceCheckinMixin {
     }
 
     // 方法2：直接查询 point_records 表作为验证
-    // 红线：北京当日 00:00 对应的 UTC 边界（固定 UTC+8，无夏令时）。
-    // 切勿用 DateTime(本地时区).toUtc()，非东八区设备会把本地 0 点误当北京 0 点，导致查询窗口错位。
-    final todayStart = DateTime.utc(today.year, today.month, today.day)
-        .subtract(const Duration(hours: 8))
+    // 红线：北京当日 00:00 对应的 UTC 边界一律走 DateTimeUtils.beijingDayStartUtc
+    // （固定 UTC+8，无夏令时）。切勿用 DateTime(本地时区).toUtc()，
+    // 非东八区设备会把本地 0 点误当北京 0 点，导致查询窗口错位。
+    final todayStart = DateTimeUtils.beijingDayStartUtc(
+            today.year, today.month, today.day)
         .toIso8601String();
     final result = await ApiClient.get(
       'point_records',
@@ -360,13 +361,9 @@ mixin PointServiceCheckinMixin {
     if (userId == null) return 0;
     try {
       final now = beijingToday();
-      final nextMonth = now.month == 12 ? 1 : now.month + 1;
-      final nextYear = now.month == 12 ? now.year + 1 : now.year;
-      // 北京自然月窗口：北京时间 [月-01 00:00, 下月-01 00:00)，中国固定 UTC+8，故 UTC 边界减 8h
-      final startUtc =
-          DateTime.utc(now.year, now.month, 1).subtract(const Duration(hours: 8));
-      final endUtc = DateTime.utc(nextYear, nextMonth, 1)
-          .subtract(const Duration(hours: 8));
+      // 北京自然月窗口 [month-01 00:00, nextMonth-01 00:00) 的 UTC 边界
+      final (startUtc, endUtc) =
+          DateTimeUtils.beijingMonthUtcRange(now.year, now.month);
 
       final result = await ApiClient.get(
         'makeup_checkins',

@@ -364,7 +364,7 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       if (diff.inMinutes < 60) return '${diff.inMinutes}分钟前';
       if (diff.inHours < 24) return '${diff.inHours}小时前';
       if (diff.inDays < 7) return '${diff.inDays}天前';
-      return DateFormat('MM-dd HH:mm').format(time.add(const Duration(hours: 8)));
+      return DateTimeUtils.formatMonthDayTime(time);
     } catch (_) {
       return '';
     }

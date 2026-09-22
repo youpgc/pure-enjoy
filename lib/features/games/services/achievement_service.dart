@@ -1,8 +1,8 @@
 import 'package:flutter/foundation.dart';
-import 'package:intl/intl.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/game_achievement_model.dart';
 import 'game_service.dart';
 
@@ -151,8 +151,6 @@ class AchievementService {
   }
 }
 
-/// 将 UTC 时间格式化为北京时区展示串（YYYY-MM-DD HH:mm:ss）。
-String formatBeijing(DateTime utc) {
-  return DateFormat('yyyy-MM-dd HH:mm:ss')
-      .format(utc.add(const Duration(hours: 8)));
-}
+/// 将任意时刻格式化为北京时间展示串（YYYY-MM-DD HH:mm:ss）。
+/// 口径统一收敛到 DateTimeUtils，本函数仅作历史命名的转发。
+String formatBeijing(DateTime utc) => DateTimeUtils.formatStandard(utc);
