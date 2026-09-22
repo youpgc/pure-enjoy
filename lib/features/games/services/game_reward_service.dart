@@ -67,6 +67,24 @@ class GameRewardService {
   /// 单例
   static final GameRewardService instance = GameRewardService._();
 
+  /// 通关奖励 claim_key（【方案 B 2026-09-22】编排与发放共用单一来源，避免两处
+  /// 公式漂移）：可重复关卡每次通关一个新坑（随机后缀，受单日上限约束），
+  /// 不可重复关卡终身一坑。
+  String levelClearClaimKey(GameLevelModel level) => level.rewardRepeatable
+      ? 'level_clear:${level.id}:${const Uuid().v4()}'
+      : 'level_clear_once:${level.id}';
+
+  /// 「每日首次通关」claim_key：按北京自然日一坑。
+  String dailyFirstClearClaimKey() =>
+      'daily_first_clear:${beijingDateKey(DateTime.now())}';
+
+  /// 「成绩区间首次达成」claim_key：同一游戏同一档位终身一坑。
+  String scoreRangeClaimKey(String gameCode, String ruleId) =>
+      'score_range:$gameCode:$ruleId';
+
+  /// 成就（含段位徽章）claim_key：同一成就终身一坑。
+  String achievementClaimKey(String code) => 'achievement:$code';
+
   /// 领取「每日首次通关」奖励。
   ///
   /// 仅当 [level.countForDailyClear] 为 true（后台指定计入的关卡）才发放；
@@ -92,9 +110,8 @@ class GameRewardService {
       return GameRewardResult.notGranted(reason: '该奖励已关闭');
     }
 
-    final dateKey = beijingDateKey(DateTime.now());
     return _tryClaim(
-      claimKey: 'daily_first_clear:$dateKey',
+      claimKey: dailyFirstClearClaimKey(),
       points: rule.points,
       remark: '游戏每日首通（$gameName）',
       gameId: gameId,
@@ -145,7 +162,7 @@ class GameRewardService {
       return GameRewardResult.notGranted(reason: '该成就无积分奖励');
     }
     final res = await _tryClaim(
-      claimKey: 'achievement:${achievement.code}',
+      claimKey: achievementClaimKey(achievement.code),
       points: achievement.rewardPoints,
       remark: '成就达成（${achievement.name}）',
       gameId: achievement.gameId,
@@ -189,7 +206,7 @@ class GameRewardService {
       return GameRewardResult.notGranted(reason: '该奖励已关闭');
     }
     return _tryClaim(
-      claimKey: 'score_range:$gameCode:${rule.id}',
+      claimKey: scoreRangeClaimKey(gameCode, rule.id),
       points: rule.points,
       remark: rule.name ?? '成绩达标奖励',
       gameId: rule.gameId,
@@ -209,9 +226,7 @@ class GameRewardService {
     if (level.rewardPoints <= 0) {
       return GameRewardResult.notGranted(reason: '本关无通关奖励');
     }
-    final claimKey = level.rewardRepeatable
-        ? 'level_clear:${level.id}:${const Uuid().v4()}'
-        : 'level_clear_once:${level.id}';
+    final claimKey = levelClearClaimKey(level);
     // 关卡名种子格式自带「游戏·模式」前缀（如「2048·经典模式 L001」），
     // 直接引用即自含归因，不再拼 gameName（否则「2048·2048·…」重复展示）。
     final levelLabel = level.name.isNotEmpty
