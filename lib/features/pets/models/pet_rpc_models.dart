@@ -17,7 +17,7 @@ class PetBagItemModel {
     this.subType,
     this.icon,
     this.effect = const {},
-    this.stackLimit = 99,
+    this.stackLimit,
   });
 
   final String id;
@@ -30,12 +30,19 @@ class PetBagItemModel {
   final String? subType; // food/clean/toy/rescue...
   final String? icon; // pet_items.icon，形如 icon/<key>
   final Map<String, dynamic> effect;
-  final int stackLimit;
+
+  /// 单格堆叠上限：`pet_items.stack_limit` 为准，缺列时取后台
+  /// `pet_config.stack_limit_default`；两者皆无 → null（UI 不展示上限，不猜默认值）
+  final int? stackLimit;
 
   /// 道具效果类型（feed/clean/toy/rescue/...）
   String get effectType => effect['type'] as String? ?? '';
 
-  bool get isEgg => category == 'egg';
+  bool get isEgg => category == PetBagCategory.egg.code;
+
+  /// 是否已堆满（蛋按格占位、stack_limit=1，不参与满堆角标）
+  bool get isStackFull =>
+      !isEgg && stackLimit != null && quantity >= stackLimit!;
 
   /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
   String? get iconKey {
@@ -44,7 +51,10 @@ class PetBagItemModel {
     return v.startsWith('icon/') ? v.substring(5) : v;
   }
 
-  factory PetBagItemModel.fromJson(Map<String, dynamic> json) {
+  factory PetBagItemModel.fromJson(
+    Map<String, dynamic> json, {
+    int? stackLimitDefault,
+  }) {
     final item = (json['item'] as Map?)?.cast<String, dynamic>() ?? const {};
     return PetBagItemModel(
       id: json['id'] as String? ?? '',
@@ -59,7 +69,7 @@ class PetBagItemModel {
       effect: item['effect'] is Map
           ? Map<String, dynamic>.from(item['effect'] as Map)
           : const {},
-      stackLimit: (item['stack_limit'] as num?)?.toInt() ?? 99,
+      stackLimit: (item['stack_limit'] as num?)?.toInt() ?? stackLimitDefault,
     );
   }
 }
@@ -82,14 +92,14 @@ class PetEggModel {
   /// 对应背包行 id（孵化后该行删除；背包内精确匹配用）
   final String? bagItemId;
 
-  bool get isInstant => mode == 'instant';
+  bool get isInstant => mode == PetEggMode.instant.code;
 
   factory PetEggModel.fromJson(Map<String, dynamic> json) {
     final item = (json['item'] as Map?)?.cast<String, dynamic>() ?? const {};
     return PetEggModel(
       id: json['id'] as String? ?? '',
       poolCode: json['pool_code'] as String? ?? '',
-      mode: json['mode'] as String? ?? 'instant',
+      mode: json['mode'] as String? ?? PetEggMode.instant.code,
       itemName: item['name'] as String? ?? '神秘蛋',
       bagItemId: json['bag_item_id'] as String?,
     );

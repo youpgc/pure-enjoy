@@ -1,4 +1,4 @@
-/// 宠物系统结构枚举常量（单一真源）
+/// 宠物系统结构枚举单一真源
 ///
 /// 与 Supabase DDL 的 check 约束对齐（D:\workspace\sql\feature_pet_tables_20260916.sql）：
 /// - pet_items.category      → [PetBagCategory]
@@ -7,11 +7,18 @@
 /// - pet_eggs.status         → [PetEggStatus]
 /// - pet_pets.status         → [PetPetStatus]
 /// - pet_pets.gender         → [PetGender]
+/// - pet_adventures.status       → [PetAdventureStatus]
 /// - pet_adventures.rescue_channel → [PetRescueChannel]
 /// - pet_evo_stages.pick_mode      → [PetPickMode]
 ///
 /// 铁律：本文件只放**结构枚举**（值域契约），任何数值/阈值/价格/概率
 /// 均来自后台配置（pet_config / pet_items / pet_rarities 等），严禁在此硬编码。
+///
+/// 说明：[PetEggMode]/[PetEggStatus]/[PetLadderKey]/[PetRescueChannel]/[PetPickMode]
+/// 当前无页面消费者（对应繁育/蛋背包/扩容购买/社区救助/进化抉择均在 P1/P2 分期），
+/// 按三端 ENUM 对齐铁律作为值域契约保留登记，不视为死代码。
+/// 3D 素材验收常量（标准动画/骨骼/variants/阈值/资源包状态机）已随
+/// 3D 一期下线清理（2026-09-21），后期迭代重写渲染层时再行补回。
 library;
 
 /// 背包四分区（equip 一期枚举占位、页签空时隐藏，P2 穿戴启用）
@@ -130,6 +137,33 @@ enum PetGender {
   }
 }
 
+/// 历险实例状态机（值域 = 线上 pet_adventures_status_check 定版：
+/// feature_pet_attributes_20260917.sql 在 recall 批基础上补入 failed）
+///
+/// 流转：ongoing →（归来 claim 达标）claimed /（不达标结算）failed；
+///   ongoing →（归来遇险）awaiting_rescue →（自救或 NPC 兜底）claimed；
+///   ongoing →（主动召回，无奖励）recalled；done 为 DDL 预留终态（当前 RPC 不写入）。
+enum PetAdventureStatus {
+  ongoing('ongoing', '进行中'),
+  awaitingRescue('awaiting_rescue', '待救助'),
+  failed('failed', '结算失败'),
+  done('done', '已结束'),
+  claimed('claimed', '已领取'),
+  recalled('recalled', '已召回');
+
+  const PetAdventureStatus(this.code, this.label);
+
+  final String code;
+  final String label;
+
+  static PetAdventureStatus? fromCode(String? code) {
+    for (final v in values) {
+      if (v.code == code) return v;
+    }
+    return null;
+  }
+}
+
 /// 历险救助通道（self 自救 → friend 好友救援（远期）→ npc 兜底；community 社区（远期））
 enum PetRescueChannel {
   self_('self', '自救'),
@@ -188,57 +222,5 @@ enum PetAttrKey {
     }
     return null;
   }
-}
-
-/// 3D 资源包本地状态机（App 端自有状态，非 DDL 枚举；按系 family 独立流转）
-///
-/// 流转：missing → downloading → verifying → ready；
-/// 校验失败/文件缺失 → corrupt（可重下）；下载异常 → error（可重试）。
-enum PetAssetPackStatus {
-  missing('missing', '未下载'),
-  downloading('downloading', '下载中'),
-  verifying('verifying', '校验中'),
-  ready('ready', '已就绪'),
-  corrupt('corrupt', '已损坏'),
-  error('error', '下载失败');
-
-  const PetAssetPackStatus(this.code, this.label);
-
-  final String code;
-  final String label;
-}
-
-/// ==================== S1 素材验收规范（命名即契约，来源《3D展现与交互实现方案》§3.1） ====================
-
-/// 8 标准动画命名（全局统一；命名变更 = 破坏性变更，须走验收页校验）
-const List<String> kPetStandardAnimations = <String>[
-  'idle', 'eat', 'petted', 'happy', 'sad', 'sleep', 'walk', 'evolve',
-];
-
-/// 标准骨骼 rig 命名（每系共享一套）
-const List<String> kPetStandardBones = <String>[
-  'root', 'hips', 'spine', 'head', 'ear_L', 'ear_R', 'tail',
-  'mount_head', 'mount_neck', 'mount_back',
-];
-
-/// 标准评级 variants（glTF material variants 命名）
-const List<String> kPetStandardVariants = <String>['N', 'R', 'SR', 'SSR'];
-
-/// 素材验收阈值（S1 POC 定版；仅约束资产标准，非业务数值，不违反"数值走后台配置"铁律）
-class PetAssetThresholds {
-  const PetAssetThresholds._();
-
-  /// 单只 GLB 体积上限（Draco+KTX2 压缩后）
-  static const int maxGlbBytes = 3 * 1024 * 1024;
-
-  /// 单只三角面数上限
-  static const int maxTriangleCount = 15000;
-
-  /// 全景天空盒体积上限（4096×2048 等距柱状）
-  static const int maxSkyboxBytes = 1536 * 1024;
-
-  /// species code 文件名规范：`<family>_<rarity><序号>[_s<阶段>]`，如 cat_n1 / cat_ssr1_s2
-  static final RegExp speciesCodePattern =
-      RegExp(r'^[a-z]+_(n|r|sr|ssr)\d+(_s[0-9]+)?$');
 }
 

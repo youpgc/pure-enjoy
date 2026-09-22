@@ -31,61 +31,34 @@ class PetService {
   /// 未登录返回 false（三处入口全部隐藏）；查询失败按关闭处理（兜底不崩溃）。
   Future<bool> isPetEnabled({bool forceRefresh = false}) async {
     if (SupabaseService.instance.currentUserId == null) return false;
-    final (data, _) = await gateConfig(forceRefresh: forceRefresh);
+    final (data, _) = await _gateConfig(forceRefresh: forceRefresh);
     return data?['pet_enabled'] as bool? ?? false;
   }
 
-  /// 门控配置读取（pet_config 三列一次取回，SWR 共享 keyGate 缓存）：
-  /// `pet_enabled` 总开关 / `render3d_enabled` 3D 系统开关 / `asset_manifest`
-  /// 资源包清单。旧缓存缺新列时返回 map 中无对应键，调用方按缺省兜底。
+  /// 门控配置读取（pet_config 总开关，SWR 共享 keyGate 缓存）。
   ///
-  /// 降级路径：若 3D 增量列尚未迁移（asset SQL 未执行），PostgREST 对整条
-  /// select 报 42703 → 回退为只查 `pet_enabled`，保证总开关不受增量列缺失
-  /// 拖垮（此时 3D 开关按缺省关闭，符合分层开关语义）。
-  Future<(Map<String, dynamic>?, bool)> gateConfig({
+  /// 2026-09-21 精简：曾一并取回 `render3d_enabled`/`asset_manifest` 供 3D 渲染
+  /// 分层开关使用，3D 一期下线后无消费方，故只查总开关（原为兜 42703 的
+  /// 「三列失败降级单列」分支也随之删除）。
+  Future<(Map<String, dynamic>?, bool)> _gateConfig({
     bool forceRefresh = false,
-    Duration? ttl,
   }) async {
     try {
       return await PetCache.getMap(
         PetCache.keyGate,
-        _fetchGateConfig,
-        ttl: ttl ?? _gateTtl,
+        () => ApiClient.get(
+          'pet_config',
+          select: 'pet_enabled',
+          limit: 1,
+          note: 'pet_config 门控查询',
+        ),
+        ttl: _gateTtl,
         forceRefresh: forceRefresh,
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 门控查询失败: $e');
       return (null, false);
     }
-  }
-
-  /// 门控配置拉取器（三列优先，失败降级单列）
-  Future<ApiResponse> _fetchGateConfig() async {
-    final full = await ApiClient.get(
-      'pet_config',
-      select: 'pet_enabled,render3d_enabled,asset_manifest',
-      limit: 1,
-      note: 'pet_config 门控/3D 开关/资源清单查询',
-    );
-    if (full.isSuccess) return full;
-    if (kDebugMode) {
-      debugPrint('[PetService] 三列门控查询失败，降级仅查 pet_enabled: '
-          '${full.errorMessage}');
-    }
-    return ApiClient.get(
-      'pet_config',
-      select: 'pet_enabled',
-      limit: 1,
-      note: 'pet_config 门控降级查询（仅总开关）',
-    );
-  }
-
-  /// 3D 渲染系统开关（pet_config.render3d_enabled；未配置按关闭兜底，
-  /// 与用户开关、资源包就绪态三者与运算决定 effective_3d）。
-  Future<bool> isRender3dSystemEnabled({bool forceRefresh = false}) async {
-    if (SupabaseService.instance.currentUserId == null) return false;
-    final (data, _) = await gateConfig(forceRefresh: forceRefresh);
-    return data?['render3d_enabled'] as bool? ?? false;
   }
 
   /// 拉取宠物总览（rpc_pet_summary；SWR：缓存秒开 + 静默刷新）。
@@ -103,12 +76,21 @@ class PetService {
       final summary = PetSummaryModel.fromJson(data);
       // 总开关关闭时即便缓存有数据也按隐藏处理（兜底，防旧缓存穿透）
       if (!summary.petEnabled) return null;
+      // 留住 pet_config 快照：背包等页只按 rpc_pet_summary 已回传的配置取数，不再补请求
+      _summaryConfig = summary.config;
       return summary;
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');
       return null;
     }
   }
+
+  /// [rpc_pet_summary] 回传的 pet_config 快照（总览未拉到时为空）
+  Map<String, dynamic> _summaryConfig = const {};
+
+  /// 默认单格堆叠上限（`pet_config.stack_limit_default`；null = 总览未到，道具行自身无 stack_limit 时不展示上限）
+  int? get stackLimitDefault =>
+      (_summaryConfig['stack_limit_default'] as num?)?.toInt();
 
   /// 使总览缓存失效（喂养/购买/丢弃等写操作成功后调用，B4 起接入）
   Future<void> invalidateSummary() => PetCache.invalidate(PetCache.keySummary);

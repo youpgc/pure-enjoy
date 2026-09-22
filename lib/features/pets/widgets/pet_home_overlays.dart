@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
 
@@ -116,10 +117,10 @@ class PetAdventureBanner extends StatelessWidget {
           title: Text(
             finished
                 ? '历险已结束，点击查看结果'
-                : '历险进行中 · ${adv.status == 'awaiting_rescue' ? '待救助' : '归来倒计时'}',
+                : '历险进行中 · ${adv.status == PetAdventureStatus.awaitingRescue ? '待救助' : '归来倒计时'}',
             style: const TextStyle(fontSize: 13),
           ),
-          subtitle: adv.status == 'awaiting_rescue'
+          subtitle: adv.status == PetAdventureStatus.awaitingRescue
               ? const Text('需要你的救援！', style: TextStyle(fontSize: 11))
               : null,
           trailing: const Icon(Icons.chevron_right, size: 18),
@@ -133,14 +134,13 @@ class PetAdventureBanner extends StatelessWidget {
 /// 边缘浮动操作钮（2026-09-17 改版：文案内置——图标在上、文案在下方按钮内；
 /// [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时/已达上限）
 ///
-/// [disabled] 仅控制置灰视觉（功能未开放的占位入口），onTap 仍可传入用于点击提示。
+/// [onTap] 传 null 时整钮置灰（无交互）。
 class PetEdgeButton extends StatelessWidget {
   const PetEdgeButton({
     super.key,
     required this.icon,
     required this.label,
     this.overlay,
-    this.disabled = false,
     this.onTap,
   });
 
@@ -150,13 +150,12 @@ class PetEdgeButton extends StatelessWidget {
   /// 蒙层文案：冷却倒计时（如「2分30秒」）/「已达上限」；null 表示正常态
   final String? overlay;
 
-  final bool disabled;
   final VoidCallback? onTap;
 
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final enabled = onTap != null && !disabled;
+    final enabled = onTap != null;
     final contentColor = enabled ? cs.onPrimaryContainer : cs.outline;
     return Material(
       color: enabled ? cs.primaryContainer : cs.surfaceContainerHighest,
@@ -427,8 +426,3 @@ class PetAdventureNote extends StatelessWidget {
               color: Colors.brown.shade700,
               fontWeight: FontWeight.w500)));
 }
-
-/// 寄养功能未开放提示（左侧列禁用占位按钮的点击反馈）
-void showFosterComingSoon(BuildContext context) =>
-    ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('寄养功能即将开放，敬请期待')));

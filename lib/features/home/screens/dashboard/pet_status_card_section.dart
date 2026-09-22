@@ -30,7 +30,15 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   }
 
   /// 拉取总览并刷新状态卡（force=跳过缓存）
+  ///
+  /// 先过 `pet_enabled` 门控再调 RPC：`rpc_pet_summary` 有副作用（首次进入幂等
+  /// 发放初始包），后台关闭宠物系统时不应白跑一次写库。门控走 pet_config 轻量
+  /// GET（1 分钟新鲜度缓存），成本低于一次 RPC。
   Future<void> _load({bool force = false}) async {
+    if (!await PetService.instance.isPetEnabled()) {
+      if (mounted) setState(() => _loading = false);
+      return;
+    }
     final summary = await PetService.instance.fetchSummary(forceRefresh: force);
     if (mounted) {
       setState(() {

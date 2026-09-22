@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet.dart';
 import '../models/pet_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
@@ -35,18 +36,19 @@ Future<bool> claimAdventureResult(
     _toast(context, petRpcErrorText(err));
     return false;
   }
-  if (data?['status'] == 'awaiting_rescue') {
+  final status = PetAdventureStatus.fromCode(data?['status'] as String?);
+  if (status == PetAdventureStatus.awaitingRescue) {
     await showPetDangerDialog(
         context, deadline: data?['rescue_deadline'] as String?);
     return true;
   }
-  if (data?['status'] == 'failed') {
+  if (status == PetAdventureStatus.failed) {
     // 属性未达标结算：终态失败（宠物已回家），展示配置惩罚明细，无奖励
     await showPetPenaltyDialog(
         context, penalty: (data?['penalty'] as Map?)?.cast<String, dynamic>());
     return true;
   }
-  if (data?['status'] == 'claimed') {
+  if (status == PetAdventureStatus.claimed) {
     // 掉落明细（fix_pet_adventure_claim_items：claim 返回 items: [{code,name,qty}]）
     final items = <({String name, int qty})>[];
     final rawItems = data?['items'];
@@ -108,7 +110,8 @@ Future<bool> recallAdventureConfirmed(
 
 /// 遇险惩罚提示弹窗（claim roll 中 danger：宠物转入待救援，奖励不发）
 Future<void> showPetDangerDialog(BuildContext context, {String? deadline}) {
-  final at = DateTime.tryParse(deadline ?? '')?.toLocal();
+  // 仅剩时差计算，按瞬时值比较即可，无需换算设备时区
+  final at = DateTime.tryParse(deadline ?? '');
   final mins = at?.difference(DateTime.now()).inMinutes ?? 0;
   return showDialog<void>(
     context: context,
@@ -188,7 +191,7 @@ Widget petAdventureRailButton({
       ? (Icons.explore_outlined, '历险', openAdventure)
       : finished
           ? (Icons.redeem_outlined, '领取', claimResult)
-          : adv.status == 'awaiting_rescue'
+          : adv.status == PetAdventureStatus.awaitingRescue
               ? (Icons.healing_outlined, '救助', openAdventure)
               : (Icons.u_turn_left, '召回', recall);
   return PetEdgeButton(icon: icon, label: label, onTap: action);

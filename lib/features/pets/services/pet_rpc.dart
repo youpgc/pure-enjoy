@@ -2,6 +2,7 @@ import 'package:flutter/foundation.dart';
 
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/pet_rpc_models.dart';
 import 'pet_service.dart';
 
@@ -22,6 +23,9 @@ class PetRpc {
   // ============================================================
 
   /// 背包列表（slot 顺序；嵌套取道具目录）
+  ///
+  /// 堆叠上限以 `pet_items.stack_limit` 为准，缺列时兜底取 [PetService.stackLimitDefault]
+  /// （= 后台 `pet_config.stack_limit_default`），不在客户端写死数值。
   static Future<(List<PetBagItemModel>, String?)> fetchBag() async {
     final uid = _uid;
     if (uid == null) return const (<PetBagItemModel>[], '未登录');
@@ -37,8 +41,12 @@ class PetRpc {
       );
       if (!resp.isSuccess) return (const <PetBagItemModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
+      final stackLimitDefault = PetService.instance.stackLimitDefault;
       return (
-        rows.map(PetBagItemModel.fromJson).toList(),
+        rows
+            .map((r) =>
+                PetBagItemModel.fromJson(r, stackLimitDefault: stackLimitDefault))
+            .toList(),
         null,
       );
     } catch (e) {
@@ -74,11 +82,7 @@ class PetRpc {
   static Future<(List<PetQuestModel>, String?)> fetchTodayQuests() async {
     final uid = _uid;
     if (uid == null) return const (<PetQuestModel>[], '未登录');
-    final todayBeijing = DateTime.now()
-        .toUtc()
-        .add(const Duration(hours: 8))
-        .toIso8601String()
-        .substring(0, 10);
+    final todayBeijing = DateTimeUtils.todayBeijingKey();
     try {
       final resp = await ApiClient.get(
         'pet_daily_quests',
@@ -300,9 +304,26 @@ class PetRpc {
   }
 
   /// 背包整理（压缩空洞格位）
+  ///
+  /// 合并同道具堆叠会改变已用格数，故成功后失效总览缓存。
   static Future<String?> compactBag() async {
     final (_, err) = await _call(
         'rpc_pet_compact_bag', {}, 'rpc_pet_compact_bag 背包整理');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
+  /// 背包换位/移入空格（服务端 rpc_pet_swap_slot 坐标交换，零 DDL）
+  ///
+  /// [from]/[to] 均为 slot_index（0 起）；目标为空时退化为移动。
+  /// 服务端不合并同道具堆叠（合并由 rpc_pet_compact_bag 负责），
+  /// 越界抛 PET_INVALID_SLOT，并发改动抛 PET_BAG_FULL_RACE。
+  /// 换位不改变 bagUsed 与容量，故不失效总览缓存。
+  static Future<String?> swapSlot(int from, int to) async {
+    final (_, err) = await _call('rpc_pet_swap_slot', {
+      'p_slot_a': from,
+      'p_slot_b': to,
+    }, 'rpc_pet_swap_slot 背包换位');
     return err;
   }
 
@@ -322,6 +343,20 @@ class PetRpc {
     final (_, err) = await _call('rpc_pet_exchange', {
       'p_gold': gold,
     }, 'rpc_pet_exchange 积分兑换');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
+  /// 寄养搬运（[action]：`to_foster` 养育→寄养 / `from_foster` 寄养→养育）
+  ///
+  /// 服务端 `rpc_pet_foster_move`（feature_pet_foster_20260921.sql，零 DDL）：
+  /// 占用量按 status 计数、容量 coalesce 后台初始值，满格抛 PET_FOSTER_FULL /
+  /// PET_REARING_FULL；双向重置 last_decay_at（寄养期间不吃离线衰减）。
+  static Future<String?> fosterMove(String petId, String action) async {
+    final (_, err) = await _call('rpc_pet_foster_move', {
+      'p_pet_id': petId,
+      'p_action': action,
+    }, 'rpc_pet_foster_move 寄养搬运');
     if (err == null) await PetService.instance.invalidateSummary();
     return err;
   }

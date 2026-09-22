@@ -2,6 +2,8 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+/// 宠物主页库（part 拆分）：本文件是 library 声明与状态主体，
+/// 三个 part 共用下列导入（Dart 的 part 文件不能自带 import）。
 import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
@@ -18,9 +20,13 @@ import '../widgets/pet_home_scene.dart';
 import '../widgets/pet_living_art.dart';
 import 'pet_adventure_screen.dart';
 import 'pet_bag_screen.dart';
+import 'pet_foster_screen.dart';
 import 'pet_quests_screen.dart';
 import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
+
+part 'pet_home_screen_layout.dart';
+part 'pet_home_screen_actions.dart';
 
 /// 宠物主页（场景舞台版 2.0，2026-09-17 美化重做）
 ///
@@ -29,11 +35,16 @@ import 'pet_wallet_screen.dart';
 /// - 顶部通知横幅：历险归来待领取 / 待救助时出现（进行中不展示），
 ///   归来点击直接弹窗结算（claim → 奖励 / 遇险提示），不跳历险页；
 /// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
-///   寄养（寄养未开放禁用占位）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
+///   寄养（寄养仓库页 PetFosterScreen）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
 ///   （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
 /// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
 ///   无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
 /// 浮层组件见 pet_home_overlays / scene / adventure.dart，冷却派生见 PetActionBudget。
+///
+/// 【文件拆分 2026-09-22】单文件超 500 行红线，按职责拆为三个 part：
+/// - 本文件：状态字段 + 生命周期 + 数据装载 + 派生取值 + 整体 Stack 组装
+/// - `pet_home_screen_layout.dart`：舞台 / 顶部横幅 / 底部状态 / 左右两列的浮层构建
+/// - `pet_home_screen_actions.dart`：交互动作（喂食、孵化、跳转、历险四态）
 ///
 /// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留），
 /// 数据库 render3d_enabled / asset_manifest 列保留，3D 转后期迭代。
@@ -48,9 +59,6 @@ class PetHomeScreen extends StatefulWidget {
 }
 
 class _PetHomeScreenState extends State<PetHomeScreen> {
-  /// 左右浮动列占位宽（52px 按钮 + 边距）
-  static const double _edgeInset = 64;
-
   bool _loading = true;
   bool _enabled = false;
   PetSummaryModel? _summary;
@@ -138,33 +146,6 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     });
   }
 
-  Future<void> _run(Future<String?> Function() action,
-      {String? successMsg, bool celebrate = false}) async {
-    if (_busy) return;
-    setState(() => _busy = true);
-    final err = await action();
-    if (!mounted) return;
-    setState(() => _busy = false);
-    if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
-      return;
-    }
-    if (celebrate) _celebrate();
-    if (successMsg != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(successMsg)));
-    }
-    _load();
-  }
-
-  void _celebrate() {
-    setState(() => _excited = true);
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _excited = false);
-    });
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(body: _buildBody(Theme.of(context).colorScheme));
@@ -204,317 +185,5 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
         ],
       ],
     );
-  }
-
-  // ---------- 中央舞台（宠物主角，垂直水平居中） ----------
-
-  Widget _stage() {
-    final pet = _currentPet!;
-    return Positioned.fill(
-      // 底部让位状态面板（名牌+四维沉底），其余方向居中
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(_edgeInset + 40, 0, _edgeInset + 40, 128),
-        child: Center(
-          child: PetLivingArt(
-            frames: petIdleFrames(pet.speciesCode),
-            fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
-            excited: _excited,
-            onTap: () => _run(() => PetRpc.interact(pet.id),
-                successMsg: '开心 +${_budget.cfg('interact_mood')}'),
-          ),
-        ),
-      ),
-    );
-  }
-
-  List<Widget> _switchArrows() => [
-        Positioned(
-          left: _edgeInset - 4, top: 0, bottom: 0,
-          child: Center(
-            child: PetSwitchArrow(
-                icon: Icons.chevron_left, onTap: () => _switchPet(-1)),
-          ),
-        ),
-        Positioned(
-          right: _edgeInset - 4, top: 0, bottom: 0,
-          child: Center(
-            child: PetSwitchArrow(
-                icon: Icons.chevron_right, onTap: () => _switchPet(1)),
-          ),
-        ),
-      ];
-
-  // ---------- 顶部通知横幅（历险状态） ----------
-
-  Widget _topBanner(ColorScheme cs) {
-    final adv = _summary?.ongoingAdventure;
-    if (adv == null) return const SizedBox.shrink();
-    return Positioned(
-      top: 0,
-      left: 0,
-      right: 0,
-      child: SafeArea(
-        bottom: false,
-        child: Padding(
-          padding: const EdgeInsets.symmetric(horizontal: 76, vertical: 4),
-          child: Center(child: PetAdventureBanner(adv: adv, onTap: _bannerTap())),
-        ),
-      ),
-    );
-  }
-
-  // ---------- 底部状态区（名牌 + 四维沉底） ----------
-
-  Widget _bottomPanel(ColorScheme cs) {
-    final pet = _currentPet!;
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: SafeArea(
-        top: false,
-        child: Padding(
-          padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              if (pet.status == PetPetStatus.adventuring) ...[
-                const PetAdventureNote(),
-                const SizedBox(height: 6),
-              ],
-              PetBottomStatusCard(pet: pet, onTap: _openAttributes),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-
-  // ---------- 左侧入口列（返回键 + 背包/商城/钱包/寄养，贴顶） ----------
-
-  Widget _leftRail() {
-    return Positioned(
-      left: 8,
-      top: 0,
-      child: Padding(
-        // 贴顶：安全区下方留些许间距；返回键内联列首（避免与独立浮层重叠）
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PetBackButtonCore(onBack: () => Navigator.maybePop(context)),
-            const SizedBox(height: 10),
-            PetEdgeButton(
-                icon: Icons.inventory_2_outlined,
-                label: '背包',
-                onTap: _openBag),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.storefront_outlined,
-                label: '商城',
-                onTap: _openShop),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.account_balance_wallet_outlined,
-                label: '钱包',
-                onTap: _openWallet),
-            const SizedBox(height: 14),
-            // 寄养未开放：禁用置灰占位，点击提示
-            PetEdgeButton(
-                icon: Icons.luggage_outlined,
-                label: '寄养',
-                disabled: true,
-                onTap: () => showFosterComingSoon(context)),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------- 右侧操作列（金币 + 喂食/抚摸/历险/任务，贴顶） ----------
-
-  /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时；当日次数耗尽提示上限
-  String? _overlay(Duration? cool, int? remain) {
-    if (cool != null) return _budget.coolText(cool);
-    if (remain != null && remain <= 0) return '已达上限';
-    return null;
-  }
-
-  Widget _rightRail() {
-    final pet = _currentPet;
-    final feedCool = _budget.feedCooldown;
-    final interactCool = _budget.interactCooldown;
-    // 历险中的宠物不在场，喂食/抚摸禁用（服务端同样拦截 PET_NOT_REARING）
-    final feedOff = pet == null ||
-        _busy ||
-        pet.status == PetPetStatus.adventuring ||
-        _budget.blocked(feedCool, _budget.feedRemain);
-    final interactOff = pet == null ||
-        _busy ||
-        pet.status == PetPetStatus.adventuring ||
-        _budget.blocked(interactCool, _budget.interactRemain);
-    return Positioned(
-      right: 8,
-      top: 0,
-      child: Padding(
-        // 贴顶：安全区下方留些许间距；金币胶囊内联列首（避免与独立浮层重叠）
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PetGoldBadgeCore(gold: _summary?.wallet.goldBalance ?? 0),
-            const SizedBox(height: 10),
-            PetEdgeButton(
-                icon: Icons.restaurant,
-                label: '喂食',
-                overlay: _overlay(feedCool, _budget.feedRemain),
-                onTap: feedOff
-                    ? null
-                    : () => _run(() => PetRpc.feed(pet.id),
-                        successMsg: '喂饱啦', celebrate: true)),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.touch_app_outlined,
-                label: '抚摸',
-                overlay: _overlay(interactCool, _budget.interactRemain),
-                onTap: interactOff
-                    ? null
-                    : () => _run(() => PetRpc.interact(pet.id),
-                        celebrate: true)),
-            const SizedBox(height: 14),
-            _adventureButton(),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.task_alt_outlined,
-                label: '任务',
-                onTap: _openQuests),
-          ],
-        ),
-      ),
-    );
-  }
-
-  // ---------- 孵化（诞生弹窗 + 刷新） ----------
-
-  /// 即开首颗蛋 → 诞生弹窗（基础型形象大图）→ 确认后刷新宠物信息
-  Future<void> _hatchFirstEgg() async {
-    final (eggs, err) = await PetRpc.fetchEggs();
-    if (err != null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
-      }
-      return;
-    }
-    PetEggModel? target;
-    for (final e in eggs) {
-      if (e.isInstant) {
-        target = e;
-        break;
-      }
-    }
-    if (target == null) {
-      if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('没有可即开孵化的蛋')));
-      }
-      return;
-    }
-    final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
-    if (!mounted) return;
-    if (hatchErr != null || result == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(hatchErr))));
-      return;
-    }
-    _celebrate();
-    // 图片权重：展示基础型形象大图（帧序列首帧，未登记种属回退静态立绘）
-    final frames = petIdleFrames(result.speciesCode);
-    await showPetBirthDialog(
-      context,
-      img: frames.isNotEmpty
-          ? frames.first
-          : petStageArtAsset(result.speciesCode, 0),
-      result: result,
-    );
-    // 点击确认后刷新宠物信息
-    _load();
-  }
-
-  // ---------- 页面跳转（统一 _push 返回后刷新总览） ----------
-
-  void _push(Widget page) {
-    Navigator.push(context, MaterialPageRoute(builder: (_) => page))
-        .then((_) => _load());
-  }
-
-  void _openBag() => _push(PetBagScreen(petId: _currentPet?.id));
-
-  void _openShop() =>
-      _push(PetShopScreen(goldBalance: _summary?.wallet.goldBalance ?? 0));
-
-  void _openQuests() => _push(const PetQuestsScreen());
-
-  void _openWallet() => _push(const PetWalletScreen());
-
-  /// 属性面板（四维/健康/性格/加点；加点成功回调刷新总览）
-  void _openAttributes() {
-    final pet = _currentPet;
-    if (pet == null) return;
-    showPetAttributesSheet(context, pet: pet, onChanged: _load);
-  }
-
-  void _openAdventure() {
-    final pet = _currentPet;
-    if (pet == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('先孵化一只宠物才能历险')));
-      return;
-    }
-    _push(PetAdventureScreen(
-      petId: pet.id,
-      petName: pet.name,
-      adventure: _currentAdventure,
-      tiers: _tierList(),
-      petLevel: pet.level,
-      petAttrs: pet.attributes,
-      petHealth: pet.health,
-      healthThreshold: _budget.cfg('adventure_health_threshold'),
-    ));
-  }
-
-  // ---------- 主页历险交互（分流/动作/四态钮，helper 见 pet_home_adventure.dart） ----------
-
-  // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
-  // 横幅点击分流：待救助 → 历险页处理；归来待领取 → claim 弹窗结算
-  VoidCallback _bannerTap() =>
-      _summary?.ongoingAdventure?.status == 'awaiting_rescue'
-          ? _openAdventure
-          : () => _runAdventure(claimAdventureResult);
-
-  /// 历险动作统一入口：归来领取（弹窗）/ 召回确认（无奖励中断），完成后刷新
-  Future<void> _runAdventure(AdventureAction run) async {
-    final adv = _summary?.ongoingAdventure;
-    if (adv == null || _busy) return;
-    if (await run(context, adv.id) && mounted) _load();
-  }
-
-  /// 右列历险钮四态（历险/召回/领取/救助，分支逻辑见 petAdventureRailButton）；
-  /// adv 按当前宠过滤——B 宠在场时不再显示 A 宠历险的召回/领取态
-  Widget _adventureButton() => petAdventureRailButton(
-      adv: _currentAdventure,
-      openAdventure: _openAdventure,
-      claimResult: () => _runAdventure(claimAdventureResult),
-      recall: () => _runAdventure(recallAdventureConfirmed));
-
-  List<Map<String, dynamic>> _tierList() {
-    final raw = _summary?.config['adventure_tiers'];
-    if (raw is List) {
-      return raw
-          .whereType<Map>()
-          .map((e) => Map<String, dynamic>.from(e))
-          .toList();
-    }
-    return const [];
   }
 }

@@ -69,7 +69,6 @@ class PetBriefModel {
     this.lastFeedAt,
     this.todayInteractCount = 0,
     this.lastInteractAt,
-    this.render3d,
     this.render2d,
     this.attributes = const {},
     this.health = 100,
@@ -102,8 +101,8 @@ class PetBriefModel {
   final int todayInteractCount;
   final DateTime? lastInteractAt;
 
-  /// 种属渲染配置块（pet_species.render3d / render2d，B3 渲染层消费）
-  final Map<String, dynamic>? render3d;
+  /// 种属 2D 渲染配置块（pet_species.render2d，素材码引用；
+  /// 3D 一期下线，render3d 字段随之下线，列与数据仍在服务端保留）
   final Map<String, dynamic>? render2d;
 
   /// 四维属性当前值（base||bonus 合并，rpc_pet_summary 2026-09-17 属性系统扩展）
@@ -145,9 +144,6 @@ class PetBriefModel {
       lastFeedAt: DateTime.tryParse(json['last_feed_at'] as String? ?? ''),
       todayInteractCount: (json['today_interact_count'] as num?)?.toInt() ?? 0,
       lastInteractAt: DateTime.tryParse(json['last_interact_at'] as String? ?? ''),
-      render3d: json['render3d'] is Map
-          ? Map<String, dynamic>.from(json['render3d'] as Map)
-          : null,
       render2d: json['render2d'] is Map
           ? Map<String, dynamic>.from(json['render2d'] as Map)
           : null,
@@ -181,7 +177,8 @@ class PetAdventureBriefModel {
   final String spotId;
   final int tier;
   final DateTime? endAt;
-  final String status;
+  /// 历险状态（pet_adventures.status 值域见 PetAdventureStatus；未知值→null）
+  final PetAdventureStatus? status;
   final DateTime? rescueDeadline;
 
   factory PetAdventureBriefModel.fromJson(Map<String, dynamic> json) {
@@ -191,7 +188,7 @@ class PetAdventureBriefModel {
       spotId: json['spot_id'] as String? ?? '',
       tier: (json['tier'] as num?)?.toInt() ?? 0,
       endAt: DateTime.tryParse(json['end_at'] as String? ?? ''),
-      status: json['status'] as String? ?? '',
+      status: PetAdventureStatus.fromCode(json['status'] as String?),
       rescueDeadline:
           DateTime.tryParse(json['rescue_deadline'] as String? ?? ''),
     );
@@ -222,7 +219,8 @@ class PetSummaryModel {
   final int eggsReadyInstant;
   final PetAdventureBriefModel? ongoingAdventure;
 
-  /// 全局配置块（free_feed_daily / points_per_gold 等，B3+ 按需消费；数值零硬编码）
+  /// 全局配置块（free_feed_daily / points_per_gold / stack_limit_default 等，
+  /// B3+ 按需消费；数值零硬编码 —— 客户端不为缺失字段编默认值）
   final Map<String, dynamic> config;
 
   /// 养育中的第一只宠物（状态卡主展示对象；单只上限内通常即唯一）

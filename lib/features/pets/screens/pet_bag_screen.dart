@@ -1,26 +1,25 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_service.dart';
+import '../utils/pet_bag_meta.dart';
 import '../utils/pet_errors.dart';
-// 2026-09-20 洗练改消耗洗练点：道具直洗入口下线，showPetRefineResultDialog
-// 不再被背包引用（恢复道具直洗时一并取消注释）
-// import '../widgets/pet_attributes_sheet.dart';
+import '../widgets/pet_bag_grid.dart';
+import '../widgets/pet_bag_item_dialog.dart';
 import '../widgets/pet_home_overlays.dart';
-import '../widgets/pet_item_icon.dart';
 import 'pet_shop_screen.dart';
 
-/// 宠物背包页（分类 + 物品格 + 悬浮窗操作）
+/// 宠物背包页（格位坐标制 + 分类页签 + 拖拽换位）
 ///
-/// - 布局（2026-09-17 定版）：顶部分类页签（全部/蛋/消耗品/工具），
-///   物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与操作按钮；
-/// - 蛋条目：悬浮窗内「立即孵化」（成功弹结果卡）；等待型仅展示（P1 无等待型蛋池）；
-/// - 消耗品：feed/clean/toy/heal/refine_point 对在养宠物使用
-///   （2026-09-20 起 tool_refine 转洗练点补给品，走通用「使用」通道）；
-/// - 丢弃走 rpc_pet_discard_items（入参按 slot_index + quantity，服务端契约），
-///   append-only 流水可对账，丢弃不可恢复；
-/// - 整理走 rpc_pet_compact_bag（压缩空洞格位）。
+/// - 网格严格按 `pet_bag_items.slot_index` 定位：`itemCount = 背包容量`，
+///   第 i 格即 slot_index=i，无行的格位渲染为空格（与服务端坐标系一致）；
+/// - 分类页签只置灰不过滤（方案 A）：过滤会改变格号与坐标的对应关系；
+/// - 拖拽换位走 `rpc_pet_swap_slot`（交换/移入空格）；服务端换位不合并
+///   堆叠，故同道具格位禁止落点，合并交由「整理」`rpc_pet_compact_bag`；
+/// - 丢弃走 `rpc_pet_discard_items`（按 slot_index + quantity），不可恢复。
 class PetBagScreen extends StatefulWidget {
   const PetBagScreen({super.key, required this.petId});
 
@@ -35,17 +34,28 @@ class _PetBagScreenState extends State<PetBagScreen> {
   bool _loading = true;
   String? _error;
   List<PetBagItemModel> _items = const [];
+  Map<int, PetBagItemModel> _bySlot = const {};
+  int _capacity = 0;
+  int _gold = 0;
 
-  /// 当前分类（all / egg / consumable / tool）
+  /// 当前页签（all / egg / consumable / tool）
   String _category = 'all';
   String? _busyId;
 
-  static const _tabs = <(String, String, IconData)>[
-    ('all', '全部', Icons.grid_view_outlined),
-    ('egg', '蛋', Icons.egg_outlined),
-    ('consumable', '消耗品', Icons.restaurant),
-    ('tool', '工具', Icons.build_outlined),
-  ];
+  /// 页签图标：按枚举分支（无字符串键副本，新增类目时编译期强制补齐）
+  static IconData _categoryIcon(PetBagCategory c) => switch (c) {
+        PetBagCategory.egg => Icons.egg_outlined,
+        PetBagCategory.consumable => Icons.restaurant,
+        PetBagCategory.tool => Icons.build_outlined,
+        PetBagCategory.equip => Icons.inventory_2_outlined,
+      };
+
+  /// 页签取自 PetBagCategory；equip 属 P2 穿戴，一期不出现在页签里
+  static List<(String, String, IconData)> get _tabs => [
+        ('all', '全部', Icons.grid_view_outlined),
+        for (final c in PetBagCategory.values)
+          if (c != PetBagCategory.equip) (c.code, c.label, _categoryIcon(c)),
+      ];
 
   @override
   void initState() {
@@ -53,28 +63,43 @@ class _PetBagScreenState extends State<PetBagScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true, bool forceRefresh = false}) async {
+    if (showLoading) setState(() => _loading = true);
+    // 总览先行：PetRpc.fetchBag 的堆叠上限兜底值取自总览回传的 pet_config 快照
+    final summary =
+        await PetService.instance.fetchSummary(forceRefresh: forceRefresh);
     final (items, err) = await PetRpc.fetchBag();
-    if (mounted) {
-      setState(() {
-        _items = items;
-        _error = err == null ? null : petRpcErrorText(err);
-        _loading = false;
-      });
+    if (!mounted) return;
+    final bySlot = <int, PetBagItemModel>{
+      for (final e in items) e.slotIndex: e,
+    };
+    // 容量以后台配置为准；越界格（后台下调容量后遗留）并入显示范围，避免道具不可见
+    var cap = summary?.capacities?.backpack ?? 0;
+    for (final slot in bySlot.keys) {
+      if (slot >= cap) cap = slot + 1;
     }
+    setState(() {
+      _items = items;
+      _bySlot = bySlot;
+      _capacity = cap;
+      _gold = summary?.wallet.goldBalance ?? 0;
+      _error = err == null ? null : petRpcErrorText(err);
+      _loading = false;
+    });
   }
 
-  List<PetBagItemModel> get _filtered {
-    if (_category == 'all') return _items;
-    return _items.where((e) => e.category == _category).toList();
+  // ---------- 操作 ----------
+
+  Future<void> _run(Future<void> Function() action, String id) async {
+    setState(() => _busyId = id);
+    await action();
+    if (mounted) setState(() => _busyId = null);
   }
 
   Future<void> _hatchEgg(PetBagItemModel egg) async {
-    Navigator.of(context).pop(); // 关闭悬浮窗
-    await _busy(() async {
-      final (eggs, err) = await PetRpc.fetchEggs();
-      if (err != null) return _toast(petRpcErrorText(err));
+    await _run(() async {
+      final (eggs, fetchErr) = await PetRpc.fetchEggs();
+      if (fetchErr != null) return _toast(petRpcErrorText(fetchErr));
       // 精确匹配该背包行对应的蛋（同道具多枚时按 bag_item_id 一一对应）
       PetEggModel? target;
       for (final e in eggs) {
@@ -97,66 +122,44 @@ class _PetBagScreenState extends State<PetBagScreen> {
       if (hatchErr != null || result == null) {
         return _toast(petRpcErrorText(hatchErr));
       }
-      _showHatchResult(result);
+      showPetBirthDialog(context, img: null, result: result); // 复用主页诞生弹窗
+      await _load(showLoading: false, forceRefresh: true);
     }, egg.id);
   }
 
-  void _showHatchResult(PetHatchResultModel r) {
-    showPetBirthDialog(context, img: null, result: r); // 复用主页诞生弹窗
-    _load();
-  }
-
-  // 2026-09-20 洗练改消耗洗练点：tool_refine 转洗练点补给品（use_item 通道），
-  // 洗练入口移至属性面板；如需恢复道具直洗，取消本方法与悬浮窗 isRefine 按钮、
-  // 顶部 pet_attributes_sheet 导入的注释即可
-  // /// 洗练剂（tool/refine_reassign）：对在养宠物重掷升级加点（总值守恒，
-  // /// 孵化基础属性不动），结果经 before/after 演出展示
-  // Future<void> _refineItem(PetBagItemModel item) async {
-  //   Navigator.of(context).pop();
-  //   if (widget.petId == null) return _toast('当前没有在养宠物');
-  //   await _busy(() async {
-  //     final (data, err) =
-  //         await PetRpc.refineReassign(widget.petId!, itemId: item.itemId);
-  //     if (!mounted) return;
-  //     if (err != null || data == null) return _toast(petRpcErrorText(err));
-  //     await showPetRefineResultDialog(context,
-  //         before: (data['before'] as Map?)?.cast<String, dynamic>() ?? const {},
-  //         after: (data['after'] as Map?)?.cast<String, dynamic>() ?? const {});
-  //     _load();
-  //   }, item.id);
-  // }
-
   Future<void> _useItem(PetBagItemModel item) async {
-    Navigator.of(context).pop();
     if (widget.petId == null) return _toast('当前没有在养宠物');
-    await _busy(() async {
+    await _run(() async {
       final err = await PetRpc.useItem(item.itemId, widget.petId!);
       if (!mounted) return;
       if (err != null) return _toast(petRpcErrorText(err));
       _toast('已使用「${item.name}」');
-      _load();
+      await _load(showLoading: false);
     }, item.id);
   }
 
   Future<void> _discard(PetBagItemModel item) async {
-    Navigator.of(context).pop();
+    final cs = Theme.of(context).colorScheme;
     final confirmed = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('丢弃确认'),
         content: Text('确定丢弃「${item.name}」×${item.quantity}？丢弃不可恢复。'),
         actions: [
-          TextButton(onPressed: () => Navigator.pop(ctx, false), child: const Text('取消')),
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
           FilledButton(
-            style: FilledButton.styleFrom(backgroundColor: Theme.of(ctx).colorScheme.error),
+            style:
+                FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
             onPressed: () => Navigator.pop(ctx, true),
             child: const Text('丢弃'),
           ),
         ],
       ),
     );
-    if (confirmed != true) return;
-    await _busy(() async {
+    if (confirmed != true || !mounted) return;
+    await _run(() async {
       // 服务端契约：p_rows 为 [{slot_index, quantity}]（rpc_pet_discard_items 定义）
       final err = await PetRpc.discardItems([
         {'slot_index': item.slotIndex, 'quantity': item.quantity},
@@ -164,28 +167,63 @@ class _PetBagScreenState extends State<PetBagScreen> {
       if (!mounted) return;
       if (err != null) return _toast(petRpcErrorText(err));
       _toast('已丢弃');
-      _load();
+      await _load(showLoading: false);
     }, item.id);
   }
 
   Future<void> _compact() async {
-    final err = await PetRpc.compactBag();
-    if (!mounted) return;
-    if (err != null) return _toast(petRpcErrorText(err));
-    _toast('背包已整理');
-    _load();
+    await _run(() async {
+      final err = await PetRpc.compactBag();
+      if (!mounted) return;
+      if (err != null) return _toast(petRpcErrorText(err));
+      _toast('背包已整理');
+      await _load(showLoading: false, forceRefresh: true);
+    }, 'compact');
   }
 
-  Future<void> _busy(Future<void> Function() action, String id) async {
-    setState(() => _busyId = id);
-    await action();
-    if (mounted) setState(() => _busyId = null);
+  /// 拖拽落点判定（S3-8a）：同道具不落地——服务端 swap_slot 只换坐标不合并
+  /// 堆叠，落到同道具格会让数量与预期不符，合并统一交给「整理」。
+  bool _canAccept(int? from, int to) {
+    if (from == null || from == to || _busyId != null) return false;
+    final src = _bySlot[from];
+    if (src == null) return false;
+    final dst = _bySlot[to];
+    return dst == null || dst.itemId != src.itemId;
+  }
+
+  Future<void> _swap(int from, int to) async {
+    final src = _bySlot[from];
+    if (src == null || !_canAccept(from, to)) return;
+    await _run(() async {
+      final err = await PetRpc.swapSlot(from, to);
+      if (!mounted) return;
+      if (err != null) {
+        _toast(petRpcErrorText(err));
+        // 越界/并发（PET_BAG_FULL_RACE）后以服务端为准重拉
+        return _load(showLoading: false, forceRefresh: true);
+      }
+      await _load(showLoading: false);
+    }, src.id);
+  }
+
+  void _showItemFloat(PetBagItemModel item) {
+    showPetBagItemDialog(
+      context,
+      item: item,
+      busy: _busyId != null,
+      canUse: widget.petId != null && petBagItemUsable(item),
+      onHatch: () => _hatchEgg(item),
+      onUse: () => _useItem(item),
+      onDiscard: () => _discard(item),
+    );
   }
 
   void _toast(String msg) {
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
   }
+
+  // ---------- 布局 ----------
 
   @override
   Widget build(BuildContext context) {
@@ -195,7 +233,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
         title: const Text('背包'),
         actions: [
           TextButton.icon(
-            onPressed: _compact,
+            onPressed: _busyId == null ? _compact : null,
             icon: const Icon(Icons.cleaning_services_outlined, size: 18),
             label: const Text('整理', style: TextStyle(fontSize: 13)),
           ),
@@ -214,310 +252,134 @@ class _PetBagScreenState extends State<PetBagScreen> {
           children: [
             Text(_error!, style: TextStyle(color: cs.error)),
             const SizedBox(height: 12),
-            FilledButton(onPressed: _load, child: const Text('重试')),
+            FilledButton(
+                onPressed: () => _load(forceRefresh: true),
+                child: const Text('重试')),
           ],
         ),
       );
     }
+    if (_items.isEmpty) return _emptyView(cs);
     return Column(
       children: [
-        // 分类页签
         Padding(
           padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
           child: Row(
             children: [
-              for (final (key, label, icon) in _tabs) ...[
+              for (final (i, tab) in _tabs.indexed) ...[
                 Expanded(
-                  child: ChoiceChip(
-                    avatar: Icon(
-                      icon,
-                      size: 16,
-                      color: _category == key ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-                    ),
-                    label: Text(label),
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      color: _category == key ? cs.onSecondaryContainer : cs.onSurface,
-                    ),
-                    selected: _category == key,
-                    onSelected: (_) => setState(() => _category = key),
-                  ),
+                  child: _tabChip(cs, tab.$1, tab.$2, tab.$3),
                 ),
-                if (key != _tabs.last.$1) const SizedBox(width: 6),
+                if (i != _tabs.length - 1) const SizedBox(width: 6),
               ],
             ],
           ),
         ),
+        PetBagCapacityBar(
+          used: _items.length,
+          capacity: _capacity,
+          hint: _hint(),
+          onHintTap: _hasHoles || _mergeable ? _compact : null,
+        ),
         Expanded(
-          child: _filtered.isEmpty
-              ? _emptyView(cs)
-              : RefreshIndicator(
-                  onRefresh: _load,
-                  child: GridView.builder(
-                    padding: const EdgeInsets.all(12),
-                    // 每行 6 格、正方形物品格（2026-09-17 定版）
-                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
-                      childAspectRatio: 1,
-                      mainAxisSpacing: 8,
-                      crossAxisSpacing: 8,
-                    ),
-                    itemCount: _filtered.length,
-                    itemBuilder: (context, i) => _buildCell(_filtered[i], cs),
-                  ),
-                ),
+          child: RefreshIndicator(
+            onRefresh: () => _load(showLoading: false, forceRefresh: true),
+            child: GridView.builder(
+              padding: const EdgeInsets.all(12),
+              // 格子少时也要能下拉刷新
+              physics: const AlwaysScrollableScrollPhysics(),
+              // 每行 6 格、正方形（2026-09-17 定版）；格号恒等于 slot_index
+              gridDelegate:
+                  const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 6,
+                childAspectRatio: 1,
+                mainAxisSpacing: 8,
+                crossAxisSpacing: 8,
+              ),
+              itemCount: _capacity,
+              itemBuilder: (context, slot) {
+                final item = _bySlot[slot];
+                return PetBagSlotCell(
+                  slot: slot,
+                  item: item,
+                  dimmed: _category != 'all' &&
+                      item != null &&
+                      item.category != _category,
+                  busy: item != null && _busyId == item.id,
+                  canAccept: (from) => _canAccept(from, slot),
+                  onDrop: (from) => _swap(from, slot),
+                  onTap: item == null ? null : () => _showItemFloat(item),
+                );
+              },
+            ),
+          ),
         ),
       ],
     );
   }
 
+  Widget _tabChip(ColorScheme cs, String key, String label, IconData icon) {
+    final selected = _category == key;
+    return ChoiceChip(
+      avatar: Icon(
+        icon,
+        size: 16,
+        color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
+      ),
+      label: Text(label),
+      labelStyle: TextStyle(
+        fontSize: 12,
+        color: selected ? cs.onSecondaryContainer : cs.onSurface,
+      ),
+      selected: selected,
+      onSelected: (_) => setState(() => _category = key),
+    );
+  }
+
+  /// 是否存在空洞（有道具落在 >= 行数 的格位上）
+  bool get _hasHoles {
+    for (final e in _items) {
+      if (e.slotIndex >= _items.length) return true;
+    }
+    return false;
+  }
+
+  /// 是否有同道具分散在多格（可经整理合并）
+  bool get _mergeable {
+    final seen = <String>{};
+    for (final e in _items) {
+      if (!seen.add(e.itemId)) return true;
+    }
+    return false;
+  }
+
+  String _hint() {
+    if (_category != 'all' &&
+        !_items.any((e) => e.category == _category)) {
+      return '「${petBagCategoryLabel(_category)}」分类下暂无物品，其余格位置灰展示';
+    }
+    if (_hasHoles || _mergeable) {
+      return '检测到空洞格 / 同道具分散，点此整理可合并并压缩格位';
+    }
+    return '长按道具可拖到空格移动、拖到其它道具换位';
+  }
+
   Widget _emptyView(ColorScheme cs) {
-    if (_items.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            const EmptyWidget(message: '背包空空如也'),
-            FilledButton.tonal(
-              onPressed: () => Navigator.push(
-                context,
-                MaterialPageRoute(builder: (_) => const PetShopScreen(goldBalance: 0)),
-              ),
-              child: const Text('去商城逛逛'),
+    return Center(
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          const EmptyWidget(message: '背包空空如也'),
+          FilledButton.tonal(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => PetShopScreen(goldBalance: _gold)),
             ),
-          ],
-        ),
-      );
-    }
-    return const EmptyWidget(message: '该分类下暂无物品');
-  }
-
-  /// 物品格（正方形）：图标 + 数量角标
-  Widget _buildCell(PetBagItemModel item, ColorScheme cs) {
-    final busy = _busyId == item.id;
-    return InkWell(
-      onTap: busy ? null : () => _showItemFloat(item),
-      borderRadius: BorderRadius.circular(10),
-      child: Card(
-        margin: EdgeInsets.zero,
-        child: Center(
-          child: busy
-              ? const SizedBox(
-                  width: 18,
-                  height: 18,
-                  child: CircularProgressIndicator(strokeWidth: 2),
-                )
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    PetItemIcon(
-                      iconKey: item.iconKey,
-                      fallback: _iconFor(item),
-                      size: 26,
-                      color: item.isEgg ? cs.tertiary : cs.primary,
-                    ),
-                    if (!item.isEgg && item.quantity > 1)
-                      Positioned(
-                        right: 3,
-                        bottom: 3,
-                        child: Container(
-                          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: cs.primaryContainer,
-                            borderRadius: BorderRadius.circular(8),
-                          ),
-                          child: Text(
-                            '${item.quantity}',
-                            style: TextStyle(
-                              fontSize: 9,
-                              fontWeight: FontWeight.w600,
-                              color: cs.onPrimaryContainer,
-                            ),
-                          ),
-                        ),
-                      ),
-                  ],
-                ),
-        ),
-      ),
-    );
-  }
-
-  // ---------- 物品悬浮窗（信息 + 操作按钮） ----------
-
-  void _showItemFloat(PetBagItemModel item) {
-    final cs = Theme.of(context).colorScheme;
-    final usable = widget.petId != null && _usable(item);
-    // 2026-09-20 道具直洗入口下线（洗练点语义），按钮块一并注释保留
-    // final isRefine = widget.petId != null && item.effectType == 'refine_reassign';
-    showDialog<void>(
-      context: context,
-      builder: (ctx) => Dialog(
-        backgroundColor: cs.surface,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
-        child: Padding(
-          padding: const EdgeInsets.all(20),
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Container(
-                    width: 48,
-                    height: 48,
-                    decoration: BoxDecoration(
-                      color: cs.surfaceContainerHighest,
-                      borderRadius: BorderRadius.circular(12),
-                    ),
-                    child: PetItemIcon(
-                      iconKey: item.iconKey,
-                      fallback: _iconFor(item),
-                      size: 28,
-                      color: item.isEgg ? cs.tertiary : cs.primary,
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                              fontSize: 16, fontWeight: FontWeight.w600),
-                        ),
-                        const SizedBox(height: 2),
-                        Text(
-                          '${_categoryLabel(item.category)} · 数量 ${item.quantity}',
-                          style:
-                              TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-              if (_effectDesc(item).isNotEmpty) ...[
-                const SizedBox(height: 12),
-                Text(
-                  _effectDesc(item),
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                ),
-              ],
-              const SizedBox(height: 18),
-              Row(
-                children: [
-                  if (item.isEgg)
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: _busyId == null ? () => _hatchEgg(item) : null,
-                        icon: const Icon(Icons.auto_awesome, size: 18),
-                        label: const Text('立即孵化'),
-                      ),
-                    )
-                  else ...[
-                    if (usable) ...[
-                      Expanded(
-                        child: FilledButton.icon(
-                          onPressed: _busyId == null ? () => _useItem(item) : null,
-                          icon: const Icon(Icons.touch_app_outlined, size: 18),
-                          label: const Text('使用'),
-                        ),
-                      ),
-                      const SizedBox(width: 10),
-                    ],
-                    // 2026-09-20 道具直洗入口下线（洗练点语义）
-                    // if (isRefine) ...[
-                    //   Expanded(
-                    //     child: FilledButton.icon(
-                    //       onPressed: _busyId == null ? () => _refineItem(item) : null,
-                    //       icon: const Icon(Icons.auto_fix_high, size: 18),
-                    //       label: const Text('洗练'),
-                    //     ),
-                    //   ),
-                    //   const SizedBox(width: 10),
-                    // ],
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: cs.error,
-                          side: BorderSide(color: cs.error.withValues(alpha: 0.5)),
-                        ),
-                        onPressed: _busyId == null ? () => _discard(item) : null,
-                        icon: const Icon(Icons.delete_outline, size: 18),
-                        label: const Text('丢弃'),
-                      ),
-                    ),
-                  ],
-                ],
-              ),
-            ],
+            child: const Text('去商城逛逛'),
           ),
-        ),
+        ],
       ),
     );
-  }
-
-  bool _usable(PetBagItemModel item) =>
-      item.category == 'consumable' &&
-      const {'feed', 'clean', 'toy', 'heal', 'refine_point'}.contains(item.effectType);
-
-  String _categoryLabel(String category) => switch (category) {
-        'egg' => '蛋',
-        'consumable' => '消耗品',
-        'tool' => '工具',
-        _ => '物品',
-      };
-
-  /// 效果描述（依据 pet_items.effect 结构化字段生成，不臆测数值）
-  String _effectDesc(PetBagItemModel item) {
-    final parts = <String>[];
-    void addNum(String key, String label) {
-      final v = (item.effect[key] as num?)?.toInt();
-      if (v != null && v > 0) parts.add('$label+$v');
-    }
-
-    switch (item.effectType) {
-      case 'feed':
-        addNum('hunger', '饱食');
-        addNum('mood', '心情');
-        addNum('exp', '经验');
-      case 'clean':
-        parts.add('清洁宠物');
-        addNum('mood', '心情');
-      case 'toy':
-        parts.add('陪它玩耍');
-        addNum('mood', '心情');
-        addNum('exp', '经验');
-      case 'rescue':
-        parts.add('历险遇险时立即救回宠物');
-      case 'heal':
-        parts.add('恢复宠物健康（历险受伤后使用）');
-      case 'refine_point':
-        parts.add('使用后获得 1 洗练点（洗练在属性面板进行，每次洗练消耗 1 点）');
-      // 旧洗练剂直洗语义（2026-09-20 下线；SQL 未执行时兜底展示）
-      case 'refine_reassign':
-        parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
-      default:
-        if (item.isEgg) parts.add('点击立即孵化，见证新伙伴诞生');
-    }
-    return parts.join(' · ');
-  }
-
-  IconData _iconFor(PetBagItemModel item) {
-    if (item.isEgg) return Icons.egg_outlined;
-    return switch (item.effectType) {
-      'feed' => Icons.restaurant,
-      'clean' => Icons.shower_outlined,
-      'toy' => Icons.toys_outlined,
-      'rescue' => Icons.health_and_safety_outlined,
-      'heal' => Icons.healing_outlined,
-      'refine_point' => Icons.auto_fix_high,
-      'refine_reassign' => Icons.auto_fix_high,
-      _ => Icons.inventory_2_outlined,
-    };
   }
 }

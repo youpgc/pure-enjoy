@@ -2,7 +2,9 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../utils/date_time_utils.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
@@ -162,8 +164,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
       await _reloadSummary();
       return;
     }
-    final status = data?['status'] as String?;
-    if (status == 'awaiting_rescue') {
+    final status = PetAdventureStatus.fromCode(data?['status'] as String?);
+    if (status == PetAdventureStatus.awaitingRescue) {
       await _reloadSummary();
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -172,7 +174,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
       }
       return;
     }
-    if (status == 'failed') {
+    if (status == PetAdventureStatus.failed) {
       // 属性未达标结算：终态失败（宠物已回家），展示实际生效惩罚明细
       if (mounted) {
         await showPetPenaltyDialog(context,
@@ -250,10 +252,10 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Widget _buildBody() {
     if (_loading) return const Center(child: LoadingWidget());
     final adv = _adv;
-    if (adv != null && adv.status == 'ongoing') {
+    if (adv != null && adv.status == PetAdventureStatus.ongoing) {
       return _ongoingView(adv);
     }
-    if (adv != null && adv.status == 'awaiting_rescue') {
+    if (adv != null && adv.status == PetAdventureStatus.awaitingRescue) {
       return _rescueView(adv);
     }
     return _spotsView();
@@ -419,7 +421,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             Text(
               expired
                   ? '已超出自救窗口，将由 NPC 兜底救助'
-                  : '自救窗口截止：${deadline?.toLocal().toString().substring(5, 16) ?? '-'}',
+                  : '自救窗口截止：${deadline == null ? '-' : DateTimeUtils.formatToMinute(deadline)}',
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
