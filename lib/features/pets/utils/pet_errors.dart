@@ -62,6 +62,42 @@ String petRpcErrorText(String? error) {
     'PET_INVALID_ACTION': '操作类型无效',
     'PET_FOSTER_FULL': '寄养格不够用，可在商城「扩容」分类购买寄养扩容',
     'PET_NOT_FOSTERED': '这只伙伴不在寄养仓库中',
+    // ---------- P2 进化（rpc_pet_evolve，feature_pet_p2_rpcs_20260923.sql §3） ----------
+    'PET_EVOLVE_CHAIN_MISSING': '这只伙伴还没有进化路线，暂时不能进化',
+    'PET_EVOLVE_AT_END': '它已经是最终形态啦',
+    'PET_EVOLVE_PICK_REQUIRED': '这一步有多个方向可选，请重新选择目标形态',
+    'PET_EVOLVE_STAGE_MISSING': '进化阶段配置缺失，请联系管理员',
+    'PET_EVOLVE_SPECIES_DISABLED': '这个形态暂未开放，请先选择其他方向',
+    'PET_EVOLVE_COND_NOT_MET': '进化条件还没满足，再积累一会儿',
+    'PET_EVOLVE_COND_INVALID': '进化条件配置有误，请联系管理员',
+    // ---------- P2 等待孵化与加速（§2） ----------
+    'PET_EGG_ALREADY_HATCHED': '这枚蛋已经孵化过了',
+    'PET_EGG_NOT_WAITING': '这枚蛋还没开始孵化，先点「孵化」计时',
+    'PET_EGG_NOT_READY': '蛋还没成熟，再等一会儿或加速',
+    'PET_ACCEL_ALREADY_READY': '这枚蛋已经可以领取了',
+    // ---------- P2 功能解锁（§4） ----------
+    'PET_FEATURE_ITEM_INVALID': '该道具不能用于开通功能',
+    'PET_FEATURE_ALREADY': '这个功能已经开通了',
+    // ---------- P2 繁育（§5）：CD/亲密度阈值均为后台配置，文案不写具体数值 ----------
+    'PET_BREED_INVALID_PET': '请选择两只养育中的伙伴结配',
+    'PET_BREED_NOT_UNLOCKED': '繁育还没开通，可在商城购买「繁育巢穴」',
+    'PET_BREED_BUSY': '这只伙伴正忙着（繁育/历险/寄养），先处理完再来',
+    'PET_BREED_INTIMACY_LOW': '亲密度还不够，多陪陪它们再结配',
+    'PET_BREED_NOT_SAME_FAMILY': '只有同系别的伙伴才能结配',
+    'PET_BREED_SAME_GENDER': '需要一公一母才能结配',
+    'PET_BREED_COOLDOWN': '刚繁育过，等它们恢复一下再来',
+    'PET_BREED_LOG_NOT_FOUND': '未找到这条繁育记录',
+    'PET_BREED_ALREADY_CLAIMED': '这枚蛋已经领取过了',
+    'PET_BREED_NOT_READY': '宝宝还没足月，再等等',
+    'PET_BREED_EGG_ITEM_MISSING': '繁育蛋配置缺失，请联系管理员',
+    // ---------- P2 成就（§6） ----------
+    'PET_ACH_NOT_FOUND': '该成就暂不可领取，请稍后重试',
+    'PET_ACH_ALREADY_CLAIMED': '这份奖励已经领过啦',
+    'PET_ACH_NOT_DONE': '这个成就还没达成',
+    // ---------- P2 周任务（§7） ----------
+    'PET_WEEKLY_NOT_FOUND': '未找到本周任务，请稍后刷新',
+    'PET_WEEKLY_ALREADY_CLAIMED': '本周奖励已经领过啦',
+    'PET_WEEKLY_NOT_DONE': '本周任务还没完成',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;

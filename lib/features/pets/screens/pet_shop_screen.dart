@@ -5,6 +5,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
+import 'pet_odds_screen.dart';
 
 /// 宠物商城页（分类 + 物品格 + 悬浮窗购买）
 ///
@@ -94,6 +95,15 @@ class _PetShopScreenState extends State<PetShopScreen> {
       appBar: AppBar(
         title: const Text('宠物商城'),
         actions: [
+          // 概率公示（P2）：读后台已发布蛋池，与抽取判定同版本，纯只读入口
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(builder: (_) => const PetOddsScreen()),
+            ),
+            icon: const Icon(Icons.percent_outlined, size: 18),
+            label: const Text('概率公示', style: TextStyle(fontSize: 13)),
+          ),
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 16),

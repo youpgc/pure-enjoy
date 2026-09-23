@@ -55,7 +55,10 @@ class PetRpc {
     }
   }
 
-  /// 未打开的蛋列表
+  /// 未孵出的蛋列表（unopened / waiting / ready；hatched 已出宠不取）
+  ///
+  /// P2 起含等待孵化通道：wait 模式蛋须先 rpc_pet_hatch_wait 计时，
+  /// 到点置 ready 后再走 rpc_pet_hatch_instant 领取。
   static Future<(List<PetEggModel>, String?)> fetchEggs() async {
     final uid = _uid;
     if (uid == null) return const (<PetEggModel>[], '未登录');
@@ -63,11 +66,11 @@ class PetRpc {
       final resp = await ApiClient.get(
         'pet_eggs',
         select:
-            'id,pool_code,mode,status,bag_item_id,item:pet_items(name,item_code)',
-        filters: {'user_id': 'eq.$uid', 'status': 'eq.unopened'},
+            'id,pool_code,mode,status,ready_at,bag_item_id,item:pet_items(name,item_code)',
+        filters: {'user_id': 'eq.$uid', 'status': 'in.(unopened,waiting,ready)'},
         order: 'created_at.asc',
         limit: 100,
-        note: 'pet_eggs 未开蛋查询',
+        note: 'pet_eggs 未孵出蛋查询',
       );
       if (!resp.isSuccess) return (const <PetEggModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
@@ -173,6 +176,14 @@ class PetRpc {
     const Map<String, dynamic> empty = {};
     return (empty, null);
   }
+
+  /// 供 P2 分组 [PetRpcP2] 复用的同一套 RPC 调用口径（错误原文 + raw jsonb）
+  static Future<(Map<String, dynamic>?, String?)> callRpc(
+    String fn,
+    Map<String, dynamic> params,
+    String note,
+  ) =>
+      _call(fn, params, note);
 
   /// 即开孵化 → 成功返回孵化结果
   static Future<(PetHatchResultModel?, String?)> hatchEgg(String eggId) async {

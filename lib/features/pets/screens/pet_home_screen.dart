@@ -18,9 +18,13 @@ import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
 import '../widgets/pet_living_art.dart';
+import 'pet_achievements_screen.dart';
 import 'pet_adventure_screen.dart';
 import 'pet_bag_screen.dart';
+import 'pet_breed_screen.dart';
+import 'pet_egg_screen.dart';
 import 'pet_foster_screen.dart';
+import 'pet_growth_screen.dart';
 import 'pet_quests_screen.dart';
 import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
@@ -35,7 +39,9 @@ part 'pet_home_screen_actions.dart';
 /// - 顶部通知横幅：历险归来待领取 / 待救助时出现（进行中不展示），
 ///   归来点击直接弹窗结算（claim → 奖励 / 遇险提示），不跳历险页；
 /// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
-///   寄养（寄养仓库页 PetFosterScreen）；右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
+///   寄养 / 成就 / 繁育（P2 四项里成就与繁育走主页直达，孵蛋走背包蛋行、
+///   进化与特性洗练走属性面板，避免按钮列在小屏上溢出）；
+///   右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
 ///   （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
 /// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
 ///   无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。

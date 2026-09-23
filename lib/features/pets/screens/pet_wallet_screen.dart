@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../services/api_client.dart';
@@ -49,15 +50,12 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   int _pointsPerGold = _kDefaultPointsPerGold;
   bool _exchanging = false;
 
-  /// 流水来源中文映射（与 pet_wallet_records.source_type check 值域对齐）
-  static const Map<String, String> _sourceLabels = {
-    'pet_shop_buy': '商城消费',
-    'pet_system_reward': '系统发放',
-    'pet_adventure_penalty': '历险惩罚',
-    'pet_achievement': '成就发放',
-    'pet_exchange': '积分兑换',
-    'pet_admin_grant': '客服调整',
-  };
+  /// 流水来源中文（值域单一源 = [PetWalletSourceType]，铁律 12：不再另立一张表，
+  /// 否则新增来源如 P2 `pet_feature_spend` 会在页面上直接露出英文码）
+  static String _sourceLabel(String code) {
+    if (code.isEmpty) return '其他';
+    return PetWalletSourceType.fromCode(code)?.label ?? code;
+  }
 
   @override
   void initState() {
@@ -426,7 +424,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  _sourceLabels[sourceType] ?? (sourceType.isEmpty ? '其他' : sourceType),
+                  _sourceLabel(sourceType),
                   style: const TextStyle(fontSize: 14),
                 ),
                 const SizedBox(height: 2),

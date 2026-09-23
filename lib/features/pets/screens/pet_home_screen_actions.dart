@@ -60,9 +60,13 @@ extension _PetHomeActions on _PetHomeScreenState {
       }
     }
     if (target == null) {
-      if (mounted) {
-        showSnackBar(context, '没有可即开孵化的蛋');
+      if (!mounted) return;
+      // P2：只剩等待型蛋（传说蛋需计时）时不再死路一条，转孵蛋页处理
+      if (eggs.isEmpty) {
+        showSnackBar(context, '背包里还没有蛋');
+        return;
       }
+      _openEggs();
       return;
     }
     final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
@@ -104,11 +108,24 @@ extension _PetHomeActions on _PetHomeScreenState {
   /// 寄养仓库（养育格 <-> 寄养格搬运；寄养格未开启时页内引导商城扩容）
   void _openFoster() => _push(const PetFosterScreen());
 
-  /// 属性面板（四维/健康/性格/加点；加点成功回调刷新总览）
+  /// 成就（P2）：进入即幂等对齐一次服务端进度
+  void _openAchievements() => _push(const PetAchievementsScreen());
+
+  /// 繁育（P2）：未开通时页内给商城直达，不在主页做二次判断
+  void _openBreed() => _push(const PetBreedScreen());
+
+  /// 孵蛋（P2：即开 + 等待孵化双通道；入口亦在背包的蛋行）
+  void _openEggs() => _push(const PetEggScreen());
+
+  /// 养成（P2：进化 + 特性洗练），带上当前展示的这只
+  void _openGrowth() => _push(PetGrowthScreen(petId: _currentPet?.id));
+
+  /// 属性面板（四维/健康/性格/加点；加点成功回调刷新总览，面板内另给养成直达）
   void _openAttributes() {
     final pet = _currentPet;
     if (pet == null) return;
-    showPetAttributesSheet(context, pet: pet, onChanged: _load);
+    showPetAttributesSheet(context,
+        pet: pet, onChanged: _load, onGrowth: _openGrowth);
   }
 
   void _openAdventure() {

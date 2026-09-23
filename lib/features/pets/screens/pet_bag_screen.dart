@@ -4,12 +4,15 @@ import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_bag_meta.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_bag_grid.dart';
 import '../widgets/pet_bag_item_dialog.dart';
 import '../widgets/pet_home_overlays.dart';
+import 'pet_egg_screen.dart';
+import 'pet_growth_screen.dart';
 import 'pet_shop_screen.dart';
 
 /// 宠物背包页（格位坐标制 + 分类页签 + 拖拽换位）
@@ -100,23 +103,18 @@ class _PetBagScreenState extends State<PetBagScreen> {
     await _run(() async {
       final (eggs, fetchErr) = await PetRpc.fetchEggs();
       if (fetchErr != null) return _toast(petRpcErrorText(fetchErr));
-      // 精确匹配该背包行对应的蛋（同道具多枚时按 bag_item_id 一一对应）
+      // 精确匹配该背包行对应的蛋（同道具多枚时按 bag_item_id 一一对应）；
+      // P2 起不再退化成"随便孵一颗"——那会孵出错位的蛋
       PetEggModel? target;
       for (final e in eggs) {
-        if (e.bagItemId == egg.id && e.isInstant) {
+        if (e.bagItemId == egg.id) {
           target = e;
           break;
         }
       }
-      if (target == null) {
-        for (final e in eggs) {
-          if (e.isInstant) {
-            target = e;
-            break;
-          }
-        }
-      }
-      if (target == null) return _toast('没有可即开孵化的蛋');
+      if (target == null) return _toast('没找到这一格对应的蛋，下拉刷新后重试');
+      // 等待型蛋（传说蛋等）：即开通道走不了，转孵蛋页计时/加速/领取
+      if (!target.isInstant) return _push(const PetEggScreen());
       final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
       if (!mounted) return;
       if (hatchErr != null || result == null) {
@@ -212,10 +210,51 @@ class _PetBagScreenState extends State<PetBagScreen> {
       item: item,
       busy: _busyId != null,
       canUse: widget.petId != null && petBagItemUsable(item),
+      extraAction: _extraAction(item),
       onHatch: () => _hatchEgg(item),
       onUse: () => _useItem(item),
       onDiscard: () => _discard(item),
     );
+  }
+
+  /// P2 道具的去向：这三类都不走 `rpc_pet_use_item`，而是各有专属 RPC/页面
+  /// （蛋的孵化按钮已在 [_hatchEgg] 内分流，故此处不重复给动作）
+  ({String label, VoidCallback onTap})? _extraAction(PetBagItemModel item) {
+    if (item.isEgg) return null;
+    switch (petBagItemType(item)) {
+      case PetItemEffectType.unlock:
+        return (label: '开通功能', onTap: () => _unlock(item));
+      case PetItemEffectType.traitWash:
+        return (
+          label: '去洗练',
+          onTap: () => _push(PetGrowthScreen(
+              petId: widget.petId, initialTab: PetGrowthTab.trait))
+        );
+      case PetItemEffectType.hatchAccel:
+        return (label: '去加速孵化', onTap: () => _push(const PetEggScreen()));
+      default:
+        return null;
+    }
+  }
+
+  /// 功能开通：feature_key 由道具 effect 决定（客户端不传），一次一档
+  Future<void> _unlock(PetBagItemModel item) async {
+    await _run(() async {
+      final (result, err) = await PetRpcP2.unlockFeature(item.itemId);
+      if (!mounted) return;
+      if (err != null || result == null) {
+        return _toast(petRpcErrorText(err));
+      }
+      _toast('已开通「${petFeatureLabel(result.featureKey)}」');
+      await _load(showLoading: false);
+    }, item.id);
+  }
+
+  /// 推到子页；返回后以服务端为准重拉（开通/孵化都会改背包与格子占用）
+  void _push(Widget page) {
+    Navigator.push(context, MaterialPageRoute(builder: (_) => page)).then((_) {
+      if (mounted) _load(showLoading: false, forceRefresh: true);
+    });
   }
 
   void _toast(String msg) {

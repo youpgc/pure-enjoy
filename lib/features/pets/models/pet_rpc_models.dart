@@ -74,14 +74,20 @@ class PetBagItemModel {
   }
 }
 
-/// 蛋实例（pet_eggs join pet_items，仅未打开）
+/// 蛋实例（pet_eggs join pet_items；unopened / waiting / ready 三态）
+///
+/// 值域见 [PetEggStatus]：instant 蛋走 `rpc_pet_hatch_instant` 直接出宠；
+/// wait 蛋须先 `rpc_pet_hatch_wait` 进入 waiting，到点变 ready 后再走
+/// `rpc_pet_hatch_instant` 领取（服务端闸门 PET_EGG_NOT_READY）。
 class PetEggModel {
   const PetEggModel({
     required this.id,
     required this.poolCode,
     required this.mode,
     required this.itemName,
+    required this.status,
     this.bagItemId,
+    this.readyAt,
   });
 
   final String id;
@@ -89,10 +95,32 @@ class PetEggModel {
   final String mode; // instant / wait
   final String itemName;
 
+  /// pet_eggs.status（unopened / waiting / ready）
+  final PetEggStatus? status;
+
   /// 对应背包行 id（孵化后该行删除；背包内精确匹配用）
   final String? bagItemId;
 
+  /// 等待孵化到点时间（仅 waiting/ready 有值）
+  final DateTime? readyAt;
+
   bool get isInstant => mode == PetEggMode.instant.code;
+
+  bool get isWaiting => status == PetEggStatus.waiting;
+
+  /// 可领取（wait 蛋倒计时归零，服务端已置 ready）
+  bool get isReady => status == PetEggStatus.ready;
+
+  /// 尚未开始孵化（unopened）——wait 模式此时需先发起计时
+  bool get isUnopened => status != PetEggStatus.waiting && !isReady;
+
+  /// 剩余等待时长（到点前逐秒刷新用；无到点时间返回 null）
+  Duration? get remaining {
+    final at = readyAt;
+    if (at == null || !isWaiting) return null;
+    final left = at.difference(DateTime.now());
+    return left.isNegative ? Duration.zero : left;
+  }
 
   factory PetEggModel.fromJson(Map<String, dynamic> json) {
     final item = (json['item'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -101,7 +129,9 @@ class PetEggModel {
       poolCode: json['pool_code'] as String? ?? '',
       mode: json['mode'] as String? ?? PetEggMode.instant.code,
       itemName: item['name'] as String? ?? '神秘蛋',
+      status: PetEggStatus.fromCode(json['status'] as String?),
       bagItemId: json['bag_item_id'] as String?,
+      readyAt: DateTime.tryParse(json['ready_at'] as String? ?? ''),
     );
   }
 }
@@ -236,7 +266,11 @@ class PetShopItemModel {
 
   bool get isExpansion => ladderKey != null;
 
-  /// 分类页签归属：食物 / 清洁 / 玩具 / 救援 / 扩容
+  /// 分类页签归属：食物 / 清洁 / 玩具 / 救援 / 扩容（P1）+
+  /// 宠物蛋 / 进化 / 加速 / 洗练 / 解锁（P2）
+  ///
+  /// 键域 = `pet_items.sub_type`（无 DDL CHECK，取值见种子
+  /// `feature_pet_p2_seed_20260923.sql` §2）；未列出的 sub_type 归「其他」。
   String get categoryLabel {
     if (isExpansion) return '扩容';
     return switch (subType) {
@@ -244,6 +278,11 @@ class PetShopItemModel {
       'clean' => '清洁',
       'toy' => '玩具',
       'rescue' => '救援',
+      'random' => '宠物蛋',
+      'evolution' => '进化',
+      'accelerate' => '加速',
+      'trait_wash' => '洗练',
+      'unlock' => '解锁',
       _ => '其他',
     };
   }

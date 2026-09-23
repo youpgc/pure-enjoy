@@ -7,11 +7,14 @@ import 'pet_item_icon.dart';
 /// 背包物品悬浮窗（信息 + 操作按钮）
 ///
 /// 按钮先关闭弹窗再回调，调用方无需自行 pop；[busy] 为 true 时按钮全部禁用。
+/// [extraAction] 是 P2 道具的专属去向（开通功能 / 去养成页洗练 / 去孵蛋页加速），
+/// 与「使用」「丢弃」并列显示；null 即无附加动作。
 Future<void> showPetBagItemDialog(
   BuildContext context, {
   required PetBagItemModel item,
   required bool busy,
   required bool canUse,
+  ({String label, VoidCallback onTap})? extraAction,
   VoidCallback? onHatch,
   VoidCallback? onUse,
   VoidCallback? onDiscard,
@@ -90,7 +93,8 @@ Future<void> showPetBagItemDialog(
                     child: FilledButton.icon(
                       onPressed: busy ? null : () => fire(onHatch),
                       icon: const Icon(Icons.auto_awesome, size: 18),
-                      label: const Text('立即孵化'),
+                      // 蛋统一叫「孵化」：即开型当场出宠，等待型由调用方转孵蛋页
+                      label: const Text('孵化'),
                     ),
                   )
                 else ...[
@@ -119,9 +123,32 @@ Future<void> showPetBagItemDialog(
                 ],
               ],
             ),
+            ..._extraActionButtons(extraAction, busy, fire),
           ],
         ),
       ),
     ),
   );
+}
+
+/// 附加动作按钮（P2 道具的去向）。动作与文案都来自调用方，本函数只负责排版。
+List<Widget> _extraActionButtons(
+  ({String label, VoidCallback onTap})? action,
+  bool busy,
+  void Function(VoidCallback) fire,
+) {
+  if (action == null) return const [];
+  final label = action.label;
+  final onTap = action.onTap;
+  return [
+    const SizedBox(height: 10),
+    SizedBox(
+      width: double.infinity,
+      child: FilledButton.tonalIcon(
+        onPressed: busy ? null : () => fire(onTap),
+        icon: const Icon(Icons.arrow_forward_circle, size: 18),
+        label: Text(label),
+      ),
+    ),
+  ];
 }

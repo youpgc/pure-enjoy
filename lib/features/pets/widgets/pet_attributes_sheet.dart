@@ -17,25 +17,30 @@ import '../utils/pet_errors.dart';
 ///   结果经 [showPetRefineResultDialog] 做前后对比演出。
 ///   孵化基础属性不可洗练（仅重掷升级加点，总值守恒）。
 
-/// 打开属性面板；[onChanged] 在加点成功后回调（调用方刷新总览）
+/// 打开属性面板；[onChanged] 在加点成功后回调（调用方刷新总览），
+/// [onGrowth] 提供「进化与特性」直达（P2 养成页；先收起面板再跳转）
 Future<void> showPetAttributesSheet(
   BuildContext context, {
   required PetBriefModel pet,
   VoidCallback? onChanged,
+  VoidCallback? onGrowth,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) => _PetAttributesSheet(pet: pet, onChanged: onChanged),
+    builder: (ctx) =>
+        _PetAttributesSheet(pet: pet, onChanged: onChanged, onGrowth: onGrowth),
   );
 }
 
 class _PetAttributesSheet extends StatefulWidget {
-  const _PetAttributesSheet({required this.pet, this.onChanged});
+  const _PetAttributesSheet(
+      {required this.pet, this.onChanged, this.onGrowth});
 
   final PetBriefModel pet;
   final VoidCallback? onChanged;
+  final VoidCallback? onGrowth;
 
   @override
   State<_PetAttributesSheet> createState() => _PetAttributesSheetState();
@@ -204,6 +209,20 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
                       child: CircularProgressIndicator(strokeWidth: 2))
                   : Text(_total > 0 ? '分配 $_total 点' : '暂无可分配点数'),
             ),
+            // 养成页直达（P2 进化 + 特性洗练）：先收起面板再跳，避免面板压在下一页上
+            if (widget.onGrowth != null) ...[
+              const SizedBox(height: 2),
+              TextButton.icon(
+                onPressed: _busy
+                    ? null
+                    : () {
+                        Navigator.pop(context);
+                        widget.onGrowth?.call();
+                      },
+                icon: const Icon(Icons.auto_awesome, size: 18),
+                label: const Text('进化与特性'),
+              ),
+            ],
           ],
         ),
       ),

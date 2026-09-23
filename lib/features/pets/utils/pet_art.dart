@@ -39,3 +39,10 @@ const Map<String, List<String>> _kPetIdleFrames = {
 /// 解析种属的 idle 帧序列；未登记返回空列表（回退单帧静态）
 List<String> petIdleFrames(String speciesCode) =>
     _kPetIdleFrames[speciesCode] ?? const <String>[];
+
+/// 诞生/进化弹窗配图：优先帧序列首帧，未登记回退静态立绘，两者皆无返回 null
+String? petBirthArt(String speciesCode) {
+  final frames = petIdleFrames(speciesCode);
+  if (frames.isNotEmpty) return frames.first;
+  return petStageArtAsset(speciesCode, 0);
+}

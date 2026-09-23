@@ -92,7 +92,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  // ---------- 左侧入口列（返回键 + 背包/商城/钱包/寄养，贴顶） ----------
+  // ---------- 左侧入口列（返回键 + 背包/商城/钱包/寄养/成就/繁育，贴顶） ----------
 
   Widget _leftRail() {
     return Positioned(
@@ -125,6 +125,16 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 icon: Icons.luggage_outlined,
                 label: '寄养',
                 onTap: this._openFoster),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.workspace_premium_outlined,
+                label: '成就',
+                onTap: this._openAchievements),
+            const SizedBox(height: 14),
+            PetEdgeButton(
+                icon: Icons.favorite_outline,
+                label: '繁育',
+                onTap: this._openBreed),
           ],
         ),
       ),
