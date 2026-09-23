@@ -2,6 +2,7 @@ import 'dart:async';
 
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'package:uuid/uuid.dart';
 
 import 'models/game_dimension_model.dart';
 import 'models/game_level_model.dart';
@@ -175,6 +176,10 @@ Future<GameSettlementResult?> reportAndSettle({
   // 游戏结束立即弹出结算页；成绩上报 + 奖励结算在弹窗内异步进行，
   // 加载完成前展示 loading，期间弹窗不可点遮罩关闭/拖拽（禁其他操作）。
   final completer = Completer<GameSettlementResult?>();
+  // 本次结算的唯一标识：可重复领取的通关奖励（后台 reward_repeatable）占坑键
+  // 原本每次生成都不同，L1「重试发放」重跑时会再发一遍 → 同一局重复得分。
+  // 首次结算与重试共用本 token，服务端同键幂等（already=true），不再重复发分。
+  final settleToken = const Uuid().v4();
   final settleFuture = () async {
     try {
       // 累计型成就计数：每局在主流程至多记录一次（L1 重试只重跑发放、
@@ -210,6 +215,7 @@ Future<GameSettlementResult?> reportAndSettle({
         level: level,
         scoreValuesByCode: scoreValuesByCode,
         cleared: cleared,
+        settleToken: settleToken,
       );
     } catch (e, st) {
       // 结算链异常：上报后台后上抛，由结算页错误态承接（L1 重试入口），
@@ -229,6 +235,7 @@ Future<GameSettlementResult?> reportAndSettle({
         level: level,
         scoreValuesByCode: scoreValuesByCode,
         cleared: cleared,
+        settleToken: settleToken,
       );
     } catch (e, st) {
       ErrorReporter.report(e, st, module: 'games');

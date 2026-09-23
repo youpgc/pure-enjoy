@@ -70,9 +70,14 @@ class GameRewardService {
   /// 通关奖励 claim_key（【方案 B 2026-09-22】编排与发放共用单一来源，避免两处
   /// 公式漂移）：可重复关卡每次通关一个新坑（随机后缀，受单日上限约束），
   /// 不可重复关卡终身一坑。
-  String levelClearClaimKey(GameLevelModel level) => level.rewardRepeatable
-      ? 'level_clear:${level.id}:${const Uuid().v4()}'
-      : 'level_clear_once:${level.id}';
+  ///
+  /// [settleToken]（2026-09-23 幂等修复）：同一局结算的固定标识。可重复关卡若
+  /// 每次现取随机值，结算页 L1「重试发放」重跑就会再发一遍通关奖励（重复得分）；
+  /// 传入同一 token 后两次算出同一 claim_key，服务端按同键幂等返回，不再重复发分。
+  String levelClearClaimKey(GameLevelModel level, {String? settleToken}) =>
+      level.rewardRepeatable
+          ? 'level_clear:${level.id}:${settleToken ?? const Uuid().v4()}'
+          : 'level_clear_once:${level.id}';
 
   /// 「每日首次通关」claim_key：按北京自然日一坑。
   String dailyFirstClearClaimKey() =>
@@ -222,11 +227,12 @@ class GameRewardService {
   Future<GameRewardResult> claimLevelReward({
     required GameLevelModel level,
     required String gameName,
+    String? settleToken,
   }) async {
     if (level.rewardPoints <= 0) {
       return GameRewardResult.notGranted(reason: '本关无通关奖励');
     }
-    final claimKey = levelClearClaimKey(level);
+    final claimKey = levelClearClaimKey(level, settleToken: settleToken);
     // 关卡名种子格式自带「游戏·模式」前缀（如「2048·经典模式 L001」），
     // 直接引用即自含归因，不再拼 gameName（否则「2048·2048·…」重复展示）。
     final levelLabel = level.name.isNotEmpty
@@ -247,7 +253,7 @@ class GameRewardService {
     GameAchievementModel achievement,
   ) {
     return _tryClaim(
-      claimKey: 'achievement:${achievement.code}',
+      claimKey: achievementClaimKey(achievement.code),
       points: achievement.rewardPoints,
       remark: '成就达成（${achievement.name}）',
       gameId: achievement.gameId,
@@ -426,7 +432,12 @@ class GameRewardService {
       // 'daily limit reached'——此前一律返回「发放失败，请重试」，上限
       // 拦截对用户完全不可见、也不触发本局止付。现按原因分类，上限
       // 拦截返回含「上限」的 reason，与客户端预检同路（capHit + banner）。
+      // 2026-09-23 方案 D：服务端把两种额度拆成两个错误串，先判更具体的
+      // 单游戏版（'game daily limit reached'），否则会报成「全部游戏到顶」。
       final errText = (rpc.error ?? '').toString();
+      if (errText.contains('game daily limit')) {
+        return GameRewardResult.notGranted(reason: '本游戏今日奖励已达上限');
+      }
       if (errText.contains('daily limit')) {
         return GameRewardResult.notGranted(reason: '今日游戏奖励已达上限');
       }

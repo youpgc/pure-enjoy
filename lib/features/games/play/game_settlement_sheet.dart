@@ -244,10 +244,15 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
       );
     }
 
-    // 单日游戏奖励是否已达上限（命中上限的奖励项 reason 含「上限」）
-    final hitCap = result.items.any(
-      (i) => i.reason != null && i.reason!.contains('上限'),
-    );
+    // 单日游戏奖励是否已达上限（命中上限的奖励项 reason 含「上限」）。
+    // 横幅直接复用该 reason：全局上限 / 单游戏上限 / 服务端拦截三种来源的
+    // 文案各自不同，写死一句话会把「本游戏已达上限」误报成「今日已达上限」。
+    final capReason = result.items
+        .map((i) => i.reason)
+        .firstWhere(
+          (r) => r != null && r.contains('上限'),
+          orElse: () => null,
+        );
 
     // 仅展示「实际获得的明细」；通关奖励不论是否获得都展示（kind=level_clear），
     // 其余未获得的（已领取 / 不相关）不展示，避免结算页堆砌无效行。
@@ -285,7 +290,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
                   ),
                 ),
               )),
-        if (hitCap) ...<Widget>[
+        if (capReason != null) ...<Widget>[
           const SizedBox(height: 8),
           Container(
             width: double.infinity,
@@ -298,12 +303,13 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
               children: <Widget>[
                 Icon(Icons.info_outline, color: AppTheme.warning, size: 18),
                 const SizedBox(width: 8),
-                  const Expanded(
-                    child: Text(
-                      '今日游戏奖励已达上限，超限部分未发放；明日上限刷新后，重新通关即可获得',
-                      style: TextStyle(color: AppTheme.warning, fontSize: 13),
-                    ),
+                Expanded(
+                  child: Text(
+                    '$capReason；明日上限刷新后，重新通关即可获得',
+                    style: const TextStyle(
+                        color: AppTheme.warning, fontSize: 13),
                   ),
+                ),
               ],
             ),
           ),

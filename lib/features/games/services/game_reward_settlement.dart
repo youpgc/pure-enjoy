@@ -36,11 +36,15 @@ extension GameRewardSettlement on GameRewardService {
   ///
   /// [scoreValuesByCode] 为「维度编码 → 取值」（如 {'score': 2048, 'duration_ms': 12345}）。
   /// 成绩上报（game_scores）由调用方负责，本方法只管奖励发放。
+  ///
+  /// [settleToken] 为「本次结算」的固定标识，由调用方在一局结算开始时生成并在
+  /// L1 重试时原样复用（可重复通关奖励的 claim_key 后缀，防重试二次发分）。
   Future<GameSettlementResult> settleGame({
     required GameModel game,
     required GameLevelModel level,
     required Map<String, num> scoreValuesByCode,
     required bool cleared,
+    required String settleToken,
   }) async {
     // 未通关不发放任何奖励（通关奖励 / 首通 / 成就均只针对通关，避免失败也发分）
     if (!cleared) {
@@ -102,10 +106,14 @@ extension GameRewardSettlement on GameRewardService {
         kind: 'level_clear',
         label: '通关奖励',
         points: level.rewardPoints,
-        // 可重复关卡的 key 带随机后缀（真实发放时另生成一个），此处仅用于
-        // 阶段二的「已领剔除」——新坑永不命中，正确计为应发项。
-        claimKey: levelClearClaimKey(level),
-        claim: () => claimLevelReward(gameName: game.name, level: level),
+        // 可重复关卡的 key 后缀 = 本次结算的 settleToken（重试时不变 → 同键幂等，
+        // 不重复发分）；阶段二的「已领剔除」据此判断当日是否已为本局发过。
+        claimKey: levelClearClaimKey(level, settleToken: settleToken),
+        claim: () => claimLevelReward(
+          gameName: game.name,
+          level: level,
+          settleToken: settleToken,
+        ),
       ));
     }
 
@@ -239,7 +247,7 @@ extension GameRewardSettlement on GameRewardService {
       if (met.isNotEmpty) {
         final claimedKeys = await _fetchClaimedAchievementKeys(met);
         for (final ach in met) {
-          if (claimedKeys.contains('achievement:${ach.code}')) continue;
+          if (claimedKeys.contains(achievementClaimKey(ach.code))) continue;
           // 【方案 B 阶段一：只登记候选，不在此处发放】发放见段末 guardedClaim。
           steps.add(_SettleStep(
             kind: 'achievement',
@@ -291,14 +299,18 @@ extension GameRewardSettlement on GameRewardService {
 
     if (steps.isNotEmpty && (overGlobal || overGame)) {
       capHit = true;
+      // 文案区分两种额度（结算页横幅直接复用本 reason）：
+      //   全局 = 所有游戏今天加起来的上限；本游戏 = 单个游戏今天自己的上限
       final quotaDesc = overGlobal && overGame
-          ? '全局剩余额度 $globalRemaining 分、本游戏剩余额度 $gameRemaining 分'
+          ? '全部游戏今日合计仅剩 $globalRemaining 分、本游戏今日仅剩 '
+              '$gameRemaining 分'
           : overGlobal
-              ? '全局剩余额度 $globalRemaining 分'
-              : '本游戏剩余额度 $gameRemaining 分';
+              ? '全部游戏今日合计仅剩 $globalRemaining 分'
+              : '本游戏今日仅剩 $gameRemaining 分';
       final payableDesc = overGlobal ? payableGlobal : payableGame;
-      final reason = '今日游戏奖励已达上限（$quotaDesc，本局应发 '
-          '$payableDesc 分），本局不发放';
+      final reason =
+          '${overGlobal ? '今日游戏奖励' : '本游戏今日奖励'}已达上限'
+          '（$quotaDesc，本局应发 $payableDesc 分），本局不发放';
       for (final s in steps) {
         items.add(GameSettlementItem(
           kind: s.kind,
