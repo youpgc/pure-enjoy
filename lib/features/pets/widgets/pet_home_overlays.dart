@@ -103,7 +103,11 @@ class PetAdventureBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    final finished = adv.endAt == null || !DateTime.now().isBefore(adv.endAt!);
+    // 只有「确实拿到了结束时间且已到点」才算已结束待领取。endAt 缺失（后端
+    // 字段异常/未返回）时不能乐观判结束——否则横幅写着「已结束，点击查看结果」，
+    // 点进去却因无坑可领而报错，与 pet_home_adventure 的按钮口径也不一致。
+    final finished =
+        adv.endAt != null && !DateTime.now().isBefore(adv.endAt!);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 400),
       child: Card(
