@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
+import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
@@ -18,8 +19,7 @@ import 'pet_home_overlays.dart';
 /// 独立成文件以保证 pet_home_screen 行数在 500 以内；
 /// 动作返回 true 表示状态已变化（调用方刷新总览）。
 
-void _toast(BuildContext context, String msg) =>
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+void _toast(BuildContext context, String msg) => showSnackBar(context, msg);
 
 /// 主页历险动作签名（归来领取 / 召回确认；返回 true = 状态已变化）
 typedef AdventureAction = Future<bool> Function(

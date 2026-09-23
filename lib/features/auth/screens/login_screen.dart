@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../home/screens/home_screen.dart';
 import '../auth_provider.dart';
@@ -56,11 +55,12 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
         );
       } else if (mounted) {
         final error = ref.read(authProvider).error;
-        _showSnackBar(error ?? '登录失败，请检查账号和密码');
+        showSnackBar(context, error ?? '登录失败，请检查账号和密码',
+            isError: true);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('登录失败，请稍后重试');
+        showSnackBar(context, '登录失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) {
@@ -83,30 +83,22 @@ class _LoginScreenState extends ConsumerState<LoginScreen> {
             : null,
       );
       if (success && mounted) {
-        _showSnackBar('注册成功！请登录', isSuccess: true);
+        showSnackBar(context, '注册成功！请登录', isSuccess: true);
         setState(() => _isRegister = false);
       } else if (mounted) {
         final error = ref.read(authProvider).error;
-        _showSnackBar(error ?? '注册失败，请检查网络或稍后重试');
+        showSnackBar(context, error ?? '注册失败，请检查网络或稍后重试',
+            isError: true);
       }
     } catch (e) {
       if (mounted) {
-        _showSnackBar('注册失败，请稍后重试');
+        showSnackBar(context, '注册失败，请稍后重试', isError: true);
       }
     } finally {
       if (mounted) {
         setState(() => _isLoading = false);
       }
     }
-  }
-  // TODO: _showSnackBar 使用了自定义 backgroundColor（success），showSnackBar 函数暂不支持，保留原样
-  void _showSnackBar(String message, {bool isSuccess = false}) {
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(message),
-        backgroundColor: isSuccess ? AppTheme.success : Theme.of(context).colorScheme.error,
-      ),
-    );
   }
   @override
   Widget build(BuildContext context) {

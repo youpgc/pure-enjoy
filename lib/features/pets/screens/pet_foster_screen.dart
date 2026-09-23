@@ -76,9 +76,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
     _toast(action == 'to_foster' ? '${pet.name} 已安置进寄养仓库' : '${pet.name} 接回身边啦');
   }
 
-  void _toast(String msg) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(String msg) => showSnackBar(context, msg);
 
   @override
   Widget build(BuildContext context) {

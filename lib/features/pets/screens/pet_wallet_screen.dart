@@ -108,9 +108,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
     await _load(force: true);
   }
 
-  void _toast(String msg) => ScaffoldMessenger.of(context)
-    ..hideCurrentSnackBar()
-    ..showSnackBar(SnackBar(content: Text(msg)));
+  void _toast(String msg) => showSnackBar(context, msg);
 
   Future<void> _load({bool force = false}) async {
     final userId = SupabaseService.instance.currentUserId;

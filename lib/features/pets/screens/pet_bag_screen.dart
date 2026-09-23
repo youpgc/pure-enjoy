@@ -220,7 +220,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(SnackBar(content: Text(msg)));
+    showSnackBar(context, msg);
   }
 
   // ---------- 布局 ----------

@@ -66,9 +66,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
   Future<void> _buy(PetShopItemModel item, {bool fromDialog = false}) async {
     if (_buying.contains(item.id)) return;
     if (_gold < item.priceCoin) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('金币不足，可通过任务/历险获取')),
-      );
+      showSnackBar(context, '金币不足，可通过任务/历险获取');
       return;
     }
     setState(() => _buying.add(item.id));
@@ -76,20 +74,16 @@ class _PetShopScreenState extends State<PetShopScreen> {
     if (!mounted) return;
     setState(() => _buying.remove(item.id));
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      showSnackBar(context, petRpcErrorText(err));
       return;
     }
     if (status == 'bag_full') {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('背包已满，请先清理背包再购买')),
-      );
+      showSnackBar(context, '背包已满，请先清理背包再购买');
       return;
     }
     setState(() => _gold -= item.priceCoin);
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(item.isExpansion ? '扩容已生效' : '已购买「${item.name}」')),
-    );
+    showSnackBar(context,
+        item.isExpansion ? '扩容已生效' : '已购买「${item.name}」');
     if (fromDialog && mounted) Navigator.of(context).pop();
   }
 

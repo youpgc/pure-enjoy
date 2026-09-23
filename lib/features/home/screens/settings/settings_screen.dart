@@ -358,13 +358,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                           Navigator.pop(context);
                           showSnackBar(context, result['message'] as String);
                         } else {
-                          // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
-                          ScaffoldMessenger.of(context).showSnackBar(
-                            SnackBar(
-                              content: Text(result['message'] as String),
-                              backgroundColor: Theme.of(context).colorScheme.error,
-                            ),
-                          );
+                          showSnackBar(context, result['message'] as String,
+                              isError: true);
                         }
                       }
                     },

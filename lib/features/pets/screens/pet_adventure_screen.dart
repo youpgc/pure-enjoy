@@ -136,8 +136,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      showSnackBar(context, petRpcErrorText(err));
       return;
     }
     await _reloadSummary();
@@ -161,8 +160,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      showSnackBar(context, petRpcErrorText(err));
       await _reloadSummary();
       return;
     }
@@ -170,9 +168,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (status == PetAdventureStatus.awaitingRescue) {
       await _reloadSummary();
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('遭遇险情！请在自救窗口内使用救援道具')),
-        );
+        showSnackBar(context, '遭遇险情！请在自救窗口内使用救援道具');
       }
       return;
     }
@@ -231,14 +227,12 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      showSnackBar(context, petRpcErrorText(err));
       return;
     }
     if (mounted) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(itemId == null ? 'NPC 已救助，平安归来' : '自救成功，平安归来')),
-      );
+      showSnackBar(context,
+          itemId == null ? 'NPC 已救助，平安归来' : '自救成功，平安归来');
     }
     await _reloadSummary();
   }
@@ -317,9 +311,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   void _showTierSheet(PetSpotModel spot) {
     if (widget.tiers.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('历险档位未配置，请联系管理员')),
-      );
+      showSnackBar(context, '历险档位未配置，请联系管理员');
       return;
     }
     showModalBottomSheet<void>(
@@ -456,8 +448,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final (bag, err) = await PetRpc.fetchBag();
     if (err != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+        showSnackBar(context, petRpcErrorText(err));
       }
       return;
     }
@@ -470,9 +461,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     }
     if (rescueItem == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(content: Text('背包中没有救援道具，可去商城购买或等待 NPC 救助')),
-        );
+        showSnackBar(context, '背包中没有救援道具，可去商城购买或等待 NPC 救助');
       }
       return;
     }

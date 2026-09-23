@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 
+import '../theme/app_theme.dart';
+
 /// 通用加载组件
 class LoadingWidget extends StatelessWidget {
   final String? message;
@@ -151,13 +153,21 @@ Future<bool> showConfirmDialog(
   return result ?? false;
 }
 
-/// 显示 SnackBar
-void showSnackBar(BuildContext context, String message, {bool isError = false}) {
+/// 全局轻提示（SnackBar 唯一入口）。
+///
+/// [isError] 红底（走主题 error 色）、[isSuccess] 绿底（[AppTheme.success]），
+/// 两者都不传即默认底色。异步回调里直接调用是安全的：上下文已销毁时静默丢弃，
+/// 不再抛 setState/dependents 相关异常。
+void showSnackBar(BuildContext context, String message,
+    {bool isError = false, bool isSuccess = false}) {
+  if (!context.mounted) return;
   final colorScheme = Theme.of(context).colorScheme;
+  final backgroundColor =
+      isSuccess ? AppTheme.success : (isError ? colorScheme.error : null);
   ScaffoldMessenger.of(context).showSnackBar(
     SnackBar(
       content: Text(message),
-      backgroundColor: isError ? colorScheme.error : null,
+      backgroundColor: backgroundColor,
     ),
   );
 }

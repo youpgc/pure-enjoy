@@ -61,18 +61,15 @@ class _PetQuestsScreenState extends State<PetQuestsScreen> {
     setState(() => _claiming.remove(q.questId));
     if (reward == null) {
       // 失败：重载以拿到服务端错误语义（由 claim 的错误返回路径统一提示）
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('领取失败，请稍后重试')),
-      );
+      showSnackBar(context, '领取失败，请稍后重试');
       return;
     }
     final parts = <String>[
       if (reward.gold > 0) '金币 +${reward.gold}',
       if (reward.points > 0) '积分 +${reward.points}',
     ];
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('奖励已领取：${parts.isEmpty ? '道具已入背包' : parts.join('，')}')),
-    );
+    showSnackBar(context,
+        '奖励已领取：${parts.isEmpty ? '道具已入背包' : parts.join('，')}');
     _load();
   }
 

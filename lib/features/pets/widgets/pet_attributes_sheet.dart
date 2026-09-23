@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
+import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
@@ -81,11 +82,9 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (firstErr != null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(donePoints > 0
-            ? '已分配 $donePoints 点，其余未完成：${petRpcErrorText(firstErr)}'
-            : petRpcErrorText(firstErr)),
-      ));
+      showSnackBar(context, donePoints > 0
+          ? '已分配 $donePoints 点，其余未完成：${petRpcErrorText(firstErr)}'
+          : petRpcErrorText(firstErr));
       // 部分成功也关闭并刷新——面板宠物快照过期，重开面板续传剩余点数
       Navigator.pop(context);
       widget.onChanged?.call();
@@ -105,9 +104,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || data == null) {
-      ScaffoldMessenger.of(context).showSnackBar(SnackBar(
-        content: Text(petRpcErrorText(err)),
-      ));
+      showSnackBar(context, petRpcErrorText(err));
       return;
     }
     await showPetRefineResultDialog(

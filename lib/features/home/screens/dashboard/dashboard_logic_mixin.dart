@@ -125,13 +125,7 @@ mixin _DashboardLogic on State<DashboardPage> {
       await _loadHabitsForCheckin();
 
       if (mounted) {
-        // TODO: showSnackBar 不支持自定义 backgroundColor，保留原样
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('${habit.name} 打卡成功！'),
-            backgroundColor: AppTheme.success,
-          ),
-        );
+        showSnackBar(context, '${habit.name} 打卡成功！', isSuccess: true);
       }
     } catch (e) {
       if (mounted) {

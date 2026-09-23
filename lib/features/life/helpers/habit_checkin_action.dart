@@ -1,5 +1,4 @@
 import 'package:flutter/material.dart';
-import '../../../core/theme/app_theme.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../core/utils/event_bus.dart';
 import '../models/habit_model.dart';
@@ -23,12 +22,7 @@ Future<void> performHabitCheckIn({
     await refresh();
     EventBus.instance.fire(EventType.habitUpdated);
     if (!context.mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('${habit.name} 打卡成功！'),
-        backgroundColor: AppTheme.success,
-      ),
-    );
+    showSnackBar(context, '${habit.name} 打卡成功！', isSuccess: true);
   } catch (e) {
     if (context.mounted) {
       showSnackBar(context, '打卡失败，请稍后重试', isError: true);

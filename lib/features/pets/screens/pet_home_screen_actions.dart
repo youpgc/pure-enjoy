@@ -11,14 +11,12 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+      showSnackBar(context, petRpcErrorText(err));
       return;
     }
     if (celebrate) _celebrate();
     if (successMsg != null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(successMsg)));
+      showSnackBar(context, successMsg);
     }
     _load();
   }
@@ -50,8 +48,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final (eggs, err) = await PetRpc.fetchEggs();
     if (err != null) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(SnackBar(content: Text(petRpcErrorText(err))));
+        showSnackBar(context, petRpcErrorText(err));
       }
       return;
     }
@@ -64,16 +61,14 @@ extension _PetHomeActions on _PetHomeScreenState {
     }
     if (target == null) {
       if (mounted) {
-        ScaffoldMessenger.of(context)
-            .showSnackBar(const SnackBar(content: Text('没有可即开孵化的蛋')));
+        showSnackBar(context, '没有可即开孵化的蛋');
       }
       return;
     }
     final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
     if (!mounted) return;
     if (hatchErr != null || result == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(SnackBar(content: Text(petRpcErrorText(hatchErr))));
+      showSnackBar(context, petRpcErrorText(hatchErr));
       return;
     }
     _celebrate();
@@ -119,8 +114,7 @@ extension _PetHomeActions on _PetHomeScreenState {
   void _openAdventure() {
     final pet = _currentPet;
     if (pet == null) {
-      ScaffoldMessenger.of(context)
-          .showSnackBar(const SnackBar(content: Text('先孵化一只宠物才能历险')));
+      showSnackBar(context, '先孵化一只宠物才能历险');
       return;
     }
     _push(PetAdventureScreen(
@@ -148,8 +142,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final adv = _summary?.ongoingAdventure;
     if (adv == null || _busy) return;
     if (!adv.usable) {
-      ScaffoldMessenger.of(context).showSnackBar(const SnackBar(
-          content: Text('历险信息异常，请下拉刷新或重进宠物页重试')));
+      showSnackBar(context, '历险信息异常，请下拉刷新或重进宠物页重试');
       return;
     }
     if (await run(context, adv.id) && mounted) _load();
