@@ -26,8 +26,11 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 onDoubleTap: _onStageDoubleTap,
                 onLongPress: _openAttributes,
                 child: PetLivingArt(
-                  frames: petIdleFrames(pet.speciesCode),
-                  fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
+                  // 身体帧按当前动作取：该动作有真帧用它，没有则沿用 idle 帧
+                  frames: petStageFrames(pet.speciesCode, _machine.current,
+                      render2d: pet.render2d),
+                  fallbackAsset: petBaseArt(pet.speciesCode, pet.stage,
+                      render2d: pet.render2d),
                   action: _machine.current,
                   onActionEnd: _onActionEnd,
                 ),

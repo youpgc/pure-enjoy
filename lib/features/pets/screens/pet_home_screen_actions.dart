@@ -136,13 +136,10 @@ extension _PetHomeActions on _PetHomeScreenState {
       showSnackBar(context, petRpcErrorText(hatchErr));
       return;
     }
-    // 图片权重：展示基础型形象大图（帧序列首帧，未登记种属回退静态立绘）
-    final frames = petIdleFrames(result.speciesCode);
+    // 图片权重：展示基础型形象大图（idle 首帧透明底，未登记种属回退静态底图）
     await showPetBirthDialog(
       context,
-      img: frames.isNotEmpty
-          ? frames.first
-          : petStageArtAsset(result.speciesCode, 0),
+      img: petPortraitArt(result.speciesCode),
       result: result,
     );
     if (!mounted) return;

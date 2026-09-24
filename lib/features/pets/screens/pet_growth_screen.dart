@@ -7,7 +7,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
-import '../utils/pet_art.dart';
+import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_growth_widgets.dart';
 
@@ -298,7 +298,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   }
 
   Future<void> _showEvolved(PetEvolveResultModel result) async {
-    final img = petBirthArt(result.speciesCode);
+    final img = petPortraitArt(result.speciesCode);
     await showDialog<void>(
       context: context,
       builder: (ctx) => Dialog(

@@ -13,7 +13,7 @@ import '../services/pet_audio.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_action_machine.dart';
-import '../utils/pet_art.dart';
+import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
 import '../widgets/pet_attributes_sheet.dart';

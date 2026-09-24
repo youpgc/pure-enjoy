@@ -11,7 +11,7 @@ library;
 /// 1. App 动作仲裁与补间编排（`utils/pet_action_machine.dart`
 ///    + `widgets/pet_living_art.dart`）；
 /// 2. `pet_species.render2d` 的 `frames` 键（该动作有真帧才走帧序列，
-///    无帧走程序补间，见 `utils/pet_art.dart`）；
+///    无帧走程序补间；契约与取图见 `utils/pet_art_resolver.dart`）；
 /// 3. 素材文件名（`assets/pets/frames/<species_code>_<action>_N.png`）。
 ///
 /// 动作集合本身继承自 3D 期的定版口径（需求 §11.3 与《3D 展现与交互实现方案》

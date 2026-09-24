@@ -9,7 +9,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
-import '../utils/pet_art.dart';
+import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_item_icon.dart';
@@ -96,7 +96,7 @@ class _PetEggScreenState extends State<PetEggScreen> {
         }
         await showPetBirthDialog(
           context,
-          img: petBirthArt(result.speciesCode),
+          img: petPortraitArt(result.speciesCode),
           result: result,
         );
         await _load(forceRefresh: true);

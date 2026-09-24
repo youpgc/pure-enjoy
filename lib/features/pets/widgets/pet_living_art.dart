@@ -33,7 +33,8 @@ class PetLivingArt extends StatefulWidget {
     this.onActionEnd,
   });
 
-  /// idle 帧序列（assets/pets/frames/*）；空 = 无帧素材，走单图
+  /// 真帧序列（`petStageFrames` 解析：该动作有真帧用它，否则沿用 idle 帧）；
+  /// 空 = 无帧素材，走单图 + 补间
   final List<String> frames;
 
   /// 无帧序列时的单帧立绘回退
@@ -217,21 +218,25 @@ class _PetLivingArtState extends State<PetLivingArt>
               .clamp(128, 2048);
 
       final path = widget.fallbackAsset;
+      // 素材缺失/清单与包内文件脱节时画占位，不抛异常（铁律 8）
+      final Widget placeholder = Padding(
+        padding: const EdgeInsets.symmetric(vertical: 24),
+        child: Icon(Icons.pets, size: 64, color: cs.primary),
+      );
       final Widget art = widget.frames.isNotEmpty
           ? Image.asset(widget.frames[_frameIndex],
               height: widget.height,
               fit: widget.fit,
               cacheWidth: cacheWidth,
-              gaplessPlayback: true) // 帧切换不闪断
+              gaplessPlayback: true, // 帧切换不闪断
+              errorBuilder: (context, error, stackTrace) => placeholder)
           : path != null
               ? Image.asset(path,
                   height: widget.height,
                   fit: widget.fit,
-                  cacheWidth: cacheWidth)
-              : Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 24),
-                  child: Icon(Icons.pets, size: 64, color: cs.primary),
-                );
+                  cacheWidth: cacheWidth,
+                  errorBuilder: (context, error, stackTrace) => placeholder)
+              : placeholder;
 
       return AnimatedBuilder(
         animation: Listenable.merge([_frame, _perf]),
