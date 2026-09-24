@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../models/pet_p2_breed_models.dart';
 import '../models/pet_p2_models.dart';
 import '../models/pet_p2_progress_models.dart';
+import '../utils/pet_errors.dart';
 import 'pet_rpc.dart';
 import 'pet_service.dart';
 
@@ -52,7 +53,7 @@ class PetRpcP2 {
       return (rows.map(PetPetDetailModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 宠物明细查询失败: $e');
-      return (const <PetPetDetailModel>[], e.toString());
+      return (const <PetPetDetailModel>[], kPetLocalError);
     }
   }
 
@@ -80,7 +81,7 @@ class PetRpcP2 {
       return (rows.map(PetEvoStageOptionModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 进化候选查询失败: $e');
-      return (const <PetEvoStageOptionModel>[], e.toString());
+      return (const <PetEvoStageOptionModel>[], kPetLocalError);
     }
   }
 
@@ -102,7 +103,7 @@ class PetRpcP2 {
       return (rows.map(PetBreedOrderModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 繁育单据查询失败: $e');
-      return (const <PetBreedOrderModel>[], e.toString());
+      return (const <PetBreedOrderModel>[], kPetLocalError);
     }
   }
 
@@ -123,7 +124,7 @@ class PetRpcP2 {
       return (rows.map(PetFeatureModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 功能开通查询失败: $e');
-      return (const <PetFeatureModel>[], e.toString());
+      return (const <PetFeatureModel>[], kPetLocalError);
     }
   }
 
@@ -153,7 +154,7 @@ class PetRpcP2 {
       return (odds, null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 概率公示查询失败: $e');
-      return (const <PetEggOddsModel>[], e.toString());
+      return (const <PetEggOddsModel>[], kPetLocalError);
     }
   }
 
@@ -176,7 +177,7 @@ class PetRpcP2 {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] P2 门槛查询失败: $e');
-      return (const PetReservedModel({}), e.toString());
+      return (const PetReservedModel({}), kPetLocalError);
     }
   }
 

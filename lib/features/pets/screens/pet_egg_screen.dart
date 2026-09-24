@@ -57,14 +57,16 @@ class _PetEggScreenState extends State<PetEggScreen> {
 
   Future<void> _load({bool forceRefresh = false}) async {
     if (forceRefresh) await PetService.instance.invalidateSummary();
-    final summary = await PetService.instance.fetchSummary();
+    final (summary, summaryErr) = await PetService.instance.fetchSummary();
     final (eggs, err) = await PetRpc.fetchEggs();
     final (bag, _) = await PetRpc.fetchBag();
     final (reserved, _) = await PetRpcP2.fetchReserved();
     if (!mounted) return;
     setState(() {
       _eggs = eggs;
-      _error = err == null ? null : petRpcErrorText(err);
+      // 金币余额取自总览：总览失败虽不影响蛋列表，也必须报出来（否则兑换/加速
+      // 按钮上的金币恒为 0 却没有任何解释）
+      _error = err != null ? petRpcErrorText(err) : summaryErr;
       _accelItems = bag
           .where((e) => e.effectType == PetItemEffectType.hatchAccel.code)
           .toList();

@@ -50,11 +50,12 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
       }
       return;
     }
-    final summary = await PetService.instance.fetchSummary(forceRefresh: force);
+    final (summary, err) =
+        await PetService.instance.fetchSummary(forceRefresh: force);
     if (!mounted) return;
     setState(() {
       _summary = summary;
-      _error = summary == null ? '数据加载失败，请稍后重试' : null;
+      _error = summary == null ? (err ?? '宠物功能已关闭') : null;
       _loading = false;
     });
   }

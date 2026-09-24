@@ -4,13 +4,15 @@ import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_item_icon.dart';
 import 'pet_odds_screen.dart';
 
-/// 宠物商城页（分类 + 物品格 + 悬浮窗购买）
+/// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
 ///
-/// 布局（2026-09-17 定版）：分类页签（全部/食物/清洁/玩具/救援/扩容），
-/// 物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与购买按钮。
+/// 布局（2026-09-24 定版）：分类栏在**左侧竖排**（栅格 tile，超出出滚动条），
+/// 右侧物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与购买按钮。
+/// 分类清单取自 `PetShopItemModel.categoryLabels`（P1 五类 + P2 五类 + 其他）。
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
 class PetShopScreen extends StatefulWidget {
@@ -29,17 +31,29 @@ class _PetShopScreenState extends State<PetShopScreen> {
   final Set<String> _buying = {};
   late int _gold = widget.goldBalance;
 
-  /// 当前分类（all / 食物 / 清洁 / 玩具 / 救援 / 扩容，与 categoryLabel 对应）
+  /// 当前分类（all / [PetShopItemModel.categoryLabels] 之一）
   String _category = 'all';
 
-  static const _tabs = <(String, IconData)>[
-    ('all', Icons.grid_view_outlined),
-    ('食物', Icons.restaurant),
-    ('清洁', Icons.shower_outlined),
-    ('玩具', Icons.toys_outlined),
-    ('救援', Icons.health_and_safety_outlined),
-    ('扩容', Icons.unfold_more),
-  ];
+  /// 分类栏项：清单来自模型（与 categoryLabel 同源，防漂移），图标在本页映射
+  static List<PetCategoryItem> get _railItems => [
+        const PetCategoryItem('all', '全部', icon: Icons.grid_view_outlined),
+        for (final label in PetShopItemModel.categoryLabels)
+          PetCategoryItem(label, label, icon: _labelIcon(label)),
+      ];
+
+  static IconData _labelIcon(String label) => switch (label) {
+        '宠物蛋' => Icons.egg_outlined,
+        '食物' => Icons.restaurant,
+        '清洁' => Icons.shower_outlined,
+        '玩具' => Icons.toys_outlined,
+        '救援' => Icons.health_and_safety_outlined,
+        '扩容' => Icons.unfold_more,
+        '进化' => Icons.auto_awesome_outlined,
+        '加速' => Icons.speed_outlined,
+        '洗练' => Icons.replay_outlined,
+        '解锁' => Icons.lock_open_outlined,
+        _ => Icons.category_outlined,
+      };
 
   @override
   void initState() {
@@ -137,38 +151,15 @@ class _PetShopScreenState extends State<PetShopScreen> {
         ),
       );
     }
-    return Column(
+    // 左侧分类栏 + 右侧商品网格（2026-09-24 布局定版：分类不再占顶部一行，
+    // 分类数不再受屏宽限制，超出时分类栏自身出滚动条）
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        // 分类页签
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Row(
-            children: [
-              for (final (label, icon) in _tabs) ...[
-                Expanded(
-                  child: ChoiceChip(
-                    avatar: Icon(
-                      icon,
-                      size: 15,
-                      color: _category == label
-                          ? cs.onSecondaryContainer
-                          : cs.onSurfaceVariant,
-                    ),
-                    label: Text(label == 'all' ? '全部' : label),
-                    labelStyle: TextStyle(
-                      fontSize: 12,
-                      color: _category == label
-                          ? cs.onSecondaryContainer
-                          : cs.onSurface,
-                    ),
-                    selected: _category == label,
-                    onSelected: (_) => setState(() => _category = label),
-                  ),
-                ),
-                if (label != _tabs.last.$1) const SizedBox(width: 4),
-              ],
-            ],
-          ),
+        PetCategoryRail(
+          items: _railItems,
+          selected: _category,
+          onSelect: (key) => setState(() => _category = key),
         ),
         Expanded(
           child: _filtered.isEmpty

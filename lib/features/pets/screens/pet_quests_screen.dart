@@ -102,13 +102,11 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   Future<void> _claimDaily(PetQuestModel q) async {
     if (_claiming.contains(q.questId)) return;
     setState(() => _claiming.add(q.questId));
-    final reward = await PetRpc.questClaim(q.questId);
+    final (reward, err) = await PetRpc.questClaim(q.questId);
     if (!mounted) return;
     setState(() => _claiming.remove(q.questId));
-    if (reward == null) {
-      // 失败：重载以拿到服务端错误语义（由 claim 的错误返回路径统一提示）
-      showSnackBar(context, '领取失败，请稍后重试');
-      return;
+    if (err != null || reward == null) {
+      return showSnackBar(context, petRpcErrorText(err));
     }
     showSnackBar(context, _claimToast(_rewardParts(reward.gold, reward.points, const [])));
     _load();

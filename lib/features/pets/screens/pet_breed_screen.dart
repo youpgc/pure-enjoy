@@ -47,7 +47,8 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
 
   Future<void> _load({bool force = false}) async {
     if (force) await PetService.instance.invalidateSummary();
-    final summary = await PetService.instance.fetchSummary(forceRefresh: force);
+    final (summary, summaryErr) =
+        await PetService.instance.fetchSummary(forceRefresh: force);
     final (features, _) = await PetRpcP2.fetchUnlockedFeatures();
     final (orders, ordersErr) = await PetRpcP2.fetchBreedOrders();
     final (reserved, _) = await PetRpcP2.fetchReserved();
@@ -65,7 +66,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
       _reserved = reserved;
       _picked.removeWhere((id) => !rearing.contains(id));
       _error = summary == null
-          ? '数据加载失败，请稍后重试'
+          ? (summaryErr ?? '数据加载失败，请稍后重试')
           : (ordersErr == null ? null : petRpcErrorText(ordersErr));
       _loading = false;
     });

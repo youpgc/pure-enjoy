@@ -8,6 +8,60 @@ import './api_client.dart';
 /// 离线操作类型
 enum OfflineAction { create, update, delete }
 
+/// 本次同步未执行的原因
+enum OfflineSyncSkip { none, wifiOnly, autoSyncOff, busy }
+
+/// [OfflineSyncService.syncPending] 的结果。
+///
+/// 只服务于「用户主动触发」的调用点回话：三类总闸跳过与超次丢弃原先只写
+/// debugPrint，真机上没有任何反馈。
+class OfflineSyncResult {
+  const OfflineSyncResult({
+    this.skip = OfflineSyncSkip.none,
+    this.synced = 0,
+    this.pending = 0,
+    this.dropped = 0,
+    this.failed = false,
+  });
+
+  const OfflineSyncResult.skipped(this.skip, this.pending)
+      : synced = 0,
+        dropped = 0,
+        failed = false;
+
+  final OfflineSyncSkip skip;
+
+  /// 本次成功补发项数
+  final int synced;
+
+  /// 结束后仍留在队列里的项数
+  final int pending;
+
+  /// 超过最大重试次数被放弃的项数
+  final int dropped;
+
+  /// 同步过程本身抛错
+  final bool failed;
+
+  /// 给用户的一句话；null 表示无需打断。
+  ///
+  /// 覆盖三类跳过 + 两类「本机会丢数据」的情形（抛错、超次放弃），
+  /// 让用户在主动触发同步的入口（设置页开关）就能看见，而不是事后发现丢了记录。
+  String? get userMessage {
+    if (skip == OfflineSyncSkip.wifiOnly) {
+      return pending > 0
+          ? '已开启「仅 WiFi 同步」，当前不是 WiFi，$pending 项改动暂存在本机'
+          : '已开启「仅 WiFi 同步」，当前不是 WiFi，连上 WiFi 后自动补发';
+    }
+    if (skip == OfflineSyncSkip.autoSyncOff) {
+      return pending > 0 ? '自动同步已关闭，$pending 项改动暂存在本机' : '自动同步已关闭';
+    }
+    if (failed) return '离线同步失败，$pending 项改动仍保存在本机';
+    if (dropped > 0) return '有 $dropped 项离线改动多次同步未成功，已停止重试';
+    return null;
+  }
+}
+
 /// 离线同步服务
 /// 基于 SharedPreferences 实现轻量级写入前日志（Write-Ahead Log）
 /// 当网络请求失败时，将操作加入本地队列，网络恢复后自动同步
@@ -82,7 +136,10 @@ class OfflineSyncService {
   /// 同步所有待处理的操作。
   /// [isBackground] 标记是否为后台自动触发（启动 / 网络恢复）；
   /// 仅后台触发受「自动同步」总闸约束，用户主动操作（内联）触发的同步始终执行。
-  Future<void> syncPending({bool isBackground = false}) async {
+  ///
+  /// 返回本次结果，供**用户主动触发**的调用点回话：此前两处总闸跳过只写
+  /// debugPrint，真机上用户点了开关/加了数据却毫无反馈，误以为「已同步」。
+  Future<OfflineSyncResult> syncPending({bool isBackground = false}) async {
     // 全局总闸：仅 WiFi 同步 —— 当前非 WiFi 网络直接中止本次同步
     final wifiOnly = await _isWifiOnlyEnabled();
     if (wifiOnly) {
@@ -91,7 +148,8 @@ class OfflineSyncService {
         if (kDebugMode) {
           debugPrint('📶 仅 WiFi 同步已开启，当前非 WiFi 网络，跳过本次同步');
         }
-        return;
+        return OfflineSyncResult.skipped(
+            OfflineSyncSkip.wifiOnly, await getPendingCount());
       }
     }
 
@@ -100,21 +158,26 @@ class OfflineSyncService {
       if (kDebugMode) {
         debugPrint('🔕 自动同步已关闭，跳过后台自动补发');
       }
-      return;
+      return OfflineSyncResult.skipped(
+          OfflineSyncSkip.autoSyncOff, await getPendingCount());
     }
 
-    if (_isSyncing) return;
+    if (_isSyncing) {
+      return OfflineSyncResult.skipped(
+          OfflineSyncSkip.busy, await getPendingCount());
+    }
     _isSyncing = true;
 
     try {
       final queue = await _loadQueue();
-      if (queue.isEmpty) return;
+      if (queue.isEmpty) return const OfflineSyncResult();
 
       if (kDebugMode) {
         debugPrint('🔄 开始同步离线队列，共 ${queue.length} 项');
       }
 
       final remaining = <Map<String, dynamic>>[];
+      var dropped = 0;
 
       for (final item in queue) {
         final success = await _syncItem(item);
@@ -124,6 +187,7 @@ class OfflineSyncService {
             item['retryCount'] = retryCount + 1;
             remaining.add(item);
           } else {
+            dropped++;
             if (kDebugMode) {
               debugPrint('⚠️ 离线操作超过最大重试次数，已丢弃: ${item['table']} ${item['action']}');
             }
@@ -133,16 +197,18 @@ class OfflineSyncService {
 
       await _saveQueue(remaining);
 
-      if (kDebugMode) {
-        final synced = queue.length - remaining.length;
-        if (synced > 0) {
-          debugPrint('✅ 离线同步完成：$synced 项成功，${remaining.length} 项待重试');
-        }
+      final synced = queue.length - remaining.length;
+      if (kDebugMode && synced > 0) {
+        debugPrint('✅ 离线同步完成：$synced 项成功，${remaining.length} 项待重试');
       }
+      return OfflineSyncResult(
+          synced: synced, pending: remaining.length, dropped: dropped);
     } catch (e) {
       if (kDebugMode) {
         debugPrint('❌ 离线同步出错: $e');
       }
+      return OfflineSyncResult(
+          failed: true, pending: (await _loadQueue()).length);
     } finally {
       _isSyncing = false;
     }

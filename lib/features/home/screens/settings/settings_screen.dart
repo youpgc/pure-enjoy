@@ -74,6 +74,18 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
     await prefs.setBool(key, value);
   }
 
+  /// 同步开关立即生效，并把「为什么没同步」回话给用户。
+  ///
+  /// 必须先 await 写偏好再触发同步：否则 syncPending 读到的是旧开关值，
+  /// 刚关掉「仅 WiFi」仍会被旧值拦下。
+  Future<void> _syncNowAndReport() async {
+    final result = await OfflineSyncService.instance.syncPending();
+    final msg = result.userMessage;
+    if (msg != null && mounted) {
+      showSnackBar(context, msg);
+    }
+  }
+
   /// 字体大小 -> fontScale 映射
   double _fontSizeToScale(String size) {
     switch (size) {
@@ -104,17 +116,17 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
           ref.read(themeProvider).setThemeMode(val ? ThemeMode.dark : ThemeMode.light);
         },
         onFontSizeTap: _showFontSizeDialog,
-        onAutoSyncChanged: (val) {
+        onAutoSyncChanged: (val) async {
           setState(() => _autoSync = val);
-          _saveBoolSetting(_autoSyncKey, val);
+          await _saveBoolSetting(_autoSyncKey, val);
           // 开关立即生效：关闭后后台不再自动补发；开启后立即补发挂起队列
-          OfflineSyncService.instance.syncPending();
+          await _syncNowAndReport();
         },
-        onWifiOnlyChanged: (val) {
+        onWifiOnlyChanged: (val) async {
           setState(() => _wifiOnly = val);
-          _saveBoolSetting(_wifiOnlyKey, val);
+          await _saveBoolSetting(_wifiOnlyKey, val);
           // 开关立即生效：解除/启用 WiFi 限制后立即尝试同步（非 WiFi 时按限制跳过）
-          OfflineSyncService.instance.syncPending();
+          await _syncNowAndReport();
         },
         // [FCM 待接入·占位逻辑] 当前仅持久化用户偏好，不触发任何推送行为（无 FCM 通道）。
         // —— 接入方案（待实施）——

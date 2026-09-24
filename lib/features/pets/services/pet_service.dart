@@ -44,7 +44,7 @@ class PetService {
     bool forceRefresh = false,
   }) async {
     try {
-      return await PetCache.getMap(
+      final (data, cached, _) = await PetCache.getMap(
         PetCache.keyGate,
         () => ApiClient.get(
           'pet_config',
@@ -55,6 +55,7 @@ class PetService {
         ttl: _gateTtl,
         forceRefresh: forceRefresh,
       );
+      return (data, cached);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 门控查询失败: $e');
       return (null, false);
@@ -63,25 +64,31 @@ class PetService {
 
   /// 拉取宠物总览（rpc_pet_summary；SWR：缓存秒开 + 静默刷新）。
   ///
-  /// 返回 null 表示未登录 / 请求失败 / 功能关闭，调用方按隐藏处理。
-  Future<PetSummaryModel?> fetchSummary({bool forceRefresh = false}) async {
-    if (SupabaseService.instance.currentUserId == null) return null;
+  /// 返回 `(summary, errorMessage)`，三种情形分得清（此前统一返回 null，
+  /// 页面只能把「网络失败」也写成「功能暂未开放 / 加载失败，请稍后重试」）：
+  /// - `summary != null`：正常；
+  /// - `summary == null && err == null`：未登录 / 总开关关闭 → 按隐藏处理；
+  /// - `err != null`：请求或解析失败 → 页面给可重试的错误态并展示 [err]。
+  Future<(PetSummaryModel?, String?)> fetchSummary({
+    bool forceRefresh = false,
+  }) async {
+    if (SupabaseService.instance.currentUserId == null) return (null, null);
     try {
-      final (data, _) = await PetCache.getMap(
+      final (data, _, err) = await PetCache.getMap(
         PetCache.keySummary,
         () => ApiClient.rpc('rpc_pet_summary', note: 'rpc_pet_summary 总览'),
         forceRefresh: forceRefresh,
       );
-      if (data == null) return null;
+      if (data == null) return (null, err ?? '总览无数据');
       final summary = PetSummaryModel.fromJson(data);
       // 总开关关闭时即便缓存有数据也按隐藏处理（兜底，防旧缓存穿透）
-      if (!summary.petEnabled) return null;
+      if (!summary.petEnabled) return (null, null);
       // 留住 pet_config 快照：背包等页只按 rpc_pet_summary 已回传的配置取数，不再补请求
       _summaryConfig = summary.config;
-      return summary;
+      return (summary, null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');
-      return null;
+      return (null, '总览数据解析失败');
     }
   }
 

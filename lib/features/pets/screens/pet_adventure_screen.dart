@@ -144,8 +144,10 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   }
 
   /// 出发后/领取后重取总览拿最新 ongoing 状态
+  ///
+  /// 拉不到时保持当前状态即可（本次操作的结果已单独提示过），故不打扰用户。
   Future<void> _reloadSummary() async {
-    final summary = await PetService.instance.fetchSummary();
+    final (summary, _) = await PetService.instance.fetchSummary();
     if (mounted) {
       final adv = summary?.ongoingAdventure;
       // 空 id = 服务端概要形状异常，按「无进行中历险」处理，避免把空 uuid 发给后端

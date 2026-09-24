@@ -39,7 +39,9 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
       if (mounted) setState(() => _loading = false);
       return;
     }
-    final summary = await PetService.instance.fetchSummary(forceRefresh: force);
+    // 状态卡按设计「拉不到就不渲染」，故错误文案在此不展示（错误态由宠物主页承担）
+    final (summary, _) =
+        await PetService.instance.fetchSummary(forceRefresh: force);
     if (mounted) {
       setState(() {
         _summary = summary;

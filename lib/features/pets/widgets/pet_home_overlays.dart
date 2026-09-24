@@ -216,17 +216,22 @@ class PetEdgeButton extends StatelessWidget {
 }
 
 /// 无宠物孵化引导卡（首蛋就绪时展示立即孵化）
+///
+/// [onGoEggs]：无即开蛋时的出口。等待孵化型的蛋要先到蛋页点「孵化」计时，
+/// 否则这里是一条死路（只能干等初始蛋文案），故给一个直达蛋页的按钮。
 class PetHatchGuide extends StatelessWidget {
   const PetHatchGuide({
     super.key,
     required this.hasEgg,
     this.busy = false,
     this.onHatch,
+    this.onGoEggs,
   });
 
   final bool hasEgg;
   final bool busy;
   final VoidCallback? onHatch;
+  final VoidCallback? onGoEggs;
 
   @override
   Widget build(BuildContext context) {
@@ -244,7 +249,7 @@ class PetHatchGuide extends StatelessWidget {
             Text(hasEgg ? '你的第一颗蛋已经就绪' : '还没有宠物'),
             const SizedBox(height: 4),
             Text(
-              hasEgg ? '点击下方按钮，立即见证新伙伴的诞生' : '初始蛋将在背包中发放，稍后回来试试',
+              hasEgg ? '点击下方按钮，立即见证新伙伴的诞生' : '背包里有等待孵化的蛋，或稍后再回来看看',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             if (hasEgg) ...[
@@ -253,6 +258,13 @@ class PetHatchGuide extends StatelessWidget {
                 onPressed: busy ? null : onHatch,
                 icon: const Icon(Icons.auto_awesome),
                 label: const Text('立即孵化'),
+              ),
+            ] else if (onGoEggs != null) ...[
+              const SizedBox(height: 12),
+              OutlinedButton.icon(
+                onPressed: busy ? null : onGoEggs,
+                icon: const Icon(Icons.hourglass_empty_outlined),
+                label: const Text('去孵蛋'),
               ),
             ],
           ],

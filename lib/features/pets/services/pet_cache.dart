@@ -59,9 +59,11 @@ class PetCache {
 
   /// 带缓存的 Map 读取。
   ///
-  /// 返回 `(data, cached)`：cached=true 表示本次直接用了本地缓存（后台已在刷新）。
+  /// 返回 `(data, cached, errorMessage)`：cached=true 表示本次直接用了本地缓存
+  /// （后台已在刷新）；errorMessage 为**请求失败**时的原始文案（成功/命中缓存为 null，
+  /// 后台静默刷新失败也带不回——此时页面有旧数据可展示，无需报错）。
   /// [fetcher] 返回 [ApiResponse]，成功时经 [_extractMap] 取单对象缓存。
-  static Future<(Map<String, dynamic>?, bool)> getMap(
+  static Future<(Map<String, dynamic>?, bool, String?)> getMap(
     String key,
     Future<ApiResponse> Function() fetcher, {
     Duration ttl = defaultTtl,
@@ -90,12 +92,16 @@ class PetCache {
     // 有缓存：先秒开，后台静默刷新
     if (memory != null) {
       unawaited(refresh);
-      return (memory, true);
+      return (memory, true, null);
     }
 
     // 无缓存：必须等网络
     final resp = await refresh;
-    return (resp.isSuccess ? _extractMap(resp) : null, false);
+    return (
+      resp.isSuccess ? _extractMap(resp) : null,
+      false,
+      resp.isSuccess ? null : resp.errorMessage,
+    );
   }
 
   /// 失效单个缓存键（数据 + 时间戳）

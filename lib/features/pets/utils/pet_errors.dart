@@ -1,3 +1,10 @@
+/// 客户端本地异常（字段类型不符、解析失败）的统一文案。
+///
+/// 原始异常已在各查询点 debugPrint；把 `e.toString()` 直接回给页面会把
+/// `type 'Null' is not a subtype of ...` 这类英文串上屏（[petRpcErrorText]
+/// 对短字符串是原样放行的），用户读不懂，也掩盖了真正的配置问题。
+const String kPetLocalError = '数据读取异常，请刷新重试';
+
 /// 宠物 RPC 业务错误文案映射
 ///
 /// PostgREST 4xx 时 error 字段为服务端 message（raise exception 的文本，

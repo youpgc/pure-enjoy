@@ -130,12 +130,13 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
       }
       return;
     }
-    final summary = await PetService.instance.fetchSummary(forceRefresh: force);
+    final (summary, err) =
+        await PetService.instance.fetchSummary(forceRefresh: force);
     if (mounted) {
       setState(() {
         _enabled = true;
         _summary = summary;
-        _error = summary == null ? '总览拉取失败（rpc_pet_summary）' : null;
+        _error = summary == null ? (err ?? '宠物功能已关闭') : null;
         _loading = false;
         // 多宠切换下标防越界（列表变短时回第一只）
         final count = _stagePets.length;
@@ -186,7 +187,10 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
           PetGoldBadge(gold: _summary?.wallet.goldBalance ?? 0),
           Center(
             child: PetHatchGuide(
-                hasEgg: _summary!.eggsReadyInstant > 0, busy: _busy, onHatch: _hatchFirstEgg),
+                hasEgg: _summary!.eggsReadyInstant > 0,
+                busy: _busy,
+                onHatch: _hatchFirstEgg,
+                onGoEggs: _openEggs),
           ),
         ],
       ],

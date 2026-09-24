@@ -10,16 +10,17 @@ import '../utils/pet_bag_meta.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_bag_grid.dart';
 import '../widgets/pet_bag_item_dialog.dart';
+import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_home_overlays.dart';
 import 'pet_egg_screen.dart';
 import 'pet_growth_screen.dart';
 import 'pet_shop_screen.dart';
 
-/// 宠物背包页（格位坐标制 + 分类页签 + 拖拽换位）
+/// 宠物背包页（格位坐标制 + 左侧分类栏 + 拖拽换位）
 ///
 /// - 网格严格按 `pet_bag_items.slot_index` 定位：`itemCount = 背包容量`，
 ///   第 i 格即 slot_index=i，无行的格位渲染为空格（与服务端坐标系一致）；
-/// - 分类页签只置灰不过滤（方案 A）：过滤会改变格号与坐标的对应关系；
+/// - 分类栏只置灰不过滤（方案 A）：过滤会改变格号与坐标的对应关系；
 /// - 拖拽换位走 `rpc_pet_swap_slot`（交换/移入空格）；服务端换位不合并
 ///   堆叠，故同道具格位禁止落点，合并交由「整理」`rpc_pet_compact_bag`；
 /// - 丢弃走 `rpc_pet_discard_items`（按 slot_index + quantity），不可恢复。
@@ -69,7 +70,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   Future<void> _load({bool showLoading = true, bool forceRefresh = false}) async {
     if (showLoading) setState(() => _loading = true);
     // 总览先行：PetRpc.fetchBag 的堆叠上限兜底值取自总览回传的 pet_config 快照
-    final summary =
+    final (summary, summaryErr) =
         await PetService.instance.fetchSummary(forceRefresh: forceRefresh);
     final (items, err) = await PetRpc.fetchBag();
     if (!mounted) return;
@@ -86,7 +87,8 @@ class _PetBagScreenState extends State<PetBagScreen> {
       _bySlot = bySlot;
       _capacity = cap;
       _gold = summary?.wallet.goldBalance ?? 0;
-      _error = err == null ? null : petRpcErrorText(err);
+      // 道具行错误优先；总览失败但行拉到了也要报出来（容量/堆叠上限会回落默认值）
+      _error = err != null ? petRpcErrorText(err) : summaryErr;
       _loading = false;
     });
   }
@@ -299,79 +301,64 @@ class _PetBagScreenState extends State<PetBagScreen> {
       );
     }
     if (_items.isEmpty) return _emptyView(cs);
-    return Column(
+    // 左侧分类栏 + 右侧格位网格（2026-09-24 布局定版：分类不再占顶部一行）
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
-        Padding(
-          padding: const EdgeInsets.fromLTRB(12, 8, 12, 4),
-          child: Row(
+        PetCategoryRail(
+          items: [
+            for (final t in _tabs)
+              PetCategoryItem(t.$1, t.$2, icon: t.$3),
+          ],
+          selected: _category,
+          onSelect: (key) => setState(() => _category = key),
+        ),
+        Expanded(
+          child: Column(
             children: [
-              for (final (i, tab) in _tabs.indexed) ...[
-                Expanded(
-                  child: _tabChip(cs, tab.$1, tab.$2, tab.$3),
+              PetBagCapacityBar(
+                used: _items.length,
+                capacity: _capacity,
+                hint: _hint(),
+                onHintTap: _hasHoles || _mergeable ? _compact : null,
+              ),
+              Expanded(
+                child: RefreshIndicator(
+                  onRefresh: () => _load(showLoading: false, forceRefresh: true),
+                  child: GridView.builder(
+                    padding: const EdgeInsets.all(12),
+                    // 格子少时也要能下拉刷新
+                    physics: const AlwaysScrollableScrollPhysics(),
+                    // 每行 6 格、正方形（2026-09-17 定版）；格号恒等于 slot_index
+                    gridDelegate:
+                        const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 6,
+                      childAspectRatio: 1,
+                      mainAxisSpacing: 8,
+                      crossAxisSpacing: 8,
+                    ),
+                    itemCount: _capacity,
+                    itemBuilder: (context, slot) {
+                      final item = _bySlot[slot];
+                      return PetBagSlotCell(
+                        slot: slot,
+                        item: item,
+                        dimmed: _category != 'all' &&
+                            item != null &&
+                            item.category != _category,
+                        busy: item != null && _busyId == item.id,
+                        canAccept: (from) => _canAccept(from, slot),
+                        onDrop: (from) => _swap(from, slot),
+                        onTap: item == null ? null : () => _showItemFloat(item),
+                      );
+                    },
+                  ),
                 ),
-                if (i != _tabs.length - 1) const SizedBox(width: 6),
-              ],
+              ),
             ],
           ),
         ),
-        PetBagCapacityBar(
-          used: _items.length,
-          capacity: _capacity,
-          hint: _hint(),
-          onHintTap: _hasHoles || _mergeable ? _compact : null,
-        ),
-        Expanded(
-          child: RefreshIndicator(
-            onRefresh: () => _load(showLoading: false, forceRefresh: true),
-            child: GridView.builder(
-              padding: const EdgeInsets.all(12),
-              // 格子少时也要能下拉刷新
-              physics: const AlwaysScrollableScrollPhysics(),
-              // 每行 6 格、正方形（2026-09-17 定版）；格号恒等于 slot_index
-              gridDelegate:
-                  const SliverGridDelegateWithFixedCrossAxisCount(
-                crossAxisCount: 6,
-                childAspectRatio: 1,
-                mainAxisSpacing: 8,
-                crossAxisSpacing: 8,
-              ),
-              itemCount: _capacity,
-              itemBuilder: (context, slot) {
-                final item = _bySlot[slot];
-                return PetBagSlotCell(
-                  slot: slot,
-                  item: item,
-                  dimmed: _category != 'all' &&
-                      item != null &&
-                      item.category != _category,
-                  busy: item != null && _busyId == item.id,
-                  canAccept: (from) => _canAccept(from, slot),
-                  onDrop: (from) => _swap(from, slot),
-                  onTap: item == null ? null : () => _showItemFloat(item),
-                );
-              },
-            ),
-          ),
-        ),
       ],
-    );
-  }
-
-  Widget _tabChip(ColorScheme cs, String key, String label, IconData icon) {
-    final selected = _category == key;
-    return ChoiceChip(
-      avatar: Icon(
-        icon,
-        size: 16,
-        color: selected ? cs.onSecondaryContainer : cs.onSurfaceVariant,
-      ),
-      label: Text(label),
-      labelStyle: TextStyle(
-        fontSize: 12,
-        color: selected ? cs.onSecondaryContainer : cs.onSurface,
-      ),
-      selected: selected,
-      onSelected: (_) => setState(() => _category = key),
     );
   }
 

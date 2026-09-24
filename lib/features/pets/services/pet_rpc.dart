@@ -4,6 +4,7 @@ import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/pet_rpc_models.dart';
+import '../utils/pet_errors.dart';
 import 'pet_service.dart';
 
 /// 宠物业务 RPC / 列表查询（B4 交互闭环）
@@ -51,7 +52,7 @@ class PetRpc {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 背包查询失败: $e');
-      return (const <PetBagItemModel>[], e.toString());
+      return (const <PetBagItemModel>[], kPetLocalError);
     }
   }
 
@@ -77,7 +78,7 @@ class PetRpc {
       return (rows.map(PetEggModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 蛋查询失败: $e');
-      return (const <PetEggModel>[], e.toString());
+      return (const <PetEggModel>[], kPetLocalError);
     }
   }
 
@@ -106,7 +107,7 @@ class PetRpc {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 任务查询失败: $e');
-      return (const <PetQuestModel>[], e.toString());
+      return (const <PetQuestModel>[], kPetLocalError);
     }
   }
 
@@ -127,7 +128,7 @@ class PetRpc {
       return (rows.map(PetSpotModel.fromJson).toList(), null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 历险地查询失败: $e');
-      return (const <PetSpotModel>[], e.toString());
+      return (const <PetSpotModel>[], kPetLocalError);
     }
   }
 
@@ -153,7 +154,7 @@ class PetRpc {
       );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 商城查询失败: $e');
-      return (const <PetShopItemModel>[], e.toString());
+      return (const <PetShopItemModel>[], kPetLocalError);
     }
   }
 
@@ -250,18 +251,24 @@ class PetRpc {
     return err;
   }
 
-  /// 领取任务奖励 → 返回 (gold, points)
-  static Future<({int gold, int points})?> questClaim(
+  /// 领取任务奖励 → 返回 (奖励?, 服务端错误码)
+  ///
+  /// 错误码必须带回调用方：只返回可空奖励会让「今日已领 / 任务未完成」等
+  /// 服务端语义在页面层退化成一句「领取失败，请稍后重试」。
+  static Future<(({int gold, int points})?, String?)> questClaim(
     String questId,
   ) async {
     final (data, err) = await _call('rpc_pet_daily_quests_claim', {
       'p_quest_id': questId,
     }, 'rpc_pet_daily_quests_claim 领取任务奖励');
-    if (err != null) return null;
+    if (err != null) return (null, err);
     await PetService.instance.invalidateSummary();
     return (
-      gold: (data?['gold'] as num?)?.toInt() ?? 0,
-      points: (data?['points'] as num?)?.toInt() ?? 0,
+      (
+        gold: (data?['gold'] as num?)?.toInt() ?? 0,
+        points: (data?['points'] as num?)?.toInt() ?? 0,
+      ),
+      null,
     );
   }
 
