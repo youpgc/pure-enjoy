@@ -9,7 +9,7 @@ part of 'pet_home_screen.dart';
 /// 子页跳转、属性面板、历险四态（分流/领取/召回）。浮层构建见 `_PetHomeLayout`。
 extension _PetHomeActions on _PetHomeScreenState {
   Future<void> _run(Future<String?> Function() action,
-      {String? successMsg, bool celebrate = false}) async {
+      {String? successMsg, PetAction? anim}) async {
     if (_busy) return;
     setState(() => _busy = true);
     final err = await action();
@@ -19,18 +19,23 @@ extension _PetHomeActions on _PetHomeScreenState {
       showSnackBar(context, petRpcErrorText(err));
       return;
     }
-    if (celebrate) _celebrate();
+    if (anim != null) _playAction(anim);
     if (successMsg != null) {
       showSnackBar(context, successMsg);
     }
     _load();
   }
 
-  void _celebrate() {
-    setState(() => _excited = true);
-    Future.delayed(const Duration(seconds: 3), () {
-      if (mounted) setState(() => _excited = false);
-    });
+  /// 播放一次性动作（动作机按优先级/防抖裁决，被拒时静默跳过不打断当前演出）
+  void _playAction(PetAction action) {
+    if (!_machine.request(action)) return;
+    setState(() {});
+  }
+
+  /// 动作播完回落环境态（由 [PetLivingArt] 计时回调）
+  void _onActionEnd(PetAction action) {
+    _machine.finish(action);
+    if (mounted) setState(() {});
   }
 
   // ---------- 喂食（免费额度 与 背包口粮 分流） ----------
@@ -45,10 +50,13 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (pet == null || _busy) return;
     if (_budget.feedFreeAvailable) {
       await _run(() => PetRpc.feed(pet.id),
-          successMsg: _feedMsg, celebrate: true);
+          successMsg: _feedMsg, anim: PetAction.eat);
       return;
     }
-    if (await showPetFeedSheet(context, pet.id) && mounted) _load();
+    if (await showPetFeedSheet(context, pet.id) && mounted) {
+      _playAction(PetAction.eat);
+      _load();
+    }
   }
 
   // ---------- 孵化（诞生弹窗 + 刷新） ----------
@@ -98,7 +106,6 @@ extension _PetHomeActions on _PetHomeScreenState {
       showSnackBar(context, petRpcErrorText(hatchErr));
       return;
     }
-    _celebrate();
     // 图片权重：展示基础型形象大图（帧序列首帧，未登记种属回退静态立绘）
     final frames = petIdleFrames(result.speciesCode);
     await showPetBirthDialog(
@@ -108,6 +115,9 @@ extension _PetHomeActions on _PetHomeScreenState {
           : petStageArtAsset(result.speciesCode, 0),
       result: result,
     );
+    if (!mounted) return;
+    // 弹窗关闭后再演出"开心"，否则 1.1s 演出全被弹窗挡住
+    _playAction(PetAction.happy);
     // 点击确认后刷新宠物信息
     _load();
   }

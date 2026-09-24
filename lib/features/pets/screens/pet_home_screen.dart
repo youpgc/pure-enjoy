@@ -10,6 +10,7 @@ import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
+import '../utils/pet_action_machine.dart';
 import '../utils/pet_art.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
@@ -71,7 +72,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   PetSummaryModel? _summary;
   String? _error;
   bool _busy = false;
-  bool _excited = false;
+
+  /// 动作仲裁器（优先级/防抖，逻辑见 [PetActionMachine]）
+  final PetActionMachine _machine = PetActionMachine();
 
   /// 当前展示的宠物下标（针对 [_stagePets]；单宠时恒 0）
   int _petIndex = 0;
@@ -149,6 +152,8 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   void _switchPet(int delta) {
     final pets = _stagePets;
     if (pets.length < 2) return;
+    // 换宠回落环境态：A 宠的演出不带进 B 宠
+    _machine.reset();
     setState(() {
       _petIndex = (_petIndex + delta + pets.length) % pets.length;
     });

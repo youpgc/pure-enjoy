@@ -17,17 +17,24 @@ extension _PetHomeLayout on _PetHomeScreenState {
       child: Padding(
         padding: const EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, 128),
         child: Center(
-          child: PetLivingArt(
-            frames: petIdleFrames(pet.speciesCode),
-            fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
-            excited: _excited,
-            onTap: () => _run(() => PetRpc.interact(pet.id),
-                successMsg: _interactMsg),
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () => _interact(pet.id),
+            child: PetLivingArt(
+              frames: petIdleFrames(pet.speciesCode),
+              fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
+              action: _machine.current,
+              onActionEnd: _onActionEnd,
+            ),
           ),
         ),
       ),
     );
   }
+
+  /// 点触宠物 == 右列「抚摸」钮（同一条 interact RPC + 同一被抚摸演出）
+  void _interact(String petId) => _run(() => PetRpc.interact(petId),
+      successMsg: _interactMsg, anim: PetAction.petted);
 
   List<Widget> _switchArrows() => [
         Positioned(
@@ -231,7 +238,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 onTap: interactOff
                     ? null
                     : () => _run(() => PetRpc.interact(pet.id),
-                        celebrate: true, successMsg: _interactMsg)),
+                        successMsg: _interactMsg, anim: PetAction.petted)),
             const SizedBox(height: 14),
             _adventureButton(),
             const SizedBox(height: 14),

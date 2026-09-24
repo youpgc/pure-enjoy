@@ -25,7 +25,8 @@
 /// 当前无页面消费者（对应繁育/蛋背包/扩容购买/社区救助/进化抉择均在 P1/P2 分期），
 /// 按三端 ENUM 对齐铁律作为值域契约保留登记，不视为死代码。
 /// 3D 素材验收常量（标准动画/骨骼/variants/阈值/资源包状态机）已随
-/// 3D 一期下线清理（2026-09-21），后期迭代重写渲染层时再行补回。
+/// 3D 一期下线清理（2026-09-21）。2026-09-24 表现层定版改走 **2D 动画**，
+/// 动作契约见 [PetAction]（8 个标准动作沿用，与渲染栈无关）。
 library;
 
 /// 背包四分区（equip 一期枚举占位、页签空时隐藏，P2 穿戴启用）
@@ -478,6 +479,47 @@ enum PetQuestConditionType {
   final String label;
 
   static PetQuestConditionType? fromCode(String? code) {
+    for (final v in values) {
+      if (v.code == code) return v;
+    }
+    return null;
+  }
+}
+
+/// 宠物 2D 动作契约（8 个标准动作，命名全局统一，2026-09-24 表现层定版）
+///
+/// 三条用途，新增/改名动作必须三处同批（铁律 12）：
+/// 1. App 动作仲裁与补间编排（`utils/pet_action_machine.dart`
+///    + `widgets/pet_living_art.dart`）；
+/// 2. `pet_species.render2d` 的 `frames` 键（该动作有真帧才走帧序列，
+///    无帧走程序补间，见 `utils/pet_art.dart`）；
+/// 3. 素材文件名（`assets/pets/frames/<species_code>_<action>_N.png`）。
+///
+/// 动作集合本身继承自 3D 期的定版口径（需求 §11.3 与《3D 展现与交互实现方案》
+/// §2.1 触发矩阵）——那 8 个动作与渲染栈无关，降维到 2D 后原样沿用；
+/// 被废弃的是 3D 专有的 orbit/zoom/相机预设/天空盒，不在本枚举内。
+enum PetAction {
+  idle('idle', '待机', 0),
+  walk('walk', '行走', 1),
+  sleep('sleep', '睡觉', 2),
+  sad('sad', '委屈', 3),
+  happy('happy', '开心', 4),
+  petted('petted', '被抚摸', 5),
+  eat('eat', '进食', 6),
+  evolve('evolve', '进化演出', 7);
+
+  const PetAction(this.code, this.label, this.priority);
+
+  final String code;
+  final String label;
+
+  /// 仲裁优先级：大的打断小的；[PetAction.evolve] 最高且独占（演完才接受新请求）
+  final int priority;
+
+  /// 环境态（可循环播放）；其余为一次性反应动作，演完回落到环境态
+  bool get ambient => this == idle || this == walk || this == sleep;
+
+  static PetAction? fromCode(String? code) {
     for (final v in values) {
       if (v.code == code) return v;
     }
