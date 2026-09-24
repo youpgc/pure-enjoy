@@ -16,17 +16,26 @@ extension _PetHomeLayout on _PetHomeScreenState {
       // 底部让位状态面板（名牌+四维沉底），其余方向居中
       child: Padding(
         padding: const EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, 128),
-        child: Center(
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: () => _interact(pet.id),
-            child: PetLivingArt(
-              frames: petIdleFrames(pet.speciesCode),
-              fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
-              action: _machine.current,
-              onActionEnd: _onActionEnd,
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            Center(
+              child: GestureDetector(
+                behavior: HitTestBehavior.opaque,
+                onTap: () => _interact(pet.id),
+                onDoubleTap: _onStageDoubleTap,
+                onLongPress: _openAttributes,
+                child: PetLivingArt(
+                  frames: petIdleFrames(pet.speciesCode),
+                  fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
+                  action: _machine.current,
+                  onActionEnd: _onActionEnd,
+                ),
+              ),
             ),
-          ),
+            // 粒子层与宠物同坐标系：emit 的 Alignment 锚点即宠物身体位置
+            PetFxLayer(fx: _fx),
+          ],
         ),
       ),
     );
@@ -35,6 +44,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// 点触宠物 == 右列「抚摸」钮（同一条 interact RPC + 同一被抚摸演出）
   void _interact(String petId) => _run(() => PetRpc.interact(petId),
       successMsg: _interactMsg, anim: PetAction.petted);
+
+  /// 双击只做纯表现（开心演出 + 星星），不发 RPC、不加心情——
+  /// 照料数值一律由服务端结算，这里不能凭空造进度。
+  void _onStageDoubleTap() => _playAction(PetAction.happy);
 
   List<Widget> _switchArrows() => [
         Positioned(

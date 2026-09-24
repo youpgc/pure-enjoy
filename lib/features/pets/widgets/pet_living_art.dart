@@ -3,7 +3,7 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-import '../../../constants/pet.dart';
+import '../../../constants/pet_render.dart';
 import '../utils/pet_action_machine.dart';
 
 /// 父约束无界时的宠物显示基准边长（仅用于推算解码宽度与光晕尺寸）

@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 /// 宠物主页库（part 拆分）：本文件是 library 声明与状态主体，
 /// 三个 part 共用下列导入（Dart 的 part 文件不能自带 import）。
 import '../../../constants/pet.dart';
+import '../../../constants/pet_render.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
@@ -16,6 +17,7 @@ import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
 import '../widgets/pet_attributes_sheet.dart';
 import '../widgets/pet_feed_sheet.dart';
+import '../widgets/pet_fx_overlay.dart';
 import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
@@ -47,6 +49,9 @@ part 'pet_home_screen_actions.dart';
 ///   （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
 /// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
 ///   无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
+/// - 中央舞台手势（2026-09-24 2D 动画定版）：单击 = 抚摸（走 interact RPC）、
+///   双击 = 开心演出（纯表现，不发 RPC 不加数值）、长按 = 属性面板；
+///   动作由 [PetActionMachine] 仲裁，粒子由 [PetFxController] 绘制。
 /// 浮层组件见 pet_home_overlays / scene / adventure.dart，冷却派生见 PetActionBudget。
 ///
 /// 【文件拆分 2026-09-22】单文件超 500 行红线，按职责拆为三个 part：
@@ -66,7 +71,8 @@ class PetHomeScreen extends StatefulWidget {
   State<PetHomeScreen> createState() => _PetHomeScreenState();
 }
 
-class _PetHomeScreenState extends State<PetHomeScreen> {
+class _PetHomeScreenState extends State<PetHomeScreen>
+    with SingleTickerProviderStateMixin {
   bool _loading = true;
   bool _enabled = false;
   PetSummaryModel? _summary;
@@ -75,6 +81,9 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
 
   /// 动作仲裁器（优先级/防抖，逻辑见 [PetActionMachine]）
   final PetActionMachine _machine = PetActionMachine();
+
+  /// 舞台粒子层控制器（爱心/星星/碎屑/进化光柱，空闲自动停表）
+  late final PetFxController _fx = PetFxController(vsync: this);
 
   /// 当前展示的宠物下标（针对 [_stagePets]；单宠时恒 0）
   int _petIndex = 0;
@@ -93,6 +102,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
   @override
   void dispose() {
     _tick?.cancel();
+    _fx.dispose();
     super.dispose();
   }
 
@@ -154,6 +164,7 @@ class _PetHomeScreenState extends State<PetHomeScreen> {
     if (pets.length < 2) return;
     // 换宠回落环境态：A 宠的演出不带进 B 宠
     _machine.reset();
+    _fx.clear();
     setState(() {
       _petIndex = (_petIndex + delta + pets.length) % pets.length;
     });

@@ -1,4 +1,4 @@
-import '../../../constants/pet.dart';
+import '../../../constants/pet_render.dart';
 
 /// 2D 动作仲裁器：决定「此刻舞台上应该播哪个动作」。
 ///
