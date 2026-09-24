@@ -1,4 +1,4 @@
-part of match3_flame_game;
+part of 'match3_flame_game.dart';
 
 /// 消消乐道具能力（part of match3_flame_game，共享引擎私有状态）。
 ///

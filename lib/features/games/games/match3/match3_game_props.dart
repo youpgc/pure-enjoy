@@ -1,4 +1,9 @@
-part of match3_game;
+part of 'match3_game.dart';
+
+// 本文件是 State 的 part + extension，其中的 setState 运行期完全合法（同库、
+// 就是 _Match3GameState 的实例方法），但 @protected 规则不识别 extension 成员，
+// 会误报 invalid_use_of_protected_member。搬回 State 类会顶破 500 行拆分，故整文件豁免。
+// ignore_for_file: invalid_use_of_protected_member
 
 /// 消消乐宿主页道具域（part of match3_game，共享 State 私有成员）。
 ///

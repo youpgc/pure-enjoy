@@ -1,5 +1,10 @@
 part of 'g2048_game.dart';
 
+// 本文件是 State 的 part + extension，其中的 setState 运行期完全合法（同库、
+// 就是 State 子类的实例方法），但 @protected 规则不识别 extension 成员，
+// 会误报 invalid_use_of_protected_member。搬回 State 类会顶破 500 行拆分，故整文件豁免。
+// ignore_for_file: invalid_use_of_protected_member
+
 /// 2048 棋盘引擎（part of g2048_game，共享 State 私有状态）。
 ///
 /// 从 g2048_game.dart 抽离（审查 P1 单文件超 500 行）：网格重建、随机生方、

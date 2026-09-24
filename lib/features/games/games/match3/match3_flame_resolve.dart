@@ -1,4 +1,4 @@
-part of match3_flame_game;
+part of 'match3_flame_game.dart';
 
 /// 消消乐连锁消除与结算（part of match3_flame_game，共享引擎私有状态）。
 ///

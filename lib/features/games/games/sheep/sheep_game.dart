@@ -268,7 +268,9 @@ class _SheepGameState extends State<SheepGame> {
 
   bool _clearTriples() {
     final counts = <int, int>{};
-    for (final t in _slots) counts[t.type] = (counts[t.type] ?? 0) + 1;
+    for (final t in _slots) {
+      counts[t.type] = (counts[t.type] ?? 0) + 1;
+    }
     int? type;
     for (final e in counts.entries) {
       if (e.value >= 3) {

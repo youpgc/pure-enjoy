@@ -21,7 +21,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             frames: petIdleFrames(pet.speciesCode),
             fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
             excited: _excited,
-            onTap: () => this._run(() => PetRpc.interact(pet.id),
+            onTap: () => _run(() => PetRpc.interact(pet.id),
                 successMsg: '开心 +${_budget.cfg('interact_mood')}'),
           ),
         ),
@@ -59,7 +59,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 76, vertical: 4),
-          child: Center(child: PetAdventureBanner(adv: adv, onTap: this._bannerTap())),
+          child: Center(child: PetAdventureBanner(adv: adv, onTap: _bannerTap())),
         ),
       ),
     );
@@ -84,7 +84,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 const PetAdventureNote(),
                 const SizedBox(height: 6),
               ],
-              PetBottomStatusCard(pet: pet, onTap: this._openAttributes),
+              PetBottomStatusCard(pet: pet, onTap: _openAttributes),
             ],
           ),
         ),
@@ -109,32 +109,32 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.inventory_2_outlined,
                 label: '背包',
-                onTap: this._openBag),
+                onTap: _openBag),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.storefront_outlined,
                 label: '商城',
-                onTap: this._openShop),
+                onTap: _openShop),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.account_balance_wallet_outlined,
                 label: '钱包',
-                onTap: this._openWallet),
+                onTap: _openWallet),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.luggage_outlined,
                 label: '寄养',
-                onTap: this._openFoster),
+                onTap: _openFoster),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.workspace_premium_outlined,
                 label: '成就',
-                onTap: this._openAchievements),
+                onTap: _openAchievements),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.favorite_outline,
                 label: '繁育',
-                onTap: this._openBreed),
+                onTap: _openBreed),
           ],
         ),
       ),
@@ -180,7 +180,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 overlay: _overlay(feedCool, _budget.feedRemain),
                 onTap: feedOff
                     ? null
-                    : () => this._run(() => PetRpc.feed(pet.id),
+                    : () => _run(() => PetRpc.feed(pet.id),
                         successMsg: '喂饱啦', celebrate: true)),
             const SizedBox(height: 14),
             PetEdgeButton(
@@ -189,15 +189,15 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 overlay: _overlay(interactCool, _budget.interactRemain),
                 onTap: interactOff
                     ? null
-                    : () => this._run(() => PetRpc.interact(pet.id),
+                    : () => _run(() => PetRpc.interact(pet.id),
                         celebrate: true)),
             const SizedBox(height: 14),
-            this._adventureButton(),
+            _adventureButton(),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.task_alt_outlined,
                 label: '任务',
-                onTap: this._openQuests),
+                onTap: _openQuests),
           ],
         ),
       ),

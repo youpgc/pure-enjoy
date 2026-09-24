@@ -4,7 +4,6 @@ import 'package:flutter_svg/flutter_svg.dart';
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 
 import '../../models/match3_mode.dart';
-import 'candy_component.dart';
 import 'match3_objective.dart';
 
 /// 目标达成条件横幅（游戏容器内上方）：`图标 ×N` 文案居中，

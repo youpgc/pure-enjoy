@@ -384,8 +384,7 @@ class Match3Objective {
         ];
       case Match3Mode.boss:
         return <ObjectiveStat>[
-          ObjectiveStat('Boss 血量', '$bossLeft/$bossHp',
-              color: const Color(0xFFEF5350)),
+          ObjectiveStat('Boss 血量', '$bossLeft/$bossHp', color: bossColor),
           ObjectiveStat('得分', '$score', color: const Color(0xFFFFB300)),
           if (moveStat != null) moveStat,
         ];
@@ -429,7 +428,7 @@ class Match3Objective {
         ];
         return extra.isEmpty
             ? '$stepText击碎冰块'
-            : '${stepText}击碎冰块并收集${extra.join('、')}';
+            : '$stepText击碎冰块并收集${extra.join('、')}';
       case Match3Mode.boss:
         return '$stepText击破$bossHp血量Boss';
     }

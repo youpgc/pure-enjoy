@@ -42,7 +42,7 @@ class G2048Game extends StatefulWidget {
   /// aborted 上报 + 引擎重建，与消消乐同口径；null 时重开按钮禁用）
   final VoidCallback? onRestart;
 
-  G2048Game({
+  const G2048Game({
     super.key,
     required this.onFinished,
     required this.level,

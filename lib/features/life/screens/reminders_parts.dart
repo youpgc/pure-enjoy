@@ -160,7 +160,7 @@ class _ReminderEditDialogState extends State<ReminderEditDialog> {
               const SizedBox(height: 16),
               DropdownButtonFormField<String>(
                 decoration: const InputDecoration(labelText: '重复'),
-                value: _repeatType,
+                initialValue: _repeatType,
                 items: const [
                   DropdownMenuItem(value: null, child: Text('不重复')),
                   DropdownMenuItem(value: 'daily', child: Text('每天')),

@@ -63,6 +63,8 @@ class _GameItemShopScreenState extends State<GameItemShopScreen> {
       setState(() => _buyingId = null);
       if (res['success'] == true) {
         await _load();
+        // _load 是异步的，回来时页面可能已关闭，用 context 前须再判一次
+        if (!mounted) return;
         showSnackBar(context, res['message'] ?? '购买成功');
       } else {
         showSnackBar(context, res['message'] ?? '购买失败', isError: true);

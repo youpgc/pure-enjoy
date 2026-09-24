@@ -1,5 +1,10 @@
 part of 'sheep_game.dart';
 
+// 本文件是 State 的 part + extension，其中的 setState 运行期完全合法（同库、
+// 就是 _SheepGameState 的实例方法），但 @protected 规则不识别 extension 成员，
+// 会误报 invalid_use_of_protected_member。搬回 State 类会顶破 500 行拆分，故整文件豁免。
+// ignore_for_file: invalid_use_of_protected_member
+
 /// 羊了个羊道具域（part of sheep_game，共享 State 私有状态）：
 /// 确认弹窗 → 扣额度/扣库存 → 三种道具效果（移出 / 撤回 / 洗牌）。
 extension _SheepPropOps on _SheepGameState {
@@ -22,8 +27,8 @@ extension _SheepPropOps on _SheepGameState {
   /// - 免费用尽后消耗购买库存（consumeItem 减 1 张），受 per_game_limit 截断。
   Future<void> _useProp(SheepProp p) async {
     if (_finished || _busy) return;
-    var free = _freeLeft[p] ?? 0;
-    var owned = _ownedLeft[p] ?? 0;
+    final free = _freeLeft[p] ?? 0;
+    final owned = _ownedLeft[p] ?? 0;
     final itemId = _itemIds[p];
     if (itemId == null) return;
     if (free <= 0 && owned <= 0) return;

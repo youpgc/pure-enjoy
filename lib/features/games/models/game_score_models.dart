@@ -1,6 +1,7 @@
 /// 游戏成绩域模型（从 game_score_service.dart 拆出，逻辑零变更）。
 ///
 /// 调用方经 game_score_service.dart 的 `export` 使用，无需改 import 路径。
+library;
 
 /// 最佳成绩项
 ///

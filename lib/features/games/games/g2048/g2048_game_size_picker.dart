@@ -34,7 +34,7 @@ Future<int?> showG2048SizePicker(BuildContext context) {
               for (var s = 3; s <= 8; s++)
                 ElevatedButton(
                   onPressed: () => Navigator.of(ctx).pop(s),
-                  child: Text('${s}×${s}'),
+                  child: Text('$s×$s'),
                 ),
             ],
           ),

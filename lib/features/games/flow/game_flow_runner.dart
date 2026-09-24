@@ -118,8 +118,8 @@ class GameFlowRunner {
       states[GameFlowNode.levelSelect] = const FlowNodeState.configured();
     } catch (e) {
       debugPrint('[GameFlow] 配置节点异常，降级默认流程：$e');
-      states[GameFlowNode.modeGrid] = FlowNodeState.fallback('配置拉取异常');
-      states[GameFlowNode.levelSelect] = FlowNodeState.fallback('配置拉取异常');
+      states[GameFlowNode.modeGrid] = const FlowNodeState.fallback('配置拉取异常');
+      states[GameFlowNode.levelSelect] = const FlowNodeState.fallback('配置拉取异常');
       final shop = await _resolveShop(game);
       return GameHomeFlow(flow: flow, hasShop: shop, nodeStates: states);
     }
@@ -134,10 +134,10 @@ class GameFlowRunner {
             .toList(growable: false);
       } catch (e) {
         debugPrint('[GameFlow] 模式节点异常，隐藏网格：$e');
-        states[GameFlowNode.modeGrid] = FlowNodeState.fallback('模式解析异常');
+        states[GameFlowNode.modeGrid] = const FlowNodeState.fallback('模式解析异常');
       }
     } else {
-      states[GameFlowNode.modeGrid] = FlowNodeState.fallback('节点关闭');
+      states[GameFlowNode.modeGrid] = const FlowNodeState.fallback('节点关闭');
     }
 
     // 节点：关卡（levelSelect 关闭仍需关卡数据做 frontier 开局）
@@ -146,7 +146,7 @@ class GameFlowRunner {
       levels = snapshot.levelsOf(game.id);
     } catch (e) {
       debugPrint('[GameFlow] 关卡节点异常：$e');
-      states[GameFlowNode.levelSelect] = FlowNodeState.fallback('关卡解析异常');
+      states[GameFlowNode.levelSelect] = const FlowNodeState.fallback('关卡解析异常');
       levels = const <GameLevelModel>[];
     }
 
@@ -225,7 +225,7 @@ class GameFlowRunner {
       } else {
         level = adapter.defaultLevel(game);
       }
-      state = FlowNodeState.fallback('无配置关卡，使用默认流程');
+      state = const FlowNodeState.fallback('无配置关卡，使用默认流程');
     }
 
     // 结算门禁：默认关（id 与 modeId 均空）不发分；配置关与无尽等

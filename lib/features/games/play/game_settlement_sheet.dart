@@ -175,7 +175,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
             padding: const EdgeInsets.only(top: 4),
             child: Text(
               widget.failReason ?? '未达成通关条件，本次无奖励',
-              style: TextStyle(color: AppTheme.error, fontSize: 13),
+              style: const TextStyle(color: AppTheme.error, fontSize: 13),
             ),
           ),
       ],
@@ -194,10 +194,10 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
       return Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          Row(
+          const Row(
             children: <Widget>[
-              const Icon(Icons.error_outline, color: AppTheme.error, size: 18),
-              const SizedBox(width: 8),
+              Icon(Icons.error_outline, color: AppTheme.error, size: 18),
+              SizedBox(width: 8),
               Expanded(
                 child: Text('奖励结算异常，成绩已记录；可稍后重试或返回大厅。',
                     style: TextStyle(color: AppTheme.error, fontSize: 13)),
@@ -229,11 +229,11 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
           color: AppTheme.neutral500.withAlpha(26),
           borderRadius: BorderRadius.circular(10),
         ),
-        child: Row(
+        child: const Row(
           children: <Widget>[
             Icon(Icons.info_outline, color: AppTheme.neutral500, size: 18),
-            const SizedBox(width: 8),
-            const Expanded(
+            SizedBox(width: 8),
+            Expanded(
               child: Text(
                 '默认流程（配置未开启或异常）：本次仅记录成绩，不发放积分与成就',
                 style: TextStyle(fontSize: 13),
@@ -301,7 +301,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
             ),
             child: Row(
               children: <Widget>[
-                Icon(Icons.info_outline, color: AppTheme.warning, size: 18),
+                const Icon(Icons.info_outline, color: AppTheme.warning, size: 18),
                 const SizedBox(width: 8),
                 Expanded(
                   child: Text(
@@ -321,7 +321,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
             const Text('本局获得积分', style: TextStyle(fontSize: 16)),
             Text(
               '+${result.totalPoints}',
-              style: TextStyle(
+              style: const TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
                 color: AppTheme.success,

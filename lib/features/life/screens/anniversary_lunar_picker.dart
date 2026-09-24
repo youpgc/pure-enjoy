@@ -171,9 +171,9 @@ class _LunarPickerBodyState extends State<_LunarPickerBody> {
                     style: TextStyle(color: colorScheme.onSurfaceVariant),
                   ),
                 ),
-                Text(
+                const Text(
                   '选择农历日期',
-                  style: const TextStyle(
+                  style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.w600,
                   ),

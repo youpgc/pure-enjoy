@@ -180,7 +180,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     }
     if (result.bagFull) {
       _toast('背包已满（${result.used}/${result.capacity}），先清理再回来领蛋');
-      return _push(PetBagScreen(petId: null));
+      return _push(const PetBagScreen(petId: null));
     }
     _toast('领到「${result.eggName}」'
         '${result.rarity.isEmpty ? '' : ' · ${result.rarity}'}，在背包里点它就能孵');
@@ -257,7 +257,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
 
   Widget _title(ColorScheme cs, String text) => Text(
         text,
-        style: TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
+        style: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
       );
 
   /// 未解锁繁育功能：给商城直达路径（不在客户端造解锁道具名）

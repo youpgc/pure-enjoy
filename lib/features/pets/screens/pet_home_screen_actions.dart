@@ -1,5 +1,10 @@
 part of 'pet_home_screen.dart';
 
+// 本文件是 State 的 part + extension，其中的 setState 运行期完全合法（同库、
+// 就是 _PetHomeScreenState 的实例方法），但 @protected 规则不识别 extension 成员，
+// 会误报 invalid_use_of_protected_member。搬回 State 类会顶破 500 行拆分，故整文件豁免。
+// ignore_for_file: invalid_use_of_protected_member
+
 /// 宠物主页交互动作（part）：统一动作包装 `_run`、喂食/抚摸回调、孵化流程、
 /// 子页跳转、属性面板、历险四态（分流/领取/召回）。浮层构建见 `_PetHomeLayout`。
 extension _PetHomeActions on _PetHomeScreenState {

@@ -3,7 +3,6 @@ import 'dart:ui' as ui;
 
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
-import 'package:vector_graphics/vector_graphics_compat.dart';
 
 /// 消消乐方块数据模型（纯数据，由 FlameGame 统一绘制与驱动动画）。
 ///
@@ -97,8 +96,8 @@ void drawCandy(Canvas canvas, Candy candy, double cell, Color color) {
     final pulse = 0.55 + 0.45 * sin(candy.hintT * 9);
     canvas.drawRRect(
       RRect.fromRectAndRadius(
-        Rect.fromLTWH(3, 3, 58, 58),
-        Radius.circular(14),
+        const Rect.fromLTWH(3, 3, 58, 58),
+        const Radius.circular(14),
       ),
       Paint()
         ..isAntiAlias = true
@@ -144,16 +143,3 @@ const List<Color> kCandyColors = <Color>[
 
 /// 色板对应的中文名（收集模式 HUD 展示用）
 const List<String> kCandyColorNames = <String>['红', '蓝', '绿', '黄', '紫', '橙'];
-
-
-extension _ColorDarken on Color {
-  Color darken(double amount) {
-    final f = 1 - amount;
-    return Color.fromARGB(
-      (a * 255).round().clamp(0, 255),
-      (r * f * 255).round().clamp(0, 255),
-      (g * f * 255).round().clamp(0, 255),
-      (b * f * 255).round().clamp(0, 255),
-    );
-  }
-}

@@ -49,7 +49,7 @@ class GameFlowConfig {
       final raw = game.config['flow'];
       if (raw is! Map<String, dynamic>) return allEnabled;
       if (raw['enabled'] == false) {
-        return GameFlowConfig(enabled: false, nodes: const <String, bool>{});
+        return const GameFlowConfig(enabled: false, nodes: <String, bool>{});
       }
       final nodesRaw = raw['nodes'];
       final nodes = <String, bool>{};
