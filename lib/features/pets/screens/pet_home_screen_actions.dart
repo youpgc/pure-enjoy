@@ -33,6 +33,24 @@ extension _PetHomeActions on _PetHomeScreenState {
     });
   }
 
+  // ---------- 喂食（免费额度 与 背包口粮 分流） ----------
+
+  /// 喂食钮统一入口（2026-09-24 定版：喂食不限次数）
+  ///
+  /// 免费额度可用（无冷却 + 当日次数未尽）→ 走免费档；否则弹口粮浮层改吃背包
+  /// 道具（服务端 `rpc_pet_feed` 道具档：不占免费次数、不受冷却限制）。
+  /// 只有"吃饱了"（`pet_config.feed_full_hunger`）才置灰，见 `_budget.isFull`。
+  Future<void> _onFeedTap() async {
+    final pet = _currentPet;
+    if (pet == null || _busy) return;
+    if (_budget.feedFreeAvailable) {
+      await _run(() => PetRpc.feed(pet.id),
+          successMsg: _feedMsg, celebrate: true);
+      return;
+    }
+    if (await showPetFeedSheet(context, pet.id) && mounted) _load();
+  }
+
   // ---------- 孵化（诞生弹窗 + 刷新） ----------
 
   /// 即开首颗蛋 → 诞生弹窗（基础型形象大图）→ 确认后刷新宠物信息
@@ -103,8 +121,9 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   void _openBag() => _push(PetBagScreen(petId: _currentPet?.id));
 
-  void _openShop() =>
-      _push(PetShopScreen(goldBalance: _summary?.wallet.goldBalance ?? 0));
+  void _openShop() => _push(PetShopScreen(
+      goldBalance: _summary?.wallet.goldBalance ?? 0,
+      petId: _currentPet?.id));
 
   void _openQuests() => _push(const PetQuestsScreen());
 

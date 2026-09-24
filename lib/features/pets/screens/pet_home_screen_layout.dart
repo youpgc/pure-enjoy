@@ -22,7 +22,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             fallbackAsset: petStageArtAsset(pet.speciesCode, pet.stage),
             excited: _excited,
             onTap: () => _run(() => PetRpc.interact(pet.id),
-                successMsg: '开心 +${_budget.cfg('interact_mood')}'),
+                successMsg: _interactMsg),
           ),
         ),
       ),
@@ -92,8 +92,12 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  // ---------- 左侧入口列（返回键 + 背包/商城/钱包/寄养/成就/繁育，贴顶） ----------
+  // ---------- 左侧入口列（返回键 + 背包/商城 + 更多，贴顶） ----------
 
+  /// 左列只留高频直达（2026-09-24 D1）：
+  /// 原先 7 枚（返回键 + 6×64dp 按钮 + 5×14 间距）合计约 502dp，Stack 里左列又
+  /// 画在底部状态卡之后，小屏必然压住「经验/健康」两行；钱包/寄养/成就/繁育
+  /// 收进「更多」弹出菜单后左列约 216dp，不再与底部重叠。
   Widget _leftRail() {
     return Positioned(
       left: 8,
@@ -109,32 +113,49 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.inventory_2_outlined,
                 label: '背包',
-                onTap: _openBag),
+                onTap: this._openBag),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.storefront_outlined,
                 label: '商城',
-                onTap: _openShop),
+                onTap: this._openShop),
             const SizedBox(height: 14),
             PetEdgeButton(
-                icon: Icons.account_balance_wallet_outlined,
-                label: '钱包',
-                onTap: _openWallet),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.luggage_outlined,
-                label: '寄养',
-                onTap: _openFoster),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.workspace_premium_outlined,
-                label: '成就',
-                onTap: _openAchievements),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.favorite_outline,
-                label: '繁育',
-                onTap: _openBreed),
+                icon: Icons.more_horiz,
+                label: '更多',
+                onTap: _showMoreMenu),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 「更多」弹出菜单：钱包 / 寄养 / 成就 / 繁育
+  void _showMoreMenu() {
+    showModalBottomSheet<void>(
+      context: context,
+      showDragHandle: true,
+      builder: (sheetCtx) => SafeArea(
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            for (final (icon, label, open) in <(IconData, String, void Function())>
+                [
+              (Icons.account_balance_wallet_outlined, '金币钱包',
+                  this._openWallet),
+              (Icons.luggage_outlined, '寄养仓库', this._openFoster),
+              (Icons.workspace_premium_outlined, '成就',
+                  this._openAchievements),
+              (Icons.favorite_outline, '繁育', this._openBreed),
+            ])
+            ListTile(
+              leading: Icon(icon),
+              title: Text(label),
+              onTap: () {
+                Navigator.pop(sheetCtx);
+                open();
+              },
+            ),
           ],
         ),
       ),
@@ -150,15 +171,29 @@ extension _PetHomeLayout on _PetHomeScreenState {
     return null;
   }
 
+  /// 喂食结果文案：增量全部来自后台配置（与服务端 `_pet_add_progress` 同源），
+  /// 不再写死「喂饱啦」（旧文案与饱食度无关，20→40 也说"喂饱"，误导用户）
+  String get _feedMsg {
+    final delta = _budget.feedDeltaText;
+    return delta.isEmpty ? '已喂食' : '已喂食 · $delta';
+  }
+
+  /// 抚摸结果文案（服务端加 `interact_mood`，旧实现读不到配置恒显示 +0）
+  String get _interactMsg {
+    final delta = _budget.interactDeltaText;
+    return delta.isEmpty ? '它很开心' : '它很开心 · $delta';
+  }
+
   Widget _rightRail() {
     final pet = _currentPet;
-    final feedCool = _budget.feedCooldown;
     final interactCool = _budget.interactCooldown;
-    // 历险中的宠物不在场，喂食/抚摸禁用（服务端同样拦截 PET_NOT_REARING）
+    // 喂食置灰只看「吃饱了没有」plus 在场状态（2026-09-24 定版 A2）：
+    // 免费额度（次数/冷却）不再把按钮打死——额度用完改吃背包口粮，
+    // 服务端 rpc_pet_feed 道具档不占免费次数、不受冷却限制。
     final feedOff = pet == null ||
         _busy ||
         pet.status == PetPetStatus.adventuring ||
-        _budget.blocked(feedCool, _budget.feedRemain);
+        _budget.isFull;
     final interactOff = pet == null ||
         _busy ||
         pet.status == PetPetStatus.adventuring ||
@@ -177,11 +212,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.restaurant,
                 label: '喂食',
-                overlay: _overlay(feedCool, _budget.feedRemain),
-                onTap: feedOff
-                    ? null
-                    : () => _run(() => PetRpc.feed(pet.id),
-                        successMsg: '喂饱啦', celebrate: true)),
+                // 蒙层只在真正"吃饱了"时出现；历险中/请求中属静默禁用，不误导
+                overlay: _budget.isFull ? '已饱' : null,
+                onTap: feedOff ? null : () => this._onFeedTap()),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.touch_app_outlined,
@@ -190,14 +223,14 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 onTap: interactOff
                     ? null
                     : () => _run(() => PetRpc.interact(pet.id),
-                        celebrate: true)),
+                        celebrate: true, successMsg: _interactMsg)),
             const SizedBox(height: 14),
             _adventureButton(),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.task_alt_outlined,
                 label: '任务',
-                onTap: _openQuests),
+                onTap: this._openQuests),
           ],
         ),
       ),

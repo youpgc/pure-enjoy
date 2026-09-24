@@ -56,10 +56,47 @@ class PetActionBudget {
   bool blocked(Duration? cool, int? remain) =>
       cool != null || (remain != null && remain <= 0);
 
+  /// 免费喂食额度是否可用（false = 本次只能走背包口粮）
+  bool get feedFreeAvailable =>
+      !blocked(feedCooldown, feedRemain);
+
+  /// 饱腹阈值（`pet_config.feed_full_hunger`，后台可配；0/缺配 = 不设门槛）
+  int get feedFullHunger => cfg('feed_full_hunger');
+
+  /// 是否已吃饱：唯一让喂食钮置灰的业务条件（2026-09-24 定版）
+  ///
+  /// 阈值未下发（旧版 rpc_pet_summary）时为 false，不阻塞喂食。
+  bool get isFull {
+    final p = pet;
+    final threshold = feedFullHunger;
+    return p != null && threshold > 0 && p.hunger >= threshold;
+  }
+
+  /// 免费喂食的真实增量（配置值，服务端 _pet_add_progress 同源）
+  String get feedDeltaText {
+    final parts = <String>[];
+    final hunger = cfg('free_feed_hunger');
+    final exp = cfg('free_feed_exp');
+    if (hunger > 0) parts.add('饱食+$hunger');
+    if (exp > 0) parts.add('经验+$exp');
+    return parts.join(' · ');
+  }
+
+  /// 抚摸的真实增量（服务端加 interact_mood）
+  String get interactDeltaText {
+    final mood = cfg('interact_mood');
+    return mood > 0 ? '心情+$mood' : '';
+  }
+
   /// 冷却倒计时文案（「2分30秒」/「45秒」）
+  ///
+  /// 秒数**向上取整**：剩余 0.4 秒显示「1秒」而非「0秒」——刷新是 1 秒一跳，
+  /// 截断会出现"停在 0 秒却还点不动"的一秒空窗（2026-09-24 修）。
   String coolText(Duration d) {
-    final m = d.inMinutes;
-    final s = d.inSeconds % 60;
-    return m > 0 ? '$m分$s秒' : '$s秒';
+    final total = (d.inMilliseconds / 1000).ceil();
+    final m = total ~/ 60;
+    final s = total % 60;
+    if (m <= 0) return '$s秒';
+    return s == 0 ? '$m分' : '$m分$s秒';
   }
 }

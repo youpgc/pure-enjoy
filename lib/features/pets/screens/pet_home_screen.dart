@@ -14,6 +14,7 @@ import '../utils/pet_art.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
 import '../widgets/pet_attributes_sheet.dart';
+import '../widgets/pet_feed_sheet.dart';
 import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';

@@ -6,6 +6,7 @@ import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_item_icon.dart';
+import 'pet_bag_screen.dart';
 import 'pet_odds_screen.dart';
 
 /// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
@@ -16,9 +17,16 @@ import 'pet_odds_screen.dart';
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
 class PetShopScreen extends StatefulWidget {
-  const PetShopScreen({super.key, required this.goldBalance});
+  const PetShopScreen({
+    super.key,
+    required this.goldBalance,
+    this.petId,
+  });
 
   final int goldBalance;
+
+  /// 在养宠物 id（背包页「使用道具」的目标；由主页带过来，null 时背包内不可用道具）
+  final String? petId;
 
   @override
   State<PetShopScreen> createState() => _PetShopScreenState();
@@ -109,6 +117,18 @@ class _PetShopScreenState extends State<PetShopScreen> {
       appBar: AppBar(
         title: const Text('宠物商城'),
         actions: [
+          // 背包直达（2026-09-24）：商城↔背包互跳，不再只有背包→商城单向
+          TextButton.icon(
+            onPressed: () => Navigator.push(
+              context,
+              MaterialPageRoute(
+                  builder: (_) => PetBagScreen(petId: widget.petId)),
+            ).then((_) {
+              if (mounted) _load();
+            }),
+            icon: const Icon(Icons.inventory_2_outlined, size: 18),
+            label: const Text('背包', style: TextStyle(fontSize: 13)),
+          ),
           // 概率公示（P2）：读后台已发布蛋池，与抽取判定同版本，纯只读入口
           TextButton.icon(
             onPressed: () => Navigator.push(
@@ -170,10 +190,11 @@ class _PetShopScreenState extends State<PetShopScreen> {
                   onRefresh: _load,
                   child: GridView.builder(
                     padding: const EdgeInsets.all(12),
-                    // 每行 6 格、正方形物品格（2026-09-17 定版）
+                    // 每行 4 格、正方形物品格（2026-09-24 定版：格内显示图标+名称，
+                    // 其余信息一律收进详情弹窗，故格子必须放大到能容一行名称）
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
+                      crossAxisCount: 4,
                       childAspectRatio: 1,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
@@ -187,7 +208,11 @@ class _PetShopScreenState extends State<PetShopScreen> {
     );
   }
 
-  /// 物品格（正方形）：图标 + 金币价角标
+  /// 物品格（正方形）：只放图标 + 名称，价格/描述/购买按钮在详情弹窗里
+  ///
+  /// 图标必须走 [PetItemIcon]（`assets/pets/items/<icon>.svg`，与 `pet_items.icon`
+  /// 同源）。此前这里直接画 Material `Icon(_iconFor(item))`，永远不查 asset，
+  /// 是「商城格子不显示物品图标」的直接原因（2026-09-24 修复）。
   Widget _buildCell(PetShopItemModel item, ColorScheme cs) {
     final busy = _buying.contains(item.id);
     final affordable = _gold >= item.priceCoin;
@@ -203,37 +228,38 @@ class _PetShopScreenState extends State<PetShopScreen> {
                   height: 18,
                   child: CircularProgressIndicator(strokeWidth: 2),
                 )
-              : Stack(
-                  alignment: Alignment.center,
-                  children: [
-                    Icon(
-                      _iconFor(item),
-                      size: 26,
-                      color: affordable ? cs.primary : cs.outline,
-                    ),
-                    Positioned(
-                      right: 2,
-                      bottom: 2,
-                      child: Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.paid_outlined,
-                              size: 10,
-                              color: affordable
-                                  ? cs.onSurfaceVariant
-                                  : cs.error),
-                          const SizedBox(width: 1),
-                          Text(
-                            '${item.priceCoin}',
+              : Padding(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 6),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      PetItemIcon(
+                        iconKey: item.iconKey,
+                        fallback: _iconFor(item),
+                        size: 30,
+                        color: affordable ? cs.primary : cs.outline,
+                      ),
+                      const SizedBox(height: 4),
+                      SizedBox(
+                        height: 13,
+                        // 单行不换行：名称超出格宽时等比缩小（不截断、不折行）
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            item.name,
+                            maxLines: 1,
                             style: TextStyle(
-                              fontSize: 9,
-                              color: affordable ? cs.onSurfaceVariant : cs.error,
+                              fontSize: 11,
+                              height: 1.1,
+                              fontWeight: FontWeight.w600,
+                              color: affordable ? cs.onSurface : cs.outline,
                             ),
                           ),
-                        ],
+                        ),
                       ),
-                    ),
-                  ],
+                    ],
+                  ),
                 ),
         ),
       ),

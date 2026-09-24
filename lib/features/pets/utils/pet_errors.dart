@@ -17,6 +17,8 @@ String petRpcErrorText(String? error) {
   const map = <String, String>{
     'PET_FREE_FEED_LIMIT': '今日免费喂养次数已用完，可使用背包中的食物',
     'PET_FEED_COOLDOWN': '喂得太快啦，休息一会儿再来',
+    // 2026-09-24 饱腹门槛（pet_config.feed_full_hunger，后台可配）
+    'PET_ALREADY_FULL': '它已经吃得饱饱的啦，先陪它玩玩或去历险吧',
     'PET_INTERACT_LIMIT': '今天陪它玩够久啦，明天再来互动吧',
     'PET_INTERACT_COOLDOWN': '它还在回味刚才的抚摸，稍等一下',
     'PET_ITEM_NOT_FEED': '该道具不能用于喂养',

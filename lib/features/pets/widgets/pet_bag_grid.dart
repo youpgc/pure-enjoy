@@ -194,16 +194,41 @@ class _SlotFace extends StatelessWidget {
             : Stack(
                 alignment: Alignment.center,
                 children: [
-                  PetItemIcon(
-                    iconKey: item.iconKey,
-                    fallback: petBagFallbackIcon(item),
-                    size: 26,
-                    color: item.isEgg ? cs.tertiary : cs.primary,
+                  // 2026-09-24 定版：每行 4 格、格内图标 + 名称（单行不换行，
+                  // 超宽等比缩小）；其余信息（效果/数量上限/操作）看详情弹窗。
+                  // 数量角标保留——一格多份是背包的必要信息，去掉会看不出堆了几张。
+                  Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      PetItemIcon(
+                        iconKey: item.iconKey,
+                        fallback: petBagFallbackIcon(item),
+                        size: 30,
+                        color: item.isEgg ? cs.tertiary : cs.primary,
+                      ),
+                      const SizedBox(height: 3),
+                      SizedBox(
+                        height: 12,
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          child: Text(
+                            item.name,
+                            maxLines: 1,
+                            style: TextStyle(
+                              fontSize: 10,
+                              height: 1.1,
+                              fontWeight: FontWeight.w600,
+                              color: cs.onSurfaceVariant,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
                   if (!item.isEgg && (item.quantity > 1 || item.isStackFull))
                     Positioned(
-                      right: 2,
-                      bottom: 2,
+                      right: 0,
+                      top: 0,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 1),

@@ -329,10 +329,11 @@ class _PetBagScreenState extends State<PetBagScreen> {
                     padding: const EdgeInsets.all(12),
                     // 格子少时也要能下拉刷新
                     physics: const AlwaysScrollableScrollPhysics(),
-                    // 每行 6 格、正方形（2026-09-17 定版）；格号恒等于 slot_index
+                    // 每行 4 格、正方形（2026-09-24 定版：格内加物品名称，与商城统一）；
+                    // 格号恒等于 slot_index——改列数只改排布，不违反坐标不变量（铁律 15）
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 6,
+                      crossAxisCount: 4,
                       childAspectRatio: 1,
                       mainAxisSpacing: 8,
                       crossAxisSpacing: 8,
