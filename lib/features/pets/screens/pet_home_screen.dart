@@ -9,6 +9,7 @@ import '../../../constants/pet_render.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
+import '../services/pet_audio.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_action_machine.dart';

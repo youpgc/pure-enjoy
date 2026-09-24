@@ -29,28 +29,32 @@ extension _PetHomeActions on _PetHomeScreenState {
   /// 播放一次性动作（动作机按优先级/防抖裁决，被拒时静默跳过不打断当前演出）
   void _playAction(PetAction action) {
     if (!_machine.request(action)) return;
-    _emitFx(action);
+    _cue(action);
     setState(() {});
   }
 
-  /// 动作 → 舞台粒子（进化给光柱+光环双特效；idle/行走/委屈不放粒子）
+  /// 动作 → 舞台演出（粒子 + 音效 + 触感；进化给光柱+光环双特效）
   ///
-  /// 粒子色是表现层固定色（爱心必须粉、星星必须金），不跟随 App 主题，
-  /// 与"数值/阈值一律读 pet_config"的口径无关。
-  void _emitFx(PetAction action) {
+  /// 粒子色与音效是表现层固定选择（爱心必须粉、进食必须咀嚼声），不跟随
+  /// App 主题，与"数值/阈值一律读 pet_config"的口径无关。
+  void _cue(PetAction action) {
     final primary = Theme.of(context).colorScheme.primary;
     switch (action) {
       case PetAction.petted:
         _fx.emit(PetFxKind.hearts, const Color(0xFFFF7D9F));
+        PetAudio.instance.petted();
       case PetAction.eat:
         _fx.emit(PetFxKind.crumbs, const Color(0xFFC99A5B));
+        PetAudio.instance.eat();
       case PetAction.happy:
         _fx.emit(PetFxKind.stars, const Color(0xFFFFC94D));
+        PetAudio.instance.happy();
       case PetAction.sleep:
         _fx.emit(PetFxKind.zzz, Colors.white);
       case PetAction.evolve:
         _fx.emit(PetFxKind.beam, primary);
         _fx.emit(PetFxKind.ring, primary);
+        PetAudio.instance.evolve();
       case PetAction.idle:
       case PetAction.walk:
       case PetAction.sad:
