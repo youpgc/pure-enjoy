@@ -6,6 +6,7 @@ import '../models/pet_p2_progress_models.dart';
 import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_item_icon.dart';
 
 /// 成就页（P2）
 ///
@@ -150,6 +151,19 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
           children: [
             Row(
               children: [
+                // 成就图标位（pet_achievements.icon = icon/<key>，服务端已下发）；
+                // 未达成做灰度处理，与右侧进度语义一致
+                Opacity(
+                  opacity: a.completed ? 1 : .55,
+                  child: PetItemIcon(
+                    iconKey: a.iconKey,
+                    fallback: a.tier == PetAchTier.legendary
+                        ? Icons.workspace_premium
+                        : Icons.emoji_events_outlined,
+                    size: 34,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(a.title,
                       style: const TextStyle(

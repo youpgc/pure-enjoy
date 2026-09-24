@@ -185,8 +185,10 @@ class _PetEggScreenState extends State<PetEggScreen> {
           children: [
             Row(
               children: [
-                const PetItemIcon(
-                    iconKey: null, fallback: Icons.egg_outlined, size: 28),
+                PetItemIcon(
+                    iconKey: egg.iconKey,
+                    fallback: Icons.egg_outlined,
+                    size: 28),
                 const SizedBox(width: 10),
                 Expanded(
                   child: Text(egg.itemName,

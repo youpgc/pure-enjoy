@@ -67,7 +67,7 @@ class PetRpc {
       final resp = await ApiClient.get(
         'pet_eggs',
         select:
-            'id,pool_code,mode,status,ready_at,bag_item_id,item:pet_items(name,item_code)',
+            'id,pool_code,mode,status,ready_at,bag_item_id,item:pet_items(name,item_code,icon)',
         filters: {'user_id': 'eq.$uid', 'status': 'in.(unopened,waiting,ready)'},
         order: 'created_at.asc',
         limit: 100,

@@ -113,12 +113,12 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.inventory_2_outlined,
                 label: '背包',
-                onTap: this._openBag),
+                onTap: _openBag),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.storefront_outlined,
                 label: '商城',
-                onTap: this._openShop),
+                onTap: _openShop),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.more_horiz,
@@ -141,12 +141,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
           children: [
             for (final (icon, label, open) in <(IconData, String, void Function())>
                 [
-              (Icons.account_balance_wallet_outlined, '金币钱包',
-                  this._openWallet),
-              (Icons.luggage_outlined, '寄养仓库', this._openFoster),
-              (Icons.workspace_premium_outlined, '成就',
-                  this._openAchievements),
-              (Icons.favorite_outline, '繁育', this._openBreed),
+              (Icons.account_balance_wallet_outlined, '金币钱包', _openWallet),
+              (Icons.luggage_outlined, '寄养仓库', _openFoster),
+              (Icons.workspace_premium_outlined, '成就', _openAchievements),
+              (Icons.favorite_outline, '繁育', _openBreed),
             ])
             ListTile(
               leading: Icon(icon),
@@ -214,7 +212,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 label: '喂食',
                 // 蒙层只在真正"吃饱了"时出现；历险中/请求中属静默禁用，不误导
                 overlay: _budget.isFull ? '已饱' : null,
-                onTap: feedOff ? null : () => this._onFeedTap()),
+                onTap: feedOff ? null : () => _onFeedTap()),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.touch_app_outlined,
@@ -230,7 +228,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.task_alt_outlined,
                 label: '任务',
-                onTap: this._openQuests),
+                onTap: _openQuests),
           ],
         ),
       ),

@@ -46,6 +46,13 @@ class PetAchievementModel {
 
   bool get claimable => completed && !claimed;
 
+  /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
+  String? get iconKey {
+    final v = icon;
+    if (v == null || v.isEmpty) return null;
+    return v.startsWith('icon/') ? v.substring(5) : v;
+  }
+
   double get ratio =>
       target <= 0 ? 0 : (progress / target).clamp(0, 1).toDouble();
 

@@ -84,8 +84,8 @@ class _PetFeedSheetState extends State<_PetFeedSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 4, 16, 10),
+            const Padding(
+              padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
               child: Text('用口粮喂食',
                   style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
             ),

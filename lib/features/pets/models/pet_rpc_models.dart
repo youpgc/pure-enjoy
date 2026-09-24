@@ -86,6 +86,7 @@ class PetEggModel {
     required this.mode,
     required this.itemName,
     required this.status,
+    this.itemIcon,
     this.bagItemId,
     this.readyAt,
   });
@@ -94,6 +95,9 @@ class PetEggModel {
   final String poolCode;
   final String mode; // instant / wait
   final String itemName;
+
+  /// pet_items.icon（蛋列表图标位，形如 icon/<key>）
+  final String? itemIcon;
 
   /// pet_eggs.status（unopened / waiting / ready）
   final PetEggStatus? status;
@@ -122,6 +126,13 @@ class PetEggModel {
     return left.isNegative ? Duration.zero : left;
   }
 
+  /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
+  String? get iconKey {
+    final v = itemIcon;
+    if (v == null || v.isEmpty) return null;
+    return v.startsWith('icon/') ? v.substring(5) : v;
+  }
+
   factory PetEggModel.fromJson(Map<String, dynamic> json) {
     final item = (json['item'] as Map?)?.cast<String, dynamic>() ?? const {};
     return PetEggModel(
@@ -129,6 +140,7 @@ class PetEggModel {
       poolCode: json['pool_code'] as String? ?? '',
       mode: json['mode'] as String? ?? PetEggMode.instant.code,
       itemName: item['name'] as String? ?? '神秘蛋',
+      itemIcon: item['icon'] as String?,
       status: PetEggStatus.fromCode(json['status'] as String?),
       bagItemId: json['bag_item_id'] as String?,
       readyAt: DateTime.tryParse(json['ready_at'] as String? ?? ''),
