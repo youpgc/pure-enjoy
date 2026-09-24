@@ -228,6 +228,11 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
 
   // ---------- 公共小块 ----------
 
+  /// 任务卡（2026-09-24 版式定版）：
+  /// 第一行 = 任务介绍（左）+ 奖励（右，奖励相关动作也在这行的右侧）；
+  /// 第二行 = 进度条 + 完成度，独占一行。
+  /// 旧版把奖励文案塞进 ListTile 的 trailing 竖列，与 subtitle 的进度条上下错位，
+  /// 一眼对不上"这条奖励属于哪个进度"。
   Widget _questCard(
     ColorScheme cs, {
     required String title,
@@ -239,38 +244,69 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
     VoidCallback? onClaim,
   }) {
     return Card(
-      child: ListTile(
-        title: Text(title),
-        subtitle: Padding(
-          padding: const EdgeInsets.only(top: 6),
-          child: Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(4),
-                  child: LinearProgressIndicator(
-                    value: target <= 0 ? 0 : (progress / target).clamp(0.0, 1.0),
-                    minHeight: 7,
-                    backgroundColor: cs.surfaceContainerHighest,
-                  ),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Expanded(
+                  child: Text(title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                          fontSize: 14, fontWeight: FontWeight.w600)),
                 ),
-              ),
-              const SizedBox(width: 8),
-              Text('${progress.clamp(0, target)}/$target',
-                  style: const TextStyle(fontSize: 12)),
-            ],
-          ),
-        ),
-        trailing: claimed
-            ? const Text('已领取', style: TextStyle(fontSize: 12))
-            : onClaim == null
-                ? Text(rewardText,
-                    style: TextStyle(
-                        fontSize: 12, color: cs.onSurfaceVariant))
-                : FilledButton.tonal(
+                if (rewardText.isNotEmpty) ...[
+                  const SizedBox(width: 8),
+                  Flexible(
+                    child: Text(rewardText,
+                        textAlign: TextAlign.right,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant)),
+                  ),
+                ],
+                if (claimed) ...[
+                  const SizedBox(width: 8),
+                  Text('已领取',
+                      style: TextStyle(fontSize: 12, color: cs.outline))
+                ] else if (onClaim != null) ...[
+                  const SizedBox(width: 8),
+                  FilledButton.tonal(
                     onPressed: busy ? null : onClaim,
+                    style: FilledButton.styleFrom(
+                      visualDensity: VisualDensity.compact,
+                      padding: const EdgeInsets.symmetric(horizontal: 12),
+                    ),
                     child: Text(busy ? '领取中' : '领取'),
                   ),
+                ],
+              ],
+            ),
+            const SizedBox(height: 10),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(4),
+                    child: LinearProgressIndicator(
+                      value: target <= 0 ? 0 : (progress / target).clamp(0.0, 1.0),
+                      minHeight: 7,
+                      backgroundColor: cs.surfaceContainerHighest,
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 8),
+                Text('${progress.clamp(0, target)}/$target',
+                    style: const TextStyle(fontSize: 12)),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }

@@ -102,6 +102,13 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
       return const EmptyWidget(message: '成就还在配置中，过阵子再来看看吧');
     }
     final done = _achs.where((a) => a.completed).length;
+    // 2026-09-24 定版排序：按「领取状态」分三段（可领取置顶 → 进行中 → 已领取沉底），
+    // 段内保持服务端原序（tier.sort_order + code），不再按档位分组打标题——
+    // 置顶诉求要的是全局次序，档位标题会把可领取的成就拆散到各档下面。
+    // 档位信息改由卡片的达成条件行前缀展示，不丢。
+    final claimable = _achs.where((a) => a.completed && !a.claimed).toList();
+    final doing = _achs.where((a) => !a.completed && !a.claimed).toList();
+    final claimed = _achs.where((a) => a.claimed).toList();
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
@@ -110,11 +117,15 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
           Text('已达成 $done / ${_achs.length}',
               style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
           const SizedBox(height: 10),
-          for (final tier in PetAchTier.values)
-            if (_achs.any((a) => a.tier == tier)) ...[
-              _tierHeader(cs, tier),
+          for (final (label, list) in <(String, List<PetAchievementModel>)>[
+            ('可领取', claimable),
+            ('进行中', doing),
+            ('已领取', claimed),
+          ])
+            if (list.isNotEmpty) ...[
+              _sectionHeader(cs, label, list.length),
               const SizedBox(height: 8),
-              for (final a in _achs.where((e) => e.tier == tier))
+              for (final a in list)
                 Padding(
                   padding: const EdgeInsets.only(bottom: 10),
                   child: _card(cs, a),
@@ -126,23 +137,26 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     );
   }
 
-  Widget _tierHeader(ColorScheme cs, PetAchTier tier) => Row(
+  Widget _sectionHeader(ColorScheme cs, String label, int count) => Row(
         children: [
           Icon(
-            tier == PetAchTier.legendary
-                ? Icons.workspace_premium
-                : Icons.emoji_events_outlined,
+            label == '可领取'
+                ? Icons.card_giftcard
+                : label == '进行中'
+                    ? Icons.timelapse
+                    : Icons.check_circle_outline,
             size: 18,
             color: cs.tertiary,
           ),
           const SizedBox(width: 6),
-          Text('${tier.label}成就',
+          Text('$label · $count',
               style: TextStyle(
                   fontSize: 14, fontWeight: FontWeight.w700, color: cs.tertiary)),
         ],
       );
 
   Widget _card(ColorScheme cs, PetAchievementModel a) {
+    final tierLabel = a.tier?.label;
     return Card(
       child: Padding(
         padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -183,8 +197,12 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
               ],
             ),
             const SizedBox(height: 6),
-            Text(a.conditionLabel,
-                style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+            // 档位前缀：分组标题改成状态段后，档位（普通/精英/传说）在这行保留
+            Text(
+              tierLabel == null
+                  ? a.conditionLabel
+                  : '$tierLabel · ${a.conditionLabel}',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
             const SizedBox(height: 8),
             ClipRRect(
               borderRadius: BorderRadius.circular(4),

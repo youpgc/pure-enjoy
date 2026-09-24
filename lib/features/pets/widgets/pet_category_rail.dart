@@ -11,9 +11,10 @@ class PetCategoryItem {
 
 /// 宠物模块分类导航（背包页 / 商城页共用）
 ///
-/// 定版布局（2026-09-24）：分类从**顶部横排 chip** 改为**左侧竖排栅格 tile**——
-/// 一屏放得下的分类数不再受横向宽度限制，超出时右侧显形滚动条；
-/// 项与格位网格同为「格子」视觉语言，不再用 Tag 形态。
+/// 定版布局（2026-09-24 二次修订）：左侧竖排**贴边栅格**——项与项之间零间距、
+/// 无圆角无边框，只用一条分隔线隔离相邻分类；选中态靠整格底色区分。
+/// 分类从顶部横排 chip 改来时解决的问题仍然成立：一屏放得下的分类数不受横向
+/// 宽度限制，超出时右侧显形滚动条。
 ///
 /// 自带 [ScrollController]：`thumbVisibility` 与拖动都依赖 controller，
 /// 不显式给出时只能靠 PrimaryScrollController 兜底（嵌套在 Row 里时不保证命中）。
@@ -32,7 +33,10 @@ class PetCategoryRail extends StatefulWidget {
   final double width;
 
   static const double tileHeight = 62;
-  static const double tileSpacing = 8;
+
+  /// 分类之间的分隔线粗细（零间距，只留这条线）
+  static const double dividerThickness = 1;
+
   static const double verticalPadding = 16;
 
   @override
@@ -59,7 +63,8 @@ class _PetCategoryRailState extends State<PetCategoryRail> {
           final contentH = items.length * PetCategoryRail.tileHeight +
               (items.isEmpty
                   ? 0
-                  : (items.length - 1) * PetCategoryRail.tileSpacing) +
+                  : (items.length - 1) *
+                      PetCategoryRail.dividerThickness) +
               PetCategoryRail.verticalPadding;
           return RawScrollbar(
             controller: _scroll,
@@ -73,8 +78,12 @@ class _PetCategoryRailState extends State<PetCategoryRail> {
               padding: const EdgeInsets.symmetric(
                   vertical: PetCategoryRail.verticalPadding / 2),
               itemCount: items.length,
-              separatorBuilder: (_, __) =>
-                  const SizedBox(height: PetCategoryRail.tileSpacing),
+              // 零间距：相邻分类之间只有一条贴边分隔线
+              separatorBuilder: (_, __) => Divider(
+                height: PetCategoryRail.dividerThickness,
+                thickness: PetCategoryRail.dividerThickness,
+                color: cs.outlineVariant,
+              ),
               itemBuilder: (context, i) => _tile(cs, items[i]),
             ),
           );
@@ -87,18 +96,11 @@ class _PetCategoryRailState extends State<PetCategoryRail> {
     final on = item.key == widget.selected;
     return InkWell(
       onTap: () => widget.onSelect(item.key),
-      borderRadius: BorderRadius.circular(12),
       child: AnimatedContainer(
         duration: const Duration(milliseconds: 150),
         height: PetCategoryRail.tileHeight,
-        decoration: BoxDecoration(
-          color: on ? cs.secondaryContainer : cs.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          border: Border.all(
-            color: on ? cs.secondary : Colors.transparent,
-            width: 1.2,
-          ),
-        ),
+        // 无边框、无圆角：选中态只换整格底色，与分隔线一起构成贴边栅格
+        color: on ? cs.secondaryContainer : Colors.transparent,
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [

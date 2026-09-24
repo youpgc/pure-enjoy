@@ -2,7 +2,7 @@ part of 'pet_home_screen.dart';
 
 /// 宠物主页浮层布局（part）：中央舞台 / 多宠切换箭头 / 顶部历险横幅 /
 /// 底部状态区 / 左右两列按钮。交互动作在 `pet_home_screen_actions.dart`，
-/// 跨 part 调用动作成员统一写 `this._xxx()`（扩展成员需显式接收者才稳）。
+/// 同文件的扩展成员之间直接裸调用（`unnecessary_this` 会报冗余的 `this.`）。
 
 /// 左右浮动列占位宽（52px 按钮 + 边距），舞台与切换箭头据此让位
 const double _kEdgeInset = 64;
@@ -169,6 +169,16 @@ extension _PetHomeLayout on _PetHomeScreenState {
     return null;
   }
 
+  /// 喂食钮文案（2026-09-24 修回归）：免费额度冷却中要显示「还剩多久恢复」——
+  /// 旧版这条信息挂在黑色蒙层上，改成"冷却不置灰（可吃口粮）"时蒙层被一并去掉了，
+  /// 倒计时就再也没出现过。按钮此时仍可点，所以不能挂蒙层（会被读成禁用），
+  /// 直接用文案位；额度用尽但没冷却时文案为「口粮」，明示这一钮现在走背包口粮。
+  String get _feedLabel {
+    if (_budget.feedFreeAvailable) return '喂食';
+    final cool = _budget.feedCooldown;
+    return cool == null ? '口粮' : _budget.coolTextShort(cool);
+  }
+
   /// 喂食结果文案：增量全部来自后台配置（与服务端 `_pet_add_progress` 同源），
   /// 不再写死「喂饱啦」（旧文案与饱食度无关，20→40 也说"喂饱"，误导用户）
   String get _feedMsg {
@@ -209,7 +219,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             const SizedBox(height: 10),
             PetEdgeButton(
                 icon: Icons.restaurant,
-                label: '喂食',
+                label: _feedLabel,
                 // 蒙层只在真正"吃饱了"时出现；历险中/请求中属静默禁用，不误导
                 overlay: _budget.isFull ? '已饱' : null,
                 onTap: feedOff ? null : () => _onFeedTap()),

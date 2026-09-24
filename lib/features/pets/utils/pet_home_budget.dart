@@ -99,4 +99,14 @@ class PetActionBudget {
     if (m <= 0) return '$s秒';
     return s == 0 ? '$m分' : '$m分$s秒';
   }
+
+  /// 短倒计时（64dp 边缘钮的文案位用，最长 4 字：「30分」/「45秒」）
+  ///
+  /// [coolText] 的「29分59秒」在小尺寸按钮里会被省略号截断，文案位需要更短的口径；
+  /// 分钟向上取整，与 [coolText] 一样不会停在 0。
+  String coolTextShort(Duration d) {
+    final total = (d.inMilliseconds / 1000).ceil();
+    if (total < 60) return '$total秒';
+    return '${(total / 60).ceil()}分';
+  }
 }
