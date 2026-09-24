@@ -400,7 +400,7 @@ class PetEggOddsModel {
       configVersion: (json['config_version'] as num?)?.toInt() ?? 0,
       families: numMap(w['families']),
       rarities: numMap(w['rarity']),
-      maleChance: (numMap(w['gender'])['male'] as num?)?.toDouble(),
+      maleChance: numMap(w['gender'])['male']?.toDouble(),
     );
   }
 }

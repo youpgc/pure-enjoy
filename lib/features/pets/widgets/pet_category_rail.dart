@@ -67,7 +67,7 @@ class _PetCategoryRailState extends State<PetCategoryRail> {
             thumbVisibility: contentH > box.maxHeight,
             thickness: 4,
             radius: const Radius.circular(2),
-            color: cs.outlineVariant,
+            thumbColor: cs.outlineVariant,
             child: ListView.separated(
               controller: _scroll,
               padding: const EdgeInsets.symmetric(

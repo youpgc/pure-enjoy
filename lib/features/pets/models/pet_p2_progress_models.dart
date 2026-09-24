@@ -24,7 +24,7 @@ class PetAchievementModel {
     required this.rewardPoints,
     required this.rewardItems,
     this.icon,
-    this.conditionValue,
+    this.conditionValue = const {},
   });
 
   final String id;

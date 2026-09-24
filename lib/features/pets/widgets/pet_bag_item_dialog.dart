@@ -146,7 +146,7 @@ List<Widget> _extraActionButtons(
       width: double.infinity,
       child: FilledButton.tonalIcon(
         onPressed: busy ? null : () => fire(onTap),
-        icon: const Icon(Icons.arrow_forward_circle, size: 18),
+        icon: const Icon(Icons.arrow_right_alt, size: 18),
         label: Text(label),
       ),
     ),

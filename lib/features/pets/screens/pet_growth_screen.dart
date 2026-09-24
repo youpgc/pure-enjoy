@@ -114,7 +114,6 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     final pet = _pet;
     setState(() {
       _options = const [];
-      _pickedSpeciesId = null;
       _optionsLoading = pet?.chainId != null;
     });
     if (pet == null || pet.chainId == null) return;

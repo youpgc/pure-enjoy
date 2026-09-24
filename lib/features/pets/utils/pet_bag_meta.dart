@@ -13,7 +13,10 @@ import '../models/pet_rpc_models.dart';
 /// hatch_accel → rpc_pet_hatch_accelerate（蛋详情页）、
 /// trait_wash → rpc_pet_wash_trait（成长页）、
 /// unlock → rpc_pet_unlock_feature（背包内即点即开通）。
-const Set<String> petUsableEffectTypes = {
+///
+/// 值域取自 [PetItemEffectType]（铁律 12 单一源），故只能是 `final`——
+/// 枚举实例 getter 不是常量表达式，写 `const` 直接编译不过。
+final Set<String> petUsableEffectTypes = {
   PetItemEffectType.feed.code,
   PetItemEffectType.clean.code,
   PetItemEffectType.toy.code,
