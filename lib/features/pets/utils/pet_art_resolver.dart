@@ -33,6 +33,9 @@ library;
 import '../../../constants/pet_render.dart';
 import 'pet_art.dart';
 
+// 消费方只 import 本文件：解码宽度算法在此统一，避免各处各写一份 1.25 倍余量
+export 'pet_art.dart' show petDecodeWidth;
+
 /// 整只底图：`render2d.base` 优先，未配置或未随包则回退该种属该阶位的清单底图。
 ///
 /// 注意底图是不透明图（带背景），舞台上请用 [petStageFrames] 取透明帧做身体，

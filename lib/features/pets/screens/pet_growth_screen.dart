@@ -312,8 +312,11 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
               if (img != null)
                 ClipRRect(
                   borderRadius: BorderRadius.circular(16),
-                  child:
-                      Image.asset(img, height: 190, fit: BoxFit.contain),
+                  child: Image.asset(img,
+                      height: 190,
+                      fit: BoxFit.contain,
+                      cacheWidth: petDecodeWidth(
+                          190, MediaQuery.devicePixelRatioOf(ctx))),
                 ),
               const SizedBox(height: 12),
               Text('✨ 进化完成！',

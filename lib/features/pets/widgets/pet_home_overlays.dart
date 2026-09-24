@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
+import '../utils/pet_art_resolver.dart';
 
 /// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
 ///
@@ -394,7 +395,11 @@ Future<void> showPetBirthDialog(
             if (img != null)
               ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Image.asset(img, height: 210, fit: BoxFit.contain),
+                child: Image.asset(img,
+                    height: 210,
+                    fit: BoxFit.contain,
+                    cacheWidth: petDecodeWidth(
+                        210, MediaQuery.devicePixelRatioOf(ctx))),
               ),
             const SizedBox(height: 12),
             Text('🎉 新伙伴诞生！', style: Theme.of(ctx).textTheme.titleMedium),

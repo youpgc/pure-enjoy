@@ -37,3 +37,10 @@ bool petBaseArtBundled(String code) {
 /// 某种属某动作已随包的帧数；未登记返回 0
 int petBundledFrameCount(String speciesCode, String actionCode) =>
     kPetActionFrames[speciesCode]?[actionCode] ?? 0;
+
+/// 下采样解码宽度：按显示边长 × 设备像素比推算（多留 25% 给压扁拉伸与旋转）。
+///
+/// 底图是 2048² 的不透明图，整幅解码一张就 16MB，而 Flutter 默认图片缓存只有
+/// 100MB——弹窗按 190/210 的显示高度原图解码纯属白烧内存。
+int petDecodeWidth(double displayLogicalSize, double devicePixelRatio) =>
+    (displayLogicalSize * devicePixelRatio * 1.25).round().clamp(128, 2048);

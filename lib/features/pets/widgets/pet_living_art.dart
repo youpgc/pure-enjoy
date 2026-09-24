@@ -5,6 +5,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/pet_render.dart';
 import '../utils/pet_action_machine.dart';
+import '../utils/pet_art_resolver.dart';
 
 /// 父约束无界时的宠物显示基准边长（仅用于推算解码宽度与光晕尺寸）
 const double _kFallbackArtSize = 320;
@@ -211,11 +212,8 @@ class _PetLivingArtState extends State<PetLivingArt>
           (box.width.isFinite && box.height.isFinite
               ? math.min(box.width, box.height)
               : _kFallbackArtSize);
-      // 按显示尺寸下采样解码：内嵌立绘最大 2048²，全尺寸解码会撑爆图片缓存
       final cacheWidth =
-          (ref * MediaQuery.devicePixelRatioOf(context) * 1.25)
-              .round()
-              .clamp(128, 2048);
+          petDecodeWidth(ref, MediaQuery.devicePixelRatioOf(context));
 
       final path = widget.fallbackAsset;
       // 素材缺失/清单与包内文件脱节时画占位，不抛异常（铁律 8）
