@@ -196,6 +196,23 @@ class GameService {
         DateTime.now().difference(_lastFetchAt!) < _ttl;
     if (!force && memory != null && fresh) return memory;
 
+    // ★ single-flight（审查报告 游戏 C3）：TTL 过期后并发调用合并为一次拉取，
+    // 避免多入口同刻各自全量拉 6 表
+    final inFlight = _configFuture;
+    if (!force && inFlight != null) return (await inFlight)!;
+    final future = _doFetchConfig();
+    _configFuture = future;
+    try {
+      return await future;
+    } finally {
+      _configFuture = null;
+    }
+  }
+
+  Future<GameConfigSnapshot?>? _configFuture;
+
+  Future<GameConfigSnapshot> _doFetchConfig() async {
+    final memory = _memory;
     final results = await Future.wait<dynamic>(<Future<dynamic>>[
       _fetchRows('games', order: 'sort_order.asc'),
       _fetchRows('game_dimensions', order: 'sort_order.asc'),
@@ -217,6 +234,21 @@ class GameService {
       modes: _toModels<GameModeModel>(results[5], GameModeModel.fromJson),
       cachedAt: DateTime.now(),
     );
+
+    // ★ 全空快照不落缓存（审查报告 游戏 C3）：网络抖动一次 → 整站配置空集
+    // 会覆盖内存与持久缓存，30s TTL 内 rewardsAllowed=false 静默止付、
+    // 冷启动秒渲染丢失。空快照=疑似故障，保留旧缓存并放弃本次结果。
+    final isEmpty = snapshot.games.isEmpty &&
+        snapshot.levels.isEmpty &&
+        snapshot.modes.isEmpty;
+    if (isEmpty) {
+      ErrorReporter.reportMessage(
+        '游戏配置拉取得到全空快照，保留旧缓存不覆盖',
+        module: 'games',
+        level: 'warning',
+      );
+      return memory ?? snapshot;
+    }
 
     _memory = snapshot;
     _lastFetchAt = DateTime.now();

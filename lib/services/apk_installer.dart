@@ -156,10 +156,12 @@ class ApkInstaller {
       if (kDebugMode) debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
       // 处理重定向（GitHub Releases 返回 302 到 CDN；303/307/308 同族，审查报告 版本#7）
-      if (response.statusCode >= 300 && response.statusCode < 309 &&
+      final redirectUrl = response.headers['location'];
+      if (response.statusCode >= 300 &&
+          response.statusCode < 309 &&
           response.statusCode != 304 &&
-          response.headers['location']?.isNotEmpty == true) {
-        final redirectUrl = response.headers['location'];
+          redirectUrl != null &&
+          redirectUrl.isNotEmpty) {
         if (kDebugMode) debugPrint('📱 跟随重定向');
         // drain 当前 response stream 释放连接，避免资源泄漏
         await response.stream.drain<void>();
@@ -187,7 +189,7 @@ class ApkInstaller {
       // stall 保护时断网会让 UI 永久停在「下载中 x%」。30s 无新数据即失败。
       var stalled = false;
       var lastDataAt = DateTime.now();
-      final stallLimit = const Duration(seconds: 30);
+      const stallLimit = Duration(seconds: 30);
       Timer.periodic(const Duration(seconds: 5), (t) {
         if (DateTime.now().difference(lastDataAt) > stallLimit) {
           stalled = true;
