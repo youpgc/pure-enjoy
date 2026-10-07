@@ -62,14 +62,17 @@ Future<HabitPageBundle> fetchHabitPage({
         'habit_checkins',
         filters: {'habit_id': 'in.($habitIds)'},
         order: 'checkin_at.desc',
-        limit: limit,
-        offset: offset,
+        // ★ 子查询禁止复用列表的 offset：此前 offset 随页码平移会跳过最近的
+        //   打卡记录，导致 isCheckedInToday/完成态基于截断数据误判（可重复打卡）。
+        //   limit 给显式大值（默认 defaultLimit=10 远不够）；叠加 DB 端
+        //   uq_habit_checkins_habit_bjday 每日唯一后，1000 条 ≈ 单习惯 1000 天。
+        limit: 1000,
       ),
       ApiClient.get(
         'reminder_schedules',
         filters: {'habit_id': 'in.($habitIds)'},
-        limit: limit,
-        offset: offset,
+        // 计划数 ≈ 习惯数，量级小，全量拉取
+        limit: null,
       ),
     ]);
 

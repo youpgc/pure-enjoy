@@ -101,6 +101,16 @@ mixin _DashboardLogic on State<DashboardPage> {
     // 闭环：已达成目标天数的习惯不再允许打卡
     final totalCheckins = _checkinHistory[habit.id]?.length ?? 0;
     if (isHabitCompleted(totalCheckins, habit.targetDays)) return;
+    // ★ 前置守卫：今日（北京日）已打卡直接拦截。缓存有 1h TTL 可能滞后，
+    //   此守卫拦截本地可判定的重复；跨设备/缓存滞后的兜底由服务端
+    //   uq_habit_checkins_habit_bjday 唯一索引承担（409 → 下方按已打卡提示）。
+    final todayKey = DateTimeUtils.todayBeijingKey();
+    final alreadyToday = (_checkinHistory[habit.id] ?? [])
+        .any((c) => DateTimeUtils.beijingDateKey(c.checkinAt) == todayKey);
+    if (alreadyToday) {
+      showSnackBar(context, '今天已经打过卡啦');
+      return;
+    }
     setState(() => _checkingHabitId = habit.id);
     try {
       final today = DateTime.now();
@@ -117,6 +127,16 @@ mixin _DashboardLogic on State<DashboardPage> {
       );
 
       if (!checkinResult.isSuccess) {
+        // 409 = 服务端每日唯一索引拦截（缓存滞后/双设备重复打卡）：
+        // 按已打卡成功口径提示并刷新数据，不再报「打卡失败」
+        if (checkinResult.statusCode == 409) {
+          unawaited(RequestCache.invalidate(_kCacheHabits));
+          unawaited(_loadHabitsForCheckin());
+          if (mounted) {
+            showSnackBar(context, '今天已经打过卡啦', isSuccess: true);
+          }
+          return;
+        }
         throw Exception('打卡失败: HTTP ${checkinResult.statusCode}');
       }
 
