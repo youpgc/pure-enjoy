@@ -99,16 +99,15 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
         'user_id': 'eq.$userId',
       };
 
-      if (_searchQuery.isNotEmpty) {
-        filters['search'] = _searchQuery;
-        filters['searchFields'] = 'title,content';
-      }
-
       final (limit, offset) = paginationParams;
 
       final result = await ApiClient.get(
         'notes',
         filters: filters,
+        // ★ 搜索走命名参数（builder 生成 or=(title.ilike.*x*,content.ilike.*x*)）。
+        //   此前塞进 filters 会被当 PostgREST 列名拼成 search=xxx → 42703 查询必 400
+        search: _searchQuery.isNotEmpty ? _searchQuery : null,
+        searchFields: _searchQuery.isNotEmpty ? 'title,content' : null,
         order: 'is_pinned.desc,updated_at.desc',
         limit: limit,
         offset: offset,
