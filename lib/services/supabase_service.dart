@@ -44,6 +44,20 @@ class AuthService {
   /// 注册 Token 刷新成功回调（鉴权层 AuthNotifier._init 调用）。
   void setOnTokenRefreshed(void Function()? cb) => _onTokenRefreshed = cb;
 
+  /// 会话过期（refresh 失败终态）回调，与 setOnTokenRefreshed 对称。
+  void Function()? _onSessionExpired;
+
+  /// 注册会话过期回调（鉴权层 AuthNotifier._init 调用）。
+  void setOnSessionExpired(void Function()? cb) => _onSessionExpired = cb;
+
+  /// 401 刷新失败的会话终态：清本地会话并广播过期事件（审查报告 基建#1——
+  /// 此前该终态无任何消费方，用户被卡在「已登录但全部请求失败」的伪登录态）。
+  /// 幂等性由两端保证：clearSession 可重复调用；AuthNotifier 侧未登录态短路。
+  Future<void> handleSessionExpired() async {
+    await _session.clearSession();
+    _onSessionExpired?.call();
+  }
+
   // ==================== 用户信息代理 ====================
 
   String? get currentUserId => _session.currentUserId;

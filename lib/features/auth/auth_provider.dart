@@ -121,6 +121,8 @@ class AuthNotifier extends StateNotifier<AuthState> {
   void _init() {
     // 注册 Token 刷新成功回调：401→刷新后重同步 Riverpod 鉴权镜像，闭合 refreshUser 钩子。
     SupabaseService.instance.setOnTokenRefreshed(_onTokenRefreshed);
+    // 注册会话过期回调：refresh 失败终态 → 清孤儿数据并置未登录（切回登录页）
+    SupabaseService.instance.setOnSessionExpired(_onSessionExpired);
     final service = SupabaseService.instance;
     if (service.isLoggedIn) {
       final user = service.currentUser;
@@ -236,6 +238,15 @@ class AuthNotifier extends StateNotifier<AuthState> {
         debugPrint('🔐 [Provider] Token 刷新后同步鉴权状态失败: $e');
       }
     }
+  }
+
+  /// 会话过期（401 刷新失败终态）由 SupabaseService 回调触发：
+  /// 清本地孤儿数据并把 Riverpod 镜像置为未登录，AuthWrapper 随之切回登录页。
+  /// 未登录态直接短路（handleSessionExpired 可能被并发 401 多次触发）。
+  Future<void> _onSessionExpired() async {
+    if (!state.isAuthenticated) return;
+    await _clearLocalUserData();
+    state = const AuthState(error: '登录已过期，请重新登录');
   }
 
   /// 刷新用户信息

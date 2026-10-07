@@ -406,8 +406,16 @@ class HttpClient {
       if (success) {
         _accessToken = SupabaseService.instance.accessToken;
       }
+      if (!success || _accessToken == null) {
+        // ★ 401 终态（审查报告 基建#1）：refresh 失败 = 会话不可恢复。
+        // 此前仅由 retry_policy 抛 401_UNAUTHORIZED 且全仓无消费方，用户被
+        // 卡在「已登录但全部请求失败」的伪登录态。现在清本地会话并广播过期，
+        // AuthNotifier 置未登录 → AuthWrapper 切回登录页。
+        unawaited(SupabaseService.instance.handleSessionExpired());
+      }
       completer.complete(success && _accessToken != null);
     } catch (e) {
+      unawaited(SupabaseService.instance.handleSessionExpired());
       completer.complete(false);
     } finally {
       // 释放锁，允许后续真正需要时再次刷新
