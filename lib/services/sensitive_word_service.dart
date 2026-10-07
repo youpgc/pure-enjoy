@@ -1,7 +1,10 @@
+import 'dart:async';
+
 import 'package:flutter/foundation.dart';
 import './api_client.dart';
 import './sensitive_word_models.dart';
 import './sensitive_word_logger.dart';
+import './supabase_service.dart';
 
 export './sensitive_word_models.dart';
 
@@ -23,6 +26,10 @@ class SensitiveWordService {
 
   /// 缓存时间戳
   DateTime? _lastFetch;
+
+  /// 上次词库加载失败时间：弱网首启失败后按 60s 退避重试（审查报告 支撑#32——
+  /// 此前失败后 _lastFetch 恒 null，_checkText 的过期刷新永不触发，整会话失效）
+  DateTime? _lastFailedAt;
 
   /// 缓存有效期（小时）
   static const int _cacheHours = 6;
@@ -106,8 +113,10 @@ class SensitiveWordService {
         }
 
         _lastFetch = DateTime.now();
+        _lastFailedAt = null;
       }
     } catch (e) {
+      _lastFailedAt = DateTime.now();
       if (kDebugMode) debugPrint('❌ 加载敏感词列表失败');
     }
   }
@@ -174,9 +183,15 @@ class SensitiveWordService {
       return SensitiveWordCheckResult.safe(text);
     }
 
-    // 检查缓存是否过期，自动刷新（带锁）
-    if (_lastFetch != null &&
-        DateTime.now().difference(_lastFetch!).inHours >= _cacheHours) {
+    // 检查缓存是否过期自动刷新（带锁）；上次加载失败时按 60s 退避重试
+    final failedAgo = _lastFailedAt == null
+        ? null
+        : DateTime.now().difference(_lastFailedAt!);
+    final expired = _lastFetch != null &&
+        DateTime.now().difference(_lastFetch!).inHours >= _cacheHours;
+    final shouldRetryAfterFailure =
+        _lastFetch == null && (failedAgo == null || failedAgo.inSeconds >= 60);
+    if (expired || shouldRetryAfterFailure) {
       await refresh();
     }
 
@@ -209,7 +224,7 @@ class SensitiveWordService {
     final hasBlock = matchedWords.any((w) => w.level == 'block');
     final processedText = _processText(text, matchedWords);
 
-    return SensitiveWordCheckResult(
+    final result = SensitiveWordCheckResult(
       hasSensitive: true,
       isBlocked: hasBlock,
       processedText: processedText,
@@ -220,6 +235,33 @@ class SensitiveWordService {
               ? 'replaced'
               : 'warned',
     );
+
+    // ★ 命中留痕（审查报告 支撑#33：logHit 此前全仓零调用，sensitive_word_logs
+    //   永远为空、Admin 分析页无源数据）。在服务层单点接入覆盖全部调用方，
+    //   内部逐词 fire-and-forget，不阻塞提交链、失败静默不影响主流程。
+    _logHits(matchedWords,
+        category: category, text: text, actionTaken: result.actionTaken);
+
+    return result;
+  }
+
+  /// 命中留痕：逐词写 sensitive_word_logs（含命中计数 RPC）。仅调试态输出失败。
+  void _logHits(
+    List<SensitiveWordModel> words, {
+    required String category,
+    required String text,
+    required String actionTaken,
+  }) {
+    final userId = SupabaseService.instance.currentUserId;
+    for (final sw in words) {
+      unawaited(logHit(
+        word: sw,
+        source: category,
+        userId: userId,
+        contentSnippet: text,
+        actionTaken: actionTaken,
+      ).catchError((_) {}));
+    }
   }
 
   /// 判断文本是否匹配敏感词
@@ -253,18 +295,11 @@ class SensitiveWordService {
       switch (sw.level) {
         case 'block':
           // block 级别：用 *** 替换
-          result = result.replaceAll(
-            RegExp(sw.word, caseSensitive: false),
-            '***',
-          );
+          result = _replaceAllWord(result, sw, '***');
           break;
         case 'replace':
           // replace 级别：用指定替换词替换
-          final replaceWith = sw.replaceWord ?? '***';
-          result = result.replaceAll(
-            RegExp(sw.word, caseSensitive: false),
-            replaceWith,
-          );
+          result = _replaceAllWord(result, sw, sw.replaceWord ?? '***');
           break;
         case 'warn':
           // warn 级别：不替换文本，仅标记
@@ -273,6 +308,36 @@ class SensitiveWordService {
     }
 
     return result;
+  }
+
+  /// 大小写不敏感替换单个敏感词。
+  /// ★ 修复（审查报告 支撑#31）：此前 block/replace 一律把词当正则
+  /// `RegExp(sw.word)` 且不转义、无 try-catch——词含 `+ * ( [` 等元字符时
+  /// FormatException 未捕获直接崩溃，`.` 等元字符导致误替换。
+  /// 现仅 matchMode=regex 才按正则（带 try-catch），exact/contains 走字面量替换。
+  String _replaceAllWord(String text, SensitiveWordModel sw, String replacement) {
+    if (sw.matchMode == 'regex') {
+      try {
+        return text.replaceAll(RegExp(sw.word, caseSensitive: false), replacement);
+      } catch (e) {
+        if (kDebugMode) debugPrint('敏感词 regex 替换失败，跳过该词');
+        return text;
+      }
+    }
+    final needle = sw.word.toLowerCase();
+    if (needle.isEmpty) return text;
+    final lower = text.toLowerCase();
+    final buf = StringBuffer();
+    var start = 0;
+    var idx = lower.indexOf(needle, start);
+    while (idx >= 0) {
+      buf.write(text.substring(start, idx));
+      buf.write(replacement);
+      start = idx + needle.length;
+      idx = lower.indexOf(needle, start);
+    }
+    buf.write(text.substring(start));
+    return buf.toString();
   }
 
   /// 检查分类是否启用
