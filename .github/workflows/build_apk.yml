@@ -260,13 +260,26 @@ jobs:
             RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
-          # 创建 Gitee Release
+          # 创建 Gitee Release（body 经 json.dumps 转义，防 commit message 引号破坏 JSON）
           echo "Creating Gitee Release $TAG_NAME..."
+          export RELEASE_NOTES TAG_NAME
+          PAYLOAD_FILE=$(mktemp)
+          python3 - <<'PYEOF' > "$PAYLOAD_FILE"
+import json, os
+print(json.dumps({
+    "tag_name": os.environ["TAG_NAME"],
+    "name": os.environ["TAG_NAME"],
+    "body": os.environ.get("RELEASE_NOTES", ""),
+    "prerelease": False,
+    "target_commitish": "master",
+}, ensure_ascii=False))
+PYEOF
           CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://gitee.com/api/v5/repos/${OWNER}/${REPO}/releases" \
             -H "Content-Type: application/json" \
             -H "Authorization: token ${GITEE_TOKEN}" \
-            -d "{\"tag_name\":\"${TAG_NAME}\",\"name\":\"${TAG_NAME}\",\"body\":\"${RELEASE_NOTES}\",\"prerelease\":false,\"target_commitish\":\"master\"}")
+            -d @"$PAYLOAD_FILE")
+          rm -f "$PAYLOAD_FILE"
 
           HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
           BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
@@ -345,13 +358,25 @@ jobs:
             RELEASE_NOTES="版本更新 ${{ steps.version.outputs.version }}+${{ steps.version.outputs.build_number }}"
           fi
 
-          # 创建 GitHub Release（若已存在则获取）
+          # 创建 GitHub Release（body 经 json.dumps 转义，防 commit message 引号破坏 JSON）
           echo "Creating GitHub Release $TAG_NAME..."
+          export RELEASE_NOTES TAG_NAME
+          PAYLOAD_FILE=$(mktemp)
+          python3 - <<'PYEOF' > "$PAYLOAD_FILE"
+import json, os
+print(json.dumps({
+    "tag_name": os.environ["TAG_NAME"],
+    "name": os.environ["TAG_NAME"],
+    "body": os.environ.get("RELEASE_NOTES", ""),
+    "prerelease": False,
+}, ensure_ascii=False))
+PYEOF
           CREATE_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST \
             "https://api.github.com/repos/${OWNER}/${REPO}/releases" \
             -H "Authorization: token ${GITHUB_TOKEN}" \
             -H "Accept: application/vnd.github.v3+json" \
-            -d "{\"tag_name\":\"${TAG_NAME}\",\"name\":\"${TAG_NAME}\",\"body\":\"${RELEASE_NOTES}\",\"prerelease\":false}")
+            -d @"$PAYLOAD_FILE")
+          rm -f "$PAYLOAD_FILE"
 
           HTTP_CODE=$(echo "$CREATE_RESPONSE" | tail -n1)
           BODY=$(echo "$CREATE_RESPONSE" | sed '$d')
@@ -483,27 +508,36 @@ jobs:
           echo "Release notes:"
           echo "$RELEASE_NOTES"
 
-          # 创建数据库记录
+          # 创建数据库记录（payload 经 json.dumps 转义——此前 release_notes 直接内插，
+          # commit message 含 " 或 \ 会导致 JSON 解析失败、构建在写库步失败，
+          # 且此时 Step 1 已把 released 降为 revoked，线上出现「无 released 版本」窗口）
+          export RELEASE_NOTES
+          PAYLOAD_FILE=$(mktemp)
+          python3 - <<PYEOF > "$PAYLOAD_FILE"
+import json, os
+print(json.dumps({
+    "version": "${{ steps.version.outputs.version }}",
+    "build_number": ${{ steps.version.outputs.build_number }},
+    "platform": "android",
+    "release_type": "feature",
+    "release_notes": os.environ.get("RELEASE_NOTES", ""),
+    "apk_url": "${{ steps.upload.outputs.download_url }}",
+    "github_url": "${{ steps.upload_github.outputs.github_download_url }}",
+    "apk_size": ${{ steps.filesize.outputs.bytes }},
+    "file_name": "${{ steps.version.outputs.apk_name }}",
+    "checksum": "${{ steps.checksum.outputs.sha256 }}",
+    "status": "released",
+    "is_force_update": False,
+    "released_at": "$(date -u +%Y-%m-%dT%H:%M:%SZ)"
+}, ensure_ascii=False))
+PYEOF
           DB_RESPONSE=$(curl -s -w "\n%{http_code}" -X POST "$SUPABASE_URL/rest/v1/app_versions" \
             -H "apikey: $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Authorization: Bearer $SUPABASE_SERVICE_ROLE_KEY" \
             -H "Content-Type: application/json" \
             -H "Prefer: return=representation" \
-            -d "{
-              \"version\": \"${{ steps.version.outputs.version }}\",
-              \"build_number\": ${{ steps.version.outputs.build_number }},
-              \"platform\": \"android\",
-              \"release_type\": \"feature\",
-              \"release_notes\": \"$RELEASE_NOTES\",
-              \"apk_url\": \"${{ steps.upload.outputs.download_url }}\",
-              \"github_url\": \"${{ steps.upload_github.outputs.github_download_url }}\",
-              \"apk_size\": ${{ steps.filesize.outputs.bytes }},
-              \"file_name\": \"${{ steps.version.outputs.apk_name }}\",
-              \"checksum\": \"${{ steps.checksum.outputs.sha256 }}\",
-              \"status\": \"released\",
-              \"is_force_update\": false,
-              \"released_at\": \"$(date -u +%Y-%m-%dT%H:%M:%SZ)\"
-            }")
+            -d @"$PAYLOAD_FILE")
+          rm -f "$PAYLOAD_FILE"
 
           DB_HTTP_CODE=$(echo "$DB_RESPONSE" | tail -n1)
           echo "Database HTTP Code: $DB_HTTP_CODE"
