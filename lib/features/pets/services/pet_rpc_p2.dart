@@ -218,6 +218,8 @@ class PetRpcP2 {
         traitName: raw['trait_name'] as String?,
         oldTraitCode: raw['old_trait_code'] as String?,
         changed: raw['changed'] as bool? ?? false,
+        // 未命中保留原特性（口径 A，服务端 2026-10-07）
+        missed: raw['missed'] as bool? ?? false,
       ),
       null,
     );

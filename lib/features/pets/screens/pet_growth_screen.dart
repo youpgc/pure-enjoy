@@ -193,8 +193,11 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || result == null) return _toast(petRpcErrorText(err));
-    _toast(result.traitName == null
-        ? '洗练完成：这次没掷出特性，伙伴暂时没有特性'
+    // 洗练提示（口径 A：未命中保留原特性，服务端 2026-10-07）
+    _toast(result.missed
+        ? (result.oldTraitCode != null
+            ? '洗练未命中：保留原特性'
+            : '洗练完成：这次没掷出特性，伙伴暂时没有特性')
         : (result.changed
             ? '洗出了新特性「${result.traitName}」'
             : '掷回同一个特性「${result.traitName}」'));

@@ -271,6 +271,7 @@ class PetWashTraitResultModel {
     this.traitCode,
     this.traitName,
     this.oldTraitCode,
+    this.missed = false,
   });
 
   final String petId;
@@ -281,6 +282,9 @@ class PetWashTraitResultModel {
   final String? traitName;
   final String? oldTraitCode;
   final bool changed;
+
+  /// 概率未命中（口径 A：保留原特性；oldTraitCode 为空表示原本就没有特性）
+  final bool missed;
 
   String get newTraitLabel => traitName ?? '无特性';
 }
