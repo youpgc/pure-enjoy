@@ -9,6 +9,11 @@ const double _kAlphaSoft = 0.3;
 /// （字段、getter、数据方法）一并放入 mixin，保证行为完全等价。
 mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
   List<Map<String, dynamic>> _notifications = [];
+
+  /// 广播通知（user_id is null 共享行）的 per-user 已读集合，来自
+  /// user_notification_reads 表（审查报告 P0-3：广播行级 is_read 会全局污染）
+  final Set<String> _broadcastReadIds = {};
+
   bool _isLoading = true;
   bool _isLoadingMore = false;
   bool _hasMore = true;
@@ -63,6 +68,29 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       if (result.isSuccess) {
         final data = result.data!;
         final newItems = data.cast<Map<String, dynamic>>();
+        // ★ 广播行（user_id is null）是全体共享的，行级 is_read 不可用；
+        //   已读态改查 per-user 已读表（刷新时全量同步，加载更多沿用内存集合）。
+        //   读取失败按「未读」兜底——宁可多显示红点，不让用户错过通知。
+        if (refresh) {
+          _broadcastReadIds.clear();
+          try {
+            final reads = await ApiClient.get(
+              'user_notification_reads',
+              filters: {'user_id': 'eq.$userId'},
+              select: 'notification_id',
+              limit: null,
+              note: 'notifications:my_reads',
+            );
+            if (reads.isSuccess && reads.data != null) {
+              for (final r in reads.data!) {
+                final nid = r['notification_id']?.toString();
+                if (nid != null) _broadcastReadIds.add(nid);
+              }
+            }
+          } catch (e) {
+            if (kDebugMode) debugPrint('广播已读集加载失败，按未读兜底');
+          }
+        }
         if (!mounted) return;
         setState(() {
           if (refresh) {
@@ -96,6 +124,27 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
   }
   Future<void> _markAsRead(String id) async {
     try {
+      final item = _notifications.firstWhere(
+        (n) => n['id'] == id,
+        orElse: () => <String, dynamic>{},
+      );
+      // ★ 广播行是全体用户共享的（user_id is null），PATCH 行级 is_read 会让
+      //   所有用户的红点消失（审查报告 P0-3）。广播改写 per-user 已读表。
+      if (item.isNotEmpty && item['user_id'] == null) {
+        final res = await ApiClient.post(
+          'user_notification_reads',
+          {'notification_id': id},
+          returnRepresentation: false,
+        );
+        // 409 = 唯一约束兜底（已读过），按成功处理
+        if (!res.isSuccess && res.statusCode != 409) {
+          if (kDebugMode) debugPrint('广播标记已读失败: ${res.error}');
+          return;
+        }
+        if (!mounted) return;
+        setState(() => _broadcastReadIds.add(id));
+        return;
+      }
       final result = await ApiClient.patchByFilter(
         'notifications',
         filters: {'id': 'eq.$id'},
@@ -124,21 +173,35 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       final userId = _userId;
       if (userId == null) return;
 
-      // 与拉取过滤一致：本人通知 + 系统广播(user_id 为 null) 一并标记已读，
-      // 否则系统广播在服务端仍为未读，下次拉取会回弹（闭环断裂）。
+      // ★ 本人行（user_id=自己）行级 PATCH 本就无共享问题，保持不变；
+      //   广播行（user_id is null）是全局共享行——PATCH 它会污染所有用户
+      //   （审查报告 P0-3 的污染点），改走 per-user 已读 RPC 原子补插。
       final result = await ApiClient.patchByFilter(
         'notifications',
-        filters: {'or': '(user_id.eq.$userId,user_id.is.null)', 'is_read': 'eq.false'},
+        filters: {'user_id': 'eq.$userId', 'is_read': 'eq.false'},
         body: {'is_read': true, 'read_at': DateTime.now().toUtc().toIso8601String()},
       );
-      if (!result.isSuccess) {
-        if (kDebugMode) debugPrint('批量标记已读失败: ${result.error}');
+      final rpc = await ApiClient.rpc(
+        'rpc_notifications_mark_broadcasts_read',
+        params: const <String, dynamic>{},
+        note: 'notifications:mark_broadcasts_read',
+      );
+      if (!result.isSuccess || !rpc.isSuccess) {
+        if (kDebugMode) debugPrint('批量标记已读失败: ${result.error} / ${rpc.error}');
+        if (mounted) {
+          showSnackBar(context, '操作失败，请稍后重试', isError: true);
+        }
         return;
       }
       if (!mounted) return;
       setState(() {
         for (var n in _notifications) {
-          n['is_read'] = true;
+          if (n['user_id'] != null) {
+            n['is_read'] = true;
+          } else {
+            final nid = n['id']?.toString();
+            if (nid != null) _broadcastReadIds.add(nid);
+          }
         }
       });
       if (mounted) {
@@ -150,7 +213,17 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       }
     }
   }
-  int get _unreadCount => _notifications.where((n) => !n['is_read']).length;
+  // ★ 已读判定：本人行看行级字段；广播行看 per-user 已读集合（审查报告 P0-3）
+  bool _isItemRead(Map<String, dynamic> n) {
+    if (n['is_read'] == true) return true;
+    if (n['user_id'] == null) {
+      final nid = n['id']?.toString();
+      return nid != null && _broadcastReadIds.contains(nid);
+    }
+    return false;
+  }
+
+  int get _unreadCount => _notifications.where((n) => !_isItemRead(n)).length;
   IconData _getIcon(String? icon) {
     switch (icon) {
       case 'info_outline': return Icons.info_outline;
@@ -275,7 +348,7 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
             );
           }
           final item = _notifications[index];
-          final isRead = item['is_read'] as bool? ?? false;
+          final isRead = _isItemRead(item);
           final icon = _getIcon(item['icon'] as String?);
           final color = _getColor(item['color'] as String?);
           final type = _getTypeLabel(item['type'] as String?);
