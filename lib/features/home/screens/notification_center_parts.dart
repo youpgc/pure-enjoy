@@ -251,7 +251,6 @@ mixin _NotificationCenterScreenUiMixin on State<NotificationCenterScreen> {
       case 'update': return '更新';
       case 'reminder': return '提醒';
       case 'habit': return '习惯';
-      case 'novel': return '小说';
       case 'expense': return '消费';
       default: return '通知';
     }

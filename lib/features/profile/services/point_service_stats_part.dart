@@ -120,7 +120,9 @@ mixin PointServiceStatsMixin {
           result.data!.isNotEmpty) {
         final created = result.data![0]['created_at'] as String?;
         if (created != null) {
-          final dt = DateTime.parse(created);
+          // 北京年月取最早月（审查报告 积分 App#6）：直接用 UTC 年月在
+          // 北京 0-8 点的签到上会偏一个月
+          final dt = DateTimeUtils.toBeijingWallClock(DateTime.parse(created));
           return DateTime(dt.year, dt.month, 1);
         }
       }

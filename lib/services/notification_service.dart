@@ -173,7 +173,6 @@ class NotificationService {
         // 跳转到通知中心
         unawaited(Navigator.pushNamed(context, '/notifications'));
         break;
-      case 'novel':
       case 'expense':
       default:
         if (kDebugMode) {

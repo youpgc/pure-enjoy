@@ -100,7 +100,7 @@ class SensitiveWordService {
       final response = await ApiClient.get(
         'sensitive_words',
         select: 'id,word,category,level,replace_word,match_mode,is_active,hit_count',
-        filters: {'is_active': 'eq.true'},
+        filters: {'is_active': 'eq.true', 'category': 'eq.system'},
         limit: null,
       );
 

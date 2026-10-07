@@ -1,3 +1,4 @@
+import 'dart:async';
 import 'dart:io';
 
 import 'package:flutter/foundation.dart';
@@ -106,6 +107,17 @@ class ApkInstaller {
       if (kDebugMode) debugPrint('📱 URL 缺少 host');
       return null;
     }
+    // ★ 安全（审查报告 版本#4）：仅允许 https + 官方域（Gitee/GitHub），
+    // 防被污染的版本记录把安装包指向 http 明文源或任意站点
+    if (uri.scheme != 'https' ||
+        !(uri.host == 'gitee.com' ||
+            uri.host.endsWith('.gitee.com') ||
+            uri.host == 'github.com' ||
+            uri.host.endsWith('.github.com') ||
+            uri.host.endsWith('.githubusercontent.com'))) {
+      if (kDebugMode) debugPrint('📱 URL 非官方 https 源，拒绝下载: ${uri.host}');
+      return null;
+    }
     try {
       downloadProgress.value = 0;
 
@@ -143,19 +155,19 @@ class ApkInstaller {
 
       if (kDebugMode) debugPrint('📱 HTTP 状态码: ${response.statusCode}');
 
-      // 处理重定向（GitHub Releases 返回 302 到 CDN）
-      if (response.statusCode == 302 || response.statusCode == 301) {
+      // 处理重定向（GitHub Releases 返回 302 到 CDN；303/307/308 同族，审查报告 版本#7）
+      if (response.statusCode >= 300 && response.statusCode < 309 &&
+          response.statusCode != 304 &&
+          response.headers['location']?.isNotEmpty == true) {
         final redirectUrl = response.headers['location'];
-        if (redirectUrl != null && redirectUrl.isNotEmpty) {
-          if (kDebugMode) debugPrint('📱 跟随重定向');
-          // drain 当前 response stream 释放连接，避免资源泄漏
-          await response.stream.drain<void>();
-          return await _downloadFromUrl(
-            redirectUrl,
-            onProgress: onProgress,
-            redirectDepth: redirectDepth + 1,
-          );
-        }
+        if (kDebugMode) debugPrint('📱 跟随重定向');
+        // drain 当前 response stream 释放连接，避免资源泄漏
+        await response.stream.drain<void>();
+        return await _downloadFromUrl(
+          redirectUrl,
+          onProgress: onProgress,
+          redirectDepth: redirectDepth + 1,
+        );
       }
 
       if (response.statusCode != 200) {
@@ -171,8 +183,21 @@ class ApkInstaller {
 
       downloadStatus.value = '正在下载...';
 
+      // ★ 读超时（审查报告 版本#4）：getRawStream 超时只覆盖响应头，正文无
+      // stall 保护时断网会让 UI 永久停在「下载中 x%」。30s 无新数据即失败。
+      var stalled = false;
+      var lastDataAt = DateTime.now();
+      final stallLimit = const Duration(seconds: 30);
+      Timer.periodic(const Duration(seconds: 5), (t) {
+        if (DateTime.now().difference(lastDataAt) > stallLimit) {
+          stalled = true;
+          t.cancel();
+        }
+      });
+
       await response.stream.listen(
         (chunk) {
+          lastDataAt = DateTime.now();
           sink.add(chunk);
           downloadedBytes += chunk.length;
           if (totalBytes > 0) {
@@ -187,6 +212,10 @@ class ApkInstaller {
         },
         onDone: () async {
           if (kDebugMode) debugPrint('📱 下载流完成');
+          // 显式等待 flush+close 完成再校验（审查报告 版本#5：onDone 的
+          // sink.close 是异步回调，asFuture 不等待它，尾部 chunk 可能未落盘
+          // 就通过 length 校验 → 截断 APK 进安装器）
+          await sink.flush();
           await sink.close();
         },
         onError: (error) async {
@@ -195,6 +224,12 @@ class ApkInstaller {
         },
         cancelOnError: true,
       ).asFuture();
+      if (stalled) {
+        if (kDebugMode) debugPrint('📱 下载停滞超时（30s 无数据）');
+        await sink.close();
+        if (await file.exists()) await file.delete();
+        return null;
+      }
 
       // 验证文件
       if (await file.exists() && await file.length() > 0) {

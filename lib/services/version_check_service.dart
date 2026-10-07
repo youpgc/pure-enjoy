@@ -112,8 +112,10 @@ class VersionCheckService {
       }
 
       final latestVersion = result.data!.first;
-      // 统一版本号格式：去掉 v 前缀
-      final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
+      // 统一版本号格式：去掉 v 前缀（锚定开头——replaceFirst('v','') 会去掉
+      // 任意位置的首个 v，如 "1.0.dev"→"1.0.de" 害比较错乱，审查报告 版本#8）
+      final latestVersionStr =
+          (latestVersion['version'] as String).replaceFirst(RegExp('^v'), '');
       final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
       final isForceUpdate = latestVersion['is_force_update'] == true;
       final apkUrl = latestVersion['apk_url'] as String?;

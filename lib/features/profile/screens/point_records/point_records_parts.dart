@@ -66,9 +66,17 @@ ExpiryInfo _getExpiryInfo(PointRecord record) {
     );
   }
   if (record.expiresAt != null) {
+    // 读时兜底（审查报告 积分 App#7）：expires_at 已过但服务端状态仍 active
+    //（惰性过期未跑）时按已过期展示，不再显示「有效」误导用户
     final now = DateTimeUtils.nowBeijing();
     final diff = record.expiresAt!.difference(now);
-    if (diff.inDays <= 30 && diff.inDays >= 0) {
+    if (diff.isNegative) {
+      return ExpiryInfo(
+        label: '已过期',
+        color: Colors.grey,
+      );
+    }
+    if (diff.inDays <= 30) {
       return ExpiryInfo(
         label: '即将过期',
         color: AppTheme.warning,
