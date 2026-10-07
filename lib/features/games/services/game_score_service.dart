@@ -152,6 +152,8 @@ class GameScoreService {
           'status': 'eq.cleared',
         },
         select: 'level_id',
+        // offset 分页必须带稳定排序，否则窗口漂移会重复/漏行（审查报告 游戏 C1）
+        order: 'level_id',
         limit: pageSize,
         offset: offset,
         note: 'games:cleared_levels',
@@ -317,7 +319,8 @@ class GameScoreService {
           'game_id': 'eq.$gameId',
           'status': 'neq.aborted',
         },
-        order: 'played_at.desc',
+        // 追加 id 保证排序唯一（同秒成绩跨页去重，审查报告 游戏 C2）
+        order: 'played_at.desc,id.desc',
         limit: pageSize,
         offset: offset,
         note: 'games:scores_with_values',

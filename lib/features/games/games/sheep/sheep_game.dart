@@ -297,8 +297,11 @@ class _SheepGameState extends State<SheepGame> {
   }
 
   void _resolveAfterMove() {
-    final cleared = _clearTriples();
-    if (cleared) {
+    // ★ 循环消除（审查报告 游戏 S2）：道具撤回等路径可在槽内同时存在两组三连，
+    //   单次只清一组会让另一组滞留到下一次点击
+    var clearedAny = false;
+    while (_clearTriples()) {
+      clearedAny = true;
       GameAudio.instance.match();
       GameAudio.instance.haptic(GameHaptic.medium);
     }
@@ -313,6 +316,13 @@ class _SheepGameState extends State<SheepGame> {
     }
     if (!boardLeft && _slots.isNotEmpty) {
       _finish(false); // 棋盘已空但槽位无解（死局）
+      return;
+    }
+    // ★ 满槽死局兜底（审查报告 游戏 S1）：槽满、盘面未清、本步无可消，
+    //   且移出/撤回/洗牌均无免费额度无库存 → 对局不可推进，判负
+    //   （对齐原版满槽判负；持有任一道具时保留腾位机会，不触发）
+    if (_slots.length >= _slotCapacity && boardLeft && !clearedAny && !_hasAnySlotRelief()) {
+      _finish(false);
       return;
     }
     _computeCoverage();

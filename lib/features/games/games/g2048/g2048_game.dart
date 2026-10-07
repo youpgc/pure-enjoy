@@ -84,6 +84,9 @@ class _G2048GameState extends State<G2048Game> {
   bool _pendingWin = false;
   int _movesUsed = 0;
 
+  /// 限时 tick 秒级节游标（审查报告 游戏 G2）
+  int _lastTickSecond = -1;
+
   /// 本局合成次数（每次两块合并 +1）：结算 values 上报 'merges'，
   /// 供「合成达人」累计型成就计数（GameCumulativeService）。
   int _mergeCount = 0;
@@ -209,6 +212,8 @@ class _G2048GameState extends State<G2048Game> {
     _pendingWin = false;
     _pendingDir = null;
     _movesUsed = 0;
+    _mergeCount = 0; // 合成计数同归零（审查报告 游戏 G1：_reset 遗漏，复用即跨局累计）
+    _lastTickSecond = -1;
     _reachedTarget = false;
     _bonusSeconds = 0; // 道具加时不跨局保留
     _movesBonus = 0; // 道具加步不跨局保留
@@ -236,7 +241,13 @@ class _G2048GameState extends State<G2048Game> {
       _finish(_isScoreGoal && _score >= _target);
       return;
     }
-    if (mounted) setState(() {});
+    // 秒级节流（审查报告 游戏 G2）：250ms 轮询只在整秒变化时重建，
+    // 消除限时模式 4 次/秒的全量重绘（与 match3 _lastClockSecond 同案）
+    final remainingSec = _remainingSeconds();
+    if (remainingSec != _lastTickSecond) {
+      _lastTickSecond = remainingSec;
+      if (mounted) setState(() {});
+    }
   }
 
   /// 限时模式剩余秒数（用于状态栏展示，含加时卡加时）。

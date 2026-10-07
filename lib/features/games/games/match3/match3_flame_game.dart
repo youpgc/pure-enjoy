@@ -390,6 +390,26 @@ class Match3FlameGame extends FlameGame
       );
       if (hasAnyMove(grid, rows, cols)) return;
     }
+    // ★ 50 次全败兜底（审查报告 游戏 M1）：向首行前 4 格注入 [A,B,A,A] 图样
+    // ——交换 B 与相邻 A 即成三连，开局必有解。逐色尝试，同时复检「无初始连线」
+    // （注入色与第二行构成竖向三连时跳过该色）。
+    if (cols >= 4) {
+      final types = typeCount.clamp(3, _palette.length);
+      for (var t = 0; t < types; t++) {
+        final other = (t + 1) % types;
+        final row1Types = [for (var c = 0; c < 4; c++) grid[1][c]?.type];
+        if (row1Types.contains(t) && row1Types.where((x) => x == t).length >= 2) {
+          continue; // 会与下行构成本色竖向连线，换色
+        }
+        grid[0][0]!.type = t;
+        grid[0][1]!.type = other;
+        grid[0][2]!.type = t;
+        grid[0][3]!.type = t;
+        if (findRuns(grid, rows, cols).isEmpty && hasAnyMove(grid, rows, cols)) {
+          return;
+        }
+      }
+    }
   }
 
   // ---------- 交换 ----------

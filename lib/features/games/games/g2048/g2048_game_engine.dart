@@ -160,6 +160,9 @@ extension _G2048EngineOps on _G2048GameState {
 
     Future.delayed(_G2048GameState._slide + const Duration(milliseconds: 20), () {
       if (!mounted) return;
+      // 已结算（如限时归零在动画期间触发 _finish）：不再对已定局盘面
+      // 继续消块/生成（审查报告 游戏 G4）
+      if (_finished) return;
       final movesLimit = _effectiveMovesLimit;
       try {
         _tiles.removeWhere((t) => t.toRemove);

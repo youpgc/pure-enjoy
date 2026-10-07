@@ -409,7 +409,8 @@ class Match3Objective {
       case Match3Mode.timed:
         return '$stepText达成$goalScore分';
       case Match3Mode.clear:
-        return '$stepText清除$jellyLeft块果冻';
+        // 通关条件显示初始总量（审查报告 游戏 M2：实时 jellyLeft 随消除缩水，口径失真）
+        return '$stepText清除$jellyCount块果冻';
       case Match3Mode.collect:
         // 多目标：列出各色实际数量（与 collect 数组一一对应）
         if (collectGoals.isEmpty) {

@@ -8,6 +8,14 @@ part of 'sheep_game.dart';
 /// 羊了个羊道具域（part of sheep_game，共享 State 私有状态）：
 /// 确认弹窗 → 扣额度/扣库存 → 三种道具效果（移出 / 撤回 / 洗牌）。
 extension _SheepPropOps on _SheepGameState {
+  /// 满槽死局判定用：移出/撤回/洗牌任一仍有免费额度或购买库存（审查报告 游戏 S1）
+  bool _hasAnySlotRelief() {
+    for (final p in SheepProp.values) {
+      if ((_freeLeft[p] ?? 0) > 0 || (_ownedLeft[p] ?? 0) > 0) return true;
+    }
+    return false;
+  }
+
   /// 使用道具前弹窗确认（免费次数或购买库存均先确认，避免误触消耗）。
   Future<void> _confirmUseProp(SheepProp p) async {
     if (_finished || _busy) return;
