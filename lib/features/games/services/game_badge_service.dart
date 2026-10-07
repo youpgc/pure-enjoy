@@ -53,9 +53,11 @@ class GameBadgeService {
     if (topTier == null) return null;
     if (topTier.rewardPoints > 0) {
       final r = await GameRewardService.instance.claimAchievementPoints(topTier);
-      if (r.granted) return topTier;
-      if (r.reason != '该奖励已领取') return null; // 如达单日上限：不记解锁，下次重试
-      // already=true：积分此前已发，补记解锁记录
+      // granted（首次发分成功）与 already（此前已发）都要继续落解锁记录——
+      // 此前 granted 分支提前 return 导致「积分已发、徽章缺失」，
+      // 成就页不显示且 all_modes_tier 复合荣誉集齐判定永久缺一（审查报告 游戏#1）。
+      // 其它 reason（如达单日上限）：不记解锁，下次重试。
+      if (!r.granted && r.reason != '该奖励已领取') return null;
     }
     final isNew = await recordAchievementBadge(achievement: topTier);
     return isNew ? topTier : null;
