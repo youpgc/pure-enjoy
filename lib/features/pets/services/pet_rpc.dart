@@ -92,7 +92,13 @@ class PetRpc {
         'pet_daily_quests',
         select:
             'quest_id,progress,target,reward_claimed,quest:pet_quests(id,condition,rewards)',
-        filters: {'user_id': 'eq.$uid', 'assign_date': 'eq.$todayBeijing'},
+        filters: {
+          'user_id': 'eq.$uid',
+          'assign_date': 'eq.$todayBeijing',
+          // ★ 只认 daily 任务：周任务复用本表（assign_date=周一），不过滤 type
+          //   时周一「每日」页签会串显周任务（与服务端抽取判定同步修复，P1-1）
+          'quest.type': 'eq.daily',
+        },
         limit: 50,
         note: 'pet_daily_quests 当日任务查询',
       );
