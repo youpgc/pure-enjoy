@@ -24,23 +24,31 @@ Future<void> showPetAttributesSheet(
   required PetBriefModel pet,
   VoidCallback? onChanged,
   VoidCallback? onGrowth,
+  Map<String, dynamic>? config,
 }) {
   return showModalBottomSheet<void>(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    builder: (ctx) =>
-        _PetAttributesSheet(pet: pet, onChanged: onChanged, onGrowth: onGrowth),
+    builder: (ctx) => _PetAttributesSheet(
+        pet: pet, onChanged: onChanged, onGrowth: onGrowth, config: config),
   );
 }
 
 class _PetAttributesSheet extends StatefulWidget {
-  const _PetAttributesSheet(
-      {required this.pet, this.onChanged, this.onGrowth});
+  const _PetAttributesSheet({
+    required this.pet,
+    this.onChanged,
+    this.onGrowth,
+    this.config,
+  });
 
   final PetBriefModel pet;
   final VoidCallback? onChanged;
   final VoidCallback? onGrowth;
+
+  /// summary config（intimacy_daily_cap 等阈值同源；缺键时亲密行只显总值）
+  final Map<String, dynamic>? config;
 
   @override
   State<_PetAttributesSheet> createState() => _PetAttributesSheetState();
@@ -180,6 +188,8 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               const SizedBox(height: 8),
             ],
             _healthRow(cs),
+            const SizedBox(height: 8),
+            _intimacyRow(cs),
             const SizedBox(height: 10),
             Text(
               pet.refinePoints > 0
@@ -291,6 +301,30 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             size: 16,
             color: onTap != null ? cs.onPrimaryContainer : cs.outline),
       ),
+    );
+  }
+
+  /// 亲密度行（照料状态）：总值 + 今日已获/上限（config.intimacy_daily_cap 同源；
+  /// 上限用尽时提示明日再来，解释"今天怎么不涨了"）
+  Widget _intimacyRow(ColorScheme cs) {
+    final cap = (widget.config?['intimacy_daily_cap'] as num?)?.toInt();
+    final gain = widget.pet.todayIntimacyGain;
+    final capped = cap != null && cap > 0 && gain >= cap;
+    final suffix = cap == null || cap <= 0
+        ? ''
+        : '（今日 +$gain/$cap${capped ? '，明天再陪陪它吧' : ''}）';
+    return Row(
+      children: [
+        const SizedBox(
+            width: 56,
+            child: Text('亲密',
+                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+        Expanded(
+          child: Text(
+              '亲密 ${widget.pet.intimacy}$suffix',
+              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+        ),
+      ],
     );
   }
 

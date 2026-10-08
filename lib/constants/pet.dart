@@ -2,26 +2,24 @@
 ///
 /// 与 Supabase DDL 的 check 约束对齐（D:\workspace\sql\feature_pet_tables_20260916.sql）：
 /// - pet_items.category      → [PetBagCategory]
-/// - pet_items.ladder_key    → [PetLadderKey]
 /// - pet_eggs.mode           → [PetEggMode]
 /// - pet_eggs.status         → [PetEggStatus]
 /// - pet_pets.status         → [PetPetStatus]
 /// - pet_pets.gender         → [PetGender]
 /// - pet_adventures.status       → [PetAdventureStatus]
-/// - pet_adventures.rescue_channel → [PetRescueChannel]
 /// - pet_evo_stages.pick_mode      → [PetPickMode]
 /// - pet_wallet_records.source_type → [PetWalletSourceType]（DDL 为 not valid CHECK）
 /// - pet_items.effect->>'type'     → [PetItemEffectType]
 /// - pet_user_features.feature_key → [PetFeatureKey]
 /// - pet_breed_logs.status         → [PetBreedLogStatus]
 /// - pet_quests.type / difficulty / condition->>'type'
-///                                 → [PetQuestType] / [PetQuestDifficulty] / [PetQuestConditionType]
+///                                 → [PetQuestDifficulty] / [PetQuestConditionType]
 /// - pet_achievements.tier / condition_type → [PetAchTier] / [PetAchConditionType]
 ///
 /// 铁律：本文件只放**结构枚举**（值域契约），任何数值/阈值/价格/概率
 /// 均来自后台配置（pet_config / pet_items / pet_rarities 等），严禁在此硬编码。
 ///
-/// 说明：[PetEggMode]/[PetEggStatus]/[PetLadderKey]/[PetRescueChannel]/[PetPickMode]
+/// 说明：[PetEggMode]/[PetEggStatus]/[PetPickMode]
 /// 当前无页面消费者（对应繁育/蛋背包/扩容购买/社区救助/进化抉择均在 P1/P2 分期），
 /// 按三端 ENUM 对齐铁律作为值域契约保留登记，不视为死代码。
 /// 3D 素材验收常量（标准动画/骨骼/variants/阈值/资源包状态机）已随
@@ -50,26 +48,7 @@ enum PetBagCategory {
   }
 }
 
-/// 统一扩容阶梯（背包 / 养育格 / 寄养格三套共用 pet_items 阶梯道具行模型）
-enum PetLadderKey {
-  backpack('backpack', '背包'),
-  rearing('rearing', '养育格'),
-  foster('foster', '寄养格');
 
-  const PetLadderKey(this.code, this.label);
-
-  final String code;
-  final String label;
-
-  static PetLadderKey? fromCode(String? code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-}
-
-/// 蛋孵化模式（档位绑定：instant 即开 / wait 等待孵化，P2 启用 wait）
 enum PetEggMode {
   instant('instant', '即开'),
   wait('wait', '等待孵化');
@@ -165,26 +144,6 @@ enum PetAdventureStatus {
   final String label;
 
   static PetAdventureStatus? fromCode(String? code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-}
-
-/// 历险救助通道（self 自救 → friend 好友救援（远期）→ npc 兜底；community 社区（远期））
-enum PetRescueChannel {
-  self_('self', '自救'),
-  npc('npc', 'NPC 兜底'),
-  friend('friend', '好友救援'),
-  community('community', '社区救助');
-
-  const PetRescueChannel(this.code, this.label);
-
-  final String code;
-  final String label;
-
-  static PetRescueChannel? fromCode(String? code) {
     for (final v in values) {
       if (v.code == code) return v;
     }
@@ -379,25 +338,7 @@ enum PetEvoCondType {
   }
 }
 
-/// 任务周期类型（pet_quests.type；日/周两套实例靠此判别，周一同日不串改）
-enum PetQuestType {
-  daily('daily', '每日'),
-  weekly('weekly', '每周');
 
-  const PetQuestType(this.code, this.label);
-
-  final String code;
-  final String label;
-
-  static PetQuestType? fromCode(String? code) {
-    for (final v in values) {
-      if (v.code == code) return v;
-    }
-    return null;
-  }
-}
-
-/// 任务难度（pet_quests.difficulty；注意与成就 tier 是两组值域，勿混写）
 enum PetQuestDifficulty {
   normal('normal', '普通'),
   advanced('advanced', '进阶'),

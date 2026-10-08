@@ -76,6 +76,7 @@ class PetBriefModel {
     this.refinePoints = 0,
     this.personalityCode,
     this.personalityName,
+    this.todayIntimacyGain = 0,
   });
 
   final String id;
@@ -121,6 +122,10 @@ class PetBriefModel {
   final String? personalityCode;
   final String? personalityName;
 
+  /// 今日已获照料亲密度（上限 = config.intimacy_daily_cap；summary 2026-10-08 扩展，
+  /// 旧版服务端缺键按 0 展示，不阻塞）
+  final int todayIntimacyGain;
+
   /// 读取四维属性值（未配置/未下发维度补 0）
   int attr(String code) => attributes[code] ?? 0;
 
@@ -154,6 +159,7 @@ class PetBriefModel {
       health: (json['health'] as num?)?.toInt() ?? 100,
       pendingAttrPoints: (json['pending_attr_points'] as num?)?.toInt() ?? 0,
       refinePoints: (json['refine_points'] as num?)?.toInt() ?? 0,
+      todayIntimacyGain: (json['today_intimacy_gain'] as num?)?.toInt() ?? 0,
       personalityCode: json['personality_code'] as String?,
       personalityName: json['personality_name'] as String?,
     );

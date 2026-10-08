@@ -107,6 +107,12 @@ String petRpcErrorText(String? error) {
     'PET_WEEKLY_NOT_FOUND': '未找到本周任务，请稍后刷新',
     'PET_WEEKLY_ALREADY_CLAIMED': '本周奖励已经领过啦',
     'PET_WEEKLY_NOT_DONE': '本周任务还没完成',
+    // ---------- 随机事件（feature_pet_random_events_20261008.sql） ----------
+    'PET_EVENT_NOT_FOUND': '这个事件已经不在了，换一个吧',
+    'PET_EVENT_BAD_CONTEXT': '事件触发时机无效',
+    'PET_EVENT_BAD_OPTION': '这个选项不存在了，重新选一个吧',
+    'PET_EVENT_NOT_FIRED_TODAY': '这个事件今天不在你的清单里，稍后再来看看',
+    'PET_EVENT_NEED_PET': '需要有在养育中的宠物才能领取这份奖励',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;

@@ -192,7 +192,10 @@ extension _PetHomeActions on _PetHomeScreenState {
     final pet = _currentPet;
     if (pet == null) return;
     showPetAttributesSheet(context,
-        pet: pet, onChanged: _load, onGrowth: _openGrowth);
+        pet: pet,
+        config: _summary?.config,
+        onChanged: _load,
+        onGrowth: _openGrowth);
   }
 
   void _openAdventure() {
