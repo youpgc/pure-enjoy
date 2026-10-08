@@ -15,6 +15,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_action_machine.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
+import '../utils/pet_exp_curve.dart';
 import '../utils/pet_home_budget.dart';
 import '../widgets/pet_attributes_sheet.dart';
 import '../widgets/pet_feed_sheet.dart';

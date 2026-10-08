@@ -31,6 +31,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
                       render2d: pet.render2d),
                   fallbackAsset: petBaseArt(pet.speciesCode, pet.stage,
                       render2d: pet.render2d),
+                  // 分层弯曲：已登记几何的形态走逐行弯曲，其余留在整图补间
+                  bendGeo: petBendGeo(pet.speciesCode, pet.stage),
+                  bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
                   action: _machine.current,
                   onActionEnd: _onActionEnd,
                 ),
@@ -107,7 +110,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 const PetAdventureNote(),
                 const SizedBox(height: 6),
               ],
-              PetBottomStatusCard(pet: pet, onTap: _openAttributes),
+              PetBottomStatusCard(
+                  pet: pet,
+                  expNeed: petExpNeed(pet.level, _summary?.config),
+                  onTap: _openAttributes),
             ],
           ),
         ),

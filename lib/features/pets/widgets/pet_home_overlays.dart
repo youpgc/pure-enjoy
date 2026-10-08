@@ -37,11 +37,14 @@ class PetNamePill extends StatelessWidget {
   }
 }
 
-/// 四维状态卡（饱食/心情/亲密/经验，2×2 紧凑排布）
+/// 四维状态卡（饱食/心情/亲密/经验，2×2 紧凑排布；当前主页未挂载，保留备用）
 class PetStatusCard extends StatelessWidget {
-  const PetStatusCard({super.key, required this.pet});
+  const PetStatusCard({super.key, required this.pet, this.expNeed});
 
   final PetBriefModel pet;
+
+  /// 升下一级所需经验（同 PetBottomStatusCard 口径）；null 回退 /100 旧展示
+  final int? expNeed;
 
   @override
   Widget build(BuildContext context) {
@@ -63,7 +66,11 @@ class PetStatusCard extends StatelessWidget {
             Row(children: [
               Expanded(child: _miniStat('亲密', pet.intimacy, cs)),
               const SizedBox(width: 14),
-              Expanded(child: _miniStat('经验', pet.exp, cs)),
+              Expanded(
+                  child: _miniStat('经验', pet.exp, cs,
+                      max: expNeed,
+                      displayText:
+                          expNeed == null ? null : '${pet.exp}/$expNeed')),
             ]),
           ],
         ),
@@ -71,27 +78,31 @@ class PetStatusCard extends StatelessWidget {
     );
   }
 
-  Widget _miniStat(String label, int value, ColorScheme cs) => Row(
-        children: [
-          SizedBox(
-              width: 30, child: Text(label, style: const TextStyle(fontSize: 11))),
-          Expanded(
-            child: ClipRRect(
-              borderRadius: BorderRadius.circular(3),
-              child: LinearProgressIndicator(
-                value: (value / 100).clamp(0.0, 1.0),
-                minHeight: 6,
-              ),
+  Widget _miniStat(String label, int value, ColorScheme cs,
+      {int? max, String? displayText}) {
+    final denom = (max == null || max <= 0) ? 100 : max;
+    return Row(
+      children: [
+        SizedBox(
+            width: 30, child: Text(label, style: const TextStyle(fontSize: 11))),
+        Expanded(
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(3),
+            child: LinearProgressIndicator(
+              value: (value / denom).clamp(0.0, 1.0),
+              minHeight: 6,
             ),
           ),
-          const SizedBox(width: 4),
-          SizedBox(
-            width: 28,
-            child: Text('$value',
-                textAlign: TextAlign.end, style: const TextStyle(fontSize: 11)),
-          ),
-        ],
-      );
+        ),
+        const SizedBox(width: 4),
+        SizedBox(
+          width: displayText == null ? 28 : 52,
+          child: Text(displayText ?? '$value',
+              textAlign: TextAlign.end, style: const TextStyle(fontSize: 11)),
+        ),
+      ],
+    );
+  }
 }
 
 /// 历险横幅（进行中 / 待救助 / 已结束待领取）

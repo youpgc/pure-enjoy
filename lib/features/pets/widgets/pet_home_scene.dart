@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 
 import '../models/pet_models.dart';
 import 'pet_item_icon.dart';
-
 /// 宠物主页场景层（2026-09-17 美化重做 + 拍板背景接入）
 ///
 /// 与 App 全局主题解耦的独立界面感：
@@ -89,9 +88,18 @@ class PetGoldBadgeCore extends StatelessWidget {
 /// 点击整卡打开属性面板（属性系统 Phase 2：四维/健康/性格/加点，见
 /// pet_attributes_sheet.dart）。
 class PetBottomStatusCard extends StatelessWidget {
-  const PetBottomStatusCard({super.key, required this.pet, this.onTap});
+  const PetBottomStatusCard({
+    super.key,
+    required this.pet,
+    this.expNeed,
+    this.onTap,
+  });
 
   final PetBriefModel pet;
+
+  /// 升下一级所需经验（rpc_pet_summary config 同源计算，见 petExpNeed）。
+  /// null（旧版服务端未下发曲线两键）时经验行回退 /100 旧展示。
+  final int? expNeed;
 
   /// 打开属性面板（null 时不可点）
   final VoidCallback? onTap;
@@ -136,7 +144,10 @@ class PetBottomStatusCard extends StatelessWidget {
             const SizedBox(height: 6),
             _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
             const SizedBox(height: 6),
-            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp),
+            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
+                max: expNeed,
+                displayText:
+                    expNeed == null ? null : '${pet.exp}/$expNeed'),
             const SizedBox(height: 6),
             // 健康行（状态值：历险失败惩罚扣减，恢复途径后续配置）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
@@ -148,8 +159,14 @@ class PetBottomStatusCard extends StatelessWidget {
   }
 
   /// 单条状态行：图标 + 标签 + 进度条 + 数值（独占一行）
-  Widget _statRow(String label, String iconKey, IconData fallback, int value) {
+  ///
+  /// [max] 为该行值域上限（缺省 100）；[displayText] 非空时数值格改显该文案
+  /// （经验行 exp/need），格宽随之放宽。经验需求 >100（2 级起），写死 /100
+  /// 会让条恒满——上限必须来自 summary config 同源曲线（petExpNeed）。
+  Widget _statRow(String label, String iconKey, IconData fallback, int value,
+      {int? max, String? displayText}) {
     const accent = Color(0xFFFFD37E);
+    final denom = (max == null || max <= 0) ? 100 : max;
     return Row(
       children: [
         PetItemIcon(iconKey: iconKey, fallback: fallback, size: 14),
@@ -164,7 +181,7 @@ class PetBottomStatusCard extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: (value / 100).clamp(0.0, 1.0),
+              value: (value / denom).clamp(0.0, 1.0),
               minHeight: 5,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation(accent),
@@ -173,8 +190,8 @@ class PetBottomStatusCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: 26,
-          child: Text('$value',
+          width: displayText == null ? 26 : 64,
+          child: Text(displayText ?? '$value',
               textAlign: TextAlign.right,
               style: const TextStyle(
                   fontSize: 11,
