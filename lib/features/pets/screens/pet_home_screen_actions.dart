@@ -24,6 +24,9 @@ extension _PetHomeActions on _PetHomeScreenState {
       showSnackBar(context, successMsg);
     }
     _load();
+    // 照料动作成功的插叙事件（§3.6 action_done；喂食/抚摸走本包装）
+    WidgetsBinding.instance
+        .addPostFrameCallback((_) => _maybeShowEvent('action_done'));
   }
 
   /// 播放一次性动作（动作机按优先级/防抖裁决，被拒时静默跳过不打断当前演出）
@@ -86,6 +89,9 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (await showPetFeedSheet(context, pet.id) && mounted) {
       _playAction(PetAction.eat);
       _load();
+      // 道具喂养成功同样是照料动作（§3.6 action_done）
+      WidgetsBinding.instance
+          .addPostFrameCallback((_) => _maybeShowEvent('action_done'));
     }
   }
 

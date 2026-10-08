@@ -23,6 +23,7 @@ import '../widgets/pet_fx_overlay.dart';
 import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
+import '../widgets/pet_event_dialog.dart';
 import '../widgets/pet_living_art.dart';
 import 'pet_achievements_screen.dart';
 import 'pet_adventure_screen.dart';
@@ -80,6 +81,11 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   PetSummaryModel? _summary;
   String? _error;
   bool _busy = false;
+
+  /// 随机事件（§3.6）：进页后首次 summary 成功时 roll 一次 home_open；
+  /// 照料动作成功后 roll action_done。_eventDialogShowing 防弹层叠加。
+  bool _homeEventRolled = false;
+  bool _eventDialogShowing = false;
 
   /// 动作仲裁器（优先级/防抖，逻辑见 [PetActionMachine]）
   final PetActionMachine _machine = PetActionMachine();
@@ -158,7 +164,32 @@ class _PetHomeScreenState extends State<PetHomeScreen>
         final count = _stagePets.length;
         if (_petIndex >= count) _petIndex = 0;
       });
+      // 打开宠物页的插叙事件：仅本次停留首次成功装载时掷一次（§3.6 home_open）
+      if (summary != null && !_homeEventRolled) {
+        _homeEventRolled = true;
+        WidgetsBinding.instance
+            .addPostFrameCallback((_) => _maybeShowEvent('home_open'));
+      }
     }
+  }
+
+  /// 随机事件尝试触发：roll 未命中/失败一律静默（插叙彩蛋不打扰主流程），
+  /// 命中才弹层；选择结算后刷新总览（心情/经验/亲密/金币可能变化）。
+  Future<void> _maybeShowEvent(String pContext) async {
+    if (!mounted || _eventDialogShowing || _busy) return;
+    final pet = _currentPet;
+    if (pet == null) return;
+    final (event, _) = await PetRpc.eventRoll(pContext);
+    if (!mounted || _eventDialogShowing) return;
+    if (event == null || event.options.isEmpty) return;
+    final target = _currentPet ?? pet; // roll 期间切宠则落点当前宠
+    _eventDialogShowing = true;
+    try {
+      await showPetEventDialog(context, event: event, petId: target.id);
+    } finally {
+      _eventDialogShowing = false;
+    }
+    if (mounted) _load();
   }
 
   void _switchPet(int delta) {

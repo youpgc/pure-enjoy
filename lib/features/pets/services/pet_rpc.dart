@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../utils/pet_errors.dart';
 import 'pet_service.dart';
@@ -426,5 +427,36 @@ class PetRpc {
     return _call('rpc_pet_adventure_match', {
       'p_pet_id': petId,
     }, 'rpc_pet_adventure_match 历险地匹配');
+  }
+
+  /// 随机事件抽取（§3.6）：服务端掷概率 + 加权抽当日未触发事件。
+  /// 未命中返回 (null, null)——fired=false 属正常业务态，不是错误。
+  /// roll 不失效 summary（未改任何数值，配额与流水都在服务端）。
+  static Future<(PetEventModel?, String?)> eventRoll(String context) async {
+    final (data, err) = await _call('rpc_pet_event_roll', {
+      'p_context': context,
+    }, 'rpc_pet_event_roll 随机事件抽取');
+    if (err != null) return (null, err);
+    return (PetEventModel.fromJson(data ?? const {}), null);
+  }
+
+  /// 随机事件选择结算。作用对象传当前查看的在养宠物（多宠用户自主决定加成落点）。
+  /// 成功后失效 summary（心情/经验/亲密/饱食/金币可能变化）。
+  static Future<(PetEventChooseResultModel?, String?)> eventChoose(
+    String eventId,
+    int optionIndex,
+    String petId,
+  ) async {
+    final (data, err) = await _call('rpc_pet_event_choose', {
+      'p_event_id': eventId,
+      'p_option_index': optionIndex,
+      'p_pet_id': petId,
+    }, 'rpc_pet_event_choose 随机事件选择');
+    if (err != null) return (null, err);
+    await PetService.instance.invalidateSummary();
+    return (
+      PetEventChooseResultModel.fromJson(data ?? const {}),
+      null,
+    );
   }
 }
