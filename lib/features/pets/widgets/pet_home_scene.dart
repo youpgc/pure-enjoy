@@ -92,14 +92,18 @@ class PetBottomStatusCard extends StatelessWidget {
     super.key,
     required this.pet,
     this.expNeed,
+    this.expMaxed = false,
     this.onTap,
   });
 
   final PetBriefModel pet;
 
   /// 升下一级所需经验（rpc_pet_summary config 同源计算，见 petExpNeed）。
-  /// null（旧版服务端未下发曲线两键）时经验行回退 /100 旧展示。
+  /// null（旧版服务端未下发曲线两键）时经验行回退旧的 /100 展示。
   final int? expNeed;
+
+  /// 已达等级上限（level_max，服务端同源冻结 exp）：经验条满格 + 显示 MAX
+  final bool expMaxed;
 
   /// 打开属性面板（null 时不可点）
   final VoidCallback? onTap;
@@ -145,9 +149,11 @@ class PetBottomStatusCard extends StatelessWidget {
             _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
             const SizedBox(height: 6),
             _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
-                max: expNeed,
-                displayText:
-                    expNeed == null ? null : '${pet.exp}/$expNeed'),
+                max: expMaxed ? null : expNeed,
+                forceFull: expMaxed,
+                displayText: expMaxed
+                    ? 'MAX'
+                    : (expNeed == null ? null : '${pet.exp}/$expNeed')),
             const SizedBox(height: 6),
             // 健康行（状态值：历险失败惩罚扣减，恢复途径后续配置）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
@@ -164,7 +170,7 @@ class PetBottomStatusCard extends StatelessWidget {
   /// （经验行 exp/need），格宽随之放宽。经验需求 >100（2 级起），写死 /100
   /// 会让条恒满——上限必须来自 summary config 同源曲线（petExpNeed）。
   Widget _statRow(String label, String iconKey, IconData fallback, int value,
-      {int? max, String? displayText}) {
+      {int? max, bool forceFull = false, String? displayText}) {
     const accent = Color(0xFFFFD37E);
     final denom = (max == null || max <= 0) ? 100 : max;
     return Row(
@@ -181,7 +187,7 @@ class PetBottomStatusCard extends StatelessWidget {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: (value / denom).clamp(0.0, 1.0),
+              value: forceFull ? 1.0 : (value / denom).clamp(0.0, 1.0),
               minHeight: 5,
               backgroundColor: Colors.white24,
               valueColor: const AlwaysStoppedAnimation(accent),

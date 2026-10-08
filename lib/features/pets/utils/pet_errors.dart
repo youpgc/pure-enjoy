@@ -113,6 +113,10 @@ String petRpcErrorText(String? error) {
     'PET_EVENT_BAD_OPTION': '这个选项不存在了，重新选一个吧',
     'PET_EVENT_NOT_FIRED_TODAY': '这个事件今天不在你的清单里，稍后再来看看',
     'PET_EVENT_NEED_PET': '需要有在养育中的宠物才能领取这份奖励',
+    // ---------- 更名卡（rpc_pet_rename） ----------
+    'PET_RENAME_INVALID': '名字要 1~12 个字哦',
+    'PET_RENAME_SAME': '这个名字和现在一样啦',
+    'PET_RENAME_CARD_MISSING': '未配置更名卡，请联系管理员',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;

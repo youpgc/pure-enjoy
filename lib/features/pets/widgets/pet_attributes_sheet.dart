@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
+import '../../../services/sensitive_word_service.dart';
 import '../models/pet_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
@@ -107,6 +108,77 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     widget.onChanged?.call();
   }
 
+  /// 改名（§2.5 更名卡口径）：每宠首次免费（rename_count=0），此后消耗
+  /// 更名卡×1；敏感词在客户端预检（服务端无敏感词基础设施为已知边界）。
+  Future<void> _rename() async {
+    if (_busy) return;
+    // 模型无独立 nickname 字段（summary 已合并显示名），预填当前显示名
+    final controller = TextEditingController(text: widget.pet.name);
+    final freeNext = widget.pet.renameCount == 0;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('给伙伴改个名字'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            TextField(
+              controller: controller,
+              autofocus: true,
+              maxLength: 12,
+              decoration: const InputDecoration(
+                hintText: '1~12 个字',
+                counterText: '',
+              ),
+            ),
+            const SizedBox(height: 8),
+            Text(
+              freeNext ? '这只伙伴首次改名免费' : '本次改名将消耗 1 张更名卡',
+              style: TextStyle(
+                  fontSize: 12,
+                  color: Theme.of(ctx).colorScheme.onSurfaceVariant),
+            ),
+          ],
+        ),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('确认')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    final name = controller.text.trim();
+    if (name.isEmpty || name.length > 12) {
+      showSnackBar(context, '名字要 1~12 个字哦');
+      return;
+    }
+    if (name == widget.pet.name) {
+      showSnackBar(context, petRpcErrorText('PET_RENAME_SAME'));
+      return;
+    }
+    final sw = await SensitiveWordService.instance.checkSystemContent(name);
+    if (!mounted) return;
+    if (sw.isBlocked) {
+      showSnackBar(context, '这个名字不太合适，换一个吧');
+      return;
+    }
+    setState(() => _busy = true);
+    final err = await PetRpc.rename(widget.pet.id, name);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null) {
+      showSnackBar(context, petRpcErrorText(err));
+      return;
+    }
+    showSnackBar(context, '已改名为「$name」');
+    Navigator.pop(context);
+    widget.onChanged?.call();
+  }
+
   /// 洗练：消耗 1 洗练点重掷升级加点（2026-09-20 语义）。
   /// 演出弹窗叠在面板上方；关闭后一并收起面板并刷新——
   /// 面板宠物快照含属性值，洗练后已过期
@@ -146,7 +218,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 标题行：名字 + 性格
+            // 标题行：名字（点笔改名）+ 性格
             Row(
               children: [
                 Expanded(
@@ -155,6 +227,13 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
                       overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700)),
+                ),
+                // 改名入口（§2.5 更名卡口径：首次免费，此后消耗更名卡）
+                IconButton(
+                  visualDensity: VisualDensity.compact,
+                  icon: const Icon(Icons.edit_outlined, size: 18),
+                  tooltip: '改名',
+                  onPressed: _busy ? null : _rename,
                 ),
                 Container(
                   padding:

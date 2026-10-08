@@ -429,7 +429,18 @@ class PetRpc {
     }, 'rpc_pet_adventure_match 历险地匹配');
   }
 
-  /// 随机事件抽取（§3.6）：服务端掷概率 + 加权抽当日未触发事件。
+  /// 昵称修改（更名卡口径：每宠首次免费，此后消耗更名卡×1；敏感词在
+  /// 调用方预检，服务端做长度/同名校验）。成功后失效 summary（昵称变化）。
+  static Future<String?> rename(String petId, String nickname) async {
+    final (_, err) = await _call('rpc_pet_rename', {
+      'p_pet_id': petId,
+      'p_nickname': nickname,
+    }, 'rpc_pet_rename 昵称修改');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
+    /// 随机事件抽取（§3.6）：服务端掷概率 + 加权抽当日未触发事件。
   /// 未命中返回 (null, null)——fired=false 属正常业务态，不是错误。
   /// roll 不失效 summary（未改任何数值，配额与流水都在服务端）。
   static Future<(PetEventModel?, String?)> eventRoll(String context) async {

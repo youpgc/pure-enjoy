@@ -18,3 +18,11 @@ int? petExpNeed(int level, Map<String, dynamic>? config) {
   if (level < 1) level = 1;
   return (base * math.pow(growth.toDouble(), level - 1)).round();
 }
+
+/// 是否已达等级上限（pet_config.level_max，服务端同源冻结 exp）。
+/// 缺键（旧版服务端）视为未达上限——不造默认值，回退普通展示。
+bool petExpMaxed(int level, Map<String, dynamic>? config) {
+  if (config == null) return false;
+  final max = config['level_max'];
+  return max is num && max > 0 && level >= max;
+}

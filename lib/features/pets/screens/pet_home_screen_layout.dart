@@ -114,6 +114,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
               PetBottomStatusCard(
                   pet: pet,
                   expNeed: petExpNeed(pet.level, _summary?.config),
+                  expMaxed: petExpMaxed(pet.level, _summary?.config),
                   onTap: _openAttributes),
             ],
           ),

@@ -77,6 +77,7 @@ class PetBriefModel {
     this.personalityCode,
     this.personalityName,
     this.todayIntimacyGain = 0,
+    this.renameCount = 0,
   });
 
   final String id;
@@ -126,6 +127,9 @@ class PetBriefModel {
   /// 旧版服务端缺键按 0 展示，不阻塞）
   final int todayIntimacyGain;
 
+  /// 已改名次数（0=下次改名免费；rpc_pet_rename 首次免费口径的数据源）
+  final int renameCount;
+
   /// 读取四维属性值（未配置/未下发维度补 0）
   int attr(String code) => attributes[code] ?? 0;
 
@@ -160,6 +164,7 @@ class PetBriefModel {
       pendingAttrPoints: (json['pending_attr_points'] as num?)?.toInt() ?? 0,
       refinePoints: (json['refine_points'] as num?)?.toInt() ?? 0,
       todayIntimacyGain: (json['today_intimacy_gain'] as num?)?.toInt() ?? 0,
+      renameCount: (json['rename_count'] as num?)?.toInt() ?? 0,
       personalityCode: json['personality_code'] as String?,
       personalityName: json['personality_name'] as String?,
     );
