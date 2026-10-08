@@ -171,6 +171,27 @@ class _PetHomeScreenState extends State<PetHomeScreen>
             .addPostFrameCallback((_) => _maybeShowEvent('home_open'));
       }
     }
+    _syncAmbient();
+  }
+
+  /// 低状态环境态接线（§11.3 2026-10-08 修订）：饱食/心情任一低于历险出发
+  /// 阈值（同一口径，零新增配置）→ ambient 切 sad；恢复即回 idle。
+  /// 阈值缺键（旧版服务端）不启用 sad，回退常态 idle。
+  void _syncAmbient() {
+    final pet = _currentPet;
+    final cfg = _summary?.config ?? const {};
+    final hT = (cfg['adventure_hunger_threshold'] as num?)?.toInt();
+    final mT = (cfg['adventure_mood_threshold'] as num?)?.toInt();
+    final low = pet != null &&
+        ((hT != null && hT > 0 && pet.hunger < hT) ||
+            (mT != null && mT > 0 && pet.mood < mT));
+    _machine.ambientOverride = low ? PetAction.sad : null;
+    if (low) {
+      if (_machine.current == PetAction.idle) _playAction(PetAction.sad);
+    } else if (_machine.current == PetAction.sad) {
+      _machine.reset();
+      if (mounted) setState(() {});
+    }
   }
 
   /// 随机事件尝试触发：roll 未命中/失败一律静默（插叙彩蛋不打扰主流程），
@@ -201,6 +222,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     setState(() {
       _petIndex = (_petIndex + delta + pets.length) % pets.length;
     });
+    _syncAmbient(); // 新宠的低状态环境态（sad）按其自身数值重算
   }
 
   @override

@@ -1,11 +1,12 @@
+import '../../../constants/pet_bend.dart';
 import '../../../constants/pet_render.dart';
 
 /// 2D 动作仲裁器：决定「此刻舞台上应该播哪个动作」。
 ///
-/// 口径来自需求 §11.3 的 8 标准动作与《3D 展现与交互实现方案》§2.1 的触发矩阵
-/// ——该矩阵只讲优先级与互斥，与渲染栈无关，故 2D 原样沿用：
-/// `evolve`（独占）> `eat` = `petted` > `happy` > `sad` > `sleep` > `walk` > `idle`，
-/// 高优先级打断低优先级，一次性动作演完回落到环境态。
+/// 口径来自需求 §11.3（2026-10-08 修订：核心 5 + 氛围 1；happy 并入 petted、
+/// walk 移出定版集）——优先级与互斥沿用原触发矩阵：
+/// `evolve`（独占）> `eat` = `petted` > `sad` > `sleep` > `idle`，
+/// 高优先级打断低优先级，一次性动作演完回落到环境态（低状态时回落到 sad）。
 ///
 /// **只做仲裁，不做计时**：播放时长是本文件的编排常量（表现层属性，不是业务
 /// 阈值，故不受铁律 2 的「数值必须后台可配」约束）；业务阈值（饱食/心情/时段/
@@ -23,14 +24,14 @@ class PetActionMachine {
   /// 当前正在播放的动作
   PetAction get current => _current;
 
+  /// 环境态覆盖（2026-10-08 §11.3 修订接线）：低状态（饱食/心情低于历险出发
+  /// 阈值，同一口径零新增配置）时由页面注入 [PetAction.sad]，恢复后置回 null。
+  /// null = 常态 idle；sleep（夜间/久无操作）仍待 pet_config 阈值接线
+  /// （铁律 2：客户端不写默认值），接线后在同一点扩展。
+  PetAction? ambientOverride;
+
   /// 环境态：无交互时应该循环什么。
-  ///
-  /// 只有 [PetAction.idle] 是纯结构性判定，可直接给；`sleep`（夜间时段 /
-  /// 无操作满 N 分钟）与 `walk`（空闲随机 30~90 秒）都需要 `pet_config` 里的
-  /// 时段与秒数阈值，缺配置时**不启用**（铁律 2：客户端不写默认值）。
-  /// 两个动作的播放能力已经实装（见 `pet_living_art.dart`），后台补上
-  /// `anim_sleep_*` / `anim_walk_*` 阈值后只需在此处接判定。
-  PetAction get ambient => PetAction.idle;
+  PetAction get ambient => ambientOverride ?? PetAction.idle;
 
   /// 反应式动作是否接受播放；返回 false 表示被仲裁挡掉（不打断当前动作）。
   ///
@@ -66,18 +67,13 @@ class PetActionMachine {
   /// 同级防抖窗口：小于该值内的同名重复请求直接丢弃
   static const Duration _samePriorityGap = Duration(milliseconds: 900);
 
-  /// 各动作一轮演出时长（idle/sleep/walk 为循环周期）
-  static const Map<PetAction, Duration> _durations = {
-    PetAction.idle: Duration(milliseconds: 3400),
-    PetAction.walk: Duration(milliseconds: 4200),
-    PetAction.sleep: Duration(milliseconds: 4800),
-    PetAction.sad: Duration(milliseconds: 2400),
-    PetAction.happy: Duration(milliseconds: 1100),
-    PetAction.petted: Duration(milliseconds: 1200),
-    PetAction.eat: Duration(milliseconds: 1500),
-    PetAction.evolve: Duration(milliseconds: 2200),
-  };
-
-  static Duration durationOf(PetAction action) =>
-      _durations[action] ?? _durations[PetAction.idle]!;
+  /// 各动作一轮演出时长：直接回读弯曲编排表（`kPetBendActs` 的 `per`，单位秒）。
+  ///
+  /// 旧版这里是本文件手抄的一份 Duration 表，和样片冻结的周期早已对不上
+  /// （walk 4200 vs 3200、evolve 2200 vs 6800）——一次性动作的回落计时比实际演出
+  /// 短一截，演到一半就被切回环境态。周期本来就是编排的一部分，只留一个源。
+  static Duration durationOf(PetAction action) {
+    final per = (kPetBendActs[action.code] ?? kPetBendActs['idle']!).per;
+    return Duration(milliseconds: (per * 1000).round());
+  }
 }

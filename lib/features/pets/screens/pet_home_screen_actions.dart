@@ -149,8 +149,8 @@ extension _PetHomeActions on _PetHomeScreenState {
       result: result,
     );
     if (!mounted) return;
-    // 弹窗关闭后再演出"开心"，否则 1.1s 演出全被弹窗挡住
-    _playAction(PetAction.happy);
+    // 弹窗关闭后再演出正向反馈（§11.3 修订：happy 并入 petted，单槽位）
+    _playAction(PetAction.petted);
     // 点击确认后刷新宠物信息
     _load();
   }

@@ -51,9 +51,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
   void _interact(String petId) => _run(() => PetRpc.interact(petId),
       successMsg: _interactMsg, anim: PetAction.petted);
 
-  /// 双击只做纯表现（开心演出 + 星星），不发 RPC、不加心情——
+  /// 双击只做纯表现（正向反馈），不发 RPC、不加心情——
   /// 照料数值一律由服务端结算，这里不能凭空造进度。
-  void _onStageDoubleTap() => _playAction(PetAction.happy);
+  /// §11.3 2026-10-08 修订：happy 并入 petted（正向反馈单槽位）。
+  void _onStageDoubleTap() => _playAction(PetAction.petted);
 
   List<Widget> _switchArrows() => [
         Positioned(
