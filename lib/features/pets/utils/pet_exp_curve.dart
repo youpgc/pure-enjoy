@@ -12,7 +12,9 @@ int? petExpNeed(int level, Map<String, dynamic>? config) {
   if (config == null) return null;
   final base = config['level_exp_base'];
   final growth = config['level_exp_growth'];
-  if (base is! num || growth is! num || base <= 0 || growth <= 1) return null;
+  // growth == 1（平坦曲线）是合法配置：need 恒等于 base，必须照算——
+  // 拒绝它会让 App 回退 /100，与 base≠100 的服务端曲线再次不同源
+  if (base is! num || growth is! num || base <= 0 || growth <= 0) return null;
   if (level < 1) level = 1;
   return (base * math.pow(growth.toDouble(), level - 1)).round();
 }
