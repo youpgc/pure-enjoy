@@ -27,12 +27,11 @@
 /// 动作契约（[PetAction] 等不入库的表现层命名）拆到同级 `pet_render.dart`。
 library;
 
-/// 背包四分区（equip 一期枚举占位、页签空时隐藏，P2 穿戴启用）
+/// 背包三分区（2026-10-09 修订：装备分区需求移除）
 enum PetBagCategory {
   egg('egg', '蛋'),
   consumable('consumable', '消耗品'),
-  tool('tool', '工具'),
-  equip('equip', '装备');
+  tool('tool', '工具');
 
   const PetBagCategory(this.code, this.label);
 

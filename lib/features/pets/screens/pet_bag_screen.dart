@@ -51,14 +51,13 @@ class _PetBagScreenState extends State<PetBagScreen> {
         PetBagCategory.egg => Icons.egg_outlined,
         PetBagCategory.consumable => Icons.restaurant,
         PetBagCategory.tool => Icons.build_outlined,
-        PetBagCategory.equip => Icons.inventory_2_outlined,
       };
 
-  /// 页签取自 PetBagCategory；equip 属 P2 穿戴，一期不出现在页签里
+  /// 页签取自 PetBagCategory（2026-10-09 修订：装备分区已移除）
   static List<(String, String, IconData)> get _tabs => [
         ('all', '全部', Icons.grid_view_outlined),
         for (final c in PetBagCategory.values)
-          if (c != PetBagCategory.equip) (c.code, c.label, _categoryIcon(c)),
+          (c.code, c.label, _categoryIcon(c)),
       ];
 
   @override
