@@ -29,6 +29,7 @@ import 'pet_achievements_screen.dart';
 import 'pet_adventure_screen.dart';
 import 'pet_bag_screen.dart';
 import 'pet_breed_screen.dart';
+import 'pet_dex_screen.dart';
 import 'pet_egg_screen.dart';
 import 'pet_foster_screen.dart';
 import 'pet_growth_screen.dart';
@@ -178,6 +179,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 阈值（同一口径，零新增配置）→ ambient 切 sad；恢复即回 idle。
   /// 阈值缺键（旧版服务端）不启用 sad，回退常态 idle。
   void _syncAmbient() {
+    if (!mounted) return; // _load 完成时页面可能已销毁（异步竞态）
     final pet = _currentPet;
     final cfg = _summary?.config ?? const {};
     final hT = (cfg['adventure_hunger_threshold'] as num?)?.toInt();
