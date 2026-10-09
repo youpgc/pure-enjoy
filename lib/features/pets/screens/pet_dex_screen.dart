@@ -234,7 +234,7 @@ class _PetDexScreenState extends State<PetDexScreen> {
                   ? (img != null
                       ? Image.asset(img,
                           fit: BoxFit.contain,
-                          cacheWidth: (72 * MediaQuery.devicePixelRatioOf(context)).round(),
+                          cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
                           errorBuilder: (_, __, ___) => Icon(
                               Icons.cruelty_free_outlined,
                               size: 28,
