@@ -97,8 +97,9 @@ class _StarryPainter extends CustomPainter {
     // 弦月（右上）
     final moonCenter = Offset(size.width * 0.80, size.height * 0.16);
     canvas.drawCircle(moonCenter, 34, Paint()..color = const Color(0xFFF5EFD8));
+    final biteColor = Color.lerp(_top, _mid, 0.32)!;
     canvas.drawCircle(
-        moonCenter.translate(-14, -8), 30, Paint()..color = _mid);
+        moonCenter.translate(-14, -8), 30, Paint()..color = biteColor);
 
     // 远山剪影（两重）
     final hill1 = Path()
