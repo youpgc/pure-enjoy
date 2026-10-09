@@ -83,6 +83,9 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   String? _error;
   bool _busy = false;
 
+  /// 场景主题（§11.1）：当前激活场景码；进页拉一次，主题面板切换后更新
+  String _activeScene = 'scene_dream';
+
   /// 随机事件（§3.6）：进页后首次 summary 成功时 roll 一次 home_open；
   /// 照料动作成功后 roll action_done。_eventDialogShowing 防弹层叠加。
   bool _homeEventRolled = false;
@@ -103,8 +106,18 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   void initState() {
     super.initState();
     _load();
+    _loadActiveScene();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (mounted && _budget.anyCooling) setState(() {});
+    });
+  }
+
+  /// 拉取当前激活场景（独立于 _load：主题切换不触发总览刷新）
+  Future<void> _loadActiveScene() async {
+    final (data, err) = await PetRpc.fetchScenes();
+    if (!mounted || err != null || data == null) return;
+    setState(() {
+      _activeScene = data['active']?.toString() ?? 'scene_dream';
     });
   }
 
@@ -247,7 +260,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     return Stack(
       fit: StackFit.expand,
       children: [
-        const PetSceneBackground(),
+        PetSceneBackground(sceneCode: _activeScene),
         if (_stagePets.isNotEmpty) ...[
           _stage(),
           ..._switchArrows(),

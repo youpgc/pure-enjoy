@@ -210,6 +210,19 @@ extension _PetHomeActions on _PetHomeScreenState {
   /// 繁育（P2）：未开通时页内给商城直达，不在主页做二次判断
   void _openBreed() => _push(const PetBreedScreen());
 
+  /// 场景主题面板（§11.1）：自取数 + 购买/切换，返回最新激活码
+  Future<void> _openThemes() async {
+    final active = await showModalBottomSheet<String>(
+      context: context,
+      showDragHandle: true,
+      isScrollControlled: true,
+      builder: (_) => PetThemeSheet(active: _activeScene),
+    );
+    if (active != null && active != _activeScene && mounted) {
+      setState(() => _activeScene = active);
+    }
+  }
+
   /// 孵蛋（P2：即开 + 等待孵化双通道；入口亦在背包的蛋行）
   void _openEggs() => _push(const PetEggScreen());
 

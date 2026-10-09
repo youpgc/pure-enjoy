@@ -161,7 +161,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  /// 「更多」弹出菜单：钱包 / 寄养 / 成就 / 图鉴 / 繁育
+  /// 「更多」弹出菜单：钱包 / 寄养 / 成就 / 图鉴 / 场景主题 / 繁育
   void _showMoreMenu() {
     showModalBottomSheet<void>(
       context: context,
@@ -176,6 +176,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
               (Icons.luggage_outlined, '寄养仓库', _openFoster),
               (Icons.workspace_premium_outlined, '成就', _openAchievements),
               (Icons.auto_stories_outlined, '图鉴', _openDex),
+              (Icons.wallpaper_outlined, '场景主题', _openThemes),
               (Icons.favorite_outline, '繁育', _openBreed),
             ])
             ListTile(

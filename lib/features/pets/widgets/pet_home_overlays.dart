@@ -3,7 +3,10 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
+import '../services/pet_rpc.dart';
 import '../utils/pet_art_resolver.dart';
+import '../utils/pet_errors.dart';
+import '../../../core/widgets/widgets.dart';
 
 /// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
 ///
@@ -369,4 +372,221 @@ class PetAdventureNote extends StatelessWidget {
               fontSize: 12,
               color: Colors.brown.shade700,
               fontWeight: FontWeight.w500)));
+}
+
+/// 场景主题面板（§11.1 背景主题购买替换）
+///
+/// 自取数（rpc_pet_scenes）；购买=扣金+解锁+自动激活；使用=切换激活。
+/// 关闭时经 Navigator.pop 返回最新激活码，宿主按需刷新背景。
+class PetThemeSheet extends StatefulWidget {
+  const PetThemeSheet({super.key, required this.active});
+
+  /// 打开面板时的当前激活场景码
+  final String active;
+
+  @override
+  State<PetThemeSheet> createState() => _PetThemeSheetState();
+}
+
+class _PetThemeSheetState extends State<PetThemeSheet> {
+  static const _sceneLabels = {
+    'scene_dream': '梦幻夜空',
+    'scene_meadow': '晨曦草甸',
+    'scene_starry': '星海之栏',
+  };
+
+  List<Map<String, dynamic>>? _scenes;
+  String _active = 'scene_dream';
+  String? _err;
+  String? _pending; // 正在结算的场景码
+
+  @override
+  void initState() {
+    super.initState();
+    _active = widget.active;
+    _load();
+  }
+
+  Future<void> _load() async {
+    setState(() => _err = null);
+    final (data, err) = await PetRpc.fetchScenes();
+    if (!mounted) return;
+    if (err != null || data == null) {
+      setState(() => _err = err);
+      return;
+    }
+    final raw = data['scenes'];
+    setState(() {
+      _scenes = raw is List
+          ? raw.whereType<Map>().map((e) => e.cast<String, dynamic>()).toList()
+          : <Map<String, dynamic>>[];
+      _active = data['active']?.toString() ?? 'scene_dream';
+    });
+  }
+
+  Future<void> _purchase(Map<String, dynamic> sc) async {
+    if (_pending != null) return;
+    final code = sc['scene_code']?.toString() ?? '';
+    final price = (sc['price_coin'] as num?)?.toInt() ?? 0;
+    final label = _sceneLabels[code] ?? code;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: Text('购买「$label」'),
+        content: Text('将消耗 $price 金币，购买后自动启用。'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('购买')),
+        ],
+      ),
+    );
+    if (confirmed != true || !mounted) return;
+    setState(() => _pending = code);
+    final (data, err) = await PetRpc.purchaseScene(code);
+    if (!mounted) return;
+    setState(() => _pending = null);
+    if (err != null || data == null) {
+      showSnackBar(context, petRpcErrorText(err));
+      return;
+    }
+    setState(() => _active = code);
+    showSnackBar(context, '主题已启用');
+  }
+
+  Future<void> _activate(Map<String, dynamic> sc) async {
+    if (_pending != null) return;
+    final code = sc['scene_code']?.toString() ?? '';
+    setState(() => _pending = code);
+    final (data, err) = await PetRpc.activateScene(code);
+    if (!mounted) return;
+    setState(() => _pending = null);
+    if (err != null || data == null) {
+      showSnackBar(context, petRpcErrorText(err));
+      return;
+    }
+    setState(() => _active = code);
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return SafeArea(
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(16, 0, 16, 16),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          crossAxisAlignment: CrossAxisAlignment.stretch,
+          children: [
+            const Padding(
+              padding: EdgeInsets.only(bottom: 10),
+              child: Text('场景主题',
+                  textAlign: TextAlign.center,
+                  style: TextStyle(
+                      fontSize: 16, fontWeight: FontWeight.w700)),
+            ),
+            if (_err != null)
+              Column(
+                children: [
+                  Text(petRpcErrorText(_err),
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onSurfaceVariant)),
+                  const SizedBox(height: 8),
+                  FilledButton.tonal(onPressed: _load, child: const Text('重试')),
+                ],
+              )
+            else if (_scenes == null)
+              const Center(
+                  child: Padding(
+                padding: EdgeInsets.all(24),
+                child: CircularProgressIndicator(),
+              ))
+            else
+              for (final sc in _scenes!) ...[
+                _sceneTile(cs, sc),
+                const SizedBox(height: 8),
+              ],
+          ],
+        ),
+      ),
+    );
+  }
+
+  Widget _sceneTile(ColorScheme cs, Map<String, dynamic> sc) {
+    final code = sc['scene_code']?.toString() ?? '';
+    final owned = sc['owned'] == true;
+    final using = _active == code;
+    final price = (sc['price_coin'] as num?)?.toInt();
+    final label = _sceneLabels[code] ?? code;
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+        borderRadius: BorderRadius.circular(12),
+        border: using ? Border.all(color: cs.primary, width: 1.4) : null,
+      ),
+      child: Row(
+        children: [
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Text(label,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w600)),
+                    const SizedBox(width: 6),
+                    if (using) _miniTag(cs, '使用中', cs.primary),
+                  ],
+                ),
+                if (!owned && price != null)
+                  Text('售价 $price 金币',
+                      style: TextStyle(
+                          fontSize: 11, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+          if (using)
+            Icon(Icons.check_circle, size: 20, color: cs.primary)
+          else if (owned)
+            OutlinedButton(
+              onPressed: _pending == null ? () => _activate(sc) : null,
+              child: _pending == code
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : const Text('使用'),
+            )
+          else
+            FilledButton(
+              onPressed: _pending == null ? () => _purchase(sc) : null,
+              child: _pending == code
+                  ? const SizedBox(
+                      width: 14,
+                      height: 14,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Text('$price 金币'),
+            ),
+        ],
+      ),
+    );
+  }
+
+  Widget _miniTag(ColorScheme cs, String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.15),
+        borderRadius: BorderRadius.circular(10),
+      ),
+      child: Text(label,
+          style: TextStyle(
+              fontSize: 10, fontWeight: FontWeight.w600, color: color)),
+    );
+  }
 }

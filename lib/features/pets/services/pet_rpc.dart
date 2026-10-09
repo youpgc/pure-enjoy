@@ -430,7 +430,29 @@ class PetRpc {
     }, 'rpc_pet_adventure_match 历险地匹配');
   }
 
-  /// 批量喂养（§6.3 高级食盆解锁）：逐宠分流（免费优先/额度尽口粮/冷却跳过）。
+  /// 场景主题目录 + 拥有态 + 当前激活（§11.1 背景主题购买替换）
+  static Future<(Map<String, dynamic>?, String?)> fetchScenes() async {
+    return _call('rpc_pet_scenes', {}, 'rpc_pet_scenes 场景目录');
+  }
+
+  /// 购买场景主题（扣金+解锁+自动激活，三合一事务）
+  static Future<(Map<String, dynamic>?, String?)> purchaseScene(String sceneCode) async {
+    final (data, err) = await _call('rpc_pet_scene_purchase', {
+      'p_scene_code': sceneCode,
+    }, 'rpc_pet_scene_purchase 购买主题');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return (data, err);
+  }
+
+  /// 切换场景（默认或已拥有方可激活）
+  static Future<(Map<String, dynamic>?, String?)> activateScene(String sceneCode) async {
+    final (data, err) = await _call('rpc_pet_scene_activate', {
+      'p_scene_code': sceneCode,
+    }, 'rpc_pet_scene_activate 切换主题');
+    return (data, err);
+  }
+
+    /// 批量喂养（§6.3 高级食盆解锁）：逐宠分流（免费优先/额度尽口粮/冷却跳过）。
   /// 未解锁返回 PET_BATCH_FEED_LOCKED 错误。成功后失效 summary。
   static Future<(Map<String, dynamic>?, String?)> feedAll() async {
     final (data, err) = await _call('rpc_pet_feed_all', {}, 'rpc_pet_feed_all 批量喂养');

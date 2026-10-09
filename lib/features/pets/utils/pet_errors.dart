@@ -121,6 +121,11 @@ String petRpcErrorText(String? error) {
     'PET_RELEASE_NOT_ALLOWED': '它现在正在忙（历险/繁育中），处理完再送别吧',
     // ---------- 批量喂养（rpc_pet_feed_all） ----------
     'PET_BATCH_FEED_LOCKED': '尚未解锁批量喂养——商城购买「高级食盆」即可一键喂养全部',
+    // ---------- 场景主题（rpc_pet_scene_*） ----------
+    'PET_SCENE_NOT_AVAILABLE': '这个主题暂时下架了',
+    'PET_SCENE_ALREADY': '你已经拥有这个主题啦',
+    'PET_SCENE_NOT_OWNED': '还没有获得这个主题，先去购买吧',
+    'PET_SCENE_PRICE_MISSING': '主题未定价，请联系管理员',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;
