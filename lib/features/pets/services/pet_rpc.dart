@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
+import '../models/pet_dex_models.dart';
 import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../utils/pet_errors.dart';
@@ -429,7 +430,43 @@ class PetRpc {
     }, 'rpc_pet_adventure_match 历险地匹配');
   }
 
-  /// 昵称修改（更名卡口径：每宠首次免费，此后消耗更名卡×1；敏感词在
+  /// 批量喂养（§6.3 高级食盆解锁）：逐宠分流（免费优先/额度尽口粮/冷却跳过）。
+  /// 未解锁返回 PET_BATCH_FEED_LOCKED 错误。成功后失效 summary。
+  static Future<(Map<String, dynamic>?, String?)> feedAll() async {
+    final (data, err) = await _call('rpc_pet_feed_all', {}, 'rpc_pet_feed_all 批量喂养');
+    if (err != null) return (null, err);
+    await PetService.instance.invalidateSummary();
+    return (data, null);
+  }
+
+  /// 成长时间线（只读，最近 pLimit 条倒序）
+  static Future<(Map<String, dynamic>?, String?)> fetchTimeline(String petId, {int limit = 100}) async {
+    return _call('rpc_pet_timeline', {
+      'p_pet_id': petId,
+      'p_limit': limit,
+    }, 'rpc_pet_timeline 成长时间线');
+  }
+
+    /// 图鉴总览（只读；owned=历史拥有过含已放生，范围=enabled 形态）
+  static Future<(PetDexModel?, String?)> fetchDex() async {
+    final (data, err) = await _call('rpc_pet_dex', {}, 'rpc_pet_dex 图鉴总览');
+    if (err != null) return (null, err);
+    return (PetDexModel.fromJson(data ?? const {}), null);
+  }
+
+  /// 放生（软删除：status='released'，时间线归档保留；补偿=等级×单价×评级倍率）。
+  /// 成功后失效 summary（宠物离场）。
+  static Future<(({int gold})?, String?)> release(String petId) async {
+    final (data, err) = await _call('rpc_pet_release', {
+      'p_pet_id': petId,
+    }, 'rpc_pet_release 放生');
+    if (err != null) return (null, err);
+    await PetService.instance.invalidateSummary();
+    final gold = (data?['gold'] as num?)?.toInt() ?? 0;
+    return ((gold: gold), null);
+  }
+
+    /// 昵称修改（更名卡口径：每宠首次免费，此后消耗更名卡×1；敏感词在
   /// 调用方预检，服务端做长度/同名校验）。成功后失效 summary（昵称变化）。
   static Future<String?> rename(String petId, String nickname) async {
     final (_, err) = await _call('rpc_pet_rename', {

@@ -161,7 +161,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  /// 「更多」弹出菜单：钱包 / 寄养 / 成就 / 繁育
+  /// 「更多」弹出菜单：钱包 / 寄养 / 成就 / 图鉴 / 繁育
   void _showMoreMenu() {
     showModalBottomSheet<void>(
       context: context,
@@ -175,6 +175,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
               (Icons.account_balance_wallet_outlined, '金币钱包', _openWallet),
               (Icons.luggage_outlined, '寄养仓库', _openFoster),
               (Icons.workspace_premium_outlined, '成就', _openAchievements),
+              (Icons.auto_stories_outlined, '图鉴', _openDex),
               (Icons.favorite_outline, '繁育', _openBreed),
             ])
             ListTile(
@@ -253,7 +254,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 label: _feedLabel,
                 // 蒙层只在真正"吃饱了"时出现；历险中/请求中属静默禁用，不误导
                 overlay: _budget.isFull ? '已饱' : null,
-                onTap: feedOff ? null : () => _onFeedTap()),
+                onTap: feedOff ? null : () => _onFeedTap(),
+                // 批量喂养（§6.3 高级食盆解锁后）：长按一键喂养全部在养伙伴
+                onLongPress: feedOff ? null : _onFeedAllTap),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.touch_app_outlined,

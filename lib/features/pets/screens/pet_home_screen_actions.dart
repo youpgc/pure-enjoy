@@ -71,6 +71,32 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (mounted) setState(() {});
   }
 
+  /// 批量喂养（§6.3 高级食盆解锁后）：长按喂食键触发——逐宠分流
+  /// （免费额度优先 → 额度尽落口粮；冷却中/已饱跳过防误触烧粮）。
+  /// 未解锁时服务端拒绝并引导商城。结果以摘要 Toast 呈现。
+  Future<void> _onFeedAllTap() async {
+    if (_busy) return;
+    setState(() => _busy = true);
+    final (data, err) = await PetRpc.feedAll();
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null || data == null) {
+      showSnackBar(context, petRpcErrorText(err));
+      return;
+    }
+    int n(String k) => (data[k] as num?)?.toInt() ?? 0;
+    final parts = <String>[];
+    if (n('free') > 0) parts.add('免费 ${n('free')}');
+    if (n('item') > 0) parts.add('口粮 ${n('item')}');
+    if (n('full') > 0) parts.add('已饱 ${n('full')}');
+    if (n('cooldown') > 0) parts.add('刚喂过 ${n('cooldown')}');
+    if (n('no_food') > 0) parts.add('口粮不足 ${n('no_food')}');
+    if (n('error') > 0) parts.add('失败 ${n('error')}');
+    showSnackBar(context,
+        parts.isEmpty ? '没有需要喂养的伙伴' : '一键喂养：${parts.join(' · ')}');
+    _load();
+  }
+
   // ---------- 喂食（免费额度 与 背包口粮 分流） ----------
 
   /// 喂食钮统一入口（2026-09-24 定版：喂食不限次数）
@@ -177,6 +203,9 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   /// 成就（P2）：进入即幂等对齐一次服务端进度
   void _openAchievements() => _push(const PetAchievementsScreen());
+
+  /// 图鉴（§2026-10-09）：收集总览，只读
+  void _openDex() => _push(const PetDexScreen());
 
   /// 繁育（P2）：未开通时页内给商城直达，不在主页做二次判断
   void _openBreed() => _push(const PetBreedScreen());

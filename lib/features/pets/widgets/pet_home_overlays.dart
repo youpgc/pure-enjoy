@@ -65,6 +65,7 @@ class PetEdgeButton extends StatelessWidget {
     required this.label,
     this.overlay,
     this.onTap,
+    this.onLongPress,
   });
 
   final IconData icon;
@@ -74,6 +75,9 @@ class PetEdgeButton extends StatelessWidget {
   final String? overlay;
 
   final VoidCallback? onTap;
+
+  /// 长按手势（批量喂养：§6.3 高级食盆解锁后使用）
+  final VoidCallback? onLongPress;
 
   @override
   Widget build(BuildContext context) {
@@ -86,6 +90,7 @@ class PetEdgeButton extends StatelessWidget {
       child: InkWell(
         borderRadius: BorderRadius.circular(16),
         onTap: onTap,
+        onLongPress: onLongPress,
         child: SizedBox(
           width: 64,
           height: 64,

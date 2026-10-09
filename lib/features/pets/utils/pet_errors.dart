@@ -117,6 +117,10 @@ String petRpcErrorText(String? error) {
     'PET_RENAME_INVALID': '名字要 1~12 个字哦',
     'PET_RENAME_SAME': '这个名字和现在一样啦',
     'PET_RENAME_CARD_MISSING': '未配置更名卡，请联系管理员',
+    // ---------- 放生（rpc_pet_release） ----------
+    'PET_RELEASE_NOT_ALLOWED': '它现在正在忙（历险/繁育中），处理完再送别吧',
+    // ---------- 批量喂养（rpc_pet_feed_all） ----------
+    'PET_BATCH_FEED_LOCKED': '尚未解锁批量喂养——商城购买「高级食盆」即可一键喂养全部',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;

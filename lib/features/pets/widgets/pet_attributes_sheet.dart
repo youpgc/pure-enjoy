@@ -4,6 +4,7 @@ import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../services/sensitive_word_service.dart';
 import '../models/pet_models.dart';
+import '../screens/pet_timeline_screen.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 
@@ -312,10 +313,97 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
                 label: const Text('进化与特性'),
               ),
             ],
+            // 成长回忆（§3.3 时间线纪念卡）
+            TextButton.icon(
+              onPressed: _busy
+                  ? null
+                  : () {
+                      Navigator.pop(context);
+                      Navigator.push(
+                        context,
+                        MaterialPageRoute(
+                            builder: (_) => PetTimelineScreen(
+                                petId: pet.id, petName: pet.name)),
+                      ).then((_) => widget.onChanged?.call());
+                    },
+              icon: const Icon(Icons.history_edu, size: 18),
+              label: const Text('成长回忆'),
+            ),
+            // 放生入口（危险区，§2026-10-09）：历险/繁育中不可放，服务端亦拦
+            if (pet.status == PetPetStatus.rearing ||
+                pet.status == PetPetStatus.fostered) ...[
+              const SizedBox(height: 4),
+              TextButton.icon(
+                onPressed: _busy ? null : _release,
+                icon: Icon(Icons.pets_outlined,
+                    size: 16, color: cs.error.withValues(alpha: 0.8)),
+                label: Text('送别…',
+                    style: TextStyle(
+                        fontSize: 12, color: cs.error.withValues(alpha: 0.8))),
+              ),
+            ],
           ],
         ),
       ),
     );
+  }
+
+  /// 放生（软删除）：两段确认——① 警告+补偿预览 ② 明示不可逆终确认。
+  /// 成功后收起面板并刷新（宠物离场，图鉴"曾经拥有"保留）。
+  Future<void> _release() async {
+    if (_busy) return;
+    final pet = widget.pet;
+    final gold = pet.level * 3; // 预览值（单价默认 3；实际以服务端结算为准）
+    final first = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('送别伙伴'),
+        content: Text(
+            '将「${pet.name}」送归自然。\n\n'
+            '· 补偿金币约 $gold（以实际结算为准）\n'
+            '· 图鉴收集记录会保留\n'
+            '· 这一步之后还可以反悔吗？——不能，请想清楚'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('再想想')),
+          FilledButton(
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('继续')),
+        ],
+      ),
+    );
+    if (first != true || !mounted) return;
+    final second = await showDialog<bool>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('最终确认'),
+        content: const Text('「送别」不可恢复。\n确定要与它告别了吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.pop(ctx, false),
+              child: const Text('取消')),
+          FilledButton(
+              style: FilledButton.styleFrom(
+                  backgroundColor: Theme.of(ctx).colorScheme.error),
+              onPressed: () => Navigator.pop(ctx, true),
+              child: const Text('确认送别')),
+        ],
+      ),
+    );
+    if (second != true || !mounted) return;
+    setState(() => _busy = true);
+    final (result, err) = await PetRpc.release(pet.id);
+    if (!mounted) return;
+    setState(() => _busy = false);
+    if (err != null || result == null) {
+      showSnackBar(context, petRpcErrorText(err));
+      return;
+    }
+    showSnackBar(context, '送别完成，补偿金币 +${result.gold}');
+    Navigator.pop(context);
+    widget.onChanged?.call();
   }
 
   /// 单维属性行：标签 + 当前值（含本次分配预览）+ 步进器
