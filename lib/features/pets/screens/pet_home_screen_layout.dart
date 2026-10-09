@@ -255,8 +255,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 // 蒙层只在真正"吃饱了"时出现；历险中/请求中属静默禁用，不误导
                 overlay: _budget.isFull ? '已饱' : null,
                 onTap: feedOff ? null : () => _onFeedTap(),
-                // 批量喂养（§6.3 高级食盆解锁后）：长按一键喂养全部在养伙伴
-                onLongPress: feedOff ? null : _onFeedAllTap),
+                // 批量喂养（§6.3 高级食盆解锁后）：长按一键喂养全部在养伙伴。
+                // 门控与单宠状态解耦（审查 2026-10-09）：当前宠已饱/历险中时,
+                // 其他宠仍可能需要喂养——只挡无宠与请求中。
+                onLongPress: (pet == null || _busy) ? null : _onFeedAllTap),
             const SizedBox(height: 14),
             PetEdgeButton(
                 icon: Icons.touch_app_outlined,
