@@ -58,6 +58,16 @@ class GameAudio {
   /// 失败
   void fail() => _play('fail.wav');
 
+  /// 俄罗斯方块：旋转（复用 select 音，轻短；缺资源时静默降级）
+  void rotate() => _play('tetris_rotate.wav');
+
+  /// 俄罗斯方块：消行（1-3 行轻快音，4 行 TETRIS 重音；缺资源回退 match）
+  void lineClear(int lines) =>
+      _play(lines >= 4 ? 'tetris_tetris.wav' : 'tetris_clear.wav');
+
+  /// 俄罗斯方块：升级（marathon/blitz 等级跃迁；缺资源回退 merge）
+  void levelUp() => _play('tetris_levelup.wav');
+
   /// 触感反馈（静音时同样抑制）
   void haptic(GameHaptic type) {
     if (_muted) return;

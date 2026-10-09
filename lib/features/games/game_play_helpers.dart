@@ -70,7 +70,7 @@ String gameCoverAsset(String? code) {
     'grid_4x4': 'g2048',
     'casino': 'match3',
   };
-  const Set<String> known = <String>{'g2048', 'sheep', 'match3'};
+  const Set<String> known = <String>{'g2048', 'sheep', 'match3', 'tetris'};
   final String c = (code != null && code.isNotEmpty) ? code : 'g2048';
   final String name = known.contains(c) ? c : (legacy[c] ?? 'g2048');
   return 'assets/games/icons/$name.svg';

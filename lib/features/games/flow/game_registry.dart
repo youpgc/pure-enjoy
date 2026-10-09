@@ -4,6 +4,7 @@ import '../game_play_helpers.dart';
 import '../games/g2048/g2048_game.dart';
 import '../games/match3/match3_game.dart';
 import '../games/sheep/sheep_game.dart';
+import '../games/tetris/tetris_game.dart';
 import '../models/game_level_model.dart';
 import '../models/game_model.dart';
 
@@ -128,6 +129,44 @@ class _Match3Adapter extends GameFlowAdapter {
   }
 }
 
+/// 俄罗斯方块适配器：默认流程 = 马拉松 L1 语义合成关（消 10 行通关，
+/// 1000ms 重力，局内逐级加速；config 缺位时引擎同款兜底）。
+class _TetrisAdapter extends GameFlowAdapter {
+  @override
+  String get code => 'tetris';
+
+  @override
+  GameLevelModel defaultLevel(GameModel game) => GameLevelModel(
+        id: '',
+        gameId: game.id,
+        levelNo: 1,
+        name: '马拉松模式',
+        config: const <String, dynamic>{
+          'lines': 10,
+          'fall_ms': 1000,
+          'level_up_lines': 10,
+          'speed_factor': 0.85,
+          'fall_min': 60,
+        },
+      );
+
+  @override
+  Widget buildEngine({
+    required Key key,
+    required GameModel game,
+    required GameLevelModel level,
+    required ValueChanged<GamePlayOutcome> onFinished,
+    required VoidCallback onRestart,
+  }) {
+    return TetrisGame(
+      key: key,
+      onFinished: onFinished,
+      level: level,
+      onRestart: onRestart,
+    );
+  }
+}
+
 /// 流程注册表：game.code → adapter。
 ///
 /// 新游戏接入：实现 [GameFlowAdapter] 后在此注册一行即可复用全链路。
@@ -138,6 +177,7 @@ class GameFlowRegistry {
     _SheepAdapter().code: _SheepAdapter(),
     _G2048Adapter().code: _G2048Adapter(),
     _Match3Adapter().code: _Match3Adapter(),
+    _TetrisAdapter().code: _TetrisAdapter(),
   };
 
   /// 取适配器；未注册的游戏返回 null（调用方回落「该游戏暂未实现」占位）。

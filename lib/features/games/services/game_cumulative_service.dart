@@ -9,6 +9,7 @@ import '../../../services/supabase_service.dart';
 /// - clear：累计通关次数（通关 +1）
 /// - merge：累计合成次数（g2048，当局引擎上报 merges 增量）
 /// - clear_blocks：累计消除方块数（消消乐，当局引擎上报 cleared_blocks 增量）
+/// - lines：累计消行数（俄罗斯方块，当局引擎上报 lines 增量，2026-10-09）
 class GameCumulativeMetrics {
   GameCumulativeMetrics._();
 
@@ -16,9 +17,16 @@ class GameCumulativeMetrics {
   static const String clear = 'clear';
   static const String merge = 'merge';
   static const String clearBlocks = 'clear_blocks';
+  static const String lines = 'lines';
 
   /// 全部支持指标（判定时取全量，避免逐指标查存储）
-  static const List<String> all = <String>[play, clear, merge, clearBlocks];
+  static const List<String> all = <String>[
+    play,
+    clear,
+    merge,
+    clearBlocks,
+    lines,
+  ];
 }
 
 /// 累计型成就计数服务（cumulative 条件判定的数据源）。
@@ -61,6 +69,8 @@ class GameCumulativeService {
         GameCumulativeMetrics.merge: values['merges']!.toInt(),
       if (values['cleared_blocks'] != null)
         GameCumulativeMetrics.clearBlocks: values['cleared_blocks']!.toInt(),
+      if (values['lines'] != null && gameCode == 'tetris')
+        GameCumulativeMetrics.lines: values['lines']!.toInt(),
     }..removeWhere((_, v) => v == 0);
     if (deltas.isEmpty) return;
 

@@ -46,6 +46,8 @@ GameGuideInfo gameGuideOf(GameModel game) {
       return _sheepGuide(game);
     case 'g2048':
       return _g2048Guide(game);
+    case 'tetris':
+      return _tetrisGuide(game);
     default:
       return GameGuideInfo(title: game.name);
   }
@@ -152,6 +154,31 @@ GameGuideInfo _g2048Guide(GameModel game) {
         title: '策略',
         body: '尽量把最大数字固定在角落，并让各行/列保持由大到小的梯度，'
             '留出移动空间，避免被小数字堵死。',
+      ),
+    ],
+  );
+}
+
+GameGuideInfo _tetrisGuide(GameModel game) {
+  return GameGuideInfo(
+    title: '俄罗斯方块',
+    intro: _introOf(game, '拖动下落的方块填满整行即可消除。'
+        '左右滑移动、点按旋转、下滑软降、快速下滑硬降；'
+        '消多行、连消与 T 型旋入可获得高额加成。下面按模式分别说明：'),
+    sections: <GameGuideSection>[
+      _rulesSection(
+        game,
+        title: '基本规则',
+        fallbackBody: '方块落定后整行填满即消除并得分：1/2/3/4 行分别得 '
+            '100/300/500/800 × 等级；连续消行有连击加成，连续 4 消或 T 旋'
+            '触发 B2B 倍率，一次清空全场另有全清大奖。堆到顶部即结束。',
+      ),
+      ..._modeSectionsOf(game, (_) => null),
+      const GameGuideSection(
+        title: '技巧',
+        body: '尽量在场地边缘留出竖直长井等长条方块；T 型块旋入凹槽'
+            '（T-SPIN）分数远高于普通消除；闪电模式中保持连续消行'
+            '可叠升 Frenzy 倍率，断连会立即回落。',
       ),
     ],
   );
