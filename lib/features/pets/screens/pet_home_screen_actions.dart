@@ -220,6 +220,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     );
     if (active != null && active != _activeScene && mounted) {
       setState(() => _activeScene = active);
+      _load(); // 购买扣了金币，首页金币徽章需要新余额
     }
   }
 
