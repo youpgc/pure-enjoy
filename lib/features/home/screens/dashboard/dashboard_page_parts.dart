@@ -65,7 +65,6 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
       _loadToolConfig(),
       _loadHabitsForCheckin(),
       _loadAnnouncements(),
-      _loadPetGate(),
     ]);
   }
 
