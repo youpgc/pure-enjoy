@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import 'package:pure_enjoy/core/theme/app_theme.dart';
+
 import './game_total_dashboard.dart';
 import '../game_home_screen.dart';
 import '../shared/duration_format.dart';
@@ -178,15 +180,18 @@ class _GameBannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 圆角跟随全局配置（cardTheme 的 cardRadius，2026-10-10 调整）
-    final BorderRadius radius =
-        ((Theme.of(context).cardTheme.shape is RoundedRectangleBorder)
-                ? (Theme.of(context).cardTheme.shape!
-                    as RoundedRectangleBorder)
-                : const RoundedRectangleBorder(
-                    borderRadius: BorderRadius.all(Radius.circular(8))))
-            .borderRadius
-            as BorderRadius;
+    // 个性化配置接入（2026-10-10）：圆角跟随 UI 风格 token（简约扁平 8 /
+    // 锐利极简 4 / 胶囊现代 18…），投影与边框跟随全局「开启阴影/显示边框」
+    // 开关，暗色模式下渐变整体压暗。
+    final radius = BorderRadius.circular(
+        UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius);
+    final elevation = AppTheme.cardElevation(context);
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colors = isDark
+        ? _colors
+            .map((c) => Color.lerp(c, const Color(0xFF10131F), 0.35)!)
+            .toList()
+        : _colors;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -200,15 +205,19 @@ class _GameBannerCard extends StatelessWidget {
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
-              colors: _colors,
+              colors: colors,
             ),
-            boxShadow: <BoxShadow>[
-              BoxShadow(
-                color: _colors.last.withValues(alpha: 0.45),
-                blurRadius: 10,
-                offset: const Offset(0, 4),
-              ),
-            ],
+            border: Border.fromBorderSide(
+                AppTheme.cardBorderSide(context, colors.last)),
+            boxShadow: elevation > 0
+                ? <BoxShadow>[
+                    BoxShadow(
+                      color: AppTheme.cardShadowColor(colors.last),
+                      blurRadius: 10,
+                      offset: const Offset(0, 4),
+                    ),
+                  ]
+                : null,
           ),
           child: ClipRRect(
             borderRadius: radius,
