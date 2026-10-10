@@ -44,53 +44,56 @@ extension _TetrisInputOps on _TetrisGameState {
     );
   }
 
-  /// 底部操作按钮行（2026-10-10 市场风格二次设计）：
-  /// 橘红渐变方块圆角键、白色图标+文案、按下缩放/变深+触觉反馈；
-  /// 「旋转」为最高频主键（更大更亮），←/→/↓ 支持长按连发。
+  /// 底部操作按钮行（2026-10-10 三稿）：按钮 Expanded 等分铺满底部栏、
+  /// 间距仅 4px、高度加大；「旋转」主键用更亮渐变区分。
   /// config `buttons:false` 时整行不渲染。
   Widget _buildControlBar() {
     if (!_buttonsEnabled) return const SizedBox.shrink();
     final canHold =
         _holdEnabled && !_holdUsed && _current != null && !_finished;
+    Widget cell(Widget child) => Expanded(
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 2),
+            child: child,
+          ),
+        );
     return SafeArea(
       top: false,
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(10, 4, 10, 8),
+        padding: const EdgeInsets.fromLTRB(4, 4, 4, 4),
         child: Row(
-          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-          crossAxisAlignment: CrossAxisAlignment.end,
           children: <Widget>[
-            _TetrisActionButton(
+            cell(_TetrisActionButton(
               icon: Icons.swap_vert_circle_outlined,
               label: '暂存',
               dimmed: !canHold,
               onTap: canHold ? _holdPiece : null,
-            ),
-            _TetrisActionButton(
+            )),
+            cell(_TetrisActionButton(
               icon: Icons.rotate_right,
               label: '旋转',
               primary: true,
               onTap: _finished ? null : () => _rotatePiece(1),
-            ),
-            _TetrisActionButton(
+            )),
+            cell(_TetrisActionButton(
               icon: Icons.arrow_back,
               label: '左移',
               onTap: _finished ? null : () => _moveHorizontal(-1),
               repeatStep: _finished ? null : () => _moveHorizontal(-1),
-            ),
-            _TetrisActionButton(
+            )),
+            cell(_TetrisActionButton(
               icon: Icons.arrow_downward,
               label: '软降',
               onTap: _finished ? null : _softDropStep,
               repeatStep: _finished ? null : _softDropStep,
               repeatInterval: const Duration(milliseconds: 60),
-            ),
-            _TetrisActionButton(
+            )),
+            cell(_TetrisActionButton(
               icon: Icons.arrow_forward,
               label: '右移',
               onTap: _finished ? null : () => _moveHorizontal(1),
               repeatStep: _finished ? null : () => _moveHorizontal(1),
-            ),
+            )),
           ],
         ),
       ),
@@ -101,8 +104,9 @@ extension _TetrisInputOps on _TetrisGameState {
 /// 橘红方块圆角操作键（休闲手游立体按键风格）：
 /// - 渐变底（上亮下深）+ 顶部高光条 + 橘色投影 →「方块糖」质感；
 /// - 白色图标 + 白色文案；
-/// - 按下反馈：缩放至 0.88 + 渐变换深 + 轻触觉（AnimatedScale 平滑恢复）；
+/// - 按下反馈：缩放至 0.95 + 渐变换深 + 轻触觉（AnimatedScale 平滑恢复）；
 /// - [repeatStep] 非空支持长按连发（默认 110ms，软降 60ms）。
+/// 宽度由父级 Expanded 等分（铺满底部栏），高度 76px（主键 82px）。
 class _TetrisActionButton extends StatefulWidget {
   final IconData icon;
   final String label;
@@ -114,7 +118,7 @@ class _TetrisActionButton extends StatefulWidget {
   final VoidCallback? repeatStep;
   final Duration repeatInterval;
 
-  /// 主键（旋转）：更大、渐变更亮
+  /// 主键（旋转）：渐变更亮
   final bool primary;
 
   /// 置灰（如 HOLD 已用/对局结束）：保形降饱和
@@ -144,7 +148,7 @@ class _TetrisActionButtonState extends State<_TetrisActionButton> {
   static const Color _cBottomDeep = Color(0xFFC93E0E);
   static const Color _cShadow = Color(0x40F2571B);
 
-  double get _size => widget.primary ? 68 : 58;
+  double get _height => widget.primary ? 82 : 76;
 
   void _setPressed(bool v) {
     if (_pressed == v) return;
@@ -195,17 +199,17 @@ class _TetrisActionButtonState extends State<_TetrisActionButton> {
               _stopRepeat();
             },
       child: AnimatedScale(
-        scale: _pressed ? 0.88 : 1.0,
+        scale: _pressed ? 0.95 : 1.0,
         duration: const Duration(milliseconds: 80),
         curve: Curves.easeOut,
         child: AnimatedOpacity(
           opacity: disabled && widget.dimmed ? 0.45 : 1.0,
           duration: const Duration(milliseconds: 120),
           child: Container(
-            width: _size,
-            height: _size,
+            width: double.infinity,
+            height: _height,
             decoration: BoxDecoration(
-              borderRadius: BorderRadius.circular(widget.primary ? 20 : 17),
+              borderRadius: BorderRadius.circular(18),
               gradient: LinearGradient(
                 begin: Alignment.topCenter,
                 end: Alignment.bottomCenter,
@@ -229,11 +233,11 @@ class _TetrisActionButtonState extends State<_TetrisActionButton> {
                 // 顶部高光条（立体质感，按下时隐去）
                 if (!_pressed)
                   Positioned(
-                    left: 8,
-                    right: 8,
+                    left: 10,
+                    right: 10,
                     top: 4,
                     child: Container(
-                      height: _size * 0.22,
+                      height: _height * 0.18,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
                         color: Colors.white.withValues(alpha: 0.22),
@@ -244,14 +248,12 @@ class _TetrisActionButtonState extends State<_TetrisActionButton> {
                   child: Column(
                     mainAxisSize: MainAxisSize.min,
                     children: <Widget>[
-                      Icon(widget.icon,
-                          size: widget.primary ? 28 : 24,
-                          color: Colors.white),
-                      const SizedBox(height: 2),
+                      Icon(widget.icon, size: 26, color: Colors.white),
+                      const SizedBox(height: 3),
                       Text(
                         widget.label,
                         style: const TextStyle(
-                          fontSize: 9,
+                          fontSize: 11,
                           fontWeight: FontWeight.bold,
                           color: Colors.white,
                           height: 1,
