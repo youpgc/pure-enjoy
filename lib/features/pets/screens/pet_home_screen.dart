@@ -106,6 +106,18 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 只按它守卫会跳过清除渲染 → 蒙层冻在「1秒」（2026-10-10 修）
   bool _wasCooling = false;
 
+  /// 底部状态面板实测高度：切换箭头按「面板顶 + 10px」对位（首帧前用兜底值）
+  final GlobalKey _panelKey = GlobalKey();
+  double _panelH = 168;
+
+  /// 每帧后量一次面板高度；变化超 0.5px 才重建（防测量循环）
+  void _measurePanel() {
+    final h = _panelKey.currentContext?.size?.height;
+    if (h != null && h > 0 && (h - _panelH).abs() > 0.5 && mounted) {
+      setState(() => _panelH = h);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
@@ -253,6 +265,8 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   @override
   Widget build(BuildContext context) {
+    // 面板高度随内容（历险提示行出现/消失）浮动，每帧后量一次供箭头对位
+    WidgetsBinding.instance.addPostFrameCallback((_) => _measurePanel());
     return Scaffold(body: _buildBody(Theme.of(context).colorScheme));
   }
 

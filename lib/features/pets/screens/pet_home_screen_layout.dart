@@ -13,9 +13,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
   Widget _stage() {
     final pet = _currentPet!;
     return Positioned.fill(
-      // 底部让位状态面板（名牌+四维沉底），其余方向居中
+      // 底部让位状态面板（让位高度=面板实测值，随内容浮动），其余方向居中
       child: Padding(
-        padding: const EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, 128),
+        padding: EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, _panelH),
         // 宠物整体下沉 20%（粒子层同坐标系随动，FX 锚点不脱节）
         child: FractionalTranslation(
           translation: const Offset(0, 0.2),
@@ -61,17 +61,22 @@ extension _PetHomeLayout on _PetHomeScreenState {
   void _onStageDoubleTap() => _playAction(PetAction.petted);
 
   List<Widget> _switchArrows() => [
-        // 沉底贴边：底缘对齐状态面板让位线（128），左右 12px 贴屏边
-        Positioned(
-          left: 12, bottom: 132,
-          child: PetSwitchArrow(
-              icon: Icons.chevron_left, onTap: () => _switchPet(-1)),
-        ),
-        Positioned(
-          right: 12, bottom: 132,
-          child: PetSwitchArrow(
-              icon: Icons.chevron_right, onTap: () => _switchPet(1)),
-        ),
+        // 沉底贴边：底缘 = 面板实测顶 + 10px（随历险提示行出现/消失自适应）
+        for (final left in const [true, false])
+          Positioned(
+            left: left ? 12 : null,
+            right: left ? null : 12,
+            bottom: 0,
+            child: SafeArea(
+              top: false,
+              child: Padding(
+                padding: EdgeInsets.only(bottom: _panelH + 10),
+                child: PetSwitchArrow(
+                    icon: left ? Icons.chevron_left : Icons.chevron_right,
+                    onTap: () => _switchPet(left ? -1 : 1)),
+              ),
+            ),
+          ),
       ];
 
   // ---------- 顶部通知横幅（历险状态） ----------
@@ -103,7 +108,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
       left: 0,
       right: 0,
       bottom: 0,
+      // key 挂 SafeArea：实测整块面板高度（含手势条安全区），供箭头/舞台对位
       child: SafeArea(
+        key: _panelKey,
         top: false,
         child: Padding(
           padding: const EdgeInsets.fromLTRB(8, 0, 8, 10),
