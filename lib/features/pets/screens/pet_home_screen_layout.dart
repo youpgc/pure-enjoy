@@ -251,8 +251,8 @@ extension _PetHomeLayout on _PetHomeScreenState {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            PetGoldBadgeCore(gold: _summary?.wallet.goldBalance ?? 0),
-            const SizedBox(height: 10),
+            // 金币展示已隐藏（2026-10-10）：余额看「更多 → 金币钱包」
+            const SizedBox(height: 6),
             PetEdgeButton(
                 icon: Icons.restaurant,
                 label: _feedLabel,
