@@ -323,6 +323,8 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
   /// 使用道具：确认弹窗 → 引擎执行 → 成功才扣券（两段式延迟扣券）。
   Future<void> _useProp(TetrisPropSlot s) async {
     if (_finished || !s.available) return;
+    // 消行闪烁动画中禁止使用（laser/quake 与动画后的删行会并发冲突）
+    if (_flashTimer != null || _flashRows.isNotEmpty) return;
     final label = (s.item?.name.isNotEmpty ?? false)
         ? s.item!.name
         : (_propLabels[s.itemType] ?? s.itemType);

@@ -36,6 +36,9 @@ extension _TetrisGarbageOps on _TetrisGameState {
   /// 返回 false = 顶部溢出（原顶行有块或当前块上移后碰撞），调用方结算 Block Out。
   bool _pushGarbageRow() {
     if (_finished) return true;
+    // 消行闪烁中跳过本次顶起：整盘上移会让 _flashRows 行号错位、
+    // 动画结束时删错行（闪烁窗口仅 ~360ms，顺延一个周期无感知）
+    if (_flashRows.isNotEmpty) return true;
     // 溢出判定：顶行已有块，顶起即出界
     if (_board[0].any((c) => c != null)) return false;
     _board.removeAt(0);

@@ -109,8 +109,13 @@ class _TetrisGameState extends State<TetrisGame> {
   Timer? _gravityTimer;
   Timer? _lockTimer;
   Timer? _tickTimer; // blitz 倒计时 / survival 顶起倒计时轮询
+  Timer? _flashTimer; // 消行闪烁动画（90ms × 4 相位）
   int _lockResets = 0;
   int _lastTickSecond = -1;
+
+  /// 消行闪烁动画：正在闪烁的满行行号 + 当前相位（0..3，亮暗交替）
+  List<int> _flashRows = <int>[];
+  int _flashPhase = 0;
 
   /// 消行大字特效（board 上层浮现）
   final List<_TetrisFx> _fxMessages = <_TetrisFx>[];
@@ -233,6 +238,9 @@ class _TetrisGameState extends State<TetrisGame> {
       v is int ? v : (v is num ? v.toInt() : fallback);
 
   void _reset() {
+    _flashTimer?.cancel();
+    _flashRows = <int>[];
+    _flashPhase = 0;
     _board = List<List<int?>>.generate(
         kTetrisRows, (_) => List<int?>.filled(kTetrisCols, null));
     _boardRev++;
@@ -361,6 +369,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _cancelLockTimer();
     _tickTimer?.cancel();
     _garbageTimer?.cancel();
+    _flashTimer?.cancel();
     super.dispose();
   }
 
@@ -373,6 +382,8 @@ class _TetrisGameState extends State<TetrisGame> {
     _cancelLockTimer();
     _tickTimer?.cancel();
     _garbageTimer?.cancel();
+    _flashTimer?.cancel();
+    _flashRows = <int>[];
     if (cleared) {
       GameAudio.instance.win();
       // 每日挑战：通关写本地完成标记（当日模式卡置灰；奖励走 daily_first_clear

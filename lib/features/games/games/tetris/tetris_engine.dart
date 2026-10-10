@@ -361,7 +361,10 @@ extension _TetrisEngineOps on _TetrisGameState {
     return isFull ? _TetrisSpin.full : _TetrisSpin.mini;
   }
 
-  /// 锁定当前块：写盘 → T-Spin 判定 → 消行 → 计分 → 通关/续 spawn。
+  /// 锁定当前块：写盘 → T-Spin 判定 → 满行检测。
+  /// 有消行时先播放闪烁动画（_flashRows 白色高亮 4 相位 ~360ms，2026-10-10
+  /// 用户反馈「瞬间消失太生硬」），动画结束在 [_finishLineClear] 真正删行计分；
+  /// 无消行走原路径直接结算。
   void _lockPiece() {
     final p = _current;
     if (p == null || _finished) return;
@@ -379,19 +382,36 @@ extension _TetrisEngineOps on _TetrisGameState {
     _cancelLockTimer();
     _lockResets = 0;
 
-    var cleared = 0;
-    for (var r = kTetrisRows - 1; r >= 0; r--) {
-      if (_board[r].every((c) => c != null)) {
-        // 被消行含垃圾砖则计入挖掘统计（dig/digger 成就数据源）
-        if (_board[r].contains(kGarbageColorIndex)) _garbageCleared++;
-        _board.removeAt(r);
-        _board.insert(0, List<int?>.filled(kTetrisCols, null));
-        cleared++;
-        r++; // 行下移后原索引重新检查
-      }
+    // 满行检测
+    final full = <int>[
+      for (var r = 0; r < kTetrisRows; r++)
+        if (_board[r].every((c) => c != null)) r,
+    ];
+    if (full.isNotEmpty) {
+      // 消行动画：保留被消行原样，白色高亮一亮一暗闪 4 相位
+      _flashRows = full;
+      _flashPhase = 0;
+      _boardRev++;
+      GameAudio.instance.lineClear(full.length);
+      GameAudio.instance
+          .haptic(full.length >= 4 ? GameHaptic.heavy : GameHaptic.medium);
+      if (mounted) setState(() {});
+      _flashTimer?.cancel();
+      _flashTimer = Timer.periodic(const Duration(milliseconds: 90), (t) {
+        _flashPhase++;
+        if (_flashPhase >= 4) {
+          t.cancel();
+          _finishLineClear(spin);
+          return;
+        }
+        _boardRev++;
+        if (mounted) setState(() {});
+      });
+      return;
     }
-    if (cleared > 0) _boardRev++;
-    _applyClearScore(cleared, spin);
+
+    // 无消行：空锁定也要给 combo 断链语义（_applyClearScore(0)）
+    _applyClearScore(0, spin);
 
     // 挑战模式块数耗尽：spawn 前结算
     if (_piecesLimit != null && _piecesPlaced >= _piecesLimit!) {
@@ -478,9 +498,7 @@ extension _TetrisEngineOps on _TetrisGameState {
       if (isB2BMove && b2bApplied) _pushFx('B2B');
       // 速度等级（仅 marathon 局内加速）：每 levelUpLines 行间隔 ×speedFactor
       _applyFallSpeed();
-      GameAudio.instance.lineClear(lines);
-      GameAudio.instance
-          .haptic(lines >= 4 ? GameHaptic.heavy : GameHaptic.medium);
+      // 消行音效/触觉已在闪烁动画开始时播放（_lockPiece），此处不重复
     }
 
     // 计分等级随消行增长（全模式）
@@ -531,6 +549,37 @@ extension _TetrisEngineOps on _TetrisGameState {
         break;
     }
     return false;
+  }
+
+  /// 消行闪烁动画结束：真正删行（含垃圾砖统计）→ 计分 → 通关/续 spawn。
+  void _finishLineClear(_TetrisSpin? spin) {
+    if (_finished) return; // 闪烁期间对局可能已被超时/放弃路径结束
+    final n = _flashRows.length;
+    // 垃圾砖统计在删前进行（dig/digger 成就数据源）
+    for (final r in _flashRows) {
+      if (_board[r].contains(kGarbageColorIndex)) _garbageCleared++;
+    }
+    // 重建棋盘：剔除被消行、顶部补等量空行（保持行序，等价 removeAt+insert）
+    final kept = <List<int?>>[
+      for (var r = 0; r < kTetrisRows; r++)
+        if (!_flashRows.contains(r)) _board[r],
+    ];
+    _board = <List<int?>>[
+      for (var i = 0; i < n; i++) List<int?>.filled(kTetrisCols, null),
+      ...kept,
+    ];
+    _flashRows = <int>[];
+    _boardRev++;
+    _applyClearScore(n, spin);
+
+    // 挑战模式块数耗尽：spawn 前结算（计分后用最新分判定，比一期更准确）
+    if (_piecesLimit != null && _piecesPlaced >= _piecesLimit!) {
+      _finish(_score >= _scoreTarget);
+      return;
+    }
+    if (_checkWin()) return;
+    _holdUsed = false;
+    _spawnPiece();
   }
 
   /// Block Out（顶死）结算：达标仍算通关（最后一消恰好达标、顶死在后的情况）。

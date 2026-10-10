@@ -127,6 +127,8 @@ extension _TetrisBoardOps on _TetrisGameState {
                       boardRev: _boardRev,
                       current: _current,
                       ghostY: _ghostEnabled && _current != null ? _ghostY() : null,
+                      flashRows: _flashRows,
+                      flashPhase: _flashPhase,
                     ),
                   ),
                 ),
@@ -169,7 +171,7 @@ extension _TetrisBoardOps on _TetrisGameState {
   }
 }
 
-/// 棋盘画笔：网格 + 已落块 + ghost + 当前方块。
+/// 棋盘画笔：网格 + 已落块 + ghost + 当前方块 + 消行闪烁覆盖。
 class _TetrisBoardPainter extends CustomPainter {
   final List<List<int?>> board;
 
@@ -178,11 +180,17 @@ class _TetrisBoardPainter extends CustomPainter {
   final Piece? current;
   final int? ghostY;
 
+  /// 消行闪烁中的满行行号与相位（0..3，一亮一暗交替，空=无动画）
+  final List<int> flashRows;
+  final int flashPhase;
+
   _TetrisBoardPainter({
     required this.board,
     required this.boardRev,
     required this.current,
     required this.ghostY,
+    this.flashRows = const <int>[],
+    this.flashPhase = 0,
   });
 
   @override
@@ -240,6 +248,24 @@ class _TetrisBoardPainter extends CustomPainter {
         _drawCell(canvas, (cur.x + p.x) * cell, y * cell, cell, color);
       }
     }
+    // 消行闪烁覆盖：白色高亮一亮一暗（相位 0/2 亮、1/3 暗），动画结束删行
+    if (flashRows.isNotEmpty) {
+      final bright = flashPhase.isEven;
+      final alpha = bright ? 0.92 : 0.30;
+      final flashPaint = Paint()..color = Colors.white.withValues(alpha: alpha);
+      for (final r in flashRows) {
+        if (r < 0 || r >= kTetrisRows) continue;
+        canvas.drawRect(
+            Rect.fromLTWH(0, r * cell, size.width, cell), flashPaint);
+        // 亮相位叠加一抹主题橙，呼应按钮/方块配色
+        if (bright) {
+          canvas.drawRect(
+            Rect.fromLTWH(0, r * cell, size.width, cell * 0.3),
+            Paint()..color = const Color(0xFFFFB74D).withValues(alpha: 0.55),
+          );
+        }
+      }
+    }
   }
 
   /// 单格：圆角矩形 + 左上高光（Block Blast 式爽感反馈的最小实现）。
@@ -282,6 +308,8 @@ class _TetrisBoardPainter extends CustomPainter {
       old.boardRev != boardRev ||
       old.current != current ||
       old.ghostY != ghostY ||
+      old.flashPhase != flashPhase ||
+      old.flashRows.length != flashRows.length ||
       !identical(old.board, board);
 }
 
