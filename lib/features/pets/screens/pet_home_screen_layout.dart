@@ -117,10 +117,14 @@ extension _PetHomeLayout on _PetHomeScreenState {
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
-              if (pet.status == PetPetStatus.adventuring) ...[
-                const PetAdventureNote(),
-                const SizedBox(height: 6),
-              ],
+              // 固定占位槽（30px）：历险提示行出现/消失不改变面板总高——
+              // 切换箭头「面板顶 + 10px」对位恒定，不因场中新增元素偏移
+              SizedBox(
+                height: 30,
+                child: pet.status == PetPetStatus.adventuring
+                    ? const Center(child: PetAdventureNote())
+                    : null,
+              ),
               PetBottomStatusCard(
                   pet: pet,
                   expNeed: petExpNeed(pet.level, _summary?.config),
