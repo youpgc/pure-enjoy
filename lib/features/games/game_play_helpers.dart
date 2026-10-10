@@ -250,11 +250,17 @@ Future<GameSettlementResult?> reportAndSettle({
   // 不下发弹窗，避免出现未转译的维度编码标签。
   // level 为三游戏通用展示项（关序，弹窗有中文兜底），保留；
   // 维度配置异常（空）时退化为展示原值，避免成绩区空白。
+  // 0 值维度不展示（2026-10-10 用户反馈）：满屏 0 无信息量，且四消/T-Spin
+  // 等维度只有在真正发生时才值得出现——值为 0 一律隐藏，>0 才展示。
   final displayValues = dims.isEmpty
-      ? scoreValuesByCode
+      ? <String, num>{
+          for (final e in scoreValuesByCode.entries)
+            if (e.value != 0) e.key: e.value,
+        }
       : <String, num>{
           for (final e in scoreValuesByCode.entries)
-            if (dims.any((d) => d.code == e.key) || e.key == 'level')
+            if ((dims.any((d) => d.code == e.key) || e.key == 'level') &&
+                e.value != 0)
               e.key: e.value,
         };
 
