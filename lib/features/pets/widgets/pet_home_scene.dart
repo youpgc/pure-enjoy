@@ -391,13 +391,19 @@ class PetBottomStatusCard extends StatelessWidget {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          width: displayText == null ? 26 : 64,
-          child: Text(displayText ?? '$value',
-              textAlign: TextAlign.right,
-              style: const TextStyle(
-                  fontSize: 11,
-                  fontWeight: FontWeight.w600,
-                  color: Color(0xFFF5EFE4))),
+          // 数值格全行统一宽度：经验行 exp/need 与单值行（饱食 85 等）右端对齐，
+          // 五条进度条右缘齐平；FittedBox 防高等级 '1094189813/1094189813' 溢出
+          width: 64,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: Alignment.centerRight,
+            child: Text(displayText ?? '$value',
+                textAlign: TextAlign.right,
+                style: const TextStyle(
+                    fontSize: 11,
+                    fontWeight: FontWeight.w600,
+                    color: Color(0xFFF5EFE4))),
+          ),
         ),
       ],
     );
