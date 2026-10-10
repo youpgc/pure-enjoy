@@ -373,6 +373,7 @@ extension _TetrisEngineOps on _TetrisGameState {
         _board[r][col] = p.type.index;
       }
     }
+    _boardRev++;
     _current = null;
     _piecesPlaced++;
     _cancelLockTimer();
@@ -387,6 +388,7 @@ extension _TetrisEngineOps on _TetrisGameState {
         r++; // 行下移后原索引重新检查
       }
     }
+    if (cleared > 0) _boardRev++;
     _applyClearScore(cleared, spin);
 
     // 挑战模式块数耗尽：spawn 前结算
@@ -451,7 +453,10 @@ extension _TetrisEngineOps on _TetrisGameState {
     }
 
     if (_frenzyEnabled && lines > 0) {
-      final mult = 1 + 0.5 * min(_combo, 6);
+      // Frenzy 断连规则：倒计时最后 10s 倍率强制归 1（终局不加成）
+      final mult = (_timeLimit != null && _remainingSeconds() <= 10)
+          ? 1.0
+          : 1 + 0.5 * min(_combo, 6);
       gain = (gain * mult).round();
     }
 
@@ -462,7 +467,7 @@ extension _TetrisEngineOps on _TetrisGameState {
       if (lines == 4) {
         _pushFx('TETRIS!');
       } else if (spin == _TetrisSpin.full) {
-        _pushFx('T-SPIN ${lines > 0 ? '$lines 行' : ''}');
+        _pushFx(lines > 0 ? 'T-SPIN $lines 行' : 'T-SPIN');
       } else if (spin == _TetrisSpin.mini) {
         _pushFx('T-SPIN MINI');
       } else if (_combo >= 2) {

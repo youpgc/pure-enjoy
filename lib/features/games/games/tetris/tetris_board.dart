@@ -85,16 +85,17 @@ extension _TetrisBoardOps on _TetrisGameState {
             ),
             child: ClipRRect(
               borderRadius: BorderRadius.circular(6.5),
-              child: _buildTetrisGestureArea(
-                child: CustomPaint(
-                  size: Size(cell * kTetrisCols, cell * kTetrisRows),
-                  painter: _TetrisBoardPainter(
-                    board: _board,
-                    current: _current,
-                    ghostY: _ghostEnabled && _current != null ? _ghostY() : null,
+                child: _buildTetrisGestureArea(
+                  child: CustomPaint(
+                    size: Size(cell * kTetrisCols, cell * kTetrisRows),
+                    painter: _TetrisBoardPainter(
+                      board: _board,
+                      boardRev: _boardRev,
+                      current: _current,
+                      ghostY: _ghostEnabled && _current != null ? _ghostY() : null,
+                    ),
                   ),
                 ),
-              ),
             ),
           ),
         );
@@ -137,11 +138,15 @@ extension _TetrisBoardOps on _TetrisGameState {
 /// 棋盘画笔：网格 + 已落块 + ghost + 当前方块。
 class _TetrisBoardPainter extends CustomPainter {
   final List<List<int?>> board;
+
+  /// 棋盘内容版本号（board 原地写改时递增，见宿主 [_TetrisGameState._boardRev]）
+  final int boardRev;
   final Piece? current;
   final int? ghostY;
 
   _TetrisBoardPainter({
     required this.board,
+    required this.boardRev,
     required this.current,
     required this.ghostY,
   });
@@ -217,6 +222,7 @@ class _TetrisBoardPainter extends CustomPainter {
 
   @override
   bool shouldRepaint(_TetrisBoardPainter old) =>
+      old.boardRev != boardRev ||
       old.current != current ||
       old.ghostY != ghostY ||
       !identical(old.board, board);

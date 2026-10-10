@@ -110,6 +110,11 @@ class _TetrisGameState extends State<TetrisGame> {
   /// 消行大字特效（board 上层浮现）
   final List<_TetrisFx> _fxMessages = <_TetrisFx>[];
 
+  /// 棋盘内容版本号：board 原地写改（锁定/消行/重置）时递增，
+  /// 供 painter shouldRepaint 精确判重（不依赖 current 间接覆盖——
+  /// 二期 garbage 顶起只改 board 不动 current，无此旗标会漏重绘）。
+  int _boardRev = 0;
+
   /// 手势用单格尺寸（board 布局时回填）
   double _cellExtent = 24;
 
@@ -168,6 +173,7 @@ class _TetrisGameState extends State<TetrisGame> {
   void _reset() {
     _board = List<List<int?>>.generate(
         kTetrisRows, (_) => List<int?>.filled(kTetrisCols, null));
+    _boardRev++;
     _bag.clear();
     _queue.clear();
     while (_queue.length <= _nextPreview) {
@@ -326,7 +332,12 @@ class _TetrisGameState extends State<TetrisGame> {
     }
   }
 
-  /// Frenzy 当前倍率（blitz 专属；×1 不展示）。
+  /// Frenzy 当前倍率（blitz 专属；×1 不展示；终局最后 10s 归 1 与计分同口径）。
+  bool get _frenzyActive =>
+      _frenzyEnabled &&
+      _combo >= 1 &&
+      !(_timeLimit != null && _remainingSeconds() <= 10);
+
   double get _frenzyMult => 1 + 0.5 * min(_combo, 6);
 
   @override
@@ -348,7 +359,7 @@ class _TetrisGameState extends State<TetrisGame> {
           ),
         GameStatusItem(label: '消行', value: '$_linesTotal'),
         GameStatusItem(label: '等级', value: '$_scoreLevel'),
-        if (_frenzyEnabled && _combo >= 1)
+        if (_frenzyEnabled && _frenzyActive)
           GameStatusItem(
             label: 'Frenzy',
             value: '×${_frenzyMult.toStringAsFixed(1)}',
