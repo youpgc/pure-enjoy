@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-import 'package:pure_enjoy/core/theme/app_theme.dart';
 import './game_total_dashboard.dart';
 import '../game_home_screen.dart';
 import '../shared/duration_format.dart';
@@ -127,67 +126,218 @@ class _GameHallPageState extends State<GameHallPage> {
               onRefresh: () => _load(refresh: true),
               child: games.isEmpty
                   ? (_loading
-                      // 网格区局部 loading（规范：禁止整页 loading）
+                      // 局部 loading（规范：禁止整页 loading）
                       ? const GameLocalLoading(label: '游戏加载中…')
                       : const Center(child: Text('暂无可用游戏')))
-                  : GridView.builder(
-                      padding: const EdgeInsets.all(16),
+                  : ListView.separated(
+                      padding: const EdgeInsets.all(12),
                       itemCount: games.length,
-                      gridDelegate:
-                          const SliverGridDelegateWithFixedCrossAxisCount(
-                        crossAxisCount: 2,
-                        mainAxisSpacing: 16,
-                        crossAxisSpacing: 16,
-                        childAspectRatio: 0.85,
-                      ),
+                      separatorBuilder: (_, __) => const SizedBox(height: 12),
                       itemBuilder: (ctx, i) {
                         final game = games[i];
                         final best = _primaryBest(game.id);
-                        return InkWell(
+                        return _GameBannerCard(
+                          game: game,
+                          best: best,
+                          fmtBest: best == null ? null : _fmtBest(best),
                           onTap: () => _openGame(game),
-                          borderRadius: BorderRadius.circular(16),
-                          child: Card(
-                            child: Padding(
-                              padding: const EdgeInsets.all(16),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.center,
-                                children: <Widget>[
-                                  SvgPicture.asset(gameCoverAsset(game.icon),
-                                      width: 48, height: 48),
-                                  const SizedBox(height: 12),
-                                  Text(game.name,
-                                      style: const TextStyle(
-                                          fontSize: 18,
-                                          fontWeight: FontWeight.bold)),
-                                  const SizedBox(height: 8),
-                                  if (best != null)
-                                    Column(
-                                      children: <Widget>[
-                                        Text(best.dimensionName,
-                                            style: const TextStyle(
-                                                fontSize: 12,
-                                                color: AppTheme.neutral600)),
-                                        Text(_fmtBest(best),
-                                            style: const TextStyle(
-                                              fontSize: 20,
-                                              fontWeight: FontWeight.bold,
-                                              color: AppTheme.success,
-                                            )),
-                                      ],
-                                    )
-                                  else
-                                    const Text('暂无成绩',
-                                        style: TextStyle(
-                                            fontSize: 12,
-                                            color: AppTheme.neutral500)),
-                                ],
-                              ),
-                            ),
-                          ),
                         );
                       },
                     ),
             ),
+    );
+  }
+}
+
+/// 游戏入口横幅卡（2026-10-10 大厅改版：一行一游戏、氛围化设计）。
+/// 结构：游戏专属渐变底 + 氛围装饰 SVG（透明底散布元素，缺失时纯渐变兜底）
+/// + 暗角遮罩保文字可读 + 前景（大图标 / 名称与简介 / 最佳成绩胶囊 / 开玩钮）。
+class _GameBannerCard extends StatelessWidget {
+  final GameModel game;
+  final GameBestScore? best;
+  final String? fmtBest;
+  final VoidCallback onTap;
+
+  const _GameBannerCard({
+    required this.game,
+    required this.best,
+    required this.fmtBest,
+    required this.onTap,
+  });
+
+  /// 游戏专属氛围渐变（未知游戏回落通用蓝紫）
+  static const Map<String, List<Color>> _gradients = <String, List<Color>>{
+    'match3': <Color>[Color(0xFFEC407A), Color(0xFF6A1B9A)],
+    'sheep': <Color>[Color(0xFF26A69A), Color(0xFF004D40)],
+    'g2048': <Color>[Color(0xFFFF7043), Color(0xFF8D2A0C)],
+    'tetris': <Color>[Color(0xFF3F51B5), Color(0xFF101331)],
+  };
+
+  List<Color> get _colors =>
+      _gradients[game.code] ?? const <Color>[Color(0xFF5C6BC0), Color(0xFF283593)];
+
+  @override
+  Widget build(BuildContext context) {
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Container(
+          height: 124,
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: _colors,
+            ),
+            boxShadow: <BoxShadow>[
+              BoxShadow(
+                color: _colors.last.withValues(alpha: 0.45),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
+              ),
+            ],
+          ),
+          child: ClipRRect(
+            borderRadius: BorderRadius.circular(20),
+            child: Stack(
+              fit: StackFit.expand,
+              children: <Widget>[
+                // 氛围装饰层：散布元素（资产缺失时 errorBuilder 渲染空，渐变兜底）
+                SvgPicture.asset(
+                  'assets/games/backgrounds/${game.code}.svg',
+                  fit: BoxFit.cover,
+                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                ),
+                // 暗角遮罩：左侧深、右侧浅，保证文字对比度
+                DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                      colors: <Color>[
+                        Colors.black.withValues(alpha: 0.34),
+                        Colors.black.withValues(alpha: 0.02),
+                      ],
+                    ),
+                  ),
+                ),
+                // 前景
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                  child: Row(
+                    children: <Widget>[
+                      // 游戏图标（白底圆角卡，突出主体）
+                      Container(
+                        width: 64,
+                        height: 64,
+                        decoration: BoxDecoration(
+                          color: Colors.white.withValues(alpha: 0.94),
+                          borderRadius: BorderRadius.circular(16),
+                          boxShadow: <BoxShadow>[
+                            BoxShadow(
+                              color: Colors.black.withValues(alpha: 0.25),
+                              blurRadius: 6,
+                              offset: const Offset(0, 2),
+                            ),
+                          ],
+                        ),
+                        padding: const EdgeInsets.all(7),
+                        child: SvgPicture.asset(
+                          gameCoverAsset(game.icon),
+                          errorBuilder: (_, __, ___) =>
+                              const Icon(Icons.sports_esports, size: 40),
+                        ),
+                      ),
+                      const SizedBox(width: 12),
+                      // 名称 + 简介 + 成绩
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: <Widget>[
+                            Text(
+                              game.name,
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: const TextStyle(
+                                fontSize: 20,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.white,
+                                shadows: <Shadow>[
+                                  Shadow(
+                                      color: Colors.black45, blurRadius: 4),
+                                ],
+                              ),
+                            ),
+                            const SizedBox(height: 3),
+                            Text(
+                              best == null
+                                  ? '尚未挑战 · 点击开玩'
+                                  : '${best!.dimensionName} · ${fmtBest ?? ''}',
+                              maxLines: 1,
+                              overflow: TextOverflow.ellipsis,
+                              style: TextStyle(
+                                fontSize: 12,
+                                color: Colors.white.withValues(alpha: 0.88),
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            // 最佳成绩胶囊
+                            if (best != null)
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                    horizontal: 8, vertical: 2),
+                                decoration: BoxDecoration(
+                                  color: Colors.black.withValues(alpha: 0.30),
+                                  borderRadius: BorderRadius.circular(20),
+                                ),
+                                child: Row(
+                                  mainAxisSize: MainAxisSize.min,
+                                  children: <Widget>[
+                                    const Icon(Icons.emoji_events,
+                                        size: 13, color: Color(0xFFFFD54F)),
+                                    const SizedBox(width: 4),
+                                    Flexible(
+                                      child: Text(
+                                        '最佳 ${fmtBest ?? ''}',
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                        style: const TextStyle(
+                                          fontSize: 11,
+                                          fontWeight: FontWeight.bold,
+                                          color: Color(0xFFFFD54F),
+                                        ),
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
+                      const SizedBox(width: 8),
+                      // 开玩钮
+                      Container(
+                        width: 42,
+                        height: 42,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          color: Colors.white.withValues(alpha: 0.92),
+                        ),
+                        child: const Icon(Icons.play_arrow_rounded,
+                            size: 30, color: Color(0xFFF2571B)),
+                      ),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 }

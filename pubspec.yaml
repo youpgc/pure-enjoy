@@ -93,6 +93,7 @@ flutter:
   assets:
     - assets/audio/
     - assets/games/icons/
+    - assets/games/backgrounds/
     - assets/games/achievements/
     - assets/games/match3/
     - assets/games/items/
@@ -104,3 +105,24 @@ flutter:
     - assets/pets/scenes/
     # 宠物道具/界面图标（洛克风 SVG，pet_items.icon 键 + 蛋组扩展位 + ui_* 四维/金币）
     - assets/pets/items/
+    # 宠物分层弯曲素材：assets/pets/anim/<评级>/<种属 code>/<阶 s0|s1|s2>/，
+    # 每目录 6 档表情帧（c1_neutral…c6_wide）。目录由
+    # `node pet_anim_demo/tools/export_app_render.mjs` 生成、与 lib/constants/pet_bend.dart
+    # 里的 PetBendGeo.dir 一一对应；flutter assets 不递归，故逐叶子目录登记。
+    - assets/pets/anim/n/cat_n1/s0/
+    - assets/pets/anim/n/cat_n2/s0/
+    - assets/pets/anim/n/cat_n3/s0/
+    - assets/pets/anim/n/cat_n4/s0/
+    - assets/pets/anim/r/cat_r1/s0/
+    - assets/pets/anim/r/cat_r2/s0/
+    - assets/pets/anim/r/cat_r3/s0/
+    - assets/pets/anim/sr/cat_sr1/s0/
+    - assets/pets/anim/sr/cat_sr2/s0/
+    - assets/pets/anim/ssr/cat_ssr1/s0/
+    - assets/pets/anim/ssr/cat_ssr1/s1/
+    - assets/pets/anim/ssr/cat_ssr1/s2/
+
+  # 运行时效果（GLSL）：宠物分层弯曲渲染器，逐片元逆映射采样
+  # （口径与沙盒冻结件 pet_anim_demo/tools/cat_gl_warp.mjs 一致）
+  shaders:
+    - shaders/pet_bend.frag
