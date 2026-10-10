@@ -229,10 +229,23 @@ String match3ModeLabelOf(String code) {
 
 /// 按 play_kind（模式语义编码）取统一模式网格的展示色。
 /// match3 六模式（score/clear/collect/obstacle/timed/boss）取各自配色；
-/// 其余（2048 / merge 等）回落默认棕，保证三游戏网格视觉一致。
+/// 俄罗斯方块 7 模式取 tetris 专属色板（2026-10-10 补——此前回落棕色，
+/// 模式网格 tetris 卡图标底色全部失色）；其余回落默认棕，保证网格视觉一致。
 Color modeColorOf(String playKind) {
   for (final m in Match3Mode.values) {
     if (m.code == playKind) return m.color;
   }
+  // 俄罗斯方块（与 TetrisMode.color 同值；此处硬编码避免 models→games 反向依赖）
+  const tetrisColors = <String, Color>{
+    'tetris': Color(0xFF3949AB),
+    'tetris_sprint': Color(0xFF00897B),
+    'tetris_blitz': Color(0xFFEF6C00),
+    'tetris_challenge': Color(0xFF8E24AA),
+    'tetris_dig': Color(0xFF6D4C41),
+    'tetris_survival': Color(0xFFB71C1C),
+    'tetris_daily': Color(0xFF2E7D32),
+  };
+  final c = tetrisColors[playKind];
+  if (c != null) return c;
   return const Color(0xFF5D4037);
 }

@@ -16,7 +16,18 @@ class _GuideSectionView extends StatelessWidget {
         children: <Widget>[
           Row(
             children: <Widget>[
-              if (section.icon != null) ...<Widget>[
+              if (section.iconAsset != null) ...<Widget>[
+                SvgPicture.asset(
+                  'assets/games/icons/${section.iconAsset}.svg',
+                  width: 18,
+                  height: 18,
+                  errorBuilder: (_, __, ___) => const Icon(
+                      Icons.extension_outlined,
+                      size: 18,
+                      color: AppTheme.primaryOrange),
+                ),
+                const SizedBox(width: 6),
+              ] else if (section.icon != null) ...<Widget>[
                 Icon(section.icon, size: 18, color: AppTheme.primaryOrange),
                 const SizedBox(width: 8),
               ],

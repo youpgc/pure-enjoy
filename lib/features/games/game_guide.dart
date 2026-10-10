@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'models/game_model.dart';
 import 'models/game_mode_model.dart';
 import 'models/match3_mode.dart';
+import 'games/tetris/tetris_mode.dart';
 import 'services/game_service.dart';
 
 /// 玩法说明数据源：集中三款游戏（羊了个羊 / 2048 / 消消乐）的说明文案，
@@ -17,10 +18,15 @@ class GameGuideSection {
   final String body;
   final IconData? icon;
 
+  /// SVG 资产文件名（assets/games/icons/<iconAsset>.svg，2026-10-10 补——
+  /// 俄罗斯方块模式段图标为 SVG 资产，与 Material [icon] 二选一优先渲染）
+  final String? iconAsset;
+
   const GameGuideSection({
     required this.title,
     required this.body,
     this.icon,
+    this.iconAsset,
   });
 }
 
@@ -173,7 +179,35 @@ GameGuideInfo _tetrisGuide(GameModel game) {
             '100/300/500/800 × 等级；连续消行有连击加成，连续 4 消或 T 旋'
             '触发 B2B 倍率，一次清空全场另有全清大奖。堆到顶部即结束。',
       ),
-      ..._modeSectionsOf(game, (_) => null),
+      // 模式段：DB game_modes.summary/guide 优先，空则回退 TetrisMode 内置文案
+      ...(() {
+        final modes = GameService.instance.cachedConfig.modesOf(game.id);
+        final sections = <GameGuideSection>[];
+        for (final m in modes) {
+          final meta = tetrisModeFromPlayKind(m.playKind);
+          final configured = <String>[
+            if (m.summary.isNotEmpty) m.summary,
+            if (m.guide.isNotEmpty) m.guide,
+          ].join('\n');
+          final body = configured.isNotEmpty
+              ? configured
+              : (meta == null ? '' : '${meta.summary}\n\n${meta.detail}');
+          if (body.isEmpty) continue;
+          sections.add(GameGuideSection(
+            title: m.name,
+            body: body,
+            iconAsset: meta?.icon,
+          ));
+        }
+        return sections;
+      })(),
+      const GameGuideSection(
+        title: '道具',
+        body: '对局左侧道具栏（后台开启后出现）：时缓卡让方块减速 30 秒，'
+            '激光卡烧掉底部三行，地震卡震落实块填平空洞，磁铁卡吸附到'
+            '最优落点，换块卡随机重掷当前方块，清屏卡清空整场翻盘。'
+            '用积分在商城购买，点击后确认即生效。',
+      ),
       const GameGuideSection(
         title: '技巧',
         body: '尽量在场地边缘留出竖直长井等长条方块；T 型块旋入凹槽'

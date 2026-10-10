@@ -258,10 +258,13 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
   }
 
   /// 道具轨按钮：深色圆钮 + 右上角库存角标，点击走确认→执行→扣券。
+  /// 图标优先渲染 game_items.icon 定版 SVG（assets/games/items/），
+  /// 空/缺失回落内置 Material 图标（itemIconFor 同款兜底语义）。
   Widget _buildPropRailButton(TetrisPropSlot s) {
     final label = (s.item?.name.isNotEmpty ?? false)
         ? s.item!.name
         : (_propLabels[s.itemType] ?? s.itemType);
+    final hasAsset = (s.item?.icon?.isNotEmpty ?? false);
     return Tooltip(
       message: label,
       child: GestureDetector(
@@ -278,8 +281,17 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
                   color: const Color(0xFF1E2230),
                   border: Border.all(color: const Color(0xFF2E3245)),
                 ),
-                child: Icon(_propIcon(s.itemType),
-                    size: 24, color: const Color(0xFFFFB74D)),
+                padding: const EdgeInsets.all(8),
+                child: hasAsset
+                    ? SvgPicture.asset(
+                        'assets/games/items/${s.item!.icon}.svg',
+                        width: 36,
+                        height: 36,
+                        errorBuilder: (_, __, ___) => Icon(_propIcon(s.itemType),
+                            size: 24, color: const Color(0xFFFFB74D)),
+                      )
+                    : Icon(_propIcon(s.itemType),
+                        size: 24, color: const Color(0xFFFFB74D)),
               ),
               Positioned(
                 right: -2,
