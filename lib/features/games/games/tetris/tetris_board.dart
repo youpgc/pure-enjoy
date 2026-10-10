@@ -63,7 +63,11 @@ extension _TetrisBoardOps on _TetrisGameState {
       child: Column(
         children: <Widget>[
           if (_holdEnabled)
-            _buildMiniBox(type: _held, size: 44, label: _holdUsed ? '·' : 'HOLD'),
+            _buildMiniBox(
+                type: _held,
+                special: _heldSpecial,
+                size: 44,
+                label: _holdUsed ? '·' : 'HOLD'),
           const SizedBox(height: 8),
           const Text('NEXT',
               style: TextStyle(
