@@ -127,6 +127,9 @@ String petRpcErrorText(String? error) {
     'PET_SCENE_ALREADY': '你已经拥有这个主题啦',
     'PET_SCENE_NOT_OWNED': '还没有获得这个主题，先去购买吧',
     'PET_SCENE_PRICE_MISSING': '主题未定价，请联系管理员',
+    // ---------- 放生守卫（fix_pet_release_guards_20261010） ----------
+    'PET_RELEASE_INITIAL': '初始伙伴月萤会一直陪着你，不能送别哦',
+    'PET_RELEASE_LAST': '至少要有一只伙伴陪在你身边，先获得新的伙伴吧',
   };
   if (map.containsKey(code)) return map[code]!;
   if (code.length <= 40) return code;
