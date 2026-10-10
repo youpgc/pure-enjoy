@@ -5,24 +5,31 @@ part of 'tetris_game.dart';
 
 extension _TetrisBoardOps on _TetrisGameState {
   /// 顶部预览条：Hold 槽 + Next×N。
-  Widget _buildNextHoldBar() {
+  /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开小圆钮。
+  Widget _buildRightColumn() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
-      child: Row(
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      child: Column(
         children: <Widget>[
           if (_holdEnabled)
             _buildMiniBox(type: _held, size: 44, label: _holdUsed ? '·' : 'HOLD'),
-          const Spacer(),
+          const SizedBox(height: 8),
+          const Text('NEXT',
+              style: TextStyle(
+                  fontSize: 8,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8A8FA3))),
+          const SizedBox(height: 4),
           for (var i = 0; i < _nextPreview; i++)
             Padding(
-              padding: const EdgeInsets.only(left: 5),
+              padding: const EdgeInsets.only(top: 5),
               child: _buildMiniBox(
                 type: i < _queue.length ? _queue[i] : null,
                 size: 44,
-                label: i == 0 ? 'NEXT' : '',
+                label: '',
               ),
             ),
-          const SizedBox(width: 6),
+          const Spacer(),
           _buildRestartButton(),
         ],
       ),
@@ -34,7 +41,7 @@ extension _TetrisBoardOps on _TetrisGameState {
     return Tooltip(
       message: '重新开始',
       child: Material(
-        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        color: const Color(0xFF1E2230),
         shape: const CircleBorder(),
         child: InkWell(
           customBorder: const CircleBorder(),
@@ -42,14 +49,15 @@ extension _TetrisBoardOps on _TetrisGameState {
           child: const SizedBox(
             width: 44,
             height: 44,
-            child: Icon(Icons.refresh, size: 24),
+            child: Icon(Icons.refresh,
+                size: 24, color: Color(0xFF8A8FA3)),
           ),
         ),
       ),
     );
   }
 
-  /// 紧凑预览面板：mini 画布 + 底部 7px 微标签（可选，2026-10-10 铺满优化）。
+  /// 紧凑预览面板（深色容器内，深底与容器融合 + 微标签）。
   Widget _buildMiniBox({
     required String label,
     required Tetromino? type,
@@ -61,7 +69,7 @@ extension _TetrisBoardOps on _TetrisGameState {
       decoration: BoxDecoration(
         color: const Color(0xFF171923),
         borderRadius: BorderRadius.circular(9),
-        border: Border.all(color: const Color(0xFF2A2D3A)),
+        border: Border.all(color: const Color(0xFF2E3245)),
       ),
       child: Stack(
         children: <Widget>[

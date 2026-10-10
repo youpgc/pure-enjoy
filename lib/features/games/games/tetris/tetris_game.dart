@@ -453,9 +453,10 @@ class _TetrisGameState extends State<TetrisGame> {
 
   @override
   Widget build(BuildContext context) {
-    // 布局（2026-10-10 铺满优化）：顶部 HUD → 紧凑预览条（含重开小钮）→
-    // 棋盘占满剩余空间 → 大圆形操作按钮行。hint 与底部大按钮移除
-    //（操作说明在「查看说明」；重开改预览条右端小圆钮），纵向全部让给棋盘。
+    // 布局（2026-10-10 二次优化，对齐消消乐深色容器）：
+    // 深色容器铺满 content 全宽 → 内部三列：左=道具竖排轨（数据驱动）、
+    // 中=棋盘（居中不受影响）、右=Hold/Next 竖排 + 重开小钮；
+    // 底部大圆形操作按钮行不变。无道具时左列隐藏、棋盘进一步加宽。
     return GameShell(
       statusItems: <Widget>[
         GameStatusItem(label: '分数', value: '$_score'),
@@ -489,18 +490,37 @@ class _TetrisGameState extends State<TetrisGame> {
             valueColor: const Color(0xFFEF6C00),
           ),
       ],
-      propActions: _buildPropActionList(),
-      propPlaceholder: '', // 无道具时不渲染道具栏（铺满优化：纵向全部让给棋盘）
+      propActions: const <GameAction>[],
+      propPlaceholder: '',
       actions: const <GameAction>[],
       content: Column(
         children: <Widget>[
-          _buildNextHoldBar(),
           Expanded(
-            child: Stack(
-              children: <Widget>[
-                _buildGestureBoard(),
-                if (_fxMessages.isNotEmpty) _buildFxOverlay(),
-              ],
+            child: Container(
+              width: double.infinity,
+              height: double.infinity,
+              decoration: BoxDecoration(
+                color: const Color(0xFF101220),
+                borderRadius: BorderRadius.circular(16),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(16),
+                child: Row(
+                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                  children: <Widget>[
+                    _buildPropRail(),
+                    Expanded(
+                      child: Stack(
+                        children: <Widget>[
+                          _buildGestureBoard(),
+                          if (_fxMessages.isNotEmpty) _buildFxOverlay(),
+                        ],
+                      ),
+                    ),
+                    _buildRightColumn(),
+                  ],
+                ),
+              ),
             ),
           ),
           _buildControlBar(),

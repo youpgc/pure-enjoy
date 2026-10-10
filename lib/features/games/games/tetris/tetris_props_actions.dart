@@ -234,21 +234,78 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
     return Icons.extension_outlined;
   }
 
-  /// GameShell 道具栏 actions（目录未载入/无适用道具时空列表 → 占位行）。
-  List<GameAction> _buildPropActionList() {
-    final list = <GameAction>[];
-    for (final s in _props.slots) {
-      if (!s.available) continue;
-      list.add(GameAction(
-        icon: _propIcon(s.itemType),
-        label: (s.item?.name.isNotEmpty ?? false)
-            ? s.item!.name
-            : (_propLabels[s.itemType] ?? s.itemType),
-        badge: '${s.total}',
-        onPressed: () => _useProp(s),
-      ));
-    }
-    return list;
+  /// 左列道具竖排轨（2026-10-10 布局：深色容器内左侧从上到下）。
+  /// 无可用道具时返回窄空条（保持深色容器左缘节奏，不挤压棋盘）。
+  Widget _buildPropRail() {
+    final available = _props.slots.where((s) => s.available).toList();
+    return SizedBox(
+      width: 60,
+      child: available.isEmpty
+          ? const SizedBox.shrink()
+          : Padding(
+              padding: const EdgeInsets.fromLTRB(4, 8, 0, 8),
+              child: Column(
+                children: <Widget>[
+                  for (final s in available)
+                    Padding(
+                      padding: const EdgeInsets.only(top: 6),
+                      child: _buildPropRailButton(s),
+                    ),
+                ],
+              ),
+            ),
+    );
+  }
+
+  /// 道具轨按钮：深色圆钮 + 右上角库存角标，点击走确认→执行→扣券。
+  Widget _buildPropRailButton(TetrisPropSlot s) {
+    final label = (s.item?.name.isNotEmpty ?? false)
+        ? s.item!.name
+        : (_propLabels[s.itemType] ?? s.itemType);
+    return Tooltip(
+      message: label,
+      child: GestureDetector(
+        onTap: () => _useProp(s),
+        child: SizedBox(
+          width: 52,
+          height: 52,
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: <Widget>[
+              Container(
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: const Color(0xFF1E2230),
+                  border: Border.all(color: const Color(0xFF2E3245)),
+                ),
+                child: Icon(_propIcon(s.itemType),
+                    size: 24, color: const Color(0xFFFFB74D)),
+              ),
+              Positioned(
+                right: -2,
+                top: -2,
+                child: Container(
+                  padding:
+                      const EdgeInsets.symmetric(horizontal: 5, vertical: 1),
+                  decoration: BoxDecoration(
+                    color: const Color(0xFFEF6C00),
+                    borderRadius: BorderRadius.circular(9),
+                  ),
+                  child: Text(
+                    '${s.total}',
+                    style: const TextStyle(
+                        fontSize: 9,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white,
+                        height: 1.2),
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
   }
 
   /// 使用道具：确认弹窗 → 引擎执行 → 成功才扣券（两段式延迟扣券）。
