@@ -294,40 +294,49 @@ class _GameBannerCard extends StatelessWidget {
                         ),
                       ),
                       const SizedBox(width: 14),
-                      // 名称（垂直居中，描述行移除）
+                      // 名称（垂直居中；过长时 FittedBox 缩小字号，
+                      // 不出现省略号——2026-10-10 用户反馈）
                       Expanded(
-                        child: Text(
-                          game.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(
-                            fontSize: 22,
-                            fontWeight: FontWeight.bold,
-                            color: Colors.white,
-                            shadows: <Shadow>[
-                              Shadow(color: Colors.black45, blurRadius: 4),
-                            ],
+                        child: FittedBox(
+                          fit: BoxFit.scaleDown,
+                          alignment: Alignment.centerLeft,
+                          child: Text(
+                            game.name,
+                            maxLines: 1,
+                            style: const TextStyle(
+                              fontSize: 22,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.white,
+                              shadows: <Shadow>[
+                                Shadow(color: Colors.black45, blurRadius: 4),
+                              ],
+                            ),
                           ),
                         ),
                       ),
                       // 最佳成绩（文字在奖杯左侧）+ 大号奖杯；无成绩不展示
                       if (best != null) ...<Widget>[
                         const SizedBox(width: 10),
-                        Text(
-                          '最佳 ${fmtBest ?? ''}',
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          textAlign: TextAlign.right,
-                          style: const TextStyle(
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                            color: Color(0xFFFFD54F),
-                            shadows: <Shadow>[
-                              Shadow(
-                                  color: Colors.black54,
-                                  blurRadius: 4,
-                                  offset: Offset(0, 1)),
-                            ],
+                        ConstrainedBox(
+                          constraints: const BoxConstraints(maxWidth: 130),
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            alignment: Alignment.centerRight,
+                            child: Text(
+                              '最佳 ${fmtBest ?? ''}',
+                              maxLines: 1,
+                              style: const TextStyle(
+                                fontSize: 12,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFFFFD54F),
+                                shadows: <Shadow>[
+                                  Shadow(
+                                      color: Colors.black54,
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1)),
+                                ],
+                              ),
+                            ),
                           ),
                         ),
                         const SizedBox(width: 8),
