@@ -178,15 +178,25 @@ class _GameBannerCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 圆角跟随全局配置（cardTheme 的 cardRadius，2026-10-10 调整）
+    final BorderRadius radius =
+        ((Theme.of(context).cardTheme.shape is RoundedRectangleBorder)
+                ? (Theme.of(context).cardTheme.shape!
+                    as RoundedRectangleBorder)
+                : const RoundedRectangleBorder(
+                    borderRadius: BorderRadius.all(Radius.circular(8))))
+            .borderRadius
+            as BorderRadius;
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: radius,
         child: Container(
-          height: 124,
+          // 高度由内容决定：上下内边距共 12px（2026-10-10 调整）
+          padding: const EdgeInsets.symmetric(vertical: 6),
           decoration: BoxDecoration(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: radius,
             gradient: LinearGradient(
               begin: Alignment.topLeft,
               end: Alignment.bottomRight,
@@ -201,26 +211,36 @@ class _GameBannerCard extends StatelessWidget {
             ],
           ),
           child: ClipRRect(
-            borderRadius: BorderRadius.circular(20),
+            borderRadius: radius,
             child: Stack(
-              fit: StackFit.expand,
               children: <Widget>[
-                // 氛围装饰层：散布元素（资产缺失时 errorBuilder 渲染空，渐变兜底）
-                SvgPicture.asset(
-                  'assets/games/backgrounds/${game.code}.svg',
-                  fit: BoxFit.cover,
-                  errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                // 氛围装饰层：散布元素整体倾斜 + 降透明度（俏皮、退后做底），
+                // 资产缺失时 errorBuilder 渲染空，渐变兜底
+                Positioned.fill(
+                  child: Transform.rotate(
+                    angle: -0.06,
+                    child: Opacity(
+                      opacity: 0.55,
+                      child: SvgPicture.asset(
+                        'assets/games/backgrounds/${game.code}.svg',
+                        fit: BoxFit.cover,
+                        errorBuilder: (_, __, ___) => const SizedBox.shrink(),
+                      ),
+                    ),
+                  ),
                 ),
                 // 暗角遮罩：左侧深、右侧浅，保证文字对比度
-                DecoratedBox(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                      colors: <Color>[
-                        Colors.black.withValues(alpha: 0.34),
-                        Colors.black.withValues(alpha: 0.02),
-                      ],
+                Positioned.fill(
+                  child: DecoratedBox(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
+                        colors: <Color>[
+                          Colors.black.withValues(alpha: 0.34),
+                          Colors.black.withValues(alpha: 0.02),
+                        ],
+                      ),
                     ),
                   ),
                 ),
@@ -228,7 +248,7 @@ class _GameBannerCard extends StatelessWidget {
                 // 大号立体奖杯（有成绩金色/无成绩置灰）+ 最佳成绩小字；
                 // 描述行与播放按钮移除（整卡可点）。
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
                   child: Row(
                     children: <Widget>[
                       // 游戏图标（白底圆角卡，突出主体）
