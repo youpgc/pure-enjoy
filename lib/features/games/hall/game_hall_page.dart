@@ -183,9 +183,12 @@ class _GameBannerCard extends StatelessWidget {
     // 个性化配置接入（2026-10-10）：圆角跟随 UI 风格 token（简约扁平 8 /
     // 锐利极简 4 / 胶囊现代 18…），投影与边框跟随全局「开启阴影/显示边框」
     // 开关，暗色模式下渐变整体压暗。
-    final cardRadius =
-        UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius;
-    final radius = BorderRadius.circular(cardRadius);
+    // 胶囊 50% 适配仅作用于大厅卡（2026-10-10 用户拍板：全局 token 已撤销）：
+    // 胶囊现代风格下，88px 高的全宽卡端头圆角 = 44（短边一半，长卡变胶囊）
+    final uiStyle = AppTheme.uiStyleOf(context);
+    final tokenRadius = UiStyleToken.of(uiStyle).cardRadius;
+    final isPill = uiStyle == UiStyle.pillModern;
+    final radius = BorderRadius.circular(isPill ? 44.0 : tokenRadius);
     final elevation = AppTheme.cardElevation(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = isDark
@@ -193,17 +196,17 @@ class _GameBannerCard extends StatelessWidget {
             .map((c) => Color.lerp(c, const Color(0xFF10131F), 0.35)!)
             .toList()
         : _colors;
-    // 左右内边距随风格圆角自适应：胶囊现代（18px 圆角）加大留白防内容被吞
-    final hpad = 14.0 + (cardRadius - 8).clamp(0.0, 12.0);
+    // 左右内边距随风格圆角自适应：胶囊端头 44px 时加大留白防内容被吞
+    final hpad = isPill ? 26.0 : 14.0 + (tokenRadius - 8).clamp(0.0, 12.0);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
         child: Container(
-          // 固定高度：避免「外层渐变容器 + 内层背景图层」两层高度不一致；
-          // 背景装饰/遮罩 Positioned.fill 独占全卡，前景垂直居中
-          height: 76,
+          // 固定高度 88（2026-10-10 调整）：避免「外层渐变容器 + 内层背景
+          // 图层」两层高度不一致；装饰/遮罩 Positioned.fill 独占全卡
+          height: 88,
           decoration: BoxDecoration(
             borderRadius: radius,
             gradient: LinearGradient(
@@ -271,7 +274,13 @@ class _GameBannerCard extends StatelessWidget {
                         height: 64,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.94),
-                          borderRadius: BorderRadius.circular(16),
+                          // 联动风格圆角：胶囊风格下 64 正方图标卡变圆
+                          borderRadius: BorderRadius.circular(
+                              UiStyleToken.of(AppTheme.uiStyleOf(context))
+                                          .cardRadius >=
+                                      999
+                                  ? 999
+                                  : 16),
                           boxShadow: <BoxShadow>[
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.25),
