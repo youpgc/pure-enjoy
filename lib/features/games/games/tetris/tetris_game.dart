@@ -2,6 +2,7 @@ import 'dart:async';
 import 'dart:math';
 
 import 'package:flutter/material.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import '../../game_play_helpers.dart';
 import '../../models/game_level_model.dart';
@@ -9,13 +10,17 @@ import '../../services/game_service.dart';
 import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
 import 'tetris_mode.dart';
+import 'tetris_props.dart';
 
 // 【文件拆分】单文件 ≤500 行红线：本文件为宿主 State（配置/HUD/流程），
 // 引擎逻辑见 tetris_engine.dart（part）、渲染见 tetris_board.dart（part）、
-// 手势与按钮行见 tetris_input.dart（part）。
+// 手势与按钮行见 tetris_input.dart（part）、垃圾行系统见 tetris_garbage.dart（part）、
+// 道具栏与道具执行见 tetris_props_actions.dart（part，二期）。
 part 'tetris_engine.dart';
 part 'tetris_board.dart';
 part 'tetris_input.dart';
+part 'tetris_garbage.dart';
+part 'tetris_props_actions.dart';
 
 /// 俄罗斯方块（市场驱动一期「标准四艺」）
 ///
@@ -98,12 +103,11 @@ class _TetrisGameState extends State<TetrisGame> {
 
   /// 计时基准（非 final：重开必须重置，g2048 同坑）
   DateTime _startTime = DateTime.now();
-  final Random _rng = Random();
 
   // 计时器组
   Timer? _gravityTimer;
   Timer? _lockTimer;
-  Timer? _tickTimer; // blitz 倒计时轮询
+  Timer? _tickTimer; // blitz 倒计时 / survival 顶起倒计时轮询
   int _lockResets = 0;
   int _lastTickSecond = -1;
 
@@ -114,6 +118,57 @@ class _TetrisGameState extends State<TetrisGame> {
   /// 供 painter shouldRepaint 精确判重（不依赖 current 间接覆盖——
   /// 二期 garbage 顶起只改 board 不动 current，无此旗标会漏重绘）。
   int _boardRev = 0;
+
+  // ───────── 二期：dig / survival / 每日挑战 / 道具 ─────────
+
+  /// dig 预填垃圾行数（config `dig_rows`，0=非 dig）
+  int _digRows = 0;
+
+  /// survival 垃圾顶起间隔秒（config `garbage_interval`，0=非 survival）
+  int _garbageInterval = 0;
+  Timer? _garbageTimer;
+
+  /// 下次顶起时刻（survival HUD 倒计时）
+  DateTime _garbageNextPushAt = DateTime.now();
+
+  /// 垃圾行公平洞位（相邻行不同列）
+  int _lastGarbageHole = -1;
+
+  /// 本局清除的垃圾行数（digger 成就 / `garbage_cleared` 判定维度）
+  int _garbageCleared = 0;
+
+  /// 每日挑战：config `seed_daily=true` 时以北京日期派生发牌种子
+  bool _seedDaily = false;
+
+  /// 已解析的随机源（daily 模式为日期种子实例，其余随机）
+  late Random _rng;
+
+  /// 道具域（数据驱动：game_items enabled=false 起步，由后台开启）
+  final TetrisProps _props = TetrisProps();
+
+  /// 时缓卡生效截止时刻（null=未生效）
+  DateTime? _slowUntil;
+
+  /// 每日挑战当前北京日期键（[_initRng] 填充；完成标记用）
+  String _dailyDateKey = '';
+
+  /// 初始化随机源：每日挑战 = `'tetris' + 北京日期` 自制哈希种子
+  ///（跨会话稳定、同日全员同序列），其余系统熵。须在 [_reset] 洗牌前调用。
+  void _initRng() {
+    if (!_seedDaily) {
+      _rng = Random();
+      return;
+    }
+    final b = DateTime.now().toUtc().add(const Duration(hours: 8));
+    _dailyDateKey = '${b.year.toString().padLeft(4, '0')}'
+        '${b.month.toString().padLeft(2, '0')}'
+        '${b.day.toString().padLeft(2, '0')}';
+    var h = 0;
+    for (final c in ('tetris$_dailyDateKey').codeUnits) {
+      h = (h * 31 + c) & 0x7fffffff;
+    }
+    _rng = Random(h);
+  }
 
   /// 手势用单格尺寸（board 布局时回填）
   double _cellExtent = 24;
@@ -128,6 +183,8 @@ class _TetrisGameState extends State<TetrisGame> {
     _startTime = DateTime.now();
     _parseModeAndConfig();
     _reset();
+    // 道具目录/库存异步加载（失败不影响对局；数据驱动 enabled 后台控制）
+    _loadProps();
   }
 
   void _parseModeAndConfig() {
@@ -146,12 +203,11 @@ class _TetrisGameState extends State<TetrisGame> {
     _scoreTarget = _intOf(cfg['score_target'], 0);
     _timeLimit = _intOf(cfg['time_limit'], 0) > 0 ? _intOf(cfg['time_limit'], 0) : null;
     _piecesLimit = _intOf(cfg['max_pieces'], 0) > 0 ? _intOf(cfg['max_pieces'], 0) : null;
-    // 下落间隔按模式兜底（sprint 800 恒速 / blitz·challenge 900 / marathon 1000）
+    // 下落间隔按模式兜底（sprint 800 恒速 / blitz·challenge·dig·survival 900）
     final fallbackFall = switch (_mode) {
       TetrisMode.marathon => 1000,
       TetrisMode.sprint => 800,
-      TetrisMode.blitz => 900,
-      TetrisMode.challenge => 900,
+      _ => 900,
     };
     _fallMsBase = max(80, _intOf(cfg['fall_ms'], fallbackFall));
     final fallbackMin = _mode == TetrisMode.marathon ? 60 : 80;
@@ -165,6 +221,11 @@ class _TetrisGameState extends State<TetrisGame> {
     _buttonsEnabled = cfg['buttons'] != false;
     _ghostEnabled = cfg['ghost'] != false;
     _nextPreview = _intOf(cfg['next'], 3).clamp(1, 5);
+    // 二期：dig 预填 / survival 顶起 / 每日挑战种子
+    _digRows = _intOf(cfg['dig_rows'], 0);
+    _garbageInterval = _intOf(cfg['garbage_interval'], 0);
+    _seedDaily = cfg['seed_daily'] == true || _mode == TetrisMode.daily;
+    _initRng();
   }
 
   int _intOf(dynamic v, int fallback) =>
@@ -199,17 +260,45 @@ class _TetrisGameState extends State<TetrisGame> {
     _lockResets = 0;
     _lastTickSecond = -1;
     _currentFallMs = _fallMsBase;
+    _garbageCleared = 0;
+    _lastGarbageHole = -1;
+    _slowUntil = null; // 时缓不跨局（重开后重力间隔恢复原速）
     _startTime = DateTime.now();
+    // dig：先预填垃圾行再落首块（board 为空，直接写底部）
+    if (_mode == TetrisMode.dig && _digRows > 0) {
+      _prefillGarbage(_digRows);
+    }
     _restartGravityTimer();
     _startTickTimer();
+    _startGarbageTimer();
     _spawnPiece();
   }
 
   // ───────── 计时器管理 ─────────
 
+  /// survival 垃圾顶起定时器（周期恒定 = config `garbage_interval`）；
+  /// 顶起溢出（顶行有块/当前块碰撞）按 Block Out 结算（survival 口径 lines 判定）。
+  void _startGarbageTimer() {
+    _garbageTimer?.cancel();
+    if (_garbageInterval <= 0) return;
+    _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
+    _garbageTimer = Timer.periodic(Duration(seconds: _garbageInterval), (_) {
+      if (_finished) {
+        _garbageTimer?.cancel();
+        return;
+      }
+      _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
+      if (!_pushGarbageRow()) {
+        _onBlockOut();
+      }
+    });
+  }
+
   void _restartGravityTimer() {
     _gravityTimer?.cancel();
-    _gravityTimer = Timer.periodic(Duration(milliseconds: _currentFallMs), (_) {
+    // 时缓卡生效期间下落间隔 ×2（与 marathon 局内加速叠加）
+    final ms = _currentFallMs * (_isSlowed ? 2 : 1);
+    _gravityTimer = Timer.periodic(Duration(milliseconds: ms), (_) {
       _gravityTick();
     });
   }
@@ -228,26 +317,35 @@ class _TetrisGameState extends State<TetrisGame> {
     _lockTimer = null;
   }
 
-  /// blitz 倒计时轮询（250ms 轮询、整秒变化才重建，g2048 同款节流）
+  /// blitz 倒计时 / survival 顶起倒计时轮询（250ms 轮询、整秒变化才重建，g2048 同款节流）
   void _startTickTimer() {
     _tickTimer?.cancel();
-    if (_timeLimit == null) return;
+    if (_timeLimit == null && _garbageInterval <= 0) return;
     _tickTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
       if (_finished) {
         timer.cancel();
         return;
       }
-      if (_remainingSeconds() <= 0) {
+      if (_timeLimit != null && _remainingSeconds() <= 0) {
         _finish(_scoreTarget > 0 && _score >= _scoreTarget,
             reason: '时间到');
         return;
       }
-      final s = _remainingSeconds();
+      final s = _hudSecond();
       if (s != _lastTickSecond) {
         _lastTickSecond = s;
         if (mounted) setState(() {});
       }
     });
+  }
+
+  /// HUD 秒级刷新值：限时模式=剩余秒；survival=顶起倒计时秒；其余=0（不刷新）。
+  int _hudSecond() {
+    if (_timeLimit != null) return _remainingSeconds();
+    if (_garbageInterval > 0) {
+      return _garbageNextPushAt.difference(DateTime.now()).inSeconds;
+    }
+    return 0;
   }
 
   int _remainingSeconds() {
@@ -261,6 +359,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _gravityTimer?.cancel();
     _cancelLockTimer();
     _tickTimer?.cancel();
+    _garbageTimer?.cancel();
     super.dispose();
   }
 
@@ -272,8 +371,15 @@ class _TetrisGameState extends State<TetrisGame> {
     _gravityTimer?.cancel();
     _cancelLockTimer();
     _tickTimer?.cancel();
+    _garbageTimer?.cancel();
     if (cleared) {
       GameAudio.instance.win();
+      // 每日挑战：通关写本地完成标记（当日模式卡置灰；奖励走 daily_first_clear
+      // 的 claim_key 日期幂等，本地标记仅控制展示）
+      if (_seedDaily && _dailyDateKey.isNotEmpty) {
+        SharedPreferences.getInstance().then((sp) => sp.setString(
+            'tetris_daily_done_$_dailyDateKey', '1'));
+      }
     } else {
       GameAudio.instance.fail();
     }
@@ -292,6 +398,7 @@ class _TetrisGameState extends State<TetrisGame> {
         'max_combo': _maxCombo,
         'perfect_clears': _perfectClears,
         'level_reached': _scoreLevel,
+        if (_garbageCleared > 0) 'garbage_cleared': _garbageCleared,
       },
       durationMs: elapsed,
     ));
@@ -325,10 +432,14 @@ class _TetrisGameState extends State<TetrisGame> {
     switch (_mode) {
       case TetrisMode.marathon:
       case TetrisMode.sprint:
+      case TetrisMode.survival:
+      case TetrisMode.daily:
         return '${max(0, _linesTarget - _linesTotal)} 行';
       case TetrisMode.blitz:
       case TetrisMode.challenge:
         return '$_scoreTarget 分';
+      case TetrisMode.dig:
+        return '$_garbageRowsRemaining 行垃圾';
     }
   }
 
@@ -339,6 +450,17 @@ class _TetrisGameState extends State<TetrisGame> {
       !(_timeLimit != null && _remainingSeconds() <= 10);
 
   double get _frenzyMult => 1 + 0.5 * min(_combo, 6);
+
+  /// 操作提示按模式微调（survival 强调顶起节奏）。
+  String get _modeHint {
+    if (_mode == TetrisMode.survival) {
+      return '左右滑移动 · 点按旋转 · 快速下滑硬降 · 底部将周期顶起垃圾行';
+    }
+    if (_mode == TetrisMode.dig) {
+      return '左右滑移动 · 点按旋转 · 快速下滑硬降 · 挖穿底部全部垃圾行';
+    }
+    return '左右滑移动 · 点按旋转 · 下滑软降 · 快速下滑硬降';
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -351,6 +473,15 @@ class _TetrisGameState extends State<TetrisGame> {
             label: '剩余时间',
             value: '${_remainingSeconds()}s',
             valueColor: _remainingSeconds() <= 10 ? const Color(0xFFE53935) : null,
+          ),
+        if (_garbageInterval > 0)
+          GameStatusItem(
+            label: '顶起倒计时',
+            value: '${max(0, _garbageNextPushAt.difference(DateTime.now()).inSeconds)}s',
+            valueColor:
+                _garbageNextPushAt.difference(DateTime.now()).inSeconds <= 3
+                    ? const Color(0xFFE53935)
+                    : null,
           ),
         if (_piecesLimit != null)
           GameStatusItem(
@@ -366,8 +497,8 @@ class _TetrisGameState extends State<TetrisGame> {
             valueColor: const Color(0xFFEF6C00),
           ),
       ],
-      hint: '左右滑移动 · 点按旋转 · 下滑软降 · 快速下滑硬降',
-      propPlaceholder: '',
+      hint: _modeHint,
+      propActions: _buildPropActionList(),
       actions: <GameAction>[
         GameAction(
           icon: Icons.refresh,

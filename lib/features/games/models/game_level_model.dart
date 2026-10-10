@@ -141,6 +141,37 @@ class GameLevelModel {
     );
   }
 
+  /// 俄罗斯方块每日挑战合成关（二期）：马拉松 L50 基准变体（消 40 行、
+  /// 700ms 起速逐级加速），发牌种子由引擎按「北京日期哈希」派生——
+  /// 无 server 关、不入库；`countForDailyClear=true` 使通关触发每日首通
+  ///（claim_key 日期幂等，当日只发一次）。
+  /// ⚠️ `levelNo=0`：承载页 _onFinished 会注入 level=levelNo 维度，非 0 值
+  ///（如 20000）会让 level 型成就（min_level_no 10..100）一次全解锁——
+  /// 0 使标题不显示关号且 level 维度恒 0，不误达成任何 level/段位成就。
+  /// 成绩上报由 GameScoreService.sanitizeUuid 将非 uuid id 置 null，安全。
+  factory GameLevelModel.tetrisDaily({
+    required String gameId,
+    String modeId = '',
+  }) {
+    return GameLevelModel(
+      id: 'daily_tetris',
+      gameId: gameId,
+      modeId: modeId,
+      levelNo: 0,
+      name: '每日挑战',
+      config: <String, dynamic>{
+        'lines': 40,
+        'fall_ms': 700,
+        'fall_min': 60,
+        'level_up_lines': 10,
+        'speed_factor': 0.85,
+        'seed_daily': true,
+      },
+      countForDailyClear: true,
+      rewardPoints: 0,
+    );
+  }
+
   /// 复制并覆盖指定字段。
   GameLevelModel copyWith({
     String? id,

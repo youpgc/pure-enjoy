@@ -15,7 +15,16 @@ enum TetrisMode {
   blitz('blitz', 'tetris_blitz', '闪电'),
 
   /// 挑战：限方块数内刷分达标
-  challenge('challenge', 'tetris_challenge', '挑战');
+  challenge('challenge', 'tetris_challenge', '挑战'),
+
+  /// 挖掘（二期）：预填垃圾行挖穿到地板，比最快
+  dig('dig', 'tetris_dig', '挖掘'),
+
+  /// 生存（二期）：周期顶起垃圾行，消行达标或顶死结算
+  survival('survival', 'tetris_survival', '生存'),
+
+  /// 每日挑战（二期）：北京日期派生发牌种子，全员当日同序列
+  daily('daily', 'tetris_daily', '每日挑战');
 
   const TetrisMode(this.code, this.playKind, this.label);
 
@@ -39,6 +48,12 @@ enum TetrisMode {
         return const Color(0xFFEF6C00);
       case TetrisMode.challenge:
         return const Color(0xFF8E24AA);
+      case TetrisMode.dig:
+        return const Color(0xFF6D4C41);
+      case TetrisMode.survival:
+        return const Color(0xFFB71C1C);
+      case TetrisMode.daily:
+        return const Color(0xFF2E7D32);
     }
   }
 }
@@ -54,6 +69,7 @@ TetrisMode? tetrisModeFromPlayKind(String? playKind) {
 /// 综合解析：优先 play_kind，回落 config 语义键兜底。
 ///
 /// 兜底规则：带 `time_limit` → blitz；带 `max_pieces` → challenge；
+/// 带 `dig_rows` → dig；带 `garbage_interval` → survival；
 /// 其余（含空 config）→ marathon（默认模式，与 adapter.defaultLevel 一致）。
 TetrisMode resolveTetrisMode({
   String? playKind,
@@ -66,6 +82,12 @@ TetrisMode resolveTetrisMode({
   }
   if (config['max_pieces'] != null || config['maxPieces'] != null) {
     return TetrisMode.challenge;
+  }
+  if (config['dig_rows'] != null || config['digRows'] != null) {
+    return TetrisMode.dig;
+  }
+  if (config['garbage_interval'] != null || config['garbageInterval'] != null) {
+    return TetrisMode.survival;
   }
   return TetrisMode.marathon;
 }

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
+import 'package:shared_preferences/shared_preferences.dart';
 
 import 'package:pure_enjoy/core/theme/app_theme.dart';
 import 'package:pure_enjoy/core/widgets/widgets.dart';
@@ -41,10 +42,32 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   GameHomeFlow? _flow;
   bool _loading = true;
 
+  /// 俄罗斯方块每日挑战：今日是否已完成（本地标记，控制模式卡角标/副标题）
+  bool _tetrisDailyDone = false;
+
+  /// 是否俄罗斯方块每日挑战模式（合成关入口，无 server 关）
+  bool _isDailyMode(GameModeModel m) => m.playKind == 'tetris_daily';
+
+  String get _dailyDoneKey {
+    final b = DateTime.now().toUtc().add(const Duration(hours: 8));
+    final dateKey = '${b.year.toString().padLeft(4, '0')}'
+        '${b.month.toString().padLeft(2, '0')}'
+        '${b.day.toString().padLeft(2, '0')}';
+    return 'tetris_daily_done_$dateKey';
+  }
+
+  Future<void> _refreshDailyDone() async {
+    final sp = await SharedPreferences.getInstance();
+    if (mounted) {
+      setState(() => _tetrisDailyDone = sp.getString(_dailyDoneKey) == '1');
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _load();
+    _refreshDailyDone();
   }
 
   /// 首页加载 = 流程体系「配置→模式→关卡→进度→商城」节点编排；
@@ -217,6 +240,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     _modeGridGeneric(_modes
                         .where((m) =>
                             m.isEndless ||
+                            _isDailyMode(m) ||
                             _levels.any((l) => l.modeId == m.id))
                         .toList()),
 
@@ -324,9 +348,12 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
             final cleared = _modeClearedById(mode);
             final total = _levelsOfModeId(mode.id).length;
             final color = modeColorOf(mode.playKind);
-            final subtitle = mode.isEndless
-                ? '无尽 · 随时挑战'
-                : '已通关 $cleared/$total';
+            final isDaily = _isDailyMode(mode);
+            final subtitle = isDaily
+                ? (_tetrisDailyDone ? '今日已完成 · 明日再来' : '今日挑战 · 同日同序列')
+                : mode.isEndless
+                    ? '无尽 · 随时挑战'
+                    : '已通关 $cleared/$total';
             return InkWell(
               onTap: () => _onModeTap(mode),
               borderRadius: BorderRadius.circular(14),
@@ -350,9 +377,30 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: <Widget>[
-                            Text(mode.name,
-                                style: const TextStyle(
-                                    fontSize: 15, fontWeight: FontWeight.bold)),
+                            Row(
+                              children: <Widget>[
+                                Flexible(
+                                  child: Text(mode.name,
+                                      style: const TextStyle(
+                                          fontSize: 15, fontWeight: FontWeight.bold)),
+                                ),
+                                if (isDaily && _tetrisDailyDone) ...<Widget>[
+                                  const SizedBox(width: 6),
+                                  Container(
+                                    padding: const EdgeInsets.symmetric(
+                                        horizontal: 6, vertical: 1),
+                                    decoration: BoxDecoration(
+                                      color: AppTheme.success.withAlpha(26),
+                                      borderRadius: BorderRadius.circular(8),
+                                    ),
+                                    child: const Text('今日已完成',
+                                        style: TextStyle(
+                                            fontSize: 9,
+                                            color: AppTheme.success)),
+                                  ),
+                                ],
+                              ],
+                            ),
                             const SizedBox(height: 4),
                             Text(subtitle,
                                 style: const TextStyle(
@@ -400,6 +448,21 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
         ),
       );
       if (mounted) await _load(force: true);
+      return;
+    }
+    // 俄罗斯方块每日挑战：无 server 关，直接开当日种子合成关
+    //（奖励走 daily_first_clear 日期幂等；返回后刷新完成标记）
+    if (_isDailyMode(mode)) {
+      final lv = GameLevelModel.tetrisDaily(
+        gameId: widget.game.id,
+        modeId: mode.id,
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GamePlayScreen(game: widget.game, level: lv),
+        ),
+      );
+      if (mounted) await _refreshDailyDone();
       return;
     }
     final selectable =

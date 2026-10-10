@@ -382,6 +382,8 @@ extension _TetrisEngineOps on _TetrisGameState {
     var cleared = 0;
     for (var r = kTetrisRows - 1; r >= 0; r--) {
       if (_board[r].every((c) => c != null)) {
+        // 被消行含垃圾砖则计入挖掘统计（dig/digger 成就数据源）
+        if (_board[r].contains(kGarbageColorIndex)) _garbageCleared++;
         _board.removeAt(r);
         _board.insert(0, List<int?>.filled(kTetrisCols, null));
         cleared++;
@@ -506,6 +508,8 @@ extension _TetrisEngineOps on _TetrisGameState {
     switch (_mode) {
       case TetrisMode.marathon:
       case TetrisMode.sprint:
+      case TetrisMode.survival:
+      case TetrisMode.daily:
         if (_linesTarget > 0 && _linesTotal >= _linesTarget) {
           _finish(true);
           return true;
@@ -518,15 +522,34 @@ extension _TetrisEngineOps on _TetrisGameState {
           return true;
         }
         break;
+      case TetrisMode.dig:
+        // 挖掘：预填垃圾行全部清除即通关（挖光必然触达地板）
+        if (_digRows > 0 && _garbageRowsRemaining == 0) {
+          _finish(true);
+          return true;
+        }
+        break;
     }
     return false;
   }
 
   /// Block Out（顶死）结算：达标仍算通关（最后一消恰好达标、顶死在后的情况）。
   void _onBlockOut() {
-    final win = _mode == TetrisMode.marathon || _mode == TetrisMode.sprint
-        ? _linesTarget > 0 && _linesTotal >= _linesTarget
-        : _scoreTarget > 0 && _score >= _scoreTarget;
+    final bool win;
+    switch (_mode) {
+      case TetrisMode.marathon:
+      case TetrisMode.sprint:
+      case TetrisMode.survival:
+      case TetrisMode.daily:
+        win = _linesTarget > 0 && _linesTotal >= _linesTarget;
+        break;
+      case TetrisMode.blitz:
+      case TetrisMode.challenge:
+        win = _scoreTarget > 0 && _score >= _scoreTarget;
+        break;
+      case TetrisMode.dig:
+        win = false; // 挖掘顶死=未挖穿
+    }
     _finish(win, reason: win ? null : '方块堆到顶部，对局结束');
   }
 

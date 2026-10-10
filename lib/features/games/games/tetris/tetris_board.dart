@@ -169,7 +169,11 @@ class _TetrisBoardPainter extends CustomPainter {
       for (var c = 0; c < kTetrisCols; c++) {
         final v = board[r][c];
         if (v != null) {
-          _drawCell(canvas, c * cell, r * cell, cell, kTetrominoColors[v]);
+          if (v == kGarbageColorIndex) {
+            _drawGarbageCell(canvas, c * cell, r * cell, cell);
+          } else {
+            _drawCell(canvas, c * cell, r * cell, cell, kTetrominoColors[v]);
+          }
         }
       }
     }
@@ -217,6 +221,25 @@ class _TetrisBoardPainter extends CustomPainter {
         Radius.circular(cell * 0.1),
       ),
       Paint()..color = Colors.white.withValues(alpha: 0.28),
+    );
+  }
+
+  /// 垃圾砖：哑光灰 + 裂纹点（与普通块明显区分，无高光）。
+  void _drawGarbageCell(Canvas canvas, double x, double y, double cell) {
+    final rect = Rect.fromLTWH(x + 1, y + 1, cell - 2, cell - 2);
+    canvas.drawRRect(
+      RRect.fromRectAndRadius(rect, Radius.circular(cell * 0.12)),
+      Paint()..color = kGarbageColor,
+    );
+    canvas.drawCircle(
+      Offset(x + cell * 0.35, y + cell * 0.62),
+      cell * 0.07,
+      Paint()..color = const Color(0xFF4B5563),
+    );
+    canvas.drawCircle(
+      Offset(x + cell * 0.66, y + cell * 0.38),
+      cell * 0.055,
+      Paint()..color = const Color(0xFF4B5563),
     );
   }
 
