@@ -54,3 +54,34 @@ enum PetAction {
     return null;
   }
 }
+
+/// 表现层**静默闸门**：这里列出的动作在舞台上改播待机动画
+///
+/// 2026-10-10 加。量产是「一只一只、一个动作一个动作」推进的，非待机动作的
+/// 素材（弯曲表情档 / 整图帧）产出进度不稳定，画风与已定版的 idle 对不齐时
+/// 宁可不上台——故先统一静默成 idle，补齐一个、归位一个。
+///
+/// **归位方式＝把那个动作从这个集合里删掉**，别的都不动：仲裁、优先级、
+/// 回落计时、粒子、音效、RPC 全部照常（那些不吃这张表），动作期间宠物只是
+/// 继续呼吸。
+///
+/// 编译期常量而非后台配置：弯曲几何/编排与帧文件全在包内（`pet_bend.dart`、
+/// `pet_art.dart` 两张生成表），素材补齐必然发版，闸门跟着素材走才有单一源。
+const Set<PetAction> kPetActionsSilenced = {
+  PetAction.walk,
+  PetAction.sleep,
+  PetAction.sad,
+  PetAction.happy,
+  PetAction.petted,
+  PetAction.eat,
+  PetAction.evolve,
+};
+
+extension PetActionSilence on PetAction {
+  /// 闸门放行后**实际该演**的动作；未在表内的原样返回。
+  ///
+  /// 只给画面用（姿态/弯曲编排/身体帧/帧率），不要拿它去做仲裁或计时——
+  /// 那两个消费者要的是动作本体。
+  PetAction get played =>
+      kPetActionsSilenced.contains(this) ? PetAction.idle : this;
+}

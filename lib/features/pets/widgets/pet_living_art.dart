@@ -32,6 +32,10 @@ const double _kFallbackArtSize = 320;
 /// 只保留一次性动作的回落计时。缺几何 / 缺编排（新动作没进表）时整条回退到下面
 /// 的整图补间；着色器本身不可用时由 `PetBendArt` 内部退化成整图兜底，
 /// 两条路都不会让宠物消失（铁律 8：配置缺码一律不崩溃）。
+///
+/// 2026-10-10 静默闸门：画面演的是 [PetAction.played]（`kPetActionsSilenced`
+/// 里登记的动作改播 idle），计时/回落/粒子/音效仍按动作本体走——所以喂完食
+/// 依然是「宠物呼吸 5 秒后回到待机」，只是不再演那套姿态。
 class PetLivingArt extends StatefulWidget {
   const PetLivingArt({
     super.key,
@@ -83,9 +87,13 @@ class _PetLivingArtState extends State<PetLivingArt>
   Timer? _endTimer;
   PetAction _playing = PetAction.idle;
 
+  /// 画面实际演出的动作：静默闸门（`kPetActionsSilenced`）改播 idle。
+  /// [PetAction] 本体仍按真动作计时与回落，粒子/音效不受这张表支配。
+  PetAction get _visual => _playing.played;
+
   /// 帧轮播一圈时长：待机 ~3.5fps，动作期间提速到 ~8fps
   Duration get _frameCycle {
-    final fps = _playing.ambient ? 3.5 : 8.0;
+    final fps = _visual.ambient ? 3.5 : 8.0;
     final perFrame = (1000 / fps).round();
     return Duration(milliseconds: perFrame * math.max(1, widget.frames.length));
   }
@@ -95,7 +103,7 @@ class _PetLivingArtState extends State<PetLivingArt>
 
   /// 当前动作的分层弯曲编排；null = 无编排（新动作或表里没登记），整图补间兜底
   PetActDef? get _bendAct =>
-      widget.bendGeo == null ? null : kPetBendActs[_playing.code];
+      widget.bendGeo == null ? null : kPetBendActs[_visual.code];
 
   @override
   void initState() {
@@ -177,7 +185,7 @@ class _PetLivingArtState extends State<PetLivingArt>
   _Pose _pose() {
     final t = _perf.value;
     final wave = math.sin(2 * math.pi * t);
-    switch (_playing) {
+    switch (_visual) {
       case PetAction.petted:
         final sway = math.sin(4 * math.pi * t);
         return _Pose(
@@ -285,7 +293,7 @@ class _PetLivingArtState extends State<PetLivingArt>
         animation: Listenable.merge([_frame, _perf]),
         builder: (context, child) {
           final pose = _pose();
-          final glow = _playing == PetAction.evolve
+          final glow = _visual == PetAction.evolve
               ? math.sin(math.pi * _perf.value)
               : 0.0;
           return RepaintBoundary(

@@ -86,10 +86,14 @@ List<String> petActionFrames(String speciesCode, PetAction action,
 ///
 /// 之所以不能「无真帧就退回底图」：idle 帧是抠好底的透明图，底图带背景，
 /// 动作期间换底图会闪出方框背景。透明身体 + 程序补间才是这套 puppet 的前提。
+///
+/// 取的是 [PetAction.played]（静默闸门后的实际演出动作）：被静默的动作即使
+/// 已产出真帧也不上台，归位只需从 `kPetActionsSilenced` 删一项。
 List<String> petStageFrames(String speciesCode, PetAction action,
     {Map<String, dynamic>? render2d}) {
-  final own = petActionFrames(speciesCode, action, render2d: render2d);
-  if (own.isNotEmpty || action == PetAction.idle) return own;
+  final play = action.played;
+  final own = petActionFrames(speciesCode, play, render2d: render2d);
+  if (own.isNotEmpty || play == PetAction.idle) return own;
   return petActionFrames(speciesCode, PetAction.idle, render2d: render2d);
 }
 

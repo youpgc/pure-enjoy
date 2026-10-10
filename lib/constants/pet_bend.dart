@@ -290,12 +290,12 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
     0: PetBendGeo(
       dir: 'assets/pets/anim/ssr/cat_ssr1/s0',
       side: 384,
-      headTop: 85,
+      headTop: 86,
       foot: 383,
-      pivotX: 169,
+      pivotX: 128,
       yn: 288,
-      eyeY: 189,
-      eyeBox: Rect4(77, 183, 229, 239),
+      eyeY: 176,
+      eyeBox: Rect4(90, 170, 177, 200),
       droopRamp: 0.25,
       droopRampMin: 40,
     ), // fill=0.78
@@ -304,10 +304,10 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       side: 384,
       headTop: 61,
       foot: 383,
-      pivotX: 145,
+      pivotX: 105,
       yn: 280,
-      eyeY: 158,
-      eyeBox: Rect4(98, 152, 191, 182),
+      eyeY: 154,
+      eyeBox: Rect4(60, 148, 157, 184),
       droopRamp: 0.25,
       droopRampMin: 40,
     ), // fill=0.84
@@ -316,13 +316,178 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       side: 384,
       headTop: 0,
       foot: 383,
-      pivotX: 114,
+      pivotX: 103,
       yn: 260,
-      eyeY: 64,
-      eyeBox: Rect4(79, 58, 151, 89),
+      eyeY: 63,
+      eyeBox: Rect4(64, 57, 153, 98),
       droopRamp: 0.25,
       droopRampMin: 40,
     ), // fill=1
+  },
+  // 豆豆（N）
+  'dog_n1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/dog_n1/s0',
+      side: 384,
+      headTop: 84,
+      foot: 383,
+      pivotX: 121,
+      yn: 287,
+      eyeY: 189,
+      eyeBox: Rect4(79, 183, 171, 223),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.78
+  },
+  // 汤圆（N）
+  'dog_n2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/dog_n2/s0',
+      side: 384,
+      headTop: 120,
+      foot: 383,
+      pivotX: 159,
+      yn: 299,
+      eyeY: 219,
+      eyeBox: Rect4(111, 213, 209, 254),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.6864
+  },
+  // 阿黄（N）
+  'dog_n3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/dog_n3/s0',
+      side: 384,
+      headTop: 99,
+      foot: 383,
+      pivotX: 128,
+      yn: 292,
+      eyeY: 200,
+      eyeBox: Rect4(84, 194, 181, 236),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.741
+  },
+  // 小灰（N）
+  'dog_n4': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/dog_n4/s0',
+      side: 384,
+      headTop: 129,
+      foot: 383,
+      pivotX: 119,
+      yn: 302,
+      eyeY: 200,
+      eyeBox: Rect4(77, 194, 177, 238),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.663
+  },
+  // 哈奇（R）
+  'dog_r1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/r/dog_r1/s0',
+      side: 384,
+      headTop: 84,
+      foot: 383,
+      pivotX: 112,
+      yn: 287,
+      eyeY: 201,
+      eyeBox: Rect4(66, 195, 166, 242),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.78
+  },
+  // 卷卷（R）
+  'dog_r2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/r/dog_r2/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 142,
+      yn: 297,
+      eyeY: 192,
+      eyeBox: Rect4(107, 186, 182, 219),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 柴柴（R）
+  'dog_r3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/r/dog_r3/s0',
+      side: 384,
+      headTop: 108,
+      foot: 383,
+      pivotX: 130,
+      yn: 295,
+      eyeY: 212,
+      eyeBox: Rect4(82, 206, 184, 246),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.7176
+  },
+  // 金金（SR）
+  'dog_sr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/sr/dog_sr1/s0',
+      side: 384,
+      headTop: 84,
+      foot: 383,
+      pivotX: 125,
+      yn: 287,
+      eyeY: 168,
+      eyeBox: Rect4(76, 162, 181, 201),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.78
+  },
+  // 墨墨（SR）
+  'dog_sr2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/sr/dog_sr2/s0',
+      side: 384,
+      headTop: 96,
+      foot: 383,
+      pivotX: 127,
+      yn: 291,
+      eyeY: 170,
+      eyeBox: Rect4(86, 164, 172, 202),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.7488
+  },
+  // 布丁（N）
+  'mouse_n1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/mouse_n1/s0',
+      side: 384,
+      headTop: 168,
+      foot: 383,
+      pivotX: 138,
+      yn: 314,
+      eyeY: 234,
+      eyeBox: Rect4(101, 228, 185, 271),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5616
+  },
+  // 糯米（N）
+  'rabbit_n1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/n/rabbit_n1/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 136,
+      yn: 297,
+      eyeY: 242,
+      eyeBox: Rect4(92, 236, 190, 280),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
   },
 };
 
@@ -345,12 +510,12 @@ const Map<String, PetActDef> kPetBendActs = {
   ),
   'eat': PetActDef(
     key: 'eat',
-    per: 2.4,
+    per: 5,
     loop: false,
     reveal: false,
-    expr: [[0, 0], [0.1, 4], [0.92, 0]],
-    th: [[0, 0], [0.5, 0.35], [1, 0]],
-    a: [[0, 0], [0.18, 16], [0.32, 5], [0.48, 15], [0.62, 4], [0.78, 13], [1, 0]],
+    expr: [[0, 0], [0.036, 7], [0.074, 8], [0.112, 9], [0.15, 10], [0.206, 9], [0.238, 8], [0.27, 7], [0.302, 0], [0.352, 7], [0.39, 8], [0.428, 9], [0.466, 10], [0.522, 9], [0.554, 8], [0.586, 7], [0.618, 0], [0.668, 7], [0.706, 8], [0.744, 9], [0.782, 10], [0.838, 9], [0.87, 8], [0.902, 7], [0.934, 0]],
+    th: [[0, 0]],
+    a: [[0, 0]],
     dx: null,
     dy: null,
     sx: null,

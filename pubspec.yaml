@@ -114,11 +114,22 @@ flutter:
     - assets/pets/anim/n/cat_n2/s0/
     - assets/pets/anim/n/cat_n3/s0/
     - assets/pets/anim/n/cat_n4/s0/
+    - assets/pets/anim/n/dog_n1/s0/
+    - assets/pets/anim/n/dog_n2/s0/
+    - assets/pets/anim/n/dog_n3/s0/
+    - assets/pets/anim/n/dog_n4/s0/
+    - assets/pets/anim/n/mouse_n1/s0/
+    - assets/pets/anim/n/rabbit_n1/s0/
     - assets/pets/anim/r/cat_r1/s0/
     - assets/pets/anim/r/cat_r2/s0/
     - assets/pets/anim/r/cat_r3/s0/
+    - assets/pets/anim/r/dog_r1/s0/
+    - assets/pets/anim/r/dog_r2/s0/
+    - assets/pets/anim/r/dog_r3/s0/
     - assets/pets/anim/sr/cat_sr1/s0/
     - assets/pets/anim/sr/cat_sr2/s0/
+    - assets/pets/anim/sr/dog_sr1/s0/
+    - assets/pets/anim/sr/dog_sr2/s0/
     - assets/pets/anim/ssr/cat_ssr1/s0/
     - assets/pets/anim/ssr/cat_ssr1/s1/
     - assets/pets/anim/ssr/cat_ssr1/s2/
