@@ -30,11 +30,25 @@
 /// 不存在的文件——一期素材全随包，加素材必然发版，配置无权凭空造资源。
 library;
 
+import '../../../constants/pet_bend.dart';
 import '../../../constants/pet_render.dart';
 import 'pet_art.dart';
 
 // 消费方只 import 本文件：解码宽度算法在此统一，避免各处各写一份 1.25 倍余量
 export 'pet_art.dart' show petDecodeWidth;
+export '../../../constants/pet_bend.dart' show PetBendGeo;
+
+/// 分层弯曲的形态几何；查不到 = 该形态没有弯曲素材，调用方走整图补间。
+///
+/// 弯曲用的 6 档表情帧是**结构性**素材（编排 `expr` 通道按下标点名，缺任一档
+/// 就会在切档瞬间闪透明），因此**不受 `render2d.frames` 支配**——后台改帧数
+/// 只影响整图补间那条路径，要不要用弯曲由 `kPetBendGeo` 是否登记决定。
+PetBendGeo? petBendGeo(String speciesCode, int stage) =>
+    kPetBendGeo[speciesCode]?[stage];
+
+/// 进化末段切到的目标阶目录；无下一阶返回 null（播放器停在当前帧档不越界）
+String? petBendRevealDir(String speciesCode, int stage) =>
+    kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
 /// 整只底图：`render2d.base` 优先，未配置或未随包则回退该种属该阶位的清单底图。
 ///

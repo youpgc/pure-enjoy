@@ -3,9 +3,11 @@ import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
+import '../../../constants/pet_bend.dart';
 import '../../../constants/pet_render.dart';
 import '../utils/pet_action_machine.dart';
 import '../utils/pet_art_resolver.dart';
+import 'pet_bend_art.dart';
 
 /// 父约束无界时的宠物显示基准边长（仅用于推算解码宽度与光晕尺寸）
 const double _kFallbackArtSize = 320;
@@ -23,6 +25,13 @@ const double _kFallbackArtSize = 320;
 ///
 /// 与旧版差别：旧版只有一个 `excited` 布尔位（把帧率 3.5fps 提到 8fps），现在
 /// 由 [action] 驱动完整姿态编排；[onActionEnd] 供宿主把动作回落到环境态。
+///
+/// 2026-10 分层弯曲接入：给了 [bendGeo] 且该动作在 `kPetBendActs` 有编排时，
+/// 整条表现改由 [PetBendArt] 承担——被弯曲的是图像内部的一行行像素（归零线以下
+/// 真·不动），而不是整张图的位姿，故本文件的 `_frame`/`_perf`/`_pose` 全部让位，
+/// 只保留一次性动作的回落计时。缺几何 / 缺编排（新动作没进表）时整条回退到下面
+/// 的整图补间；着色器本身不可用时由 `PetBendArt` 内部退化成整图兜底，
+/// 两条路都不会让宠物消失（铁律 8：配置缺码一律不崩溃）。
 class PetLivingArt extends StatefulWidget {
   const PetLivingArt({
     super.key,
@@ -32,6 +41,8 @@ class PetLivingArt extends StatefulWidget {
     this.fit = BoxFit.contain,
     this.action = PetAction.idle,
     this.onActionEnd,
+    this.bendGeo,
+    this.bendRevealDir,
   });
 
   /// 真帧序列（`petStageFrames` 解析：该动作有真帧用它，否则沿用 idle 帧）；
@@ -50,6 +61,12 @@ class PetLivingArt extends StatefulWidget {
 
   /// 一次性动作播完通知；宿主据此把动作回落到环境态
   final ValueChanged<PetAction>? onActionEnd;
+
+  /// 分层弯曲几何（`petBendGeo` 解析）；null = 该形态无弯曲素材，走整图补间
+  final PetBendGeo? bendGeo;
+
+  /// 进化末段替换的目标阶目录（`petBendRevealDir` 解析）
+  final String? bendRevealDir;
 
   @override
   State<PetLivingArt> createState() => _PetLivingArtState();
@@ -76,6 +93,10 @@ class _PetLivingArtState extends State<PetLivingArt>
   static Duration _duration(PetAction action) =>
       PetActionMachine.durationOf(action);
 
+  /// 当前动作的分层弯曲编排；null = 无编排（新动作或表里没登记），整图补间兜底
+  PetActDef? get _bendAct =>
+      widget.bendGeo == null ? null : kPetBendActs[_playing.code];
+
   @override
   void initState() {
     super.initState();
@@ -97,6 +118,19 @@ class _PetLivingArtState extends State<PetLivingArt>
 
   /// 环境态循环播放；一次性动作播完计时回调宿主回落
   void _applyPlayMode() {
+    _endTimer?.cancel();
+    if (_bendAct != null) {
+      // 弯曲路径：逐帧姿态由 PetBendArt 自己的时钟承担，本文件的两个控制器
+      // 不参与画面（留着跑会白刷一层 AnimatedBuilder），只保留回落计时
+      _frame.stop();
+      _perf.stop();
+      if (!_playing.ambient) {
+        _endTimer = Timer(_duration(_playing), () {
+          if (mounted) widget.onActionEnd?.call(_playing);
+        });
+      }
+      return;
+    }
     // 动作期间帧率提速到 ~8fps，环境态回落到 ~3.5fps
     _frame.duration = _frameCycle;
     _syncFrameClock();
@@ -106,7 +140,6 @@ class _PetLivingArtState extends State<PetLivingArt>
       return;
     }
     _perf.forward(from: 0);
-    _endTimer?.cancel();
     _endTimer = Timer(_duration(_playing), () {
       if (mounted) widget.onActionEnd?.call(_playing);
     });
@@ -118,7 +151,9 @@ class _PetLivingArtState extends State<PetLivingArt>
     if (oldWidget.frames != widget.frames) {
       _syncFrameClock();
     }
-    if (oldWidget.action != widget.action) {
+    if (oldWidget.action != widget.action ||
+        oldWidget.bendGeo != widget.bendGeo) {
+      // 换形态也要重算播放模式（弯曲↔补间之间可能切换，控制器不能留在旧状态）
       _playing = widget.action;
       _applyPlayMode();
     }
@@ -205,6 +240,16 @@ class _PetLivingArtState extends State<PetLivingArt>
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
+    final geo = widget.bendGeo;
+    final act = _bendAct;
+    if (geo != null && act != null) {
+      return PetBendArt(
+        geo: geo,
+        act: act,
+        revealDir: widget.bendRevealDir,
+        primaryColor: cs.primary,
+      );
+    }
     return LayoutBuilder(builder: (context, constraints) {
       final box = constraints.biggest;
       // 基准边长：无父约束时回退 320（弹窗/列表缩略图等 loose 场景）
