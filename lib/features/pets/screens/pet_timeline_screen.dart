@@ -130,8 +130,33 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
       case 'release':
         return (Icons.spa_outlined, '送别',
             '被送归自然（Lv.${p['level'] ?? '?'}），图鉴会永远记得它');
+      case 'obtain':
+        return (Icons.child_care, '初见', '破壳而出，来到了你的身边');
+      case 'breed':
+        return (Icons.egg, '新生命', '繁育诞生了一枚崭新的蛋，静静等待破壳');
+      case 'refine_reassigned':
+        return (Icons.tune, '属性洗练', '天赋重新洗练，潜能分配焕然一新');
+      case 'trait_wash':
+        return (Icons.auto_fix_high, '特性洗练', '天赋特性焕然一新');
+      case 'adventure_memory':
+        final gold = p['gold'];
+        final exp = p['exp'];
+        final gains = [
+          if (gold != null) ' $gold 金币',
+          if (exp != null) ' $exp 经验',
+        ].join('、');
+        return (
+          Icons.explore,
+          '历险纪念',
+          gains.isEmpty ? '完成了一次难忘的冒险' : '完成了一次冒险，带回了$gains'
+        );
+      case 'adventure_failed':
+        return (Icons.shield_outlined, '历险遇险', '在冒险中遇到了危险，所幸平安归来');
+      case 'adventure_recalled':
+        return (Icons.home_outlined, '提前召回', '还没走完旅程，就被你召回了家');
       default:
-        return (Icons.circle_outlined, item.type, p.toString());
+        // 未知/未来新增事件类型：不出类型码与原始载荷，保持纪念卡中文观感
+        return (Icons.circle_outlined, '成长记录', '留下了成长的足迹');
     }
   }
 
