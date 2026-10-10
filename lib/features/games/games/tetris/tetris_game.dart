@@ -159,6 +159,22 @@ class _TetrisGameState extends State<TetrisGame> {
   /// 特殊方块注入概率（config `special_chance`，0..1；0=不注入）
   double _specialChance = 0;
 
+  /// 延迟结算（2026-10-10）：已达成通关目标但尚未结算——继续游戏刷分，
+  /// 玩家点「确认结算」提前落袋或玩到自然封顶（顶死/超时/块尽）自动结算。
+  /// 仅马拉松/每日/闪电/挑战/生存支持（竞速用时/挖掘挖穿/Boss 血空即结算）。
+  bool _goalReached = false;
+
+  /// 当前模式是否支持「达标后继续游戏」
+  bool get _supportsContinue => switch (_mode) {
+        TetrisMode.marathon ||
+        TetrisMode.daily ||
+        TetrisMode.blitz ||
+        TetrisMode.challenge ||
+        TetrisMode.survival =>
+          true,
+        _ => false,
+      };
+
   /// 已解析的随机源（daily 模式为日期种子实例，其余随机）
   late Random _rng;
 
@@ -291,6 +307,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _garbageCleared = 0;
     _lastGarbageHole = -1;
     _slowUntil = null; // 时缓不跨局（重开后重力间隔恢复原速）
+    _goalReached = false; // 延迟结算状态不跨局
     _bossHp = _bossMaxHp; // Boss 血量每局回满
     _startTime = DateTime.now();
     // dig：先预填垃圾行再落首块（board 为空，直接写底部）
@@ -461,6 +478,7 @@ class _TetrisGameState extends State<TetrisGame> {
   // ───────── HUD 文案 ─────────
 
   String get _targetLabel {
+    if (_goalReached) return '已达成 ✓';
     switch (_mode) {
       case TetrisMode.marathon:
       case TetrisMode.sprint:

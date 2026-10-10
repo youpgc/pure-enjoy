@@ -571,15 +571,30 @@ extension _TetrisEngineOps on _TetrisGameState {
     _restartGravityTimer();
   }
 
-  /// 通关检测（消行/计分后调用）；达成即结束。
+  /// 通关检测（消行/计分后调用）。
+  ///
+  /// 延迟结算（2026-10-10 用户需求）：马拉松/每日/闪电/挑战/生存五模式
+  /// 首次达标不立即结束，置 [_goalReached] 继续游戏刷更高分——玩家可点
+  /// 「确认结算」提前落袋，或玩到自然封顶（顶死/超时/块尽）按累计值
+  /// 正常结算；竞速（用时语义）/挖掘（挖穿即胜）/Boss（血空即胜）
+  /// 达标即结算不延续。
   bool _checkWin() {
     if (_finished) return true;
+    if (_goalReached) return false; // 已达标待结算，不再重复判定
     switch (_mode) {
       case TetrisMode.marathon:
       case TetrisMode.sprint:
       case TetrisMode.survival:
       case TetrisMode.daily:
         if (_linesTarget > 0 && _linesTotal >= _linesTarget) {
+          if (_supportsContinue) {
+            _goalReached = true;
+            _pushFx('目标达成!');
+            _pushFx('可继续挑战或结算');
+            GameAudio.instance.levelUp();
+            if (mounted) setState(() {});
+            return false;
+          }
           _finish(true);
           return true;
         }
@@ -587,6 +602,14 @@ extension _TetrisEngineOps on _TetrisGameState {
       case TetrisMode.blitz:
       case TetrisMode.challenge:
         if (_scoreTarget > 0 && _score >= _scoreTarget) {
+          if (_supportsContinue) {
+            _goalReached = true;
+            _pushFx('目标达成!');
+            _pushFx('可继续挑战或结算');
+            GameAudio.instance.levelUp();
+            if (mounted) setState(() {});
+            return false;
+          }
           _finish(true);
           return true;
         }
