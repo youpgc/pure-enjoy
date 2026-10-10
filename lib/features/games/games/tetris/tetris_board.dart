@@ -76,6 +76,8 @@ extension _TetrisBoardOps on _TetrisGameState {
               padding: const EdgeInsets.only(top: 5),
               child: _buildMiniBox(
                 type: i < _queue.length ? _queue[i].type : null,
+                special:
+                    i < _queue.length ? _queue[i].special : TetrisSpecial.none,
                 size: 44,
                 label: '',
               ),
@@ -109,10 +111,12 @@ extension _TetrisBoardOps on _TetrisGameState {
   }
 
   /// 紧凑预览面板（深色容器内，深底与容器融合 + 微标签）。
+  /// [special] 非空时右上角叠特殊标记点（炸弹橙 / 重块灰，三期 T3-02）。
   Widget _buildMiniBox({
     required String label,
     required Tetromino? type,
     required double size,
+    TetrisSpecial special = TetrisSpecial.none,
   }) {
     return Container(
       width: size,
@@ -129,6 +133,21 @@ extension _TetrisBoardOps on _TetrisGameState {
               painter: _MiniPiecePainter(type: type),
             ),
           ),
+          if (special != TetrisSpecial.none)
+            Positioned(
+              right: 2,
+              top: 2,
+              child: Container(
+                width: 8,
+                height: 8,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: special == TetrisSpecial.bomb
+                      ? const Color(0xFFFFB300)
+                      : const Color(0xFF90A4AE),
+                ),
+              ),
+            ),
           if (label.isNotEmpty)
             Positioned(
               left: 0,

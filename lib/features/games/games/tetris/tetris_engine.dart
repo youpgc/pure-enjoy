@@ -331,12 +331,15 @@ extension _TetrisEngineOps on _TetrisGameState {
     _cancelLockTimer();
     _lockResets = 0;
     final held = _held;
+    final heldSpecial = _heldSpecial;
     _held = p.type;
+    _heldSpecial = p.special;
     if (held == null) {
       _spawnPiece();
     } else {
       _current = Piece(held, 0,
-          (kTetrisCols - _pieceWidth(held)) ~/ 2, 0);
+          (kTetrisCols - _pieceWidth(held)) ~/ 2, 0,
+          special: heldSpecial);
       _lastAction = _TetrisAction.spawn;
       if (_collides(_current!, 0, 0)) {
         _current!.y--;

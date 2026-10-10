@@ -79,6 +79,10 @@ class _TetrisGameState extends State<TetrisGame> {
   final List<QueuedPiece> _queue = <QueuedPiece>[];
   Piece? _current;
   Tetromino? _held;
+
+  /// 暂存块的特殊标记（三期 T3-02：Hold 交换时随 _held 一起保存/恢复，
+  /// 防止炸弹/重块经 Hold 变普通块）
+  TetrisSpecial _heldSpecial = TetrisSpecial.none;
   bool _holdUsed = false;
   Piece? get currentPiece => _current;
 
@@ -265,6 +269,7 @@ class _TetrisGameState extends State<TetrisGame> {
     }
     _current = null;
     _held = null;
+    _heldSpecial = TetrisSpecial.none;
     _holdUsed = false;
     _finished = false;
     _score = 0;
