@@ -196,8 +196,7 @@ class _GameBannerCard extends StatelessWidget {
             .map((c) => Color.lerp(c, const Color(0xFF10131F), 0.35)!)
             .toList()
         : _colors;
-    // 左右内边距随风格圆角自适应：胶囊端头 44px 时加大留白防内容被吞
-    final hpad = isPill ? 26.0 : 14.0 + (tokenRadius - 8).clamp(0.0, 12.0);
+    final hpad = isPill ? 14.0 : 14.0 + (tokenRadius - 8).clamp(0.0, 12.0);
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -268,10 +267,10 @@ class _GameBannerCard extends StatelessWidget {
                   child: SizedBox.expand(
                     child: Row(
                     children: <Widget>[
-                      // 游戏图标（白底圆角卡，突出主体）
+                      // 游戏图标（白底圆角卡，突出主体；胶囊下 50% 变圆）
                       Container(
-                        width: 64,
-                        height: 64,
+                        width: 56,
+                        height: 56,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.94),
                           // 联动风格圆角：胶囊风格下 64 正方图标卡变圆
@@ -313,50 +312,37 @@ class _GameBannerCard extends StatelessWidget {
                           ),
                         ),
                       ),
-                      const SizedBox(width: 10),
-                      // 奖杯墙：大号奖杯 + 最佳成绩小字
-                      SizedBox(
-                        width: 74,
-                        child: Column(
-                          mainAxisSize: MainAxisSize.min,
-                          children: <Widget>[
-                            SvgPicture.asset(
-                              best == null
-                                  ? 'assets/games/backgrounds/trophy_gray.svg'
-                                  : 'assets/games/backgrounds/trophy_gold.svg',
-                              width: 48,
-                              height: 48,
-                              errorBuilder: (_, __, ___) => Icon(
-                                Icons.emoji_events,
-                                size: 44,
-                                color: best == null
-                                    ? Colors.white.withValues(alpha: 0.4)
-                                    : const Color(0xFFFFD54F),
-                              ),
-                            ),
-                            const SizedBox(height: 2),
-                            Text(
-                              best == null ? '暂无成绩' : '最佳 ${fmtBest ?? ''}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              textAlign: TextAlign.center,
-                              style: TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.bold,
-                                color: best == null
-                                    ? Colors.white.withValues(alpha: 0.55)
-                                    : const Color(0xFFFFD54F),
-                                shadows: const <Shadow>[
-                                  Shadow(
-                                      color: Colors.black54,
-                                      blurRadius: 4,
-                                      offset: Offset(0, 1)),
-                                ],
-                              ),
-                            ),
-                          ],
+                      // 最佳成绩（文字在奖杯左侧）+ 大号奖杯；无成绩不展示
+                      if (best != null) ...<Widget>[
+                        const SizedBox(width: 10),
+                        Text(
+                          '最佳 ${fmtBest ?? ''}',
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          textAlign: TextAlign.right,
+                          style: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                            color: Color(0xFFFFD54F),
+                            shadows: <Shadow>[
+                              Shadow(
+                                  color: Colors.black54,
+                                  blurRadius: 4,
+                                  offset: Offset(0, 1)),
+                            ],
+                          ),
                         ),
-                      ),
+                        const SizedBox(width: 8),
+                        SvgPicture.asset(
+                          'assets/games/backgrounds/trophy_gold.svg',
+                          width: 48,
+                          height: 48,
+                          errorBuilder: (_, __, ___) => const Icon(
+                              Icons.emoji_events,
+                              size: 44,
+                              color: Color(0xFFFFD54F)),
+                        ),
+                      ],
                     ],
                   ),
                 ),
