@@ -32,6 +32,8 @@ Future<bool> showPetFeedSheet(BuildContext context, String petId) async {
     context: context,
     showDragHandle: true,
     isScrollControlled: true,
+    // 宽屏铺满：Flutter 默认把底部弹层限宽 640 居中，喂食浮层（含无口粮空态）放开
+    constraints: const BoxConstraints(maxWidth: double.infinity),
     builder: (_) =>
         _PetFeedSheet(petId: petId, foods: foods, onFed: () => fed = true),
   );
