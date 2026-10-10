@@ -44,98 +44,113 @@ extension _TetrisInputOps on _TetrisGameState {
     );
   }
 
-  /// 底部辅助按钮行（五键）。config `buttons:false` 时整行不渲染。
-  List<Widget> _buildControlButtons() {
-    return <Widget>[
-      Padding(
-        padding: const EdgeInsets.fromLTRB(10, 2, 10, 0),
+  /// 底部操作按钮行（2026-10-10 市场风格重设计）：
+  /// 五键大圆形（56px，无文字，位置固定便于盲操），「旋转」为最高频主键
+  /// 用主题强调色填充，其余 tonal 浅底；config `buttons:false` 时整行不渲染。
+  Widget _buildControlBar() {
+    if (!_buttonsEnabled) return const SizedBox.shrink();
+    return SafeArea(
+      top: false,
+      child: Padding(
+        padding: const EdgeInsets.fromLTRB(12, 4, 12, 8),
         child: Row(
+          mainAxisAlignment: MainAxisAlignment.spaceEvenly,
           children: <Widget>[
-            Expanded(
-              child: _TetrisControlButton(
-                icon: Icons.swap_vert_circle_outlined,
-                label: 'HOLD',
-                onPressed:
-                    (_holdEnabled && !_holdUsed && _current != null && !_finished)
-                        ? _holdPiece
-                        : null,
-              ),
+            _TetrisRoundButton(
+              icon: Icons.swap_vert_circle_outlined,
+              tooltip: 'HOLD（暂存）',
+              onPressed:
+                  (_holdEnabled && !_holdUsed && _current != null && !_finished)
+                      ? _holdPiece
+                      : null,
             ),
-            Expanded(
-              child: _TetrisControlButton(
-                icon: Icons.rotate_right,
-                label: '旋转',
-                onPressed: _finished ? null : () => _rotatePiece(1),
-              ),
+            _TetrisRoundButton(
+              icon: Icons.rotate_right,
+              tooltip: '旋转',
+              primary: true,
+              big: true,
+              onPressed: _finished ? null : () => _rotatePiece(1),
             ),
-            Expanded(
-              child: _TetrisRepeatButton(
-                icon: Icons.arrow_back_ios_new,
-                label: '左移',
-                step: () => _moveHorizontal(-1),
-                enabled: !_finished,
-              ),
+            _TetrisRepeatButton(
+              icon: Icons.arrow_back,
+              tooltip: '左移',
+              step: () => _moveHorizontal(-1),
+              enabled: !_finished,
             ),
-            Expanded(
-              child: _TetrisRepeatButton(
-                icon: Icons.arrow_downward,
-                label: '软降',
-                step: _softDropStep,
-                enabled: !_finished,
-                interval: const Duration(milliseconds: 60),
-              ),
+            _TetrisRepeatButton(
+              icon: Icons.arrow_downward,
+              tooltip: '软降',
+              step: _softDropStep,
+              enabled: !_finished,
+              interval: const Duration(milliseconds: 60),
             ),
-            Expanded(
-              child: _TetrisRepeatButton(
-                icon: Icons.arrow_forward_ios,
-                label: '右移',
-                step: () => _moveHorizontal(1),
-                enabled: !_finished,
-              ),
+            _TetrisRepeatButton(
+              icon: Icons.arrow_forward,
+              tooltip: '右移',
+              step: () => _moveHorizontal(1),
+              enabled: !_finished,
             ),
           ],
         ),
       ),
-    ];
+    );
   }
 }
 
-/// 单发控制按钮（HOLD / 旋转）。
-class _TetrisControlButton extends StatelessWidget {
+/// 大圆形操作按钮（56px / 主键 64px）：图标为主、无文字——
+/// 参考热门俄罗斯方块手游的圆形触控钮设计；主键强调色填充。
+class _TetrisRoundButton extends StatelessWidget {
   final IconData icon;
-  final String label;
+  final String tooltip;
   final VoidCallback? onPressed;
+  final bool primary;
+  final bool big;
 
-  const _TetrisControlButton({
+  const _TetrisRoundButton({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     this.onPressed,
+    this.primary = false,
+    this.big = false,
   });
 
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
     final enabled = onPressed != null;
-    return Opacity(
-      opacity: enabled ? 1.0 : 0.45,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
+    final size = big ? 64.0 : 56.0;
+    return Tooltip(
+      message: tooltip,
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.4,
         child: Material(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
           child: InkWell(
-            borderRadius: BorderRadius.circular(12),
+            customBorder: const CircleBorder(),
             onTap: onPressed,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(icon, size: 20),
-                  const SizedBox(height: 2),
-                  Text(label,
-                      style: const TextStyle(fontSize: 10)),
-                ],
+            child: Container(
+              width: size,
+              height: size,
+              decoration: BoxDecoration(
+                shape: BoxShape.circle,
+                color: primary
+                    ? theme.colorScheme.primary
+                    : theme.colorScheme.primary.withValues(alpha: 0.10),
+                border: Border.all(
+                  color: primary
+                      ? Colors.transparent
+                      : theme.colorScheme.primary.withValues(alpha: 0.25),
+                  width: 1.2,
+                ),
+              ),
+              child: Icon(
+                icon,
+                size: big ? 32 : 26,
+                color: primary
+                    ? theme.colorScheme.onPrimary
+                    : theme.colorScheme.primary,
               ),
             ),
           ),
@@ -145,10 +160,10 @@ class _TetrisControlButton extends StatelessWidget {
   }
 }
 
-/// 长按连发按钮（←/↓/→）：点按单步、长按 [interval] 连发。
+/// 长按连发圆形按钮（←/↓/→）：点按单步、长按 [interval] 连发。
 class _TetrisRepeatButton extends StatefulWidget {
   final IconData icon;
-  final String label;
+  final String tooltip;
 
   /// 单步动作
   final VoidCallback step;
@@ -161,7 +176,7 @@ class _TetrisRepeatButton extends StatefulWidget {
 
   const _TetrisRepeatButton({
     required this.icon,
-    required this.label,
+    required this.tooltip,
     required this.step,
     required this.enabled,
     this.interval = const Duration(milliseconds: 110),
@@ -195,29 +210,34 @@ class _TetrisRepeatButtonState extends State<_TetrisRepeatButton> {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
-    return Opacity(
-      opacity: widget.enabled ? 1.0 : 0.45,
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 3),
-        child: Material(
-          color: theme.colorScheme.surfaceContainerHighest,
-          borderRadius: BorderRadius.circular(12),
-          child: GestureDetector(
-            behavior: HitTestBehavior.opaque,
-            onTap: widget.enabled ? widget.step : null,
-            onLongPressStart: widget.enabled ? (_) => _startRepeat() : null,
-            onLongPressCancel: _stopRepeat,
-            onLongPressEnd: widget.enabled ? (_) => _stopRepeat() : null,
-            child: Padding(
-              padding: const EdgeInsets.symmetric(vertical: 8),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: <Widget>[
-                  Icon(widget.icon, size: 20),
-                  const SizedBox(height: 2),
-                  Text(widget.label,
-                      style: const TextStyle(fontSize: 10)),
-                ],
+    return Tooltip(
+      message: widget.tooltip,
+      child: Opacity(
+        opacity: widget.enabled ? 1.0 : 0.4,
+        child: GestureDetector(
+          behavior: HitTestBehavior.opaque,
+          onTap: widget.enabled ? widget.step : null,
+          onLongPressStart: widget.enabled ? (_) => _startRepeat() : null,
+          onLongPressCancel: _stopRepeat,
+          onLongPressEnd: widget.enabled ? (_) => _stopRepeat() : null,
+          child: Material(
+            color: Colors.transparent,
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              child: Container(
+                width: 56,
+                height: 56,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: theme.colorScheme.primary.withValues(alpha: 0.10),
+                  border: Border.all(
+                    color: theme.colorScheme.primary.withValues(alpha: 0.25),
+                    width: 1.2,
+                  ),
+                ),
+                child: Icon(widget.icon,
+                    size: 26, color: theme.colorScheme.primary),
               ),
             ),
           ),

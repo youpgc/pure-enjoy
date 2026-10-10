@@ -7,27 +7,49 @@ extension _TetrisBoardOps on _TetrisGameState {
   /// 顶部预览条：Hold 槽 + Next×N。
   Widget _buildNextHoldBar() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(8, 4, 8, 4),
+      padding: const EdgeInsets.fromLTRB(8, 2, 8, 2),
       child: Row(
         children: <Widget>[
           if (_holdEnabled)
-            _buildMiniBox(label: 'HOLD', type: _held, size: 52),
+            _buildMiniBox(type: _held, size: 44, label: _holdUsed ? '·' : 'HOLD'),
           const Spacer(),
           for (var i = 0; i < _nextPreview; i++)
             Padding(
-              padding: const EdgeInsets.only(left: 6),
+              padding: const EdgeInsets.only(left: 5),
               child: _buildMiniBox(
-                label: i == 0 ? 'NEXT' : '',
                 type: i < _queue.length ? _queue[i] : null,
-                size: 52,
+                size: 44,
+                label: i == 0 ? 'NEXT' : '',
               ),
             ),
+          const SizedBox(width: 6),
+          _buildRestartButton(),
         ],
       ),
     );
   }
 
-  /// 单个预览格（标签 + mini 画布）。
+  /// 「重新开始」小圆钮：二次确认后交宿主 _restartGame（aborted 口径不变）。
+  Widget _buildRestartButton() {
+    return Tooltip(
+      message: '重新开始',
+      child: Material(
+        color: Theme.of(context).colorScheme.surfaceContainerHighest,
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: widget.onRestart == null ? null : _confirmRestartViaHost,
+          child: const SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(Icons.refresh, size: 24),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 紧凑预览面板：mini 画布 + 底部 7px 微标签（可选，2026-10-10 铺满优化）。
   Widget _buildMiniBox({
     required String label,
     required Tetromino? type,
@@ -35,31 +57,35 @@ extension _TetrisBoardOps on _TetrisGameState {
   }) {
     return Container(
       width: size,
-      height: size + (label.isEmpty ? 0 : 14),
+      height: size,
       decoration: BoxDecoration(
         color: const Color(0xFF171923),
-        borderRadius: BorderRadius.circular(8),
+        borderRadius: BorderRadius.circular(9),
         border: Border.all(color: const Color(0xFF2A2D3A)),
       ),
-      child: Column(
-        mainAxisAlignment: MainAxisAlignment.center,
+      child: Stack(
         children: <Widget>[
-          if (label.isNotEmpty)
-            Text(
-              label,
-              style: const TextStyle(
-                fontSize: 9,
-                fontWeight: FontWeight.bold,
-                color: Color(0xFF8A8FA3),
-              ),
-            ),
-          SizedBox(
-            width: size - 10,
-            height: size - 14 - (label.isEmpty ? 0 : 0),
+          SizedBox.expand(
             child: CustomPaint(
               painter: _MiniPiecePainter(type: type),
             ),
           ),
+          if (label.isNotEmpty)
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 1,
+              child: Text(
+                label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  fontSize: 7,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFF8A8FA3),
+                  height: 1,
+                ),
+              ),
+            ),
         ],
       ),
     );

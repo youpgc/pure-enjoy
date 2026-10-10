@@ -163,6 +163,12 @@ class _PropBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final theme = Theme.of(context);
+    // 空占位关闭语义（propPlaceholder=''）：完全不渲染，不占纵向空间
+    //（此前实现仍渲染空容器占 56px，压缩了棋盘可用高度——2026-10-10 修复，
+    // 与 GameShell.propPlaceholder 注释「传空字符串关闭占位」对齐）
+    if (placeholder != null && placeholder!.isEmpty && actions.isEmpty) {
+      return const SizedBox.shrink();
+    }
     return SafeArea(
       top: false,
       child: Container(

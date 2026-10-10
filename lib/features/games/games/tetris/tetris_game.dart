@@ -451,19 +451,11 @@ class _TetrisGameState extends State<TetrisGame> {
 
   double get _frenzyMult => 1 + 0.5 * min(_combo, 6);
 
-  /// 操作提示按模式微调（survival 强调顶起节奏）。
-  String get _modeHint {
-    if (_mode == TetrisMode.survival) {
-      return '左右滑移动 · 点按旋转 · 快速下滑硬降 · 底部将周期顶起垃圾行';
-    }
-    if (_mode == TetrisMode.dig) {
-      return '左右滑移动 · 点按旋转 · 快速下滑硬降 · 挖穿底部全部垃圾行';
-    }
-    return '左右滑移动 · 点按旋转 · 下滑软降 · 快速下滑硬降';
-  }
-
   @override
   Widget build(BuildContext context) {
+    // 布局（2026-10-10 铺满优化）：顶部 HUD → 紧凑预览条（含重开小钮）→
+    // 棋盘占满剩余空间 → 大圆形操作按钮行。hint 与底部大按钮移除
+    //（操作说明在「查看说明」；重开改预览条右端小圆钮），纵向全部让给棋盘。
     return GameShell(
       statusItems: <Widget>[
         GameStatusItem(label: '分数', value: '$_score'),
@@ -497,16 +489,9 @@ class _TetrisGameState extends State<TetrisGame> {
             valueColor: const Color(0xFFEF6C00),
           ),
       ],
-      hint: _modeHint,
       propActions: _buildPropActionList(),
-      actions: <GameAction>[
-        GameAction(
-          icon: Icons.refresh,
-          label: '重新开始',
-          primary: true,
-          onPressed: widget.onRestart == null ? null : _confirmRestartViaHost,
-        ),
-      ],
+      propPlaceholder: '', // 无道具时不渲染道具栏（铺满优化：纵向全部让给棋盘）
+      actions: const <GameAction>[],
       content: Column(
         children: <Widget>[
           _buildNextHoldBar(),
@@ -518,8 +503,7 @@ class _TetrisGameState extends State<TetrisGame> {
               ],
             ),
           ),
-          if (_buttonsEnabled) ..._buildControlButtons(),
-          const SizedBox(height: 4),
+          _buildControlBar(),
         ],
       ),
     );
