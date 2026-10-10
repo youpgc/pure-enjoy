@@ -34,7 +34,8 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     final (pools, err) = await PetRpcP2.fetchPublishedEggOdds();
     if (!mounted) return;
     setState(() {
-      _pools = pools;
+      // 繁育产出蛋（breed_*，内部池）不在公示页罗列——说明并入繁育页
+      _pools = pools.where((p) => !p.poolCode.startsWith('breed_')).toList();
       _error = err == null ? null : petRpcErrorText(err);
       _loading = false;
     });
@@ -86,10 +87,10 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     );
   }
 
-  /// 概率组占比换算（组内归一化；保留 1 位小数、整数不带 .0）
+  /// 概率组占比换算（组内归一化；先取两位精度消浮点残差，保留 1 位小数展示）
   String _pct(num v, num total) {
     if (total <= 0) return '0%';
-    final p = v / total * 100;
+    final p = (v / total * 100 * 100).round() / 100;
     final s = p == p.roundToDouble() ? p.round().toString() : p.toStringAsFixed(1);
     return '$s%';
   }
