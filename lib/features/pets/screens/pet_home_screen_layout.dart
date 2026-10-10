@@ -77,7 +77,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
   // ---------- 顶部通知横幅（历险状态） ----------
 
   Widget _topBanner(ColorScheme cs) {
-    final adv = _summary?.ongoingAdventure;
+    // §2026-10-10 改版：横幅按当前宠过滤（_currentAdventure）——只在查看的
+    // 宠物正在历险时展示，养育中的不展示；点击跳历险详情页看进度/倒计时
+    final adv = _currentAdventure;
     if (adv == null || !adv.usable) return const SizedBox.shrink();
     return Positioned(
       top: 0,

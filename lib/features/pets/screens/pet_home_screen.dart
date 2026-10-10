@@ -102,13 +102,24 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   Timer? _tick; // 冷却倒计时逐秒刷新
 
+  /// 上一帧是否冷却中：冷却清零的那一跳 anyCooling 已翻 false，
+  /// 只按它守卫会跳过清除渲染 → 蒙层冻在「1秒」（2026-10-10 修）
+  bool _wasCooling = false;
+
   @override
   void initState() {
     super.initState();
     _load();
     _loadActiveScene();
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _budget.anyCooling) setState(() {});
+      if (!mounted) return;
+      final cooling = _budget.anyCooling;
+      if (cooling || _wasCooling) {
+        _wasCooling = cooling;
+        setState(() {});
+      } else {
+        _wasCooling = false;
+      }
     });
   }
 
@@ -142,7 +153,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   }
 
   /// 当前宠物的进行中历险（多宠场景按 petId 过滤——A 宠历险不再错挂到
-  /// B 宠的历险钮/历险页；顶部横幅保留全局：归来/待救助是全局事件通知）
+  /// B 宠的历险钮/历险页/顶部横幅；2026-10-10 横幅改按当前宠展示）
   PetAdventureBriefModel? get _currentAdventure {
     final adv = _summary?.ongoingAdventure;
     if (adv == null) return null;

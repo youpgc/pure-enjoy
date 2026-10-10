@@ -261,11 +261,9 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
 
-  // 横幅点击分流：待救助 → 历险页处理；归来待领取 → claim 弹窗结算
-  VoidCallback _bannerTap() =>
-      _summary?.ongoingAdventure?.status == PetAdventureStatus.awaitingRescue
-          ? _openAdventure
-          : () => _runAdventure(claimAdventureResult);
+  // 横幅点击恒跳历险详情页（查看进行中详情与归来倒计时）；
+  // 结算/召回动作入口在右列历险钮，不混在横幅上（2026-10-10）
+  VoidCallback _bannerTap() => _openAdventure;
 
   /// 历险动作统一入口：归来领取（弹窗）/ 召回确认（无奖励中断），完成后刷新
   Future<void> _runAdventure(AdventureAction run) async {

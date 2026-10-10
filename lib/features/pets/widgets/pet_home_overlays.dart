@@ -43,7 +43,9 @@ class PetAdventureBanner extends StatelessWidget {
           title: Text(
             finished
                 ? '历险已结束，点击查看结果'
-                : '历险进行中 · ${adv.status == PetAdventureStatus.awaitingRescue ? '待救助' : '归来倒计时'}',
+                : (adv.status == PetAdventureStatus.awaitingRescue
+                    ? '历险进行中 · 待救助'
+                    : '历险进行中'),
             style: const TextStyle(fontSize: 13),
           ),
           subtitle: adv.status == PetAdventureStatus.awaitingRescue

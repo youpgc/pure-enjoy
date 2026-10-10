@@ -432,14 +432,17 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           ),
         ),
         const SizedBox(width: 10),
-        Text(
-          plus > 0 ? '$base +$plus' : '$base',
-          style: TextStyle(
-            fontSize: 13,
-            fontWeight: FontWeight.w700,
-            color: plus > 0 ? cs.primary : null,
-          ),
-        ),
+        SizedBox(
+            width: 52,
+            child: Text(
+              plus > 0 ? '$base +$plus' : '$base',
+              textAlign: TextAlign.right,
+              style: TextStyle(
+                fontSize: 13,
+                fontWeight: FontWeight.w700,
+                color: plus > 0 ? cs.primary : null,
+              ),
+            )),
         // 步进器（仅有点数时出现）
         if (canAlloc) ...[
           const SizedBox(width: 10),
@@ -521,9 +524,13 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           ),
         ),
         const SizedBox(width: 10),
-        Text('$health',
-            style: TextStyle(fontSize: 13, fontWeight: FontWeight.w700, color: color)),
-        const SizedBox(width: 66), // 与四维步进器区域等宽对齐
+        // 数值格与四维行同宽（52 右对齐）：五行进度条等宽，去掉旧 66 垫宽
+        SizedBox(
+            width: 52,
+            child: Text('$health',
+                textAlign: TextAlign.right,
+                style: TextStyle(
+                    fontSize: 13, fontWeight: FontWeight.w700, color: color))),
       ],
     );
   }
