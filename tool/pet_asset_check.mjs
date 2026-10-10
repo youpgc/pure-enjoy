@@ -21,6 +21,8 @@ const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = path.join(ROOT, 'assets', 'pets');
 const INVENTORY = path.join(ROOT, 'lib', 'features', 'pets', 'utils', 'pet_art.dart');
 const ACTION_ENUM = path.join(ROOT, 'lib', 'constants', 'pet_render.dart');
+const BEND = path.join(ROOT, 'lib', 'constants', 'pet_bend.dart');
+const PUBSPEC = path.join(ROOT, 'pubspec.yaml');
 const ADMIN_ICONS = path.resolve(ROOT, '..', 'pure-enjoy-admin', 'public', 'pet-icons');
 
 /// 阈值口径（2026-09-24 按实测数据校准，分两类预算）：
@@ -138,10 +140,15 @@ function checkRaster(file, codes) {
 function collectInventory(codes) {
   const stageArt = new Map(); // species -> [{stage, file}]
   const frames = new Map(); // species -> Map(action -> Set(N))
-  // 场景图不参与清单（它是全屏背景，按 BoxFit.cover 用，与种属无关）
+  // 场景图不参与清单（它是全屏背景，按 BoxFit.cover 用，与种属无关）；
+  // anim/ 是分层弯曲的 6 档表情帧，契约由 checkBendTree 单独校验——它按
+  // 评级/种属/阶 分目录、文件名不带种属前缀，不该套进「底图 + 动作帧」两套清单
   const files = walk(ASSETS).filter(
     (f) =>
-      /\.(png|jpe?g|webp)$/i.test(f) && !inDir(f, 'items') && !inDir(f, 'scenes'),
+      /\.(png|jpe?g|webp)$/i.test(f) &&
+      !inDir(f, 'items') &&
+      !inDir(f, 'scenes') &&
+      !inDir(f, 'anim'),
   );
   for (const f of files) {
     const name = path.basename(f);
@@ -247,6 +254,76 @@ function checkIcons() {
   if (!onlyAdmin.length && !onlyApp.length) add('PASS', `物品图标两端一致：${app.size} 个`);
 }
 
+/**
+ * 分层弯曲素材契约（`assets/pets/anim/<评级>/<种属 code>/<阶 sN>/`）。
+ *
+ * 为什么单列一道校验：弯曲渲染把「表情分档」当结构用——编排表的 `expr` 通道按
+ * **下标**点名第几档，缺任一档就在切档瞬间画出透明像素（闪一下空帧）；而 6 档帧
+ * 的几何全部定义在该形态的生产栅格 side 上，尺寸一变就逐像素错位。再加上
+ * flutter assets 不递归，漏登记一行目录＝运行期 rootBundle 取不到图。
+ * 三类错误都在真机上才看得见，故在这里前置成 FAIL。
+ */
+function checkBendTree() {
+  const start = issues.length;
+  const src = fs.readFileSync(BEND, 'utf8');
+  const list = /kPetBendFrameFiles = \[([\s\S]*?)\];/.exec(src);
+  if (!list) {
+    add('FAIL', 'pet_bend.dart 未找到 kPetBendFrameFiles，弯曲契约无法校验');
+    return;
+  }
+  const want = [...list[1].matchAll(/'([a-z0-9_]+)'/g)].map((m) => m[1]);
+  const specs = [
+    ...src.matchAll(/dir:\s*'([^']+)',[^}]*?side:\s*(\d+)/g),
+  ].map((m) => ({ dir: m[1], side: Number(m[2]) }));
+  if (!specs.length) {
+    add('FAIL', 'pet_bend.dart 未解析到任何 PetBendGeo.dir');
+    return;
+  }
+  const pub = fs.readFileSync(PUBSPEC, 'utf8');
+  for (const { dir, side } of specs) {
+    const abs = path.join(ROOT, dir);
+    if (!fs.existsSync(abs)) {
+      add('FAIL', `${dir}: kPetBendGeo 登记了目录但包内不存在（六档全解码失败＝舞台空白）`);
+      continue;
+    }
+    if (!pub.includes(`- ${dir}/`)) {
+      add('FAIL', `${dir}: 未登记进 pubspec 的 assets（flutter assets 不递归，漏一行就取不到图）`);
+    }
+    const names = fs.readdirSync(abs).map((f) => f.replace(/\.png$/i, ''));
+    const missing = want.filter((n) => !names.includes(n));
+    const extra = names.filter((n) => !want.includes(n));
+    if (missing.length) {
+      add('FAIL', `${dir}: 缺表情帧 ${missing.join(', ')}（编排按下标点名，缺档＝切档闪空帧）`);
+    }
+    if (extra.length) {
+      add('WARN', `${dir}: 有未登记文件 ${extra.join(', ')}（不会被播放，白占包体）`);
+    }
+    for (const n of want) {
+      const f = path.join(abs, `${n}.png`);
+      if (!fs.existsSync(f)) continue;
+      const info = probe(f);
+      if (info.sig !== 'PNG') add('FAIL', `${dir}/${n}.png: 实为 ${info.sig}，弯曲渲染要求透明 PNG`);
+      else if (info.alpha === false) add('FAIL', `${dir}/${n}.png: 无透明通道，舞台上会闪出方框背景`);
+      if (info.w && (info.w !== side || info.h !== side)) {
+        add('FAIL', `${dir}/${n}.png: ${info.w}×${info.h} 与该形态栅格 ${side}² 不符（归零线/眼区/支点全定义在 ${side} 上）`);
+      }
+    }
+  }
+  const root = path.join(ASSETS, 'anim');
+  if (!fs.existsSync(root)) {
+    add('WARN', 'assets/pets/anim 不存在，弯曲路径无素材（整图补间兜底）');
+    return;
+  }
+  const dirs = [...new Set(walk(root).filter((f) => /\.png$/i.test(f)).map(path.dirname))];
+  const known = new Set(specs.map((s) => path.join(ROOT, s.dir)));
+  for (const d of dirs) {
+    if (!known.has(d)) add('WARN', `${rel(d)}: 磁盘上有弯曲目录但没登记进 kPetBendGeo（不会被播放）`);
+  }
+  if (!issues.slice(start).some((i) => i.level === 'FAIL')) {
+    add('PASS', `弯曲素材契约一致：${specs.length} 形态 × ${want.length} 档表情帧，均已登记 pubspec`);
+  }
+}
+
 const codes = actionCodes();
 const files = walk(ASSETS).filter(
   (f) => /\.(png|jpe?g|webp)$/i.test(f) && !inDir(f, 'items'),
@@ -254,6 +331,7 @@ const files = walk(ASSETS).filter(
 for (const f of files) checkRaster(f, codes);
 const inv = collectInventory(codes);
 checkInventoryDart(inv);
+checkBendTree();
 checkIcons();
 
 const order = { FAIL: 0, WARN: 1, PASS: 2 };

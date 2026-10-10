@@ -2,13 +2,16 @@
 /**
  * 宠物 2D 素材处理管线（纯 node 内置 zlib，零 npm 依赖）。
  *
- * 只做两件事，且默认不覆盖原图（输出到候选目录，人眼过一遍再决定换不换）：
+ * 只做三件事，且默认不覆盖原图（输出到候选目录，人眼过一遍再决定换不换）：
  *   --refilter   无损：逐扫描行挑最优 PNG 滤波器重编码（像素完全不变）
  *   --scale 768  有损（缩小）：预乘 alpha 的盒式降采样到目标长边，再重编码
+ *   --sheet / --parts  AI 姿态表/部件表 → 逐帧素材 / 剪贴部件（见各模式注释）
  *
  * 用法：
  *   node tool/pet_asset_pipeline.mjs --refilter --in assets/pets/scenes --out /tmp/pets_out
  *   node tool/pet_asset_pipeline.mjs --scale 768 --in assets/pets/frames --out /tmp/pets_out
+ *   node tool/pet_asset_pipeline.mjs --sheet --in 表.png --out 目录 --cols 4 --rows 2 --height 328
+ *   node tool/pet_asset_pipeline.mjs --parts --in 部件表.png --out 目录 --cols 4 --rows 2
  *
  * 处理不了什么：扩展名叫 .png 但内容是 JPEG 的文件（月萤三阶底图就是）——
  * 解 JPEG 需要 DCT/哈夫曼解码器，不是一层 zlib 的事，加依赖又违背"零依赖脚本"。
@@ -16,196 +19,23 @@
  */
 import fs from 'node:fs';
 import path from 'node:path';
-import zlib from 'node:zlib';
+import { decodePng, resizeBox, encodePng } from './pet_png.mjs';
 
 const argv = process.argv.slice(2);
 const flag = (name, dft) => {
   const i = argv.indexOf(`--${name}`);
   return i === -1 ? dft : argv[i + 1];
 };
-const MODE = argv.includes('--sheet') ? 'sheet' : argv.includes('--scale') ? 'scale' : 'refilter';
+const MODE = argv.includes('--parts')
+  ? 'parts'
+  : argv.includes('--sheet')
+    ? 'sheet'
+    : argv.includes('--scale')
+      ? 'scale'
+      : 'refilter';
 const TARGET = Number(flag('scale', 768));
 const IN = path.resolve(flag('in', 'assets/pets/frames'));
 const OUT = path.resolve(flag('out', '/tmp/pets_out'));
-
-const CRC_TABLE = (() => {
-  const t = new Int32Array(256);
-  for (let n = 0; n < 256; n++) {
-    let c = n;
-    for (let k = 0; k < 8; k++) c = c & 1 ? 0xedb88320 ^ (c >>> 1) : c >>> 1;
-    t[n] = c;
-  }
-  return t;
-})();
-
-function crc32(buf) {
-  let c = ~0;
-  for (const b of buf) c = CRC_TABLE[(c ^ b) & 0xff] ^ (c >>> 8);
-  return ~c >>> 0;
-}
-
-function chunk(type, data) {
-  const head = Buffer.alloc(8);
-  head.writeUInt32BE(data.length, 0);
-  head.write(type, 4, 'ascii');
-  const body = Buffer.concat([head, data]);
-  const tail = Buffer.alloc(4);
-  tail.writeUInt32BE(crc32(body.subarray(4)), 0);
-  return Buffer.concat([body, tail]);
-}
-
-/** Paeth 预测器，PNG 解码与逐行选滤波都要用 */
-const paeth = (a, b, c) => {
-  const p = a + b - c;
-  const pa = Math.abs(p - a);
-  const pb = Math.abs(p - b);
-  const pc = Math.abs(p - c);
-  return pa <= pb && pa <= pc ? a : pb <= pc ? b : c;
-};
-
-/** 解出 RGBA/RGB 位图；不支持的（JPEG 内容、16bit、隔行、调色板）返回 null */
-function decodePng(buf) {
-  if (!(buf[0] === 0x89 && buf[1] === 0x50)) return null;
-  let off = 8;
-  let ihdr = null;
-  const idat = [];
-  while (off + 8 <= buf.length) {
-    const len = buf.readUInt32BE(off);
-    const type = buf.subarray(off + 4, off + 8).toString('ascii');
-    const data = buf.subarray(off + 8, off + 8 + len);
-    if (type === 'IHDR') {
-      ihdr = {
-        w: data.readUInt32BE(0),
-        h: data.readUInt32BE(4),
-        depth: data[8],
-        color: data[9],
-        interlace: data[12],
-      };
-    } else if (type === 'IDAT') {
-      idat.push(Buffer.from(data));
-    } else if (type === 'IEND') {
-      break;
-    }
-    off += 12 + len;
-  }
-  if (!ihdr || ihdr.depth !== 8 || ihdr.interlace !== 0) return null;
-  const bpp = ihdr.color === 6 ? 4 : ihdr.color === 2 ? 3 : 0;
-  if (!bpp) return null;
-  const raw = zlib.inflateSync(Buffer.concat(idat));
-  const stride = ihdr.w * bpp;
-  if (raw.length !== ihdr.h * (stride + 1)) return null;
-  const out = Buffer.alloc(ihdr.h * stride);
-  for (let y = 0; y < ihdr.h; y++) {
-    const ft = raw[y * (stride + 1)];
-    const src = y * (stride + 1) + 1;
-    const cur = y * stride;
-    const up = cur - stride;
-    for (let x = 0; x < stride; x++) {
-      const a = x >= bpp ? out[cur + x - bpp] : 0;
-      const b = y > 0 ? out[up + x] : 0;
-      const c = x >= bpp && y > 0 ? out[up + x - bpp] : 0;
-      const v = raw[src + x];
-      const d =
-        ft === 0
-          ? v
-          : ft === 1
-            ? v + a
-            : ft === 2
-              ? v + b
-              : ft === 3
-                ? v + ((a + b) >> 1)
-                : v + paeth(a, b, c);
-      out[cur + x] = d & 0xff;
-    }
-  }
-  return { ...ihdr, bpp, pixels: out };
-}
-
-/** 盒式降采样：RGBA 先预乘 alpha 再加权平均，避免透明区的脏色渗出黑边 */
-function resizeBox(img, tw, th) {
-  const { w, h, bpp, pixels: src } = img;
-  const out = Buffer.alloc(tw * th * bpp);
-  for (let ty = 0; ty < th; ty++) {
-    const y0 = Math.floor((ty * h) / th);
-    const y1 = Math.max(y0 + 1, Math.floor(((ty + 1) * h) / th));
-    for (let tx = 0; tx < tw; tx++) {
-      const x0 = Math.floor((tx * w) / tw);
-      const x1 = Math.max(x0 + 1, Math.floor(((tx + 1) * w) / tw));
-      const n = (y1 - y0) * (x1 - x0);
-      const acc = [0, 0, 0, 0];
-      for (let y = y0; y < y1; y++) {
-        for (let x = x0; x < x1; x++) {
-          const i = (y * w + x) * bpp;
-          const a = bpp === 4 ? src[i + 3] : 255;
-          acc[0] += src[i] * a;
-          acc[1] += src[i + 1] * a;
-          acc[2] += src[i + 2] * a;
-          acc[3] += a;
-        }
-      }
-      const o = (ty * tw + tx) * bpp;
-      const aAvg = acc[3] / n;
-      if (bpp === 4) {
-        out[o + 3] = Math.round(aAvg);
-        const k = aAvg > 0 ? 255 / aAvg : 0;
-        out[o] = acc[3] > 0 ? Math.min(255, Math.round((acc[0] / acc[3]) * k)) : 0;
-        out[o + 1] = acc[3] > 0 ? Math.min(255, Math.round((acc[1] / acc[3]) * k)) : 0;
-        out[o + 2] = acc[3] > 0 ? Math.min(255, Math.round((acc[2] / acc[3]) * k)) : 0;
-      } else {
-        out[o] = Math.round(acc[0] / n / 255);
-        out[o + 1] = Math.round(acc[1] / n / 255);
-        out[o + 2] = Math.round(acc[2] / n / 255);
-      }
-    }
-  }
-  return { w: tw, h: th, bpp, pixels: out };
-}
-
-/** 重编码：逐扫描行挑最优滤波器（最小绝对和启发式）+ zlib level 9 */
-function encodePng({ w, h, bpp, pixels }) {
-  const stride = w * bpp;
-  const rows = [];
-  for (let y = 0; y < h; y++) {
-    const cur = y * stride;
-    const row = pixels.subarray(cur, cur + stride);
-    const up = y > 0 ? pixels.subarray(cur - stride, cur) : Buffer.alloc(stride);
-    let best = null;
-    let bestScore = Infinity;
-    let bestType = 0;
-    for (let ft = 0; ft <= 4; ft++) {
-      const cand = Buffer.allocUnsafe(stride);
-      let score = 0;
-      for (let x = 0; x < stride; x++) {
-        const a = x >= bpp ? row[x - bpp] : 0;
-        const b = up[x];
-        const c = x >= bpp ? up[x - bpp] : 0;
-        const pred =
-          ft === 0 ? 0 : ft === 1 ? a : ft === 2 ? b : ft === 3 ? (a + b) >> 1 : paeth(a, b, c);
-        const d = (row[x] - pred) & 0xff;
-        cand[x] = d;
-        score += d > 128 ? 256 - d : d;
-      }
-      if (score < bestScore) {
-        bestScore = score;
-        best = cand;
-        bestType = ft;
-      }
-    }
-    rows.push(Buffer.from([bestType]), best);
-  }
-  const ihdr = Buffer.alloc(13);
-  ihdr.writeUInt32BE(w, 0);
-  ihdr.writeUInt32BE(h, 4);
-  ihdr[8] = 8;
-  ihdr[9] = bpp === 4 ? 6 : 2;
-  const idat = zlib.deflateSync(Buffer.concat(rows), { level: 9 });
-  return Buffer.concat([
-    Buffer.from([0x89, 0x50, 0x4e, 0x47, 0x0d, 0x0a, 0x1a, 0x0a]),
-    chunk('IHDR', ihdr),
-    chunk('IDAT', idat),
-    chunk('IEND', Buffer.alloc(0)),
-  ]);
-}
 
 /* ---------- sheet 模式：AI 姿态表 → 逐帧素材 ----------
  * 三步都在解决 AI 出图的既有毛病，缺一步动画就会抖：
@@ -222,6 +52,10 @@ const FRAME_H = Number(flag('height', 384));
 const PREFIX = flag('prefix', 'frame');
 /// 次大连通块的保留门槛：0.15 刚好留住「吃」姿态里的食盆，又能滤掉右下角水印
 const KEEP_RATIO = Number(flag('ratio', 0.15));
+/// 连通块「填充率」下限：面积 / 包围盒面积。部件实心通常在 0.3 以上，
+/// 而格子分隔线是又长又空的细条（<0.1），据此把线判掉而不是按触边猜。
+const LINE_FILL = Number(flag('fill', 0.12));
+const BY_GRID = argv.includes('--grid');
 
 function sliceCell(img, cx, cy, cw, ch) {
   const at = (x, y) => {
@@ -301,6 +135,108 @@ function dropSmallIslands(cell, ratio = KEEP_RATIO) {
   return comps.reduce((a, c) => a + (c.length >= keep ? 1 : 0), 0);
 }
 
+/**
+ * 全表连通块分格（取代「按格线硬切」）。
+ * AI 画部件表时不守格线：头会溢出到隔壁格，格子之间还有淡淡的分隔线。
+ * 按格线切就会把溢出的一截下巴留在错误的格里（表现为部件上多一块毛）。
+ * 这里先从整张图的外沿洪水抠像，再对前景做连通块标记，按质心把每一块
+ * 分派到它所属的格子——下巴与头本来就相连，自然跟着头走；分隔线是又长又
+ * 空的细条，按「填充率」判掉。
+ */
+function segmentCells(img, cols, rows) {
+  const { w, h, bpp, pixels } = img;
+  const at = (x, y) => {
+    const s = (y * w + x) * bpp;
+    return [pixels[s], pixels[s + 1], pixels[s + 2]];
+  };
+  const isBg = (x, y) => Math.min(...at(x, y)) >= KEY_T;
+  const keyed = new Uint8Array(w * h);
+  const stack = new Int32Array(w * h);
+  let sp = 0;
+  const push = (x, y) => {
+    const q = y * w + x;
+    if (!keyed[q] && isBg(x, y)) {
+      keyed[q] = 1;
+      stack[sp++] = q;
+    }
+  };
+  for (let x = 0; x < w; x++) { push(x, 0); push(x, h - 1); }
+  for (let y = 0; y < h; y++) { push(0, y); push(w - 1, y); }
+  while (sp > 0) {
+    const q = stack[--sp];
+    const x = q % w;
+    const y = (q - x) / w;
+    if (x > 0) push(x - 1, y);
+    if (x < w - 1) push(x + 1, y);
+    if (y > 0) push(x, y - 1);
+    if (y < h - 1) push(x, y + 1);
+  }
+  const seen = new Uint8Array(w * h);
+  const cw = Math.floor(w / cols);
+  const ch = Math.floor(h / rows);
+  const cells = [];
+  for (let r = 0; r < rows; r++) {
+    for (let c = 0; c < cols; c++) {
+      cells.push({ x0: c * cw, y0: r * ch, w: cw, h: ch, pixels: Buffer.alloc(cw * ch * 4), n: 0 });
+    }
+  }
+  let dropped = 0;
+  for (let i = 0; i < w * h; i++) {
+    if (seen[i] || keyed[i]) continue;
+    sp = 0;
+    const list = [];
+    let sx = 0, sy = 0, x0 = w, x1 = -1, y0 = h, y1 = -1;
+    seen[i] = 1;
+    stack[sp++] = i;
+    while (sp > 0) {
+      const q = stack[--sp];
+      list.push(q);
+      const x = q % w;
+      const y = (q - x) / w;
+      sx += x;
+      sy += y;
+      if (x < x0) x0 = x;
+      if (x > x1) x1 = x;
+      if (y < y0) y0 = y;
+      if (y > y1) y1 = y;
+      const nb = [];
+      if (x > 0) nb.push(q - 1);
+      if (x < w - 1) nb.push(q + 1);
+      if (y > 0) nb.push(q - w);
+      if (y < h - 1) nb.push(q + w);
+      for (const n of nb) {
+        if (!seen[n] && !keyed[n]) {
+          seen[n] = 1;
+          stack[sp++] = n;
+        }
+      }
+    }
+    const bw = x1 - x0 + 1;
+    const bh = y1 - y0 + 1;
+    // 分隔线/杂点：包围盒很大但像素很稀（填充率），或整体太小
+    if (list.length < 200 || list.length / (bw * bh) < LINE_FILL) {
+      dropped++;
+      continue;
+    }
+    const cx = Math.floor(sx / list.length / cw);
+    const cy = Math.floor(sy / list.length / ch);
+    const cell = cells[Math.min(rows - 1, cy) * cols + Math.min(cols - 1, cx)];
+    for (const q of list) {
+      const x = q % w;
+      const y = (q - x) / w;
+      const [r, g, b] = at(x, y);
+      const d = ((y - cell.y0) * cell.w + (x - cell.x0)) * 4;
+      const src = q * bpp;
+      cell.pixels[d] = pixels[src];
+      cell.pixels[d + 1] = pixels[src + 1];
+      cell.pixels[d + 2] = pixels[src + 2];
+      cell.pixels[d + 3] = 255;
+    }
+    cell.n++;
+  }
+  return { cells, dropped };
+}
+
 function contentBox(cell) {
   const { w, h, pixels } = cell;
   let x0 = w, y0 = h, x1 = -1, y1 = -1;
@@ -352,17 +288,24 @@ function runSheet(inFile, outDir) {
   const cw = Math.floor(img.w / COLS);
   const ch = Math.floor(img.h / ROWS);
   const cells = [];
-  for (let r = 0; r < ROWS; r++) {
-    for (let c = 0; c < COLS; c++) {
-      const cell = sliceCell(img, c * cw, r * ch, cw, ch);
-      const kept = dropSmallIslands(cell);
-      const b = contentBox(cell);
-      if (b.w <= 0) {
-        console.log(`SKIP 格 ${r * COLS + c + 1}: 整格被判为背景`);
-        continue;
-      }
-      cells.push({ cell, box: b, kept });
+  const grid = [];
+  if (BY_GRID) {
+    for (let r = 0; r < ROWS; r++)
+      for (let c = 0; c < COLS; c++) grid.push(sliceCell(img, c * cw, r * ch, cw, ch));
+  } else {
+    const seg = segmentCells(img, COLS, ROWS);
+    grid.push(...seg.cells);
+    console.log(`连通块分格：按细条/碎块规则丢掉 ${seg.dropped} 块`);
+  }
+  for (let i = 0; i < grid.length; i++) {
+    const cell = grid[i];
+    const kept = dropSmallIslands(cell);
+    const b = contentBox(cell);
+    if (b.w <= 0) {
+      console.log(`SKIP 格 ${i + 1}: 整格被判为背景`);
+      continue;
     }
+    cells.push({ cell, box: b, kept });
   }
   const med = (arr) => {
     const a = [...arr].sort((x, y) => x - y);
@@ -406,6 +349,64 @@ function runSheet(inFile, outDir) {
       `量产能见：8 动作 × ${cells.length} 帧 = ${8 * cells.length} 张/形态；` +
       `按本表实测单帧推算约 ${(total / cells.length * 8 * cells.length / 1024 / 1024).toFixed(1)}MB/形态`,
   );
+}
+
+/* ---------- parts 模式：AI 部件表 → 剪贴动画（cutout puppet）素材 ----------
+ * 与 sheet 模式的两点关键差别，都是被"逐帧约定会毁掉部件"逼出来的：
+ *  1) 不做统一缩放、不做底部对齐——部件之间要保持原表里的相对位置，
+ *     否则头和身各自归到同一地平线后，接起来就是"头埋进身体"。
+ *  2) 输出 parts.json：记录每个部件在**原表坐标系**的左上角与尺寸，
+ *     Lottie 图层位置 = 部件中心 - 参考部件中心，据此还原骨架。
+ */
+function runParts(inFile, outDir) {
+  const img = decodePng(fs.readFileSync(inFile));
+  if (!img) {
+    console.error(`${inFile} 解不出来：需要 8bit 非隔行 PNG（AI 出的 JPEG 请先转 PNG）`);
+    process.exit(1);
+  }
+  const cw = Math.floor(img.w / COLS);
+  const ch = Math.floor(img.h / ROWS);
+  const seg = segmentCells(img, COLS, ROWS);
+  console.log(`连通块分格：按细条/碎块规则丢掉 ${seg.dropped} 块`);
+  fs.mkdirSync(outDir, { recursive: true });
+  const parts = [];
+  let total = 0;
+  seg.cells.forEach((cell, i) => {
+    const kept = dropSmallIslands(cell);
+    const b = contentBox(cell);
+    if (b.w <= 0) {
+      console.log(`SKIP 格 ${i + 1}: 整格被判为背景`);
+      return;
+    }
+    const name = `${PREFIX}_${String(i + 1).padStart(2, '0')}.png`;
+    const enc = encodePng(crop(cell, b));
+    fs.writeFileSync(path.join(outDir, name), enc);
+    total += enc.length;
+    parts.push({
+      name,
+      cell: i,
+      x: cell.x0 + b.x0,
+      y: cell.y0 + b.y0,
+      w: b.w,
+      h: b.h,
+      blocks: kept,
+    });
+    console.log(
+      `${name} ${b.w}×${b.h} @(${parts[parts.length - 1].x},${parts[parts.length - 1].y}) ` +
+        `${(enc.length / 1024).toFixed(0)}KB 前景块 ${kept}`,
+    );
+  });
+  const manifest = { sheetW: img.w, sheetH: img.h, cols: COLS, rows: ROWS, cellW: cw, cellH: ch, parts };
+  fs.writeFileSync(path.join(outDir, 'parts.json'), JSON.stringify(manifest, null, 2));
+  console.log(
+    `\n${parts.length} 个部件，合计 ${(total / 1024).toFixed(0)}KB；坐标清单 parts.json → ${outDir}\n` +
+      `注意：部件尺寸未经缩放，量的是原表像素；拼动画时以 sheetW×sheetH 为设计画布。`,
+  );
+}
+
+if (MODE === 'parts') {
+  runParts(IN, OUT);
+  process.exit(0);
 }
 
 if (MODE === 'sheet') {
