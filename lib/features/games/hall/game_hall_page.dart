@@ -183,8 +183,9 @@ class _GameBannerCard extends StatelessWidget {
     // 个性化配置接入（2026-10-10）：圆角跟随 UI 风格 token（简约扁平 8 /
     // 锐利极简 4 / 胶囊现代 18…），投影与边框跟随全局「开启阴影/显示边框」
     // 开关，暗色模式下渐变整体压暗。
-    final radius = BorderRadius.circular(
-        UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius);
+    final cardRadius =
+        UiStyleToken.of(AppTheme.uiStyleOf(context)).cardRadius;
+    final radius = BorderRadius.circular(cardRadius);
     final elevation = AppTheme.cardElevation(context);
     final isDark = Theme.of(context).brightness == Brightness.dark;
     final colors = isDark
@@ -192,14 +193,17 @@ class _GameBannerCard extends StatelessWidget {
             .map((c) => Color.lerp(c, const Color(0xFF10131F), 0.35)!)
             .toList()
         : _colors;
+    // 左右内边距随风格圆角自适应：胶囊现代（18px 圆角）加大留白防内容被吞
+    final hpad = 14.0 + (cardRadius - 8).clamp(0.0, 12.0);
     return Material(
       color: Colors.transparent,
       child: InkWell(
         onTap: onTap,
         borderRadius: radius,
         child: Container(
-          // 高度由内容决定：上下内边距共 12px（2026-10-10 调整）
-          padding: const EdgeInsets.symmetric(vertical: 6),
+          // 固定高度：避免「外层渐变容器 + 内层背景图层」两层高度不一致；
+          // 背景装饰/遮罩 Positioned.fill 独占全卡，前景垂直居中
+          height: 76,
           decoration: BoxDecoration(
             borderRadius: radius,
             gradient: LinearGradient(
@@ -208,11 +212,11 @@ class _GameBannerCard extends StatelessWidget {
               colors: colors,
             ),
             border: Border.fromBorderSide(
-                AppTheme.cardBorderSide(context, colors.last)),
+                AppTheme.cardBorderSide(context, colors.first)),
             boxShadow: elevation > 0
                 ? <BoxShadow>[
                     BoxShadow(
-                      color: AppTheme.cardShadowColor(colors.last),
+                      color: AppTheme.cardShadowColor(colors.first),
                       blurRadius: 10,
                       offset: const Offset(0, 4),
                     ),
@@ -257,8 +261,9 @@ class _GameBannerCard extends StatelessWidget {
                 // 大号立体奖杯（有成绩金色/无成绩置灰）+ 最佳成绩小字；
                 // 描述行与播放按钮移除（整卡可点）。
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 6, 14, 6),
-                  child: Row(
+                  padding: EdgeInsets.symmetric(horizontal: hpad),
+                  child: SizedBox.expand(
+                    child: Row(
                     children: <Widget>[
                       // 游戏图标（白底圆角卡，突出主体）
                       Container(
@@ -346,6 +351,7 @@ class _GameBannerCard extends StatelessWidget {
                     ],
                   ),
                 ),
+              ),
               ],
             ),
           ),
