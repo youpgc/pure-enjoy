@@ -267,7 +267,6 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               _attrRow(k, cs),
               const SizedBox(height: 8),
             ],
-            _healthRow(cs),
             const SizedBox(height: 8),
             _intimacyRow(cs),
             const SizedBox(height: 10),
@@ -494,43 +493,6 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               '亲密 ${widget.pet.intimacy}$suffix',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
         ),
-      ],
-    );
-  }
-
-  /// 健康行（状态值只读：历险失败惩罚扣减，恢复途径后续配置）
-  Widget _healthRow(ColorScheme cs) {
-    final health = widget.pet.health;
-    final color = health > 60
-        ? const Color(0xFF7FB77E)
-        : health > 30
-            ? const Color(0xFFE0A458)
-            : Theme.of(context).colorScheme.error;
-    return Row(
-      children: [
-        const SizedBox(
-            width: 56,
-            child: Text('健康',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-        Expanded(
-          child: ClipRRect(
-            borderRadius: BorderRadius.circular(4),
-            child: LinearProgressIndicator(
-              value: (health / 100).clamp(0.0, 1.0),
-              minHeight: 8,
-              backgroundColor: cs.surfaceContainerHighest,
-              valueColor: AlwaysStoppedAnimation(color),
-            ),
-          ),
-        ),
-        const SizedBox(width: 10),
-        // 数值格与四维行同宽（52 右对齐）：五行进度条等宽，去掉旧 66 垫宽
-        SizedBox(
-            width: 52,
-            child: Text('$health',
-                textAlign: TextAlign.right,
-                style: TextStyle(
-                    fontSize: 13, fontWeight: FontWeight.w700, color: color))),
       ],
     );
   }

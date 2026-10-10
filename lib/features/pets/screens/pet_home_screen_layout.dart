@@ -138,7 +138,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
       top: 0,
       child: Padding(
         // 贴顶：安全区下方留些许间距；返回键内联列首（避免与独立浮层重叠）
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+        padding: const EdgeInsets.only(top: 60),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -247,7 +247,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
       top: 0,
       child: Padding(
         // 贴顶：安全区下方留些许间距；金币胶囊内联列首（避免与独立浮层重叠）
-        padding: EdgeInsets.only(top: MediaQuery.paddingOf(context).top + 6),
+        padding: const EdgeInsets.only(top: 60),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [

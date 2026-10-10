@@ -282,6 +282,10 @@ class PetGoldBadgeCore extends StatelessWidget {
 ///
 /// 点击整卡打开属性面板（属性系统 Phase 2：四维/健康/性格/加点，见
 /// pet_attributes_sheet.dart）。
+/// 形态 0-2 → 幼年期/成长期/成年期（2026-10-10 转译）
+String _stageName(int stage) =>
+    const ['幼年期', '成长期', '成年期'][stage.clamp(0, 2)];
+
 class PetBottomStatusCard extends StatelessWidget {
   const PetBottomStatusCard({
     super.key,
@@ -321,7 +325,8 @@ class PetBottomStatusCard extends StatelessWidget {
               children: [
                 Expanded(
                   child: Text(
-                    '${pet.name} · Lv.${pet.level} · ${pet.showNo} · 形态${pet.stage}',
+                    // 编号（showNo）已隐藏；形态 0-2 转译幼年期/成长期/成年期
+                    '${pet.name} · Lv.${pet.level} · ${_stageName(pet.stage)}',
                     maxLines: 1,
                     overflow: TextOverflow.ellipsis,
                     textAlign: TextAlign.center,
