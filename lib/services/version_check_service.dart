@@ -235,8 +235,19 @@ class VersionCheckService {
           if (lastCheckTime != null) {
             final elapsed = DateTime.now().difference(lastCheckTime);
             if (elapsed < _minCheckInterval) {
-              // 缓存明确为最新版本信息（即便已被忽略也保留）→ 直接返回
+              // 缓存明确为最新版本信息（即便已被忽略也保留）→ 先与当前已安装
+              // 版本对齐：内部更新重启后可能已追平缓存版本，追平则清除陈旧
+              // 缓存返回 null，否则「我的」页红点会误报已装版本（2026-10-10 修）
               if (cachedVersionInfo != null) {
+                final cachedVer = cachedVersionInfo['version'] as String? ?? '';
+                final cachedBuild = cachedVersionInfo['build_number'] as int? ?? 0;
+                if (!_shouldUpdate(currentVersion, currentBuildNumber, cachedVer, cachedBuild)) {
+                  if (kDebugMode) {
+                    debugPrint('📱 [手动] 当前已安装版本已追平缓存 v$cachedVer，清除陈旧缓存');
+                  }
+                  await prefs.remove(_versionCheckCacheKey);
+                  return null;
+                }
                 if (kDebugMode) {
                   debugPrint('📱 [手动] 使用缓存最新版本 v${cachedVersionInfo['version']}');
                 }
