@@ -100,7 +100,10 @@ extension _TetrisBoardOps on _TetrisGameState {
   /// 「确认结算」钮（延迟结算）：金底高亮，点击按累计值立即结算落袋。
   /// 未达成通关条件（[_goalReached] 为 false）时禁用置灰。
   Widget _buildConfirmSettleButton() {
-    final enabled = _goalReached && !_finished;
+    // 消行闪烁窗口（~360ms）内禁点：此时点结算会取消动画，
+    // 正在闪烁的那波消行将不计入成绩
+    final flashing = _flashTimer != null || _flashRows.isNotEmpty;
+    final enabled = _goalReached && !_finished && !flashing;
     return Tooltip(
       message: enabled ? '确认结算' : '达成通关条件后可结算',
       child: Opacity(

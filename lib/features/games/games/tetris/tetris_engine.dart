@@ -589,8 +589,7 @@ extension _TetrisEngineOps on _TetrisGameState {
         if (_linesTarget > 0 && _linesTotal >= _linesTarget) {
           if (_supportsContinue) {
             _goalReached = true;
-            _pushFx('目标达成!');
-            _pushFx('可继续挑战或结算');
+            _pushFx('目标达成! 可继续');
             GameAudio.instance.levelUp();
             if (mounted) setState(() {});
             return false;
@@ -604,8 +603,7 @@ extension _TetrisEngineOps on _TetrisGameState {
         if (_scoreTarget > 0 && _score >= _scoreTarget) {
           if (_supportsContinue) {
             _goalReached = true;
-            _pushFx('目标达成!');
-            _pushFx('可继续挑战或结算');
+            _pushFx('目标达成! 可继续');
             GameAudio.instance.levelUp();
             if (mounted) setState(() {});
             return false;
