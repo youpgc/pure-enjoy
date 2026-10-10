@@ -144,18 +144,18 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// 画在底部状态卡之后，小屏必然压住「经验/健康」两行；钱包/寄养/成就/繁育
   /// 收进「更多」弹出菜单后左列约 216dp，不再与底部重叠。
   Widget _leftRail() {
-    // 2026-10-10：操作钮统一 top 60（与右列同距）；返回键独立位（top 12），
+    // 2026-10-10：操作钮统一 top 140（60+80 下调，与右列同距）；返回键独立位（安全区+6 原位），
     // 不占操作钮列首（原先内联会把「背包」顶到 ~110，两列首钮不对齐）
     return Stack(
       children: [
         Positioned(
           left: 8,
-          top: 12,
+          top: MediaQuery.paddingOf(context).top + 6,
           child: PetBackButtonCore(onBack: () => Navigator.maybePop(context)),
         ),
         Positioned(
           left: 8,
-          top: 60,
+          top: 140,
           child: Column(
             mainAxisSize: MainAxisSize.min,
             children: [
@@ -263,7 +263,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
       top: 0,
       child: Padding(
         // 操作钮统一 top 60（与左列同距）；金币胶囊已隐藏，首钮即喂食
-        padding: const EdgeInsets.only(top: 60),
+        padding: const EdgeInsets.only(top: 140),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
