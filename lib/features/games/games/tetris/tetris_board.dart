@@ -206,16 +206,24 @@ class _TetrisBoardPainter extends CustomPainter {
     for (var r = 1; r < kTetrisRows; r++) {
       canvas.drawLine(Offset(0, r * cell), Offset(size.width, r * cell), gridPaint);
     }
-    // 已落块
+    // 已落块（消行闪烁时：被消行的格子自身向白色插值，一亮一暗两轮后消失）
     for (var r = 0; r < kTetrisRows; r++) {
+      final flashing = flashRows.contains(r);
+      final t = flashing ? (flashPhase.isEven ? 0.85 : 0.12) : 0.0;
       for (var c = 0; c < kTetrisCols; c++) {
         final v = board[r][c];
-        if (v != null) {
-          if (v == kGarbageColorIndex) {
-            _drawGarbageCell(canvas, c * cell, r * cell, cell);
+        if (v == null) continue;
+        if (v == kGarbageColorIndex) {
+          if (flashing) {
+            _drawCell(canvas, c * cell, r * cell, cell,
+                Color.lerp(kGarbageColor, Colors.white, t)!);
           } else {
-            _drawCell(canvas, c * cell, r * cell, cell, kTetrominoColors[v]);
+            _drawGarbageCell(canvas, c * cell, r * cell, cell);
           }
+        } else {
+          final base = kTetrominoColors[v];
+          _drawCell(canvas, c * cell, r * cell, cell,
+              flashing ? Color.lerp(base, Colors.white, t)! : base);
         }
       }
     }
@@ -248,26 +256,9 @@ class _TetrisBoardPainter extends CustomPainter {
         _drawCell(canvas, (cur.x + p.x) * cell, y * cell, cell, color);
       }
     }
-    // 消行闪烁覆盖：白色高亮一亮一暗（相位 0/2 亮、1/3 暗），动画结束删行
-    if (flashRows.isNotEmpty) {
-      final bright = flashPhase.isEven;
-      final alpha = bright ? 0.92 : 0.30;
-      final flashPaint = Paint()..color = Colors.white.withValues(alpha: alpha);
-      for (final r in flashRows) {
-        if (r < 0 || r >= kTetrisRows) continue;
-        canvas.drawRect(
-            Rect.fromLTWH(0, r * cell, size.width, cell), flashPaint);
-        // 亮相位叠加一抹主题橙，呼应按钮/方块配色
-        if (bright) {
-          canvas.drawRect(
-            Rect.fromLTWH(0, r * cell, size.width, cell * 0.3),
-            Paint()..color = const Color(0xFFFFB74D).withValues(alpha: 0.55),
-          );
-        }
-      }
-    }
+    // 消行闪烁覆盖层已移除（2026-10-10 用户反馈样式太花哨）：
+    // 改为被消行格子自身向白色插值，在上方「已落块」绘制循环内处理
   }
-
   /// 单格：圆角矩形 + 左上高光（Block Blast 式爽感反馈的最小实现）。
   void _drawCell(Canvas canvas, double x, double y, double cell, Color color) {
     final rect = Rect.fromLTWH(x + 1, y + 1, cell - 2, cell - 2);
