@@ -240,10 +240,13 @@ class PetSummaryModel {
   /// B3+ 按需消费；数值零硬编码 —— 客户端不为缺失字段编默认值）
   final Map<String, dynamic> config;
 
-  /// 养育中的第一只宠物（状态卡主展示对象；单只上限内通常即唯一）
+  /// 养育格第一只宠物（状态卡主展示对象）。
+  /// 「在养育格」= 未寄养：历险中/繁育中的宠物仍占用养育格（保留舞台）；
+  /// 已放生个体在 summary SQL 层已被排除，按创建序取第一只——
+  /// 首宠月萤恒定展示（2026-10-10 口径收紧）
   PetBriefModel? get primaryPet {
     for (final p in pets) {
-      if (p.status == PetPetStatus.rearing) return p;
+      if (p.status != PetPetStatus.fostered) return p;
     }
     return pets.isEmpty ? null : pets.first;
   }
