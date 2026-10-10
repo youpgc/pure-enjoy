@@ -87,51 +87,54 @@ extension _TetrisBoardOps on _TetrisGameState {
               ),
             ),
           const Spacer(),
-          // 延迟结算（2026-10-10）：达标后出现「确认结算」金色钮（重开钮上方），
-          // 点击按当前累计值立即结算；未达标不占位
-          if (_goalReached) ...<Widget>[
-            _buildConfirmSettleButton(),
-            const SizedBox(height: 6),
-          ],
           _buildRestartButton(),
+          const SizedBox(height: 20),
+          // 延迟结算（2026-10-10）：确认结算恒显示——达成通关条件高亮可点，
+          // 未达成禁用置灰；位置在重开钮下方，间隔 20px
+          _buildConfirmSettleButton(),
         ],
       ),
     );
   }
 
   /// 「确认结算」钮（延迟结算）：金底高亮，点击按累计值立即结算落袋。
+  /// 未达成通关条件（[_goalReached] 为 false）时禁用置灰。
   Widget _buildConfirmSettleButton() {
+    final enabled = _goalReached && !_finished;
     return Tooltip(
-      message: '确认结算',
-      child: Material(
-        color: Colors.transparent,
-        shape: const CircleBorder(),
-        clipBehavior: Clip.antiAlias,
-        child: InkWell(
-          customBorder: const CircleBorder(),
-          onTap: _finished ? null : () => _finish(true),
-          child: Container(
-            width: 44,
-            height: 44,
-            decoration: const BoxDecoration(
-              shape: BoxShape.circle,
-              gradient: LinearGradient(
-                begin: Alignment.topCenter,
-                end: Alignment.bottomCenter,
-                colors: <Color>[Color(0xFFFFD54F), Color(0xFFFFB300)],
+      message: enabled ? '确认结算' : '达成通关条件后可结算',
+      child: Opacity(
+        opacity: enabled ? 1.0 : 0.4,
+        child: Material(
+          color: Colors.transparent,
+          shape: const CircleBorder(),
+          clipBehavior: Clip.antiAlias,
+          child: InkWell(
+            customBorder: const CircleBorder(),
+            onTap: enabled ? () => _finish(true) : null,
+            child: Container(
+              width: 44,
+              height: 44,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: <Color>[Color(0xFFFFD54F), Color(0xFFFFB300)],
+                ),
               ),
-            ),
-            child: const Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: <Widget>[
-                Icon(Icons.check_circle, size: 18, color: Color(0xFF5D4037)),
-                Text('结算',
-                    style: TextStyle(
-                        fontSize: 8,
-                        fontWeight: FontWeight.bold,
-                        color: Color(0xFF5D4037),
-                        height: 1.2)),
-              ],
+              child: const Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: <Widget>[
+                  Icon(Icons.check_circle, size: 18, color: Color(0xFF5D4037)),
+                  Text('结算',
+                      style: TextStyle(
+                          fontSize: 8,
+                          fontWeight: FontWeight.bold,
+                          color: Color(0xFF5D4037),
+                          height: 1.2)),
+                ],
+              ),
             ),
           ),
         ),
