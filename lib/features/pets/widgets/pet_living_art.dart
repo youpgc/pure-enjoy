@@ -269,11 +269,9 @@ class _PetLivingArtState extends State<PetLivingArt>
           petDecodeWidth(ref, MediaQuery.devicePixelRatioOf(context));
 
       final path = widget.fallbackAsset;
-      // 素材缺失/清单与包内文件脱节时画占位，不抛异常（铁律 8）
-      final Widget placeholder = Padding(
-        padding: const EdgeInsets.symmetric(vertical: 24),
-        child: Icon(Icons.pets, size: 64, color: cs.primary),
-      );
+      // 素材缺失/清单与包内文件脱节时画动物剪影骨架屏（不抛异常，铁律 8）；
+      // 素材落位后同一解析路径自动换回真帧，占位无需下线
+      final Widget placeholder = _SkeletonPlaceholder(ref: ref, clock: _perf);
       final Widget art = widget.frames.isNotEmpty
           ? Image.asset(widget.frames[_frameIndex],
               height: widget.height,
@@ -344,4 +342,106 @@ class _Pose {
   /// 横/纵向缩放（压扁拉伸）
   final double sx;
   final double sy;
+}
+
+/// 素材未产出形态的骨架占位：四足动物剪影（头+双耳+身+尾），
+/// 剪影内一道斜向亮带随环境态时钟往复扫动（骨架屏 shimmer 蒙层）。
+/// 语义 = 「这里会有一只，素材还在路上」；真帧就位后本占位自动隐退。
+class _SkeletonPlaceholder extends StatelessWidget {
+  const _SkeletonPlaceholder({required this.ref, required this.clock});
+
+  /// 基准边长（与真帧同源，占位尺寸随舞台缩放）
+  final double ref;
+
+  /// 环境态时钟：驱动呼吸明暗与扫光相位
+  final Animation<double> clock;
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Padding(
+      padding: const EdgeInsets.symmetric(vertical: 24),
+      child: AnimatedBuilder(
+        animation: clock,
+        builder: (context, _) {
+          final t = clock.value;
+          final breathe = 0.5 - 0.5 * math.sin(2 * math.pi * t);
+          return SizedBox(
+            width: ref * 0.62,
+            height: ref * 0.46,
+            child: CustomPaint(
+              painter: _PetSkeletonPainter(
+                base: cs.surfaceContainerHighest.withValues(alpha: 0.85),
+                shimmer: (cs.primary.withValues(alpha: 0.30))
+                    .withValues(alpha: 0.12 + 0.22 * breathe),
+                phase: t,
+              ),
+            ),
+          );
+        },
+      ),
+    );
+  }
+}
+
+class _PetSkeletonPainter extends CustomPainter {
+  _PetSkeletonPainter({
+    required this.base,
+    required this.shimmer,
+    required this.phase,
+  });
+
+  final Color base;
+  final Color shimmer;
+  final double phase;
+
+  @override
+  void paint(Canvas canvas, Size size) {
+    final w = size.width, h = size.height;
+    // 剪影 = 身（椭圆）+ 头（圆）+ 双耳（三角）+ 前后腿（圆角短柱）+ 尾（弧线）
+    final path = Path()
+      ..addOval(Rect.fromCenter(
+          center: Offset(w * 0.56, h * 0.62), width: w * 0.64, height: h * 0.5))
+      ..addOval(Rect.fromCenter(
+          center: Offset(w * 0.25, h * 0.34), width: w * 0.36, height: h * 0.36))
+      ..moveTo(w * 0.13, h * 0.26)
+      ..lineTo(w * 0.19, h * 0.05)
+      ..lineTo(w * 0.28, h * 0.20)
+      ..close()
+      ..moveTo(w * 0.30, h * 0.20)
+      ..lineTo(w * 0.38, h * 0.03)
+      ..lineTo(w * 0.43, h * 0.23)
+      ..close();
+    final fill = Paint()
+      ..color = base
+      ..style = PaintingStyle.fill;
+    canvas.drawPath(path, fill);
+    final leg = Paint()
+      ..color = base
+      ..strokeWidth = h * 0.085
+      ..strokeCap = StrokeCap.round;
+    canvas.drawLine(Offset(w * 0.42, h * 0.78), Offset(w * 0.42, h * 0.96), leg);
+    canvas.drawLine(Offset(w * 0.70, h * 0.78), Offset(w * 0.70, h * 0.96), leg);
+    final tail = Path()
+      ..moveTo(w * 0.86, h * 0.60)
+      ..quadraticBezierTo(w * 1.02, h * 0.48, w * 0.90, h * 0.26);
+    canvas.drawPath(
+        tail,
+        Paint()
+          ..color = base
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = h * 0.055
+          ..strokeCap = StrokeCap.round);
+    // 扫光蒙层：斜向亮带按 phase 在 [-0.3w, 1.3w] 区间往复，裁剪进剪影
+    canvas.save();
+    canvas.clipPath(path);
+    final sweep = (phase < 0.5 ? phase * 2 : (1 - phase) * 2);
+    final x = -w * 0.3 + w * 1.6 * sweep;
+    canvas.drawRect(Rect.fromLTWH(x, 0, w * 0.24, h), Paint()..color = shimmer);
+    canvas.restore();
+  }
+
+  @override
+  bool shouldRepaint(covariant _PetSkeletonPainter old) =>
+      old.phase != phase || old.base != base || old.shimmer != shimmer;
 }
