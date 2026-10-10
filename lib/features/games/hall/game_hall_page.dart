@@ -152,8 +152,10 @@ class _GameHallPageState extends State<GameHallPage> {
 }
 
 /// 游戏入口横幅卡（2026-10-10 大厅改版：一行一游戏、氛围化设计）。
-/// 结构：游戏专属渐变底 + 氛围装饰 SVG（透明底散布元素，缺失时纯渐变兜底）
-/// + 暗角遮罩保文字可读 + 前景（大图标 / 名称与简介 / 最佳成绩胶囊 / 开玩钮）。
+/// 结构：游戏专属渐变底（暗色模式压暗）+ 氛围装饰 SVG（倾斜、降透明，
+/// 缺失时纯渐变兜底）+ 暗角遮罩保文字可读 + 前景（图标卡 / 名称 /
+/// 右侧奖杯墙：最佳成绩 + 大号奖杯，无成绩不展示）。样式接入个性化
+/// 设置：圆角跟随 UI 风格（胶囊现代 50% 适配）、投影/边框跟随全局开关。
 class _GameBannerCard extends StatelessWidget {
   final GameModel game;
   final GameBestScore? best;
@@ -273,13 +275,9 @@ class _GameBannerCard extends StatelessWidget {
                         height: 56,
                         decoration: BoxDecoration(
                           color: Colors.white.withValues(alpha: 0.94),
-                          // 联动风格圆角：胶囊风格下 64 正方图标卡变圆
-                          borderRadius: BorderRadius.circular(
-                              UiStyleToken.of(AppTheme.uiStyleOf(context))
-                                          .cardRadius >=
-                                      999
-                                  ? 999
-                                  : 16),
+                          // 联动风格圆角：胶囊风格下正方图标卡变圆
+                          borderRadius:
+                              BorderRadius.circular(isPill ? 999 : 16),
                           boxShadow: <BoxShadow>[
                             BoxShadow(
                               color: Colors.black.withValues(alpha: 0.25),
