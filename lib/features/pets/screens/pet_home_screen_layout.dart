@@ -16,32 +16,36 @@ extension _PetHomeLayout on _PetHomeScreenState {
       // 底部让位状态面板（名牌+四维沉底），其余方向居中
       child: Padding(
         padding: const EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, 128),
-        child: Stack(
-          fit: StackFit.expand,
-          children: [
-            Center(
-              child: GestureDetector(
-                behavior: HitTestBehavior.opaque,
-                onTap: () => _interact(pet.id),
-                onDoubleTap: _onStageDoubleTap,
-                onLongPress: _openAttributes,
-                child: PetLivingArt(
-                  // 身体帧按当前动作取：该动作有真帧用它，没有则沿用 idle 帧
-                  frames: petStageFrames(pet.speciesCode, _machine.current,
-                      render2d: pet.render2d),
-                  fallbackAsset: petBaseArt(pet.speciesCode, pet.stage,
-                      render2d: pet.render2d),
-                  // 分层弯曲：已登记几何的形态走逐行弯曲，其余留在整图补间
-                  bendGeo: petBendGeo(pet.speciesCode, pet.stage),
-                  bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
-                  action: _machine.current,
-                  onActionEnd: _onActionEnd,
+        // 宠物整体下沉 20%（粒子层同坐标系随动，FX 锚点不脱节）
+        child: FractionalTranslation(
+          translation: const Offset(0, 0.2),
+          child: Stack(
+            fit: StackFit.expand,
+            children: [
+              Center(
+                child: GestureDetector(
+                  behavior: HitTestBehavior.opaque,
+                  onTap: () => _interact(pet.id),
+                  onDoubleTap: _onStageDoubleTap,
+                  onLongPress: _openAttributes,
+                  child: PetLivingArt(
+                    // 身体帧按当前动作取：该动作有真帧用它，没有则沿用 idle 帧
+                    frames: petStageFrames(pet.speciesCode, _machine.current,
+                        render2d: pet.render2d),
+                    fallbackAsset: petBaseArt(pet.speciesCode, pet.stage,
+                        render2d: pet.render2d),
+                    // 分层弯曲：已登记几何的形态走逐行弯曲，其余留在整图补间
+                    bendGeo: petBendGeo(pet.speciesCode, pet.stage),
+                    bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
+                    action: _machine.current,
+                    onActionEnd: _onActionEnd,
+                  ),
                 ),
               ),
-            ),
-            // 粒子层与宠物同坐标系：emit 的 Alignment 锚点即宠物身体位置
-            PetFxLayer(fx: _fx),
-          ],
+              // 粒子层与宠物同坐标系：emit 的 Alignment 锚点即宠物身体位置
+              PetFxLayer(fx: _fx),
+            ],
+          ),
         ),
       ),
     );
@@ -57,19 +61,16 @@ extension _PetHomeLayout on _PetHomeScreenState {
   void _onStageDoubleTap() => _playAction(PetAction.petted);
 
   List<Widget> _switchArrows() => [
+        // 沉底贴边：底缘对齐状态面板让位线（128），左右 12px 贴屏边
         Positioned(
-          left: _kEdgeInset - 4, top: 0, bottom: 0,
-          child: Center(
-            child: PetSwitchArrow(
-                icon: Icons.chevron_left, onTap: () => _switchPet(-1)),
-          ),
+          left: 12, bottom: 132,
+          child: PetSwitchArrow(
+              icon: Icons.chevron_left, onTap: () => _switchPet(-1)),
         ),
         Positioned(
-          right: _kEdgeInset - 4, top: 0, bottom: 0,
-          child: Center(
-            child: PetSwitchArrow(
-                icon: Icons.chevron_right, onTap: () => _switchPet(1)),
-          ),
+          right: 12, bottom: 132,
+          child: PetSwitchArrow(
+              icon: Icons.chevron_right, onTap: () => _switchPet(1)),
         ),
       ];
 
