@@ -144,34 +144,39 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// 画在底部状态卡之后，小屏必然压住「经验/健康」两行；钱包/寄养/成就/繁育
   /// 收进「更多」弹出菜单后左列约 216dp，不再与底部重叠。
   Widget _leftRail() {
-    return Positioned(
-      left: 8,
-      top: 0,
-      child: Padding(
-        // 贴顶：安全区下方留些许间距；返回键内联列首（避免与独立浮层重叠）
-        padding: const EdgeInsets.only(top: 60),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            PetBackButtonCore(onBack: () => Navigator.maybePop(context)),
-            const SizedBox(height: 10),
-            PetEdgeButton(
-                icon: Icons.inventory_2_outlined,
-                label: '背包',
-                onTap: _openBag),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.storefront_outlined,
-                label: '商城',
-                onTap: _openShop),
-            const SizedBox(height: 14),
-            PetEdgeButton(
-                icon: Icons.more_horiz,
-                label: '更多',
-                onTap: _showMoreMenu),
-          ],
+    // 2026-10-10：操作钮统一 top 60（与右列同距）；返回键独立位（top 12），
+    // 不占操作钮列首（原先内联会把「背包」顶到 ~110，两列首钮不对齐）
+    return Stack(
+      children: [
+        Positioned(
+          left: 8,
+          top: 12,
+          child: PetBackButtonCore(onBack: () => Navigator.maybePop(context)),
         ),
-      ),
+        Positioned(
+          left: 8,
+          top: 60,
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              PetEdgeButton(
+                  icon: Icons.inventory_2_outlined,
+                  label: '背包',
+                  onTap: _openBag),
+              const SizedBox(height: 14),
+              PetEdgeButton(
+                  icon: Icons.storefront_outlined,
+                  label: '商城',
+                  onTap: _openShop),
+              const SizedBox(height: 14),
+              PetEdgeButton(
+                  icon: Icons.more_horiz,
+                  label: '更多',
+                  onTap: _showMoreMenu),
+            ],
+          ),
+        ),
+      ],
     );
   }
 
@@ -257,13 +262,11 @@ extension _PetHomeLayout on _PetHomeScreenState {
       right: 8,
       top: 0,
       child: Padding(
-        // 贴顶：安全区下方留些许间距；金币胶囊内联列首（避免与独立浮层重叠）
+        // 操作钮统一 top 60（与左列同距）；金币胶囊已隐藏，首钮即喂食
         padding: const EdgeInsets.only(top: 60),
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            // 金币展示已隐藏（2026-10-10）：余额看「更多 → 金币钱包」
-            const SizedBox(height: 6),
             PetEdgeButton(
                 icon: Icons.restaurant,
                 label: _feedLabel,
