@@ -1,0 +1,18 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <defs>
+    <linearGradient id="g" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFE082"/><stop offset="1" stop-color="#FFB300"/>
+    </linearGradient>
+    <linearGradient id="g2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#FFCA28"/><stop offset="1" stop-color="#FF8F00"/>
+    </linearGradient>
+  </defs>
+  <path d="M18 10 h28 v6 c0 12 -5 20 -14 20 s-14 -8 -14 -20 z" fill="url(#g)" stroke="#E65100" stroke-width="2"/>
+  <path d="M18 13 c-7 0 -10 4 -9 9 c1 5 5 8 11 8" fill="none" stroke="url(#g2)" stroke-width="3.5"/>
+  <path d="M46 13 c7 0 10 4 9 9 c-1 5 -5 8 -11 8" fill="none" stroke="url(#g2)" stroke-width="3.5"/>
+  <path d="M28 35 h8 v6 h-8 z" fill="url(#g2)" stroke="#E65100" stroke-width="1.6"/>
+  <rect x="20" y="41" width="24" height="6" rx="2" fill="url(#g)" stroke="#E65100" stroke-width="1.8"/>
+  <rect x="16" y="47" width="32" height="7" rx="2.5" fill="url(#g2)" stroke="#E65100" stroke-width="1.8"/>
+  <path d="M32 17 l2 4.2 4.6 0.5 -3.4 3.1 1 4.5 -4.2 -2.3 -4.2 2.3 1 -4.5 -3.4 -3.1 4.6 -0.5 z" fill="#FFF8E1" opacity="0.95"/>
+  <path d="M22 13 v14" stroke="#FFF8E1" stroke-width="2.4" opacity="0.7" stroke-linecap="round"/>
+</svg>

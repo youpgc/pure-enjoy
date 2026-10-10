@@ -224,9 +224,11 @@ class _GameBannerCard extends StatelessWidget {
                     ),
                   ),
                 ),
-                // 前景
+                // 前景（2026-10-10 二稿）：左侧图标+名称；右侧「奖杯墙」——
+                // 大号立体奖杯（有成绩金色/无成绩置灰）+ 最佳成绩小字；
+                // 描述行与播放按钮移除（整卡可点）。
                 Padding(
-                  padding: const EdgeInsets.fromLTRB(14, 12, 12, 12),
+                  padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
                   child: Row(
                     children: <Widget>[
                       // 游戏图标（白底圆角卡，突出主体）
@@ -251,84 +253,66 @@ class _GameBannerCard extends StatelessWidget {
                               const Icon(Icons.sports_esports, size: 40),
                         ),
                       ),
-                      const SizedBox(width: 12),
-                      // 名称 + 简介 + 成绩
+                      const SizedBox(width: 14),
+                      // 名称（垂直居中，描述行移除）
                       Expanded(
+                        child: Text(
+                          game.name,
+                          maxLines: 1,
+                          overflow: TextOverflow.ellipsis,
+                          style: const TextStyle(
+                            fontSize: 22,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.white,
+                            shadows: <Shadow>[
+                              Shadow(color: Colors.black45, blurRadius: 4),
+                            ],
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 10),
+                      // 奖杯墙：大号奖杯 + 最佳成绩小字
+                      SizedBox(
+                        width: 74,
                         child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
                           children: <Widget>[
+                            SvgPicture.asset(
+                              best == null
+                                  ? 'assets/games/backgrounds/trophy_gray.svg'
+                                  : 'assets/games/backgrounds/trophy_gold.svg',
+                              width: 48,
+                              height: 48,
+                              errorBuilder: (_, __, ___) => Icon(
+                                Icons.emoji_events,
+                                size: 44,
+                                color: best == null
+                                    ? Colors.white.withValues(alpha: 0.4)
+                                    : const Color(0xFFFFD54F),
+                              ),
+                            ),
+                            const SizedBox(height: 2),
                             Text(
-                              game.name,
+                              best == null ? '暂无成绩' : '最佳 ${fmtBest ?? ''}',
                               maxLines: 1,
                               overflow: TextOverflow.ellipsis,
-                              style: const TextStyle(
-                                fontSize: 20,
+                              textAlign: TextAlign.center,
+                              style: TextStyle(
+                                fontSize: 10,
                                 fontWeight: FontWeight.bold,
-                                color: Colors.white,
-                                shadows: <Shadow>[
+                                color: best == null
+                                    ? Colors.white.withValues(alpha: 0.55)
+                                    : const Color(0xFFFFD54F),
+                                shadows: const <Shadow>[
                                   Shadow(
-                                      color: Colors.black45, blurRadius: 4),
+                                      color: Colors.black54,
+                                      blurRadius: 4,
+                                      offset: Offset(0, 1)),
                                 ],
                               ),
                             ),
-                            const SizedBox(height: 3),
-                            Text(
-                              best == null
-                                  ? '尚未挑战 · 点击开玩'
-                                  : '${best!.dimensionName} · ${fmtBest ?? ''}',
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: Colors.white.withValues(alpha: 0.88),
-                              ),
-                            ),
-                            const SizedBox(height: 6),
-                            // 最佳成绩胶囊
-                            if (best != null)
-                              Container(
-                                padding: const EdgeInsets.symmetric(
-                                    horizontal: 8, vertical: 2),
-                                decoration: BoxDecoration(
-                                  color: Colors.black.withValues(alpha: 0.30),
-                                  borderRadius: BorderRadius.circular(20),
-                                ),
-                                child: Row(
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: <Widget>[
-                                    const Icon(Icons.emoji_events,
-                                        size: 13, color: Color(0xFFFFD54F)),
-                                    const SizedBox(width: 4),
-                                    Flexible(
-                                      child: Text(
-                                        '最佳 ${fmtBest ?? ''}',
-                                        maxLines: 1,
-                                        overflow: TextOverflow.ellipsis,
-                                        style: const TextStyle(
-                                          fontSize: 11,
-                                          fontWeight: FontWeight.bold,
-                                          color: Color(0xFFFFD54F),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
                           ],
                         ),
-                      ),
-                      const SizedBox(width: 8),
-                      // 开玩钮
-                      Container(
-                        width: 42,
-                        height: 42,
-                        decoration: BoxDecoration(
-                          shape: BoxShape.circle,
-                          color: Colors.white.withValues(alpha: 0.92),
-                        ),
-                        child: const Icon(Icons.play_arrow_rounded,
-                            size: 30, color: Color(0xFFF2571B)),
                       ),
                     ],
                   ),
