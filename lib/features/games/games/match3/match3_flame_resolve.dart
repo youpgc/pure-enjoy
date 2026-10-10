@@ -227,7 +227,6 @@ extension _Match3Resolve on Match3FlameGame {
   void _finishByObjective({String? failReason}) {
     if (_over) return;
     _over = true;
-    _pendingSwipe = null; // 对局结束，丢弃未执行的缓冲滑动
     _syncHud();
     final cleared = objective.achieved;
     if (cleared) {

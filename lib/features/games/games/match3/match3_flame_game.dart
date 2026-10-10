@@ -164,13 +164,9 @@ class Match3FlameGame extends FlameGame
   void onSwipe(int r, int c, int dr, int dc) {
     // 任一道具待命中：滑动手势不触发交换也不缓冲，留给点击执行道具目标
     if (smashArmed || forceSwapArmed || magicArmed) return;
-    // 输入缓冲（2026-09-14 审查修复）：动画/锁定期开始的滑动不再整条丢弃，
-    // 记录待执行，_busy 解除瞬间在 update() 里补执行（主流三消标准做法）。
-    // 后到的滑动覆盖先前的缓冲（最新意图优先）。
-    if (!canInteract) {
-      _pendingSwipe = (r, c, dr, dc);
-      return;
-    }
+    // 连击/锁定期滑动直接丢弃（2026-10-10 用户口径：等待连击完成才允许
+    // 下次交换——此前 2026-09-14 的输入缓冲会在连击结束瞬间补执行，
+    // 体感为连击未完成就动了）。点选路径 onTapUp 的 _busy 检查同口径。
     final tr = r + dr;
     final tc = c + dc;
     if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
@@ -179,24 +175,6 @@ class Match3FlameGame extends FlameGame
     _trySwap(r, c, tr, tc);
   }
 
-  /// 待执行滑动缓冲（起始行, 起始列, 行增量, 列增量）；null = 无
-  (int, int, int, int)? _pendingSwipe;
-
-  /// 每帧检查：锁定期结束后补执行缓冲的滑动。
-  /// 执行前复验目标格仍有效（动画期间盘面可能已变化）。
-  void _flushPendingSwipe() {
-    final pending = _pendingSwipe;
-    if (pending == null || !canInteract) return;
-    _pendingSwipe = null;
-    final (r, c, dr, dc) = pending;
-    final tr = r + dr;
-    final tc = c + dc;
-    if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
-    if (grid[r][c] == null || grid[tr][tc] == null) return;
-    _selectedR = null;
-    _selectedC = null;
-    _trySwap(r, c, tr, tc);
-  }
 
   Offset _cellCenter(int r, int c) => Offset(
         _offsetX + c * _cell + _cell / 2,
@@ -329,8 +307,7 @@ class Match3FlameGame extends FlameGame
     super.update(dt);
     effects.update(dt);
     // 锁定期结束后补执行缓冲的滑动（输入缓冲，见 onSwipe 注释）
-    _flushPendingSwipe();
-    // 限时模式：倒计时推进，归零即结算
+        // 限时模式：倒计时推进，归零即结算
     if (objective.isTimed && _loaded && !_over) {
       objective.secondsLeft -= dt;
       if (objective.secondsLeft <= 0) {

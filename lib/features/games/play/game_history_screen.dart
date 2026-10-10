@@ -257,11 +257,16 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
           final clock = formatDurationSmart(h.durationMs ?? 0);
           final scope = _scopeLabel(h);
           final isSession = _sessionRounds.containsKey(h.id);
+          // 无尽会话记录展示最终分数（2026-10-10 用户反馈：新会话为单条
+          // 记录，此前只显示用时没有分数）；聚合项（旧多局数据）带局数
+          final isEndlessSingle = !_isEndlessRecord(h) ? false : !isSession;
           final subtitle = isSession
-              ? '无尽模式 · ${_sessionRounds[h.id]} 局 · 累计 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
-              : (scope.isEmpty
-                  ? '用时 $clock'
-                  : '$scope · 用时 $clock');
+              ? '无尽模式 · ${_sessionRounds[h.id]} 局 · 最终 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
+              : (isEndlessSingle
+                  ? '无尽模式 · 最终 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
+                  : (scope.isEmpty
+                      ? '用时 $clock'
+                      : '$scope · 用时 $clock'));
           return ListTile(
             dense: true,
             leading: Icon(
