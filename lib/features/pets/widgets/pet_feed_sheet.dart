@@ -31,9 +31,8 @@ Future<bool> showPetFeedSheet(BuildContext context, String petId) async {
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    isScrollControlled: true,
-    // 宽屏铺满：Flutter 默认把底部弹层限宽 640 居中，喂食浮层（含无口粮空态）放开
-    constraints: const BoxConstraints(maxWidth: double.infinity),
+    // 与「更多」菜单弹窗同款配置：不带 isScrollControlled/constraints，
+    // 全宽贴底；长列表由内部 Flexible + shrinkWrap 兜底
     builder: (_) =>
         _PetFeedSheet(petId: petId, foods: foods, onFed: () => fed = true),
   );
@@ -79,79 +78,78 @@ class _PetFeedSheetState extends State<_PetFeedSheet> {
     final cs = Theme.of(context).colorScheme;
     final foods = widget.foods;
     return SafeArea(
-      child: ConstrainedBox(
-        // 口粮种类不多，限高避免空态时整屏空白
-        constraints: const BoxConstraints(maxHeight: 420),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            const Padding(
-              padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
-              child: Text('用口粮喂食',
-                  style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
-            ),
-            if (foods.isEmpty)
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 0, 16, 24),
-                child: Text(
-                  '背包里没有可喂食的道具，可在商城「食物」分类购买。',
-                  style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
-                ),
-              )
-            else
-              Flexible(
-                child: ListView.separated(
-                  shrinkWrap: true,
-                  itemCount: foods.length,
-                  separatorBuilder: (_, __) => const Divider(height: 1),
-                  itemBuilder: (context, i) {
-                    final item = foods[i];
-                    final busy = _busyId == item.id;
-                    final desc = petBagEffectDesc(item);
-                    return ListTile(
-                      leading: SizedBox(
-                        width: 40,
-                        height: 40,
-                        child: PetItemIcon(
-                          iconKey: item.iconKey,
-                          fallback: petBagFallbackIcon(item),
-                          size: 26,
-                          color: cs.primary,
-                        ),
-                      ),
-                      title: Text(item.name,
-                          maxLines: 1,
-                          overflow: TextOverflow.ellipsis,
-                          style: const TextStyle(fontSize: 14)),
-                      subtitle: desc.isEmpty
-                          ? null
-                          : Text(desc,
-                              maxLines: 1,
-                              overflow: TextOverflow.ellipsis,
-                              style: TextStyle(
-                                  fontSize: 12, color: cs.onSurfaceVariant)),
-                      trailing: busy
-                          ? const SizedBox(
-                              width: 18,
-                              height: 18,
-                              child: CircularProgressIndicator(strokeWidth: 2),
-                            )
-                          : Text('×${item.quantity}',
-                              style: TextStyle(
-                                  fontSize: 13,
-                                  fontWeight: FontWeight.w600,
-                                  color: cs.onSurfaceVariant)),
-                      onTap: _busyId == null ? () => _feed(item) : null,
-                    );
-                  },
-                ),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const Padding(
+            padding: EdgeInsets.fromLTRB(16, 4, 16, 10),
+            child: Text('用口粮喂食',
+                style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+          ),
+          if (foods.isEmpty)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
+              child: Text(
+                '背包里没有可喂食的道具，可在商城「食物」分类购买。',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
-            const SizedBox(height: 6),
-            Text('小贴士：解锁「高级食盆」后，长按主页喂食键可一键喂养全部伙伴',
+            )
+          else
+            // Flexible + shrinkWrap：口粮少时按内容收缩，多时在弹层限高内滚动
+            Flexible(
+              child: ListView.separated(
+                shrinkWrap: true,
+                itemCount: foods.length,
+                separatorBuilder: (_, __) => const Divider(height: 1),
+                itemBuilder: (context, i) {
+                  final item = foods[i];
+                  final busy = _busyId == item.id;
+                  final desc = petBagEffectDesc(item);
+                  return ListTile(
+                    leading: SizedBox(
+                      width: 40,
+                      height: 40,
+                      child: PetItemIcon(
+                        iconKey: item.iconKey,
+                        fallback: petBagFallbackIcon(item),
+                        size: 26,
+                        color: cs.primary,
+                      ),
+                    ),
+                    title: Text(item.name,
+                        maxLines: 1,
+                        overflow: TextOverflow.ellipsis,
+                        style: const TextStyle(fontSize: 14)),
+                    subtitle: desc.isEmpty
+                        ? null
+                        : Text(desc,
+                            maxLines: 1,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                                fontSize: 12, color: cs.onSurfaceVariant)),
+                    trailing: busy
+                        ? const SizedBox(
+                            width: 18,
+                            height: 18,
+                            child: CircularProgressIndicator(strokeWidth: 2),
+                          )
+                        : Text('×${item.quantity}',
+                            style: TextStyle(
+                                fontSize: 13,
+                                fontWeight: FontWeight.w600,
+                                color: cs.onSurfaceVariant)),
+                    onTap: _busyId == null ? () => _feed(item) : null,
+                  );
+                },
+              ),
+            ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 6, 16, 14),
+            child: Text('小贴士：解锁「高级食盆」后，长按主页喂食键可一键喂养全部伙伴',
                 style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-          ],
-        ),
+          ),
+        ],
       ),
     );
   }
