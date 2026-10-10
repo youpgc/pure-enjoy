@@ -205,6 +205,7 @@ extension _TetrisEngineOps on _TetrisGameState {
     p.x += dx;
     _lastAction = _TetrisAction.move;
     _afterSuccessfulShift();
+    GameAudio.instance.move();
     if (mounted) setState(() {});
     return true;
   }
@@ -462,6 +463,7 @@ extension _TetrisEngineOps on _TetrisGameState {
     }
 
     // 无消行：空锁定也要给 combo 断链语义（_applyClearScore(0)）
+    GameAudio.instance.lock();
     _applyClearScore(0, spin);
 
     // 挑战模式块数耗尽：spawn 前结算
@@ -632,6 +634,10 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 消行闪烁动画结束：真正删行（含垃圾砖统计）→ 计分 → 通关/续 spawn。
   void _finishLineClear(_TetrisSpin? spin) {
     if (_finished) return; // 闪烁期间对局可能已被超时/放弃路径结束
+    // ⚠️ 必须 cancel 并把字段置 null：回调里的 t.cancel() 只取消 Timer 对象，
+    // 字段仍非 null 会令「闪烁中禁点确认结算」判定恒真（按钮永远禁用）
+    _flashTimer?.cancel();
+    _flashTimer = null;
     final n = _flashRows.length;
     // 垃圾砖统计在删前进行（dig/digger 成就数据源）
     for (final r in _flashRows) {

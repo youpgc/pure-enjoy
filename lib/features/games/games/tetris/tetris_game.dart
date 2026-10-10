@@ -273,6 +273,7 @@ class _TetrisGameState extends State<TetrisGame> {
 
   void _reset() {
     _flashTimer?.cancel();
+    _flashTimer = null;
     _flashRows = <int>[];
     _flashPhase = 0;
     _board = List<List<int?>>.generate(
@@ -420,6 +421,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _tickTimer?.cancel();
     _garbageTimer?.cancel();
     _flashTimer?.cancel();
+    _flashTimer = null;
     _flashRows = <int>[];
     if (cleared) {
       GameAudio.instance.win();
@@ -484,12 +486,14 @@ class _TetrisGameState extends State<TetrisGame> {
       case TetrisMode.sprint:
       case TetrisMode.survival:
       case TetrisMode.daily:
-        return '${max(0, _linesTarget - _linesTotal)} 行';
+        // 目标固定显示总量，不随消行递减（2026-10-10 用户反馈）
+        return '$_linesTarget 行';
       case TetrisMode.blitz:
       case TetrisMode.challenge:
         return '$_scoreTarget 分';
       case TetrisMode.dig:
-        return '$_garbageRowsRemaining 行垃圾';
+        // 挖掘固定显示预填总量；现场剩余量在 fx/玩法中呈现
+        return '$_digRows 行垃圾';
       case TetrisMode.boss:
         return '血量 $_bossHp';
     }

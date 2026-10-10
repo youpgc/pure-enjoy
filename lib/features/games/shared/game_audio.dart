@@ -12,7 +12,12 @@ class GameAudio {
 
   static final GameAudio instance = GameAudio._();
 
-  final AudioPlayer _player = AudioPlayer();
+  /// 播放器池（2026-10-10 音效断播修复）：单实例连续 stop→play 存在竞态
+  /// （上一个 play 未完成即被 stop 截断，表现为时有时无/断播），改为多实例
+  /// 轮询——短音效各自独立播放互不打断；池大小 4 可覆盖最高连发密度。
+  final List<AudioPlayer> _pool =
+      List.generate(4, (_) => AudioPlayer());
+  int _nextSlot = 0;
   bool _muted = false;
   // 播放失败只上报一次：资源缺失属全局性问题，逐次上报会刷屏
   bool _playFailureReported = false;
@@ -25,9 +30,11 @@ class GameAudio {
 
   Future<void> _play(String file) async {
     if (_muted) return;
+    final player = _pool[_nextSlot];
+    _nextSlot = (_nextSlot + 1) % _pool.length;
     try {
-      await _player.stop();
-      await _player.play(AssetSource('audio/$file'));
+      await player.stop();
+      await player.play(AssetSource('audio/$file'));
     } catch (e, st) {
       // 资源缺失或播放失败时静默降级，不影响游戏逻辑；仅首次上报便于发现打包遗漏
       if (!_playFailureReported) {
@@ -60,6 +67,12 @@ class GameAudio {
 
   /// 俄罗斯方块：旋转（复用 select 音，轻短；缺资源时静默降级）
   void rotate() => _play('tetris_rotate.wav');
+
+  /// 俄罗斯方块：移动（轻 tap 音）
+  void move() => _play('tap.wav');
+
+  /// 俄罗斯方块：锁定落定（非消行锁定）
+  void lock() => _play('select.wav');
 
   /// 俄罗斯方块：消行（1-3 行轻快音，4 行 TETRIS 重音；缺资源回退 match）
   void lineClear(int lines) =>
