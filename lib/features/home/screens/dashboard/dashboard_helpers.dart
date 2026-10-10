@@ -96,15 +96,13 @@ void showAddHabitSheet(BuildContext context,
 /// 显示工具配置弹窗
 void showToolConfigSheet(BuildContext context,
     {required List<String> visibleIds,
-    required void Function(List<String>) onSave,
-    required bool petEnabled}) {
+    required void Function(List<String>) onSave}) {
   showModalBottomSheet(
     context: context,
     isScrollControlled: true,
     builder: (context) => ToolConfigSheet(
       visibleIds: visibleIds,
       onSave: onSave,
-      petEnabled: petEnabled,
     ),
   );
 }

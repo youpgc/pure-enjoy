@@ -91,9 +91,10 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
 
   @override
   Widget build(BuildContext context) {
+    // 宠物主入口 = PetStatusCardSection 状态卡；常用工具区不再提供宠物入口
+    // （2026-10-10 移除：id=='pet' 一律排除，历史勾选配置无需迁移）
     final visibleTools = allTools
-        .where((t) =>
-            _visibleToolIds.contains(t.id) && (t.id != 'pet' || _petEnabled))
+        .where((t) => t.id != 'pet' && _visibleToolIds.contains(t.id))
         .toList();
 
     return Scaffold(
@@ -146,7 +147,6 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
                 context,
                 visibleIds: _visibleToolIds,
                 onSave: _saveToolConfig,
-                petEnabled: _petEnabled,
               ),
               onToolTap: _onToolTap,
             ),

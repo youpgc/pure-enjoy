@@ -17,7 +17,7 @@ class ToolItem {
   });
 }
 
-/// 所有可用工具列表
+/// 所有可用工具列表（宠物已移出常用工具：主入口 = 首页宠物状态卡，2026-10-10）
 const List<ToolItem> allTools = [
   ToolItem(id: 'diary', label: '写日记', icon: Icons.note_add_outlined, color: Color(0xFFFFB300)),
   ToolItem(id: 'expense', label: '记一笔', icon: Icons.account_balance_wallet_outlined, color: Color(0xFF4CAF50)),
@@ -25,7 +25,6 @@ const List<ToolItem> allTools = [
   ToolItem(id: 'note', label: '记笔记', icon: Icons.sticky_note_2_outlined, color: Color(0xFFF26522)),
   ToolItem(id: 'reminder', label: '添加提醒', icon: Icons.alarm_add_outlined, color: Color(0xFFFFB300)),
   ToolItem(id: 'habit', label: '添加习惯', icon: Icons.track_changes_outlined, color: Color(0xFFFF9800)),
-  ToolItem(id: 'pet', label: '宠物', icon: Icons.pets_outlined, color: Color(0xFF8D6E63)),
 ];
 
 /// 工具配置底部弹窗
@@ -35,15 +34,10 @@ class ToolConfigSheet extends StatefulWidget {
   final List<String> visibleIds;
   final ValueChanged<List<String>> onSave;
 
-  /// 宠物系统总开关（pet_enabled=false 时「宠物」工具禁选——
-  /// 首页网格亦不渲染该工具，避免「可选却不出」的困惑）。
-  final bool petEnabled;
-
   const ToolConfigSheet({
     super.key,
     required this.visibleIds,
     required this.onSave,
-    required this.petEnabled,
   });
 
   @override
@@ -99,48 +93,32 @@ class ToolConfigSheetState extends State<ToolConfigSheet> {
             runSpacing: 12,
             children: allTools.map((tool) {
               final isSelected = _selectedIds.contains(tool.id);
-              // 宠物系统关闭时「宠物」工具禁选（与首页网格门控一致）
-              final locked = tool.id == 'pet' && !widget.petEnabled;
               return FilterChip(
                 label: Row(
                   mainAxisSize: MainAxisSize.min,
                   children: [
                     Icon(tool.icon,
                         size: 16,
-                        color: isSelected && !locked
-                            ? Colors.white
-                            : tool.color),
+                        color: isSelected ? Colors.white : tool.color),
                     const SizedBox(width: 6),
                     Text(tool.label),
                   ],
                 ),
-                selected: isSelected && !locked,
+                selected: isSelected,
                 selectedColor: tool.color,
                 checkmarkColor: Colors.white,
-                onSelected: locked
-                    ? null
-                    : (selected) {
-                        setState(() {
-                          if (selected) {
-                            _selectedIds.add(tool.id);
-                          } else {
-                            _selectedIds.remove(tool.id);
-                          }
-                        });
-                      },
+                onSelected: (selected) {
+                  setState(() {
+                    if (selected) {
+                      _selectedIds.add(tool.id);
+                    } else {
+                      _selectedIds.remove(tool.id);
+                    }
+                  });
+                },
               );
             }).toList(),
           ),
-          if (!widget.petEnabled) ...[
-            const SizedBox(height: 8),
-            Text(
-              '「宠物」工具暂未开放，系统开启后可添加到首页',
-              style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                color: Theme.of(context).colorScheme.outline,
-              ),
-              textAlign: TextAlign.center,
-            ),
-          ],
           const SizedBox(height: 20),
           FilledButton(
             onPressed: () {
