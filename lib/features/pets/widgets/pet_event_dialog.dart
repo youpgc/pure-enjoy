@@ -7,8 +7,9 @@ import 'pet_item_icon.dart';
 
 /// 随机事件弹层（需求 §3.6 轻量插叙事件）
 ///
-/// 两段式：文案 + 选项 → 选择后换结算明细。奖惩包来自 roll 下发的公示数据
-/// （§17#1 所见即所得），结算与服务端 choose 返回为准。
+/// 两段式：文案 + 选项 → 选择后换结算明细。选项只描述事件、**不公示奖励**
+/// （2026-10-10 用户拍板「惊喜制」：roll 下发的奖惩包仍供服务端结算与
+/// 审计，App 侧选项不渲染），所得在选择后的结算页一次揭示。
 /// 返回 true = 完成了一次有效选择（调用方可据以刷新）。
 Future<bool> showPetEventDialog(
   BuildContext context, {
@@ -121,44 +122,12 @@ class _PetEventDialogState extends State<_PetEventDialog> {
                 height: 16,
                 child: CircularProgressIndicator(strokeWidth: 2))
             : Padding(
-                padding: const EdgeInsets.symmetric(vertical: 2),
-                child: Column(
-                  children: [
-                    Text(opt.label,
-                        style: const TextStyle(fontWeight: FontWeight.w600)),
-                    const SizedBox(height: 2),
-                    Text(_rewardHint(opt.rewards),
-                        style: TextStyle(
-                            fontSize: 11,
-                            color: Theme.of(context)
-                                .colorScheme
-                                .onSurfaceVariant)),
-                  ],
-                ),
+                // 惊喜制：选项只给事件描述，奖励留到结算页揭示
+                padding: const EdgeInsets.symmetric(vertical: 6),
+                child: Text(opt.label,
+                    style: const TextStyle(fontWeight: FontWeight.w600)),
               ),
       ),
     );
   }
-
-  /// 公示奖惩的短文案（与结算字段同源；负数如实显示代价）
-  String _rewardHint(Map<String, dynamic> rewards) {
-    int? n(String k) => (rewards[k] as num?)?.toInt();
-    final parts = <String>[];
-    final gold = n('gold');
-    if (gold != null && gold != 0) parts.add('金币${_sign(gold)}');
-    final points = n('points');
-    if (points != null && points != 0) parts.add('积分${_sign(points)}');
-    final exp = n('exp');
-    if (exp != null && exp != 0) parts.add('经验${_sign(exp)}');
-    final mood = n('mood');
-    if (mood != null && mood != 0) parts.add('心情${_sign(mood)}');
-    final intimacy = n('intimacy');
-    if (intimacy != null && intimacy != 0) parts.add('亲密${_sign(intimacy)}');
-    final hunger = n('hunger');
-    if (hunger != null && hunger != 0) parts.add('饱食${_sign(hunger)}');
-    if (rewards['item_code'] != null) parts.add('道具');
-    return parts.isEmpty ? '' : parts.join(' · ');
-  }
-
-  String _sign(int v) => v > 0 ? '+$v' : '$v';
 }
