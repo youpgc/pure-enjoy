@@ -8,13 +8,25 @@ part of 'tetris_game.dart';
 /// 七种方块（索引即棋盘存色 id）。
 enum Tetromino { I, J, L, O, S, T, Z }
 
-/// 方块实例：类型 + 旋转态（0=spawn/1=R/2=180/3=L）+ 左上角棋盘坐标。
+/// 方块实例：类型 + 旋转态（0=spawn/1=R/2=180/3=L）+ 左上角棋盘坐标 +
+/// 特殊标记（三期 T3-02：bomb/weight 由 config `special_chance` 概率注入）。
 class Piece {
   Tetromino type;
   int rot;
   int x;
   int y;
-  Piece(this.type, this.rot, this.x, this.y);
+  TetrisSpecial special;
+  Piece(this.type, this.rot, this.x, this.y, {this.special = TetrisSpecial.none});
+}
+
+/// 特殊方块类型（三期 T3-02）。
+enum TetrisSpecial { none, bomb, weight }
+
+/// 发牌队列条目：方块类型 + 注入的特殊标记（Next 预览同步显示）。
+class QueuedPiece {
+  final Tetromino type;
+  final TetrisSpecial special;
+  const QueuedPiece(this.type, {this.special = TetrisSpecial.none});
 }
 
 /// 棋盘尺寸（Guideline 标准 10×20）。
@@ -122,27 +134,35 @@ const List<Color> kTetrominoColors = <Color>[
 // ───────────────────────── 引擎状态与流程 ─────────────────────────
 
 extension _TetrisEngineOps on _TetrisGameState {
-  /// 从 7-bag 取下一块（袋空重洗），并补充预览队列。
-  Tetromino _nextFromBag() {
+  /// 从 7-bag 取下一块（袋空重洗），并按 `special_chance` 掷骰特殊标记
+  /// （三期 T3-02：bomb/weight 各半概率二选一）。
+  QueuedPiece _nextFromBag() {
     if (_bag.isEmpty) {
       _bag
         ..clear()
         ..addAll(Tetromino.values)
         ..shuffle(_rng);
     }
-    return _bag.removeLast();
+    final type = _bag.removeLast();
+    var special = TetrisSpecial.none;
+    if (_specialChance > 0 && _rng.nextDouble() < _specialChance) {
+      special = _rng.nextBool() ? TetrisSpecial.bomb : TetrisSpecial.weight;
+    }
+    return QueuedPiece(type, special: special);
   }
 
   /// 生成新块：spawn 位被占 = Block Out（顶死）。
   void _spawnPiece() {
-    final type = _queue.removeAt(0);
+    final qp = _queue.removeAt(0);
     while (_queue.length <= _nextPreview) {
       _queue.add(_nextFromBag());
     }
+    final type = qp.type;
     final cells = _kCells[type]![0];
     final minX = cells.map((p) => p.x).reduce(min);
     final maxX = cells.map((p) => p.x).reduce(max);
-    _current = Piece(type, 0, (kTetrisCols - (maxX - minX + 1)) ~/ 2 - minX, 0);
+    _current = Piece(type, 0, (kTetrisCols - (maxX - minX + 1)) ~/ 2 - minX, 0,
+        special: qp.special);
     _lastAction = _TetrisAction.spawn;
     if (_collides(_current!, 0, 0)) {
       // 顶死：先尝试上移一格（spawn 行被占时仍可救一块）
@@ -197,6 +217,8 @@ extension _TetrisEngineOps on _TetrisGameState {
       GameAudio.instance.rotate();
       return true;
     }
+    // 重块（三期 T3-02）：不可旋转
+    if (p.special == TetrisSpecial.weight) return false;
     final to = (p.rot + dir + 4) % 4;
     final key = '${p.rot}$to${p.type == Tetromino.I ? 'I' : ''}';
     final kicks = _kKickTable[key] ??
@@ -237,10 +259,17 @@ extension _TetrisEngineOps on _TetrisGameState {
   }
 
   /// 重力 tick：能下移则下移；触底则启动 lock delay。
+  /// 重块特殊：每 tick 额外再下移 1 格（等效 ×2 速，与宿主 0.4 间隔系数
+  /// 叠加≈快速下沉）。
   void _gravityTick() {
     if (_finished || _current == null) return;
     if (!_isResting) {
       _current!.y++;
+      if (_current!.special == TetrisSpecial.weight &&
+          !_isResting &&
+          !_finished) {
+        _current!.y++; // 重块二次下坠
+      }
       _cancelLockTimer();
       if (mounted) setState(() {});
       return;
@@ -381,6 +410,25 @@ extension _TetrisEngineOps on _TetrisGameState {
     _piecesPlaced++;
     _cancelLockTimer();
     _lockResets = 0;
+
+    // 炸弹块引爆（三期 T3-02）：清除以锁定中心格为准的 3×3 邻域，
+    // 固定 30×等级引爆分；引爆清格不算消行、不计 Boss 伤害（防刷），
+    // 但可能连带拼出满行走下方正常消行流程（计分/计伤/B2B 断链照旧）。
+    if (p.special == TetrisSpecial.bomb) {
+      final cr = p.y + 1;
+      final cc = p.x + 1;
+      for (var r = cr - 1; r <= cr + 1; r++) {
+        for (var c = cc - 1; c <= cc + 1; c++) {
+          if (r >= 0 && r < kTetrisRows && c >= 0 && c < kTetrisCols) {
+            _board[r][c] = null;
+          }
+        }
+      }
+      _score += 30 * _scoreLevel;
+      _boardRev++;
+      _pushFx('BOOM!');
+      GameAudio.instance.haptic(GameHaptic.heavy);
+    }
 
     // 满行检测
     final full = <int>[
@@ -547,6 +595,12 @@ extension _TetrisEngineOps on _TetrisGameState {
           return true;
         }
         break;
+      case TetrisMode.boss:
+        if (_bossMaxHp > 0 && _bossHp <= 0) {
+          _finish(true);
+          return true;
+        }
+        break;
     }
     return false;
   }
@@ -571,6 +625,24 @@ extension _TetrisEngineOps on _TetrisGameState {
     _flashRows = <int>[];
     _boardRev++;
     _applyClearScore(n, spin);
+
+    // Boss 伤害结算（三期 T3-01）：普通消行 = 行数 ×1；T-Spin full +2 /
+    // mini +1 额外加成；删行补空后盘面全空 = Perfect Clear，额外 +10% 最大
+    // 血量。血条归零 → 通关。
+    if (_bossMaxHp > 0 && n > 0) {
+      var dmg = n;
+      if (spin == _TetrisSpin.full) {
+        dmg += 2;
+      } else if (spin == _TetrisSpin.mini) {
+        dmg += 1;
+      }
+      _bossHp = max(0, _bossHp - dmg);
+      if (_board.every((row) => row.every((c) => c == null))) {
+        _bossHp = max(0, _bossHp - (_bossMaxHp * 0.10).round());
+        _pushFx('BOSS -10%');
+      }
+      if (mounted) setState(() {});
+    }
 
     // 挑战模式块数耗尽：spawn 前结算（计分后用最新分判定，比一期更准确）
     if (_piecesLimit != null && _piecesPlaced >= _piecesLimit!) {
@@ -597,7 +669,8 @@ extension _TetrisEngineOps on _TetrisGameState {
         win = _scoreTarget > 0 && _score >= _scoreTarget;
         break;
       case TetrisMode.dig:
-        win = false; // 挖掘顶死=未挖穿
+      case TetrisMode.boss:
+        win = false; // 挖掘顶死=未挖穿；Boss 顶死=血量未清空
     }
     _finish(win, reason: win ? null : '方块堆到顶部，对局结束');
   }

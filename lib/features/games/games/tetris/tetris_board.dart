@@ -4,6 +4,57 @@ part of 'tetris_game.dart';
 // （已落块/ghost/当前块/网格）、消行大字浮层。
 
 extension _TetrisBoardOps on _TetrisGameState {
+  /// Boss 血条（三期 T3-01，深色容器顶部）：黑底槽 + 红渐变剩余血量 +
+  /// BOSS 标签。随伤害结算 setState 实时刷新。
+  Widget _buildBossBar() {
+    final ratio =
+        _bossMaxHp <= 0 ? 0.0 : (_bossHp / _bossMaxHp).clamp(0.0, 1.0);
+    return Padding(
+      padding: const EdgeInsets.fromLTRB(10, 6, 10, 0),
+      child: Row(
+        children: <Widget>[
+          const Text('BOSS',
+              style: TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFCE93D8),
+                  letterSpacing: 1.5)),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Container(
+              height: 10,
+              decoration: BoxDecoration(
+                color: const Color(0xFF171923),
+                borderRadius: BorderRadius.circular(5),
+                border: Border.all(color: const Color(0xFF2E3245)),
+              ),
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: FractionallySizedBox(
+                  alignment: Alignment.centerLeft,
+                  widthFactor: ratio,
+                  child: Container(
+                    decoration: const BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: <Color>[Color(0xFFEF5350), Color(0xFFB71C1C)],
+                      ),
+                    ),
+                  ),
+                ),
+              ),
+            ),
+          ),
+          const SizedBox(width: 8),
+          Text('$_bossHp/$_bossMaxHp',
+              style: const TextStyle(
+                  fontSize: 10,
+                  fontWeight: FontWeight.bold,
+                  color: Color(0xFFCE93D8))),
+        ],
+      ),
+    );
+  }
+
   /// 顶部预览条：Hold 槽 + Next×N。
   /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开小圆钮。
   Widget _buildRightColumn() {
@@ -24,7 +75,7 @@ extension _TetrisBoardOps on _TetrisGameState {
             Padding(
               padding: const EdgeInsets.only(top: 5),
               child: _buildMiniBox(
-                type: i < _queue.length ? _queue[i] : null,
+                type: i < _queue.length ? _queue[i].type : null,
                 size: 44,
                 label: '',
               ),
@@ -253,12 +304,45 @@ class _TetrisBoardPainter extends CustomPainter {
       for (final p in _kCells[cur.type]![cur.rot]) {
         final y = cur.y + p.y;
         if (y < 0) continue; // 顶缓冲区不绘制
-        _drawCell(canvas, (cur.x + p.x) * cell, y * cell, cell, color);
+        final px = (cur.x + p.x) * cell;
+        final py = y * cell;
+        _drawCell(canvas, px, py, cell, color);
+        // 特殊块标记（三期 T3-02）：炸弹=深色圆心+火花，重块=四角铆钉
+        if (cur.special == TetrisSpecial.bomb) {
+          _drawBombMark(canvas, px, py, cell);
+        } else if (cur.special == TetrisSpecial.weight) {
+          _drawWeightMark(canvas, px, py, cell);
+        }
       }
     }
     // 消行闪烁覆盖层已移除（2026-10-10 用户反馈样式太花哨）：
     // 改为被消行格子自身向白色插值，在上方「已落块」绘制循环内处理
   }
+  /// 炸弹标记：格心深色圆 + 橙色火花点（警示注入的特殊块）。
+  void _drawBombMark(Canvas canvas, double x, double y, double cell) {
+    canvas.drawCircle(
+      Offset(x + cell / 2, y + cell / 2),
+      cell * 0.22,
+      Paint()..color = const Color(0xFF263238),
+    );
+    canvas.drawCircle(
+      Offset(x + cell * 0.58, y + cell * 0.34),
+      cell * 0.09,
+      Paint()..color = const Color(0xFFFFB300),
+    );
+  }
+
+  /// 重块标记：格内四角铆钉灰点（厚重质感）。
+  void _drawWeightMark(Canvas canvas, double x, double y, double cell) {
+    final paint = Paint()..color = const Color(0xFF546E7A);
+    final d = cell * 0.10;
+    final o = cell * 0.24;
+    canvas.drawCircle(Offset(x + o, y + o), d, paint);
+    canvas.drawCircle(Offset(x + cell - o, y + o), d, paint);
+    canvas.drawCircle(Offset(x + o, y + cell - o), d, paint);
+    canvas.drawCircle(Offset(x + cell - o, y + cell - o), d, paint);
+  }
+
   /// 单格：圆角矩形 + 左上高光（Block Blast 式爽感反馈的最小实现）。
   void _drawCell(Canvas canvas, double x, double y, double cell, Color color) {
     final rect = Rect.fromLTWH(x + 1, y + 1, cell - 2, cell - 2);

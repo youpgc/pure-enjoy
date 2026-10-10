@@ -76,7 +76,7 @@ class _TetrisGameState extends State<TetrisGame> {
   // ───────── 引擎状态（tetris_engine.dart 消费） ─────────
   List<List<int?>> _board = <List<int?>>[];
   final List<Tetromino> _bag = <Tetromino>[];
-  final List<Tetromino> _queue = <Tetromino>[];
+  final List<QueuedPiece> _queue = <QueuedPiece>[];
   Piece? _current;
   Tetromino? _held;
   bool _holdUsed = false;
@@ -145,6 +145,15 @@ class _TetrisGameState extends State<TetrisGame> {
 
   /// 每日挑战：config `seed_daily=true` 时以北京日期派生发牌种子
   bool _seedDaily = false;
+
+  // ───────── 三期：Boss 战 / 特殊方块 ─────────
+
+  /// Boss 当前/最大血量（config `boss_hp`>0 启用；伤害模型见真相源三期）
+  int _bossHp = 0;
+  int _bossMaxHp = 0;
+
+  /// 特殊方块注入概率（config `special_chance`，0..1；0=不注入）
+  double _specialChance = 0;
 
   /// 已解析的随机源（daily 模式为日期种子实例，其余随机）
   late Random _rng;
@@ -231,6 +240,11 @@ class _TetrisGameState extends State<TetrisGame> {
     _digRows = _intOf(cfg['dig_rows'], 0);
     _garbageInterval = _intOf(cfg['garbage_interval'], 0);
     _seedDaily = cfg['seed_daily'] == true || _mode == TetrisMode.daily;
+    _specialChance = (cfg['special_chance'] is num)
+        ? (cfg['special_chance'] as num).toDouble().clamp(0.0, 1.0)
+        : 0.0;
+    _bossMaxHp = _intOf(cfg['boss_hp'], 0);
+    _bossHp = _bossMaxHp;
     _initRng();
   }
 
@@ -272,6 +286,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _garbageCleared = 0;
     _lastGarbageHole = -1;
     _slowUntil = null; // 时缓不跨局（重开后重力间隔恢复原速）
+    _bossHp = _bossMaxHp; // Boss 血量每局回满
     _startTime = DateTime.now();
     // dig：先预填垃圾行再落首块（board 为空，直接写底部）
     if (_mode == TetrisMode.dig && _digRows > 0) {
@@ -452,6 +467,8 @@ class _TetrisGameState extends State<TetrisGame> {
         return '$_scoreTarget 分';
       case TetrisMode.dig:
         return '$_garbageRowsRemaining 行垃圾';
+      case TetrisMode.boss:
+        return '血量 $_bossHp';
     }
   }
 
@@ -517,19 +534,26 @@ class _TetrisGameState extends State<TetrisGame> {
               ),
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(16),
-                child: Row(
-                  crossAxisAlignment: CrossAxisAlignment.stretch,
+                child: Column(
                   children: <Widget>[
-                    _buildPropRail(),
+                    if (_bossMaxHp > 0) _buildBossBar(),
                     Expanded(
-                      child: Stack(
+                      child: Row(
+                        crossAxisAlignment: CrossAxisAlignment.stretch,
                         children: <Widget>[
-                          _buildGestureBoard(),
-                          if (_fxMessages.isNotEmpty) _buildFxOverlay(),
+                          _buildPropRail(),
+                          Expanded(
+                            child: Stack(
+                              children: <Widget>[
+                                _buildGestureBoard(),
+                                if (_fxMessages.isNotEmpty) _buildFxOverlay(),
+                              ],
+                            ),
+                          ),
+                          _buildRightColumn(),
                         ],
                       ),
                     ),
-                    _buildRightColumn(),
                   ],
                 ),
               ),

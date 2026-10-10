@@ -38,7 +38,14 @@ enum TetrisMode {
   /// 每日挑战（二期）：北京日期派生发牌种子，全员当日同序列
   daily('daily', 'tetris_daily', '每日挑战',
       '同日全员同序列，通关拿每日首通奖励',
-      '每天的发牌序列由日期决定——所有玩家当天完全一致，次日更换。通关即领每日首通积分；想比对进度，和朋友比同一天的分数最公平。');
+      '每天的发牌序列由日期决定——所有玩家当天完全一致，次日更换。通关即领每日首通积分；想比对进度，和朋友比同一天的分数最公平。'),
+
+  /// Boss 战（三期）：血条 + 周期推行垃圾行，消行造伤打空血量通关
+  boss('boss', 'tetris_boss', 'Boss',
+      '消行攻击 Boss 血条，打空即胜',
+      '底部会周期性顶起垃圾行，消行越多对 Boss 伤害越高：普通消行按行数计伤，'
+          '4 消与 T 旋有额外加成，全清一次打掉 10% 血量。血条打空即通关，'
+          '方块堆到顶部则挑战失败。');
 
   const TetrisMode(this.code, this.playKind, this.label,
       this.summary, this.detail);
@@ -75,6 +82,8 @@ enum TetrisMode {
         return const Color(0xFFB71C1C);
       case TetrisMode.daily:
         return const Color(0xFF2E7D32);
+      case TetrisMode.boss:
+        return const Color(0xFF4A148C);
     }
   }
 
@@ -113,6 +122,9 @@ TetrisMode resolveTetrisMode({
   }
   if (config['garbage_interval'] != null || config['garbageInterval'] != null) {
     return TetrisMode.survival;
+  }
+  if (config['boss_hp'] != null || config['bossHp'] != null) {
+    return TetrisMode.boss;
   }
   return TetrisMode.marathon;
 }
