@@ -139,7 +139,8 @@ class VersionCheckService {
 
       if (kDebugMode) debugPrint('📱 [手动] 最新版本获取成功 v${latest['version']}');
       final info = _infoFrom(latest);
-      _memStore(info);
+      // 强更结论不入缓存（与 checkUpdate 同口径）：下次检查实时再确认
+      if (!(latest['force'] as bool)) _memStore(info);
       return info;
     } catch (e) {
       if (kDebugMode) debugPrint('📱 [手动] 获取最新版本失败');
