@@ -64,16 +64,16 @@ extension _TetrisInputOps on _TetrisGameState {
         child: Row(
           children: <Widget>[
             cell(_TetrisActionButton(
-              icon: Icons.swap_vert_circle_outlined,
-              label: '暂存',
-              dimmed: !canHold,
-              onTap: canHold ? _holdPiece : null,
-            )),
-            cell(_TetrisActionButton(
               icon: Icons.rotate_right,
               label: '旋转',
               primary: true,
               onTap: _finished ? null : () => _rotatePiece(1),
+            )),
+            cell(_TetrisActionButton(
+              icon: Icons.swap_vert_circle_outlined,
+              label: '暂存',
+              dimmed: !canHold,
+              onTap: canHold ? _holdPiece : null,
             )),
             cell(_TetrisActionButton(
               icon: Icons.arrow_back,

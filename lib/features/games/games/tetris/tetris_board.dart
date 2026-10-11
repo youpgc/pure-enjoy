@@ -59,7 +59,8 @@ extension _TetrisBoardOps on _TetrisGameState {
   /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开小圆钮。
   Widget _buildRightColumn() {
     return Padding(
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 8),
+      // 底部不留 padding：确认结算钮底边与游戏主容器底边持平（2026-10-11）
+      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
       child: Column(
         children: <Widget>[
           if (_holdEnabled)
@@ -68,7 +69,7 @@ extension _TetrisBoardOps on _TetrisGameState {
                 special: _heldSpecial,
                 size: 44,
                 label: _holdUsed ? '·' : 'HOLD'),
-          const SizedBox(height: 8),
+          const SizedBox(height: 20),
           const Text('NEXT',
               style: TextStyle(
                   fontSize: 8,
@@ -90,7 +91,7 @@ extension _TetrisBoardOps on _TetrisGameState {
           _buildRestartButton(),
           const SizedBox(height: 20),
           // 延迟结算（2026-10-10）：确认结算恒显示——达成通关条件高亮可点，
-          // 未达成禁用置灰；位置在重开钮下方，间隔 20px
+          // 未达成禁用置灰；在重开钮下方，间隔 20px；底部与主容器底边持平
           _buildConfirmSettleButton(),
         ],
       ),
