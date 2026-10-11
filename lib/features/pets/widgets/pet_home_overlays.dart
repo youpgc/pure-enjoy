@@ -25,30 +25,40 @@ class PetAdventureBanner extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
-    // 只有「确实拿到了结束时间且已到点」才算已结束待领取。endAt 缺失（后端
-    // 字段异常/未返回）时不能乐观判结束——否则横幅写着「已结束，点击查看结果」，
-    // 点进去却因无坑可领而报错，与 pet_home_adventure 的按钮口径也不一致。
+    // 待救助优先于"到点"：awaiting_rescue 的 endAt 必然已过，若 finished 先判
+    // 横幅会写"已结束，点击查看结果"——与点击行为（跳救助视图）不符（20261011）。
+    // finished 仍要求 endAt 非空：字段异常/未返回时不能乐观判结束（否则点进去报错）。
+    final awaiting = adv.status == PetAdventureStatus.awaitingRescue;
     final finished =
-        adv.endAt != null && !DateTime.now().isBefore(adv.endAt!);
+        !awaiting && adv.endAt != null && !DateTime.now().isBefore(adv.endAt!);
     return ConstrainedBox(
       constraints: const BoxConstraints(maxWidth: 400),
       child: Card(
         elevation: 0,
         margin: EdgeInsets.zero,
-        color: finished ? cs.primaryContainer : cs.surfaceContainerHighest,
+        color: awaiting
+            ? cs.errorContainer.withValues(alpha: 0.85)
+            : finished
+                ? cs.primaryContainer
+                : cs.surfaceContainerHighest,
         child: ListTile(
           dense: true,
-          leading: Icon(finished ? Icons.redeem_outlined : Icons.explore_outlined,
-              color: cs.primary),
+          leading: Icon(
+              awaiting
+                  ? Icons.healing_outlined
+                  : finished
+                      ? Icons.redeem_outlined
+                      : Icons.explore_outlined,
+              color: awaiting ? cs.onErrorContainer : cs.primary),
           title: Text(
-            finished
-                ? '历险已结束，点击查看结果'
-                : (adv.status == PetAdventureStatus.awaitingRescue
-                    ? '历险进行中 · 待救助'
-                    : '历险进行中'),
+            awaiting
+                ? '历险遇险 · 点击去救助'
+                : finished
+                    ? '历险已结束，点击查看结果'
+                    : '历险进行中',
             style: const TextStyle(fontSize: 13),
           ),
-          subtitle: adv.status == PetAdventureStatus.awaitingRescue
+          subtitle: awaiting
               ? const Text('需要你的救援！', style: TextStyle(fontSize: 11))
               : null,
           trailing: const Icon(Icons.chevron_right, size: 18),
