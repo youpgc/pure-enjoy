@@ -277,6 +277,10 @@ extension _PetHomeActions on _PetHomeScreenState {
   Future<void> _runAdventure(AdventureAction run) async {
     final adv = _summary?.ongoingAdventure;
     if (adv == null || _busy) return;
+    // 槽位归属防陈旧：按钮只在 _currentAdventure（按当前宠过滤）非空时出现，
+    // 但 summary 单槽可能在他宠间切换——id 与当前宠不符时忽略本次触发
+    final pet = _currentPet;
+    if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {
       showSnackBar(context, '历险信息异常，请下拉刷新或重进宠物页重试');
       return;

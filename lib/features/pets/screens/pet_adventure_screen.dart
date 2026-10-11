@@ -150,8 +150,14 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final (summary, _) = await PetService.instance.fetchSummary();
     if (mounted) {
       final adv = summary?.ongoingAdventure;
-      // 空 id = 服务端概要形状异常，按「无进行中历险」处理，避免把空 uuid 发给后端
-      setState(() => _adv = (adv != null && adv.usable) ? adv : null);
+      // 本屏按 petId 私有：summary 单槽可能已被他宠历险占据（待救助优先排序），
+      // 非本宠的历险不得装入本屏（张冠李戴）；空 id = 形状异常，按无进行中处理
+      final mine = (adv != null &&
+              adv.usable &&
+              adv.petId == widget.petId)
+          ? adv
+          : null;
+      setState(() => _adv = mine);
     }
   }
 
