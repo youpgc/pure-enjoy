@@ -167,6 +167,7 @@ class Match3FlameGame extends FlameGame
     // 连击/锁定期滑动直接丢弃（2026-10-10 用户口径：等待连击完成才允许
     // 下次交换——此前 2026-09-14 的输入缓冲会在连击结束瞬间补执行，
     // 体感为连击未完成就动了）。点选路径 onTapUp 的 _busy 检查同口径。
+    if (!canInteract) return;
     final tr = r + dr;
     final tc = c + dc;
     if (tr < 0 || tr >= rows || tc < 0 || tc >= cols) return;
