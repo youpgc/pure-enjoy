@@ -60,7 +60,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// §11.3 2026-10-08 修订：happy 并入 petted（正向反馈单槽位）。
   void _onStageDoubleTap() => _playAction(PetAction.petted);
 
-  List<Widget> _switchArrows() => [
+  List<Widget> _switchArrows() {
+    // 舞台宠物（在养+历险）只有一只时无切换语义，隐藏左右箭头
+    if (_stagePets.length < 2) return const <Widget>[];
+    return [
         // 沉底贴边：底缘 = 面板实测顶 + 10px（随历险提示行出现/消失自适应）
         for (final left in const [true, false])
           Positioned(
@@ -78,6 +81,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             ),
           ),
       ];
+  }
 
   // ---------- 顶部通知横幅（历险状态） ----------
 
