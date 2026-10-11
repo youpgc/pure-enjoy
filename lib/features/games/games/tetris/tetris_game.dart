@@ -480,7 +480,8 @@ class _TetrisGameState extends State<TetrisGame> {
   // ───────── HUD 文案 ─────────
 
   String get _targetLabel {
-    if (_goalReached) return '已达成 ✓';
+    // 达成后仍显示初始目标值（2026-10-11 用户口径）：不切「已达成 ✓」，
+    // 达成状态由右下角结算钮点亮 + 「目标达成」fx 提示承载
     switch (_mode) {
       case TetrisMode.marathon:
       case TetrisMode.sprint:
