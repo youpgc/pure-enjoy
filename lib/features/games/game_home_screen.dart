@@ -380,9 +380,16 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                             Row(
                               children: <Widget>[
                                 Flexible(
-                                  child: Text(mode.name,
-                                      style: const TextStyle(
-                                          fontSize: 15, fontWeight: FontWeight.bold)),
+                                  // 模式名（后台可自定义）过长时缩小不换行
+                                  child: FittedBox(
+                                    fit: BoxFit.scaleDown,
+                                    alignment: Alignment.centerLeft,
+                                    child: Text(mode.name,
+                                        maxLines: 1,
+                                        style: const TextStyle(
+                                            fontSize: 15,
+                                            fontWeight: FontWeight.bold)),
+                                  ),
                                 ),
                                 if (isDaily && _tetrisDailyDone) ...<Widget>[
                                   const SizedBox(width: 6),

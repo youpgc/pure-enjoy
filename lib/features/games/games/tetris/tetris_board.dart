@@ -2,6 +2,8 @@ part of 'tetris_game.dart';
 
 // 渲染层（part of _TetrisGameState）：Next/Hold 预览条、棋盘 CustomPaint
 // （已落块/ghost/当前块/网格）、消行大字浮层。
+// ignore_for_file: invalid_use_of_protected_member
+// （extension 内调宿主 setState 属 analyzer 已知误报，garbage/props 同款处理）
 
 extension _TetrisBoardOps on _TetrisGameState {
   /// Boss 血条（三期 T3-01，深色容器顶部）：黑底槽 + 红渐变剩余血量 +
@@ -246,6 +248,16 @@ extension _TetrisBoardOps on _TetrisGameState {
           constraints.maxHeight / kTetrisRows,
         );
         _cellExtent = cell;
+        // 右列（非 flex 子级）在 Row 中先于本 Expanded 布局，读到的
+        // _cellExtent 是上一帧值：尺寸变化（进局/旋转/分屏）当帧让位会差
+        // 一帧，挂机时无后续 setState 就一直错——变化帧排一个末帧回调
+        // 补一次 rebuild 自愈（稳态值不变不排，零额外开销）
+        if (cell != _lastLaidOutCellExtent) {
+          _lastLaidOutCellExtent = cell;
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (mounted) setState(() {});
+          });
+        }
         return Center(
           child: Container(
             width: cell * kTetrisCols,

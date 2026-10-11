@@ -208,6 +208,9 @@ class _TetrisGameState extends State<TetrisGame> {
   /// 手势用单格尺寸（board 布局时回填）
   double _cellExtent = 24;
 
+  /// 上一帧实际布局的单格尺寸（用于检测尺寸变化帧，驱动右列让位自愈）
+  double _lastLaidOutCellExtent = 0;
+
   /// 手势累计位移（input 层消费）
   double _dragDx = 0;
   double _dragDy = 0;
