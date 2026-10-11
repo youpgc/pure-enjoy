@@ -214,9 +214,10 @@ class _ProfilePageState extends State<ProfilePage> {
             }
           : null,
       onVersionTap: () async {
-        // 走不受「稍后更新」影响的手动检查通道，确保即便已忽略也能更新
+        // 手动检查强制直连服务器（force 绕过进程内缓存）：运营发版后立即手动
+        // 检查必须即时可见；且不受「稍后更新」影响，确保即便已忽略也能更新
         final versionInfo =
-            await VersionCheckService.instance.getLatestVersionInfo();
+            await VersionCheckService.instance.getLatestVersionInfo(force: true);
         if (!context.mounted) return;
         // 刷新红点状态
         if (mounted) {

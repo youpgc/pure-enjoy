@@ -1,4 +1,3 @@
-import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
@@ -9,6 +8,14 @@ import './apk_installer.dart';
 import './update_dialog.dart';
 
 /// 版本检查服务 - 支持内部下载安装APK
+///
+/// 更新检测**不做跨进程持久缓存**——它是前后两个缺陷的总根子：
+/// - 持久缓存"无更新"结论被原样信任 1 小时 → 新版本发布后最多 1 小时黑洞，
+///   自动与手动两条通道都取不到更新（2026-10-11 v1.11.3 实证，含强更被吞）；
+/// - 持久缓存旧版本信息 → 内部更新重启后与已装版本追平误报（2026-10-10 修）。
+/// 现改为**进程内 5 分钟内存缓存**：同一会话内省请求；安装新版本必然新进程，
+/// 内存必空 → 装完立刻能查到下一个版本。「稍后更新」忽略（dismiss）在读取时
+/// 拦截自动弹窗，手动检查（force）绕过缓存与忽略，永远直连服务器。
 class VersionCheckService {
   static final VersionCheckService _instance = VersionCheckService._internal();
   factory VersionCheckService() => _instance;
@@ -28,138 +35,170 @@ class VersionCheckService {
   /// APK 下载与安装子系统（从本类抽取，行为与原实现一致）
   late final ApkInstaller _installer;
 
-  // 版本检查缓存配置
-  static const String _versionCheckCacheKey = 'version_check_cache';
   static const String _dismissedVersionKey = 'dismissed_update_version';
-  static const Duration _minCheckInterval = Duration(hours: 1);
 
-  /// 检查是否需要更新
-  /// 使用 SharedPreferences 缓存检查结果，1 小时内重复调用直接返回缓存
+  /// 进程内检查结论缓存：{'info': 版本信息或 null}——null 表示"服务器最新 =
+  /// 当前已装"。强更结论不入缓存（强更每次实时确认，不吞不延）。
+  static Map<String, dynamic>? _memResult;
+  static DateTime? _memAt;
+  static const Duration _memTtl = Duration(minutes: 5);
+
+  static Map<String, dynamic>? _memHit() {
+    final at = _memAt;
+    if (_memResult == null || at == null) return null;
+    if (DateTime.now().difference(at) >= _memTtl) {
+      _memResult = null;
+      _memAt = null;
+      return null;
+    }
+    return _memResult;
+  }
+
+  static void _memStore(Map<String, dynamic>? info) {
+    _memResult = {'info': info};
+    _memAt = DateTime.now();
+  }
+
+  /// 检查是否需要更新（首页/启动自动通道）
+  ///
+  /// 「稍后更新」忽略在读取时拦截（含进程内缓存命中路径）；强更不受忽略限制
+  /// 且永不复用缓存。
   Future<Map<String, dynamic>?> checkUpdate() async {
     try {
       final prefs = await SharedPreferences.getInstance();
-
-      // 最先检查：用户是否已忽略当前最新版本的��新提示
-      // 此检查必须在缓存检查之前，确保无论缓存命中还是网络请求，dismiss 都生效
       final dismissedVersion = prefs.getString(_dismissedVersionKey);
 
-      final cacheJson = prefs.getString(_versionCheckCacheKey);
-
-      // 提前读取当前已安装版本：缓存命中时需用它复核版本是否真的需要更新，
-      // 避免内部更新重启后旧缓存把已装上的版本误报为待更新版本。
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version;
-      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-
-      // 读取缓存
-      if (cacheJson != null && cacheJson.isNotEmpty) {
-        try {
-          final cache = jsonDecode(cacheJson) as Map<String, dynamic>;
-          final lastCheckTime = DateTime.tryParse(cache['timestamp'] as String? ?? '');
-          final cachedVersionInfo = cache['versionInfo'] as Map<String, dynamic>?;
-
-          if (lastCheckTime != null) {
-            final elapsed = DateTime.now().difference(lastCheckTime);
-            // 强制更新不受缓存限制，始终需要检查
-            final isForce = cachedVersionInfo?['is_force_update'] == true;
-
-            if (elapsed < _minCheckInterval && !isForce) {
-              // 缓存命中时也要检查 dismiss
-              if (cachedVersionInfo != null && dismissedVersion != null) {
-                final cachedVer = cachedVersionInfo['version'] as String?;
-                if (cachedVer == dismissedVersion) {
-                  if (kDebugMode) debugPrint('📱 用户已忽略缓存中的 v$cachedVer 更新提示');
-                  return null;
-                }
-              }
-              // 【修复】内部更新重启后，当前已安装版本可能已追平缓存中的最新版本，
-              // 需用当前版本复核：若已是最新则清除陈旧缓存并返回 null，避免误报更新。
-              if (cachedVersionInfo != null) {
-                final cachedVer = cachedVersionInfo['version'] as String? ?? '';
-                final cachedBuild = cachedVersionInfo['build_number'] as int? ?? 0;
-                if (!_shouldUpdate(currentVersion, currentBuildNumber, cachedVer, cachedBuild)) {
-                  if (kDebugMode) {
-                    debugPrint('📱 当前已安装版本 v$currentVersion 已是最新，缓存为旧数据，清除并跳过更新提示');
-                  }
-                  await prefs.remove(_versionCheckCacheKey);
-                  return null;
-                }
-              }
-              if (kDebugMode) {
-                debugPrint('📱 使用缓存结果（${elapsed.inMinutes} 分钟前检查过）');
-              }
-              return cachedVersionInfo;
-            }
-          }
-        } catch (e) {
-          // 缓存解析失败，继续走网络请求
-          if (kDebugMode) debugPrint('📱 缓存解析失败，重新检查');
-        }
-      }
-
-      if (kDebugMode) debugPrint('📱 当前版本检查');
-
-      final result = await ApiClient.get(
-        'app_versions',
-        filters: {'status': 'eq.released', 'platform': 'eq.android'},
-        order: 'created_at.desc',
-        limit: 1,
-      );
-
-      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
-        if (kDebugMode) debugPrint('📱 未获取到最新版本或请求失败');
-        return null;
-      }
-
-      final latestVersion = result.data!.first;
-      // 统一版本号格式：去掉 v 前缀（锚定开头——replaceFirst('v','') 会去掉
-      // 任意位置的首个 v，如 "1.0.dev"→"1.0.de" 害比较错乱，审查报告 版本#8）
-      final latestVersionStr =
-          (latestVersion['version'] as String).replaceFirst(RegExp('^v'), '');
-      final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
-      final isForceUpdate = latestVersion['is_force_update'] == true;
-      final apkUrl = latestVersion['apk_url'] as String?;
-
-      // 防御：没有下载地址时不提示更新（数据不完整）
-      if (apkUrl == null || apkUrl.isEmpty) {
-        if (kDebugMode) debugPrint('📱 最新版本缺少下载地址，跳过更新提示');
-        return null;
-      }
-
-      if (kDebugMode) debugPrint('📱 最新版本获取成功');
-
-      Map<String, dynamic>? versionInfo;
-      if (_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
-        // 检查用户是否已忽略此版本的更新提示（网络请求路径也要检查，防止 dismiss 后缓存过期重新弹出）
-        if (!isForceUpdate && dismissedVersion == latestVersionStr) {
-          if (kDebugMode) debugPrint('📱 用户已忽略 v$latestVersionStr 的更新提示');
+      final mem = _memHit();
+      if (mem != null) {
+        final info = mem['info'] as Map<String, dynamic>?;
+        if (info != null &&
+            dismissedVersion != null &&
+            info['version'] == dismissedVersion) {
+          if (kDebugMode) debugPrint('📱 用户已忽略 v${info['version']} 更新提示');
           return null;
         }
-
-      versionInfo = {
-        'version': latestVersionStr,
-        'build_number': latestBuildNumber,
-        'apk_url': apkUrl,
-        'github_url': latestVersion['github_url'],
-        'release_notes': latestVersion['release_notes'],
-        'is_force_update': isForceUpdate,
-        'release_type': latestVersion['release_type'],
-        'checksum': latestVersion['checksum'],
-      };
+        if (kDebugMode) {
+          debugPrint('📱 使用进程内检查结论（${DateTime.now().difference(_memAt!).inSeconds} 秒前）');
+        }
+        return info;
       }
 
-      // 写入缓存（无论是否需要更新都缓存）
-      final cacheData = {
-        'timestamp': DateTime.now().toIso8601String(),
-        'versionInfo': versionInfo,
-      };
-      await prefs.setString(_versionCheckCacheKey, jsonEncode(cacheData));
+      final current = await _currentInfo();
+      final latest = await _fetchLatest();
+      if (current == null || latest == null) return null;
 
+      final needUpdate = _shouldUpdate(
+          current.$1, current.$2, latest['version'] as String, latest['build'] as int);
+      final isForce = latest['force'] as bool;
+
+      Map<String, dynamic>? versionInfo;
+      if (needUpdate) {
+        versionInfo = _infoFrom(latest);
+        // 已被「稍后更新」忽略的非强更：不弹（结论仍入缓存，供我的页手动更新）
+        if (!isForce &&
+            dismissedVersion != null &&
+            dismissedVersion == latest['version']) {
+          if (kDebugMode) debugPrint('📱 用户已忽略 v${latest['version']} 的更新提示');
+          _memStore(versionInfo);
+          return null;
+        }
+      }
+
+      // 强更结论不入缓存：下次检查实时再确认
+      if (!isForce) _memStore(versionInfo);
       return versionInfo;
     } catch (e) {
       if (kDebugMode) debugPrint('📱 检查更新失败');
       return null;
     }
+  }
+
+  /// 获取最新版本信息（不受「稍后更新」忽略状态影响）。
+  ///
+  /// 用于「我的」页面展示可用版本与手动触发更新：
+  /// - [force] = true（用户手动点击）绕过进程内缓存直连服务器——运营发版后
+  ///   立即手动检查必须即时可见，不得吃旧结论；
+  /// - 返回 null 表示当前已是最新或网络/数据不可用。
+  Future<Map<String, dynamic>?> getLatestVersionInfo({bool force = false}) async {
+    try {
+      if (!force) {
+        final mem = _memHit();
+        if (mem != null) return mem['info'] as Map<String, dynamic>?;
+      }
+
+      final current = await _currentInfo();
+      final latest = await _fetchLatest();
+      if (current == null || latest == null) return null;
+
+      if (!_shouldUpdate(current.$1, current.$2,
+          latest['version'] as String, latest['build'] as int)) {
+        if (kDebugMode) debugPrint('📱 [手动] 当前已是最新');
+        _memStore(null);
+        return null;
+      }
+
+      if (kDebugMode) debugPrint('📱 [手动] 最新版本获取成功 v${latest['version']}');
+      final info = _infoFrom(latest);
+      _memStore(info);
+      return info;
+    } catch (e) {
+      if (kDebugMode) debugPrint('📱 [手动] 获取最新版本失败');
+      return null;
+    }
+  }
+
+  /// 当前已安装版本（version, buildNumber）；读取失败返回 null
+  Future<(String, int)?> _currentInfo() async {
+    try {
+      final p = await PackageInfo.fromPlatform();
+      return (p.version, int.tryParse(p.buildNumber) ?? 0);
+    } catch (_) {
+      return null;
+    }
+  }
+
+  /// 拉取服务器最新 released 版本（含防御：版本号空/缺下载地址均视为不可用）
+  Future<Map<String, dynamic>?> _fetchLatest() async {
+    final result = await ApiClient.get(
+      'app_versions',
+      filters: {'status': 'eq.released', 'platform': 'eq.android'},
+      order: 'created_at.desc',
+      limit: 1,
+    );
+    if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
+      if (kDebugMode) debugPrint('📱 未获取到最新版本或请求失败');
+      return null;
+    }
+    final row = result.data!.first;
+    // 统一版本号格式：只去锚定开头的 v 前缀（无锚定的 replaceFirst 会吃掉
+    // 任意位置的首个 v，如 "1.0.dev"→"1.0.de"，审查报告 版本#8）
+    final version = ((row['version'] as String?) ?? '')
+        .replaceFirst(RegExp('^v'), '');
+    final apkUrl = row['apk_url'] as String?;
+    if (version.isEmpty || apkUrl == null || apkUrl.isEmpty) {
+      if (kDebugMode) debugPrint('📱 最新版本数据不完整（版本号/下载地址缺失），跳过');
+      return null;
+    }
+    return {
+      'version': version,
+      'build': row['build_number'] as int? ?? 0,
+      'force': row['is_force_update'] == true,
+      'row': row,
+    };
+  }
+
+  Map<String, dynamic> _infoFrom(Map<String, dynamic> latest) {
+    final row = latest['row'] as Map;
+    return {
+      'version': latest['version'],
+      'build_number': latest['build'],
+      'apk_url': row['apk_url'],
+      'github_url': row['github_url'],
+      'release_notes': row['release_notes'],
+      'is_force_update': latest['force'],
+      'release_type': row['release_type'],
+      'checksum': row['checksum'],
+    };
   }
 
   /// 判断是否需要更新
@@ -208,103 +247,10 @@ class VersionCheckService {
   Future<void> dismissVersion(String version) async {
     final prefs = await SharedPreferences.getInstance();
     await prefs.setString(_dismissedVersionKey, version);
+    // 忽略动作即时生效：清进程内结论，下次检查重新走网络（dismiss 在读取时拦截）
+    _memResult = null;
+    _memAt = null;
     if (kDebugMode) debugPrint('📱 已忽略 v$version 的更新提示');
-  }
-
-  /// 获取最新版本信息（不受「稍后更新」ignore 状态影响）。
-  ///
-  /// 用于「我的」页面展示可用版本、以及点击版本信息时手动触发更新。
-  /// - 不修改 dismiss 状态，也不抑制自动弹窗（自动弹窗仍由 [checkUpdate] 控制）。
-  /// - 与 [checkUpdate] 共享 1 小时缓存；即使该版本已被「稍后更新」忽略，
-  ///   缓存中仍保留其最新版本信息，这里直接返回，从而允许手动更新。
-  /// - 返回 null 表示当前已是最新或网络/数据不可用。
-  Future<Map<String, dynamic>?> getLatestVersionInfo() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final cacheJson = prefs.getString(_versionCheckCacheKey);
-      final packageInfo = await PackageInfo.fromPlatform();
-      final currentVersion = packageInfo.version;
-      final currentBuildNumber = int.tryParse(packageInfo.buildNumber) ?? 0;
-
-      // 优先复用 1 小时内的新鲜缓存（与 checkUpdate 共享）
-      if (cacheJson != null && cacheJson.isNotEmpty) {
-        try {
-          final cache = jsonDecode(cacheJson) as Map<String, dynamic>;
-          final lastCheckTime = DateTime.tryParse(cache['timestamp'] as String? ?? '');
-          final cachedVersionInfo = cache['versionInfo'] as Map<String, dynamic>?;
-          if (lastCheckTime != null) {
-            final elapsed = DateTime.now().difference(lastCheckTime);
-            if (elapsed < _minCheckInterval) {
-              // 缓存明确为最新版本信息（即便已被忽略也保留）→ 先与当前已安装
-              // 版本对齐：内部更新重启后可能已追平缓存版本，追平则清除陈旧
-              // 缓存返回 null，否则「我的」页红点会误报已装版本（2026-10-10 修）
-              if (cachedVersionInfo != null) {
-                final cachedVer = cachedVersionInfo['version'] as String? ?? '';
-                final cachedBuild = cachedVersionInfo['build_number'] as int? ?? 0;
-                if (!_shouldUpdate(currentVersion, currentBuildNumber, cachedVer, cachedBuild)) {
-                  if (kDebugMode) {
-                    debugPrint('📱 [手动] 当前已安装版本已追平缓存 v$cachedVer，清除陈旧缓存');
-                  }
-                  await prefs.remove(_versionCheckCacheKey);
-                  return null;
-                }
-                if (kDebugMode) {
-                  debugPrint('📱 [手动] 使用缓存最新版本 v${cachedVersionInfo['version']}');
-                }
-                return cachedVersionInfo;
-              }
-              return null; // 缓存明确为无更新
-            }
-          }
-        } catch (e) {
-          if (kDebugMode) debugPrint('📱 [手动] 缓存解析失败，重新检查');
-        }
-      }
-
-      // 缓存失效 → 走网络
-      final result = await ApiClient.get(
-        'app_versions',
-        filters: {'status': 'eq.released', 'platform': 'eq.android'},
-        order: 'created_at.desc',
-        limit: 1,
-      );
-      if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
-        if (kDebugMode) debugPrint('📱 [手动] 未获取到最新版本或请求失败');
-        return null;
-      }
-
-      final latestVersion = result.data!.first;
-      final latestVersionStr = (latestVersion['version'] as String).replaceFirst('v', '');
-      final latestBuildNumber = latestVersion['build_number'] as int? ?? 0;
-      final apkUrl = latestVersion['apk_url'] as String?;
-
-      // 防御：没有下载地址时不提示更新（数据不完整）
-      if (apkUrl == null || apkUrl.isEmpty) {
-        if (kDebugMode) debugPrint('📱 [手动] 最新版本缺少下载地址');
-        return null;
-      }
-
-      // 已是最新则不返回
-      if (!_shouldUpdate(currentVersion, currentBuildNumber, latestVersionStr, latestBuildNumber)) {
-        if (kDebugMode) debugPrint('📱 [手动] 当前已是最新');
-        return null;
-      }
-
-      if (kDebugMode) debugPrint('📱 [手动] 最新版本获取成功 v$latestVersionStr');
-      return {
-        'version': latestVersionStr,
-        'build_number': latestBuildNumber,
-        'apk_url': apkUrl,
-        'github_url': latestVersion['github_url'],
-        'release_notes': latestVersion['release_notes'],
-        'is_force_update': latestVersion['is_force_update'] == true,
-        'release_type': latestVersion['release_type'],
-        'checksum': latestVersion['checksum'],
-      };
-    } catch (e) {
-      if (kDebugMode) debugPrint('📱 [手动] 获取最新版本失败');
-      return null;
-    }
   }
 
   /// 显示更新对话框（带下载进度）
