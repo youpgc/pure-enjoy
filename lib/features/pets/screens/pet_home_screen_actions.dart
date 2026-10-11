@@ -261,10 +261,12 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
 
-  // 横幅点击分流（2026-10-10 二次修订）：历险结束（到点未领）→ 领取奖励弹窗；
-  // 仍在历险中（含待救助）→ 跳历险详情页查看进度/归来倒计时
+  // 横幅点击分流（2026-10-11 三次修订）：待救助 → 跳历险页救助视图（endAt 已过，
+  // 不能再走 claim——服务端拒 PET_ADV_NOT_ONGOING，原逻辑在此卡死）；历险结束
+  // （到点未领）→ 领取奖励弹窗；仍在历险中 → 跳历险详情页查看进度/归来倒计时
   VoidCallback _bannerTap() {
     final adv = _currentAdventure;
+    if (adv?.status == PetAdventureStatus.awaitingRescue) return _openAdventure;
     final finished = adv != null &&
         adv.endAt != null &&
         !DateTime.now().isBefore(adv.endAt!);

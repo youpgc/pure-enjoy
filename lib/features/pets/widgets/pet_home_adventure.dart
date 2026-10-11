@@ -179,20 +179,25 @@ Future<void> showPetPenaltyDialog(
   );
 }
 
-/// 主页右列历险钮四态：无历险→历险入口；归来待领取→领取；待救助→救助；进行中→召回
+/// 主页右列历险钮四态：无历险→历险入口；待救助→救助；归来待领取→领取；进行中→召回
 Widget petAdventureRailButton({
   required PetAdventureBriefModel? adv,
   required VoidCallback openAdventure,
   required VoidCallback claimResult,
   required VoidCallback recall,
 }) {
-  final finished = adv?.endAt != null && !DateTime.now().isBefore(adv!.endAt!);
+  // 待救助必须优先于"到点"判定：awaiting_rescue 的 endAt 必然已过，若 finished
+  // 先判会永远卡在"领取"分支（claim 被服务端拒 PET_ADV_NOT_ONGOING），救助入口
+  // 不可达 = 状态卡死（2026-10-11 缺陷根因）
+  final awaiting = adv?.status == PetAdventureStatus.awaitingRescue;
+  final finished =
+      !awaiting && adv?.endAt != null && !DateTime.now().isBefore(adv!.endAt!);
   final (icon, label, action) = adv == null
       ? (Icons.explore_outlined, '历险', openAdventure)
-      : finished
-          ? (Icons.redeem_outlined, '领取', claimResult)
-          : adv.status == PetAdventureStatus.awaitingRescue
-              ? (Icons.healing_outlined, '救助', openAdventure)
+      : awaiting
+          ? (Icons.healing_outlined, '救助', openAdventure)
+          : finished
+              ? (Icons.redeem_outlined, '领取', claimResult)
               : (Icons.u_turn_left, '召回', recall);
   return PetEdgeButton(icon: icon, label: label, onTap: action);
 }
