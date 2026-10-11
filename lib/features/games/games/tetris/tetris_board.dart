@@ -247,13 +247,13 @@ extension _TetrisBoardOps on _TetrisGameState {
           constraints.maxWidth / kTetrisCols,
           constraints.maxHeight / kTetrisRows,
         );
-        _cellExtent = cell;
         // 右列（非 flex 子级）在 Row 中先于本 Expanded 布局，读到的
         // _cellExtent 是上一帧值：尺寸变化（进局/旋转/分屏）当帧让位会差
         // 一帧，挂机时无后续 setState 就一直错——变化帧排一个末帧回调
         // 补一次 rebuild 自愈（稳态值不变不排，零额外开销）
-        if (cell != _lastLaidOutCellExtent) {
-          _lastLaidOutCellExtent = cell;
+        final cellChanged = cell != _cellExtent;
+        _cellExtent = cell;
+        if (cellChanged) {
           WidgetsBinding.instance.addPostFrameCallback((_) {
             if (mounted) setState(() {});
           });
