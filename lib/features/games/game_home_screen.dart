@@ -350,7 +350,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
             final color = modeColorOf(mode.playKind);
             final isDaily = _isDailyMode(mode);
             final subtitle = isDaily
-                ? (_tetrisDailyDone ? '今日已完成 · 明日再来' : '今日挑战 · 同日同序列')
+                ? (_tetrisDailyDone ? '今日已完成 · 明日再来' : '0点刷新奖励')
                 : mode.isEndless
                     ? '无尽 · 随时挑战'
                     : '已通关 $cleared/$total';
@@ -402,9 +402,16 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                               ],
                             ),
                             const SizedBox(height: 4),
-                            Text(subtitle,
-                                style: const TextStyle(
-                                    fontSize: 11, color: AppTheme.neutral500)),
+                            // 副标题过长时整体缩小不换行（2026-10-11 用户反馈：
+                            // 窄卡片内曾因布局换行挤压高度）
+                            FittedBox(
+                              fit: BoxFit.scaleDown,
+                              alignment: Alignment.centerLeft,
+                              child: Text(subtitle,
+                                  maxLines: 1,
+                                  style: const TextStyle(
+                                      fontSize: 11, color: AppTheme.neutral500)),
+                            ),
                           ],
                         ),
                       ),

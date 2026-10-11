@@ -58,10 +58,19 @@ extension _TetrisBoardOps on _TetrisGameState {
   /// 顶部预览条：Hold 槽 + Next×N。
   /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开小圆钮。
   Widget _buildRightColumn() {
-    return Padding(
-      // 底部不留 padding：确认结算钮底边与游戏主容器底边持平（2026-10-11）
-      padding: const EdgeInsets.fromLTRB(4, 8, 4, 0),
-      child: Column(
+    // 结算钮底边与「棋盘游戏容器」底边持平（2026-10-11 口径：不是整个深色
+    // 背景容器）：棋盘在中间区垂直居中，底边距 = (行高 - 棋盘高) / 2。
+    // cell 由棋盘的 LayoutBuilder 在同帧先布局算出（Row 子级按序布局），
+    // 此处直接读 _cellExtent 即为本帧值；棋盘占满高度时 gap=0 退化为贴底。
+    return LayoutBuilder(
+      builder: (ctx, cons) {
+        final boardH = _cellExtent * kTetrisRows;
+        final gap = (cons.maxHeight.isFinite && boardH > 0)
+            ? ((cons.maxHeight - boardH) / 2).clamp(0.0, double.infinity)
+            : 0.0;
+        return Padding(
+          padding: EdgeInsets.fromLTRB(4, 8, 4, gap),
+          child: Column(
         children: <Widget>[
           if (_holdEnabled)
             _buildMiniBox(
@@ -91,10 +100,12 @@ extension _TetrisBoardOps on _TetrisGameState {
           _buildRestartButton(),
           const SizedBox(height: 20),
           // 延迟结算（2026-10-10）：确认结算恒显示——达成通关条件高亮可点，
-          // 未达成禁用置灰；在重开钮下方，间隔 20px；底部与主容器底边持平
+          // 未达成禁用置灰；在重开钮下方间隔 20px，底边与棋盘容器底边持平
           _buildConfirmSettleButton(),
         ],
-      ),
+          ),
+        );
+      },
     );
   }
 

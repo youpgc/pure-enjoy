@@ -104,7 +104,16 @@ class GameShell extends StatelessWidget {
             child: Row(
               mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               children: statusItems
-                  .map((w) => Flexible(child: Center(child: w)))
+                  // 内容过多时逐项 FittedBox 缩小字号：单行不换行不省略
+                  //（2026-10-11 用户反馈，俄罗斯方块 7 项时曾换行）
+                  .map((w) => Flexible(
+                        child: Center(
+                          child: FittedBox(
+                            fit: BoxFit.scaleDown,
+                            child: w,
+                          ),
+                        ),
+                      ))
                   .toList(),
             ),
           ),
