@@ -307,8 +307,7 @@ class Match3FlameGame extends FlameGame
   void update(double dt) {
     super.update(dt);
     effects.update(dt);
-    // 锁定期结束后补执行缓冲的滑动（输入缓冲，见 onSwipe 注释）
-        // 限时模式：倒计时推进，归零即结算
+    // 限时模式：倒计时推进，归零即结算
     if (objective.isTimed && _loaded && !_over) {
       objective.secondsLeft -= dt;
       if (objective.secondsLeft <= 0) {

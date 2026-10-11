@@ -261,7 +261,7 @@ class _GameHistoryScreenState extends State<GameHistoryScreen> {
           // 记录，此前只显示用时没有分数）；聚合项（旧多局数据）带局数
           final isEndlessSingle = !_isEndlessRecord(h) ? false : !isSession;
           final subtitle = isSession
-              ? '无尽模式 · ${_sessionRounds[h.id]} 局 · 最终 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
+              ? '无尽模式 · ${_sessionRounds[h.id]} 局 · 累计 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
               : (isEndlessSingle
                   ? '无尽模式 · 最终 ${h.score?.toInt() ?? 0} 分 · 用时 $clock'
                   : (scope.isEmpty
