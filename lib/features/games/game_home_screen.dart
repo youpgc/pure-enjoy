@@ -350,7 +350,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
             final color = modeColorOf(mode.playKind);
             final isDaily = _isDailyMode(mode);
             final subtitle = isDaily
-                ? (_tetrisDailyDone ? '今日已完成 · 明日再来' : '0点刷新奖励')
+                ? (_tetrisDailyDone ? '今日已完成' : '0点刷新奖励')
                 : mode.isEndless
                     ? '无尽 · 随时挑战'
                     : '已通关 $cleared/$total';
