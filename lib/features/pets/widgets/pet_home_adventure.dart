@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
 import 'pet_claim_result_dialog.dart';
 import 'pet_home_overlays.dart';
+import 'pet_toast.dart';
 
 /// 主页历险动作集（2026-09-17 历险闭环修复）
 ///
@@ -19,7 +20,7 @@ import 'pet_home_overlays.dart';
 /// 独立成文件以保证 pet_home_screen 行数在 500 以内；
 /// 动作返回 true 表示状态已变化（调用方刷新总览）。
 
-void _toast(BuildContext context, String msg) => showSnackBar(context, msg);
+void _toast(BuildContext context, String msg) => showPetToast(context, msg);
 
 /// 主页历险动作签名（归来领取 / 召回确认；返回 true = 状态已变化）
 typedef AdventureAction = Future<bool> Function(
@@ -81,21 +82,13 @@ Future<bool> recallAdventureConfirmed(
   BuildContext context,
   String adventureId,
 ) async {
-  final ok = await showDialog<bool>(
-    context: context,
-    builder: (ctx) => AlertDialog(
-      title: const Text('召回宠物'),
-      content: const Text(
-          '宠物将立即结束本次历险返回家中，本次历险不会获得任何奖励。确定召回吗？'),
-      actions: [
-        TextButton(
-            onPressed: () => Navigator.pop(ctx, false),
-            child: const Text('再等等')),
-        FilledButton(
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('确定召回')),
-      ],
-    ),
+  // 统一走强制组件 showConfirmDialog（此前裸 AlertDialog，审计批 20261012）
+  final ok = await showConfirmDialog(
+    context,
+    title: '召回宠物',
+    content: '宠物将立即结束本次历险返回家中，本次历险不会获得任何奖励。确定召回吗？',
+    cancelText: '再等等',
+    confirmText: '确定召回',
   );
   if (ok != true) return false;
   final err = await PetRpc.adventureRecall(adventureId);

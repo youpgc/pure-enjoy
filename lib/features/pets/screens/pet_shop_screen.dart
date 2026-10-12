@@ -8,6 +8,7 @@ import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_item_icon.dart';
 import 'pet_bag_screen.dart';
 import 'pet_odds_screen.dart';
+import '../widgets/pet_toast.dart';
 
 /// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
 ///
@@ -86,28 +87,117 @@ class _PetShopScreenState extends State<PetShopScreen> {
     return _items.where((e) => e.categoryLabel == _category).toList();
   }
 
-  Future<void> _buy(PetShopItemModel item, {bool fromDialog = false}) async {
+  Future<void> _buy(
+    PetShopItemModel item, {
+    bool fromDialog = false,
+
+    /// 满格腾位「扩容并重试」的自动重试：结果 toast 合并扩容信息——
+    /// toast 是替换式单条，扩容先吐一条会被购买结果立即覆盖
+    /// （复审批 P3：'扩容已生效' 存活不足百毫秒）
+    bool afterExpand = false,
+  }) async {
     if (_buying.contains(item.id)) return;
     if (_gold < item.priceCoin) {
-      showSnackBar(context, '金币不足，可通过任务/历险获取');
+      showPetToast(context, '金币不足，可通过任务/历险获取');
       return;
     }
     setState(() => _buying.add(item.id));
-    final (status, err) = await PetRpc.shopBuy(item.id);
+    final (result, err) = await PetRpc.shopBuy(item.id);
     if (!mounted) return;
     setState(() => _buying.remove(item.id));
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, afterExpand
+          ? '已扩容，购买未完成：${petRpcErrorText(err)}'
+          : petRpcErrorText(err));
       return;
     }
-    if (status == 'bag_full') {
-      showSnackBar(context, '背包已满，请先清理背包再购买');
+    if (result == null) {
+      showPetToast(context, afterExpand
+          ? '已扩容，购买未完成：$kPetLocalError'
+          : kPetLocalError);
+      return;
+    }
+    if (result.isBagFull) {
+      // 满格未扣款：走 §5.4 腾位流程（有下一级扩容 → 购买后自动重试；
+      // 无 → 引导清理背包）。腾位决策发生在扣款前，不产生资金损失。
+      await _showBagFullDialog(item, result, fromDialog: fromDialog);
       return;
     }
     setState(() => _gold -= item.priceCoin);
-    showSnackBar(context,
-        item.isExpansion ? '扩容已生效' : '已购买「${item.name}」');
+    showPetToast(context,
+        item.isExpansion && !afterExpand
+            ? '扩容已生效'
+            : '已购买「${item.name}」');
     if (fromDialog && mounted) Navigator.of(context).pop();
+  }
+
+  /// 满格腾位对话框（需求 §5.4）：展示容量占用与本次所需格数；
+  /// 服务端给出下一级扩容道具时提供「扩容并重试」，购买成功后同流程内
+  /// 自动重试原购买；已达上限则只有「去清理背包」一条路径。
+  Future<void> _showBagFullDialog(
+    PetShopItemModel item,
+    PetShopBuyResultModel result, {
+    bool fromDialog = false,
+  }) async {
+    final expand = result.nextExpand;
+    final action = await showDialog<String>(
+      context: context,
+      builder: (dialogCtx) => AlertDialog(
+        title: const Text('背包已满'),
+        content: Text(
+          result.used != null && result.capacity != null
+              ? '背包 ${result.used}/${result.capacity} 格已用完'
+                  '${result.rowsNeeded == null ? '' : '，本次需要 ${result.rowsNeeded} 格'}。'
+              : '背包空间不足。'
+          '${expand == null ? '\n已达扩容上限，请清理背包后再试。' : ''}',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop(),
+            child: const Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(dialogCtx).pop('clean'),
+            child: const Text('去清理背包'),
+          ),
+          if (expand != null)
+            FilledButton(
+              onPressed: () => Navigator.of(dialogCtx).pop('expand'),
+              child: Text('扩容+1格 · ${expand.priceCoin}金币'),
+            ),
+        ],
+      ),
+    );
+    if (!mounted || action == null) return;
+    if (action == 'clean') {
+      await Navigator.push(
+        context,
+        MaterialPageRoute(
+            builder: (_) => PetBagScreen(petId: widget.petId)),
+      );
+      if (mounted) _load();
+      return;
+    }
+    if (action == 'expand' && expand != null) {
+      setState(() => _buying.add(expand.itemId));
+      final (expandResult, expandErr) =
+          await PetRpc.shopBuy(expand.itemId);
+      if (!mounted) return;
+      setState(() => _buying.remove(expand.itemId));
+      if (expandErr != null) {
+        showPetToast(context, petRpcErrorText(expandErr));
+        return;
+      }
+      if (expandResult == null || expandResult.isBagFull) {
+        showPetToast(context, '扩容购买未完成，请清理背包后再试');
+        return;
+      }
+      setState(() => _gold -= expand.priceCoin);
+      // 同流程内闭环：扩容成功即重试原购买（§5.4）；结果 toast 由
+      // 重试的 _buy 以 afterExpand 合并文案输出（替换式 toast 会覆盖
+      // 此处的'扩容已生效'，单独吐等于没说）
+      await _buy(item, fromDialog: fromDialog, afterExpand: true);
+    }
   }
 
   @override

@@ -93,6 +93,9 @@ class CacheHelper {
       keyProfileStats,
       // 宠物总览（rpc_pet_summary 结果，含用户宠物/钱包数据）：切号须清除
       keyPetSummary,
+      // 宠物总览的新鲜度时间戳键（PetCache._tsKey 生成）：数据键清除后残留
+      // 会让切号后的新账号命中旧时间戳（审计批 20261012）
+      '${keyPetSummary}__ts',
       // 注：keyGames 是全局配置（非用户数据），故意不在此清除
     ];
     for (final key in keysToRemove) {

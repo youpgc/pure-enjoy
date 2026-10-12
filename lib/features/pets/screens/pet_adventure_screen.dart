@@ -13,6 +13,7 @@ import '../utils/pet_errors.dart';
 import '../widgets/pet_adventure_cards.dart';
 import '../widgets/pet_claim_result_dialog.dart';
 import '../widgets/pet_home_adventure.dart';
+import '../widgets/pet_toast.dart';
 
 /// 历险页
 ///
@@ -136,7 +137,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     await _reloadSummary();
@@ -168,7 +169,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       await _reloadSummary();
       return;
     }
@@ -176,7 +177,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (status == PetAdventureStatus.awaitingRescue) {
       await _reloadSummary();
       if (mounted) {
-        showSnackBar(context, '遭遇险情！请在自救窗口内使用救援道具');
+        showPetToast(context, '遭遇险情！请在自救窗口内使用救援道具');
       }
       return;
     }
@@ -235,11 +236,11 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     if (mounted) {
-      showSnackBar(context,
+      showPetToast(context,
           itemId == null ? 'NPC 已救助，平安归来' : '自救成功，平安归来');
     }
     await _reloadSummary();
@@ -319,7 +320,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   void _showTierSheet(PetSpotModel spot) {
     if (widget.tiers.isEmpty) {
-      showSnackBar(context, '历险档位未配置，请联系管理员');
+      showPetToast(context, '历险档位未配置，请联系管理员');
       return;
     }
     showModalBottomSheet<void>(
@@ -456,7 +457,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final (bag, err) = await PetRpc.fetchBag();
     if (err != null) {
       if (mounted) {
-        showSnackBar(context, petRpcErrorText(err));
+        showPetToast(context, petRpcErrorText(err));
       }
       return;
     }
@@ -469,7 +470,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     }
     if (rescueItem == null) {
       if (mounted) {
-        showSnackBar(context, '背包中没有救援道具，可去商城购买或等待 NPC 救助');
+        showPetToast(context, '背包中没有救援道具，可去商城购买或等待 NPC 救助');
       }
       return;
     }

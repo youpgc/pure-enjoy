@@ -363,3 +363,67 @@ class PetHatchResultModel {
     );
   }
 }
+
+/// 商城满格腾位选项（rpc_pet_shop_buy 返回 status='bag_full' 时的 next_expand；
+/// null = 已达扩容上限、无可购的下一级）
+class PetBagFullExpandModel {
+  const PetBagFullExpandModel({
+    required this.itemId,
+    required this.itemCode,
+    required this.name,
+    required this.priceCoin,
+  });
+
+  final String itemId;
+  final String itemCode;
+  final String name;
+  final int priceCoin;
+
+  factory PetBagFullExpandModel.fromJson(Map<String, dynamic> json) {
+    return PetBagFullExpandModel(
+      itemId: json['item_id'] as String? ?? '',
+      itemCode: json['item_code'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      priceCoin: (json['price_coin'] as num?)?.toInt() ?? 0,
+    );
+  }
+}
+
+/// 商城购买结果（rpc_pet_shop_buy）
+///
+/// - status='ok'：已扣款入包；
+/// - status='bag_full'：容量预检未过、**未扣款**，携带腾位所需信息——按需求
+///   §5.4 走腾位流程（有下一级扩容 → 引导购买后重试；无 → 引导清理背包）。
+///   此前服务层仅透传 'bag_full' 字符串、丢弃腾位载荷，决策链在服务层断链
+///   （审计批 20261012 修复）。
+class PetShopBuyResultModel {
+  const PetShopBuyResultModel({
+    required this.status,
+    this.capacity,
+    this.used,
+    this.rowsNeeded,
+    this.nextExpand,
+  });
+
+  final String status; // 'ok' | 'bag_full'
+  final int? capacity;
+  final int? used;
+  final int? rowsNeeded;
+  final PetBagFullExpandModel? nextExpand;
+
+  bool get isBagFull => status == 'bag_full';
+
+  factory PetShopBuyResultModel.fromJson(Map<String, dynamic> json) {
+    final expand = json['next_expand'];
+    return PetShopBuyResultModel(
+      status: json['status'] as String? ?? 'ok',
+      capacity: (json['capacity'] as num?)?.toInt(),
+      used: (json['used'] as num?)?.toInt(),
+      rowsNeeded: (json['rows_needed'] as num?)?.toInt(),
+      nextExpand: expand is Map
+          ? PetBagFullExpandModel.fromJson(
+              Map<String, dynamic>.from(expand))
+          : null,
+    );
+  }
+}

@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../../../core/widgets/widgets.dart';
+import 'pet_toast.dart';
 
 /// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
 ///
@@ -439,22 +440,19 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
   Future<void> _purchase(Map<String, dynamic> sc) async {
     if (_pending != null) return;
     final code = sc['scene_code']?.toString() ?? '';
-    final price = (sc['price_coin'] as num?)?.toInt() ?? 0;
+    // 价格缺失时拒绝并提示（此前 ?? 0 会显示「消耗 0 金币」，确认后被
+    // 服务端 PET_SCENE_PRICE_MISSING 拒绝，两段体验错位——审计批 20261012）
+    final price = (sc['price_coin'] as num?)?.toInt();
     final label = _sceneLabels[code] ?? code;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: Text('购买「$label」'),
-        content: Text('将消耗 $price 金币，购买后自动启用。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('购买')),
-        ],
-      ),
+    if (price == null) {
+      showPetToast(context, '「$label」暂未定价，无法购买');
+      return;
+    }
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '购买「$label」',
+      content: '将消耗 $price 金币，购买后自动启用。',
+      confirmText: '购买',
     );
     if (confirmed != true || !mounted) return;
     setState(() => _pending = code);
@@ -462,11 +460,11 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     if (!mounted) return;
     setState(() => _pending = null);
     if (err != null || data == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     setState(() => _active = code);
-    showSnackBar(context, '主题已启用');
+    showPetToast(context, '主题已启用');
   }
 
   Future<void> _activate(Map<String, dynamic> sc) async {
@@ -477,7 +475,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     if (!mounted) return;
     setState(() => _pending = null);
     if (err != null || data == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     setState(() => _active = code);

@@ -10,6 +10,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_growth_widgets.dart';
+import '../widgets/pet_toast.dart';
 
 /// 养成页签（进化 / 特性）——UI 语义，非 DDL 值域，故不进 constants/pet.dart
 enum PetGrowthTab {
@@ -54,6 +55,10 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   List<PetBagItemModel> _washItems = const [];
   String? _petId;
   bool _optionsLoading = false;
+
+  /// 候选拉取失败（网络/服务端）：区别于「空列表=最终形态」业务态——
+  /// 此前失败被吞成空列表、页面误显「已经是最终形态了」（审计批 20261012）
+  String? _optionsError;
   bool _busy = false;
 
   @override
@@ -114,14 +119,16 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     final pet = _pet;
     setState(() {
       _options = const [];
+      _optionsError = null;
       _optionsLoading = pet?.chainId != null;
     });
     if (pet == null || pet.chainId == null) return;
-    final (options, _) =
+    final (options, err) =
         await PetRpcP2.fetchEvoOptions(pet.chainId!, pet.stage + 1);
     if (!mounted) return;
     setState(() {
       _options = options;
+      _optionsError = err == null ? null : petRpcErrorText(err);
       _optionsLoading = false;
     });
   }
@@ -132,7 +139,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     _loadOptions();
   }
 
-  void _toast(String msg) => showSnackBar(context, msg);
+  void _toast(String msg) => showPetToast(context, msg);
 
   // ---------- 写操作 ----------
 
@@ -142,21 +149,14 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     if (pet == null || _busy) return;
     // 只有玩家自选（或唯一分支）才回传目标形态；概率分支传 null 交服务端掷取
     final byUser = lockTarget || option.pickMode == PetPickMode.userChoice;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认进化'),
-        content: Text(byUser
-            ? '「${pet.name}」将进化为「${option.name}」，此过程不可逆。'
-            : '「${pet.name}」将进入下一阶段，形态由概率决定，此过程不可逆。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('再想想')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true), child: const Text('进化')),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认进化',
+      content: byUser
+          ? '「${pet.name}」将进化为「${option.name}」，此过程不可逆。'
+          : '「${pet.name}」将进入下一阶段，形态由概率决定，此过程不可逆。',
+      cancelText: '再想想',
+      confirmText: '进化',
     );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
@@ -172,20 +172,12 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   Future<void> _wash(PetBagItemModel item) async {
     final pet = _pet;
     if (pet == null || _busy) return;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认洗练特性'),
-        content: Text('使用「${item.name}」重掷「${pet.name}」的特性？'
-            '新特性直接覆盖旧特性，不提供回退。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true), child: const Text('洗练')),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认洗练特性',
+      content: '使用「${item.name}」重掷「${pet.name}」的特性？'
+          '新特性直接覆盖旧特性，不提供回退。',
+      confirmText: '洗练',
     );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
@@ -237,8 +229,19 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
       children: [
         petGrowthPetSelector(cs, _details, _petId, _selectPet),
         const SizedBox(height: 12),
-        if (_error != null) _errorLine(cs),
-        if (pet == null)
+        if (_error != null) ...[
+          // 明细拉取失败：整页错误态（可重试），不落「还没有伙伴」误导空态
+          // （审计批 20261012：此前错误仅 12 号小字、下方仍是空态文案）
+          _errorLine(cs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _load(force: true),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重试'),
+            ),
+          ),
+        ] else if (pet == null)
           const EmptyWidget(message: '还没有伙伴，先去孵一只吧')
         else ..._evolveBlocks(cs, pet),
       ],
@@ -264,7 +267,19 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
                   height: 22,
                   child: CircularProgressIndicator(strokeWidth: 2.4))),
         )
-      else if (_options.isEmpty)
+      else if (_optionsError != null) ...[
+        Text('候选形态加载失败：${_optionsError!}',
+            style: TextStyle(fontSize: 13, color: cs.error)),
+        const SizedBox(height: 6),
+        Align(
+          alignment: Alignment.centerLeft,
+          child: TextButton.icon(
+            onPressed: _loadOptions,
+            icon: const Icon(Icons.refresh, size: 16),
+            label: const Text('重试'),
+          ),
+        ),
+      ] else if (_options.isEmpty)
         Text('已经是最终形态了',
             style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
       else
@@ -354,18 +369,31 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
       children: [
         petGrowthPetSelector(cs, _details, _petId, _selectPet),
         const SizedBox(height: 12),
-        petGrowthHeadCard(cs, pet),
-        const SizedBox(height: 14),
-        if (pet != null && !pet.rearing)
-          Text('伙伴正在${pet.status?.label ?? '外出'}，回到身边后才能洗练',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
-        else if (_washItems.isEmpty)
-          Text('背包里还没有特性洗练剂，可在商城「全部」里购买',
-              style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
-        else
-          for (final item in _washItems)
-            petGrowthWashRow(cs, item,
-                busy: _busy, onWash: () => _wash(item)),
+        if (_error != null) ...[
+          // 与进化页签同口径：明细失败整页错误态，不落「没有洗练剂」空态
+          _errorLine(cs),
+          Align(
+            alignment: Alignment.centerLeft,
+            child: TextButton.icon(
+              onPressed: () => _load(force: true),
+              icon: const Icon(Icons.refresh, size: 16),
+              label: const Text('重试'),
+            ),
+          ),
+        ] else ...[
+          petGrowthHeadCard(cs, pet),
+          const SizedBox(height: 14),
+          if (pet != null && !pet.rearing)
+            Text('伙伴正在${pet.status?.label ?? '外出'}，回到身边后才能洗练',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
+          else if (_washItems.isEmpty)
+            Text('背包里还没有特性洗练剂，可在商城「全部」里购买',
+                style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
+          else
+            for (final item in _washItems)
+              petGrowthWashRow(cs, item,
+                  busy: _busy, onWash: () => _wash(item)),
+        ],
         const SizedBox(height: 12),
         Text('洗练会重掷这只伙伴的特性，新结果直接覆盖旧特性、不可回退；'
             '也可能一次洗不出特性（属正常结果）。',

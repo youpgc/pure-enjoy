@@ -1,3 +1,5 @@
+import 'package:flutter/foundation.dart';
+
 import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
@@ -10,6 +12,7 @@ import '../../profile/services/point_service.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_toast.dart';
 
 /// 金币钱包页（我的页「金币钱包」入口的独立落点，不进宠物主页）
 ///
@@ -32,7 +35,6 @@ class PetWalletScreen extends StatefulWidget {
 
 class _PetWalletScreenState extends State<PetWalletScreen> {
   static const int _kRecordLimit = 50;
-  static const int _kDefaultPointsPerGold = 10;
 
   bool _loading = true;
   bool _enabled = true;
@@ -47,7 +49,10 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   /// 此前 App 无入口，用户只能攒积分换不到金币）
   final TextEditingController _goldCtrl = TextEditingController();
   int _availablePoints = 0;
-  int _pointsPerGold = _kDefaultPointsPerGold;
+  /// 积分→金币汇率（pet_config.points_per_gold；null = 配置未取到——
+  /// 此前静默兜底 10 参与预检与文案，与 rpc_pet_exchange 真实汇率漂移
+  /// （审计批 20261012）：缺配置时禁用兑换区，不造默认值）
+  int? _pointsPerGold;
   bool _exchanging = false;
 
   /// 流水来源中文（值域单一源 = [PetWalletSourceType]，铁律 12：不再另立一张表，
@@ -78,7 +83,12 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
       _toast('请输入要兑换的金币数量');
       return;
     }
-    final cost = gold * _pointsPerGold;
+    final rate = _pointsPerGold;
+    if (rate == null) {
+      _toast('兑换汇率未加载，请下拉刷新后重试');
+      return;
+    }
+    final cost = gold * rate;
     if (cost > _availablePoints) {
       _toast('积分不足：需 $cost 积分，当前可用 $_availablePoints');
       return;
@@ -87,7 +97,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
       context,
       title: '积分兑换金币',
       content: '将消耗 $cost 积分，兑换 $gold 金币'
-          '（1 金币 = $_pointsPerGold 积分）。兑换不可撤销。',
+          '（1 金币 = $rate 积分）。兑换不可撤销。',
       confirmText: '确认兑换',
     );
     if (!confirmed || !mounted) return;
@@ -106,7 +116,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
     await _load(force: true);
   }
 
-  void _toast(String msg) => showSnackBar(context, msg);
+  void _toast(String msg) => showPetToast(context, msg);
 
   Future<void> _load({bool force = false}) async {
     final userId = SupabaseService.instance.currentUserId;
@@ -159,11 +169,9 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         note: 'pet_config 积分兑金币汇率',
       );
       final configRows = configRes.data ?? const [];
-      final pointsPerGold =
-          (configRows.isNotEmpty
-                  ? (configRows.first['points_per_gold'] as num?)
-                  : null) ??
-              _kDefaultPointsPerGold;
+      final pointsPerGold = configRows.isNotEmpty
+          ? (configRows.first['points_per_gold'] as num?)?.toInt()
+          : null;
       final availablePoints =
           await PointService.instance.getAvailablePoints();
       final walletRows = walletRes.data ?? const [];
@@ -174,12 +182,13 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         _totalEarned = (wallet?['total_earned'] as num?)?.toInt() ?? 0;
         _totalSpent = (wallet?['total_spent'] as num?)?.toInt() ?? 0;
         _records = (recordsRes.data ?? const []).cast<Map<String, dynamic>>();
-        _pointsPerGold = pointsPerGold.toInt();
+        _pointsPerGold = pointsPerGold;
         _availablePoints = availablePoints;
         _error = null;
         _loading = false;
       });
     } catch (e) {
+      if (kDebugMode) debugPrint('[PetWallet] 加载失败: $e');
       if (!mounted) return;
       setState(() {
         _error = '$e';
@@ -325,8 +334,10 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   /// 积分兑换金币区块（单向；服务端 rpc_pet_exchange 同事务双账本）
   Widget _exchangeBlock(ColorScheme colorScheme) {
     final gold = int.tryParse(_goldCtrl.text.trim()) ?? 0;
-    final cost = gold > 0 ? gold * _pointsPerGold : 0;
-    final canSubmit = !_exchanging && cost > 0 && cost <= _availablePoints;
+    final rate = _pointsPerGold;
+    final cost = (gold > 0 && rate != null) ? gold * rate : 0;
+    final canSubmit =
+        !_exchanging && rate != null && cost > 0 && cost <= _availablePoints;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -378,7 +389,9 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         ),
         const SizedBox(height: 6),
         Text(
-          '1 金币 = $_pointsPerGold 积分；只支持积分 → 金币，金币不可换回积分。',
+          rate == null
+              ? '兑换汇率未加载，请下拉刷新；只支持积分 → 金币，金币不可换回积分。'
+              : '1 金币 = $rate 积分；只支持积分 → 金币，金币不可换回积分。',
           style: TextStyle(
             fontSize: 12,
             color: cost > _availablePoints

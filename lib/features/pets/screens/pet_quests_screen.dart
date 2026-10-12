@@ -6,6 +6,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_toast.dart';
 
 /// 任务页（每日 + 每周两个页签）
 ///
@@ -106,9 +107,9 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
     if (!mounted) return;
     setState(() => _claiming.remove(q.questId));
     if (err != null || reward == null) {
-      return showSnackBar(context, petRpcErrorText(err));
+      return showPetToast(context, petRpcErrorText(err));
     }
-    showSnackBar(context, _claimToast(_rewardParts(reward.gold, reward.points, const [])));
+    showPetToast(context, _claimToast(_rewardParts(reward.gold, reward.points, const [])));
     _load();
   }
 
@@ -119,9 +120,9 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
     if (!mounted) return;
     setState(() => _claiming.remove(q.questId));
     if (err != null || result == null) {
-      return showSnackBar(context, petRpcErrorText(err));
+      return showPetToast(context, petRpcErrorText(err));
     }
-    showSnackBar(context,
+    showPetToast(context,
         _claimToast(_rewardParts(result.gold, result.points, result.items)));
     await _loadWeekly(showLoading: false);
   }

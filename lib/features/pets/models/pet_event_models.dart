@@ -123,20 +123,26 @@ class PetEventChooseResultModel {
   }
 
   /// 到账明细文案（跳过 0 值项；顺序稳定便于测试）
+  ///
+  /// 事件 rewards 允许负值（需求 §3.6：hunger 可为负=代价型，负向奖惩在
+  /// 结算时已生效）——此前只渲染 >0 项，惩罚被静默吞掉，用户无感知丢资产
+  /// （审计批 20261012 修复：统一判 !=0 并按符号渲染）。
   List<String> get grantedLines {
     final lines = <String>[];
-    void add(String text, bool cond) {
-      if (cond) lines.add(text);
+    void add(String label, int v) {
+      if (v == 0) return;
+      final sign = v > 0 ? '+' : '';
+      lines.add('$label $sign$v');
     }
 
-    add('金币 +$gold', gold > 0);
-    add('积分 +$points', points > 0);
-    add('经验 +$exp', exp > 0);
-    add('心情 +$mood', mood > 0);
-    add('亲密 +$intimacy', intimacy > 0);
-    add('饱食 $hunger', hunger != 0);
+    add('金币', gold);
+    add('积分', points);
+    add('经验', exp);
+    add('心情', mood);
+    add('亲密', intimacy);
+    add('饱食', hunger);
     if (itemCode != null) {
-      add(bagFull ? '道具未发放（背包已满）' : '道具 ×$itemCount', true);
+      lines.add(bagFull ? '道具未发放（背包已满）' : '道具 ×$itemCount');
     }
     return lines;
   }

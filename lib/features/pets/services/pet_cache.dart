@@ -14,7 +14,8 @@ import '../../../utils/cache_helper.dart';
 /// - 写操作后调用 [invalidate] 保证强一致（B4 起各写 RPC 接入）
 class PetCache {
   /// 宠物总览缓存键（含用户数据，切号须清除——已加入 CacheHelper.clearAllUserData）
-  static const String keySummary = 'cache_pet_summary';
+  /// 单一真源 = CacheHelper.keyPetSummary（声明两处曾各自为政，改任一处即静默失效）
+  static const String keySummary = CacheHelper.keyPetSummary;
 
   /// 总开关缓存键（全局配置性质，非用户数据，切号不清除——同 keyGames 策略）
   static const String keyGate = 'cache_pet_gate';
@@ -83,8 +84,13 @@ class PetCache {
     final refresh = fetcher().then((resp) async {
       final map = resp.isSuccess ? _extractMap(resp) : null;
       if (map != null) {
-        await CacheHelper.instance.saveMap(key, map);
-        await _writeTs(key);
+        try {
+          await CacheHelper.instance.saveMap(key, map);
+          await _writeTs(key);
+        } catch (_) {
+          // 缓存写失败不影响主流程（本链经 unawaited 挂后台，
+          // 不捕获会成为无人接住的异步异常）
+        }
       }
       return resp;
     });

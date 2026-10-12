@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
-import '../../../core/widgets/widgets.dart';
 import '../../../services/sensitive_word_service.dart';
 import '../models/pet_models.dart';
 import '../screens/pet_timeline_screen.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import 'pet_toast.dart';
 
 /// 属性面板（2026-09-17 属性系统 Phase 2）
 ///
@@ -32,6 +32,11 @@ Future<void> showPetAttributesSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
+    // 浮卡式自绘容器（透明背景 + margin）：必须关掉主题的全局拖拽把手
+    //（bottomSheetTheme.showDragHandle=true）——否则把手画在容器外的透明
+    // 边距区，视觉悬空在弹窗外（20261012 用户反馈）；把手由容器内部
+    // [_DragHandle] 自绘，与「更多」菜单等标准弹窗同视觉
+    showDragHandle: false,
     builder: (ctx) => _PetAttributesSheet(
         pet: pet, onChanged: onChanged, onGrowth: onGrowth, config: config),
   );
@@ -97,7 +102,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (firstErr != null) {
-      showSnackBar(context, donePoints > 0
+      showPetToast(context, donePoints > 0
           ? '已分配 $donePoints 点，其余未完成：${petRpcErrorText(firstErr)}'
           : petRpcErrorText(firstErr));
       // 部分成功也关闭并刷新——面板宠物快照过期，重开面板续传剩余点数
@@ -110,9 +115,13 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
   }
 
   /// 改名（§2.5 更名卡口径）：每宠首次免费（rename_count=0），此后消耗
-  /// 更名卡×1；敏感词在客户端预检（服务端无敏感词基础设施为已知边界）。
+  /// 更名卡×1；敏感词客户端预检 + 服务端直查双保险（2026-10-09 接入）。
   Future<void> _rename() async {
     if (_busy) return;
+    if (widget.pet.status != PetPetStatus.rearing) {
+      showPetToast(context, '只有养育中的伙伴才能改名');
+      return;
+    }
     // 模型无独立 nickname 字段（summary 已合并显示名），预填当前显示名
     final controller = TextEditingController(text: widget.pet.name);
     final freeNext = widget.pet.renameCount == 0;
@@ -151,20 +160,21 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
         ],
       ),
     );
-    if (confirmed != true || !mounted) return;
     final name = controller.text.trim();
+    controller.dispose(); // 弹窗已关、取值完毕即释放（此前每次改名泄漏一个）
+    if (confirmed != true || !mounted) return;
     if (name.isEmpty || name.length > 12) {
-      showSnackBar(context, '名字要 1~12 个字哦');
+      showPetToast(context, '名字要 1~12 个字哦');
       return;
     }
     if (name == widget.pet.name) {
-      showSnackBar(context, petRpcErrorText('PET_RENAME_SAME'));
+      showPetToast(context, petRpcErrorText('PET_RENAME_SAME'));
       return;
     }
     final sw = await SensitiveWordService.instance.checkSystemContent(name);
     if (!mounted) return;
     if (sw.isBlocked) {
-      showSnackBar(context, '这个名字不太合适，换一个吧');
+      showPetToast(context, '这个名字不太合适，换一个吧');
       return;
     }
     setState(() => _busy = true);
@@ -172,10 +182,10 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
-    showSnackBar(context, '已改名为「$name」');
+    showPetToast(context, '已改名为「$name」');
     Navigator.pop(context);
     widget.onChanged?.call();
   }
@@ -190,7 +200,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || data == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     await showPetRefineResultDialog(
@@ -210,7 +220,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     return SafeArea(
       child: Container(
         margin: const EdgeInsets.all(12),
-        padding: const EdgeInsets.fromLTRB(18, 14, 18, 14),
+        padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
         decoration: BoxDecoration(
           color: cs.surface,
           borderRadius: BorderRadius.circular(22),
@@ -219,6 +229,9 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
+            // 拖拽把手：M3 同款视觉（onSurfaceVariant 40%、32×4 胶囊），
+            // 收进容器内——全局主题把手会画在浮卡外的透明边距区（20261012）
+            const _DragHandle(),
             // 标题行：名字（点笔改名）+ 性格
             Row(
               children: [
@@ -229,12 +242,18 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
                       style: const TextStyle(
                           fontSize: 16, fontWeight: FontWeight.w700)),
                 ),
-                // 改名入口（§2.5 更名卡口径：首次免费，此后消耗更名卡）
+                // 改名入口（§2.5 更名卡口径：首次免费，此后消耗更名卡；
+                // 仅养育中可改——寄养冻结从保守，服务端 rearing-only）
                 IconButton(
                   visualDensity: VisualDensity.compact,
                   icon: const Icon(Icons.edit_outlined, size: 18),
-                  tooltip: '改名',
-                  onPressed: _busy ? null : _rename,
+                  tooltip: pet.status == PetPetStatus.rearing
+                      ? '改名'
+                      : '仅养育中的伙伴可改名',
+                  onPressed:
+                      !_busy && pet.status == PetPetStatus.rearing
+                          ? _rename
+                          : null,
                 ),
                 Container(
                   padding:
@@ -256,9 +275,11 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             Text(
               pet.status == PetPetStatus.adventuring
                   ? '历险中的宠物暂时无法加点，归来后再分配吧'
-                  : pet.pendingAttrPoints > 0
-                      ? '升级获得了属性点，快为它加点吧（剩余 $_remain/${pet.pendingAttrPoints}）'
-                      : '宠物升级时会获得属性点',
+                  : pet.status != PetPetStatus.rearing
+                      ? '伙伴不在养育中，回到身边后才能加点'
+                      : pet.pendingAttrPoints > 0
+                          ? '升级获得了属性点，快为它加点吧（剩余 $_remain/${pet.pendingAttrPoints}）'
+                          : '宠物升级时会获得属性点',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 8),
@@ -277,12 +298,14 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
-            // 洗练入口（2026-09-20 起：消耗洗练点；历险中禁用，服务端亦拦）
+            // 洗练入口（2026-09-20 起：消耗洗练点；仅养育中可洗——
+            // 服务端拦 PET_NOT_REARING，此前客户端只排 adventuring，
+            // breeding/fostered 可点必收拒（审计批 20261012）
             OutlinedButton.icon(
               onPressed:
                   !_busy &&
                           pet.refinePoints > 0 &&
-                          pet.status != PetPetStatus.adventuring
+                          pet.status == PetPetStatus.rearing
                       ? _refine
                       : null,
               icon: const Icon(Icons.auto_fix_high, size: 18),
@@ -352,14 +375,16 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
   Future<void> _release() async {
     if (_busy) return;
     final pet = widget.pet;
-    final gold = pet.level * 3; // 预览值（单价默认 3；实际以服务端结算为准）
+    // 补偿 = 等级 × 单价（pet_config.release_gold_per_level）× 评级倍率
+    // （reserved.release_gold_mult），两项配置均不下发客户端——预览不造数，
+    // 以结算为准（此前写死 level*3 漏评级倍率，误导不可逆决策，审计批 20261012）
     final first = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
         title: const Text('送别伙伴'),
         content: Text(
             '将「${pet.name}」送归自然。\n\n'
-            '· 补偿金币约 $gold（以实际结算为准）\n'
+            '· 补偿金币以实际结算为准（等级越高越多）\n'
             '· 图鉴收集记录会保留\n'
             '· 这一步之后还可以反悔吗？——不能，请想清楚'),
         actions: [
@@ -397,10 +422,10 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || result == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
-    showSnackBar(context, '送别完成，补偿金币 +${result.gold}');
+    showPetToast(context, '送别完成，补偿金币 +${result.gold}');
     Navigator.pop(context);
     widget.onChanged?.call();
   }
@@ -410,9 +435,10 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     final pet = widget.pet;
     final base = pet.attr(key.code);
     final plus = _alloc[key.code] ?? 0;
-    // 历险中禁用加点（服务端 allocate 拦 PET_NOT_REARING，客户端前置禁更友好）
+    // 仅养育中可加点（服务端 allocate 拦 PET_NOT_REARING，四态中三态全拒；
+    // 此前只排 adventuring，breeding/fostered 可点必收拒——审计批 20261012）
     final canAlloc =
-        pet.pendingAttrPoints > 0 && pet.status != PetPetStatus.adventuring;
+        pet.pendingAttrPoints > 0 && pet.status == PetPetStatus.rearing;
     return Row(
       children: [
         SizedBox(
@@ -577,4 +603,27 @@ Widget _refineRow(BuildContext ctx, PetAttrKey key,
       ],
     ),
   );
+}
+
+/// 浮卡式底部弹窗的拖拽把手：与全局主题把手（M3：onSurfaceVariant 40%、
+/// 32×4 胶囊）同视觉，但画在容器**内部**——透明背景弹窗若不关全局
+/// showDragHandle，把手会落在浮卡外的透明边距区，视觉悬空（20261012 用户反馈）
+class _DragHandle extends StatelessWidget {
+  const _DragHandle();
+
+  @override
+  Widget build(BuildContext context) {
+    final cs = Theme.of(context).colorScheme;
+    return Center(
+      child: Container(
+        width: 32,
+        height: 4,
+        margin: const EdgeInsets.only(bottom: 10),
+        decoration: ShapeDecoration(
+          color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+          shape: const StadiumBorder(),
+        ),
+      ),
+    );
+  }
 }

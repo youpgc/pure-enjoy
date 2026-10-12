@@ -20,7 +20,10 @@ class PetTimelineScreen extends StatefulWidget {
 class _Item {
   final String type;
   final Map<String, dynamic> payload;
-  final DateTime at;
+
+  /// 事件时间(null = 服务端时间解析失败——不回退 now() 冒充真实日期，
+  /// 隐藏日期行即可，审计批 20261012)
+  final DateTime? at;
   _Item(this.type, this.payload, this.at);
 }
 
@@ -55,7 +58,7 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
               .map((e) => _Item(
                   e['type']?.toString() ?? 'unknown',
                   (e['payload'] as Map?)?.cast<String, dynamic>() ?? const {},
-                  DateTime.tryParse(e['at']?.toString() ?? '') ?? DateTime.now()))
+                  DateTime.tryParse(e['at']?.toString() ?? '')))
               .toList()
           : <_Item>[];
     });
@@ -208,11 +211,12 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
                                 style: const TextStyle(
                                     fontSize: 14,
                                     fontWeight: FontWeight.w600))),
-                        Text(
-                          '${item.at.year}.${item.at.month}.${item.at.day}',
-                          style: TextStyle(
-                              fontSize: 11, color: cs.onSurfaceVariant),
-                        ),
+                        if (item.at != null)
+                          Text(
+                            '${item.at!.year}.${item.at!.month}.${item.at!.day}',
+                            style: TextStyle(
+                                fontSize: 11, color: cs.onSurfaceVariant),
+                          ),
                       ],
                     ),
                     const SizedBox(height: 4),

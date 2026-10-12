@@ -15,6 +15,7 @@ import '../widgets/pet_home_overlays.dart';
 import 'pet_egg_screen.dart';
 import 'pet_growth_screen.dart';
 import 'pet_shop_screen.dart';
+import '../widgets/pet_toast.dart';
 
 /// 宠物背包页（格位坐标制 + 左侧分类栏 + 拖拽换位）
 ///
@@ -95,6 +96,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   // ---------- 操作 ----------
 
   Future<void> _run(Future<void> Function() action, String id) async {
+    if (_busyId != null) return; // 防重入（与 pet_egg_screen 同口径，审计批 20261012）
     setState(() => _busyId = id);
     await action();
     if (mounted) setState(() => _busyId = null);
@@ -138,24 +140,13 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   Future<void> _discard(PetBagItemModel item) async {
-    final cs = Theme.of(context).colorScheme;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('丢弃确认'),
-        content: Text('确定丢弃「${item.name}」×${item.quantity}？丢弃不可恢复。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('取消')),
-          FilledButton(
-            style:
-                FilledButton.styleFrom(backgroundColor: cs.error, foregroundColor: cs.onError),
-            onPressed: () => Navigator.pop(ctx, true),
-            child: const Text('丢弃'),
-          ),
-        ],
-      ),
+    // 统一走强制组件（danger=error 色确认钮，保留不可逆警示语义）
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '丢弃确认',
+      content: '确定丢弃「${item.name}」×${item.quantity}？丢弃不可恢复。',
+      confirmText: '丢弃',
+      danger: true,
     );
     if (confirmed != true || !mounted) return;
     await _run(() async {
@@ -260,7 +251,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   void _toast(String msg) {
     if (!mounted) return;
-    showSnackBar(context, msg);
+    showPetToast(context, msg);
   }
 
   // ---------- 布局 ----------

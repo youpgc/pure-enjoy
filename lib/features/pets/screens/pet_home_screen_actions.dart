@@ -16,17 +16,17 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     if (anim != null) _playAction(anim);
     if (successMsg != null) {
-      showSnackBar(context, successMsg);
+      showPetToast(context, successMsg);
     }
     _load();
     // 照料动作成功的插叙事件（§3.6 action_done；喂食/抚摸走本包装）
     WidgetsBinding.instance
-        .addPostFrameCallback((_) => _maybeShowEvent('action_done'));
+        .addPostFrameCallback((_) => _maybeShowEvent(kPetEventContextActionDone));
   }
 
   /// 播放一次性动作（动作机按优先级/防抖裁决，被拒时静默跳过不打断当前演出）
@@ -81,7 +81,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || data == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     int n(String k) => (data[k] as num?)?.toInt() ?? 0;
@@ -92,7 +92,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (n('cooldown') > 0) parts.add('刚喂过 ${n('cooldown')}');
     if (n('no_food') > 0) parts.add('口粮不足 ${n('no_food')}');
     if (n('error') > 0) parts.add('失败 ${n('error')}');
-    showSnackBar(context,
+    showPetToast(context,
         parts.isEmpty ? '没有需要喂养的伙伴' : '一键喂养：${parts.join(' · ')}');
     _load();
   }
@@ -117,7 +117,7 @@ extension _PetHomeActions on _PetHomeScreenState {
       _load();
       // 道具喂养成功同样是照料动作（§3.6 action_done）
       WidgetsBinding.instance
-          .addPostFrameCallback((_) => _maybeShowEvent('action_done'));
+          .addPostFrameCallback((_) => _maybeShowEvent(kPetEventContextActionDone));
     }
   }
 
@@ -141,7 +141,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final (eggs, err) = await PetRpc.fetchEggs();
     if (err != null) {
       if (mounted) {
-        showSnackBar(context, petRpcErrorText(err));
+        showPetToast(context, petRpcErrorText(err));
       }
       return;
     }
@@ -156,7 +156,7 @@ extension _PetHomeActions on _PetHomeScreenState {
       if (!mounted) return;
       // P2：只剩等待型蛋（传说蛋需计时）时不再死路一条，转孵蛋页处理
       if (eggs.isEmpty) {
-        showSnackBar(context, '背包里还没有蛋');
+        showPetToast(context, '背包里还没有蛋');
         return;
       }
       _openEggs();
@@ -165,7 +165,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
     if (!mounted) return;
     if (hatchErr != null || result == null) {
-      showSnackBar(context, petRpcErrorText(hatchErr));
+      showPetToast(context, petRpcErrorText(hatchErr));
       return;
     }
     // 图片权重：展示基础型形象大图（idle 首帧透明底，未登记种属回退静态底图）
@@ -244,7 +244,7 @@ extension _PetHomeActions on _PetHomeScreenState {
   void _openAdventure() {
     final pet = _currentPet;
     if (pet == null) {
-      showSnackBar(context, '先孵化一只宠物才能历险');
+      showPetToast(context, '先孵化一只宠物才能历险');
       return;
     }
     _push(PetAdventureScreen(
@@ -282,7 +282,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final pet = _currentPet;
     if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {
-      showSnackBar(context, '历险信息异常，请下拉刷新或重进宠物页重试');
+      showPetToast(context, '历险信息异常，请下拉刷新或重进宠物页重试');
       return;
     }
     if (await run(context, adv.id) && mounted) _load();

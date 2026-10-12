@@ -8,6 +8,7 @@ import '../../../constants/pet.dart';
 import '../../../constants/pet_render.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
+import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_audio.dart';
 import '../services/pet_rpc.dart';
@@ -36,6 +37,7 @@ import 'pet_growth_screen.dart';
 import 'pet_quests_screen.dart';
 import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
+import '../widgets/pet_toast.dart';
 
 part 'pet_home_screen_layout.dart';
 part 'pet_home_screen_actions.dart';
@@ -205,7 +207,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
       if (summary != null && !_homeEventRolled) {
         _homeEventRolled = true;
         WidgetsBinding.instance
-            .addPostFrameCallback((_) => _maybeShowEvent('home_open'));
+            .addPostFrameCallback((_) => _maybeShowEvent(kPetEventContextHomeOpen));
       }
     }
     _syncAmbient();

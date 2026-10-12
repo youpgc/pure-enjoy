@@ -11,6 +11,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import 'pet_bag_screen.dart';
 import 'pet_shop_screen.dart';
+import '../widgets/pet_toast.dart';
 
 /// 繁育页（P2）
 ///
@@ -49,7 +50,9 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     if (force) await PetService.instance.invalidateSummary();
     final (summary, summaryErr) =
         await PetService.instance.fetchSummary(forceRefresh: force);
-    final (features, _) = await PetRpcP2.fetchUnlockedFeatures();
+    // 解锁清单拉取失败必须并入错误态：吞掉会把已开通繁育的用户误判成
+    // 「尚未解锁」并引导去商城（网络错误篡改业务态，审计批 20261012）
+    final (features, featuresErr) = await PetRpcP2.fetchUnlockedFeatures();
     final (orders, ordersErr) = await PetRpcP2.fetchBreedOrders();
     final (reserved, _) = await PetRpcP2.fetchReserved();
     if (!mounted) return;
@@ -58,6 +61,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
         .where((p) => p.status == PetPetStatus.rearing)
         .map((p) => p.id)
         .toSet();
+    final firstErr = ordersErr ?? featuresErr;
     setState(() {
       _summary = summary;
       _unlocked = features.any(
@@ -67,12 +71,12 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
       _picked.removeWhere((id) => !rearing.contains(id));
       _error = summary == null
           ? (summaryErr ?? '数据加载失败，请稍后重试')
-          : (ordersErr == null ? null : petRpcErrorText(ordersErr));
+          : (firstErr == null ? null : petRpcErrorText(firstErr));
       _loading = false;
     });
   }
 
-  void _toast(String msg) => showSnackBar(context, msg);
+  void _toast(String msg) => showPetToast(context, msg);
 
   void _push(Widget page) {
     Navigator.push(context, MaterialPageRoute(builder: (_) => page))
@@ -130,23 +134,14 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     if (pair == null || _busy) return;
     final a = pair[0];
     final b = pair[1];
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('确认结配'),
-        content: Text(
-            '让「${a.name}」与「${b.name}」结配？\n'
-            '完成后会得一枚蛋${_feeText()}\n'
-            '孕期约 ${_reserved.breedGestationHours ?? '--'} 小时，期间两只伙伴不可喂食互动。'),
-        actions: [
-          TextButton(
-              onPressed: () => Navigator.pop(ctx, false),
-              child: const Text('再想想')),
-          FilledButton(
-              onPressed: () => Navigator.pop(ctx, true),
-              child: const Text('结配')),
-        ],
-      ),
+    final confirmed = await showConfirmDialog(
+      context,
+      title: '确认结配',
+      content: '让「${a.name}」与「${b.name}」结配？\n'
+          '完成后会得一枚蛋${_feeText()}\n'
+          '孕期约 ${_reserved.breedGestationHours ?? '--'} 小时，期间两只伙伴不可喂食互动。',
+      cancelText: '再想想',
+      confirmText: '结配',
     );
     if (confirmed != true || !mounted) return;
     setState(() => _busy = true);
@@ -219,7 +214,34 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
         padding: const EdgeInsets.fromLTRB(16, 12, 16, 28),
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
-          if (!_unlocked)
+          if (_error != null) ...[
+            // 明细(含解锁清单)拉取失败:错误态置顶可重试,不渲染「尚未解锁」
+            // 误导卡片——网络错误不得篡改业务态引导用户去商城(审计批 20261012
+            // 复审补:此前错误只在页底小字,解锁卡片照常渲染)
+            Card(
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text('繁育数据加载失败',
+                        style: TextStyle(fontSize: 13, color: cs.error)),
+                    const SizedBox(height: 4),
+                    Text(_error!,
+                        style: TextStyle(
+                            fontSize: 12, color: cs.onSurfaceVariant),
+                        textAlign: TextAlign.center),
+                    const SizedBox(height: 10),
+                    OutlinedButton.icon(
+                      onPressed: () => _load(force: true),
+                      icon: const Icon(Icons.refresh, size: 16),
+                      label: const Text('重试'),
+                    ),
+                  ],
+                ),
+              ),
+            ),
+          ] else if (!_unlocked)
             _unlockCard(cs)
           else ...[
             _ruleCard(cs),
@@ -242,14 +264,15 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
           _title(cs, '繁育记录'),
           const SizedBox(height: 8),
           if (_orders.isEmpty)
-            Text(_unlocked ? '还没有结配记录' : '',
+            // 故障态不陈述业务事实(复审 P3:错误卡片下渲染"还没有结配记录"
+            // 会把网络失败读成没有记录)
+            Text(
+                _error != null
+                    ? '记录加载失败，请重试'
+                    : (_unlocked ? '还没有结配记录' : ''),
                 style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
           else
             for (final o in _orders) _orderCard(cs, o),
-          if (_error != null) ...[
-            const SizedBox(height: 12),
-            Text(_error!, style: TextStyle(fontSize: 12, color: cs.error)),
-          ],
         ],
       ),
     );

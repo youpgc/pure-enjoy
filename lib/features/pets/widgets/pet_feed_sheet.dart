@@ -1,12 +1,12 @@
 import 'package:flutter/material.dart';
 
 import '../../../constants/pet.dart';
-import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_bag_meta.dart';
 import '../utils/pet_errors.dart';
 import 'pet_item_icon.dart';
+import 'pet_toast.dart';
 
 /// 主页「口粮」选择浮层（2026-09-24 新增）
 ///
@@ -20,7 +20,7 @@ Future<bool> showPetFeedSheet(BuildContext context, String petId) async {
   final (items, err) = await PetRpc.fetchBag();
   if (!context.mounted) return false;
   if (err != null) {
-    showSnackBar(context, petRpcErrorText(err));
+    showPetToast(context, petRpcErrorText(err));
     return false;
   }
   final foods = items
@@ -64,13 +64,13 @@ class _PetFeedSheetState extends State<_PetFeedSheet> {
     if (!mounted) return;
     setState(() => _busyId = null);
     if (err != null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     final desc = petBagEffectDesc(item);
     widget.onFed();
     Navigator.pop(context);
-    showSnackBar(context, '已喂「${item.name}」${desc.isEmpty ? '' : ' · $desc'}');
+    showPetToast(context, '已喂「${item.name}」${desc.isEmpty ? '' : ' · $desc'}');
   }
 
   @override

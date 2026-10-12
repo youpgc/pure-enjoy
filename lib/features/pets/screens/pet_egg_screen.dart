@@ -13,6 +13,7 @@ import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_item_icon.dart';
+import '../widgets/pet_toast.dart';
 
 /// 孵蛋页（P2：即开 + 等待孵化双通道）
 ///
@@ -39,13 +40,35 @@ class _PetEggScreenState extends State<PetEggScreen> {
   String? _busyId;
   Timer? _tick;
 
+  /// 到点重拉进行中标志（防逐秒 tick 重复触发 _load）
+  bool _reloadingForReady = false;
+
+  /// 已触发过到点重拉的蛋 id：重拉后服务端仍未翻转（时钟偏差）或拉取失败时
+  /// 不再逐秒重试（否则退化为 1Hz 轮询打点服务端）——用户可下拉手动刷新
+  /// （复审批 20261012）
+  final Set<String> _reloadedEggs = {};
+
   @override
   void initState() {
     super.initState();
     _load();
     // 倒计时逐秒刷新（仅在有 waiting 蛋时重绘，避免无谓 setState）
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
-      if (mounted && _eggs.any((e) => e.isWaiting)) setState(() {});
+      if (!mounted) return;
+      // wait 蛋到点：ready 是服务端状态，客户端倒计时归零必须重拉，
+      // 否则主按钮恒为禁用的 00:00:00、「领取」永不出现（审计批 20261012）
+      final due = _eggs.where((e) =>
+          e.remaining == Duration.zero && !_reloadedEggs.contains(e.id));
+      if (!_reloadingForReady && due.isNotEmpty) {
+        _reloadedEggs.addAll(due.map((e) => e.id));
+        _reloadingForReady = true;
+        _load(forceRefresh: true).whenComplete(() {
+          _reloadingForReady = false;
+          if (mounted) setState(() {});
+        });
+        return;
+      }
+      if (_eggs.any((e) => e.isWaiting)) setState(() {});
     });
   }
 
@@ -77,7 +100,7 @@ class _PetEggScreenState extends State<PetEggScreen> {
   }
 
   void _toast(String msg) {
-    if (mounted) showSnackBar(context, msg);
+    if (mounted) showPetToast(context, msg);
   }
 
   Future<void> _run(String id, Future<void> Function() action) async {

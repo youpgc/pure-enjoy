@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import 'pet_shop_screen.dart';
+import '../widgets/pet_toast.dart';
 
 /// 寄养仓库页（P0-3 补齐：宠物在「养育格 <-> 寄养格」之间搬运）
 ///
@@ -77,7 +78,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
     _toast(action == 'to_foster' ? '${pet.name} 已安置进寄养仓库' : '${pet.name} 接回身边啦');
   }
 
-  void _toast(String msg) => showSnackBar(context, msg);
+  void _toast(String msg) => showPetToast(context, msg);
 
   @override
   Widget build(BuildContext context) {

@@ -234,10 +234,16 @@ class PetRpc {
   }
 
   /// 商城购买（扩容道具服务端自动转阶梯 RPC）
-  /// 返回 'bag_full' 表示容量预检未过（不扣款），UI 引导清理背包
-  static Future<(String?, String?)> shopBuy(
+  ///
+  /// 返回 (结果, err)。结果为 [PetShopBuyResultModel.isBagFull] 时表示容量
+  /// 预检未过、**未扣款**，腾位选项（下一级扩容道具 / 容量占用）在结果里——
+  /// UI 据此走「扩容后重试 / 清理背包」引导（需求 §5.4，扣款前决策）。
+  static Future<(PetShopBuyResultModel?, String?)> shopBuy(
     String itemId, {
     int qty = 1,
+    // p_currency 服务端支持 'points' 通道，但积分购买入口未实装：
+    // 线上全部在架道具 price_points=null / points_purchasable=false，
+    // points 分支实际不可达（2026-10-12 线上核实），维持恒 'coin'。
     String currency = 'coin',
   }) async {
     final (data, err) = await _call('rpc_pet_shop_buy', {
@@ -246,10 +252,11 @@ class PetRpc {
       'p_currency': currency,
     }, 'rpc_pet_shop_buy 商城购买');
     if (err != null) return (null, err);
-    final status = data?['status'] as String?;
-    if (status == 'bag_full') return ('bag_full', null);
-    await PetService.instance.invalidateSummary();
-    return ('ok', null);
+    if (data == null) return (null, kPetLocalError);
+    final result = PetShopBuyResultModel.fromJson(data);
+    // 满格未扣款：总览无变化，不失效缓存（与原行为一致）
+    if (!result.isBagFull) await PetService.instance.invalidateSummary();
+    return (result, null);
   }
 
   /// 抽取/对齐当日任务（幂等，advisory lock 防并发）

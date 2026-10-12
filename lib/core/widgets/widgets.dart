@@ -126,12 +126,16 @@ class ErrorWidget extends StatelessWidget {
 }
 
 /// 确认对话框
+///
+/// [danger] = true 时确认钮用 error 色（丢弃/放生等不可逆操作的危险语义），
+/// 默认 false 保持主色（既有调用零影响）。
 Future<bool> showConfirmDialog(
   BuildContext context, {
   required String title,
   required String content,
   String confirmText = '确定',
   String cancelText = '取消',
+  bool danger = false,
 }) async {
   final result = await showDialog<bool>(
     context: context,
@@ -144,6 +148,11 @@ Future<bool> showConfirmDialog(
           child: Text(cancelText),
         ),
         FilledButton(
+          style: danger
+              ? FilledButton.styleFrom(
+                  backgroundColor: Theme.of(context).colorScheme.error,
+                  foregroundColor: Theme.of(context).colorScheme.onError)
+              : null,
           onPressed: () => Navigator.pop(context, true),
           child: Text(confirmText),
         ),

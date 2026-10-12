@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../models/pet_models.dart';
+import '../utils/pet_errors.dart';
 import 'pet_cache.dart';
 
 /// 宠物系统服务（单例 + setState 双轨，禁 Riverpod / supabase_flutter）
@@ -88,7 +89,9 @@ class PetService {
       return (summary, null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');
-      return (null, '总览数据解析失败');
+      // 客户端解析异常统一文案单一源（此前自造「总览数据解析失败」双源并存；
+      // 该 catch 同时兜住缓存写失败，故文案不指名「解析」）
+      return (null, kPetLocalError);
     }
   }
 

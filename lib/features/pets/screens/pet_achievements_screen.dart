@@ -7,6 +7,7 @@ import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
+import '../widgets/pet_toast.dart';
 
 /// 成就页（P2）
 ///
@@ -52,7 +53,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     if (!mounted) return;
     setState(() => _claiming.remove(a.id));
     if (err != null || result == null) {
-      showSnackBar(context, petRpcErrorText(err));
+      showPetToast(context, petRpcErrorText(err));
       return;
     }
     final parts = <String>[
@@ -60,7 +61,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
       if (result.points > 0) '积分 +${result.points}',
       if (result.items.isNotEmpty) '道具 ×${result.items.length}',
     ];
-    showSnackBar(context,
+    showPetToast(context,
         '已领取「${result.title}」：${parts.isEmpty ? '奖励已发放' : parts.join('，')}');
     await PetService.instance.invalidateSummary();
     await _load();
