@@ -53,7 +53,10 @@ class G2048Game extends StatefulWidget {
   State<G2048Game> createState() => _G2048GameState();
 }
 
-class _G2048GameState extends State<G2048Game> {
+class _G2048GameState extends State<G2048Game> with WidgetsBindingObserver {
+  /// 切后台暂停起点（null=未因切后台暂停）：限时判定为截线制
+  /// （_startTime + 加时卡），恢复时平移 _startTime——后台不流逝
+  DateTime? _bgPausedAt;
   late int _size;
   late int _target;
   /// 无通关条件（经典「棋盘选择」无尽模式）：达到目标方块也不结束，
@@ -128,6 +131,7 @@ class _G2048GameState extends State<G2048Game> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 切后台自动暂停
     _startTime = DateTime.now();
     // 从后台关卡配置读取棋盘尺寸与目标分（含安全边界，异常值回退默认）
     final cfgSize = widget.level.config['size'];
@@ -209,6 +213,7 @@ class _G2048GameState extends State<G2048Game> {
     _score = 0;
     _animating = false;
     _finished = false;
+    _bgPausedAt = null; // 切后台暂停态不跨局
     _pendingWin = false;
     _pendingDir = null;
     _movesUsed = 0;
@@ -258,8 +263,28 @@ class _G2048GameState extends State<G2048Game> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _tickTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 切后台主动暂停（2026-10-12）：限时判定为截线制（同俄罗斯方块），
+    // 不暂停会后台照常流逝甚至直接判负；恢复时平移 _startTime，
+    // 后台时间不计入倒计时与用时
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_finished || _bgPausedAt != null) return;
+      _bgPausedAt = DateTime.now();
+      _tickTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_finished || _bgPausedAt == null) return;
+      _startTime = _startTime.add(DateTime.now().difference(_bgPausedAt!));
+      _bgPausedAt = null;
+      _startTimer();
+    }
   }
 
   void _finish(bool cleared) {

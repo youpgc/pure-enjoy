@@ -52,7 +52,7 @@ class Match3Game extends StatefulWidget {
   State<Match3Game> createState() => _Match3GameState();
 }
 
-class _Match3GameState extends State<Match3Game> {
+class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
   late final ValueNotifier<int> _hudTick;
   late final Match3Objective _objective;
   late final Match3FlameGame _game;
@@ -78,6 +78,7 @@ class _Match3GameState extends State<Match3Game> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 切后台暂停 Flame 引擎
     final cfg = widget.level?.config ?? const <String, dynamic>{};
     final levelNo = widget.level?.levelNo ?? 0;
     final rows = (cfg['rows'] as num?)?.toInt() ?? 8;
@@ -233,8 +234,24 @@ class _Match3GameState extends State<Match3Game> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _hudTick.dispose();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 切后台主动暂停（2026-10-12）：限时倒计时由 update(dt) 每帧扣减，
+    // 不暂停则回前台首帧 dt 携带整个后台时长、倒计时一次性流逝（引擎
+    // 游戏循环停摆期间 Ticker 时间戳仍在累计）；恢复自动续跑（回合制
+    // 无续玩障碍，与俄罗斯方块的主动恢复口径不同）
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      _game.pauseEngine();
+    } else if (state == AppLifecycleState.resumed) {
+      _game.resumeEngine();
+    }
   }
 
   /// 顶部横幅：Boss 血条 / 收集与破冰的「目标达成条件」chips

@@ -42,7 +42,10 @@ class SheepGame extends StatefulWidget {
   State<SheepGame> createState() => _SheepGameState();
 }
 
-class _SheepGameState extends State<SheepGame> {
+class _SheepGameState extends State<SheepGame> with WidgetsBindingObserver {
+  /// 切后台暂停起点（null=未因切后台暂停）：恢复时平移 [_startTime]，
+  /// 后台时间不计入用时
+  DateTime? _bgPausedAt;
   static const int _slotCapacity = 7;
 
   List<SheepTile> _tiles = <SheepTile>[];
@@ -86,6 +89,7 @@ class _SheepGameState extends State<SheepGame> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 切后台自动暂停
     _startTime = DateTime.now();
     final cfg = widget.level?.config ?? const <String, dynamic>{};
     _types = ((cfg['types'] as int?) ?? 8).clamp(3, GameIcons.fruits.length);
@@ -331,8 +335,28 @@ class _SheepGameState extends State<SheepGame> {
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _clockTimer?.cancel();
     super.dispose();
+  }
+
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 切后台主动暂停（2026-10-12）：限时倒计时是秒级递减计数器，不暂停
+    // 会后台照常递减甚至回来已被判负；恢复从冻结剩余数续跑（计数器制
+    // 无需平移），同时平移 _startTime——后台时间不计入用时
+    if (state == AppLifecycleState.paused ||
+        state == AppLifecycleState.hidden) {
+      if (_finished || _bgPausedAt != null) return;
+      _bgPausedAt = DateTime.now();
+      _clockTimer?.cancel();
+    } else if (state == AppLifecycleState.resumed) {
+      if (_finished || _bgPausedAt == null) return;
+      _startTime = _startTime.add(DateTime.now().difference(_bgPausedAt!));
+      _bgPausedAt = null;
+      if (_timeLimit > 0) _startClock();
+    }
   }
 
   void _finish(bool cleared) {
