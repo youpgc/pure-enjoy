@@ -42,7 +42,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   GameHomeFlow? _flow;
   bool _loading = true;
 
-  /// 俄罗斯方块每日挑战：今日是否已完成（本地标记，控制模式卡角标/副标题）
+  /// 俄罗斯方块每日挑战：今日是否已完成（本地标记，控制模式卡副标题）
   bool _tetrisDailyDone = false;
 
   /// 是否俄罗斯方块每日挑战模式（合成关入口，无 server 关）
@@ -391,21 +391,6 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                                             fontWeight: FontWeight.bold)),
                                   ),
                                 ),
-                                if (isDaily && _tetrisDailyDone) ...<Widget>[
-                                  const SizedBox(width: 6),
-                                  Container(
-                                    padding: const EdgeInsets.symmetric(
-                                        horizontal: 6, vertical: 1),
-                                    decoration: BoxDecoration(
-                                      color: AppTheme.success.withAlpha(26),
-                                      borderRadius: BorderRadius.circular(8),
-                                    ),
-                                    child: const Text('今日已完成',
-                                        style: TextStyle(
-                                            fontSize: 9,
-                                            color: AppTheme.success)),
-                                  ),
-                                ],
                               ],
                             ),
                             const SizedBox(height: 4),
