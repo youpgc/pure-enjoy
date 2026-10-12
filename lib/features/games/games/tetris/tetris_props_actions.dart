@@ -339,6 +339,9 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
       iconAsset: (s.item?.icon?.isNotEmpty ?? false) ? s.item!.icon : null,
     );
     if (sure != true || !mounted || _finished) return;
+    // 弹窗 await 期间对局仍在推进：确认瞬间可能已切后台自动暂停、或对局
+    // 进入消行闪烁（与入口守卫同口径），拒绝执行且不扣券
+    if (_isPaused || _flashTimer != null || _flashRows.isNotEmpty) return;
     final ok = switch (s.itemType) {
       'slow' => _execSlow(),
       'laser' => _execLaser(),
