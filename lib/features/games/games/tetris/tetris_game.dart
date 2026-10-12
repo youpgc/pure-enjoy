@@ -52,7 +52,7 @@ class TetrisGame extends StatefulWidget {
   State<TetrisGame> createState() => _TetrisGameState();
 }
 
-class _TetrisGameState extends State<TetrisGame> {
+class _TetrisGameState extends State<TetrisGame> with WidgetsBindingObserver {
   // ───────── 模式与配置（config 驱动，带默认兜底） ─────────
   late TetrisMode _mode;
   int _linesTarget = 0;
@@ -116,6 +116,16 @@ class _TetrisGameState extends State<TetrisGame> {
   Timer? _flashTimer; // 消行闪烁动画（90ms × 4 相位）
   int _lockResets = 0;
   int _lastTickSecond = -1;
+
+  /// 暂停起始时刻（null=未暂停；2026-10-12 用户需求：结算钮下方暂停钮）。
+  /// 暂停冻结全部游戏计时：周期 Timer 取消，截线制时刻（[_startTime] 倒计时/
+  /// 用时、[_garbageNextPushAt] 顶起点、[_slowUntil] 时缓截止）在恢复时统一
+  /// 平移暂停时长——暂停期间时间不流逝。
+  DateTime? _pausedAt;
+  bool get _isPaused => _pausedAt != null;
+
+  /// 暂停感知「当前时刻」：暂停期间冻结在暂停点，倒计时类 HUD 读它不流逝。
+  DateTime get _now => _isPaused ? _pausedAt! : DateTime.now();
 
   /// 消行闪烁动画：正在闪烁的满行行号 + 当前相位（0..3，亮暗交替）
   List<int> _flashRows = <int>[];
@@ -215,6 +225,7 @@ class _TetrisGameState extends State<TetrisGame> {
   @override
   void initState() {
     super.initState();
+    WidgetsBinding.instance.addObserver(this); // 切后台自动暂停
     _startTime = DateTime.now();
     _parseModeAndConfig();
     _reset();
@@ -309,6 +320,7 @@ class _TetrisGameState extends State<TetrisGame> {
     _lastGarbageHole = -1;
     _slowUntil = null; // 时缓不跨局（重开后重力间隔恢复原速）
     _goalReached = false; // 延迟结算状态不跨局
+    _pausedAt = null; // 暂停态不跨局
     _bossHp = _bossMaxHp; // Boss 血量每局回满
     _startTime = DateTime.now();
     // dig：先预填垃圾行再落首块（board 为空，直接写底部）
@@ -334,6 +346,7 @@ class _TetrisGameState extends State<TetrisGame> {
         _garbageTimer?.cancel();
         return;
       }
+      if (_isPaused) return; // 暂停冻结（防御未在册重建，恢复时整体替换）
       _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
       if (!_pushGarbageRow()) {
         _onBlockOut();
@@ -373,6 +386,7 @@ class _TetrisGameState extends State<TetrisGame> {
         timer.cancel();
         return;
       }
+      if (_isPaused) return; // 暂停冻结（恢复时整体重启）
       if (_timeLimit != null && _remainingSeconds() <= 0) {
         _finish(_scoreTarget > 0 && _score >= _scoreTarget,
             reason: '时间到');
@@ -386,23 +400,76 @@ class _TetrisGameState extends State<TetrisGame> {
     });
   }
 
+  // ───────── 暂停 / 恢复（2026-10-12 用户需求） ─────────
+
+  /// 暂停对局：取消全部周期 Timer；消行闪烁 Timer 保留但回调按 [_isPaused]
+  /// 冻结（删行/计分/补块链不推进，恢复后动画续播）。截线制时刻在恢复时
+  /// 统一平移，见 [_resumeGame]。
+  void _pauseGame() {
+    if (_finished || _isPaused || !mounted) return;
+    _pausedAt = DateTime.now();
+    _gravityTimer?.cancel();
+    _cancelLockTimer();
+    _tickTimer?.cancel();
+    _garbageTimer?.cancel();
+    if (mounted) setState(() {});
+  }
+
+  /// 恢复对局：暂停时长从全部截线制时刻中扣除（暂停不流逝）——blitz 倒计时
+  /// 与结算用时（[_startTime] 基准）、survival 顶起点（[_garbageNextPushAt]）、
+  /// 时缓卡截止（[_slowUntil]）。
+  void _resumeGame() {
+    if (_finished || !_isPaused || !mounted) return;
+    final paused = DateTime.now().difference(_pausedAt!);
+    _pausedAt = null;
+    _startTime = _startTime.add(paused);
+    _garbageNextPushAt = _garbageNextPushAt.add(paused);
+    _slowUntil = _slowUntil?.add(paused);
+    _restartGravityTimer();
+    _startTickTimer();
+    _resumeGarbageTimer();
+    // 暂停时已触底：锁定延迟冻结重启（悬空则由重力 tick 自然接管）
+    if (_current != null && _isResting) _startLockTimer();
+    if (mounted) setState(() {});
+  }
+
+  void _togglePause() => _isPaused ? _resumeGame() : _pauseGame();
+
+  /// survival 顶起定时器恢复：按暂停冻结的剩余时间接续首个顶起点（暂停不
+  /// 白送新周期），其后交回 [_startGarbageTimer] 恒定周期。
+  void _resumeGarbageTimer() {
+    _garbageTimer?.cancel();
+    if (_garbageInterval <= 0 || _finished) return;
+    final remain = _garbageNextPushAt.difference(DateTime.now());
+    _garbageTimer = Timer(remain.isNegative ? Duration.zero : remain, () {
+      if (_finished || _isPaused) return;
+      _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
+      if (!_pushGarbageRow()) {
+        _onBlockOut();
+        return;
+      }
+      _startGarbageTimer();
+    });
+  }
+
   /// HUD 秒级刷新值：限时模式=剩余秒；survival=顶起倒计时秒；其余=0（不刷新）。
   int _hudSecond() {
     if (_timeLimit != null) return _remainingSeconds();
     if (_garbageInterval > 0) {
-      return _garbageNextPushAt.difference(DateTime.now()).inSeconds;
+      return _garbageNextPushAt.difference(_now).inSeconds;
     }
     return 0;
   }
 
   int _remainingSeconds() {
     if (_timeLimit == null) return 0;
-    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
+    final elapsed = _now.difference(_startTime).inMilliseconds;
     return max(0, _timeLimit! - elapsed ~/ 1000);
   }
 
   @override
   void dispose() {
+    WidgetsBinding.instance.removeObserver(this);
     _gravityTimer?.cancel();
     _cancelLockTimer();
     _tickTimer?.cancel();
@@ -411,11 +478,21 @@ class _TetrisGameState extends State<TetrisGame> {
     super.dispose();
   }
 
+  @override
+  void didChangeAppLifecycleState(AppLifecycleState state) {
+    super.didChangeAppLifecycleState(state);
+    // 切后台自动暂停：倒计时为截线制，后台不暂停时间会照常流逝
+    if (state == AppLifecycleState.paused || state == AppLifecycleState.hidden) {
+      _pauseGame();
+    }
+  }
+
   // ───────── 结束 / 结算 ─────────
 
   void _finish(bool cleared, {String? reason}) {
     if (_finished) return;
     _finished = true;
+    _pausedAt = null; // 结束即脱离暂停态（恢复路径全部失效）
     _gravityTimer?.cancel();
     _cancelLockTimer();
     _tickTimer?.cancel();
@@ -527,9 +604,9 @@ class _TetrisGameState extends State<TetrisGame> {
         if (_garbageInterval > 0)
           GameStatusItem(
             label: '顶起倒计时',
-            value: '${max(0, _garbageNextPushAt.difference(DateTime.now()).inSeconds)}s',
+            value: '${max(0, _garbageNextPushAt.difference(_now).inSeconds)}s',
             valueColor:
-                _garbageNextPushAt.difference(DateTime.now()).inSeconds <= 3
+                _garbageNextPushAt.difference(_now).inSeconds <= 3
                     ? const Color(0xFFE53935)
                     : null,
           ),
@@ -575,6 +652,8 @@ class _TetrisGameState extends State<TetrisGame> {
                               children: <Widget>[
                                 _buildGestureBoard(),
                                 if (_fxMessages.isNotEmpty) _buildFxOverlay(),
+                                // 暂停浮层置顶（盖住棋盘与 fx，右列按钮不受影响）
+                                if (_isPaused) _buildPauseOverlay(),
                               ],
                             ),
                           ),

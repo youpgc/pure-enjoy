@@ -58,10 +58,10 @@ extension _TetrisBoardOps on _TetrisGameState {
   }
 
   /// 顶部预览条：Hold 槽 + Next×N。
-  /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开小圆钮。
+  /// 右列（深色容器内）：Hold 暂存 + Next×3 竖排 + 重开/结算/暂停圆钮。
   Widget _buildRightColumn() {
-    // 结算钮底边与「棋盘游戏容器」底边持平（2026-10-11 口径：不是整个深色
-    // 背景容器）：棋盘在中间区垂直居中，底边距 = (行高 - 棋盘高) / 2。
+    // 列底边（暂停钮）与「棋盘游戏容器」底边持平（2026-10-11 口径：不是
+    // 整个深色背景容器）：棋盘在中间区垂直居中，底边距 = (行高 - 棋盘高) / 2。
     // cell 由棋盘的 LayoutBuilder 在同帧先布局算出（Row 子级按序布局），
     // 此处直接读 _cellExtent 即为本帧值；棋盘占满高度时 gap=0 退化为贴底。
     return LayoutBuilder(
@@ -102,12 +102,93 @@ extension _TetrisBoardOps on _TetrisGameState {
           _buildRestartButton(),
           const SizedBox(height: 20),
           // 延迟结算（2026-10-10）：确认结算恒显示——达成通关条件高亮可点，
-          // 未达成禁用置灰；在重开钮下方间隔 20px，底边与棋盘容器底边持平
+          // 未达成禁用置灰；重开钮下方间隔 20px
           _buildConfirmSettleButton(),
+          // 暂停钮（2026-10-12 用户需求）：结算钮下方，接管列底边贴齐
+          const SizedBox(height: 16),
+          _buildPauseButton(),
         ],
           ),
         );
       },
+    );
+  }
+
+  /// 「暂停/继续」圆钮（重开钮同款深底灰图标）：对局中切换暂停态。
+  /// 暂停中图标切播放，与棋盘浮层（点任意处继续）双入口。
+  Widget _buildPauseButton() {
+    final paused = _isPaused;
+    return Tooltip(
+      message: paused ? '继续' : '暂停',
+      child: Material(
+        color: const Color(0xFF1E2230),
+        shape: const CircleBorder(),
+        child: InkWell(
+          customBorder: const CircleBorder(),
+          onTap: _finished ? null : _togglePause,
+          child: SizedBox(
+            width: 44,
+            height: 44,
+            child: Icon(
+              paused ? Icons.play_arrow : Icons.pause,
+              size: 24,
+              color: paused ? const Color(0xFFFFD54F) : const Color(0xFF8A8FA3),
+            ),
+          ),
+        ),
+      ),
+    );
+  }
+
+  /// 暂停浮层：盖住棋盘区（右列结算/重开/暂停钮仍可点），点任意处继续。
+  Widget _buildPauseOverlay() {
+    return Positioned.fill(
+      child: Material(
+        color: Colors.black.withValues(alpha: 0.62),
+        child: InkWell(
+          onTap: _resumeGame,
+          child: Center(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: <Widget>[
+                const Icon(Icons.pause_circle_outline,
+                    size: 56, color: Color(0xFFFFD54F)),
+                const SizedBox(height: 12),
+                const Text('已暂停',
+                    style: TextStyle(
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.white)),
+                const SizedBox(height: 20),
+                Material(
+                  color: Colors.transparent,
+                  child: InkWell(
+                    borderRadius: BorderRadius.circular(22),
+                    onTap: _resumeGame,
+                    child: Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 24, vertical: 10),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(22),
+                        gradient: const LinearGradient(
+                          begin: Alignment.topCenter,
+                          end: Alignment.bottomCenter,
+                          colors: <Color>[Color(0xFFFFD54F), Color(0xFFFFB300)],
+                        ),
+                      ),
+                      child: const Text('继续游戏',
+                          style: TextStyle(
+                              fontSize: 14,
+                              fontWeight: FontWeight.bold,
+                              color: Color(0xFF5D4037))),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+      ),
     );
   }
 

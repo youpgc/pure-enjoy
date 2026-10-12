@@ -17,7 +17,7 @@ extension _TetrisInputOps on _TetrisGameState {
         _dragDy = 0;
       },
       onPanUpdate: (d) {
-        if (_finished || _current == null) return;
+        if (_finished || _isPaused || _current == null) return;
         _dragDx += d.delta.dx;
         _dragDy += d.delta.dy;
         // 水平：每跨过一格宽度移动一步（拖动跟随，可一次跨多格）
@@ -49,8 +49,9 @@ extension _TetrisInputOps on _TetrisGameState {
   /// config `buttons:false` 时整行不渲染。
   Widget _buildControlBar() {
     if (!_buttonsEnabled) return const SizedBox.shrink();
+    final blocked = _finished || _isPaused; // 对局结束/暂停：整行禁用
     final canHold =
-        _holdEnabled && !_holdUsed && _current != null && !_finished;
+        _holdEnabled && !_holdUsed && _current != null && !blocked;
     Widget cell(Widget child) => Expanded(
           child: Padding(
             padding: const EdgeInsets.symmetric(horizontal: 2),
@@ -67,7 +68,7 @@ extension _TetrisInputOps on _TetrisGameState {
               icon: Icons.rotate_right,
               label: '旋转',
               primary: true,
-              onTap: _finished ? null : () => _rotatePiece(1),
+              onTap: blocked ? null : () => _rotatePiece(1),
             )),
             cell(_TetrisActionButton(
               icon: Icons.swap_vert_circle_outlined,
@@ -78,21 +79,21 @@ extension _TetrisInputOps on _TetrisGameState {
             cell(_TetrisActionButton(
               icon: Icons.arrow_back,
               label: '左移',
-              onTap: _finished ? null : () => _moveHorizontal(-1),
-              repeatStep: _finished ? null : () => _moveHorizontal(-1),
+              onTap: blocked ? null : () => _moveHorizontal(-1),
+              repeatStep: blocked ? null : () => _moveHorizontal(-1),
             )),
             cell(_TetrisActionButton(
               icon: Icons.arrow_downward,
               label: '软降',
-              onTap: _finished ? null : _softDropStep,
-              repeatStep: _finished ? null : _softDropStep,
+              onTap: blocked ? null : _softDropStep,
+              repeatStep: blocked ? null : _softDropStep,
               repeatInterval: const Duration(milliseconds: 60),
             )),
             cell(_TetrisActionButton(
               icon: Icons.arrow_forward,
               label: '右移',
-              onTap: _finished ? null : () => _moveHorizontal(1),
-              repeatStep: _finished ? null : () => _moveHorizontal(1),
+              onTap: blocked ? null : () => _moveHorizontal(1),
+              repeatStep: blocked ? null : () => _moveHorizontal(1),
             )),
           ],
         ),

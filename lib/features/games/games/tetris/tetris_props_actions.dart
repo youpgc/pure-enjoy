@@ -7,9 +7,10 @@ part of 'tetris_game.dart';
 // （part+extension 内调宿主 setState 属 analyzer 已知误报，g2048 同款处理）
 
 extension _TetrisPropsActionsOps on _TetrisGameState {
-  /// 时缓卡生效截止时刻（null=未生效）
+  /// 时缓卡生效截止时刻（null=未生效；读暂停感知 [_TetrisGameState._now]，
+  /// 暂停期间效果不流逝）
   bool get _isSlowed =>
-      _slowUntil != null && DateTime.now().isBefore(_slowUntil!);
+      _slowUntil != null && _now.isBefore(_slowUntil!);
 
   /// 载入道具目录/库存（initState 调用，失败不影响对局）
   Future<void> _loadProps() async {
@@ -322,7 +323,7 @@ extension _TetrisPropsActionsOps on _TetrisGameState {
 
   /// 使用道具：确认弹窗 → 引擎执行 → 成功才扣券（两段式延迟扣券）。
   Future<void> _useProp(TetrisPropSlot s) async {
-    if (_finished || !s.available) return;
+    if (_finished || _isPaused || !s.available) return;
     // 消行闪烁动画中禁止使用（laser/quake 与动画后的删行会并发冲突）
     if (_flashTimer != null || _flashRows.isNotEmpty) return;
     final label = (s.item?.name.isNotEmpty ?? false)

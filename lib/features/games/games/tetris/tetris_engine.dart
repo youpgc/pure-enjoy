@@ -203,7 +203,9 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 横移一格（按钮/手势）；成功返回 true。
   bool _moveHorizontal(int dx) {
     final p = _current;
-    if (p == null || _finished || _collides(p, dx, 0)) return false;
+    if (p == null || _finished || _isPaused || _collides(p, dx, 0)) {
+      return false;
+    }
     p.x += dx;
     _lastAction = _TetrisAction.move;
     _afterSuccessfulShift();
@@ -215,7 +217,7 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// SRS 旋转（O 恒成功但不计入 T-Spin 末态）。
   bool _rotatePiece(int dir) {
     final p = _current;
-    if (p == null || _finished) return false;
+    if (p == null || _finished || _isPaused) return false;
     if (p.type == Tetromino.O) {
       GameAudio.instance.rotate();
       return true;
@@ -266,7 +268,7 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 重块特殊：每 tick 额外再下移 1 格（等效 ×2 速，与宿主 0.4 间隔系数
   /// 叠加≈快速下沉）。
   void _gravityTick() {
-    if (_finished || _current == null) return;
+    if (_finished || _isPaused || _current == null) return;
     if (!_isResting) {
       _current!.y++;
       if (_current!.special == TetrisSpecial.weight &&
@@ -284,7 +286,7 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 硬降：直达 ghost 位并立即锁定（+2 分/格）。
   void _hardDrop() {
     final p = _current;
-    if (p == null || _finished) return;
+    if (p == null || _finished || _isPaused) return;
     final gy = _ghostY();
     final dist = gy - p.y;
     if (dist > 0) {
@@ -300,7 +302,7 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 软降一步（按钮/按住手势）：能下移则 +1 分；触底则交给 lock delay。
   void _softDropStep() {
     final p = _current;
-    if (p == null || _finished) return;
+    if (p == null || _finished || _isPaused) return;
     if (!_isResting) {
       p.y++;
       _score += 1;
@@ -331,7 +333,9 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// Hold：落地前每块仅一次；有暂存则交换，无暂存则取队列头。
   void _holdPiece() {
     final p = _current;
-    if (p == null || _finished || !_holdEnabled || _holdUsed) return;
+    if (p == null || _finished || !_holdEnabled || _holdUsed || _isPaused) {
+      return;
+    }
     _cancelLockTimer();
     _lockResets = 0;
     final held = _held;
@@ -403,7 +407,7 @@ extension _TetrisEngineOps on _TetrisGameState {
   /// 无消行走原路径直接结算。
   void _lockPiece() {
     final p = _current;
-    if (p == null || _finished) return;
+    if (p == null || _finished || _isPaused) return;
     final spin = _detectTSpin(p);
     for (final c in _kCells[p.type]![p.rot]) {
       final r = p.y + c.y;
@@ -453,6 +457,7 @@ extension _TetrisEngineOps on _TetrisGameState {
       if (mounted) setState(() {});
       _flashTimer?.cancel();
       _flashTimer = Timer.periodic(const Duration(milliseconds: 90), (t) {
+        if (_isPaused) return; // 暂停冻结闪烁相位（恢复后续播，不推进删行链）
         _flashPhase++;
         if (_flashPhase >= 4) {
           t.cancel();
