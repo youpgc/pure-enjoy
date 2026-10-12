@@ -185,8 +185,10 @@ extension _TetrisEngineOps on _TetrisGameState {
     return _board[row][col] != null;
   }
 
-  bool _collides(Piece p, int dx, int dy) {
-    for (final c in _kCells[p.type]![p.rot]) {
+  /// 格碰撞检测；[rot] 缺省用当前朝向，旋转预检必须传目标朝向——
+  /// 用旧朝向测通过、应用新朝向后会压进已占格（穿模/锁定覆盖他人）。
+  bool _collides(Piece p, int dx, int dy, {int? rot}) {
+    for (final c in _kCells[p.type]![rot ?? p.rot]) {
       if (_cellBlocked(p.y + c.y + dy, p.x + c.x + dx)) return true;
     }
     return false;
@@ -227,7 +229,8 @@ extension _TetrisEngineOps on _TetrisGameState {
         const <Point<int>>[];
     for (var i = 0; i < kicks.length; i++) {
       final k = kicks[i];
-      if (!_collides(p, k.x, k.y)) {
+      // 按旋转后的目标朝向检测（rot: to），旧朝向会误判通过
+      if (!_collides(p, k.x, k.y, rot: to)) {
         p.rot = to;
         p.x += k.x;
         p.y += k.y;
