@@ -133,9 +133,14 @@ class BackendResult {
     this.statusCode = 0,
   });
 
-  /// 分页数据便捷取列表（data['list']）
-  List<dynamic> get list =>
-      data is Map<String, dynamic> ? (data['list'] as List<dynamic>? ?? []) : [];
+  /// 数据列表便捷取值：分页端点取 data['list']；纯数组端点（如 /users/me/avatars）取 data 本身
+  List<dynamic> get list {
+    if (data is List) return data as List<dynamic>;
+    if (data is Map<String, dynamic>) {
+      return (data['list'] as List<dynamic>? ?? []);
+    }
+    return [];
+  }
 
   /// 分页数据便捷取总数
   int get total =>
