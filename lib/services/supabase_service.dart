@@ -7,7 +7,7 @@ library;
 import './supabase_config.dart';
 import './session_manager.dart';
 import './auth_api.dart';
-import './api_client.dart';
+import './backend_api.dart';
 import './http_client.dart';
 import '../utils/cache_helper.dart';
 import './notification_service.dart';
@@ -324,31 +324,25 @@ class AuthService {
     if (user == null) return false;
 
     // 同步 users 表积分统计到会话缓存，使 currentPoints 与事实一致
+    // change-server：改走后端 /users/me（档案 VO 含 points/available_points/avatar_url；
+    // effective_points 后端不下发，以 available_points 同值填充保持缓存键兼容）
     try {
       final userId = _session.currentUserId;
       if (userId != null) {
-        final statsRes = await ApiClient.get(
-          'users',
-          filters: {
-            'id': 'eq.$userId',
-            'is_deleted': 'eq.false',
-          },
-          columns:
-              'id,points,available_points,effective_points,expiring_points,avatar_url',
-          limit: 1,
-        );
-        if (statsRes.isSuccess &&
-            statsRes.data != null &&
-            statsRes.data!.isNotEmpty) {
-          final row = statsRes.data![0];
+        final statsRes = await BackendApi.get('/users/me');
+        if (statsRes.success && statsRes.data is Map<String, dynamic>) {
+          final row = statsRes.data as Map<String, dynamic>;
+          final available =
+              (row['available_points'] as num?)?.toInt() ?? 0;
           final metadata = Map<String, dynamic>.from(
             user['user_metadata'] as Map<dynamic, dynamic>? ?? {},
           );
           metadata['points'] = row['points'] ?? metadata['points'];
-          metadata['available_points'] = row['available_points'];
-          metadata['effective_points'] = row['effective_points'];
-          metadata['expiring_points'] = row['expiring_points'];
-          // 同步头像URL（public.users.avatar_url），修复"我的"页头像已上传却不渲染
+          metadata['available_points'] = available;
+          metadata['effective_points'] = available;
+          // expiring_points 档案 VO 不含，保留 metadata 原值（积分页以概览端点为准）
+          metadata['expiring_points'] = metadata['expiring_points'] ?? 0;
+          // 同步头像URL（users.avatar_url），修复"我的"页头像已上传却不渲染
           metadata['avatar_url'] = row['avatar_url'] ?? metadata['avatar_url'];
           user['user_metadata'] = metadata;
           await _session.updateAuthUser(user);

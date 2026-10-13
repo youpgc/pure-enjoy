@@ -4,7 +4,7 @@ import 'package:image_picker/image_picker.dart';
 import '../../../../core/widgets/widgets.dart';
 import '../../../../services/storage_service.dart';
 import '../../../../config.dart';
-import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../../../services/supabase_service.dart';
 import '../avatar_crop_screen.dart';
 import '../avatar_preset/avatar_preset_page.dart';
@@ -80,23 +80,15 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       }
       _userId = userId;
 
-      final result = await ApiClient.get(
-        'users',
-        filters: {
-          'id': 'eq.$userId',
-          'is_deleted': 'eq.false',
-        },
-      );
+      // change-server：改走后端档案端点（/users/me），字段键与旧 users 行一致
+      final result = await BackendApi.get('/users/me');
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        if (data.isNotEmpty) {
-          if (!mounted) return;
-          setState(() {
-            _userData = data.first;
-            _initializeControllers();
-          });
-        }
+      if (result.success && result.data is Map<String, dynamic>) {
+        if (!mounted) return;
+        setState(() {
+          _userData = result.data as Map<String, dynamic>;
+          _initializeControllers();
+        });
       } else {
         _showError('加载用户数据失败: ${result.statusCode}');
       }
@@ -194,72 +186,35 @@ class _EditProfileScreenState extends State<EditProfileScreen>
       final newUsername = _usernameController.text.trim();
       final newPhone = _phoneController.text.trim();
 
-      // 校验用户名唯一性（排除当前用户）
-      if (newUsername.isNotEmpty && newUsername != (_userData?['username'] ?? '')) {
-        final checkResult = await ApiClient.get(
-          'users',
-          filters: {
-            'username': 'eq.$newUsername',
-            'id': 'neq.$_userId',
-            'is_deleted': 'eq.false',
-          },
-          limit: 1,
-        );
-        if (checkResult.isSuccess && (checkResult.data?.isNotEmpty ?? false)) {
-          _showError('用户名已被其他用户使用');
-          setState(() => _isSaving = false);
-          return;
-        }
-      }
-
-      // 校验手机号唯一性（排除当前用户）
-      if (newPhone.isNotEmpty && newPhone != (_userData?['phone'] ?? '')) {
-        final checkResult = await ApiClient.get(
-          'users',
-          filters: {
-            'phone': 'eq.$newPhone',
-            'id': 'neq.$_userId',
-            'is_deleted': 'eq.false',
-          },
-          limit: 1,
-        );
-        if (checkResult.isSuccess && (checkResult.data?.isNotEmpty ?? false)) {
-          _showError('手机号已被其他用户使用');
-          setState(() => _isSaving = false);
-          return;
-        }
-      }
+      // 用户名 / 手机号唯一性由后端 PUT /users/me 服务层校验（冲突返回 400 文案）
 
       final heightText = _heightController.text.trim();
-      final updateData = {
+      final updateData = <String, dynamic>{
         'nickname': _nicknameController.text.trim(),
         'email': _emailController.text.trim(),
         'phone': newPhone,
         'username': newUsername,
         'bio': _bioController.text.trim(),
         'location': _locationController.text.trim(),
-        'birthday': _birthdayController.text.trim(),
-        'height': heightText.isNotEmpty ? double.tryParse(heightText) : null,
+        // 后端 birthday 为 LocalDate，空串不传（未设置生日时保持原值）
+        if (_birthdayController.text.trim().isNotEmpty)
+          'birthday': _birthdayController.text.trim(),
+        if (heightText.isNotEmpty) 'height': double.tryParse(heightText),
         'gender': _gender ?? '保密',
         'occupation': _occupationController.text.trim(),
         'company': _companyController.text.trim(),
         'website': _websiteController.text.trim(),
-        'updated_at': DateTime.now().toUtc().toIso8601String(),
       };
 
-      final result = await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$_userId'},
-        body: updateData,
-      );
+      final result = await BackendApi.put('/users/me', body: updateData);
 
-      if (result.isSuccess) {
+      if (result.success) {
         if (mounted) {
           showSnackBar(context, '保存成功');
           Navigator.pop(context, true);
         }
       } else {
-        _showError('保存失败: ${result.statusCode}');
+        _showError(result.error ?? '保存失败: ${result.statusCode}');
       }
     } catch (e) {
       _showError('保存失败，请稍后重试');

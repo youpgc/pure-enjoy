@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
-import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../models/feedback_model.dart';
 import './feedback_detail_content.dart';
 
@@ -26,16 +26,18 @@ class _FeedbackDetailScreenState extends State<FeedbackDetailScreen> {
 
   Future<void> _loadFlowRecords() async {
     try {
-      final result = await ApiClient.get(
-        'feedback_flow_records',
-        filters: {'feedback_id': 'eq.${widget.feedback.id}'},
-        order: 'created_at.desc',
+      // change-server：改走后端反馈详情端点，流转记录随详情一并返回（VO.flow）
+      final result = await BackendApi.get(
+        '/users/feedbacks/${widget.feedback.id}',
       );
 
       if (!mounted) return;
-      if (result.isSuccess) {
+      if (result.success && result.data is Map<String, dynamic>) {
+        final flow =
+            (result.data as Map<String, dynamic>)['flow'] as List<dynamic>? ??
+                [];
         setState(() {
-          _flowRecords = result.data!;
+          _flowRecords = flow.cast<Map<String, dynamic>>();
           _loadingFlow = false;
         });
       } else {

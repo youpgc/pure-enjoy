@@ -48,17 +48,13 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
         contentType: 'image/png',
       );
 
-      // 更新用户头像URL
-      final updateResult = await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$_userId'},
-        body: {
-          'avatar_url': publicUrl,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
+      // 更新用户头像URL（change-server：走后端档案端点）
+      final updateResult = await BackendApi.put(
+        '/users/me',
+        body: {'avatar_url': publicUrl},
       );
 
-      if (updateResult.isSuccess) {
+      if (updateResult.success) {
         setState(() => _avatarUrl = publicUrl);
         // 同步会话缓存，确保“我的”页即时刷新
         await AuthService.instance.reloadCurrentUser();
@@ -88,15 +84,11 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
 
     setState(() => _isUploadingAvatar = true);
     try {
-      final updateResult = await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$_userId'},
-        body: {
-          'avatar_url': selected,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
+      final updateResult = await BackendApi.put(
+        '/users/me',
+        body: {'avatar_url': selected},
       );
-      if (updateResult.isSuccess) {
+      if (updateResult.success) {
         setState(() => _avatarUrl = selected);
         await AuthService.instance.reloadCurrentUser();
         if (mounted) showSnackBar(context, '已选择预设头像');
@@ -131,15 +123,11 @@ mixin _EditProfileAvatarMixin on State<EditProfileScreen> {
     if (_userId == null) return;
     setState(() => _isUploadingAvatar = true);
     try {
-      final updateResult = await ApiClient.patchByFilter(
-        'users',
-        filters: {'id': 'eq.$_userId'},
-        body: {
-          'avatar_url': url,
-          'updated_at': DateTime.now().toUtc().toIso8601String(),
-        },
+      final updateResult = await BackendApi.put(
+        '/users/me',
+        body: {'avatar_url': url},
       );
-      if (updateResult.isSuccess) {
+      if (updateResult.success) {
         setState(() => _avatarUrl = url);
         await AuthService.instance.reloadCurrentUser();
         if (mounted) showSnackBar(context, successMsg);

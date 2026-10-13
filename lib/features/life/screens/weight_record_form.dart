@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:uuid/uuid.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/weight_record_model.dart';
 import '../widgets/app_date_picker.dart';
@@ -59,17 +59,14 @@ class RecordFormState extends State<RecordForm> {
   }
 
   /// 加载用户资料（身高、生日、性别），用于自动计算 BMI/体脂率
+  /// change-server：改走后端 /users/me
   Future<void> _loadUserProfile() async {
     try {
       final userId = AuthService.instance.currentUserId;
       if (userId == null) return;
-      final result = await ApiClient.get(
-        'users',
-        filters: {'id': 'eq.$userId', 'is_deleted': 'eq.false'},
-        limit: 1,
-      );
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final user = result.data!.first;
+      final result = await BackendApi.get('/users/me');
+      if (result.success && result.data is Map<String, dynamic>) {
+        final user = result.data as Map<String, dynamic>;
         setState(() {
           _userHeight = user['height'] != null ? (user['height'] as num).toDouble() : null;
           _userGender = user['gender'] as String?;

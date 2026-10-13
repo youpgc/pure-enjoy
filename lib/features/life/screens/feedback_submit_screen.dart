@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/sensitive_word_service.dart';
 import '../../../services/dict_service.dart';
@@ -46,7 +46,6 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     if (!_formKey.currentState!.validate()) return;
 
     final userId = AuthService.instance.currentUserId;
-    final userNickname = AuthService.instance.currentUserName;
     if (userId == null) {
       showSnackBar(context, '请先登录', isError: true);
       return;
@@ -66,28 +65,26 @@ class _FeedbackSubmitScreenState extends State<FeedbackSubmitScreen> {
     }
 
     try {
-      final result = await ApiClient.post(
-        'user_feedback',
-        {
-          'user_id': userId,
-          'user_nickname': userNickname,
+      // change-server：改走后端反馈端点（user_id/昵称由后端登录态推导）
+      final result = await BackendApi.post(
+        '/users/feedbacks',
+        body: {
           'title': titleResult.processedText,
           'description': _descController.text.trim().isEmpty
               ? null
               : descResult!.processedText,
           'category': _category,
-          'status': 'pending',
         },
       );
 
-      if (result.isSuccess) {
+      if (result.success) {
         EventBus.instance.fire(EventType.feedbackUpdated);
         if (mounted) {
           showSnackBar(context, '反馈提交成功');
           Navigator.pop(context);
         }
       } else {
-        throw Exception(result.errorMessage ?? '提交失败');
+        throw Exception(result.error ?? '提交失败');
       }
     } catch (e) {
       if (mounted) {

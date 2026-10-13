@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../services/supabase_service.dart';
-import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../services/horoscope_service.dart';
 
 /// 欢迎区块组件
@@ -28,27 +28,16 @@ class _WelcomeSectionState extends State<WelcomeSection> {
   }
 
   Future<void> _load() async {
-    // 生日存在 public.users 表，不在 Auth 用户对象里，必须从 users 表查询
-    final userId = AuthService.instance.currentUserId;
+    // 生日存在 users 表，不在 Auth 用户对象里，必须从档案接口读取
+    // change-server：改走后端 /users/me
     String? birthday;
-    if (userId != null) {
-      try {
-        final result = await ApiClient.get(
-          'users',
-          filters: {
-            'id': 'eq.$userId',
-            'is_deleted': 'eq.false',
-          },
-          limit: 1,
-        );
-        if (result.isSuccess &&
-            result.data != null &&
-            result.data!.isNotEmpty) {
-          birthday = result.data!.first['birthday'] as String?;
-        }
-      } catch (_) {
-        // 查询失败：静默降级
+    try {
+      final result = await BackendApi.get('/users/me');
+      if (result.success && result.data is Map<String, dynamic>) {
+        birthday = (result.data as Map<String, dynamic>)['birthday'] as String?;
       }
+    } catch (_) {
+      // 查询失败：静默降级
     }
 
     if (kDebugMode && birthday == null) {

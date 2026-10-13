@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart';
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/dict_service.dart';
 import '../../../core/theme/app_theme.dart';
@@ -68,20 +68,22 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
 
     try {
       final (limit, offset) = paginationParams;
+      final page = (offset ~/ limit) + 1;
 
-      final result = await ApiClient.get(
-        'user_feedback',
-        filters: {
-          'user_id': 'eq.$userId',
-          'is_deleted': 'eq.false',
-        },
-        order: 'created_at.desc',
-        limit: limit,
-        offset: offset,
+      // change-server：改走后端反馈列表端点（user_id 由登录态推导）
+      final result = await BackendApi.get(
+        '/users/feedbacks',
+        query: {'page': '$page', 'page_size': '$limit'},
       );
 
-      if (result.isSuccess) {
-        final feedbacks = result.data!.map((e) => FeedbackModel.fromJson(e)).toList();
+      if (result.success) {
+        final feedbacks = result.list
+            .map((e) => FeedbackModel.fromJson({
+                  ...(e as Map<String, dynamic>),
+                  // 后端 VO 不含 user_id，补当前用户以兼容 FeedbackModel 必填字段
+                  'user_id': userId,
+                }))
+            .toList();
         if (mounted) {
           setState(() {
             if (refresh) {
@@ -94,7 +96,7 @@ class _FeedbackListScreenState extends State<FeedbackListScreen> with PaginatedL
           });
         }
       } else {
-        throw Exception(result.errorMessage ?? '请求失败');
+        throw Exception(result.error ?? '请求失败');
       }
     } catch (e) {
       if (mounted) {

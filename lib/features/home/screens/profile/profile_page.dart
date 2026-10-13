@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import '../../../../services/supabase_service.dart';
-import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../../profile/services/point_service.dart';
 import '../../../games/services/achievement_service.dart';
 import '../../../games/screens/achievement_list_screen.dart';
@@ -122,25 +122,15 @@ class _ProfilePageState extends State<ProfilePage> {
       if (kDebugMode) debugPrint('读取成就数失败: $e');
     }
 
-    // 直接读取 users 表 avatar_url（与「编辑资料」页同源），确保头像可靠显示，
+    // 直接读取档案 avatar_url（与「编辑资料」页同源），确保头像可靠显示，
     // 不依赖 auth user_metadata 的异步同步（该同步偶发未及时完成，导致显示默认头像）。
+    // change-server：改走后端 /users/me
     String? avatarUrl = SupabaseService.instance.currentUserAvatar;
     try {
-      final userId = SupabaseService.instance.currentUserId;
-      if (userId != null) {
-        final res = await ApiClient.get(
-          'users',
-          filters: {
-            'id': 'eq.$userId',
-            'is_deleted': 'eq.false',
-          },
-          columns: 'avatar_url',
-          limit: 1,
-        );
-        if (res.isSuccess && res.data != null && res.data!.isNotEmpty) {
-          final v = res.data![0]['avatar_url'];
-          if (v != null && v is String && v.isNotEmpty) avatarUrl = v;
-        }
+      final res = await BackendApi.get('/users/me');
+      if (res.success && res.data is Map<String, dynamic>) {
+        final v = (res.data as Map<String, dynamic>)['avatar_url'];
+        if (v != null && v is String && v.isNotEmpty) avatarUrl = v;
       }
     } catch (e) {
       if (kDebugMode) debugPrint('读取用户头像失败: $e');
