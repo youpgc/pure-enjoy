@@ -2,17 +2,18 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/supabase_service.dart';
-import '../../../../services/api_client.dart';
 import '../../../../core/utils/event_bus.dart';
 import '../../widgets/app_date_picker.dart';
 import './expense_statistics_content.dart';
+import '../../../../services/backend_api.dart';
 
 /// 消费统计页面
 class ExpenseStatisticsScreen extends StatefulWidget {
   const ExpenseStatisticsScreen({super.key});
 
   @override
-  State<ExpenseStatisticsScreen> createState() => _ExpenseStatisticsScreenState();
+  State<ExpenseStatisticsScreen> createState() =>
+      _ExpenseStatisticsScreenState();
 }
 
 class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
@@ -30,8 +31,9 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
     _endMonth = DateTime.now();
     // 闭环修复：从统计页跳转到列表并编辑/删除记录后，列表会 fire(expenseUpdated)，
     // 统计页在路由栈底层需监听该事件以刷新饼图（否则返回后仍为旧聚合）。
-    _expenseSub =
-        EventBus.instance.on(EventType.expenseUpdated).listen((_) => _loadData());
+    _expenseSub = EventBus.instance
+        .on(EventType.expenseUpdated)
+        .listen((_) => _loadData());
     _loadData();
   }
 
@@ -56,19 +58,21 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
       final startOfRange = DateTime(_startMonth.year, _startMonth.month, 1);
       final firstOfNextMonth = DateTime(_endMonth.year, _endMonth.month + 1, 1);
 
-      final result = await ApiClient.get(
-        'expenses',
-        filters: {
-          'user_id': 'eq.$userId',
-          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfRange)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
+      // change-server: 后端语义化（日期区间，全量拉取用大 page_size）
+      final result = await BackendApi.get(
+        '/users/expenses',
+        query: {
+          'page': '1',
+          'page_size': '500',
+          'from': DateFormat('yyyy-MM-dd').format(startOfRange),
+          'to': DateFormat('yyyy-MM-dd')
+              .format(firstOfNextMonth.subtract(const Duration(days: 1))),
         },
-        order: 'date.desc',
-        limit: 500,
       );
 
       if (!mounted) return;
-      if (result.isSuccess) {
-        final List<dynamic> data = result.data!;
+      if (result.success) {
+        final List<dynamic> data = result.list.cast<Map<String, dynamic>>();
         setState(() {
           _expenses = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -143,7 +147,8 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
 
   String get _rangeText {
     final sameYear = _startMonth.year == _endMonth.year;
-    if (_startMonth.year == _endMonth.year && _startMonth.month == _endMonth.month) {
+    if (_startMonth.year == _endMonth.year &&
+        _startMonth.month == _endMonth.month) {
       return '${_startMonth.year}年${_startMonth.month}月';
     }
     if (sameYear) {

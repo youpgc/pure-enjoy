@@ -1,8 +1,7 @@
-import 'package:uuid/uuid.dart';
 import '../../../services/api_client.dart';
 import '../models/habit_model.dart';
 import '../models/reminder_schedule_model.dart';
-
+import '../../../services/backend_api.dart';
 /// 习惯页数据层：纯网络请求，不含任何 State/UI 逻辑。
 /// 从 [HabitsScreen] 抽离，降低单体文件体积（治理 §1.5.5 膨胀防御）。
 /// 行为与原内联实现逐字节等价。
@@ -29,26 +28,18 @@ Future<HabitPageBundle> fetchHabitPage({
   required int offset,
   required int limit,
 }) async {
-  final filters = <String, String>{
-    'user_id': 'eq.$userId',
-  };
-  if (filterStatus != null) {
-    filters['is_active'] = 'eq.$filterStatus';
+  // change-server: 后端语义化列表（归属由登录态注入，is_active 可选）
+  final habitsResult = await BackendApi.get('/users/habits', query: {
+    'page': '${offset ~/ limit + 1}',
+    'page_size': '$limit',
+    if (filterStatus != null) 'is_active': '$filterStatus',
+  });
+
+  if (!habitsResult.success) {
+    throw Exception(habitsResult.error ?? '加载习惯失败');
   }
 
-  final habitsResult = await ApiClient.get(
-    'habits',
-    filters: filters,
-    order: 'is_active.desc',
-    limit: limit,
-    offset: offset,
-  );
-
-  if (!habitsResult.isSuccess) {
-    throw Exception('HTTP ${habitsResult.statusCode}');
-  }
-
-  final habitsData = habitsResult.data!;
+  final habitsData = habitsResult.list;
   final items = habitsData.map((e) => HabitModel.fromJson(e)).toList();
   final rawHabits = habitsData.cast<Map<String, dynamic>>();
 
@@ -58,30 +49,34 @@ Future<HabitPageBundle> fetchHabitPage({
   if (items.isNotEmpty) {
     final habitIds = items.map((h) => h.id).join(',');
     final results = await Future.wait([
-      ApiClient.get(
-        'habit_checkins',
-        filters: {'habit_id': 'in.($habitIds)'},
-        order: 'checkin_at.desc',
-        // ★ 子查询禁止复用列表的 offset：此前 offset 随页码平移会跳过最近的
-        //   打卡记录，导致 isCheckedInToday/完成态基于截断数据误判（可重复打卡）。
-        //   limit 给显式大值（默认 defaultLimit=10 远不够）；叠加 DB 端
-        //   uq_habit_checkins_habit_bjday 每日唯一后，1000 条 ≈ 单习惯 1000 天。
-        limit: 1000,
+      // change-server: 跨习惯打卡走聚合端点（/users/habits/checkins，data 为行数组）
+      BackendApi.get(
+        '/users/habits/checkins',
+        query: {
+          'habit_ids': habitIds,
+          // ★ 不复用列表 offset：limit 给显式大值，叠加每日唯一约束
+          //   1000 条 ≈ 单习惯 1000 天。
+          'limit': '1000',
+        },
       ),
-      ApiClient.get(
-        'reminder_schedules',
-        filters: {'habit_id': 'in.($habitIds)'},
-        // 计划数 ≈ 习惯数，量级小，全量拉取
-        limit: null,
+      BackendApi.get(
+        '/users/reminder-schedules',
+        query: {
+          'habit_ids': habitIds,
+          // 计划数 ≈ 习惯数，量级小，全量拉取
+          'page': '1',
+          'page_size': '500',
+        },
       ),
     ]);
 
     final checkinsResult = results[0];
     final scheduleResult = results[1];
 
-    if (checkinsResult.isSuccess) {
-      for (final checkin in checkinsResult.data!) {
-        final model = HabitCheckinModel.fromJson(checkin);
+    if (checkinsResult.success) {
+      // checkinsByIds 的 data 直接是行数组
+      for (final checkin in checkinsResult.data as List<dynamic>) {
+        final model = HabitCheckinModel.fromJson(checkin as Map<String, dynamic>);
         history.putIfAbsent(model.habitId, () => []).add(model);
       }
     }
@@ -90,8 +85,8 @@ Future<HabitPageBundle> fetchHabitPage({
       history.putIfAbsent(habit.id, () => []);
     }
 
-    if (scheduleResult.isSuccess) {
-      for (final s in scheduleResult.data!) {
+    if (scheduleResult.success) {
+      for (final s in scheduleResult.list) {
         final model = ReminderScheduleModel.fromJson(s);
         schedules[model.habitId] = model;
       }
@@ -111,21 +106,16 @@ Future<HabitCheckinModel> createCheckin({
   required String userId,
   required String habitId,
 }) async {
-  final checkinId = const Uuid().v4();
-  final result = await ApiClient.post(
-    'habit_checkins',
-    {
-      'id': checkinId,
-      'habit_id': habitId,
-      'user_id': userId,
-      'checkin_at': DateTime.now().toUtc().toIso8601String(),
-    },
-  );
-  if (!result.isSuccess) {
-    throw Exception('添加打卡记录失败: HTTP ${result.statusCode}');
+  // change-server: 打卡走后端幂等端点（北京日期，返回打卡结果 VO）
+  final result = await BackendApi.post('/users/habits/$habitId/checkin');
+  if (!result.success) {
+    throw Exception('添加打卡记录失败: ${result.error ?? ''}');
   }
+  // CheckinResultVO 无打卡记录 id，用 habit+北京日期合成（仅本地即时反馈用）
+  final data = result.data as Map<String, dynamic>? ?? {};
+  final bjDate = (data['date'] ?? '') as String;
   return HabitCheckinModel(
-    id: checkinId,
+    id: '${habitId}_$bjDate',
     habitId: habitId,
     checkinAt: DateTime.now(),
   );

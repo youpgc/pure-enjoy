@@ -12,6 +12,7 @@ import '../../../../core/widgets/paginated_list_mixin.dart';
 import '../../models/mood_diary_model.dart';
 import '../mood_diary_form.dart';
 import './mood_diary_content.dart';
+import '../../../../services/backend_api.dart';
 
 /// 心情日记页面 - Supabase 数据同步
 class MoodDiaryScreen extends StatefulWidget {
@@ -21,7 +22,8 @@ class MoodDiaryScreen extends StatefulWidget {
   State<MoodDiaryScreen> createState() => _MoodDiaryScreenState();
 }
 
-class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMixin {
+class _MoodDiaryScreenState extends State<MoodDiaryScreen>
+    with PaginatedListMixin {
   List<MoodDiaryModel> _diaries = [];
   bool _isLoading = true;
 
@@ -68,7 +70,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     final userId = _userId;
     if (userId == null) return;
     try {
-      final cached = await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
+      final cached =
+          await CacheHelper.instance.loadList(CacheHelper.keyDiaries);
       if (cached.isNotEmpty && mounted) {
         final diaries = <MoodDiaryModel>[];
         for (final item in cached) {
@@ -112,18 +115,17 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     try {
       final (limit, offset) = paginationParams;
 
-      final result = await ApiClient.get(
-        'mood_diaries',
-        filters: {
-          'user_id': 'eq.$userId',
+      // change-server: 后端语义化分页
+      final result = await BackendApi.get(
+        '/users/mood-diaries',
+        query: {
+          'page': '${offset ~/ limit + 1}',
+          'page_size': '$limit',
         },
-        order: 'date.desc',
-        limit: limit,
-        offset: offset,
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
+      if (result.success) {
+        final data = result.list.cast<Map<String, dynamic>>();
         final diaries = <MoodDiaryModel>[];
         for (final item in data) {
           try {
@@ -206,7 +208,8 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
   }
 
   Future<void> _deleteMoodDiary(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条日记吗？');
+    final confirm =
+        await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条日记吗？');
 
     if (confirm == true) {
       try {
@@ -294,9 +297,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         onSave: (updatedDiary) async {
           // 系统敏感词检测
           await SensitiveWordService.instance.initialize();
-          final contentResult = updatedDiary.content == null || updatedDiary.content!.isEmpty
-              ? null
-              : SensitiveWordService.instance.checkSystemContentSync(updatedDiary.content!);
+          final contentResult =
+              updatedDiary.content == null || updatedDiary.content!.isEmpty
+                  ? null
+                  : SensitiveWordService.instance
+                      .checkSystemContentSync(updatedDiary.content!);
           if (contentResult?.isBlocked ?? false) {
             if (!context.mounted) return;
             showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
@@ -321,9 +326,11 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
         onSave: (newDiary) async {
           // 系统敏感词检测
           await SensitiveWordService.instance.initialize();
-          final contentResult = newDiary.content == null || newDiary.content!.isEmpty
-              ? null
-              : SensitiveWordService.instance.checkSystemContentSync(newDiary.content!);
+          final contentResult =
+              newDiary.content == null || newDiary.content!.isEmpty
+                  ? null
+                  : SensitiveWordService.instance
+                      .checkSystemContentSync(newDiary.content!);
           if (contentResult?.isBlocked ?? false) {
             if (!context.mounted) return;
             showSnackBar(context, '日记内容包含敏感信息，请修改后重试', isError: true);
@@ -361,4 +368,3 @@ class _MoodDiaryScreenState extends State<MoodDiaryScreen> with PaginatedListMix
     );
   }
 }
-

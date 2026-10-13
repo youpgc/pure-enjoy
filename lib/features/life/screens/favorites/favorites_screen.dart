@@ -11,6 +11,7 @@ import '../../../../core/theme/app_theme.dart';
 import '../../../../widgets/common_widgets.dart';
 import '../../../../services/dict_service.dart';
 import '../../models/favorite_model.dart';
+import '../../../../services/backend_api.dart';
 
 part 'favorites_screen_parts.dart';
 part 'favorites_item_part.dart';

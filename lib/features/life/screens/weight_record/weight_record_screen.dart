@@ -11,6 +11,7 @@ import '../../models/weight_record_model.dart';
 import '../weight_statistics/weight_statistics_screen.dart';
 import '../weight_record_form.dart';
 import './weight_record_content.dart';
+import '../../../../services/backend_api.dart';
 
 /// 体重记录页面 - Supabase 数据同步
 class WeightRecordScreen extends StatefulWidget {
@@ -20,7 +21,8 @@ class WeightRecordScreen extends StatefulWidget {
   State<WeightRecordScreen> createState() => _WeightRecordScreenState();
 }
 
-class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedListMixin {
+class _WeightRecordScreenState extends State<WeightRecordScreen>
+    with PaginatedListMixin {
   List<WeightRecordModel> _records = [];
   bool _isLoading = true;
 
@@ -65,7 +67,8 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
   Future<void> _loadCache() async {
     final userId = _userId;
     if (userId == null) return;
-    final cached = await CacheHelper.instance.loadList(CacheHelper.keyWeightRecords);
+    final cached =
+        await CacheHelper.instance.loadList(CacheHelper.keyWeightRecords);
     if (cached.isNotEmpty && mounted) {
       setState(() {
         _records = cached.map((e) => WeightRecordModel.fromJson(e)).toList();
@@ -90,22 +93,21 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
     if (!refresh && !beginLoadMore()) return;
 
     try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-      };
-
       final (limit, offset) = paginationParams;
 
-      final result = await ApiClient.get(
-        'weight_records',
-        filters: filters,
-        order: 'date.desc',
-        limit: limit, offset: offset,
+      // change-server: 后端语义化分页
+      final result = await BackendApi.get(
+        '/users/weight-records',
+        query: {
+          'page': '${offset ~/ limit + 1}',
+          'page_size': '$limit',
+        },
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final newRecords = data.map((e) => WeightRecordModel.fromJson(e)).toList();
+      if (result.success) {
+        final data = result.list.cast<Map<String, dynamic>>();
+        final newRecords =
+            data.map((e) => WeightRecordModel.fromJson(e)).toList();
 
         // date 排序优先，相同 date 时 created_at 优先
         newRecords.sort((a, b) {
@@ -189,7 +191,8 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
   }
 
   Future<void> _deleteWeightRecord(String id) async {
-    final confirm = await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
+    final confirm =
+        await showConfirmDialog(context, title: '确认删除', content: '确定要删除这条记录吗？');
 
     if (confirm == true) {
       try {
@@ -310,8 +313,10 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
     );
   }
 
-  double? get _latestWeight => _records.isNotEmpty ? _records.first.weight : null;
-  double? get _previousWeight => _records.length > 1 ? _records[1].weight : null;
+  double? get _latestWeight =>
+      _records.isNotEmpty ? _records.first.weight : null;
+  double? get _previousWeight =>
+      _records.length > 1 ? _records[1].weight : null;
   double? get _weightChange {
     if (_latestWeight == null || _previousWeight == null) return null;
     return _latestWeight! - _previousWeight!;
@@ -329,7 +334,8 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
             onPressed: () {
               Navigator.push(
                 context,
-                MaterialPageRoute(builder: (_) => const WeightStatisticsScreen()),
+                MaterialPageRoute(
+                    builder: (_) => const WeightStatisticsScreen()),
               );
             },
           ),
@@ -354,4 +360,3 @@ class _WeightRecordScreenState extends State<WeightRecordScreen> with PaginatedL
     );
   }
 }
-

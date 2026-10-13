@@ -2,10 +2,10 @@ import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../../../../services/supabase_service.dart';
-import '../../../../services/api_client.dart';
 import '../../../../core/utils/event_bus.dart';
 import '../../widgets/app_date_picker.dart';
 import './weight_statistics_content.dart';
+import '../../../../services/backend_api.dart';
 
 /// 体重统计页面
 class WeightStatisticsScreen extends StatefulWidget {
@@ -30,7 +30,8 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
     _endMonth = DateTime.now();
     _loadData();
     // 闭环：体重记录增删改会 fire(weightRecordUpdated)，统计页返回时需刷新
-    _weightSub = EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
+    _weightSub =
+        EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
       if (mounted) _loadData();
     });
   }
@@ -56,19 +57,21 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
       final startOfRange = DateTime(_startMonth.year, _startMonth.month, 1);
       final firstOfNextMonth = DateTime(_endMonth.year, _endMonth.month + 1, 1);
 
-      final result = await ApiClient.get(
-        'weight_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfRange)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
+      // change-server: 后端语义化（日期区间，全量拉取用大 page_size）
+      final result = await BackendApi.get(
+        '/users/weight-records',
+        query: {
+          'page': '1',
+          'page_size': '500',
+          'from': DateFormat('yyyy-MM-dd').format(startOfRange),
+          'to': DateFormat('yyyy-MM-dd')
+              .format(firstOfNextMonth.subtract(const Duration(days: 1))),
         },
-        order: 'date.desc',
-        limit: 500,
       );
 
       if (!mounted) return;
-      if (result.isSuccess) {
-        final List<dynamic> data = result.data!;
+      if (result.success) {
+        final List<dynamic> data = result.list.cast<Map<String, dynamic>>();
         setState(() {
           _records = data.cast<Map<String, dynamic>>();
           _isLoading = false;
@@ -141,7 +144,8 @@ class _WeightStatisticsScreenState extends State<WeightStatisticsScreen> {
 
   String get _rangeText {
     final sameYear = _startMonth.year == _endMonth.year;
-    if (_startMonth.year == _endMonth.year && _startMonth.month == _endMonth.month) {
+    if (_startMonth.year == _endMonth.year &&
+        _startMonth.month == _endMonth.month) {
       return '${_startMonth.year}年${_startMonth.month}月';
     }
     if (sameYear) {

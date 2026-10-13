@@ -10,7 +10,7 @@ import '../widgets/anniversary_card.dart';
 import '../widgets/anniversary_edit_dialog.dart';
 import '../../../utils/cache_helper.dart';
 import './anniversary_helpers.dart';
-
+import '../../../services/backend_api.dart';
 /// 纪念日/生日列表页面 - Supabase 数据同步
 class AnniversariesScreen extends StatefulWidget {
   /// 类型过滤：'anniversary' 或 'birthday'
@@ -85,22 +85,21 @@ class _AnniversariesScreenState extends State<AnniversariesScreen> with Paginate
     // 2. 静默从网络刷新
     try {
       final (limit, offset) = paginationParams;
-      final result = await ApiClient.get(
-        'user_anniversaries',
-        filters: {
-          'user_id': 'eq.$userId',
-          'type': 'eq.${widget.filterType}',
+      // change-server: 后端语义化（type 筛选，date 升序为后端内置）
+      final result = await BackendApi.get(
+        '/users/anniversaries',
+        query: {
+          'page': '${offset ~/ limit + 1}',
+          'page_size': '$limit',
+          'type': widget.filterType,
         },
-        order: 'date.asc',
-        limit: limit,
-        offset: offset,
       );
 
-      if (!result.isSuccess) {
+      if (!result.success) {
         throw Exception('HTTP ${result.statusCode}');
       }
 
-      final data = result.data!;
+      final data = result.list.cast<Map<String, dynamic>>();
       final items = data.map((e) => AnniversaryModel.fromJson(e)).toList();
 
       // 保存缓存（只保存当前用户、当前类型的数据，仅 refresh 时）

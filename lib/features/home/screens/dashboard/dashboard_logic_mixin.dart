@@ -1,5 +1,4 @@
 part of './dashboard_page.dart';
-
 const String _prefsKeyTools = 'dashboard_visible_tools';
 
 /// 首页各区块本地缓存键（stale-while-revalidate，秒开用）
@@ -47,24 +46,21 @@ mixin _DashboardLogic on State<DashboardPage> {
     if (userId == null) return;
 
     Future<ApiResponse> fetcher() async {
-      final result = await ApiClient.get('habits',
-          filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
-          select:
-              'id,user_id,name,description,target_days,current_streak,longest_streak,is_active,created_at',
-          order: 'created_at.desc',
-          limit: _kHomeListLimit);
-      if (!result.isSuccess) return ApiResponse.success([]);
-      final habitsData = result.data as List;
+      // change-server: 后端语义化（is_active 筛选 + 跨习惯打卡聚合端点）
+      final result = await BackendApi.get('/users/habits', query: {
+        'page': '1',
+        'page_size': '$_kHomeListLimit',
+        'is_active': 'true',
+      });
+      if (!result.success) return ApiResponse.success([]);
+      final habitsData = result.list;
       final checkinsData = <dynamic>[];
       if (habitsData.isNotEmpty) {
-        final habitIds = habitsData.map((h) => h['id'].toString()).toList();
-        final checkinsResult = await ApiClient.get('habit_checkins',
-            filters: {'habit_id': 'in.(${habitIds.join(",")})'},
-            select: 'id,habit_id,user_id,checkin_at,note,created_at',
-            order: 'checkin_at.desc',
-            limit: _kHomeListLimit);
-        if (checkinsResult.isSuccess && checkinsResult.data != null) {
-          checkinsData.addAll(checkinsResult.data!);
+        final habitIds = habitsData.map((h) => h['id'].toString()).join(',');
+        final checkinsResult = await BackendApi.get('/users/habits/checkins',
+            query: {'habit_ids': habitIds, 'limit': '$_kHomeListLimit'});
+        if (checkinsResult.success && checkinsResult.data is List) {
+          checkinsData.addAll(checkinsResult.data as List);
         }
       }
       // 合并为可缓存 plain JSON（单一元素 list）
@@ -109,23 +105,16 @@ mixin _DashboardLogic on State<DashboardPage> {
     }
     setState(() => _checkingHabitId = habit.id);
     try {
-      final today = DateTime.now();
 
-      final checkinResult = await ApiClient.post(
-        'habit_checkins',
-        {
-          'id': const Uuid().v4(),
-          'habit_id': habit.id,
-          'user_id': AuthService.instance.currentUserId,
-          'checkin_at': today.toUtc().toIso8601String(),
-        },
-        returnRepresentation: false,
-      );
-
-      if (!checkinResult.isSuccess) {
-        // 409 = 服务端每日唯一索引拦截（缓存滞后/双设备重复打卡）：
+      // change-server: 打卡走后端幂等端点（重复打卡由 alreadyChecked 表达）
+      final checkinResult = await BackendApi.post('/users/habits/${habit.id}/checkin');
+      final alreadyChecked = checkinResult.success &&
+          (checkinResult.data is Map<String, dynamic>) &&
+          ((checkinResult.data as Map<String, dynamic>)['already_checked'] == true);
+      if (!checkinResult.success && !alreadyChecked) {
+        // 服务端拒绝（含「该日期已打卡」）：
         // 按已打卡成功口径提示并刷新数据，不再报「打卡失败」
-        if (checkinResult.statusCode == 409) {
+        if (checkinResult.error != null && checkinResult.error!.contains('已打卡')) {
           unawaited(RequestCache.invalidate(_kCacheHabits));
           unawaited(_loadHabitsForCheckin());
           if (mounted) {
@@ -199,29 +188,20 @@ mixin _DashboardLogic on State<DashboardPage> {
     // 读取时再 buildXxxActivity 生成含图标的渲染条目。否则 jsonEncode 缓存会抛异常。
     Future<ApiResponse> fetcher() async {
       final futures = [
-        ApiClient.get('expenses',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'category,amount,created_at,date',
-            order: 'created_at.desc',
-            limit: _kHomeSingleLimit),
-        ApiClient.get('mood_diaries',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'content,mood,created_at,date',
-            order: 'created_at.desc',
-            limit: _kHomeSingleLimit),
-        ApiClient.get('weight_records',
-            filters: {'user_id': 'eq.$userId'},
-            select: 'weight,created_at,date',
-            order: 'created_at.desc',
-            limit: _kHomeSingleLimit),
+        BackendApi.get('/users/expenses',
+            query: {'page': '1', 'page_size': '$_kHomeSingleLimit'}),
+        BackendApi.get('/users/mood-diaries',
+            query: {'page': '1', 'page_size': '$_kHomeSingleLimit'}),
+        BackendApi.get('/users/weight-records',
+            query: {'page': '1', 'page_size': '$_kHomeSingleLimit'}),
       ];
       final results = await Future.wait(futures);
       final raw = <Map<String, dynamic>>[];
       const sources = ['expense', 'mood', 'weight'];
       for (var i = 0; i < results.length; i++) {
         final r = results[i];
-        if (r.isSuccess && r.data != null && r.data!.isNotEmpty) {
-          final item = Map<String, dynamic>.from(r.data![0]);
+        if (r.success && r.list.isNotEmpty) {
+          final item = Map<String, dynamic>.from(r.list.first);
           item['__source'] = sources[i];
           raw.add(item);
         }
@@ -272,18 +252,15 @@ mixin _DashboardLogic on State<DashboardPage> {
       return;
     }
 
-    final result = await ApiClient.get('reminders',
-        filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
-        select:
-            'id,user_id,title,description,remind_at,is_completed,is_repeated,repeat_type,created_at',
-        order: 'remind_at.asc',
-        limit: 3);
+    final result = await BackendApi.get('/users/reminders',
+        query: {'page': '1', 'page_size': '3', 'is_completed': 'false'});
     if (!mounted) return;
     // 请求失败保持上一轮数据，避免界面闪烁
-    if (!result.isSuccess || result.data == null) return;
+    if (!result.success) return;
 
     _remindersLastFetched = DateTime.now();
-    final reminders = (result.data as List).map((e) => ReminderModel.fromJson(e)).toList();
+    final reminders =
+        result.list.map((e) => ReminderModel.fromJson(e as Map<String, dynamic>)).toList();
     setState(() => _pendingReminders = reminders);
   }
 

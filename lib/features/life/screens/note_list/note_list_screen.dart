@@ -3,7 +3,7 @@ import 'package:flutter/foundation.dart';
 import 'package:uuid/uuid.dart';
 import '../../../../core/utils/event_bus.dart';
 import '../../../../services/supabase_service.dart';
-import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../../../services/offline_sync_service.dart';
 import '../../../../services/sensitive_word_service.dart';
 import '../../../../utils/date_time_utils.dart';
@@ -95,27 +95,20 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
     if (!refresh && !beginLoadMore()) return;
 
     try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-      };
-
+      // change-server: 数据面切换至本地后端（语义化筛选，主体归属由后端从登录态取）
       final (limit, offset) = paginationParams;
-
-      final result = await ApiClient.get(
-        'notes',
-        filters: filters,
-        // ★ 搜索走命名参数（builder 生成 or=(title.ilike.*x*,content.ilike.*x*)）。
-        //   此前塞进 filters 会被当 PostgREST 列名拼成 search=xxx → 42703 查询必 400
-        search: _searchQuery.isNotEmpty ? _searchQuery : null,
-        searchFields: _searchQuery.isNotEmpty ? 'title,content' : null,
-        order: 'is_pinned.desc,updated_at.desc',
-        limit: limit,
-        offset: offset,
+      final result = await BackendApi.get(
+        '/users/notes',
+        query: {
+          'page': '${offset ~/ limit + 1}',
+          'page_size': '$limit',
+          if (_searchQuery.isNotEmpty) 'keyword': _searchQuery,
+        },
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final notes = data.map((e) => NoteModel.fromJson(e)).toList();
+      if (result.success) {
+        final notes =
+            result.list.map((e) => NoteModel.fromJson(e as Map<String, dynamic>)).toList();
 
         setState(() {
           if (refresh) {
@@ -147,12 +140,12 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
   Future<void> _createNote(NoteModel note) async {
     try {
-      final result = await ApiClient.post(
-        'notes',
-        note.toJson(),
+      final result = await BackendApi.post(
+        '/users/notes',
+        body: note.toJson(), // 多余字段（id/user_id 等）后端 DTO 自动忽略
       );
 
-      if (result.isSuccess) {
+      if (result.success) {
         await _loadNotes(refresh: true);
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);
@@ -183,13 +176,12 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
   Future<void> _updateNote(NoteModel note) async {
     try {
-      final result = await ApiClient.patchByFilter(
-        'notes',
-        filters: {'id': 'eq.${note.id}'},
+      final result = await BackendApi.put(
+        '/users/notes/${note.id}',
         body: note.toJsonForUpdate(),
       );
 
-      if (result.isSuccess) {
+      if (result.success) {
         await _loadNotes(refresh: true);
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);
@@ -229,12 +221,9 @@ class _NoteListScreenState extends State<NoteListScreen> with PaginatedListMixin
 
   Future<void> _deleteNote(String id) async {
     try {
-      final result = await ApiClient.batchDeleteByFilter(
-        'notes',
-        filters: {'id': 'eq.$id'},
-      );
+      final result = await BackendApi.delete('/users/notes/$id');
 
-      if (result.isSuccess) {
+      if (result.success) {
         await _loadNotes(refresh: true);
         OfflineSyncService.instance.syncPending();
         EventBus.instance.fire(EventType.noteUpdated);

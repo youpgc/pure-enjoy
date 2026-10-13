@@ -133,23 +133,20 @@ extension NotificationSchedulers on NotificationService {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
     try {
-      final result = await ApiClient.get(
-        'reminder_schedules',
-        filters: {'user_id': 'eq.$userId', 'is_enabled': 'eq.true'},
-      );
-      if (!result.isSuccess || result.data == null) return;
+      // change-server: 后端语义化（is_enabled / is_active 筛选，全量 page_size 500）
+      final result = await BackendApi.get('/users/reminder-schedules',
+          query: {'page': '1', 'page_size': '500', 'is_enabled': 'true'});
+      if (!result.success) return;
 
-      final habitsResult = await ApiClient.get(
-        'habits',
-        filters: {'user_id': 'eq.$userId', 'is_active': 'eq.true'},
-      );
+      final habitsResult = await BackendApi.get('/users/habits',
+          query: {'page': '1', 'page_size': '500', 'is_active': 'true'});
       final nameById = <String, String>{};
       final targetById = <String, int>{};
       // 仅「进行中」习惯参与重挂；已暂停(is_active=false)或已删除的习惯不在此集合，
       // 对应的提醒计划必须跳过，否则暂停后仍会在启动/登录时重新被挂上（未闭环）。
       final activeHabitIds = <String>{};
-      if (habitsResult.isSuccess && habitsResult.data != null) {
-        for (final h in habitsResult.data!) {
+      if (habitsResult.success) {
+        for (final h in habitsResult.list) {
           final hid = h['id'] as String;
           nameById[hid] = (h['name'] as String?) ?? '习惯';
           targetById[hid] = (h['target_days'] as int?) ?? 21;
@@ -159,13 +156,11 @@ extension NotificationSchedulers on NotificationService {
 
       // 计算每个习惯的累计打卡数，用于「已完成」判定（闭环：达成目标后不再发起提醒）
       final checkinCountById = <String, int>{};
-      final checkinsResult = await ApiClient.get(
-        'habit_checkins',
-        filters: {'user_id': 'eq.$userId'},
-        select: 'habit_id',
-      );
-      if (checkinsResult.isSuccess && checkinsResult.data != null) {
-        for (final c in checkinsResult.data!) {
+      // change-server: 跨习惯打卡聚合端点（含 habit_id）
+      final checkinsResult = await BackendApi.get('/users/habits/checkins',
+          query: {'page_size': '1000'});
+      if (checkinsResult.success && checkinsResult.data is List) {
+        for (final c in checkinsResult.data as List) {
           final hid = c['habit_id'] as String?;
           if (hid != null) {
             checkinCountById[hid] = (checkinCountById[hid] ?? 0) + 1;
@@ -256,13 +251,12 @@ extension NotificationSchedulers on NotificationService {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
     try {
-      final result = await ApiClient.get(
-        'reminders',
-        filters: {'user_id': 'eq.$userId', 'is_completed': 'eq.false'},
-      );
-      if (!result.isSuccess || result.data == null) return;
+      // change-server: 后端语义化（未完成提醒，全量 page_size 500）
+      final result = await BackendApi.get('/users/reminders',
+          query: {'page': '1', 'page_size': '500', 'is_completed': 'false'});
+      if (!result.success) return;
       final now = DateTime.now();
-      for (final r in result.data!) {
+      for (final r in result.list) {
         final model = ReminderModel.fromJson(r);
         if (model.remindEnabled && model.remindAt.isAfter(now)) {
           await scheduleReminderNotification(model);
@@ -372,12 +366,11 @@ extension NotificationSchedulers on NotificationService {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
     try {
-      final result = await ApiClient.get(
-        'user_anniversaries',
-        filters: {'user_id': 'eq.$userId', 'remind_enabled': 'eq.true'},
-      );
-      if (!result.isSuccess || result.data == null) return;
-      for (final a in result.data!) {
+      // change-server: 后端语义化（remind_enabled 筛选）
+      final result = await BackendApi.get('/users/anniversaries',
+          query: {'page': '1', 'page_size': '500', 'remind_enabled': 'true'});
+      if (!result.success) return;
+      for (final a in result.list) {
         await scheduleAnniversaryReminder(AnniversaryModel.fromJson(a));
       }
     } catch (e) {

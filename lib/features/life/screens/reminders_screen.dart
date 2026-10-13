@@ -12,7 +12,7 @@ import '../models/remind_offset.dart';
 import '../widgets/remind_offset_selector.dart';
 import '../widgets/app_date_picker.dart';
 import '../../../core/utils/event_bus.dart';
-
+import '../../../services/backend_api.dart';
 part 'reminders_parts.dart';
 
 /// 提醒事项页面 - Supabase 数据同步
@@ -57,26 +57,28 @@ class _RemindersScreenState extends State<RemindersScreen> {
 
     // 2. 从网络刷新
     try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
+      // change-server: 后端语义化（is_completed + sort），全量拉取用大 page_size
+      final query = <String, String>{
+        'page': '1',
+        'page_size': '500',
+        'sort': 'desc',
       };
-
       switch (_filter) {
         case 'pending':
-          filters['is_completed'] = 'eq.false';
+          query['is_completed'] = 'false';
         case 'completed':
-          filters['is_completed'] = 'eq.true';
+          query['is_completed'] = 'true';
       }
 
-      final result = await ApiClient.get(
-        'reminders',
-        filters: filters,
-        order: 'remind_at.desc',
+      final result = await BackendApi.get(
+        '/users/reminders',
+        query: query,
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final reminders = data.map((e) => ReminderModel.fromJson(e)).toList();
+      if (result.success) {
+        final data = result.list;
+        final reminders =
+            data.map((e) => ReminderModel.fromJson(e as Map<String, dynamic>)).toList();
         // 保存缓存
         await CacheHelper.instance.saveList(CacheHelper.keyReminders, data);
         if (mounted) {

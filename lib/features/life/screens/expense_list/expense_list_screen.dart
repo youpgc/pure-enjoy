@@ -16,7 +16,7 @@ import '../../../../widgets/common_widgets.dart';
 import '../../models/expense_model.dart';
 import '../expense_statistics/expense_statistics_screen.dart';
 import '../../widgets/expense_form.dart';
-
+import '../../../../services/backend_api.dart';
 part 'expense_list_parts.dart';
 part 'expense_list_ui_part.dart';
 
@@ -181,22 +181,19 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     try {
       // 'all' 表示不限分类：与列表查询口径一致（:234 对 'all' 跳过分类过滤），
       // 故不向 RPC 传 p_category，避免云端按 category='all' 字面匹配导致合计恒为 0。
-      final rpcParams = <String, dynamic>{
-        'p_user_id': userId,
-        'p_year': month.year,
-        'p_month': month.month,
-      };
-      if (_selectedCategory != 'all') {
-        rpcParams['p_category'] = _selectedCategory;
-      }
-      final result = await ApiClient.rpc(
-        'fn_get_monthly_expense_total',
-        params: rpcParams,
+      // change-server: 月度总额走后端聚合端点（原 fn_get_monthly_expense_total RPC）
+      final result = await BackendApi.get(
+        '/users/expenses/monthly-total',
+        query: {
+          'year': '${month.year}',
+          'month': '${month.month}',
+          if (_selectedCategory != 'all') 'category': _selectedCategory,
+        },
       );
 
       double total = 0.0;
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final value = result.data!.first['total'];
+      if (result.success && result.data is Map<String, dynamic>) {
+        final value = (result.data as Map<String, dynamic>)['total'];
         if (value != null) {
           total = (value as num).toDouble();
         }
@@ -235,42 +232,37 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     if (!refresh && !beginLoadMore()) return;
 
     try {
-      final filters = <String, String>{
-        'user_id': 'eq.$userId',
-      };
-
-      if (_selectedCategory != 'all') {
-        filters['category'] = 'eq.$_selectedCategory';
-      }
+      // change-server: 后端语义化（from/to/category），归属由登录态注入
+      final query = <String, String>{};
 
       // 预置日期区间（统计页跳转带入）：与统计页取数口径一致
       // [startMonth 当月1号, endMonth 下月1号)
-      if (_rangeStart != null && _rangeEnd != null) {
-        final gte = DateTime(_rangeStart!.year, _rangeStart!.month, 1);
-        final lt = DateTime(_rangeEnd!.year, _rangeEnd!.month + 1, 1);
-        filters['and'] =
-            '(date.gte.${DateFormat('yyyy-MM-dd').format(gte)},date.lt.${DateFormat('yyyy-MM-dd').format(lt)})';
-      } else if (_rangeStart != null) {
-        final gte = DateTime(_rangeStart!.year, _rangeStart!.month, 1);
-        filters['date'] = 'gte.${DateFormat('yyyy-MM-dd').format(gte)}';
-      } else if (_rangeEnd != null) {
-        final lt = DateTime(_rangeEnd!.year, _rangeEnd!.month + 1, 1);
-        filters['date'] = 'lt.${DateFormat('yyyy-MM-dd').format(lt)}';
+      if (_selectedCategory != 'all') {
+        query['category'] = _selectedCategory;
+      }
+      // 预置日期区间（统计页跳转带入）：[startMonth 当月1号, endMonth 下月1号)
+      if (_rangeStart != null) {
+        query['from'] = DateFormat('yyyy-MM-dd')
+            .format(DateTime(_rangeStart!.year, _rangeStart!.month, 1));
+      }
+      if (_rangeEnd != null) {
+        query['to'] = DateFormat('yyyy-MM-dd')
+            .format(DateTime(_rangeEnd!.year, _rangeEnd!.month, 1));
       }
 
       final (limit, offset) = paginationParams;
+      query['page'] = '${offset ~/ limit + 1}';
+      query['page_size'] = '$limit';
 
-      final result = await ApiClient.get(
-        'expenses',
-        filters: filters,
-        order: 'date.desc',
-        limit: limit,
-        offset: offset,
+      final result = await BackendApi.get(
+        '/users/expenses',
+        query: query,
       );
 
-      if (result.isSuccess) {
-        final data = result.data!;
-        final newExpenses = data.map((e) => ExpenseModel.fromJson(e)).toList();
+      if (result.success) {
+        final data = result.list;
+        final newExpenses =
+            data.map((e) => ExpenseModel.fromJson(e as Map<String, dynamic>)).toList();
 
         // date 排序优先，相同 date 时 created_at 优先
         newExpenses.sort((a, b) {

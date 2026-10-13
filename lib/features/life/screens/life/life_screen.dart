@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/dict_service.dart';
-import '../../../../services/api_client.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../../core/utils/event_bus.dart';
 import '../../../../core/theme/app_theme.dart';
@@ -15,9 +14,8 @@ import '../favorites/favorites_screen.dart';
 import '../reminders_screen.dart';
 import '../habits_screen.dart';
 import '../anniversaries_screen.dart';
-
+import '../../../../services/backend_api.dart';
 part 'life_screen_parts.dart';
-
 
 /// 生活模块主页面 - 展示最新记录 + 功能入口
 class LifeScreen extends StatefulWidget {
@@ -47,13 +45,16 @@ class _LifeScreenState extends State<LifeScreen> {
 
   /// 监听全局事件，数据变更时自动刷新
   void _listenEvents() {
-    _expenseSubscription = EventBus.instance.on(EventType.expenseUpdated).listen((_) {
+    _expenseSubscription =
+        EventBus.instance.on(EventType.expenseUpdated).listen((_) {
       _loadLatestRecords();
     });
-    _weightSubscription = EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
+    _weightSubscription =
+        EventBus.instance.on(EventType.weightRecordUpdated).listen((_) {
       _loadLatestRecords();
     });
-    _moodSubscription = EventBus.instance.on(EventType.moodDiaryUpdated).listen((_) {
+    _moodSubscription =
+        EventBus.instance.on(EventType.moodDiaryUpdated).listen((_) {
       _loadLatestRecords();
     });
   }
@@ -76,31 +77,26 @@ class _LifeScreenState extends State<LifeScreen> {
 
     try {
       // 并行请求两个模块的最新记录
+      // change-server: 后端语义化（各取最近一条）
       final results = await Future.wait([
-        ApiClient.get(
-          'expenses',
-          filters: {'user_id': 'eq.$userId'},
-          order: 'created_at.desc',
-          limit: 1,
-        ),
-        ApiClient.get(
-          'weight_records',
-          filters: {'user_id': 'eq.$userId'},
-          order: 'created_at.desc',
-          limit: 1,
-        ),
+        BackendApi.get('/users/expenses',
+            query: {'page': '1', 'page_size': '1'}),
+        BackendApi.get('/users/weight-records',
+            query: {'page': '1', 'page_size': '1'}),
       ]);
 
       if (!mounted) return;
 
-      final expenseList = results[0].isSuccess ? results[0].data! : [];
-      final weightList = results[1].isSuccess ? results[1].data! : [];
+      final expenseList = results[0].success ? results[0].list : [];
+      final weightList = results[1].success ? results[1].list : [];
 
       setState(() {
-        _latestExpense =
-            expenseList.isNotEmpty ? expenseList[0] as Map<String, dynamic> : null;
-        _latestWeight =
-            weightList.isNotEmpty ? weightList[0] as Map<String, dynamic> : null;
+        _latestExpense = expenseList.isNotEmpty
+            ? expenseList[0] as Map<String, dynamic>
+            : null;
+        _latestWeight = weightList.isNotEmpty
+            ? weightList[0] as Map<String, dynamic>
+            : null;
         _isLoading = false;
       });
     } catch (e) {
@@ -214,9 +210,12 @@ class _LifeScreenState extends State<LifeScreen> {
               backgroundColor: colorScheme.primaryContainer,
               summary: _latestExpense != null
                   ? () {
-                      final categoryCode = _latestExpense!['category'] as String? ?? '';
+                      final categoryCode =
+                          _latestExpense!['category'] as String? ?? '';
                       final categoryLabel = categoryCode.isNotEmpty
-                          ? DictService.instance.getLabelOrDefault('expense_category', categoryCode, defaultValue: categoryCode)
+                          ? DictService.instance.getLabelOrDefault(
+                              'expense_category', categoryCode,
+                              defaultValue: categoryCode)
                           : '';
                       return '$categoryLabel ${_latestExpense!['amount'] ?? ''}';
                     }()
@@ -309,7 +308,10 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.track_changes,
           title: '习惯打卡',
           subtitle: '培养好习惯',
-          color: Theme.of(context).colorScheme.primaryContainer.withValues(alpha: 0.7),
+          color: Theme.of(context)
+              .colorScheme
+              .primaryContainer
+              .withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
@@ -317,16 +319,20 @@ class _LifeScreenState extends State<LifeScreen> {
             );
           },
         ),
-
         _FeatureItem(
           icon: Icons.cake,
           title: '生日',
           subtitle: '记录亲友生日',
-          color: Theme.of(context).colorScheme.tertiaryContainer.withValues(alpha: 0.7),
+          color: Theme.of(context)
+              .colorScheme
+              .tertiaryContainer
+              .withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AnniversariesScreen(filterType: 'birthday')),
+              MaterialPageRoute(
+                  builder: (_) =>
+                      const AnniversariesScreen(filterType: 'birthday')),
             );
           },
         ),
@@ -334,14 +340,18 @@ class _LifeScreenState extends State<LifeScreen> {
           icon: Icons.celebration,
           title: '纪念日',
           subtitle: '记录重要日子',
-          color: Theme.of(context).colorScheme.secondaryContainer.withValues(alpha: 0.7),
+          color: Theme.of(context)
+              .colorScheme
+              .secondaryContainer
+              .withValues(alpha: 0.7),
           onTap: (context) {
             Navigator.push(
               context,
-              MaterialPageRoute(builder: (_) => const AnniversariesScreen(filterType: 'anniversary')),
+              MaterialPageRoute(
+                  builder: (_) =>
+                      const AnniversariesScreen(filterType: 'anniversary')),
             );
           },
         ),
       ];
 }
-
