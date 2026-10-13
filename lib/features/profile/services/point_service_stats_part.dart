@@ -2,38 +2,30 @@ part of 'point_service.dart';
 
 /// 用户统计 / 积分记录 / 日历查询 / 本地缓存相关实现
 mixin PointServiceStatsMixin {
-  /// 分页获取积分记录
+  /// 分页获取积分记录（change-server：走后端 /users/points/records）
   ///
-  /// [statusFilter] 状态过滤，null 表示不过滤（显示所有记录）
+  /// [statusFilter] 状态过滤，null 表示不过滤（后端默认 active）
   Future<List<PointRecord>> getRecords({
     int page = 1,
     int pageSize = 20,
     String? statusFilter,
   }) async {
     try {
-      final userId = AuthService.instance.currentUserId;
-      if (userId == null) return [];
-
-      final offset = (page - 1) * pageSize;
-      final filters = <String, String>{'user_id': 'eq.$userId'};
-      if (statusFilter != null) {
-        filters['status'] = 'eq.$statusFilter';
-      }
-
-      final result = await ApiClient.get(
-        'point_records',
-        filters: filters,
-        order: 'created_at.desc',
-        limit: pageSize,
-        offset: offset,
+      final result = await BackendApi.get(
+        '/users/points/records',
+        query: {
+          'page': '$page',
+          'page_size': '$pageSize',
+          // null=不过滤：显式传 all（后端缺省 active，会把已过期记录隐藏，
+          // 而流水页需要全量以展示「已过期/即将过期」标签）
+          'status': statusFilter ?? 'all',
+        },
       );
 
-      if (result.isSuccess) {
-        final records = result.data!;
-        return records.map((json) => PointRecord.fromJson(json)).toList();
-      }
-
-      return [];
+      if (!result.success) return [];
+      return result.list
+          .map((json) => PointRecord.fromJson(json as Map<String, dynamic>))
+          .toList();
     } catch (e) {
       if (kDebugMode) {
         debugPrint('获取积分记录失败');
@@ -62,67 +54,61 @@ mixin PointServiceStatsMixin {
 
   /// 获取指定月份（北京时区）已签到的日期键集合（yyyy-MM-dd）。
   ///
-  /// 仅供签到日历展示使用，纯只读查询 point_records，不修改任何数据、不改奖励逻辑。
+  /// 仅供签到日历展示使用，纯只读查询，不修改任何数据、不改奖励逻辑。
   /// [month] 任意代表目标月份的 DateTime（仅取年月）。
+  /// change-server：走后端 records 端点 type=checkin + created_date 范围（北京日，闭区间）。
   Future<Set<String>> getCheckinDatesInMonth(DateTime month) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return {};
+    try {
+      final first = DateTime(month.year, month.month, 1);
+      final last = DateTime(month.year, month.month + 1, 0);
+      final result = await BackendApi.get(
+        '/users/points/records',
+        query: {
+          'type': 'checkin',
+          'from': beijingDateKey(first),
+          'to': beijingDateKey(last),
+          'page_size': '100',
+          // checkin 流水 180 天后过期翻转为 expired，日历回溯需跨状态全量
+          'status': 'all',
+        },
+      );
 
-    // 以北京自然月为窗口：北京时间 [month-01 00:00, nextMonth-01 00:00)
-    // 边界换算统一走 DateTimeUtils（固定 UTC+8，与设备时区无关）
-    final (startUtc, endUtc) =
-        DateTimeUtils.beijingMonthUtcRange(month.year, month.month);
-
-    final result = await ApiClient.get(
-      'point_records',
-      filters: {
-        'user_id': 'eq.$userId',
-        'type': 'eq.checkin',
-        'and':
-            '(created_at.gte.${startUtc.toIso8601String()},created_at.lt.${endUtc.toIso8601String()})',
-      },
-      columns: 'created_at',
-      limit: null,
-    );
-
-    final dates = <String>{};
-    if (result.isSuccess && result.data != null) {
-      for (final record in result.data!) {
-        final created = record['created_at'] as String?;
-        if (created != null) {
-          dates.add(beijingDateKey(DateTime.parse(created)));
+      final dates = <String>{};
+      if (result.success) {
+        for (final row in result.list) {
+          final date = (row as Map<String, dynamic>)['created_date'] as String?;
+          if (date != null) dates.add(date);
         }
       }
+      return dates;
+    } catch (e) {
+      if (kDebugMode) debugPrint('查询当月签到日期失败: $e');
+      return {};
     }
-    return dates;
   }
 
   /// 查询最早一条签到记录所在月份的首日（仅取年月），无数据返回 null。
   ///
   /// 用于约束日历向前翻月范围：早于该月的月份均无签到数据，不再允许切换。
-  /// 只读 point_records，不修改任何数据。
+  /// change-server：走后端 records 端点 type=checkin + order=asc，取首条 created_date。
   Future<DateTime?> getEarliestCheckinMonth() async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return null;
     try {
-      final result = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'type': 'eq.checkin',
+      final result = await BackendApi.get(
+        '/users/points/records',
+        query: {
+          'type': 'checkin',
+          'order': 'asc',
+          'page_size': '1',
+          // 同上：早期签到流水可能已翻转为 expired，须跨状态查询
+          'status': 'all',
         },
-        columns: 'created_at',
-        order: 'created_at.asc',
-        limit: 1,
       );
-      if (result.isSuccess &&
-          result.data != null &&
-          result.data!.isNotEmpty) {
-        final created = result.data![0]['created_at'] as String?;
-        if (created != null) {
-          // 北京年月取最早月（审查报告 积分 App#6）：直接用 UTC 年月在
-          // 北京 0-8 点的签到上会偏一个月
-          final dt = DateTimeUtils.toBeijingWallClock(DateTime.parse(created));
+      if (result.success && result.list.isNotEmpty) {
+        final date =
+            (result.list.first as Map<String, dynamic>)['created_date']
+                as String?;
+        if (date != null && date.isNotEmpty) {
+          final dt = DateTime.parse(date);
           return DateTime(dt.year, dt.month, 1);
         }
       }

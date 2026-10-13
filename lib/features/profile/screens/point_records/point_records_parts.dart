@@ -162,6 +162,15 @@ class PointRecordListItem extends StatelessWidget {
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
+          // 动态记账：本笔流水入账/出账后的余额快照（后端增量写入；旧数据无此字段不展示）
+          if (record.balanceAfter != null)
+            Text(
+              '余额 ${record.balanceAfter}',
+              style: TextStyle(
+                fontSize: 12,
+                color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
+              ),
+            ),
         ],
       ),
     );

@@ -13,29 +13,6 @@ Future<Map<String, dynamic>?> _fetchUserStats() async {
   return fetchUserStats(userId);
 }
 
-/// 更新 users 表统计字段（实现见 point_user_stats.dart）
-/// 返回 true 表示更新成功，false 表示更新失败
-Future<bool> _updateUserStats({
-  int? consecutiveCheckinDays,
-  DateTime? lastCheckinDate,
-  int? effectivePoints,
-  int? availablePoints,
-  int? expiringPoints,
-  int? points,
-}) async {
-  final userId = AuthService.instance.currentUserId;
-  if (userId == null) return false;
-  return updateUserStats(
-    userId,
-    consecutiveCheckinDays: consecutiveCheckinDays,
-    lastCheckinDate: lastCheckinDate,
-    effectivePoints: effectivePoints,
-    availablePoints: availablePoints,
-    expiringPoints: expiringPoints,
-    points: points,
-  );
-}
-
 /// 重算并更新 users 表的积分统计字段（实现见 point_recalc.dart）
 Future<void> _recalcAndUpdateUserPoints() async {
   final userId = AuthService.instance.currentUserId;
@@ -55,20 +32,13 @@ void _fireAndForget(Future future) {
 
 /// 签到 / 补签 / 补签卡相关实现
 mixin PointServiceCheckinMixin {
-  /// 打卡获得积分
+  /// 打卡获得积分（change-server：签到闭环整体移交后端）
   ///
-  /// 关键路径（必须等待，直接决定接口返回结果，目标 <600ms）：
-  ///   1. 校验登录
-  ///   2. 查今天是否已打卡（北京自然日窗口，防重复）
-  ///   3. 反推连续签到天数（决定本次积分与展示，逻辑只信 point_records）
-  ///   4. 插入 point_records 流水（核心落库）
+  /// 关键路径（单次请求）：
+  ///   POST /users/points/checkin —— 查重、算连续天数、发分、回写统计均由后端同事务完成。
   ///
-  /// 非关键路径（fire-and-forget，不阻塞接口响应）：
-  ///   - 回写 users 展示字段（连续天数 / 最近签到日期）
-  ///   - 全量重算 users 积分展示列
-  ///   - 刷新 AuthService 用户缓存
-  ///   这些维护逻辑与本次签到结果无依赖，推迟到响应之后由事件循环异步执行，
-  ///   使接口耗时仅含「查重 + 算连续 + 插流水」三步。
+  /// 非关键路径（fire-and-forget）：刷新 AuthService 用户缓存。
+  /// 返回格式与旧版保持一致（success/message/points/streak），调用点零改动。
   Future<Map<String, dynamic>> checkin() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) {
@@ -76,72 +46,23 @@ mixin PointServiceCheckinMixin {
     }
 
     try {
-      final today = beijingToday();
-      final tomorrow = beijingTomorrow();
+      final result = await BackendApi.post('/users/points/checkin');
+      if (!result.success) {
+        return {'success': false, 'message': result.error ?? '签到失败，请稍后重试'};
+      }
+      final data = result.data is Map<String, dynamic>
+          ? result.data as Map<String, dynamic>
+          : <String, dynamic>{};
 
-      // 1. 查今天是否已打卡（北京自然日窗口）
-      final todayResult = await ApiClient.get(
-        'point_records',
-        filters: {
-          'user_id': 'eq.$userId',
-          'type': 'eq.checkin',
-          'and':
-              '(created_at.gte.${today.toUtc().toIso8601String()},created_at.lt.${tomorrow.toUtc().toIso8601String()})',
-        },
-        columns: 'id',
-      );
-
-      if (todayResult.isSuccess) {
-        final records = todayResult.data!;
-        if (records.isNotEmpty) {
-          return {'success': false, 'message': '今天已签到'};
-        }
+      // 幂等命中：今日已签到
+      if (data['already_checked_in'] == true) {
+        return {'success': false, 'message': '今天已签到'};
       }
 
-      // 2. 反推连续签到天数（逻辑计算只信 point_records，规避 users 展示列写入失败）
-      final streak = await calcConsecutiveStreak(userId, today);
-
-      // 3. 计算积分 = min(连续天数, 7)
-      final points = streak > 7 ? 7 : streak;
-
-      // 4. 插入 point_records 流水（核心落库）
-      final now = DateTime.now();
-      final nowIso = now.toUtc().toIso8601String();
-      final expiresAt =
-          now.add(const Duration(days: 180)).toUtc().toIso8601String();
-      final insertResult = await ApiClient.post(
-        'point_records',
-        {
-          'id': const Uuid().v4(),
-          'user_id': userId,
-          'type': 'checkin',
-          'amount': points,
-          'remark': '连续签到$streak天',
-          'created_at': nowIso,
-          'expires_at': expiresAt,
-          'status': 'active',
-        },
-      );
-
-      if (!insertResult.isSuccess) {
-        // 唯一索引冲突：理论上已被步骤1拦截，此处兜底视为「今日已签到」，
-        // 避免用户看到硬失败（北京时区唯一索引修复后，冲突即代表真实重复）。
-        if (insertResult.statusCode == 409) {
-          return {'success': false, 'message': '今天已签到'};
-        }
-        if (kDebugMode) {
-          debugPrint('插入积分记录失败: ${insertResult.error}');
-        }
-        return {'success': false, 'message': '签到失败: ${insertResult.error}'};
-      }
+      final points = (data['amount'] as num?)?.toInt() ?? 0;
+      final streak = (data['streak'] as num?)?.toInt() ?? 1;
 
       EventBus.instance.fire(EventType.pointsUpdated);
-      // 5-7（非关键）：回写展示字段 + 重算积分 + 刷新缓存，全部异步，不阻塞返回
-      _fireAndForget(_updateUserStats(
-        consecutiveCheckinDays: streak,
-        lastCheckinDate: today,
-      ));
-      _fireAndForget(_recalcAndUpdateUserPoints());
       _fireAndForget(AuthService.instance.reloadCurrentUser());
 
       return {
@@ -158,43 +79,27 @@ mixin PointServiceCheckinMixin {
     }
   }
 
-  /// 检查今天是否已打卡
-  /// 双重验证：先检查 users.last_checkin_date，再查询 point_records 确认
+  /// 检查今天是否已打卡（change-server：以概览端点为唯一权威）
   Future<bool> hasCheckedInToday() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return false;
 
-    final today = beijingToday();
-
-    // 方法1：检查 users 表的 last_checkin_date
     final stats = await _fetchUserStats();
-    if (stats != null && stats['last_checkin_date'] != null) {
-      final lastDateStr = stats['last_checkin_date'] as String;
-      final lastDate = DateTime.parse(lastDateStr);
-      if (lastDate.year == today.year &&
-          lastDate.month == today.month &&
-          lastDate.day == today.day) {
-        return true;
-      }
-    }
+    if (stats == null) return false;
 
-    // 方法2：直接查询 point_records 表作为验证
-    // 红线：北京当日 00:00 对应的 UTC 边界一律走 DateTimeUtils.beijingDayStartUtc
-    // （固定 UTC+8，无夏令时）。切勿用 DateTime(本地时区).toUtc()，
-    // 非东八区设备会把本地 0 点误当北京 0 点，导致查询窗口错位。
-    final todayStart = DateTimeUtils.beijingDayStartUtc(
-            today.year, today.month, today.day)
-        .toIso8601String();
-    final result = await ApiClient.get(
-      'point_records',
-      filters: {
-        'user_id': 'eq.$userId',
-        'type': 'eq.checkin',
-        'created_at': 'gte.$todayStart',
-      },
-      limit: 1,
-    );
-    return result.isSuccess && (result.data ?? []).isNotEmpty;
+    // 权威判定：后端概览 checked_in_today
+    if (stats['checked_in_today'] == true) return true;
+
+    // 兜底：last_checkin_date 与今日北京日期比对（概览缺失时仍可用）
+    final lastDateStr = stats['last_checkin_date'];
+    if (lastDateStr is String && lastDateStr.isNotEmpty) {
+      final today = beijingToday();
+      final lastDate = DateTime.parse(lastDateStr);
+      return lastDate.year == today.year &&
+          lastDate.month == today.month &&
+          lastDate.day == today.day;
+    }
+    return false;
   }
 
   /// 积分变动时插入 point_records 流水记录（供其他模块调用）

@@ -6,9 +6,9 @@ import './point_recalc.dart';
 import './point_cache.dart';
 import '../../../services/supabase_service.dart';
 import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../models/point_record_model.dart';
 import '../../../core/utils/event_bus.dart';
-import '../../../utils/date_time_utils.dart';
 
 part 'point_service_impl.dart';
 part 'point_service_stats_part.dart';
@@ -16,11 +16,11 @@ part 'point_service_makeup_part.dart';
 
 /// 积分服务
 ///
-/// 核心设计：
-/// - 积分查询从 users 表统计字段读取（effective_points / available_points / expiring_points）
-/// - 积分变动（签到、获得、消费）后，App 端主动重算并更新 users 表统计字段
-/// - 不依赖数据库触发器（trg_maintain_user_points 已确认不存在）
-/// - 连续签到天数由 calcConsecutiveStreak 从 point_records 反推（users.consecutive_checkin_days 仅作展示缓存，不参与计算，详见 §4.5）
+/// 核心设计（change-server）：
+/// - 签到 / 补签 / 补签卡兑换 / 统计查询全部走后端 /users/points/* 端点，
+///   users 统计列由后端在积分事务内统一维护，App 侧只读不再回写
+/// - updatePointsStats（games 域流水写入）暂保留 Supabase 实现，随 B5 游戏域切换另行迁移
+/// - calcConsecutiveStreak（point_service_utils.dart）仅剩 games 域调用，同批废弃
 ///
 /// 膨胀防御（治理 §1.5.5）：实例方法已拆入三个 mixin（point_service_impl.dart 签到域、
 /// point_service_stats_part.dart 统计/缓存域、point_service_makeup_part.dart 补签域），
@@ -35,9 +35,6 @@ class PointService
     _instance ??= PointService._();
     return _instance!;
   }
-
-  /// 补签卡道具类型（集中常量，避免散落字面量）
-  static const String _makeupCardType = 'makeup_card';
 
   /// 补签卡兑换成本（积分）
   static const int makeupCardCost = 30;
