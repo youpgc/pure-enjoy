@@ -6,6 +6,7 @@ import './api_response.dart';
 import './api_logger.dart';
 import './api_url_builder.dart';
 import './api_response_handler.dart';
+import './backend_api.dart';
 
 export './api_response.dart';
 
@@ -70,6 +71,11 @@ class ApiClient {
     Duration? timeout,
     String? note,
   }) async {
+    // change-server: 已切换表自动路由到本地后端（含离线队列回放）
+    final route = BackendApi.routedTables[table];
+    if (route != null) {
+      return (await BackendApi.post(route, body: body ?? data)).toApiResponse();
+    }
     try {
       final url = '$_baseUrl/rest/v1/$table';
       final headers = <String, String>{};
@@ -128,6 +134,15 @@ class ApiClient {
     Duration? timeout,
     String? note,
   }) async {
+    // change-server: 已切换表按 id 路由到后端 PUT /{path}/{id}
+    final route = BackendApi.routedTables[table];
+    if (route != null) {
+      final id = _extractId(filters);
+      if (id == null) {
+        return ApiResponse.error('本地后端模式仅支持按 id 更新 [$table]');
+      }
+      return (await BackendApi.put('$route/$id', body: body)).toApiResponse();
+    }
     try {
       final url = buildApiUrl(
         table,
@@ -197,12 +212,21 @@ class ApiClient {
   }
 
   /// 按条件批量删除
+  ///
+  /// [bypassRouting] 强制走 Supabase 直连（注销流程用：后端新数据由
+  /// 专用清空端点处理，此处仍需清理云端遗留历史数据）
   static Future<ApiResponse> batchDeleteByFilter(
     String table, {
     required Map<String, String> filters,
+    bool bypassRouting = false,
     Duration? timeout,
     String? note,
   }) async {
+    // change-server: 已切换表按 id 路由到后端 DELETE /{path}/{id}（多 id 循环）
+    final route = BackendApi.routedTables[table];
+    if (route != null && !bypassRouting) {
+      return _routedBatchDelete(route, filters);
+    }
     try {
       final url = buildApiUrl(
         table,
@@ -338,6 +362,48 @@ class ApiClient {
       ApiLogger.error('❌ RPC 请求失败 [$functionName]', error: e);
       return ApiResponse.error(ApiLogger.userFriendlyError(e));
     }
+  }
+
+  // ---------------- change-server 后端路由辅助 ----------------
+
+  /// 从 PostgREST filters 中提取 id（eq. 单值），供后端路由使用
+  static String? _extractId(Map<String, String> filters) {
+    final raw = filters['id'];
+    if (raw == null) return null;
+    final v = raw.startsWith('eq.') ? raw.substring(3) : raw;
+    return v.contains(',') ? null : v; // 多值不支持
+  }
+
+  /// 从 filters 提取 id 列表（in.(a,b,c) 或 eq.单值），供批量删除路由
+  static List<String>? _extractIdList(Map<String, String> filters) {
+    final raw = filters['id'];
+    if (raw == null) return null;
+    if (raw.startsWith('in.(') && raw.endsWith(')')) {
+      final inner = raw.substring(4, raw.length - 1);
+      return inner
+          .split(',')
+          .map((e) => e.replaceAll('"', '').trim())
+          .where((e) => e.isNotEmpty)
+          .toList();
+    }
+    final one = _extractId(filters);
+    return one == null ? null : [one];
+  }
+
+  /// 已切换表的批量删除：解析 id 列表循环单删（后端为单条 DELETE 语义）
+  static Future<ApiResponse> _routedBatchDelete(
+      String route, Map<String, String> filters) async {
+    final ids = _extractIdList(filters);
+    if (ids == null || ids.isEmpty) {
+      return ApiResponse.error('本地后端模式仅支持按 id 批量删除');
+    }
+    final rows = <Map<String, dynamic>>[];
+    for (final id in ids) {
+      final r = await BackendApi.delete('$route/$id');
+      if (!r.success) return r.toApiResponse();
+      rows.addAll(r.toApiResponse().data ?? []);
+    }
+    return ApiResponse.success(rows);
   }
 
 }

@@ -5,7 +5,7 @@ import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 import 'package:timezone/timezone.dart' as tz;
 import 'package:timezone/data/latest_all.dart' as tz_data;
 import 'package:shared_preferences/shared_preferences.dart';
-import './api_client.dart';
+import './backend_api.dart';
 import './supabase_service.dart';
 import '../features/life/models/reminder_schedule_model.dart';
 import '../features/life/models/habit_model.dart';
@@ -63,7 +63,8 @@ class NotificationService {
     tz.setLocalLocation(tz.getLocation('Asia/Shanghai'));
 
     // Android 初始化设置
-    const androidSettings = AndroidInitializationSettings('@mipmap/ic_launcher');
+    const androidSettings =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
 
     // iOS 初始化设置
     const iosSettings = DarwinInitializationSettings(
