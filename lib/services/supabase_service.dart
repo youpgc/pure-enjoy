@@ -374,6 +374,7 @@ class AuthService {
     }
     return _auth.changePassword(
       accessToken: token,
+      oldPassword: oldPassword,
       newPassword: newPassword,
     );
   }
