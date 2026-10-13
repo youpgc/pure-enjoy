@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../../../../core/theme/theme_provider.dart';
 import '../../../../services/api_client.dart';
+import '../../../../services/backend_api.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/notification_service.dart';
 import '../../../../services/offline_sync_service.dart';
@@ -256,11 +257,27 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
         'point_records',
       ];
 
+      // change-server: 后端侧数据先清空（routed 表的新数据在本地后端）。
+      // BackendApi 不抛异常（内部 catch 转 success:false），必须显式判定，
+      // 否则后端清空失败仍会继续云端清理+登出 → 「云端删了、后端还在」半删态
+      final clearResult = await BackendApi.delete('/users/data');
+      if (!clearResult.success) {
+        if (mounted) {
+          showSnackBar(context,
+              '注销失败：${clearResult.error ?? '后端数据清空未完成'}',
+              isError: true);
+        }
+        return;
+      }
+
       await Future.wait(tables.map((table) async {
         try {
+          // bypassRouting: 继续直连 Supabase 清理云端遗留历史数据
+          // （routed 表的新数据已由后端清空端点处理）
           await ApiClient.batchDeleteByFilter(
             table,
             filters: {'user_id': 'eq.$userId'},
+            bypassRouting: true,
           );
         } catch (e) {
           if (kDebugMode) {
