@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/foundation.dart';
 import '../../../core/widgets/widgets.dart';
 import '../../../services/supabase_service.dart';
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../utils/date_time_utils.dart';
 part 'notification_center_parts.dart';
 
