@@ -1,7 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../services/api_client.dart';
-import '../../../services/supabase_service.dart';
+import '../../../services/backend_api.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/game_achievement_model.dart';
 import 'game_service.dart';
@@ -61,34 +60,26 @@ class AchievementService {
   static final AchievementService instance = AchievementService._();
 
   /// 拉取当前用户已获得成就（按类目分组，每组保留已获取的全部等级）。
-  /// 未登录返回空列表。
+  ///
+  /// change-server：数据源切 `/games/achievements/mine`（服务端按 group_key
+  /// 分组并带解锁状态），此处拍平为「achievement_id → 最早解锁时间」后沿用
+  /// 原有类目归组展示逻辑。
   Future<List<AchievementGroupView>> fetchUserAchievements() async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return const <AchievementGroupView>[];
-
-    // PostgREST 单次默认上限 1000 行：全量拉取按 offset 分页循环，
-    // 按主键 id 排序保证分页窗口稳定（limit:null 只是省略参数，仍受服务端 max-rows 限制）
-    final rows = <dynamic>[];
-    var offset = 0;
-    while (true) {
-      final result = await ApiClient.get(
-        'user_game_achievements',
-        filters: <String, String>{'user_id': 'eq.$userId'},
-        select: 'id,user_id,achievement_id,unlocked_at',
-        order: 'id',
-        limit: 1000,
-        offset: offset,
-        note: 'games:user_achievements',
-      );
-      if (!result.isSuccess) {
-        debugPrint('[AchievementService] 拉取失败：${result.errorMessage}');
-        return const <AchievementGroupView>[];
-      }
-      final page = (result.data as List<dynamic>?) ?? <dynamic>[];
-      rows.addAll(page);
-      if (page.length < 1000) break;
-      offset += 1000;
+    final result = await BackendApi.get('/games/achievements/mine');
+    if (!result.success) {
+      debugPrint('[AchievementService] 拉取失败：${result.error}');
+      return const <AchievementGroupView>[];
     }
+    final rows = <Map<String, dynamic>>[
+      for (final group in (result.data as List<dynamic>?) ?? <dynamic>[])
+        if (group is Map<String, dynamic>)
+          for (final item in (group['achievements'] as List<dynamic>?) ?? <dynamic>[])
+            if (item is Map<String, dynamic> && item['unlocked'] == true)
+              <String, dynamic>{
+                'achievement_id': item['id'],
+                'unlocked_at': item['unlocked_at'],
+              },
+    ];
     // 成就定义映射（id -> GameAchievementModel），复用游戏配置缓存（仅启用项）。
     // 已解锁成就必然来自结算时启用的成就，禁用项不会写入 user_game_achievements。
     final config = await GameService.instance.fetchConfig();
@@ -100,7 +91,6 @@ class AchievementService {
     // 收集每个 achievement_id 的最早解锁时间（取最小 unlocked_at 作为「获取时间」）
     final unlockedByAch = <String, DateTime>{};
     for (final row in rows) {
-      if (row is! Map<String, dynamic>) continue;
       final aid = row['achievement_id'] as String? ?? '';
       final ts = row['unlocked_at'] != null
           ? DateTime.tryParse(row['unlocked_at'].toString())

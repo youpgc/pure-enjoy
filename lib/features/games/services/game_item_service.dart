@@ -1,20 +1,16 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 
 import 'package:pure_enjoy/core/utils/event_bus.dart';
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../services/error_reporter.dart';
-import '../../../services/supabase_service.dart';
 import '../../../features/profile/services/point_service.dart';
 import '../models/game_item_model.dart';
 
 /// 游戏道具商城服务（单例 + setState，与积分模块一致，禁 Riverpod）。
 ///
-/// 职责：
-/// - 查询某游戏（可指定模式）的已启用道具目录；
-/// - 查询当前用户持有库存；
-/// - 购买（扣积分写 `point_records.type='game_spend'` + 入库 `user_game_items`）；
-/// - 游戏内消耗（扣减库存）。
+/// change-server：数据面走自建后端 `/games/items/**`——目录+库存同源
+/// （`/items/mine` 全启用道具含持有数），购买/消耗为服务端原子操作
+/// （扣积分/扣库存与流水同事务，无客户端补偿回退路径）。
 class GameItemService {
   static GameItemService? _instance;
   GameItemService._();
@@ -23,42 +19,46 @@ class GameItemService {
     return _instance!;
   }
 
+  /// 目录+库存合并拉取：`item_id -> 行数据`（全启用道具，owned 无记录为 0）。
+  Future<List<Map<String, dynamic>>> _fetchMineRows() async {
+    final result = await BackendApi.get('/games/items/mine');
+    if (!result.success) {
+      debugPrint('[GameItemService] 道具目录/库存查询失败：${result.error}');
+      ErrorReporter.reportMessage(
+        '道具目录/库存查询失败：${result.error}',
+        module: 'games',
+        level: 'warning',
+      );
+      return <Map<String, dynamic>>[];
+    }
+    return [
+      for (final row in result.list)
+        if (row is Map<String, dynamic>) row,
+    ];
+  }
+
   /// 查询道具目录：返回该游戏已启用的道具。
   ///
   /// [mode] 非空时仅返回「通用道具(mode='')」或「匹配该模式的道具」；
   /// [mode] 为 null 时返回该游戏全部已启用道具（商城页用）。
+  /// 服务端已按 game_code+sort_order 排序，过滤保持原序。
   Future<List<GameItemModel>> fetchItems({
     required String gameCode,
     String? mode,
   }) async {
     try {
-      final filters = <String, String>{
-        'game_code': 'eq.$gameCode',
-        'enabled': 'eq.true',
-      };
-      final result = await ApiClient.get(
-        'game_items',
-        filters: filters,
-        // 按需 select：仅模型消费列（排除 created_at/updated_at）
-        select:
-            'id,game_code,mode,item_type,name,description,icon,point_cost,per_game_limit,free_per_game,enabled,sort_order',
-        order: 'sort_order.asc',
-        limit: null,
-      );
-      if (!result.isSuccess || result.data == null) {
-        // 目录拉取失败：对局内表现为无道具可用，上报后台便于发现（2026-09-11）
-        ErrorReporter.reportMessage(
-          '道具目录查询失败：${result.errorMessage ?? '空数据'}（game=$gameCode）',
-          module: 'games',
-          level: 'warning',
-        );
-        return <GameItemModel>[];
-      }
-      final items = result.data!
-          .map((j) => GameItemModel.fromJson(j))
+      final rows = await _fetchMineRows();
+      return [
+        for (final row in rows)
+          if (row['game_code']?.toString() == gameCode)
+            GameItemModel.fromJson(<String, dynamic>{
+              ...row,
+              'id': row['item_id'],
+              'enabled': true,
+            }),
+      ]
           .where((it) => mode == null || it.mode.isEmpty || it.mode == mode)
           .toList();
-      return items;
     } catch (e) {
       return <GameItemModel>[];
     }
@@ -66,50 +66,23 @@ class GameItemService {
 
   /// 查询当前用户持有库存，返回 `item_id -> owned` 映射。
   Future<Map<String, int>> fetchInventory() async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return <String, int>{};
     try {
-      // PostgREST 单次默认上限 1000 行：全量拉取必须按 offset 分页循环，
-      // 且按 item_id 排序保证分页窗口稳定（user_game_items 对单用户按道具唯一）
-      final map = <String, int>{};
-      var offset = 0;
-      while (true) {
-        final result = await ApiClient.get(
-          'user_game_items',
-          filters: {'user_id': 'eq.$userId'},
-          columns: 'id,item_id,owned',
-          order: 'item_id',
-          limit: 1000,
-          offset: offset,
-        );
-        if (!result.isSuccess) {
-          debugPrint(
-              '[GameItemService] 库存查询失败：${result.errorMessage}');
-          return <String, int>{};
-        }
-        final rows = result.data ?? <dynamic>[];
-        for (final row in rows) {
-          final itemId = row['item_id'] as String? ?? '';
-          final owned = (row['owned'] as num?)?.toInt() ?? 0;
-          if (itemId.isNotEmpty) map[itemId] = owned;
-        }
-        if (rows.length < 1000) break;
-        offset += 1000;
-      }
-      return map;
+      final rows = await _fetchMineRows();
+      return <String, int>{
+        for (final row in rows)
+          if (row['item_id'] != null)
+            row['item_id'].toString(): (row['owned'] as num?)?.toInt() ?? 0,
+      };
     } catch (e) {
       return <String, int>{};
     }
   }
 
-  /// 购买道具：扣积分（写 game_spend 流水）+ 入库（owned+1）。
+  /// 购买道具：服务端按 point_cost 扣积分并入库（同事务原子）。
   ///
-  /// 失败回退：入库失败则回退积分，保证不丢分。返回标准结果。
+  /// 客户端仅做余额预检提升体验，最终以服务端校验为准；失败原因直接
+  /// 透出后端文案（积分不足等）。返回标准结果。
   Future<Map<String, dynamic>> purchase(GameItemModel item) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) {
-      return {'success': false, 'message': '未登录'};
-    }
     try {
       final available = await PointService.instance.getAvailablePoints();
       if (available < item.pointCost) {
@@ -118,47 +91,22 @@ class GameItemService {
           'message': '积分不足，需 ${item.pointCost} 积分',
         };
       }
-
-      // 1) 消费积分（game_spend 闭环，自动重算回写 users 展示列）
-      //    扣分流未落库即中止：不得继续发放道具（否则白送）。
-      final spent = await PointService.instance.updatePointsStats(
-        delta: -item.pointCost,
-        type: 'game_spend',
-        remark: '购买道具:${item.name}',
-      );
-      if (!spent) {
+      final result =
+          await BackendApi.post('/games/items/${item.id}/purchase?quantity=1');
+      if (!result.success) {
+        final message = result.error;
         ErrorReporter.reportMessage(
-          '道具购买扣分失败：${item.name}（item=${item.id}, cost=${item.pointCost}, user=$userId）',
+          '道具购买失败：$message（item=${item.id}）',
           module: 'games',
         );
-        return {'success': false, 'message': '积分扣减失败，请稍后重试'};
+        return {'success': false, 'message': message};
       }
-
-      // 2) 入库 owned+1（先查后 upsert，复用 user_items 模式）
-      final ok = await _upsertOwned(item.id, 1);
-      if (!ok) {
-        // 入库失败 → 回退积分；回退也失败则记录，交由后续对账
-        final refunded = await PointService.instance.updatePointsStats(
-          delta: item.pointCost,
-          type: 'earn',
-          remark: '购买道具回退:${item.name}',
-        );
-        // 错误上报（2026-09-11）：扣分/回退/入库的中间态失败涉及资金一致性
-        ErrorReporter.reportMessage(
-          '道具购买入库失败：${item.name}（item=${item.id}, user=$userId, 积分回退=${refunded ? '成功' : '失败需人工核对'}）',
-          module: 'games',
-        );
-        return {
-          'success': false,
-          'message': refunded
-              ? '购买失败，已退回积分'
-              : '购买失败且回退失败，请联系客服核对积分',
-        };
-      }
-
       EventBus.instance.fire(EventType.pointsUpdated);
-      final inv = await fetchInventory();
-      final owned = inv[item.id] ?? 0;
+      final owned =
+          ((result.data is Map<String, dynamic> ? result.data['owned'] : null)
+                  as num?)
+              ?.toInt() ??
+              0;
       return {
         'success': true,
         'message': '购买成功，获得 1 张${item.name}',
@@ -169,84 +117,31 @@ class GameItemService {
     }
   }
 
-  /// 游戏内消耗道具：扣减库存 1 张。返回成功与否（库存不足返回 false）。
-  Future<bool> consumeItem(String itemId, {int qty = 1}) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return false;
+  /// 游戏内消耗道具：扣减库存（服务端条件更新保证并发不为负）。
+  /// 返回成功与否（库存不足/异常返回 false）。[dryRun]=true 仅预检不扣。
+  /// 后端单次扣 1 张，[qty]>1 时按次串行调用（任一失败即止）。
+  Future<bool> consumeItem(String itemId, {int qty = 1, bool dryRun = false}) async {
     try {
-      final nowIso = DateTime.now().toUtc().toIso8601String();
-      final result = await ApiClient.get(
-        'user_game_items',
-        filters: {
-          'user_id': 'eq.$userId',
-          'item_id': 'eq.$itemId',
-        },
-        columns: 'id,owned',
-        limit: 1,
-      );
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final row = result.data![0];
-        final id = row['id'] as String;
-        final q = (row['owned'] as num?)?.toInt() ?? 0;
-        final newQ = q - qty;
-        if (newQ < 0) return false;
-        final upd = await ApiClient.patchByFilter(
-          'user_game_items',
-          filters: {'id': 'eq.$id'},
-          body: {'owned': newQ, 'updated_at': nowIso},
-        );
-        return upd.isSuccess;
+      for (var i = 0; i < qty; i++) {
+        final result = await BackendApi
+            .post('/games/items/$itemId/consume?dryRun=$dryRun');
+        if (!result.success) {
+          debugPrint(
+              '[GameItemService] 道具消耗失败：${result.error}（item=$itemId）');
+          return false;
+        }
+        final data = result.data;
+        if (data is Map<String, dynamic> && data['can_consume'] != true) {
+          return false;
+        }
       }
-      return false; // 无库存行即视为不足
+      return true;
     } catch (e) {
       // 错误上报（2026-09-11）：道具消耗异常会导致玩家扣不到/白扣券
       ErrorReporter.reportMessage(
-        '道具消耗异常：$e（item=$itemId, user=$userId）',
+        '道具消耗异常：$e（item=$itemId）',
         module: 'games',
       );
-      return false;
-    }
-  }
-
-  /// 入库 upsert（owned +delta）。首次购买插入新行；已存在按 id PATCH。
-  Future<bool> _upsertOwned(String itemId, int delta) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return false;
-    try {
-      final nowIso = DateTime.now().toUtc().toIso8601String();
-      final result = await ApiClient.get(
-        'user_game_items',
-        filters: {
-          'user_id': 'eq.$userId',
-          'item_id': 'eq.$itemId',
-        },
-        columns: 'id,owned',
-        limit: 1,
-      );
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final row = result.data![0];
-        final id = row['id'] as String;
-        final q = (row['owned'] as num?)?.toInt() ?? 0;
-        final newQ = q + delta;
-        final upd = await ApiClient.patchByFilter(
-          'user_game_items',
-          filters: {'id': 'eq.$id'},
-          body: {'owned': newQ, 'updated_at': nowIso},
-        );
-        return upd.isSuccess;
-      } else if (delta > 0) {
-        final ins = await ApiClient.post('user_game_items', {
-          'id': const Uuid().v4(),
-          'user_id': userId,
-          'item_id': itemId,
-          'owned': delta,
-          'created_at': nowIso,
-          'updated_at': nowIso,
-        });
-        return ins.isSuccess;
-      }
-      return false;
-    } catch (e) {
       return false;
     }
   }

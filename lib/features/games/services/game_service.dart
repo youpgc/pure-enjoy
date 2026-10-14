@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../services/error_reporter.dart';
 import '../../../utils/cache_helper.dart';
 import '../models/game_achievement_model.dart';
@@ -213,25 +213,30 @@ class GameService {
 
   Future<GameConfigSnapshot> _doFetchConfig() async {
     final memory = _memory;
-    final results = await Future.wait<dynamic>(<Future<dynamic>>[
-      _fetchRows('games', order: 'sort_order.asc'),
-      _fetchRows('game_dimensions', order: 'sort_order.asc'),
-      _fetchRows('game_levels', order: 'sort_order.asc'),
-      _fetchRows('game_achievements', order: 'sort_order.asc'),
-      _fetchRows('game_reward_rules', order: 'sort_order.asc'),
-      _fetchRows('game_modes', order: 'sort_order.asc'),
-    ]);
+    // 单请求六表快照（后端 /games/config-snapshot，服务端按 enabled+sort_order 排好）
+    final result = await BackendApi.get('/games/config-snapshot');
+    if (!result.success) {
+      debugPrint('[GameService] 拉取配置快照失败：${result.error}');
+      ErrorReporter.reportMessage(
+        '游戏配置拉取失败：${result.error}',
+        module: 'games',
+        level: 'warning',
+      );
+      return memory ?? const GameConfigSnapshot();
+    }
+    final data = result.data;
+    final raw = data is Map<String, dynamic> ? data : <String, dynamic>{};
 
     final snapshot = GameConfigSnapshot(
-      games: _toModels<GameModel>(results[0], GameModel.fromJson),
+      games: _toModels<GameModel>(raw['games'], GameModel.fromJson),
       dimensions:
-          _toModels<GameDimensionModel>(results[1], GameDimensionModel.fromJson),
-      levels: _toModels<GameLevelModel>(results[2], GameLevelModel.fromJson),
+          _toModels<GameDimensionModel>(raw['dimensions'], GameDimensionModel.fromJson),
+      levels: _toModels<GameLevelModel>(raw['levels'], GameLevelModel.fromJson),
       achievements: _toModels<GameAchievementModel>(
-          results[3], GameAchievementModel.fromJson),
+          raw['achievements'], GameAchievementModel.fromJson),
       rewardRules: _toModels<GameRewardRuleModel>(
-          results[4], GameRewardRuleModel.fromJson),
-      modes: _toModels<GameModeModel>(results[5], GameModeModel.fromJson),
+          raw['reward_rules'], GameRewardRuleModel.fromJson),
+      modes: _toModels<GameModeModel>(raw['modes'], GameModeModel.fromJson),
       cachedAt: DateTime.now(),
     );
 
@@ -262,87 +267,6 @@ class GameService {
     _memory = null;
     _lastFetchAt = null;
     await CacheHelper.instance.clear(CacheHelper.keyGames);
-  }
-
-  /// 各配置表的按需 select 列清单（**只查模型与逻辑实际消费的列**，
-  /// 排除 created_at/updated_at/logical 无消费列如 game_levels.target，
-  /// 压缩快照载荷——1200 关为主载荷，每行省一字段都是量级收益）。
-  static const Map<String, String> _tableSelects = <String, String>{
-    'games':
-        'id,code,name,icon,description,intro,rules,engine,enabled,sort_order,config,version,level_selectable,level_select_mode,test_only',
-    'game_dimensions':
-        'id,game_id,code,name,unit,value_type,aggregate,is_primary,sort_order',
-    'game_levels':
-        'id,game_id,mode_id,level_no,name,config,enabled,count_for_daily_clear,reward_points,reward_repeatable,sort_order,difficulty',
-    'game_achievements':
-        'id,game_id,code,name,description,icon,condition,reward_points,group_key,enabled,sort_order',
-    'game_reward_rules':
-        'id,game_id,rule_type,name,condition,points,enabled,sort_order',
-    'game_modes':
-        'id,game_id,code,name,icon,description,summary,guide,play_kind,config,sort_order,enabled',
-  };
-
-  /// 查询启用行；失败返回空列表并记日志（配置表为全局表，不按用户过滤）。
-  ///
-  /// **分页拉全量**：PostgREST 服务端默认单次最多返回 1000 行（db-max-rows），
-  /// `limit:null` 且无 Range 头会被静默截断（game_levels 1200 关只拿到前 1000，
-  /// 选关/下一关/关序折算全部失真）。按 1000/页拉取直至不足一页。
-  ///
-  /// **性能优化（2026-09-07）**：
-  /// - **按需 select**：仅查询模型消费列（见 [_tableSelects]）；
-  /// - **ETag/304 缓存**：配置表低频变更，force 拉取时后台未改的表返回 304
-  ///   （无 body 传输，几乎瞬时），大幅缩短游戏主界面进入与下拉刷新耗时；
-  /// - **前两页并发**：game_levels（1200 关）常态为 2 页，并发探测将串行
-  ///   2 个 RTT 压成 1 个；超过 2 页时后续页仍串行（罕见路径）。
-  Future<List<dynamic>> _fetchRows(
-    String table, {
-    required String order,
-  }) async {
-    const pageSize = 1000;
-    final select = _tableSelects[table];
-    Future<List<dynamic>> page(int offset) async {
-      final result = await ApiClient.get(
-        table,
-        filters: <String, String>{'enabled': 'eq.true'},
-        select: select,
-        order: order,
-        limit: pageSize,
-        offset: offset,
-        useETag: true,
-        note: 'games:$table',
-      );
-      if (!result.isSuccess) {
-        debugPrint('[GameService] 拉取 $table 失败：${result.errorMessage}');
-        // 错误上报（2026-09-11）：配置拉取失败会让对局/结算整体降级
-        ErrorReporter.reportMessage(
-          '游戏配置拉取失败：${result.errorMessage}（table=$table, offset=$offset）',
-          module: 'games',
-          level: 'warning',
-        );
-        return <dynamic>[];
-      }
-      return (result.data as List<dynamic>?) ?? <dynamic>[];
-    }
-
-    // 首两页并发探测
-    final pages = await Future.wait<List<dynamic>>([page(0), page(pageSize)]);
-    final first = pages[0];
-    final second = pages[1];
-    if (first.isEmpty) return <dynamic>[]; // 首页空：无启用行或失败
-    if (first.length < pageSize) return first; // 单页即全量
-    final all = <dynamic>[...first, ...second];
-    if (second.length < pageSize) return all;
-
-    // 超过 2 页（罕见）：后续页串行补拉
-    var offset = 2 * pageSize;
-    while (true) {
-      final rows = await page(offset);
-      if (rows.isEmpty) break; // 失败或到尾：保留已拉到的部分（优于整体放弃）
-      all.addAll(rows);
-      if (rows.length < pageSize) break;
-      offset += pageSize;
-    }
-    return all;
   }
 
   /// 将原始行列表转为模型列表（跳过结构异常行，避免单行脏数据导致整页崩溃）。
