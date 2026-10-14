@@ -247,7 +247,8 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
       }
       if (_rangeEnd != null) {
         query['to'] = DateFormat('yyyy-MM-dd')
-            .format(DateTime(_rangeEnd!.year, _rangeEnd!.month, 1));
+            .format(DateTime(_rangeEnd!.year, _rangeEnd!.month + 1, 1)
+                .subtract(const Duration(days: 1)));
       }
 
       final (limit, offset) = paginationParams;

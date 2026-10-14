@@ -348,9 +348,10 @@ class HttpClient {
   /// 原始请求（全 URL，不注入 /rest/v1 前缀，不合并认证头）
   ///
   /// 用于 Supabase Auth 端点（/auth/v1/*）等需要完整自定义 URL 与自定义
-  /// 请求头的场景。复用统一重试与超时能力；[handle401] 固定为 false，
+  /// 请求头的场景。复用统一重试与超时能力；[handle401] 默认 false，
   /// 即 401 时返回原始响应交由调用方解析错误体，而非抛 401 异常
-  /// （登录失败必须返回 SupabaseAuthResponse 而非抛异常）。
+  /// （登录失败必须返回 SupabaseAuthResponse 而非抛异常）；
+  /// 数据面调用（BackendApi）传 true 以启用单飞刷新与原请求重试。
   Future<http.Response> rawRequest(
     String url, {
     String method = 'GET',
@@ -358,13 +359,14 @@ class HttpClient {
     Object? body,
     Duration? timeout,
     String? note,
+    bool handle401 = false,
   }) async {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
     return _request(
       () => sendRawRequest(_client, method, url, headers, encodedBody),
       timeout: timeout,
-      handle401: false,
+      handle401: handle401,
       logMethod: method,
       logUrl: url,
       logParams: body,

@@ -85,6 +85,9 @@ class BackendApi {
         body: body,
         timeout: RequestTimeout.simple,
         note: '$method $path',
+        // 401 → 单飞刷新并原请求重试；刷新失败广播会话过期（审查 P1：过期
+        // 后数据面静默全失败、用户卡伪活跃态）
+        handle401: true,
       );
 
       return _parse(response.body, response.statusCode);
@@ -153,7 +156,7 @@ class BackendResult {
     }
     List<Map<String, dynamic>> rows;
     if (data is List) {
-      rows = data.cast<Map<String, dynamic>>();
+      rows = data.whereType<Map<String, dynamic>>().toList();
     } else if (data is Map<String, dynamic>) {
       final map = data as Map<String, dynamic>;
       rows = map['list'] is List
