@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../services/api_client.dart';
+import 'pet_gateway.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/pet_dex_models.dart';
@@ -33,7 +33,7 @@ class PetRpc {
     final uid = _uid;
     if (uid == null) return const (<PetBagItemModel>[], '未登录');
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_bag_items',
         select:
             'id,quantity,slot_index,item:pet_items(id,item_code,name,icon,category,sub_type,effect,stack_limit)',
@@ -66,7 +66,7 @@ class PetRpc {
     final uid = _uid;
     if (uid == null) return const (<PetEggModel>[], '未登录');
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_eggs',
         select:
             'id,pool_code,mode,status,ready_at,bag_item_id,item:pet_items(name,item_code,icon)',
@@ -90,7 +90,7 @@ class PetRpc {
     if (uid == null) return const (<PetQuestModel>[], '未登录');
     final todayBeijing = DateTimeUtils.todayBeijingKey();
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_daily_quests',
         select:
             'quest_id,progress,target,reward_claimed,quest:pet_quests(id,condition,rewards)',
@@ -122,7 +122,7 @@ class PetRpc {
   /// 启用中的历险地列表
   static Future<(List<PetSpotModel>, String?)> fetchSpots() async {
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_adventure_spots',
         select:
             'id,code,name,unlock_conditions,attr_requirements',
@@ -143,7 +143,7 @@ class PetRpc {
   /// 商城在售道具（扩容阶梯按 step 升序）
   static Future<(List<PetShopItemModel>, String?)> fetchShopItems() async {
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_items',
         select:
             'id,item_code,name,description,icon,category,sub_type,price_coin,price_points,points_purchasable,ladder_key,ladder_step',
@@ -176,7 +176,7 @@ class PetRpc {
     Map<String, dynamic> params,
     String note,
   ) async {
-    final resp = await ApiClient.rpc(fn, params: params, note: note);
+    final resp = await PetGateway.rpc(fn, params: params, note: note);
     if (!resp.isSuccess) return (null, resp.errorMessage);
     final raw = resp.raw;
     if (raw is Map) {

@@ -1,7 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../constants/pet.dart';
-import '../../../services/api_client.dart';
+import 'pet_gateway.dart';
 import '../../../services/supabase_service.dart';
 import '../models/pet_p2_breed_models.dart';
 import '../models/pet_p2_models.dart';
@@ -37,7 +37,7 @@ class PetRpcP2 {
     final uid = _uid;
     if (uid == null) return const (<PetPetDetailModel>[], '未登录');
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_pets',
         select:
             'id,show_no,stage,level,intimacy,gender,status,trait_id,'
@@ -64,7 +64,7 @@ class PetRpcP2 {
   ) async {
     if (chainId.isEmpty) return (const <PetEvoStageOptionModel>[], null);
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_evo_stages',
         select:
             'stage,branch_key,branch_weight,pick_mode,conditions,'
@@ -90,7 +90,7 @@ class PetRpcP2 {
     final uid = _uid;
     if (uid == null) return const (<PetBreedOrderModel>[], '未登录');
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_breed_logs',
         select: 'id,pet_a_id,pet_b_id,started_at,ready_at,status,egg_id',
         filters: {'user_id': 'eq.$uid'},
@@ -112,7 +112,7 @@ class PetRpcP2 {
     final uid = _uid;
     if (uid == null) return const (<PetFeatureModel>[], '未登录');
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_user_features',
         select: 'feature_key,unlocked_at',
         filters: {'user_id': 'eq.$uid'},
@@ -133,7 +133,7 @@ class PetRpcP2 {
   /// 公示页只读此结果，客户端**不做任何概率推算**；未发布的池一律不展示。
   static Future<(List<PetEggOddsModel>, String?)> fetchPublishedEggOdds() async {
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_egg_pools',
         select: 'pool_code,config_version,weights',
         filters: {'published': 'eq.true'},
@@ -163,7 +163,7 @@ class PetRpcP2 {
   /// 只读 GET、无副作用；总览 config 快照里没有 reserved，故单独取一次。
   static Future<(PetReservedModel, String?)> fetchReserved() async {
     try {
-      final resp = await ApiClient.get(
+      final resp = await PetGateway.get(
         'pet_config',
         select: 'reserved',
         limit: 1,

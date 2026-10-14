@@ -5,7 +5,7 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../../../core/utils/event_bus.dart';
 import '../../../core/widgets/widgets.dart';
-import '../../../services/api_client.dart';
+import '../services/pet_gateway.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../profile/services/point_service.dart';
@@ -142,14 +142,14 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
     }
 
     try {
-      final walletRes = await ApiClient.get(
+      final walletRes = await PetGateway.get(
         'pet_wallets',
         filters: {'user_id': 'eq.$userId'},
         select: 'gold_balance,total_earned,total_spent',
         limit: 1,
         note: 'pet_wallets 余额查询',
       );
-      final recordsRes = await ApiClient.get(
+      final recordsRes = await PetGateway.get(
         'pet_wallet_records',
         filters: {'user_id': 'eq.$userId'},
         select: 'delta,balance_after,source_type,remark,created_at',
@@ -161,7 +161,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         throw Exception(walletRes.errorMessage ?? recordsRes.errorMessage ?? '请求失败');
       }
       // 汇率与可用积分：任一失败都不阻塞钱包主内容（兑换按钮自会因积分为 0 而禁用）
-      final configRes = await ApiClient.get(
+      final configRes = await PetGateway.get(
         'pet_config',
         filters: {'id': 'eq.1'},
         select: 'points_per_gold',

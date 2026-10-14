@@ -1,6 +1,6 @@
 import 'package:flutter/foundation.dart';
 
-import '../../../services/api_client.dart';
+import 'pet_gateway.dart';
 import '../../../services/supabase_service.dart';
 import '../models/pet_models.dart';
 import '../utils/pet_errors.dart';
@@ -47,7 +47,7 @@ class PetService {
     try {
       final (data, cached, _) = await PetCache.getMap(
         PetCache.keyGate,
-        () => ApiClient.get(
+        () => PetGateway.get(
           'pet_config',
           select: 'pet_enabled',
           limit: 1,
@@ -77,7 +77,7 @@ class PetService {
     try {
       final (data, _, err) = await PetCache.getMap(
         PetCache.keySummary,
-        () => ApiClient.rpc('rpc_pet_summary', note: 'rpc_pet_summary 总览'),
+        () => PetGateway.rpc('rpc_pet_summary', note: 'rpc_pet_summary 总览'),
         forceRefresh: forceRefresh,
       );
       if (data == null) return (null, err ?? '总览无数据');
