@@ -1,7 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/foundation.dart';
-import './api_client.dart';
+import './backend_api.dart';
 import './sensitive_word_models.dart';
 import './sensitive_word_logger.dart';
 import './supabase_service.dart';
@@ -74,14 +74,11 @@ class SensitiveWordService {
   /// 加载分类开关状态
   Future<void> _loadSwitches() async {
     try {
-      final response = await ApiClient.get(
-        'sensitive_word_configs',
-        select: 'config_key,config_value',
-        limit: null,
-      );
-
-      if (response.isSuccess && response.data != null) {
-        for (final config in response.data!) {
+      final response = await BackendApi.get('/sensitive/bootstrap');
+      if (response.success) {
+        final data = response.data as Map<String, dynamic>? ?? const {};
+        for (final config in (data['configs'] as List?) ?? const []) {
+          if (config is! Map<String, dynamic>) continue;
           if (config['config_key'] == 'novel_enabled') {
             _novelEnabled = config['config_value'] == 'true';
           } else if (config['config_key'] == 'system_enabled') {
@@ -97,17 +94,13 @@ class SensitiveWordService {
   /// 加载敏感词列表
   Future<void> _loadWords() async {
     try {
-      final response = await ApiClient.get(
-        'sensitive_words',
-        select: 'id,word,category,level,replace_word,match_mode,is_active,hit_count',
-        filters: {'is_active': 'eq.true', 'category': 'eq.system'},
-        limit: null,
-      );
-
-      if (response.isSuccess && response.data != null) {
+      final response = await BackendApi.get('/sensitive/bootstrap');
+      if (response.success) {
+        final data = response.data as Map<String, dynamic>? ?? const {};
         _wordCache.clear();
 
-        for (final item in response.data!) {
+        for (final item in (data['words'] as List?) ?? const []) {
+          if (item is! Map<String, dynamic>) continue;
           final word = SensitiveWordModel.fromJson(item);
           _wordCache.putIfAbsent(word.category, () => []).add(word);
         }

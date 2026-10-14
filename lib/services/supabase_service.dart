@@ -12,9 +12,6 @@ import './http_client.dart';
 import '../utils/cache_helper.dart';
 import './notification_service.dart';
 import 'package:flutter/foundation.dart';
-import 'dart:convert';
-import 'dart:io';
-import 'package:package_info_plus/package_info_plus.dart';
 
 // 重新导出，保持向后兼容
 export './supabase_config.dart';
@@ -106,13 +103,6 @@ class AuthService {
     final result = await _auth.signInWithEmail(
         email: email, password: password);
     await _saveAuthResult(result);
-    // 传用户 JWT：RPC 内 auth.uid() 靠它反查用户——anon key 会导致
-    // 日志游离（user_id null）且 users.login_count 不自增（2026-09-11 修复）
-    _reportLogin(
-      success: result.success,
-      account: email,
-      token: result.success ? result.accessToken : null,
-    );
     return result;
   }
 
@@ -124,103 +114,7 @@ class AuthService {
     final result = await _auth.signInWithAccount(
         account: account, password: password);
     await _saveAuthResult(result);
-    _reportLogin(
-      success: result.success,
-      account: account,
-      token: result.success ? result.accessToken : null,
-    );
     return result;
-  }
-
-  // ==================== 登录日志埋点 ====================
-  // 记录一次 App 登录事件（成功/失败）。best-effort，不阻塞登录主流程。
-  // 真实客户端 IP 由服务端 record_login RPC 从 request.headers 提取；
-  // 登录地点由前端 GeoIP 解析（best-effort，失败传 null）。
-  static String? _cachedAppVersion;
-
-  static Future<String> get _appVersion async {
-    if (_cachedAppVersion != null) return _cachedAppVersion!;
-    try {
-      final info = await PackageInfo.fromPlatform();
-      _cachedAppVersion = info.version;
-    } catch (_) {
-      _cachedAppVersion = 'unknown';
-    }
-    return _cachedAppVersion!;
-  }
-
-  /// 触发一次登录日志记录（fire-and-forget）。
-  /// [token]：成功登录时传用户 JWT——record_login 内 auth.uid() 靠它反查
-  /// 用户并回写 login_count；失败/未认证传 null（anon 身份，仅记尝试账号）。
-  void _reportLogin({required bool success, String? account, String? token}) {
-    _doReportLogin(success, account, token).catchError((_) {});
-  }
-
-  /// 解析登录地点（best-effort）：依次尝试多个免费 GeoIP 接口，任一成功即返回。
-  /// 因国内访问海外接口可能不稳定，采用主用 + 兜底策略；任一失败静默跳过。
-  static const List<Map<String, dynamic>> _geoProviders = [
-    {
-      'url': 'https://ipapi.co/json/',
-      'fields': ['country_name', 'region', 'city'],
-    },
-    {
-      'url': 'https://api.ip.sb/geoip/',
-      'fields': ['country', 'region', 'city'],
-    },
-  ];
-
-  Future<String?> _resolveLocation() async {
-    for (final p in _geoProviders) {
-      try {
-        final geo = await HttpClient.instance.rawRequest(
-          p['url'] as String,
-          method: 'GET',
-          headers: {'User-Agent': 'PureEnjoy'},
-          timeout: RequestTimeout.simple,
-          note: '定位当前省市(IP地理解析)',
-        );
-        if (geo.statusCode == 200) {
-          final j = jsonDecode(geo.body) as Map<String, dynamic>;
-          final parts = <String>[
-            for (final f in (p['fields'] as List<String>))
-              if (j[f] != null) j[f].toString(),
-          ];
-          final loc = parts.join(' ').trim();
-          if (loc.isNotEmpty) return loc;
-        }
-      } catch (_) {
-        // 尝试下一个兜底接口
-      }
-    }
-    return null;
-  }
-
-  Future<void> _doReportLogin(
-      bool success, String? account, String? token) async {
-    final location = await _resolveLocation();
-
-    final ua = 'PureEnjoy/${await _appVersion} (${Platform.operatingSystem})';
-    await HttpClient.instance.rawRequest(
-      '${SupabaseConfig.url}/rest/v1/rpc/record_login',
-      method: 'POST',
-      headers: {
-        'apikey': SupabaseConfig.anonKey,
-        // 成功登录必须带用户 JWT：record_login 内 auth.uid() 取的是 Authorization
-        // 里的 sub，用 anon key 会得到 null → 日志 user_id 为空、login_count 不自增。
-        // 失败登录无 JWT，回落 anon（RPC 已授权 anon，仅记尝试账号）。
-        'Authorization': 'Bearer ${token ?? SupabaseConfig.anonKey}',
-        'Content-Type': 'application/json',
-      },
-      body: {
-        'p_source': 'app',
-        'p_status': success ? 'success' : 'failed',
-        'p_user_agent': ua,
-        'p_location': location,
-        'p_username': account,
-      },
-      timeout: RequestTimeout.simple,
-      note: '上报登录记录(RPC)',
-    );
   }
 
   /// 注册
@@ -237,13 +131,6 @@ class AuthService {
       phone: phone,
     );
     await _saveAuthResult(result);
-    // 注册即登录：signup 成功时已拿到会话（success 要求 accessToken 非空），
-    // 属真实鉴权事件，需与登录同口径埋点；否则新用户注册期日志全缺（2026-09-11 修复）
-    _reportLogin(
-      success: result.success,
-      account: email,
-      token: result.success ? result.accessToken : null,
-    );
     return result;
   }
 

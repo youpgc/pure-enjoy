@@ -1,5 +1,5 @@
 import 'package:flutter/material.dart' hide ErrorWidget;
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../core/widgets/widgets.dart';
 
 /// app_configs 进程内缓存：配置（用户协议/隐私政策等）几乎不变，
@@ -48,17 +48,20 @@ class _RichTextPageState extends State<RichTextPage> {
     }
 
     try {
-      final result = await ApiClient.get(
-        'app_configs',
-        filters: {'config_key': 'eq.${widget.configKey}'},
-        columns: 'title,content',
-      );
+      final result = await BackendApi.get('/settings/app-configs');
 
       if (!mounted) return;
-      if (result.isSuccess) {
-        final data = result.data!;
-        if (data.isNotEmpty) {
-          final content = data[0]['content'] ?? '';
+      if (result.success) {
+        Map<String, dynamic>? row;
+        for (final r in result.list) {
+          if (r is Map<String, dynamic> &&
+              r['config_key']?.toString() == widget.configKey) {
+            row = r;
+            break;
+          }
+        }
+        if (row != null) {
+          final content = row['content'] ?? '';
           _appConfigCache[widget.configKey] = content;
           _appConfigCacheTime[widget.configKey] = DateTime.now();
           setState(() {

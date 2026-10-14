@@ -2,7 +2,7 @@ import 'dart:async';
 import 'dart:convert';
 import 'package:flutter/foundation.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import './api_client.dart';
+import './backend_api.dart';
 import '../constants/app_constants.dart';
 import './dict_models.dart';
 
@@ -114,19 +114,18 @@ class DictService {
     try {
       if (kDebugMode) debugPrint('🔄 字典服务开始从网络加载...');
 
-      // 第1次请求：获取所有 dict_types
-      final typesResult = await ApiClient.get(
-        'dict_types',
-        select: 'id,code,name,description,sort_order,is_system,is_active,updated_at',
-        limit: null, // 取消限制，获取全部
-      );
-
-      if (!typesResult.isSuccess || typesResult.data == null) {
-        if (kDebugMode) debugPrint('❌ 字典类型加载失败');
+      // 单请求引导（启用类型+启用项一次性下发，客户端本地过滤/分组）
+      final boot = await BackendApi.get('/dict/bootstrap');
+      if (!boot.success || boot.data == null) {
+        if (kDebugMode) debugPrint('❌ 字典引导加载失败');
         return;
       }
+      final bootData = boot.data as Map<String, dynamic>? ?? const {};
+      final typeRows = (bootData['types'] as List?) ?? const [];
+      final itemRows = (bootData['items'] as List?) ?? const [];
 
-      final allTypes = typesResult.data!
+      final allTypes = typeRows
+          .whereType<Map<String, dynamic>>()
           .map((json) => DictType.fromJson(json))
           .where((t) => t.isActive)
           .toList();
@@ -139,30 +138,13 @@ class DictService {
         }
       }
 
-      // 第2次请求：一次性获取所有需要的 dict_items
-      final neededIds = _typeIdMap.values.toList();
-      if (neededIds.isEmpty) {
+      if (_typeIdMap.isEmpty) {
         if (kDebugMode) debugPrint('⚠️ 没有需要加载的字典类型');
         return;
       }
-
-      final idList = neededIds.map((id) => '"$id"').join(',');
-      final itemsResult = await ApiClient.get(
-        'dict_items',
-        filters: {'type_id': 'in.($idList)', 'is_active': 'eq.true'},
-        select: 'id,type_id,code,label,value,extra,sort_order,is_default,is_active,updated_at',
-        order: 'sort_order.asc',
-        limit: null, // 取消限制，获取全部
-      );
-
-      if (!itemsResult.isSuccess || itemsResult.data == null) {
-        if (kDebugMode) debugPrint('❌ 字典项加载失败');
-        return;
-      }
-
       // 按 type_id 分组
       final newCache = <String, List<DictItem>>{};
-      for (final json in itemsResult.data!) {
+      for (final json in itemRows.whereType<Map<String, dynamic>>()) {
         final item = DictItem.fromJson(json);
         final typeCode = _typeIdMap.entries
             .firstWhere((entry) => entry.value == item.typeId,
@@ -216,101 +198,8 @@ class DictService {
   /// 增量更新：仅获取上次同步后变更的字典项
   /// 返回 true 表示增量更新成功，false 表示需要全量更新
   Future<bool> _incrementalRefresh() async {
-    try {
-      final prefs = await SharedPreferences.getInstance();
-      final lastSyncMs = prefs.getInt(_lastSyncTimeKey);
-      if (lastSyncMs == null) {
-        // 没有同步时间记录，无法增量更新
-        return false;
-      }
-
-      final lastSync = DateTime.fromMillisecondsSinceEpoch(lastSyncMs);
-      final syncTimestamp = lastSync.toUtc().toIso8601String();
-
-      if (kDebugMode) debugPrint('🔄 增量更新，起始时间: $syncTimestamp');
-
-      // 第1次请求：检查 dict_types 是否有变更（新增/删除类型）
-      final typesResult = await ApiClient.get(
-        'dict_types',
-        select: 'id,code,name,description,sort_order,is_system,is_active,updated_at',
-        filters: {'updated_at': 'gt.$syncTimestamp'},
-        limit: null,
-      );
-
-      if (!typesResult.isSuccess) return false;
-
-      // 如果有类型变更，需要全量更新（类型增删影响整体结构）
-      if (typesResult.data != null && typesResult.data!.isNotEmpty) {
-        if (kDebugMode) debugPrint('🔄 检测到字典类型变更，需要全量更新');
-        return false;
-      }
-
-      // 第2次请求：获取变更的 dict_items
-      final neededIds = _typeIdMap.values.toList();
-      if (neededIds.isEmpty) return false;
-
-      final idList = neededIds.map((id) => '"$id"').join(',');
-      final itemsResult = await ApiClient.get(
-        'dict_items',
-        filters: {
-          'type_id': 'in.($idList)',
-          'updated_at': 'gt.$syncTimestamp',
-        },
-        select: 'id,type_id,code,label,value,extra,sort_order,is_default,is_active,updated_at',
-        order: 'sort_order.asc',
-        limit: null,
-      );
-
-      if (!itemsResult.isSuccess) return false;
-
-      final changedItems = itemsResult.data ?? [];
-
-      if (changedItems.isEmpty) {
-        // 没有变更，只更新同步时间
-        await prefs.setInt(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
-        if (kDebugMode) debugPrint('✅ 字典无变更');
-        return true;
-      }
-
-      if (kDebugMode) debugPrint('🔄 增量更新 ${changedItems.length} 条变更项');
-
-      // 合并变更项到现有缓存
-      for (final json in changedItems) {
-        final item = DictItem.fromJson(json);
-        final typeCode = _typeIdMap.entries
-            .firstWhere((entry) => entry.value == item.typeId,
-                orElse: () => const MapEntry('', ''))
-            .key;
-
-        if (typeCode.isNotEmpty) {
-          final typeItems = _cache[typeCode] ?? [];
-          final existingIndex = typeItems.indexWhere((i) => i.id == item.id);
-
-          if (!item.isActive) {
-            // 已停用的项从缓存中移除
-            if (existingIndex >= 0) {
-              typeItems.removeAt(existingIndex);
-            }
-          } else if (existingIndex >= 0) {
-            // 更新已有项
-            typeItems[existingIndex] = item;
-          } else {
-            // 新增项
-            typeItems.add(item);
-          }
-        }
-      }
-
-      // 更新同步时间并保存缓存
-      await _saveToLocalCache();
-      await prefs.setInt(_lastSyncTimeKey, DateTime.now().millisecondsSinceEpoch);
-
-      if (kDebugMode) debugPrint('✅ 字典增量更新完成');
-      return true;
-    } catch (e) {
-      if (kDebugMode) debugPrint('❌ 增量更新异常: $e');
-      return false;
-    }
+    // 后端 /dict/bootstrap 为全量语义，不再提供增量通道：一律回退全量刷新
+    return false;
   }
 
   /// 保存到本地缓存

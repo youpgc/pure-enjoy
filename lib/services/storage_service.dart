@@ -2,8 +2,8 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
 import '../config.dart';
+import './server_config.dart';
 import './http_client.dart';
-import './supabase_service.dart';
 import './storage_models.dart';
 
 export './storage_models.dart';
@@ -22,21 +22,6 @@ class StorageService {
   }
 
   String get _baseUrl => AppConfig.supabaseUrl;
-  String get _anonKey => AppConfig.supabaseAnonKey;
-
-  /// 上传/删除文件的认证头。
-  ///
-  /// 与 [HttpClient._authHeaders] 保持一致：apikey 始终用发布密钥（Supabase 路由必需），
-  /// Authorization 优先用当前登录用户的 JWT（[SupabaseService.accessToken]），
-  /// 未登录时回退 anon key。私有桶的 storage.objects RLS 以 `auth.uid()` 鉴权，
-  /// 仅传 anon key 会导致 Bearer 解析为匿名角色（uid=null）而写入失败，故必须带用户 token。
-  Map<String, String> get _headers {
-    final token = SupabaseService.instance.accessToken;
-    return {
-      'apikey': _anonKey,
-      'Authorization': 'Bearer ${token ?? _anonKey}',
-    };
-  }
 
   /// 上传文件
   ///
@@ -54,15 +39,12 @@ class StorageService {
   }) async {
     try {
       final fileBytes = Uint8List.fromList(bytes);
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket/$path');
+      // B6 尾巴：上传走后端 /files/upload；唯一调用方=头像，category=avatar
+      // 走免登录公开读（/files/public/{id}/content），返回即公开 URL
+      final uri = Uri.parse('${ServerConfig.baseUrl}/api/v1/files/upload');
 
       final request = http.MultipartRequest('POST', uri);
-      request.headers.addAll(_headers);
-      request.headers['x-upsert'] = upsert.toString();
-      if (contentType != null) {
-        request.headers['content-type'] = contentType;
-      }
-
+      request.fields['category'] = 'avatar';
       request.files.add(
         http.MultipartFile.fromBytes(
           'file',
@@ -75,213 +57,35 @@ class StorageService {
       final response = await HttpClient.instance.sendMultipart(request);
       final responseBody = await response.stream.bytesToString();
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return getPublicUrl(bucket, path);
-      } else {
+      if (response.statusCode < 200 || response.statusCode >= 300) {
         throw StorageException(
           '上传文件失败',
           error: responseBody,
           statusCode: response.statusCode.toString(),
         );
       }
+      final envelope = jsonDecode(responseBody) as Map<String, dynamic>;
+      if (envelope['code'] != 200) {
+        throw StorageException(
+          '上传文件失败',
+          error: envelope['message']?.toString() ?? responseBody,
+        );
+      }
+      final meta = envelope['data'] as Map<String, dynamic>? ?? const {};
+      final id = meta['id']?.toString();
+      if (id == null || id.isEmpty) {
+        throw StorageException('上传文件失败', error: '响应缺少文件 id');
+      }
+      return '${ServerConfig.baseUrl}/api/v1/files/public/$id/content';
     } catch (e) {
       if (kDebugMode) debugPrint('上传文件失败');
       rethrow;
     }
   }
 
-  /// 获取文件公开 URL
-  ///
-  /// [bucket] - 存储桶名称
-  /// [path] - 文件路径
-  String getPublicUrl(String bucket, String path) {
-    return '$_baseUrl/storage/v1/object/public/$bucket/$path';
-  }
 
-  /// 获取签名 URL（私有文件）
-  ///
-  /// [bucket] - 存储桶名称
-  /// [path] - 文件路径
-  /// [expiresIn] - URL 过期时间（秒），默认 3600 秒（1小时）
-  Future<String> getSignedUrl(String bucket, String path, {int expiresIn = 3600}) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/sign/$bucket/$path');
-      final response = await HttpClient.instance.post(
-        uri.toString(),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({'expiresIn': expiresIn}),
-        timeout: RequestTimeout.simple,
-      );
 
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final data = jsonDecode(response.body);
-        final signedUrl = data['signedURL'] as String?;
-        if (signedUrl != null) {
-          return '$_baseUrl$signedUrl';
-        }
-        throw StorageException('获取签名 URL 失败: 响应中无 signedURL');
-      } else {
-        throw StorageException(
-          '获取签名 URL 失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('获取签名 URL 失败');
-      rethrow;
-    }
-  }
 
-  /// 删除文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [path] - 文件路径
-  Future<void> deleteFile(String bucket, String path) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket/$path');
-      final response = await HttpClient.instance.delete(
-        uri.toString(),
-        timeout: RequestTimeout.simple,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return;
-      } else {
-        throw StorageException(
-          '删除文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('删除文件失败');
-      rethrow;
-    }
-  }
-
-  /// 删除多个文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [paths] - 文件路径列表
-  Future<void> deleteFiles(String bucket, List<String> paths) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket');
-      final response = await HttpClient.instance.delete(
-        uri.toString(),
-        headers: {'Content-Type': 'application/json'},
-        timeout: RequestTimeout.simple,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return;
-      } else {
-        throw StorageException(
-          '删除多个文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('删除多个文件失败');
-      rethrow;
-    }
-  }
-
-  /// 列出文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [path] - 文件夹路径（可选）
-  Future<List<FileObject>> listFiles(String bucket, {String? path}) async {
-    try {
-      final queryParams = <String, String>{};
-      if (path != null && path.isNotEmpty) {
-        queryParams['prefix'] = path;
-      }
-
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/list/$bucket')
-          .replace(queryParameters: queryParams);
-      final response = await HttpClient.instance.get(
-        uri.toString(),
-        timeout: RequestTimeout.simple,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        final List<dynamic> data = jsonDecode(response.body);
-        return data.map((item) => FileObject.fromJson(item)).toList();
-      } else {
-        throw StorageException(
-          '列出文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('列出文件失败');
-      rethrow;
-    }
-  }
-
-  /// 下载文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [path] - 文件路径
-  Future<Uint8List> downloadFile(String bucket, String path) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/$bucket/$path');
-      final response = await HttpClient.instance.get(
-        uri.toString(),
-        timeout: RequestTimeout.file,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return response.bodyBytes;
-      } else {
-        throw StorageException(
-          '下载文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('下载文件失败');
-      rethrow;
-    }
-  }
-
-  /// 移动文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [sourcePath] - 源文件路径
-  /// [destinationPath] - 目标文件路径
-  Future<void> moveFile(String bucket, String sourcePath, String destinationPath) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/move');
-      final response = await HttpClient.instance.post(
-        uri.toString(),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'bucketId': bucket,
-          'sourceKey': sourcePath,
-          'destinationKey': destinationPath,
-        }),
-        timeout: RequestTimeout.simple,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return;
-      } else {
-        throw StorageException(
-          '移动文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('移动文件失败');
-      rethrow;
-    }
-  }
 
   /// 复制文件
   ///
