@@ -4,7 +4,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'package:uuid/uuid.dart';
 
-import 'models/game_dimension_model.dart';
 import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'play/game_settlement_sheet.dart';
@@ -136,39 +135,35 @@ Future<GameSettlementResult?> reportAndSettle({
   /// 成绩主记录上报成功后的回调（2026-09-11）：传出 score_id，供无尽会话
   /// 挂靠局明细数组（game_endless_rounds）。仅非 aborted 路径触发。
   Future<void> Function(String? scoreId)? onScoreReported,
-}) async {
-  // 维度编码 → 维度 id（成绩表按维度 id 存值）
-  final dims = GameService.instance.cachedConfig.dimensionsOf(game.id);
-  final valuesById = <String, num>{};
-  for (final entry in scoreValuesByCode.entries) {
-    GameDimensionModel? dim;
-    for (final d in dims) {
-      if (d.code == entry.key) {
-        dim = d;
-        break;
-      }
-    }
-    if (dim != null) valuesById[dim.id] = entry.value;
-  }
 
+  /// 无尽会话局明细数组（change-server：随 settle 请求一并落库）。
+  List<GameEndlessRound> endlessRounds = const <GameEndlessRound>[],
+}) async {
   // 失败记录门槛（2026-09-10 用户拍板）：非通关对局，当局步数 <5 不计入
   // 成绩记录（防秒败刷记录）。以 moves 维度取值为准——无 moves 维度的
   // 游戏（sheep 等）不适用此门槛；放弃路径另有 ≥10s 时长门槛。
   final failedMoves = cleared ? null : scoreValuesByCode['moves'];
   final belowMoveFloor = !cleared && failedMoves != null && failedMoves < 5;
 
-  // 放弃：只上报成绩，不结算不弹窗（放弃不发分，防止刷分）
+  // 放弃：只上报成绩，不结算不弹窗（放弃不发分，防止刷分）。
+  // 上报失败静默降级（记日志+上报后台），不阻断退出流程（与旧 submitScore 同口径）。
   if (aborted) {
     if (!belowMoveFloor) {
-      await GameScoreService.instance.submitScore(
-        gameId: game.id,
-        levelId: level.id.isEmpty ? null : level.id,
-        modeId: level.modeId.isEmpty ? null : level.modeId,
-        cleared: cleared,
-        statusOverride: 'aborted',
-        durationMs: durationMs,
-        values: valuesById,
-      );
+      try {
+        await GameRewardService.instance.settleGame(
+          game: game,
+          level: level,
+          scoreValuesByCode: scoreValuesByCode,
+          cleared: cleared,
+          statusOverride: 'aborted',
+          settleToken: const Uuid().v4(),
+          durationMs: durationMs,
+          rewardsAllowed: false,
+        );
+      } catch (e, st) {
+        ErrorReporter.report(e, st, module: 'games');
+        debugPrint('[GamePlayHelpers] 放弃局成绩上报失败：$e');
+      }
     }
     return null;
   }
@@ -192,31 +187,26 @@ Future<GameSettlementResult?> reportAndSettle({
           values: scoreValuesByCode,
         );
       }
-      // 成绩上报：通关 / 达标失败局始终记录；步数 <5 的失败局不计入
-      //（默认流程也记录成绩，仅不发奖励）
-      if (!belowMoveFloor) {
-        final scoreId = await GameScoreService.instance.submitScore(
-          gameId: game.id,
-          levelId: level.id.isEmpty ? null : level.id,
-          modeId: level.modeId.isEmpty ? null : level.modeId,
-          cleared: cleared,
-          durationMs: durationMs,
-          values: valuesById,
-        );
-        // 主记录上报成功 → 通知调用方挂靠衍生明细（如无尽局明细数组）
-        await onScoreReported?.call(scoreId);
-      }
-      // 奖励结算门禁：默认流程跳过（claim_key 体系不触发 = 不发分不发成就）
-      if (!rewardsAllowed) {
+      // 成绩 + 奖励单请求结算（change-server：服务端权威编排，scoreId=settleToken
+      // 幂等）；步数 <5 的失败局不计入（默认流程也记录成绩，仅不发奖励）。
+      if (belowMoveFloor) {
         return const GameSettlementResult(items: <GameSettlementItem>[]);
       }
-      return await GameRewardService.instance.settleGame(
+      final result = await GameRewardService.instance.settleGame(
         game: game,
         level: level,
         scoreValuesByCode: scoreValuesByCode,
         cleared: cleared,
         settleToken: settleToken,
+        durationMs: durationMs,
+        rewardsAllowed: rewardsAllowed,
+        cumulativeTotals:
+            await GameCumulativeService.instance.totalsFor(gameCode: game.code),
+        endlessRounds: endlessRounds,
       );
+      // 主记录上报成功 → 通知调用方挂靠衍生明细（如无尽局明细数组）
+      await onScoreReported?.call(result.scoreId);
+      return result;
     } catch (e, st) {
       // 结算链异常：上报后台后上抛，由结算页错误态承接（L1 重试入口），
       // 不再吞成空明细——那会让用户误以为「无奖励」而非「发放异常」。
@@ -226,7 +216,7 @@ Future<GameSettlementResult?> reportAndSettle({
     }
   }();
 
-  // 重试回调（L1）：仅重跑奖励发放（成绩已记录，不重复上报防止重复记录）。
+  // 重试回调（L1）：仅重跑结算（settleToken 同键幂等，服务端不重复落库/发分）。
   // 异常上报后继续上抛 → 结算页回到错误态，可再次重试。
   Future<GameSettlementResult> retryRewards() async {
     try {
@@ -236,6 +226,11 @@ Future<GameSettlementResult?> reportAndSettle({
         scoreValuesByCode: scoreValuesByCode,
         cleared: cleared,
         settleToken: settleToken,
+        durationMs: durationMs,
+        rewardsAllowed: rewardsAllowed,
+        cumulativeTotals:
+            await GameCumulativeService.instance.totalsFor(gameCode: game.code),
+        endlessRounds: endlessRounds,
       );
     } catch (e, st) {
       ErrorReporter.report(e, st, module: 'games');
@@ -244,7 +239,8 @@ Future<GameSettlementResult?> reportAndSettle({
   }
 
   // 结算弹窗成绩区展示用映射（2026-09-15 用户反馈修复）：
-  // 仅保留「后台 game_dimensions 已配置的成绩维度」（与成绩上报 valuesById 同口径）。
+  // 仅保留「后台 game_dimensions 已配置的成绩维度」（与成绩上报同口径）。
+  final dims = GameService.instance.cachedConfig.dimensionsOf(game.id);
   // 引擎注入的判定专用维度（match3 cleared_blocks/jelly_cleared/collect_done、
   // g2048 merges、sheep mistakes——供成就与累计计数判定）不属成绩展示内容，
   // 不下发弹窗，避免出现未转译的维度编码标签。

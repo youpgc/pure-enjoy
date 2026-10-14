@@ -1,9 +1,7 @@
 import 'package:flutter/foundation.dart';
-import 'package:uuid/uuid.dart';
 
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 import '../../../services/error_reporter.dart';
-import '../../../services/supabase_service.dart';
 import '../../../utils/cache_helper.dart';
 import '../models/game_score_model.dart';
 import '../services/game_service.dart';
@@ -14,16 +12,11 @@ export '../models/game_score_models.dart';
 // 【文件拆分 2026-09-22】单文件超 500 行红线，域模型拆至 models/game_score_models.dart
 // （逻辑零变更）；上述 export 保持调用方原有 import 路径不变。
 
-/// 游戏成绩服务
+/// 游戏成绩服务（change-server：数据面走自建后端 /games/**）
 ///
-/// 职责：上报游玩成绩、查询成绩记录、查询最佳成绩（经 RPC 服务端聚合）。
-/// 所有读写走 [ApiClient]；用户过滤一律用 [AuthService.instance.currentUserId]
-/// 直接匹配业务 ID 列（game_scores.user_id 存业务 ID，非 UUID）。
-/// uuid v4 格式（合成关 id 如 endless_2048_4 非法，上报前置 null）
-final RegExp _uuidRe = RegExp(
-  r'^[0-9a-fA-F]{8}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{4}-[0-9a-fA-F]{12}$',
-);
-
+/// 职责：单次结算上报（成绩+发放明细同请求）、查询成绩记录、最佳成绩、已通关集合。
+/// 状态值映射：App 语义 'cleared' → 后端 'completed'（failed/aborted 同名）。
+/// 结算幂等：客户端 settleToken 作为 scoreId 主键，重试同键服务端只回详情不重复发放。
 class GameScoreService {
   GameScoreService._();
 
@@ -39,183 +32,116 @@ class GameScoreService {
     _memoryBest = null;
   }
 
-  /// 上报一次游玩成绩。
+  /// 单次结算：落成绩（含无尽轮次）+ 服务端权威发放（方案 B 编排在后端）。
   ///
-  /// [values] 为「维度 id → 取值」，按配置维度传入（如分数、用时）。
-  /// [statusOverride] 可显式指定状态（'cleared' / 'failed' / 'aborted'）；
-  /// 缺省按 [cleared] 派生（true→cleared，false→failed）。
-  /// 先插主记录再插各维度取值；维度取值并行写入，任一失败仅记日志不阻断主流程。
-  ///
-  /// 返回成绩 id；未登录或主记录插入失败返回 null。
-  Future<String?> submitScore({
-    required String gameId,
+  /// [valuesByCode] 为「维度编码 → 取值」；[cumulativeTotals] 为累计指标总值
+  /// （cumulative 成就判定数据源，方案 A 口径）；[endlessRounds] 仅无尽会话传入。
+  /// [scoreId] 传结算唯一标识（settleToken），重试同键幂等。
+  /// 返回结算明细；失败返回 null（调用方进错误态重试）。
+  Future<GameSettleOutcome?> settle({
+    required String gameCode,
+    required String settleToken,
     String? levelId,
-    String? modeId,
+    required String modeId,
     required bool cleared,
     String? statusOverride,
     required int durationMs,
-    Map<String, num> values = const <String, num>{},
+    required bool rewardsAllowed,
+    Map<String, num> valuesByCode = const <String, num>{},
+    Map<String, int> cumulativeTotals = const <String, int>{},
+    List<GameEndlessRound> endlessRounds = const <GameEndlessRound>[],
   }) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return null;
-
-    // level_id/mode_id 列为 uuid 类型：合成关（endless_2048_N、GameFlow 默认关）
-    // 的非 uuid id 一律置 null，否则 PostgREST 22P02 上报失败（2026-09-07）
-    String? sanitizeUuid(String? v) =>
-        (v != null && _uuidRe.hasMatch(v)) ? v : null;
-    levelId = sanitizeUuid(levelId);
-    modeId = sanitizeUuid(modeId);
-
-    final scoreId = const Uuid().v4();
-    final now = DateTime.now().toUtc();
-
-    final result = await ApiClient.post(
-      'game_scores',
-      <String, dynamic>{
-        'id': scoreId,
-        'user_id': userId,
-        'game_id': gameId,
-        'level_id': levelId,
-        'mode_id': modeId,
-        'status': statusOverride ?? (cleared ? 'cleared' : 'failed'),
-        'duration_ms': durationMs,
-        'played_at': now.toIso8601String(),
-        'created_at': now.toIso8601String(),
-      },
-      returnRepresentation: false,
-      note: 'games:submit_score',
-    );
-
-    if (!result.isSuccess) {
-      debugPrint('[GameScoreService] 成绩上报失败：${result.errorMessage}');
-      // 错误上报（2026-09-11）：成绩提交失败直接影响用户数据，须后台可见
+    final status = statusOverride ?? (cleared ? 'cleared' : 'failed');
+    final body = <String, dynamic>{
+      'score_id': settleToken,
+      'mode_id': modeId,
+      'level_id': levelId,
+      'status': status == 'cleared' ? 'completed' : status,
+      'duration_ms': durationMs,
+      'rewards_allowed': rewardsAllowed,
+      'values': <Map<String, dynamic>>[
+        for (final e in valuesByCode.entries)
+          {'dimension_code': e.key, 'value': e.value},
+      ],
+      if (cumulativeTotals.isNotEmpty)
+        'cumulative': <String, num>{for (final e in cumulativeTotals.entries) e.key: e.value},
+      if (endlessRounds.isNotEmpty)
+        'rounds': <Map<String, dynamic>>[
+          for (final r in endlessRounds)
+            {
+              'round_no': r.roundNo,
+              'score': r.score,
+              'moves': r.moves,
+              'duration_ms': r.durationMs,
+            },
+        ],
+    };
+    final result = await BackendApi.post('/games/$gameCode/settle', body: body);
+    if (!result.success) {
+      debugPrint('[GameScoreService] 结算上报失败：${result.error}');
       ErrorReporter.reportMessage(
-        '游戏成绩上报失败：${result.errorMessage}（game=$gameId, level=$levelId, mode=$modeId, status=${statusOverride ?? (cleared ? 'cleared' : 'failed')}）',
+        '游戏结算上报失败：${result.error}（game=$gameCode, status=$status）',
         module: 'games',
       );
       return null;
     }
-
-    // 维度取值：ApiClient.post 只接受单条 Map，故逐条并行写入（维度通常 2-3 个）
-    if (values.isNotEmpty) {
-      await Future.wait<void>(values.entries.map((entry) async {
-        final rowResult = await ApiClient.post(
-          'game_score_values',
-          <String, dynamic>{
-            'id': const Uuid().v4(),
-            'score_id': scoreId,
-            'dimension_id': entry.key,
-            'value': entry.value,
-            'created_at': DateTime.now().toUtc().toIso8601String(),
-          },
-          returnRepresentation: false,
-          note: 'games:submit_score_value',
-        );
-        if (!rowResult.isSuccess) {
-          debugPrint(
-              '[GameScoreService] 维度 ${entry.key} 写入失败：${rowResult.errorMessage}');
-          ErrorReporter.reportMessage(
-            '游戏成绩维度值写入失败：${rowResult.errorMessage}（score=$scoreId, dim=${entry.key}, value=${entry.value}）',
-            module: 'games',
-          );
-        }
-      }));
-    }
-
-    // 成绩变动后最佳成绩可能变化，清掉缓存促下次重拉
-    _memoryBest = null;
-    await CacheHelper.instance.clear(CacheHelper.keyGameScores);
-    return scoreId;
+    final data = result.data;
+    final map = data is Map<String, dynamic> ? data : <String, dynamic>{};
+    final score = map['score'];
+    return GameSettleOutcome(
+      scoreId: score is Map<String, dynamic> ? score['id']?.toString() : null,
+      rewards: _mapList(map['rewards']),
+      achievements: _mapList(map['achievements']),
+    );
   }
 
-  /// 查询当前用户在某游戏下已通关的关卡 id 集合。
-  ///
-  /// 供「需通关后选关(gated)」模式判断锁状态：已通关关卡可重挑战，
-  /// 最新未通关关卡（frontier）可解锁，其余上锁。未登录返回空集合。
-  ///
-  /// **性能优化（2026-09-07）**：`select` 仅取 `level_id`（原全列返回，载荷随
-  /// 对局历史线性膨胀）；**分页拉全量**——原 `limit:null` 被 PostgREST 静默截断
-  /// 1000 行，通关数超限后 cleared 集合缺失会导致 frontier/锁状态失真。
+  List<Map<String, dynamic>> _mapList(dynamic raw) => [
+        for (final row in (raw as List<dynamic>?) ?? <dynamic>[])
+          if (row is Map<String, dynamic>) row,
+      ];
+
+  /// 查询当前用户在某游戏下已通关的关卡 id 集合（后端 completed 去重集合）。
   Future<Set<String>> fetchClearedLevelIds(String gameId) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return <String>{};
-
-    const pageSize = 1000;
-    final set = <String>{};
-    var offset = 0;
-    while (true) {
-      final result = await ApiClient.get(
-        'game_scores',
-        filters: <String, String>{
-          'user_id': 'eq.$userId',
-          'game_id': 'eq.$gameId',
-          'status': 'eq.cleared',
-        },
-        select: 'level_id',
-        // offset 分页必须带稳定排序，否则窗口漂移会重复/漏行（审查报告 游戏 C1）
-        order: 'level_id',
-        limit: pageSize,
-        offset: offset,
-        note: 'games:cleared_levels',
-      );
-      if (!result.isSuccess) {
-        debugPrint('[GameScoreService] 已通关关卡查询失败：${result.errorMessage}');
-        ErrorReporter.reportMessage(
-          '已通关关卡集合查询失败：${result.errorMessage}（offset=$offset）',
-          module: 'games',
-          level: 'warning',
-        );
-        return offset == 0 ? <String>{} : set; // 后续页失败保留已拉到的部分
-      }
-      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
-      for (final row in rows) {
-        if (row is Map<String, dynamic>) {
-          final lv = row['level_id'] as String?;
-          if (lv != null) set.add(lv);
-        }
-      }
-      if (rows.length < pageSize) break;
-      offset += pageSize;
+    final gameCode = _codeOf(gameId);
+    if (gameCode == null) return <String>{};
+    final result =
+        await BackendApi.get('/games/$gameCode/cleared-level-ids');
+    if (!result.success) {
+      debugPrint('[GameScoreService] 已通关关卡查询失败：${result.error}');
+      return <String>{};
     }
-    return set;
+    return <String>{
+      for (final v in (result.data as List<dynamic>?) ?? <dynamic>[])
+        if (v != null) v.toString(),
+    };
   }
 
-  /// 查询最佳成绩（服务端聚合）。
-  ///
-  /// [gameId] 为 null 时返回全部游戏最佳成绩（总看板用）；
-  /// 否则只返回该游戏（单游戏看板用）。
+  /// 查询最佳成绩（后端按维度 aggregate 聚合，行结构与原 RPC 一致）。
   ///
   /// SWR 语义（2026-09-07）：非 force 时先返回持久缓存（调用方秒渲染），
-  /// 但本方法**始终发起网络请求**更新缓存——此前无参调用在进程内永远命中
-  /// 内存缓存不发请求，导致返回大厅后最佳成绩永不更新。失败时返回持久
-  /// 缓存兜底（调用方无法区分新旧，由结果内容自然一致）。
+  /// 但本方法**始终发起网络请求**更新缓存。失败时返回持久缓存兜底。
   Future<List<GameBestScore>> fetchBestScores({
     String? gameId,
     bool force = false,
   }) async {
-
-    final result = await ApiClient.rpc(
-      'get_game_best_scores',
-      params: <String, dynamic>{'p_game_id': gameId},
-      note: 'games:best_scores',
+    final gameCode = gameId == null ? null : _codeOf(gameId);
+    final result = await BackendApi.get(
+      '/games/best-scores',
+      query: gameCode == null ? null : {'gameCode': gameCode},
     );
-
-    if (!result.isSuccess) {
-      debugPrint('[GameScoreService] 最佳成绩查询失败：${result.errorMessage}');
+    if (!result.success) {
+      debugPrint('[GameScoreService] 最佳成绩查询失败：${result.error}');
       ErrorReporter.reportMessage(
-        '最佳成绩 RPC 查询失败：${result.errorMessage}（game=$gameId）',
+        '最佳成绩查询失败：${result.error}（game=$gameId）',
         module: 'games',
         level: 'warning',
       );
       return loadCachedBestScores();
     }
-
-    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
-    final list = rows
-        .whereType<Map<String, dynamic>>()
-        .map(GameBestScore.fromJson)
-        .toList();
-
+    final list = [
+      for (final row in (result.data as List<dynamic>?) ?? <dynamic>[])
+        if (row is Map<String, dynamic>) GameBestScore.fromJson(row),
+    ];
     if (gameId == null) {
       _memoryBest = list;
       await CacheHelper.instance
@@ -236,171 +162,118 @@ class GameScoreService {
     return list;
   }
 
-  /// 查询某游戏的成绩记录（按游玩时间倒序）。
+  /// 查询某游戏的成绩记录（按游玩时间倒序，含维度值）。
   ///
-  /// [limit] 为 null 时取全量（默认 10 会截断，看板场景须显式传值）。
-  /// [offset] 用于分页滚动加载（看板「游戏记录」列表）。
+  /// [limit] 为 null 时取全量；[offset] 用于分页滚动加载。后端分页按
+  /// page/pageSize 语义，此处把 offset 折算为页号（pageSize 与请求页大小一致）。
   Future<List<GameScoreModel>> fetchScoreHistory(
     String gameId, {
     int? limit = 50,
     int offset = 0,
   }) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return <GameScoreModel>[];
-
-    final result = await ApiClient.get(
-      'game_scores',
-      filters: <String, String>{
-        'user_id': 'eq.$userId',
-        'game_id': 'eq.$gameId',
-        // App 端看板不展示「放弃」记录（通关/失败仍展示；放弃仅后台可见）
-        'status': 'neq.aborted',
-      },
-      // 按需 select：记录列表消费 时间/用时/通关状态/归属 + 嵌入取单局得分
-      // （无尽会话聚合展示「总局数+累积分数」需要 score 值，2026-09-07）
-      select:
-          'id,status,duration_ms,played_at,level_id,mode_id,game_score_values(value,dimension_id)',
-      order: 'played_at.desc',
-      limit: limit,
-      offset: offset,
-      note: 'games:score_history',
-    );
-
-    if (!result.isSuccess) {
-      debugPrint('[GameScoreService] 成绩记录查询失败：${result.errorMessage}');
-      ErrorReporter.reportMessage(
-        '成绩记录查询失败：${result.errorMessage}（game=$gameId, offset=$offset）',
-        module: 'games',
-        level: 'warning',
-      );
-      return <GameScoreModel>[];
-    }
-
-    // score 维度 id（用于从嵌入 values 提取单局得分）
+    final rows = await _fetchScoreRows(gameId, limit: limit, offset: offset);
     String? scoreDimId;
-    for (final d
-        in GameService.instance.cachedConfig.dimensionsOf(gameId)) {
+    for (final d in GameService.instance.cachedConfig.dimensionsOf(gameId)) {
       if (d.code == 'score') {
         scoreDimId = d.id;
         break;
       }
     }
-
-    final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
     return rows
-        .whereType<Map<String, dynamic>>()
         .map((r) => GameScoreModel.fromJson(r, scoreDimId: scoreDimId))
         .toList();
   }
 
   /// 查询某游戏全部成绩记录（含各维度取值），供「各模式最佳成绩」等本地聚合。
-  ///
-  /// 通过 PostgREST 嵌入 game_score_values，避免逐条查维度值；维度编码由
-  /// 缓存的维度定义反查。未登录或失败返回空列表。
-  ///
-  /// **按需查询（2026-09-07）**：分页拉全量——原 `limit:null` 被 PostgREST
-  /// 静默截断 1000 行，成绩超限后各模式最佳成绩聚合会静默缺失。
   Future<List<GameScoreEntry>> fetchScoresWithValues(String gameId) async {
-    final userId = AuthService.instance.currentUserId;
-    if (userId == null) return <GameScoreEntry>[];
-
-    const pageSize = 1000;
     final dims = GameService.instance.cachedConfig.dimensionsOf(gameId);
+    final rows = await _fetchScoreRows(gameId, limit: null, offset: 0);
     final list = <GameScoreEntry>[];
-    var offset = 0;
-    while (true) {
-      final result = await ApiClient.get(
-        'game_scores',
-        select:
-            // mode_id 供「各模式最佳成绩」分组（无尽合成局 level_id 为 null，须靠主记录 mode_id）
-            'id,level_id,mode_id,status,played_at,duration_ms,game_score_values(dimension_id,value)',
-        filters: <String, String>{
-          'user_id': 'eq.$userId',
-          'game_id': 'eq.$gameId',
-          'status': 'neq.aborted',
-        },
-        // 追加 id 保证排序唯一（同秒成绩跨页去重，审查报告 游戏 C2）
-        order: 'played_at.desc,id.desc',
-        limit: pageSize,
-        offset: offset,
-        note: 'games:scores_with_values',
-      );
-
-      if (!result.isSuccess) {
-        debugPrint('[GameScoreService] 成绩维度值查询失败：${result.errorMessage}');
-        ErrorReporter.reportMessage(
-          '成绩维度值查询失败：${result.errorMessage}（game=$gameId, offset=$offset）',
-          module: 'games',
-          level: 'warning',
-        );
-        return offset == 0 ? <GameScoreEntry>[] : list; // 保留已聚合部分
-      }
-
-      final rows = (result.data as List<dynamic>?) ?? <dynamic>[];
-      for (final raw in rows) {
-        if (raw is! Map<String, dynamic>) continue;
-        final score = GameScoreModel.fromJson(raw);
-        final values = <String, num>{};
-        final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
-        for (final v in vals) {
-          if (v is! Map<String, dynamic>) continue;
-          final dim = dims
-              .where((d) => d.id == (v['dimension_id'] as String?))
-              .firstOrNull;
-          final numVal = (v['value'] as num?) ?? 0;
-          if (dim != null) {
-            values[dim.code] = numVal;
-          } else {
-            values[v['dimension_id'].toString()] = numVal;
-          }
+    for (final raw in rows) {
+      final score = GameScoreModel.fromJson(raw);
+      final values = <String, num>{};
+      final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
+      for (final v in vals) {
+        if (v is! Map<String, dynamic>) continue;
+        final dimId = v['dimension_id']?.toString();
+        final dim = dims.where((d) => d.id == dimId).firstOrNull;
+        final numVal = (v['value'] as num?) ?? 0;
+        if (dim != null) {
+          values[dim.code] = numVal;
+        } else if (dimId != null) {
+          values[dimId] = numVal;
         }
-        list.add(GameScoreEntry(
-          score: score,
-          values: values,
-          dimensions: dims,
-        ));
       }
-      if (rows.length < pageSize) break;
-      offset += pageSize;
+      list.add(GameScoreEntry(score: score, values: values, dimensions: dims));
     }
     return list;
   }
 
-  /// 上传无尽会话的局明细数组（2026-09-11）：挂在会话主记录 score_id 下，
-  /// 供后台「无尽局明细展开表」展示。逐条插入（上限 endlessMaxRounds≤30），
-  /// 单条失败仅上报错误日志不中断其余局。返回成功写入条数。
-  Future<int> submitEndlessRounds({
-    required String scoreId,
-    required String userId,
-    required String gameId,
-    String? modeId,
-    required List<GameEndlessRound> rounds,
+  /// 成绩行拉取（后端 /games/scores 多状态过滤 + 嵌入维度值）。
+  ///
+  /// 行结构转换为模型消费的 PostgREST 嵌入形状（values → game_score_values）。
+  /// [limit] 为 null 时按 500/页循环拉全量（后端分页有界）。
+  Future<List<Map<String, dynamic>>> _fetchScoreRows(
+    String gameId, {
+    int? limit,
+    required int offset,
   }) async {
-    var ok = 0;
-    for (final round in rounds) {
-      final result = await ApiClient.post(
-        'game_endless_rounds',
-        round.toRow(
-          scoreId: scoreId,
-          userId: userId,
-          gameId: gameId,
-          modeId: modeId,
-        ),
-        returnRepresentation: false,
-        note: 'games:endless_round',
+    final gameCode = _codeOf(gameId);
+    if (gameCode == null) return <Map<String, dynamic>>[];
+    const statuses = 'completed,failed'; // 看板不展示「放弃」记录（aborted 仅后台可见）
+    final pageSize = limit ?? 500;
+    final page = offset ~/ pageSize + 1;
+    final result = await BackendApi.get('/games/scores', query: <String, String>{
+      'gameCode': gameCode,
+      'statuses': statuses,
+      'page': '$page',
+      'pageSize': '$pageSize',
+    });
+    if (!result.success) {
+      debugPrint('[GameScoreService] 成绩记录查询失败：${result.error}');
+      ErrorReporter.reportMessage(
+        '成绩记录查询失败：${result.error}（game=$gameId, page=$page）',
+        module: 'games',
+        level: 'warning',
       );
-      if (result.isSuccess) {
-        ok += 1;
-      } else {
-        debugPrint(
-            '[GameScoreService] 无尽局明细写入失败（round=${round.roundNo}）：${result.errorMessage}');
-        ErrorReporter.reportMessage(
-          '无尽局明细写入失败：${result.errorMessage}（score=$scoreId, round=${round.roundNo}）',
-          module: 'games',
-        );
-      }
+      return <Map<String, dynamic>>[];
     }
-    return ok;
+    final rows = <Map<String, dynamic>>[
+      for (final row in result.list)
+        if (row is Map<String, dynamic>)
+          <String, dynamic>{...row, 'game_score_values': row['values']},
+    ];
+    // 全量模式：不足一页即到尾；否则继续补拉（罕见路径，串行）
+    if (limit != null || rows.length < pageSize) return rows;
+    var all = rows;
+    var nextPage = page + 1;
+    while (true) {
+      final more = await BackendApi.get('/games/scores',
+          query: <String, String>{
+            'gameCode': gameCode,
+            'statuses': statuses,
+            'page': '$nextPage',
+            'pageSize': '$pageSize',
+          });
+      final moreRows = <Map<String, dynamic>>[
+        for (final row in more.list)
+          if (row is Map<String, dynamic>)
+            <String, dynamic>{...row, 'game_score_values': row['values']},
+      ];
+      if (moreRows.isEmpty) break;
+      all = [...all, ...moreRows];
+      if (moreRows.length < pageSize) break;
+      nextPage += 1;
+    }
+    return all;
+  }
+
+  /// 由快照反查游戏编码（后端端点按 gameCode 寻址）。
+  String? _codeOf(String gameId) {
+    for (final g in GameService.instance.cachedConfig.games) {
+      if (g.id == gameId) return g.code;
+    }
+    return null;
   }
 
   /// 清空成绩缓存（切换账号或下拉刷新用）。
@@ -408,4 +281,17 @@ class GameScoreService {
     _memoryBest = null;
     await CacheHelper.instance.clear(CacheHelper.keyGameScores);
   }
+}
+
+/// 单次结算结果（成绩 id + 服务端发放明细原行）。
+class GameSettleOutcome {
+  final String? scoreId;
+  final List<Map<String, dynamic>> rewards;
+  final List<Map<String, dynamic>> achievements;
+
+  const GameSettleOutcome({
+    this.scoreId,
+    this.rewards = const <Map<String, dynamic>>[],
+    this.achievements = const <Map<String, dynamic>>[],
+  });
 }

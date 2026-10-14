@@ -61,7 +61,10 @@ class GameSettlementResult {
   /// 明细列表
   final List<GameSettlementItem> items;
 
-  const GameSettlementResult({required this.items});
+  /// 成绩主记录 id（change-server：settle 同请求返回，供无尽局明细等挂靠）
+  final String? scoreId;
+
+  const GameSettlementResult({required this.items, this.scoreId});
 
   /// 实际发放总积分
   int get totalPoints =>

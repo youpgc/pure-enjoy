@@ -10,7 +10,6 @@ import 'models/game_level_model.dart';
 import 'models/game_model.dart';
 import 'services/game_score_service.dart';
 import 'services/game_service.dart';
-import '../../../services/supabase_service.dart';
 
 /// 主动放弃计入游戏记录的最短时长下限：低于此值（如误触返回）不落 game_scores、
 /// 不结算发分，避免拉低正常通关率等统计数据。
@@ -246,19 +245,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
       cleared: true,
       rewardsAllowed: _rewardsAllowed,
       endless: true,
-      onScoreReported: (scoreId) async {
-        if (scoreId == null || scoreId.isEmpty || rounds.isEmpty) return;
-        final userId = AuthService.instance.currentUserId;
-        if (userId == null) return;
-        final ok = await GameScoreService.instance.submitEndlessRounds(
-          scoreId: scoreId,
-          userId: userId,
-          gameId: game.id,
-          modeId: level.modeId.isEmpty ? null : level.modeId,
-          rounds: rounds,
-        );
-        debugPrint('[GamePlayScreen] 无尽局明细上传：$ok/${rounds.length} 局');
-      },
+      endlessRounds: rounds,
       onExit: () => Navigator.of(context).pop(),
     );
   }
