@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../core/widgets/widgets.dart';
-import './api_client.dart';
+import 'backend_api.dart';
 import './apk_installer.dart';
 import './update_dialog.dart';
 
@@ -160,17 +160,15 @@ class VersionCheckService {
 
   /// 拉取服务器最新 released 版本（含防御：版本号空/缺下载地址均视为不可用）
   Future<Map<String, dynamic>?> _fetchLatest() async {
-    final result = await ApiClient.get(
-      'app_versions',
-      filters: {'status': 'eq.released', 'platform': 'eq.android'},
-      order: 'created_at.desc',
-      limit: 1,
+    final result = await BackendApi.get(
+      '/app-versions/latest',
+      query: {'platform': 'android'},
     );
-    if (!result.isSuccess || result.data == null || result.data!.isEmpty) {
+    final row = result.list.isEmpty ? null : result.list.first;
+    if (!result.success || row == null) {
       if (kDebugMode) debugPrint('📱 未获取到最新版本或请求失败');
       return null;
     }
-    final row = result.data!.first;
     // 统一版本号格式：只去锚定开头的 v 前缀（无锚定的 replaceFirst 会吃掉
     // 任意位置的首个 v，如 "1.0.dev"→"1.0.de"，审查报告 版本#8）
     final version = ((row['version'] as String?) ?? '')

@@ -3,9 +3,8 @@ import 'dart:async';
 import 'package:flutter/foundation.dart';
 import 'package:package_info_plus/package_info_plus.dart';
 
-import './http_client.dart';
 import './session_manager.dart';
-import './supabase_config.dart';
+import './backend_api.dart';
 
 /// 全局客户端错误上报。
 ///
@@ -81,20 +80,16 @@ class ErrorReporter {
     final version = await _appVersion;
     // 当前业务用户 ID（切换账号后自动取新值），便于按用户归因
     final userId = SessionManager.instance.currentUserId;
-    await HttpClient.instance.rawRequest(
-      '${SupabaseConfig.url}/rest/v1/rpc/report_client_error',
-      method: 'POST',
-      headers: SupabaseConfig.headers,
-      body: {
-        'p_level': level,
-        'p_module': module,
-        'p_message': error.toString(),
-        'p_detail': {'stack_trace': stack?.toString()},
-        'p_source': 'app',
-        'p_app_version': version,
-        'p_user_id': userId,
+    // App 域写入通道（归属由服务端取登录态；未登录上报被 401 静默丢弃）
+    await BackendApi.post('/client/error-logs', body: {
+      'level': level,
+      'module': module,
+      'message': error.toString(),
+      'detail': {
+        'stack_trace': stack?.toString(),
+        'app_version': version,
+        'user_id': userId,
       },
-      timeout: RequestTimeout.simple,
-    );
+    });
   }
 }

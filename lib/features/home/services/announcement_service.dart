@@ -1,4 +1,4 @@
-import '../../../services/api_client.dart';
+import '../../../services/backend_api.dart';
 
 /// 公告模型
 ///
@@ -84,19 +84,14 @@ class AnnouncementService {
   /// 已发布(is_published=true) + 已过发布时间(publish_at<=now) + 未过期(expire_at 为空或 >=now)
   static Future<List<Announcement>> fetchActive({int limit = 50}) async {
     try {
-      final now = DateTime.now().toUtc().toIso8601String();
-      final result = await ApiClient.get(
-        'announcements',
-        filters: {
-          'is_published': 'eq.true',
-          'publish_at': 'lte.$now',
-          'or': '(expire_at.is.null,expire_at.gte.$now)',
-        },
-        order: 'created_at.desc',
-        limit: limit,
+      // 生效过滤（已发布/发布时间/过期时间）由后端 /announcements 权威判定
+      final result = await BackendApi.get(
+        '/announcements',
+        query: {'limit': '$limit', 'pageSize': '$limit'},
       );
-      if (!result.isSuccess || result.data == null) return [];
-      final list = result.data as List;
+      if (!result.success) return [];
+      final list = result.list;
+      if (list.isEmpty) return [];
       final items = list
           .map((e) => Announcement.fromJson(e as Map<String, dynamic>))
           .toList();
