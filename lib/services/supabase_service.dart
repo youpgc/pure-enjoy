@@ -86,7 +86,9 @@ class AuthService {
 
   /// 保存认证结果到会话
   Future<void> _saveAuthResult(SupabaseAuthResponse result) async {
-    if (result.success && result.user != null) {
+    // token 落盘即保存会话（/auth/me 瞬时失败不阻断：user 由后补链路拉取；
+    // 否则 UI 已进入登录态而无 token，数据面全部 401 且无法刷新——审查 P0）
+    if (result.success && result.accessToken != null) {
       await _session.saveSession(
         accessToken: result.accessToken!,
         refreshToken: result.refreshToken!,
@@ -260,12 +262,4 @@ class AuthService {
     );
   }
 
-  /// 获取当前用户的认证 Headers
-  Map<String, String> get authHeaders => {
-        'apikey': SupabaseConfig.anonKey,
-        'Authorization':
-            'Bearer ${_session.accessToken ?? SupabaseConfig.anonKey}',
-        'Content-Type': 'application/json',
-        'Prefer': 'return=representation',
-      };
 }

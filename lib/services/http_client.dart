@@ -356,6 +356,7 @@ class HttpClient {
     String url, {
     String method = 'GET',
     Map<String, String>? headers,
+    Map<String, String> Function()? headersProvider,
     Object? body,
     Duration? timeout,
     String? note,
@@ -364,7 +365,12 @@ class HttpClient {
     final encodedBody =
         body is String ? body : (body != null ? jsonEncode(body) : null);
     return _request(
-      () => sendRawRequest(_client, method, url, headers, encodedBody),
+      () {
+        // headersProvider：401 刷新后重试须重建认证头（复用调用方捕获的旧
+        // headers 会带着过期 Bearer 重试，刷新失效——审查 P1）
+        final h = headersProvider?.call() ?? headers;
+        return sendRawRequest(_client, method, url, h, encodedBody);
+      },
       timeout: timeout,
       handle401: handle401,
       logMethod: method,

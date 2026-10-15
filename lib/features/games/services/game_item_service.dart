@@ -91,8 +91,10 @@ class GameItemService {
           'message': '积分不足，需 ${item.pointCost} 积分',
         };
       }
-      final result =
-          await BackendApi.post('/games/items/${item.id}/purchase?quantity=1');
+      // 幂等键：同一动作重试同键，服务端按 claim_key 去重防双扣
+      final requestId = 'pur_${DateTime.now().microsecondsSinceEpoch}';
+      final result = await BackendApi
+          .post('/games/items/${item.id}/purchase?quantity=1&requestId=$requestId');
       if (!result.success) {
         final message = result.error;
         ErrorReporter.reportMessage(

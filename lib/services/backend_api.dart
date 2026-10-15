@@ -81,7 +81,9 @@ class BackendApi {
       final response = await HttpClient.instance.rawRequest(
         url,
         method: method,
-        headers: _headers(),
+        // headersProvider：每轮重试重取 SessionManager 的最新令牌
+        // （静态 map 会让刷新后的重试仍带过期 Bearer——审查 P1）
+        headersProvider: _headers,
         body: body,
         timeout: RequestTimeout.simple,
         note: '$method $path',

@@ -133,6 +133,9 @@ Future<http.Response> requestWithRetry(
         await Future.delayed(Duration(seconds: 1 << (attempt - 1)));
       }
     } on HttpException catch (e) {
+      // 401 终态（刷新已失败并广播会话过期）：不按网络错误重试，
+      // 直接外抛保留 401 语义（避免二次广播与注定失败的请求）
+      if (e.message.contains('401_UNAUTHORIZED')) rethrow;
       lastError = e;
       if (attempt < maxRetries) {
         await Future.delayed(Duration(seconds: 1 << (attempt - 1)));

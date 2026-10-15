@@ -1,7 +1,6 @@
 import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:flutter/foundation.dart';
-import '../config.dart';
 import './server_config.dart';
 import './http_client.dart';
 import './storage_models.dart';
@@ -21,7 +20,6 @@ class StorageService {
     return _instance!;
   }
 
-  String get _baseUrl => AppConfig.supabaseUrl;
 
   /// 上传文件
   ///
@@ -87,38 +85,5 @@ class StorageService {
 
 
 
-  /// 复制文件
-  ///
-  /// [bucket] - 存储桶名称
-  /// [sourcePath] - 源文件路径
-  /// [destinationPath] - 目标文件路径
-  Future<void> copyFile(String bucket, String sourcePath, String destinationPath) async {
-    try {
-      final uri = Uri.parse('$_baseUrl/storage/v1/object/copy');
-      final response = await HttpClient.instance.post(
-        uri.toString(),
-        headers: {'Content-Type': 'application/json'},
-        body: jsonEncode({
-          'bucketId': bucket,
-          'sourceKey': sourcePath,
-          'destinationKey': destinationPath,
-        }),
-        timeout: RequestTimeout.simple,
-      );
-
-      if (response.statusCode >= 200 && response.statusCode < 300) {
-        return;
-      } else {
-        throw StorageException(
-          '复制文件失败',
-          error: response.body,
-          statusCode: response.statusCode.toString(),
-        );
-      }
-    } catch (e) {
-      if (kDebugMode) debugPrint('复制文件失败');
-      rethrow;
-    }
-  }
 
 }
