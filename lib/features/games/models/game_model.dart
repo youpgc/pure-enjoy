@@ -97,7 +97,11 @@ class GameModel {
       enabled: json['enabled'] as bool? ?? true,
       sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
       config: (json['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{},
-      version: (json['version'] as num?)?.toInt() ?? 1,
+      // version 兼容两种落库形态：integer（旧库）与 text（本地 text 列存 "1"），
+      // 硬转 num 会让整个配置快照解析崩溃（成就/模式/关卡全部落空）
+      version: json['version'] is num
+          ? (json['version'] as num).toInt()
+          : int.tryParse(json['version']?.toString() ?? '') ?? 1,
       levelSelectable: json['level_selectable'] as bool? ?? false,
       levelSelectMode: (json['level_select_mode'] as String? ?? 'gated'),
       testOnly: json['test_only'] as bool? ?? false,

@@ -35,8 +35,7 @@ class PetRpc {
     try {
       final resp = await PetGateway.get(
         'pet_bag_items',
-        select:
-            'id,quantity,slot_index,item:pet_items(id,item_code,name,icon,category,sub_type,effect,stack_limit)',
+        select: 'id,item_id,quantity,slot_index',
         filters: {'user_id': 'eq.$uid'},
         order: 'slot_index.asc',
         limit: 200,
@@ -44,11 +43,21 @@ class PetRpc {
       );
       if (!resp.isSuccess) return (const <PetBagItemModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
+      // 本地网关无嵌套语法：道具目录两段查询后本地组装（缺目录行走模型空值兜底）
+      final items = await PetGateway.fetchCatalogRows(
+        'pet_items',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['item_id']}').toList(),
+        cols: 'item_code,name,icon,category,sub_type,effect,stack_limit',
+        note: 'pet_items 背包道具目录查询',
+      );
       final stackLimitDefault = PetService.instance.stackLimitDefault;
       return (
         rows
-            .map((r) =>
-                PetBagItemModel.fromJson(r, stackLimitDefault: stackLimitDefault))
+            .map((r) => PetBagItemModel.fromJson(
+                  {...r, 'item': items[r['item_id']] ?? const {}},
+                  stackLimitDefault: stackLimitDefault,
+                ))
             .toList(),
         null,
       );
@@ -68,8 +77,7 @@ class PetRpc {
     try {
       final resp = await PetGateway.get(
         'pet_eggs',
-        select:
-            'id,pool_code,mode,status,ready_at,bag_item_id,item:pet_items(name,item_code,icon)',
+        select: 'id,egg_item_id,pool_code,mode,status,ready_at,bag_item_id',
         filters: {'user_id': 'eq.$uid', 'status': 'in.(unopened,waiting,ready)'},
         order: 'created_at.asc',
         limit: 100,
@@ -77,7 +85,21 @@ class PetRpc {
       );
       if (!resp.isSuccess) return (const <PetEggModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
-      return (rows.map(PetEggModel.fromJson).toList(), null);
+      // 本地网关无嵌套语法：蛋道具目录两段查询后本地组装（FK=egg_item_id）
+      final items = await PetGateway.fetchCatalogRows(
+        'pet_items',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['egg_item_id']}').toList(),
+        cols: 'name,item_code,icon',
+        note: 'pet_items 蛋道具目录查询',
+      );
+      return (
+        rows
+            .map((r) => PetEggModel.fromJson(
+                {...r, 'item': items[r['egg_item_id']] ?? const {}}))
+            .toList(),
+        null,
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpc] 蛋查询失败: $e');
       return (const <PetEggModel>[], kPetLocalError);
@@ -92,23 +114,32 @@ class PetRpc {
     try {
       final resp = await PetGateway.get(
         'pet_daily_quests',
-        select:
-            'quest_id,progress,target,reward_claimed,quest:pet_quests(id,condition,rewards)',
+        select: 'quest_id,progress,target,reward_claimed',
         filters: {
           'user_id': 'eq.$uid',
           'assign_date': 'eq.$todayBeijing',
-          // ★ 只认 daily 任务：周任务复用本表（assign_date=周一），不过滤 type
-          //   时周一「每日」页签会串显周任务（与服务端抽取判定同步修复，P1-1）
-          'quest.type': 'eq.daily',
         },
         limit: 50,
         note: 'pet_daily_quests 当日任务查询',
       );
       if (!resp.isSuccess) return (const <PetQuestModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
+      // 本地网关无嵌套语法：任务目录两段查询后本地组装，
+      // 仅取 daily 类型（等价旧 PostgREST 下推筛选 quest.type=eq.daily）
+      final quests = await PetGateway.fetchCatalogRows(
+        'pet_quests',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['quest_id']}').toList(),
+        cols: 'condition,rewards,type',
+        extraFilters: {'type': 'eq.daily'},
+        note: 'pet_quests 当日任务目录查询',
+      );
       return (
         rows
-            .map(PetQuestModel.fromJson)
+            .map((r) => PetQuestModel.fromJson({
+                  ...r,
+                  'quest': quests[r['quest_id']] ?? const {},
+                }))
             .where((q) => q.questId.isNotEmpty)
             .toList(),
         null,

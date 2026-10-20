@@ -39,10 +39,7 @@ class PetRpcP2 {
     try {
       final resp = await PetGateway.get(
         'pet_pets',
-        select:
-            'id,show_no,stage,level,intimacy,gender,status,trait_id,'
-            'species:pet_species(id,species_code,name_cn,family,rarity_code,evolution_chain_id,enabled),'
-            'trait:pet_traits(id,code,name)',
+        select: 'id,show_no,stage,level,intimacy,gender,status,species_id,trait_id',
         filters: {'user_id': 'eq.$uid'},
         order: 'created_at.asc',
         limit: 50,
@@ -50,7 +47,31 @@ class PetRpcP2 {
       );
       if (!resp.isSuccess) return (const <PetPetDetailModel>[], resp.errorMessage);
       final rows = resp.data ?? const <Map<String, dynamic>>[];
-      return (rows.map(PetPetDetailModel.fromJson).toList(), null);
+      // 本地网关无嵌套语法：物种/特性目录两段查询后本地组装
+      final species = await PetGateway.fetchCatalogRows(
+        'pet_species',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['species_id']}').toList(),
+        cols: 'species_code,name_cn,family,rarity_code,evolution_chain_id,enabled',
+        note: 'pet_species 明细目录查询',
+      );
+      final traits = await PetGateway.fetchCatalogRows(
+        'pet_traits',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['trait_id']}').toList(),
+        cols: 'code,name',
+        note: 'pet_traits 明细目录查询',
+      );
+      return (
+        rows
+            .map((r) => PetPetDetailModel.fromJson({
+                  ...r,
+                  'species': species[r['species_id']] ?? const {},
+                  'trait': traits[r['trait_id']] ?? const {},
+                }))
+            .toList(),
+        null,
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 宠物明细查询失败: $e');
       return (const <PetPetDetailModel>[], kPetLocalError);
@@ -66,9 +87,7 @@ class PetRpcP2 {
     try {
       final resp = await PetGateway.get(
         'pet_evo_stages',
-        select:
-            'stage,branch_key,branch_weight,pick_mode,conditions,'
-            'species:pet_species(id,species_code,name_cn,rarity_code,enabled)',
+        select: 'id,species_id,stage,branch_key,branch_weight,pick_mode,conditions',
         filters: {'chain_id': 'eq.$chainId', 'stage': 'eq.$stage'},
         order: 'branch_weight.desc',
         limit: 20,
@@ -78,7 +97,23 @@ class PetRpcP2 {
         return (const <PetEvoStageOptionModel>[], resp.errorMessage);
       }
       final rows = resp.data ?? const <Map<String, dynamic>>[];
-      return (rows.map(PetEvoStageOptionModel.fromJson).toList(), null);
+      // 本地网关无嵌套语法：物种目录两段查询后本地组装
+      final species = await PetGateway.fetchCatalogRows(
+        'pet_species',
+        keyCol: 'id',
+        ids: rows.map((r) => '${r['species_id']}').toList(),
+        cols: 'species_code,name_cn,rarity_code,enabled',
+        note: 'pet_species 进化候选目录查询',
+      );
+      return (
+        rows
+            .map((r) => PetEvoStageOptionModel.fromJson({
+                  ...r,
+                  'species': species[r['species_id']] ?? const {},
+                }))
+            .toList(),
+        null,
+      );
     } catch (e) {
       if (kDebugMode) debugPrint('[PetRpcP2] 进化候选查询失败: $e');
       return (const <PetEvoStageOptionModel>[], kPetLocalError);
