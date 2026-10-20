@@ -48,6 +48,13 @@ PointTypeInfo _getTypeInfo(String type) {
         label: '管理员调整',
         color: AppTheme.info,
       );
+    case 'expire':
+      // 过期镜像流水（服务端每日过期任务生成，负数、status=expired）
+      return PointTypeInfo(
+        icon: Icons.hourglass_bottom,
+        label: '积分过期',
+        color: AppTheme.warning,
+      );
     default:
       return PointTypeInfo(
         icon: Icons.help_outline,
@@ -57,38 +64,6 @@ PointTypeInfo _getTypeInfo(String type) {
   }
 }
 
-/// 获取过期状态标签信息
-ExpiryInfo _getExpiryInfo(PointRecord record) {
-  if (record.status == 'expired') {
-    return ExpiryInfo(
-      label: '已过期',
-      color: Colors.grey,
-    );
-  }
-  if (record.expiresAt != null) {
-    // 读时兜底（审查报告 积分 App#7）：expires_at 已过但服务端状态仍 active
-    //（惰性过期未跑）时按已过期展示，不再显示「有效」误导用户
-    final now = DateTimeUtils.nowBeijing();
-    final diff = record.expiresAt!.difference(now);
-    if (diff.isNegative) {
-      return ExpiryInfo(
-        label: '已过期',
-        color: Colors.grey,
-      );
-    }
-    if (diff.inDays <= 30) {
-      return ExpiryInfo(
-        label: '即将过期',
-        color: AppTheme.warning,
-      );
-    }
-  }
-  return ExpiryInfo(
-    label: '有效',
-    color: Colors.green,
-  );
-}
-
 /// 单条积分记录
 class PointRecordListItem extends StatelessWidget {
   const PointRecordListItem({
@@ -96,13 +71,11 @@ class PointRecordListItem extends StatelessWidget {
     required this.record,
     required this.typeInfo,
     required this.isPositive,
-    required this.expiryInfo,
   });
 
   final PointRecord record;
   final PointTypeInfo typeInfo;
   final bool isPositive;
-  final ExpiryInfo expiryInfo;
 
   @override
   Widget build(BuildContext context) {
@@ -116,34 +89,8 @@ class PointRecordListItem extends StatelessWidget {
           size: 20,
         ),
       ),
-      title: Row(
-        children: [
-          Text(typeInfo.label),
-          const SizedBox(width: 8),
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-            decoration: BoxDecoration(
-              color: expiryInfo.color.withValues(alpha: 0.1),
-              borderRadius: BorderRadius.circular(4),
-            ),
-            child: Text(
-              expiryInfo.label,
-              style: TextStyle(
-                fontSize: 11,
-                color: expiryInfo.color,
-              ),
-            ),
-          ),
-          const Spacer(),
-          Text(
-            isPositive ? '+${record.amount}' : '${record.amount}',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: isPositive ? AppTheme.success : AppTheme.error,
-            ),
-          ),
-        ],
-      ),
+      // 右侧：增减积分在上、余额在下，垂直居中与左侧内容水平对齐
+      title: Text(typeInfo.label),
       subtitle: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -162,15 +109,31 @@ class PointRecordListItem extends StatelessWidget {
               color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
             ),
           ),
-          // 动态记账：本笔流水入账/出账后的余额快照（后端增量写入；旧数据无此字段不展示）
-          if (record.balanceAfter != null)
+        ],
+      ),
+      trailing: Column(
+        mainAxisAlignment: MainAxisAlignment.center,
+        mainAxisSize: MainAxisSize.min,
+        crossAxisAlignment: CrossAxisAlignment.end,
+        children: [
+          Text(
+            isPositive ? '+${record.amount}' : '${record.amount}',
+            style: TextStyle(
+              fontSize: 16,
+              fontWeight: FontWeight.bold,
+              color: isPositive ? AppTheme.success : AppTheme.error,
+            ),
+          ),
+          if (record.balanceAfter != null) ...[
+            const SizedBox(height: 4),
             Text(
               '余额 ${record.balanceAfter}',
               style: TextStyle(
-                fontSize: 12,
+                fontSize: 11,
                 color: colorScheme.onSurfaceVariant.withValues(alpha: 0.7),
               ),
             ),
+          ],
         ],
       ),
     );

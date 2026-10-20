@@ -74,12 +74,10 @@ class PointRecordsContent extends StatelessWidget {
             ...records.map((record) {
               final typeInfo = _getTypeInfo(record.type);
               final isPositive = record.amount > 0;
-              final expiryInfo = _getExpiryInfo(record);
               return PointRecordListItem(
                 record: record,
                 typeInfo: typeInfo,
                 isPositive: isPositive,
-                expiryInfo: expiryInfo,
               );
             }),
             if (isLoading && records.isNotEmpty)
