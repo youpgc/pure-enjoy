@@ -329,10 +329,12 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                 TextField(
                   controller: newPasswordController,
                   obscureText: true,
+                  maxLength: 16,
                   decoration: const InputDecoration(
                     labelText: '新密码',
-                    hintText: '请输入新密码（至少6位）',
+                    hintText: '请输入新密码（6~16位）',
                     prefixIcon: Icon(Icons.lock),
+                    counterText: '',
                   ),
                 ),
                 const SizedBox(height: 12),
@@ -365,8 +367,8 @@ class _SettingsScreenState extends ConsumerState<SettingsScreen> {
                         showSnackBar(context, '请输入旧密码');
                         return;
                       }
-                      if (newPassword.length < 6) {
-                        showSnackBar(context, '新密码至少6位');
+                      if (newPassword.length < 6 || newPassword.length > 16) {
+                        showSnackBar(context, '新密码长度需为 6~16 位');
                         return;
                       }
                       if (newPassword != confirmPassword) {

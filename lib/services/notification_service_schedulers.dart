@@ -168,7 +168,8 @@ extension NotificationSchedulers on NotificationService {
         }
       }
 
-      for (final s in result.data!) {
+      // reminder-schedules 为分页信封 {list,total}：必须经 .list 解包（data! 是 Map 会炸迭代）
+      for (final s in result.list) {
         final model = ReminderScheduleModel.fromJson(s);
         // 闭环：习惯已暂停（不在进行中集合）/ 已删除 → 取消可能存在的提醒，不再重挂
         if (!activeHabitIds.contains(model.habitId)) {
@@ -187,8 +188,8 @@ extension NotificationSchedulers on NotificationService {
         }
         await scheduleHabitReminder(schedule: model, habitName: name);
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('重挂习惯提醒失败: $e');
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('重挂习惯提醒失败: $e\n$st');
     }
   }
 
@@ -373,8 +374,8 @@ extension NotificationSchedulers on NotificationService {
       for (final a in result.list) {
         await scheduleAnniversaryReminder(AnniversaryModel.fromJson(a));
       }
-    } catch (e) {
-      if (kDebugMode) debugPrint('重挂纪念日提醒失败: $e');
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('重挂纪念日提醒失败: $e\n$st');
     }
   }
 }

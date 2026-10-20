@@ -118,8 +118,8 @@ class _ProfilePageState extends State<ProfilePage> {
     try {
       achievementCount =
           (await AchievementService.instance.fetchUserAchievements()).length;
-    } catch (e) {
-      if (kDebugMode) debugPrint('读取成就数失败: $e');
+    } catch (e, st) {
+      if (kDebugMode) debugPrint('读取成就数失败: $e\n$st');
     }
 
     // 直接读取档案 avatar_url（与「编辑资料」页同源），确保头像可靠显示，

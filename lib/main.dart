@@ -66,32 +66,32 @@ void main() async {
 /// 后台懒加载服务，不阻塞首屏渲染
 void _lazyInitializeServices() {
   // 字典服务：改为在首页加载，此处只初始化本地缓存
-  DictService.instance.initialize().catchError((e) {
+  DictService.instance.initialize().catchError((e, st) {
     if (kDebugMode) {
       debugPrint('字典服务本地缓存初始化失败');
     }
   });
 
   // 通知服务：后台初始化
-  NotificationService.instance.initialize().catchError((e) {
+  NotificationService.instance.initialize().catchError((e, st) {
     if (kDebugMode) {
       debugPrint('通知服务后台初始化失败');
     }
   });
 
   // 启动后重挂已启用的习惯提醒与未来待办提醒（跨重启/更新持续生效）
-  NotificationService.instance.armHabitRemindersFromRemote().catchError((e) {
+  NotificationService.instance.armHabitRemindersFromRemote().catchError((e, st) {
     if (kDebugMode) debugPrint('重挂习惯提醒失败: $e');
   });
-  NotificationService.instance.armRemindersFromRemote().catchError((e) {
+  NotificationService.instance.armRemindersFromRemote().catchError((e, st) {
     if (kDebugMode) debugPrint('重挂待办提醒失败: $e');
   });
-  NotificationService.instance.armAnniversariesFromRemote().catchError((e) {
+  NotificationService.instance.armAnniversariesFromRemote().catchError((e, st) {
     if (kDebugMode) debugPrint('重挂纪念日提醒失败: $e');
   });
 
   // 离线同步服务：启动时同步待处理队列
-  OfflineSyncService.instance.initialize().catchError((e) {
+  OfflineSyncService.instance.initialize().catchError((e, st) {
     if (kDebugMode) {
       debugPrint('离线同步服务初始化失败');
     }
