@@ -28,11 +28,14 @@ Future<HabitPageBundle> fetchHabitPage({
   required int offset,
   required int limit,
 }) async {
-  // change-server: 后端语义化列表（归属由登录态注入，is_active 可选）
+  // change-server: 后端语义化列表（归属由登录态注入）。
+  // 「全部」页签须显式 include_inactive=true，否则后端默认只返回进行中
+  // （暂停与软删共用 is_active=false，默认过滤防软删重现）。
   final habitsResult = await BackendApi.get('/users/habits', query: {
     'page': '${offset ~/ limit + 1}',
     'page_size': '$limit',
     if (filterStatus != null) 'is_active': '$filterStatus',
+    if (filterStatus == null) 'include_inactive': 'true',
   });
 
   if (!habitsResult.success) {
@@ -132,14 +135,13 @@ Future<void> deleteHabit(String id) async {
   }
 }
 
-/// 切换习惯启停状态。
+/// 切换习惯启停状态（走启停专用端点：仅动 is_active，不经整表校验）。
 Future<void> setHabitActive(String id, bool isActive) async {
-  final result = await ApiClient.patchByFilter(
-    'habits',
-    filters: {'id': 'eq.$id'},
+  final result = await BackendApi.put(
+    '/users/habits/$id/active',
     body: {'is_active': isActive},
   );
-  if (!result.isSuccess) {
+  if (!result.success) {
     throw Exception('HTTP ${result.statusCode}');
   }
 }
