@@ -78,6 +78,7 @@ class PetBriefModel {
     this.personalityName,
     this.todayIntimacyGain = 0,
     this.renameCount = 0,
+    this.adventure,
   });
 
   final String id;
@@ -130,6 +131,11 @@ class PetBriefModel {
   /// 已改名次数（0=下次改名免费；rpc_pet_rename 首次免费口径的数据源）
   final int renameCount;
 
+  /// 该宠的进行中历险态（summary 2026-10-15 起逐宠下发 pets[].adventure；
+  /// null=无进行中历险。单宠历险 UI 的数据源——顶层 ongoingAdventure 单槽
+  /// 只带一条（待救助优先），他宠历险此前在 UI 上不可见）
+  final PetAdventureBriefModel? adventure;
+
   /// 读取四维属性值（未配置/未下发维度补 0）
   int attr(String code) => attributes[code] ?? 0;
 
@@ -165,6 +171,14 @@ class PetBriefModel {
       refinePoints: (json['refine_points'] as num?)?.toInt() ?? 0,
       todayIntimacyGain: (json['today_intimacy_gain'] as num?)?.toInt() ?? 0,
       renameCount: (json['rename_count'] as num?)?.toInt() ?? 0,
+      adventure: json['adventure'] is Map
+          ? PetAdventureBriefModel.fromJson({
+              ...((json['adventure'] as Map).cast<String, dynamic>()),
+              // pet_id 回填本宠 id(双保险):线上 SQL 若未下发该键,宠属守卫
+              // 会因 petId='' 恒拦截「领取/召回」(20261020 批 3 审查 P0)
+              'pet_id': json['id'],
+            })
+          : null,
       personalityCode: json['personality_code'] as String?,
       personalityName: json['personality_name'] as String?,
     );
@@ -234,6 +248,8 @@ class PetSummaryModel {
 
   /// 可即开孵化的蛋数量（status='unopened' 且 mode='instant'）
   final int eggsReadyInstant;
+  /// 顶层单槽历险态（旧键）：仅为未发版旧 App 包兼容保留——UI 已全部切
+  /// per-pet 的 pets[].adventure（20261021），服务端只增不删
   final PetAdventureBriefModel? ongoingAdventure;
 
   /// 全局配置块（free_feed_daily / points_per_gold / stack_limit_default 等，
@@ -249,6 +265,26 @@ class PetSummaryModel {
       if (p.status != PetPetStatus.fostered) return p;
     }
     return pets.isEmpty ? null : pets.first;
+  }
+
+  /// 按宠 id 查宠物信息（公共查询口子）：petId 为空或未命中返回 null。
+  /// 20261021 用户拍板：横幅等 UI 一律单宠口径——切换宠物时只经它取
+  /// 当前宠状态更新，不做他宠内容展示；传任意 id 亦可查他宠（含寄养/
+  /// 历险中），留作未来扩展。
+  PetBriefModel? petInfoFor(String? petId) {
+    if (petId == null) return null;
+    for (final p in pets) {
+      if (p.id == petId) return p;
+    }
+    return null;
+  }
+
+  /// 按宠 id 取进行中历险态（历险页私有定位用，替代单槽 + petId 过滤）
+  PetAdventureBriefModel? adventureFor(String petId) {
+    for (final p in pets) {
+      if (p.id == petId) return p.adventure;
+    }
+    return null;
   }
 
   factory PetSummaryModel.fromJson(Map<String, dynamic> json) {

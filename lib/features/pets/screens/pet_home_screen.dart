@@ -46,8 +46,8 @@ part 'pet_home_screen_actions.dart';
 ///
 /// 布局原则：宠物是唯一主角（垂直水平居中），其余信息各归其位——
 /// - 场景背景：梦幻夜空场景图（与 App 主题解耦，PetSceneBackground）；
-/// - 顶部通知横幅：历险归来待领取 / 待救助时出现（进行中不展示），
-///   归来点击直接弹窗结算（claim → 奖励 / 遇险提示），不跳历险页；
+/// - 顶部通知横幅：当前查看宠的历险态三分类（进行中/归来待领取/待救助，
+///   20261021 单宠口径，切宠即跟随），点击按状态分流；
 /// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
 ///   寄养 / 成就 / 繁育（P2 四项里成就与繁育走主页直达，孵蛋走背包蛋行、
 ///   进化与特性洗练走属性面板，避免按钮列在小屏上溢出）；
@@ -99,8 +99,9 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 舞台粒子层控制器（爱心/星星/碎屑/进化光柱，空闲自动停表）
   late final PetFxController _fx = PetFxController(vsync: this);
 
-  /// 当前展示的宠物下标（针对 [_stagePets]；单宠时恒 0）
-  int _petIndex = 0;
+  /// 当前查看的宠 id（20261021 从下标制改 id 制：选中态只认身份不认位置，
+  /// 列表刷新后仍指向同一只；查宠一律走 [PetSummaryModel.petInfoFor] 公共口子）
+  String? _selectedPetId;
 
   Timer? _tick; // 冷却倒计时逐秒刷新
 
@@ -159,22 +160,20 @@ class _PetHomeScreenState extends State<PetHomeScreen>
       .toList();
 
   /// 当前选中的宠物（无舞台宠物返回 null）
+  ///
+  /// 单宠口径总闸（20261021 用户拍板）：切换宠物时只经 [petInfoFor] 取
+  /// 当前宠状态更新 UI，不做他宠内容展示。selected 失效（被放生/出列）
+  /// 回落第一只，与旧下标防越界同语义。
   PetBriefModel? get _currentPet {
     final pets = _stagePets;
     if (pets.isEmpty) return null;
-    if (_petIndex < 0 || _petIndex >= pets.length) return pets.first;
-    return pets[_petIndex];
+    final selected = _summary?.petInfoFor(_selectedPetId);
+    if (selected != null && pets.contains(selected)) return selected;
+    return pets.first;
   }
 
-  /// 当前宠物的进行中历险（多宠场景按 petId 过滤——A 宠历险不再错挂到
-  /// B 宠的历险钮/历险页/顶部横幅；2026-10-10 横幅改按当前宠展示）
-  PetAdventureBriefModel? get _currentAdventure {
-    final adv = _summary?.ongoingAdventure;
-    if (adv == null) return null;
-    final pet = _currentPet;
-    if (pet != null && adv.petId == pet.id) return adv;
-    return null;
-  }
+  /// 当前宠物的进行中历险（per-pet：summary 逐宠下发 pets[].adventure）
+  PetAdventureBriefModel? get _currentAdventure => _currentPet?.adventure;
 
   /// 冷却与每日次数派生（逻辑见 [PetActionBudget]）
   PetActionBudget get _budget =>
@@ -199,15 +198,23 @@ class _PetHomeScreenState extends State<PetHomeScreen>
         _summary = summary;
         _error = summary == null ? (err ?? '宠物功能已关闭') : null;
         _loading = false;
-        // 多宠切换下标防越界（列表变短时回第一只）
-        final count = _stagePets.length;
-        if (_petIndex >= count) _petIndex = 0;
+        // 选中失效（被放生/出列）时回落第一只；指向仍有效则保持不变。
+        // summary 拉取失败（_summary=null）不参与失效判定：瞬时网络错误
+        // 不应把选中宠重置回第一只（20261021 审查）
+        if (summary != null &&
+            _selectedPetId != null &&
+            !_stagePets.any((p) => p.id == _selectedPetId)) {
+          _selectedPetId = null;
+        }
       });
       // 打开宠物页的插叙事件：仅本次停留首次成功装载时掷一次（§3.6 home_open）
       if (summary != null && !_homeEventRolled) {
-        _homeEventRolled = true;
-        WidgetsBinding.instance
-            .addPostFrameCallback((_) => _maybeShowEvent(kPetEventContextHomeOpen));
+        WidgetsBinding.instance.addPostFrameCallback((_) async {
+          // 真正走到 roll 才算已掷（历险中等跳过场景不算，本停留可再试）
+          if (await _maybeShowEvent(kPetEventContextHomeOpen)) {
+            _homeEventRolled = true;
+          }
+        });
       }
     }
     _syncAmbient();
@@ -236,13 +243,18 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   /// 随机事件尝试触发：roll 未命中/失败一律静默（插叙彩蛋不打扰主流程），
   /// 命中才弹层；选择结算后刷新总览（心情/经验/亲密/金币可能变化）。
-  Future<void> _maybeShowEvent(String pContext) async {
-    if (!mounted || _eventDialogShowing || _busy) return;
+  /// 返回「是否真正走到 roll」——busy/历险中这类跳过场景返回 false 不算已掷，
+  /// 本次停留后续仍可再试（20261021 审查：home_open 曾被历险态跳过吞掉）
+  Future<bool> _maybeShowEvent(String pContext) async {
+    if (!mounted || _eventDialogShowing || _busy) return false;
     final pet = _currentPet;
-    if (pet == null) return;
+    if (pet == null) return false;
+    // 历险中不触发随机事件（2026-10-14 服务端 choose 已收口 rearing-only；
+    // 客户端同步收口入口，避免「弹了窗、选了才报错」的体验）
+    if (pet.status != PetPetStatus.rearing) return false;
     final (event, _) = await PetRpc.eventRoll(pContext);
-    if (!mounted || _eventDialogShowing) return;
-    if (event == null || event.options.isEmpty) return;
+    if (!mounted || _eventDialogShowing) return true; // roll 已发生，计已掷
+    if (event == null || event.options.isEmpty) return true;
     final target = _currentPet ?? pet; // roll 期间切宠则落点当前宠
     _eventDialogShowing = true;
     try {
@@ -251,16 +263,20 @@ class _PetHomeScreenState extends State<PetHomeScreen>
       _eventDialogShowing = false;
     }
     if (mounted) _load();
+    return true;
   }
 
   void _switchPet(int delta) {
     final pets = _stagePets;
     if (pets.length < 2) return;
+    final from = pets.indexWhere((p) => p.id == _selectedPetId);
+    // 选中失效（被放生/出列，视图已回落第一只）从 0 出发再位移
+    final cur = from < 0 ? 0 : from;
     // 换宠回落环境态：A 宠的演出不带进 B 宠
     _machine.reset();
     _fx.clear();
     setState(() {
-      _petIndex = (_petIndex + delta + pets.length) % pets.length;
+      _selectedPetId = pets[(cur + delta + pets.length) % pets.length].id;
     });
     _syncAmbient(); // 新宠的低状态环境态（sad）按其自身数值重算
   }

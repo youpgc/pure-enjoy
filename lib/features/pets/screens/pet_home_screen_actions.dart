@@ -106,13 +106,16 @@ extension _PetHomeActions on _PetHomeScreenState {
   /// 只有"吃饱了"（`pet_config.feed_full_hunger`）才置灰，见 `_budget.isFull`。
   Future<void> _onFeedTap() async {
     final pet = _currentPet;
-    if (pet == null || _busy) return;
+    // 历险中静默阻断（按钮已禁用，此处防口粮浮层等旁路；不弹提示，
+    // 20261021 用户拍板）
+    if (pet == null || _busy || pet.status == PetPetStatus.adventuring) return;
     if (_budget.feedFreeAvailable) {
       await _run(() => PetRpc.feed(pet.id),
           successMsg: _feedMsg, anim: PetAction.eat);
       return;
     }
-    if (await showPetFeedSheet(context, pet.id) && mounted) {
+    if (await showPetFeedSheet(context, pet.id, full: _budget.isFull) &&
+        mounted) {
       _playAction(PetAction.eat);
       _load();
       // 道具喂养成功同样是照料动作（§3.6 action_done）
@@ -264,21 +267,23 @@ extension _PetHomeActions on _PetHomeScreenState {
   // 横幅点击分流（2026-10-11 三次修订）：待救助 → 跳历险页救助视图（endAt 已过，
   // 不能再走 claim——服务端拒 PET_ADV_NOT_ONGOING，原逻辑在此卡死）；历险结束
   // （到点未领）→ 领取奖励弹窗；仍在历险中 → 跳历险详情页查看进度/归来倒计时
+  // （20261021 横幅改单宠口径：adv 恒为当前查看宠的历险，跨宠切换分支删除）
   VoidCallback _bannerTap() {
     final adv = _currentAdventure;
-    if (adv?.status == PetAdventureStatus.awaitingRescue) return _openAdventure;
-    final finished = adv != null &&
-        adv.endAt != null &&
-        !DateTime.now().isBefore(adv.endAt!);
+    if (adv == null) return _openAdventure;
+    if (adv.status == PetAdventureStatus.awaitingRescue) return _openAdventure;
+    final finished =
+        adv.endAt != null && !DateTime.now().isBefore(adv.endAt!);
     return finished ? () => _runAdventure(claimAdventureResult) : _openAdventure;
   }
 
   /// 历险动作统一入口：归来领取（弹窗）/ 召回确认（无奖励中断），完成后刷新
   Future<void> _runAdventure(AdventureAction run) async {
-    final adv = _summary?.ongoingAdventure;
+    final adv = _currentAdventure; // 与按钮同源（per-pet），防陈旧校验保留
     if (adv == null || _busy) return;
-    // 槽位归属防陈旧：按钮只在 _currentAdventure（按当前宠过滤）非空时出现，
-    // 但 summary 单槽可能在他宠间切换——id 与当前宠不符时忽略本次触发
+    // 归属防陈旧校验保留（id 须与当前宠一致）：点击到执行之间 summary 可能
+    // 已被刷新，该宠历险可能已结束/易主，不一致即忽略本次触发
+    // （20261021 注释修正：原文「单槽可能在他宠间切换」描述的是已删除的单槽语义）
     final pet = _currentPet;
     if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {

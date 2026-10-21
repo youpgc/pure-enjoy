@@ -17,6 +17,7 @@ import 'pet_toast.dart';
 /// 多宠切换箭头、加载失败视图与诞生弹窗。
 
 /// 历险横幅（进行中 / 待救助 / 已结束待领取）
+/// （20261021 单宠口径：只展示当前查看宠的历险态，宠名消歧前缀删除）
 class PetAdventureBanner extends StatelessWidget {
   const PetAdventureBanner({super.key, required this.adv, this.onTap});
 
@@ -52,13 +53,12 @@ class PetAdventureBanner extends StatelessWidget {
                       : Icons.explore_outlined,
               color: awaiting ? cs.onErrorContainer : cs.primary),
           title: Text(
-            awaiting
-                ? '历险遇险 · 点击去救助'
-                : finished
-                    ? '历险已结束，点击查看结果'
-                    : '历险进行中',
-            style: const TextStyle(fontSize: 13),
-          ),
+              awaiting
+                  ? '历险遇险，点击去救助'
+                  : finished
+                      ? '历险已结束，点击查看结果'
+                      : '历险进行中',
+              style: const TextStyle(fontSize: 13)),
           subtitle: awaiting
               ? const Text('需要你的救援！', style: TextStyle(fontSize: 11))
               : null,
@@ -118,7 +118,10 @@ class PetEdgeButton extends StatelessWidget {
                   children: [
                     Icon(icon, size: 22, color: contentColor),
                     const SizedBox(height: 3),
+                    // maxLines+fade 兜溢出:冷却文案「4分59秒」比常态「喂食」长
                     Text(label,
+                        maxLines: 1,
+                        overflow: TextOverflow.fade,
                         style: TextStyle(
                             fontSize: 10,
                             fontWeight: FontWeight.w600,

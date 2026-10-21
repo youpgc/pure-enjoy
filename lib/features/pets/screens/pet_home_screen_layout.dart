@@ -51,9 +51,15 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  /// 点触宠物 == 右列「抚摸」钮（同一条 interact RPC + 同一被抚摸演出）
-  void _interact(String petId) => _run(() => PetRpc.interact(petId),
-      successMsg: _interactMsg, anim: PetAction.petted);
+  /// 点触宠物 == 右列「抚摸」钮（同一条 interact RPC + 同一被抚摸演出）。
+  /// 历险中静默阻断：服务端会拒 PET_NOT_REARING，客户端先拦下不弹提示
+  /// （20261021 用户拍板：历险中的喂食/抚摸阻断但不提示）
+  void _interact(String petId) {
+    final pet = _currentPet;
+    if (pet == null || pet.status == PetPetStatus.adventuring) return;
+    _run(() => PetRpc.interact(petId),
+        successMsg: _interactMsg, anim: PetAction.petted);
+  }
 
   /// 双击只做纯表现（正向反馈），不发 RPC、不加心情——
   /// 照料数值一律由服务端结算，这里不能凭空造进度。
@@ -86,8 +92,8 @@ extension _PetHomeLayout on _PetHomeScreenState {
   // ---------- 顶部通知横幅（历险状态） ----------
 
   Widget _topBanner(ColorScheme cs) {
-    // §2026-10-10 改版：横幅按当前宠过滤（_currentAdventure）——只在查看的
-    // 宠物正在历险时展示，养育中的不展示；点击跳历险详情页看进度/倒计时
+    // 单宠口径（20261021 用户拍板）：横幅只反映当前查看宠的历险态，
+    // 切换宠物即跟随切换，不做其他宠物的状态展示
     final adv = _currentAdventure;
     if (adv == null || !adv.usable) return const SizedBox.shrink();
     return Positioned(
@@ -98,7 +104,8 @@ extension _PetHomeLayout on _PetHomeScreenState {
         bottom: false,
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 76, vertical: 4),
-          child: Center(child: PetAdventureBanner(adv: adv, onTap: _bannerTap())),
+          child: Center(
+              child: PetAdventureBanner(adv: adv, onTap: _bannerTap())),
         ),
       ),
     );
@@ -229,10 +236,11 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// 旧版这条信息挂在黑色蒙层上，改成"冷却不置灰（可吃口粮）"时蒙层被一并去掉了，
   /// 倒计时就再也没出现过。按钮此时仍可点，所以不能挂蒙层（会被读成禁用），
   /// 直接用文案位；额度用尽但没冷却时文案为「口粮」，明示这一钮现在走背包口粮。
+  /// （20261021 用户拍板：倒计时用全格式「4分59秒」，与抚摸蒙层口径一致）
   String get _feedLabel {
     if (_budget.feedFreeAvailable) return '喂食';
     final cool = _budget.feedCooldown;
-    return cool == null ? '口粮' : _budget.coolTextShort(cool);
+    return cool == null ? '口粮' : _budget.coolText(cool);
   }
 
   /// 喂食结果文案：增量全部来自后台配置（与服务端 `_pet_add_progress` 同源），
@@ -286,10 +294,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 icon: Icons.touch_app_outlined,
                 label: '抚摸',
                 overlay: _overlay(interactCool, _budget.interactRemain),
-                onTap: interactOff
-                    ? null
-                    : () => _run(() => PetRpc.interact(pet.id),
-                        successMsg: _interactMsg, anim: PetAction.petted)),
+                // 走 _interact 统一入口：继承历险中静默阻断守卫
+                onTap:
+                    interactOff ? null : () => _interact(pet.id)),
             const SizedBox(height: 14),
             _adventureButton(),
             const SizedBox(height: 14),
