@@ -9,7 +9,11 @@ import '../utils/pet_errors.dart';
 ///
 /// 收集语义：owned = 历史拥有过（含已放生，软删除不熄灭）；
 /// 范围 = enabled 形态（三系开闸前仅猫系 30 项，开闸自动扩容无需发版）。
-/// 未拥有形态灰位"？"占位（防剧透，素材本就未产出）。
+/// 已拥有展示弯曲树中性帧 c1_neutral（与舞台渲染同源同款、静态不动画，
+/// 20261021 用户拍板）；无弯曲几何的种属回退整只底图。
+/// 未拥有展示中央锁定徽章、名称照常展示。
+/// 格子背景板按评级分级：N 素净 → R 淡蓝 → SR 淡紫 → SSR 淡金 + 光晕，
+/// 越高级越稀有越突显（渐变顶部混白提质感）。
 class PetDexScreen extends StatefulWidget {
   const PetDexScreen({super.key});
 
@@ -27,6 +31,16 @@ const _rarityColors = {
   'SR': Color(0xFF9B59D0),
   'SSR': Color(0xFFD9A441),
 };
+
+/// 评级背景板强度分级（20261021 用户需求）：渐变浓度/边框/光晕随评级递增
+typedef _PlateSpec = ({double gradTop, double gradBottom, double border, double glow});
+
+_PlateSpec _plateOf(String rarity) => switch (rarity) {
+      'SSR' => (gradTop: 0.30, gradBottom: 0.08, border: 0.55, glow: 0.22),
+      'SR' => (gradTop: 0.22, gradBottom: 0.06, border: 0.42, glow: 0.0),
+      'R' => (gradTop: 0.16, gradBottom: 0.04, border: 0.30, glow: 0.0),
+      _ => (gradTop: 0.08, gradBottom: 0.02, border: 0.14, glow: 0.0),
+    };
 
 class _PetDexScreenState extends State<PetDexScreen> {
   PetDexModel? _dex;
@@ -163,7 +177,9 @@ class _PetDexScreenState extends State<PetDexScreen> {
     return Card(
       elevation: 0,
       margin: const EdgeInsets.only(bottom: 8),
-      color: cs.surfaceContainerHighest.withValues(alpha: 0.4),
+      // 卡底淡染评级色，与格子背景板同一层级语言
+      color: Color.lerp(
+          cs.surfaceContainerHighest.withValues(alpha: 0.4), rarityColor, 0.08),
       child: Padding(
         padding: const EdgeInsets.all(10),
         child: Column(
@@ -171,13 +187,18 @@ class _PetDexScreenState extends State<PetDexScreen> {
           children: [
             Row(
               children: [
-                // 评级角标
+                // 评级角标（渐变底+同色描边，与格子背景板呼应）
                 Container(
                   padding:
                       const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
                   decoration: BoxDecoration(
-                    color: rarityColor.withValues(alpha: 0.16),
+                    gradient: LinearGradient(colors: [
+                      rarityColor.withValues(alpha: 0.22),
+                      rarityColor.withValues(alpha: 0.10),
+                    ]),
                     borderRadius: BorderRadius.circular(10),
+                    border: Border.all(
+                        color: rarityColor.withValues(alpha: 0.35)),
                   ),
                   child: Text(chain.rarity,
                       style: TextStyle(
@@ -204,7 +225,9 @@ class _PetDexScreenState extends State<PetDexScreen> {
             Row(
               children: [
                 for (final stage in chain.stages)
-                  Expanded(child: _stageCell(cs, stage)),
+                  Expanded(
+                      child: _stageCell(cs, stage, rarityColor,
+                          _plateOf(chain.rarity))),
               ],
             ),
           ],
@@ -213,8 +236,11 @@ class _PetDexScreenState extends State<PetDexScreen> {
     );
   }
 
-  Widget _stageCell(ColorScheme cs, PetDexStage stage) {
-    final img = stage.owned ? petPortraitArt(stage.speciesCode) : null;
+  Widget _stageCell(
+      ColorScheme cs,
+      PetDexStage stage,
+      Color rarityColor,
+      _PlateSpec plate) {
     return Padding(
       padding: const EdgeInsets.symmetric(horizontal: 3),
       child: Column(
@@ -222,36 +248,57 @@ class _PetDexScreenState extends State<PetDexScreen> {
           AspectRatio(
             aspectRatio: 1,
             child: Container(
+              // 评级背景板：顶部混白的评级渐变 + 同色细边，SSR 另加外圈光晕
+              // （渐变顶部提亮是质感关键——纯色叠底会发"土"）
               decoration: BoxDecoration(
-                color: cs.surfaceContainerHighest.withValues(alpha: 0.5),
+                gradient: LinearGradient(
+                  begin: Alignment.topLeft,
+                  end: Alignment.bottomRight,
+                  colors: [
+                    Color.lerp(rarityColor, Colors.white, 0.45)!
+                        .withValues(alpha: plate.gradTop),
+                    rarityColor.withValues(alpha: plate.gradBottom),
+                  ],
+                ),
                 borderRadius: BorderRadius.circular(10),
-                border: stage.owned
-                    ? Border.all(color: cs.primary.withValues(alpha: 0.35))
+                border: Border.all(
+                    color: rarityColor.withValues(alpha: plate.border)),
+                boxShadow: plate.glow > 0
+                    ? [
+                        BoxShadow(
+                            color: rarityColor.withValues(alpha: plate.glow),
+                            blurRadius: 10,
+                            offset: const Offset(0, 2)),
+                      ]
                     : null,
               ),
               padding: const EdgeInsets.all(4),
               child: stage.owned
-                  ? (img != null
-                      ? Image.asset(img,
-                          fit: BoxFit.contain,
-                          cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
-                          errorBuilder: (_, __, ___) => Icon(
-                              Icons.cruelty_free_outlined,
-                              size: 28,
-                              color: cs.onSurfaceVariant))
-                      : Icon(Icons.cruelty_free_outlined,
-                          size: 28, color: cs.onSurfaceVariant))
+                  // 弯曲树中性帧：与舞台渲染同源同款（静态，不跑待机动画）
+                  ? _dexPetArt(cs, stage)
+                  // 未获取：中央锁定徽章（克制、不抢已获取格的视觉）
                   : Center(
-                      child: Text('？',
-                          style: TextStyle(
-                              fontSize: 22,
-                              fontWeight: FontWeight.w700,
-                              color: cs.onSurfaceVariant.withValues(alpha: 0.5)))),
+                      child: Container(
+                        width: 32,
+                        height: 32,
+                        decoration: BoxDecoration(
+                          color: cs.surface.withValues(alpha: 0.6),
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                              color:
+                                  rarityColor.withValues(alpha: 0.40)),
+                        ),
+                        child: Icon(Icons.lock_outline_rounded,
+                            size: 16,
+                            color: rarityColor.withValues(alpha: 0.80)),
+                      ),
+                    ),
             ),
           ),
           const SizedBox(height: 4),
+          // 名称照常展示（未获取不再用「？？？」）
           Text(
-            stage.owned ? stage.name : '？？？',
+            stage.name,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
             textAlign: TextAlign.center,
@@ -259,13 +306,49 @@ class _PetDexScreenState extends State<PetDexScreen> {
                 fontSize: 11,
                 color: stage.owned ? cs.onSurface : cs.onSurfaceVariant),
           ),
-          if (stage.owned && stage.firstAt != null)
-            Text(
-              '${stage.firstAt!.month}.${stage.firstAt!.day} 获得',
-              style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
-            ),
+          // 日期行恒占位等高：只有已获取格有「获得日」时该格会撑高整行，
+          // 同排其余格被拉出基线（20261021 用户截图实证的错位根因）
+          SizedBox(
+            height: 13,
+            child: (stage.owned && stage.firstAt != null)
+                ? Text(
+                    '${stage.firstAt!.month}.${stage.firstAt!.day} 获得',
+                    style: TextStyle(fontSize: 9, color: cs.onSurfaceVariant),
+                  )
+                : null,
+          ),
         ],
       ),
     );
+  }
+
+  /// 图鉴格静态形象：弯曲树的中性帧 c1_neutral（舞台渲染的基底图，与主页
+  /// 形象同源同款；不跑待机动画——20261021 用户拍板）。
+  ///
+  /// dex 种属行码带阶后缀（cat_ssr1_s1），弯曲树按「种属 + sN 目录」组织，
+  /// 先解耦再取材；路径以 kPetBendGeo 登记为准（登记 = 随包，铁律 8）。
+  /// 无弯曲几何的种属回退整只底图，再兜底占位图标。
+  Widget _dexPetArt(ColorScheme cs, PetDexStage stage) {
+    final (code, st) = _dexArtKey(stage.speciesCode);
+    final dir = petBendGeo(code, st)?.dir;
+    final img =
+        dir != null ? '$dir/c1_neutral.png' : petBaseArt(code, st);
+    if (img == null) {
+      return Icon(Icons.cruelty_free_outlined,
+          size: 34, color: cs.onSurfaceVariant);
+    }
+    return Image.asset(img,
+        fit: BoxFit.contain,
+        cacheWidth: (96 * MediaQuery.devicePixelRatioOf(context)).round(),
+        errorBuilder: (_, __, ___) => Icon(Icons.cruelty_free_outlined,
+            size: 34, color: cs.onSurfaceVariant));
+  }
+
+  /// 种属行码 → (渲染素材键, 阶)；无 `_sN` 后缀即基础阶
+  (String, int) _dexArtKey(String speciesCode) {
+    final m = RegExp(r'^(.+)_s(\d+)$').firstMatch(speciesCode);
+    return m != null
+        ? (m.group(1)!, int.tryParse(m.group(2)!) ?? 0)
+        : (speciesCode, 0);
   }
 }

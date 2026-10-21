@@ -384,6 +384,9 @@ class _SkeletonPlaceholder extends StatelessWidget {
   }
 }
 
+/// 通用宠物骨架画笔（剪影 = 身/头/双耳/前后腿/尾 + 相位扫光）。
+/// 舞台缺帧占位专用（图鉴「未获取」曾复用后改为锁定徽章样式）。
+/// 静态用法传固定 phase（0~1，0.25 = 扫光居中）。
 class _PetSkeletonPainter extends CustomPainter {
   _PetSkeletonPainter({
     required this.base,

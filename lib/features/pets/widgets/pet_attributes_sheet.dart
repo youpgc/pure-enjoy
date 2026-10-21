@@ -351,9 +351,14 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               icon: const Icon(Icons.history_edu, size: 18),
               label: const Text('成长回忆'),
             ),
-            // 放生入口（危险区，§2026-10-09）：历险/繁育中不可放，服务端亦拦
-            if (pet.status == PetPetStatus.rearing ||
-                pet.status == PetPetStatus.fostered) ...[
+            // 放生入口（危险区，§2026-10-09）：历险/繁育中不可放，服务端亦拦。
+            // 月萤（初始种属 cat_ssr1 全阶）不展示送别入口——20261021 用户拍板
+            // 「月萤隐藏送别按钮」。⚠️ 保守近似：按种属码而非「最早个体」判定，
+            // 繁育产出的同种属个体入口也会被隐藏（服务端按 created_at 判定仍放行,
+            // 只是 UI 不可达）；如需精确,须服务端下发 is_initial 标志（已登记）。
+            if ((pet.status == PetPetStatus.rearing ||
+                    pet.status == PetPetStatus.fostered) &&
+                !pet.speciesCode.startsWith('cat_ssr1')) ...[
               const SizedBox(height: 4),
               TextButton.icon(
                 onPressed: _busy ? null : _release,
