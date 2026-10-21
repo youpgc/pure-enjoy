@@ -150,15 +150,10 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _reloadSummary() async {
     final (summary, _) = await PetService.instance.fetchSummary();
     if (mounted) {
-      final adv = summary?.ongoingAdventure;
-      // 本屏按 petId 私有：summary 单槽可能已被他宠历险占据（待救助优先排序），
-      // 非本宠的历险不得装入本屏（张冠李戴）；空 id = 形状异常，按无进行中处理
-      final mine = (adv != null &&
-              adv.usable &&
-              adv.petId == widget.petId)
-          ? adv
-          : null;
-      setState(() => _adv = mine);
+      // 本屏按 petId 私有：直接取该宠自己的历险态（summary 2026-10-15 起逐宠下发；
+      // 旧单槽被他宠占据时本宠状态取不到）。usable=false = 形状异常，按无进行中处理
+      final mine = summary?.adventureFor(widget.petId);
+      setState(() => _adv = (mine != null && mine.usable) ? mine : null);
     }
   }
 
@@ -193,19 +188,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final gold = (data?['gold'] as num?)?.toInt() ?? 0;
     final exp = (data?['exp'] as num?)?.toInt() ?? 0;
     final result = data?['result_type'] as String? ?? 'play';
-    // 掉落明细（fix_pet_adventure_claim_items：claim 返回 items: [{code,name,qty}]）
-    final items = <({String name, int qty})>[];
-    final rawItems = data?['items'];
-    if (rawItems is List) {
-      for (final it in rawItems) {
-        if (it is Map) {
-          items.add((
-            name: (it['name'] as String?) ?? (it['code'] as String? ?? '道具'),
-            qty: (it['qty'] as num?)?.toInt() ?? 1,
-          ));
-        }
-      }
-    }
+    // 掉落明细(含长途独占 long_drops;共享 helper 与主页弹窗同源)
+    final items = buildClaimItems(data);
     // 结算弹窗：结果类型 + 金币/经验 + 掉落明细，关闭后再刷新总览
     if (mounted) {
       await showDialog<void>(

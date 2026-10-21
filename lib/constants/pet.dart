@@ -337,6 +337,15 @@ enum PetEvoCondType {
   }
 }
 
+/// 长途独占掉落（long_only）道具中文名——结算弹窗与历险公示页共用
+/// （20261021 审查收敛双份硬编码；名称随 pet_items.name）
+const kLongDropNames = <String, String>{
+  'relic_compass': '星辰罗盘',
+  'evo_stone_n': '进化石·凡品',
+  'evo_stone_r': '进化石·珍品',
+  // 新增 long_only 道具须同步此表
+};
+
 
 enum PetQuestDifficulty {
   normal('normal', '普通'),

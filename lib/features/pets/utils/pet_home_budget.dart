@@ -21,19 +21,63 @@ class PetActionBudget {
   /// 读取整型配置，缺省返回 0（未配置）
   int cfg(String key) => (config[key] as num?)?.toInt() ?? 0;
 
-  Duration? _cooldownLeft(DateTime? lastAt, int cooldownMin) {
-    if (lastAt == null || cooldownMin <= 0) return null;
-    final end = lastAt.add(Duration(minutes: cooldownMin));
+  /// 本地动作锚点:喂食/抚摸成功响应那一刻的客户端时间(按宠+动作记一份)。
+  ///
+  /// 冷却结束时刻 = 服务端 last_xxx_at + 冷却,而 last_xxx_at 的写入时刻
+  /// **晚于**客户端发起请求(网络往返),再叠加客户机与服务端的时钟偏移——
+  /// 直接拿服务端锚减客户端 now,会把这些全算进冷却:10 分钟喂食显示 11 分、
+  /// 1 分钟抚摸显示 63 秒(20261021 用户报告)。锚点用客户端自己的时间轴,
+  /// 保证展示自洽;注意锚点只管展示,倒计时走完后服务端仍可能拒
+  /// (PET_FEED_COOLDOWN 提示兜底)。锚点仅在 App 存活期有效,
+  /// 重进后回落服务端 last_xxx_at(偏差亚秒级)。
+  static final Map<String, DateTime> _actionAnchor = <String, DateTime>{};
+
+  /// 喂养/抚摸成功后由 [PetRpc] 回调记录锚点
+  static void noteActionAnchor(String petId, String kind) {
+    _actionAnchor['$petId:$kind'] = DateTime.now();
+  }
+
+  /// 冷却计算(秒级;20261021 配置单位下沉,_sec 新键优先,_min×60 兜底旧缓存)
+  Duration? _cooldownLeftSec(DateTime? lastAt, int? cooldownSec) {
+    if (lastAt == null || cooldownSec == null || cooldownSec <= 0) return null;
+    final end = lastAt.add(Duration(seconds: cooldownSec));
     return end.isAfter(DateTime.now()) ? end.difference(DateTime.now()) : null;
   }
 
+  /// 锚点优先的冷却计算(锚点在冷却期内用锚点;**锚点过期穿透服务端锚**——
+  /// 批量喂养等路径不写本地锚,过期即 return null 会永久遮蔽服务端新冷却,
+  /// 喂食钮误示可点(20261021 复审 P1);秒级配置缺键时由调用方传入
+  /// null → 无冷却,与「不为缺失字段编默认值」一致)
+  Duration? _cooldownAnchored(String petId, String kind, DateTime? lastAt, int? cooldownSec) {
+    if (cooldownSec == null || cooldownSec <= 0) return null;
+    final anchor = _actionAnchor['$petId:$kind'];
+    if (anchor != null) {
+      final left = anchor
+          .add(Duration(seconds: cooldownSec))
+          .difference(DateTime.now());
+      if (left > Duration.zero) return left;
+    }
+    return _cooldownLeftSec(lastAt, cooldownSec);
+  }
+
   /// 喂食剩余冷却（null = 无冷却）
-  Duration? get feedCooldown =>
-      _cooldownLeft(pet?.lastFeedAt, cfg('free_feed_cooldown_min'));
+  Duration? get feedCooldown => _cooldownAnchored(pet?.id ?? '', 'feed',
+      pet?.lastFeedAt, _cooldownSec('free_feed_cooldown_sec', 'free_feed_cooldown_min'));
 
   /// 抚摸剩余冷却（null = 无冷却）
-  Duration? get interactCooldown =>
-      _cooldownLeft(pet?.lastInteractAt, cfg('interact_cooldown_min'));
+  Duration? get interactCooldown => _cooldownAnchored(pet?.id ?? '', 'interact',
+      pet?.lastInteractAt, _cooldownSec('interact_cooldown_sec', 'interact_cooldown_min'));
+
+  /// 秒级冷却配置(20261021)。⚠️ [cfg] 对缺失键返回 0 而非 null——
+  /// 故 0 视为「键未下发」回落旧键×60(SWR 旧缓存/服务端未升级时);
+  /// 运营若要禁用冷却请配 1 秒(不支持显式 0)。
+  int? _cooldownSec(String secKey, String minKey) {
+    final sec = cfg(secKey);
+    if (sec > 0) return sec;
+    final min = cfg(minKey);
+    if (min > 0) return min * 60;
+    return null;
+  }
 
   /// 是否任一操作处于冷却中（用于逐秒刷新 Timer 的省电判断）
   bool get anyCooling => feedCooldown != null || interactCooldown != null;
@@ -98,15 +142,5 @@ class PetActionBudget {
     final s = total % 60;
     if (m <= 0) return '$s秒';
     return s == 0 ? '$m分' : '$m分$s秒';
-  }
-
-  /// 短倒计时（64dp 边缘钮的文案位用，最长 4 字：「30分」/「45秒」）
-  ///
-  /// [coolText] 的「29分59秒」在小尺寸按钮里会被省略号截断，文案位需要更短的口径；
-  /// 分钟向上取整，与 [coolText] 一样不会停在 0。
-  String coolTextShort(Duration d) {
-    final total = (d.inMilliseconds / 1000).ceil();
-    if (total < 60) return '$total秒';
-    return '${(total / 60).ceil()}分';
   }
 }

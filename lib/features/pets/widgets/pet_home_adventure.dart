@@ -26,6 +26,38 @@ void _toast(BuildContext context, String msg) => showPetToast(context, msg);
 typedef AdventureAction = Future<bool> Function(
     BuildContext context, String adventureId);
 
+/// claim 返回体 → 掉落明细(items + long_drops 并入;名称映射缺失回退 code,
+/// 保底命中带「保底」标记)。主页弹窗与历险页弹窗共用以防两处漂移(20261020 审查 P1)
+List<({String name, int qty})> buildClaimItems(Map<String, dynamic>? data) {
+  final items = <({String name, int qty})>[];
+  final rawItems = data?['items'];
+  if (rawItems is List) {
+    for (final it in rawItems) {
+      if (it is Map) {
+        items.add((
+          name: (it['name'] as String?) ?? (it['code'] as String? ?? '道具'),
+          qty: (it['qty'] as num?)?.toInt() ?? 1,
+        ));
+      }
+    }
+  }
+  final rawLong = data?['long_drops'];
+  if (rawLong is List) {
+    const longNames = kLongDropNames;
+    for (final it in rawLong) {
+      if (it is Map) {
+        final code = it['code'] as String? ?? '';
+        final forced = it['forced'] == true;
+        items.add((
+          name: '${longNames[code] ?? (code.isEmpty ? '稀有道具' : code)}${forced ? '(保底)' : ''}',
+          qty: 1,
+        ));
+      }
+    }
+  }
+  return items;
+}
+
 /// 归来领取：claim → 成功奖励弹窗 / 遇险惩罚提示
 Future<bool> claimAdventureResult(
   BuildContext context,
@@ -50,19 +82,7 @@ Future<bool> claimAdventureResult(
     return true;
   }
   if (status == PetAdventureStatus.claimed) {
-    // 掉落明细（fix_pet_adventure_claim_items：claim 返回 items: [{code,name,qty}]）
-    final items = <({String name, int qty})>[];
-    final rawItems = data?['items'];
-    if (rawItems is List) {
-      for (final it in rawItems) {
-        if (it is Map) {
-          items.add((
-            name: (it['name'] as String?) ?? (it['code'] as String? ?? '道具'),
-            qty: (it['qty'] as num?)?.toInt() ?? 1,
-          ));
-        }
-      }
-    }
+    final items = buildClaimItems(data);
     await showDialog<void>(
       context: context,
       builder: (ctx) => PetClaimResultDialog(

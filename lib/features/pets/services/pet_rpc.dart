@@ -7,6 +7,7 @@ import '../models/pet_dex_models.dart';
 import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../utils/pet_errors.dart';
+import '../utils/pet_home_budget.dart';
 import 'pet_service.dart';
 
 /// 宠物业务 RPC / 列表查询（B4 交互闭环）
@@ -140,6 +141,49 @@ class PetRpc {
     }
   }
 
+  /// 扩容阶梯已购记录(本人;商城「只展示当前可购档」的过滤依据)
+  static Future<(List<Map<String, dynamic>>, String?)> fetchExpansionRecords() async {
+    final uid = _uid;
+    if (uid == null) return (const <Map<String, dynamic>>[], '未登录');
+    try {
+      final resp = await ApiClient.get(
+        'pet_expansion_records',
+        select: 'ladder_key,step',
+        filters: {'user_id': 'eq.$uid'},
+        // desc 取最大已购步(超 limit 截掉的才是低 step 旧记录;
+        // asc 会在超 50 条时把已购档当可购档展示)
+        order: 'step.desc',
+        limit: 50,
+        note: 'pet_expansion_records 扩容已购查询',
+      );
+      if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
+      return (resp.data ?? const <Map<String, dynamic>>[], null);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[PetRpc] 扩容已购查询失败: $e');
+      return (const <Map<String, dynamic>>[], kPetLocalError);
+    }
+  }
+
+  /// 历险产出公示（概率/保底展示的判定同源数据）：30 地 drop_table 原始行
+  /// （含 long_only 独占掉落）。仅展示；概率判定仍在服务端 RPC（铁律 1）
+  static Future<(List<Map<String, dynamic>>, String?)> fetchAdventureOdds() async {
+    try {
+      final resp = await ApiClient.get(
+        'pet_adventure_spots',
+        select: 'code,name,drop_table',
+        filters: {'enabled': 'eq.true'},
+        order: 'sort_order.asc',
+        limit: 50,
+        note: 'pet_adventure_spots 历险产出公示查询',
+      );
+      if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
+      return (resp.data ?? const <Map<String, dynamic>>[], null);
+    } catch (e) {
+      if (kDebugMode) debugPrint('[PetRpc] 历险产出公示查询失败: $e');
+      return (const <Map<String, dynamic>>[], kPetLocalError);
+    }
+  }
+
   /// 商城在售道具（扩容阶梯按 step 升序）
   static Future<(List<PetShopItemModel>, String?)> fetchShopItems() async {
     try {
@@ -210,7 +254,13 @@ class PetRpc {
       'p_pet_id': petId,
       'p_item_id': itemId,
     }, 'rpc_pet_feed 喂养');
-    if (err == null) await PetService.instance.invalidateSummary();
+    if (err == null) {
+      // 成功即记录本地冷却锚点(吸收服务端/客户端时钟差,20261021)。
+      // 仅免费档记:道具档(口粮)服务端不写 last_feed_at、不占免费冷却,
+      // 记了锚点会把免费档锁进整段假冷却(20261021 审查 P1)
+      if (itemId == null) PetActionBudget.noteActionAnchor(petId, 'feed');
+      await PetService.instance.invalidateSummary();
+    }
     return err;
   }
 
@@ -219,7 +269,10 @@ class PetRpc {
     final (_, err) = await _call('rpc_pet_interact', {
       'p_pet_id': petId,
     }, 'rpc_pet_interact 互动');
-    if (err == null) await PetService.instance.invalidateSummary();
+    if (err == null) {
+      PetActionBudget.noteActionAnchor(petId, 'interact');
+      await PetService.instance.invalidateSummary();
+    }
     return err;
   }
 

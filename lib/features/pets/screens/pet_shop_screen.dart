@@ -73,13 +73,41 @@ class _PetShopScreenState extends State<PetShopScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final (items, err) = await PetRpc.fetchShopItems();
+    final (records, recErr) = await PetRpc.fetchExpansionRecords();
     if (mounted) {
       setState(() {
-        _items = items;
+        // 阶梯过滤失败不拦截商城(全量展示,购买时服务端仍校验顺序)——
+        // 仅 recErr == null 时应用「只展示当前可购档」
+        _items = recErr == null ? _filterLadder(items, records) : items;
         _error = err == null ? null : petRpcErrorText(err);
         _loading = false;
       });
     }
+  }
+
+  /// 阶梯道具「只展示当前可购档」(20261021):每套阶梯仅保留「已购最大步 + 1」
+  /// 的那一档,已购档与未来档不展示;整套购完则整类隐藏(需求 §6.3 达上限不展示)。
+  /// 服务端 shop_buy 的顺序校验仍兜底,此处只是把展示做对。
+  List<PetShopItemModel> _filterLadder(
+      List<PetShopItemModel> items, List<Map<String, dynamic>> records) {
+    final maxBought = <String, int>{};
+    for (final r in records) {
+      final k = r['ladder_key']?.toString() ?? '';
+      final st = (r['step'] as num?)?.toInt() ?? 0;
+      if (k.isEmpty) continue;
+      if (st > (maxBought[k] ?? 0)) maxBought[k] = st;
+    }
+    return items.where((e) {
+      final lk = e.ladderKey;
+      if (lk == null) return true;
+      final bought = maxBought[lk] ?? 0;
+      final totalSteps = items.where((x) => x.ladderKey == lk).length;
+      if (bought >= totalSteps) return false; // 全套购完:整类隐藏
+      // step 缺失行不参与隐藏:宁可全量展示也不让购买入口不可达
+      // (服务端顺序校验仍兜底;20261021 审查 P2)
+      if (e.ladderStep == null) return true;
+      return e.ladderStep == bought + 1; // 只出下一档
+    }).toList();
   }
 
   List<PetShopItemModel> get _filtered {
@@ -207,26 +235,15 @@ class _PetShopScreenState extends State<PetShopScreen> {
       appBar: AppBar(
         title: const Text('宠物商城'),
         actions: [
-          // 背包直达（2026-09-24）：商城↔背包互跳，不再只有背包→商城单向
-          TextButton.icon(
-            onPressed: () => Navigator.push(
-              context,
-              MaterialPageRoute(
-                  builder: (_) => PetBagScreen(petId: widget.petId)),
-            ).then((_) {
-              if (mounted) _load();
-            }),
-            icon: const Icon(Icons.inventory_2_outlined, size: 18),
-            label: const Text('背包', style: TextStyle(fontSize: 13)),
-          ),
           // 概率公示（P2）：读后台已发布蛋池，与抽取判定同版本，纯只读入口
-          TextButton.icon(
+          // （20261021 用户拍板：入口收敛为问号图标，不占 AppBar 文案位）
+          IconButton(
+            tooltip: '概率公示',
             onPressed: () => Navigator.push(
               context,
               MaterialPageRoute(builder: (_) => const PetOddsScreen()),
             ),
-            icon: const Icon(Icons.percent_outlined, size: 18),
-            label: const Text('概率公示', style: TextStyle(fontSize: 13)),
+            icon: const Icon(Icons.help_outline, size: 22),
           ),
           Center(
             child: Padding(

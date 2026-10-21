@@ -254,6 +254,7 @@ class PetShopItemModel {
     this.pricePoints,
     this.pointsPurchasable = false,
     this.ladderKey,
+    this.ladderStep,
     this.description,
   });
 
@@ -267,6 +268,10 @@ class PetShopItemModel {
   final int? pricePoints;
   final bool pointsPurchasable;
   final String? ladderKey; // 扩容阶梯道具（购买即生效）
+
+  /// 阶梯步号（扩容道具专用；商城「只展示当前可购档」过滤依据，
+  /// summary/shop items 2026-10-21 起下发）
+  final int? ladderStep;
   final String? description;
 
   /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
@@ -329,6 +334,7 @@ class PetShopItemModel {
       pricePoints: (json['price_points'] as num?)?.toInt(),
       pointsPurchasable: json['points_purchasable'] as bool? ?? false,
       ladderKey: json['ladder_key'] as String?,
+      ladderStep: (json['ladder_step'] as num?)?.toInt(),
       description: json['description'] as String?,
     );
   }
