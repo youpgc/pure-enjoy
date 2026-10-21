@@ -16,7 +16,12 @@ import 'pet_toast.dart';
 /// 因此主页喂食钮只要"没吃饱"就可点，本浮层就是免费额度不可用时的出口。
 ///
 /// 返回 true 表示成功喂掉一份口粮（调用方据此刷新总览并庆祝）。
-Future<bool> showPetFeedSheet(BuildContext context, String petId) async {
+///
+/// [full] = 宠物已饱（饱食 ≥ feed_full_hunger，调用方按 summary 同口径判定）：
+/// 道具行整列禁用并标注「已饱」——饱时喂食会被服务端拒绝（口粮不消耗），
+/// 提前禁用杜绝无效操作（20261021 用户拍板：满 100 禁用）。
+Future<bool> showPetFeedSheet(BuildContext context, String petId,
+    {bool full = false}) async {
   final (items, err) = await PetRpc.fetchBag();
   if (!context.mounted) return false;
   if (err != null) {
@@ -33,8 +38,8 @@ Future<bool> showPetFeedSheet(BuildContext context, String petId) async {
     showDragHandle: true,
     // 与「更多」菜单弹窗同款配置：不带 isScrollControlled/constraints，
     // 全宽贴底；长列表由内部 Flexible + shrinkWrap 兜底
-    builder: (_) =>
-        _PetFeedSheet(petId: petId, foods: foods, onFed: () => fed = true),
+    builder: (_) => _PetFeedSheet(
+        petId: petId, foods: foods, full: full, onFed: () => fed = true),
   );
   return fed;
 }
@@ -43,11 +48,15 @@ class _PetFeedSheet extends StatefulWidget {
   const _PetFeedSheet({
     required this.petId,
     required this.foods,
+    required this.full,
     required this.onFed,
   });
 
   final String petId;
   final List<PetBagItemModel> foods;
+
+  /// 宠物已饱（饱食 ≥ feed_full_hunger）：整列禁用，明示原因
+  final bool full;
   final VoidCallback onFed;
 
   @override
@@ -87,7 +96,14 @@ class _PetFeedSheetState extends State<_PetFeedSheet> {
             child: Text('用口粮喂食',
                 style: TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
           ),
-          if (foods.isEmpty)
+          if (widget.full)
+            Padding(
+              padding: const EdgeInsets.fromLTRB(16, 0, 16, 10),
+              child: Text('它已经吃得饱饱的啦，等消化后再喂吧',
+                  style: TextStyle(
+                      fontSize: 13, color: cs.error.withValues(alpha: 0.85))),
+            )
+          else if (foods.isEmpty)
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 0, 16, 8),
               child: Text(
@@ -134,12 +150,21 @@ class _PetFeedSheetState extends State<_PetFeedSheet> {
                             height: 18,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : Text('×${item.quantity}',
-                            style: TextStyle(
-                                fontSize: 13,
-                                fontWeight: FontWeight.w600,
-                                color: cs.onSurfaceVariant)),
-                    onTap: _busyId == null ? () => _feed(item) : null,
+                        : widget.full
+                            ? Text('已饱',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurfaceVariant))
+                            : Text('×${item.quantity}',
+                                style: TextStyle(
+                                    fontSize: 13,
+                                    fontWeight: FontWeight.w600,
+                                    color: cs.onSurfaceVariant)),
+                    // 已饱整列禁用：服务端会拒（口粮不消耗），提前禁明示原因
+                    onTap: _busyId == null && !widget.full
+                        ? () => _feed(item)
+                        : null,
                   );
                 },
               ),

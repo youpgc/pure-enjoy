@@ -147,23 +147,31 @@ class PetBagSlotCell extends StatelessWidget {
       busy: busy,
       onTap: onTap,
     );
-    return LongPressDraggable<int>(
-      data: slot,
-      maxSimultaneousDrags: 1,
-      dragAnchorStrategy: pointerDragAnchorStrategy,
-      feedback: Material(
-        color: Colors.transparent,
-        child: SizedBox(
-          width: 56,
-          height: 56,
-          child: _SlotFace(item: it, busy: false, onTap: null),
+    // LayoutBuilder 取原格边长，feedback 与原格同尺寸——原地拿起零跳变
+    return LayoutBuilder(builder: (context, box) {
+      final side = box.maxWidth.isFinite ? box.maxWidth : 72.0;
+      return LongPressDraggable<int>(
+        data: slot,
+        maxSimultaneousDrags: 1,
+        // child 锚定策略：按下点跟随手指——唤起瞬间物品原地不动（不跳位），
+        // 长按在格心即「手指中心 = 物品中心」（20261021 用户反馈：pointer
+        // 策略 + 半宽高偏移仍会在唤起瞬间把物品拽向手指，视觉偏右下）。
+        // feedback 透明只展示物品本身（图标/名称/数量角标），不带卡片底
+        dragAnchorStrategy: childDragAnchorStrategy,
+        feedback: Material(
+          color: Colors.transparent,
+          child: SizedBox(
+            width: side,
+            height: side,
+            child: _SlotFace(item: it, busy: false, onTap: null),
+          ),
         ),
-      ),
-      childWhenDragging: _emptySlot(cs),
-      onDragStarted: onDragStarted,
-      onDragEnd: (_) => onDragEnded?.call(),
-      child: face,
-    );
+        childWhenDragging: _emptySlot(cs),
+        onDragStarted: onDragStarted,
+        onDragEnd: (_) => onDragEnded?.call(),
+        child: face,
+      );
+    });
   }
 }
 

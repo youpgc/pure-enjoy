@@ -130,6 +130,23 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   Future<void> _useItem(PetBagItemModel item) async {
     if (widget.petId == null) return _toast('当前没有在养宠物');
+    // 喂食类道具：历险中/已饱静默阻断——服务端必拒（PET_NOT_REARING /
+    // PET_ALREADY_FULL），提前拦下不弹错误（20261021 用户拍板口径）。
+    // summary 拉取失败时放行走 RPC 由服务端兜底——不拦也不给误导文案
+    if (item.effectType == PetItemEffectType.feed.code) {
+      final (summary, _) = await PetService.instance.fetchSummary();
+      if (!mounted) return;
+      final pet = summary?.petInfoFor(widget.petId);
+      if (summary != null && pet == null) return _toast('当前没有在养宠物');
+      if (summary != null && pet != null) {
+        final fullLine =
+            (summary.config['feed_full_hunger'] as num?)?.toInt() ?? 100;
+        if (pet.status == PetPetStatus.adventuring ||
+            pet.hunger >= fullLine) {
+          return;
+        }
+      }
+    }
     await _run(() async {
       final err = await PetRpc.useItem(item.itemId, widget.petId!);
       if (!mounted) return;
