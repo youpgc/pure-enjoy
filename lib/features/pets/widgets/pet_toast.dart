@@ -14,7 +14,8 @@ import '../../../core/theme/app_theme.dart';
 /// - **宠物元素**：左侧爪印圆徽 + 宠物色系三态（默认主题蓝 / 成功绿 /
 ///   失败红）；
 /// - **替换式单条**：连续触发时立即替换上一条，不排队不叠加；
-/// - 顶部安全区下方滑入，2.4s 自动淡出，点击整条可提前关闭。
+/// - 顶部安全区下方滑入，3s 自动淡出，点击整条可提前关闭，
+///   上划或右滑甩出（达距离/速度阈值）也可移除；
 ///
 /// 用法与 showSnackBar 同构：`showPetToast(context, '文案', isError: true)`。
 /// 宠物模块内一律用它替代 showSnackBar（调用点机械替换，文案不变）。
@@ -91,11 +92,43 @@ class _PetToastViewState extends State<_PetToastView>
 
   bool _closing = false;
 
+  /// 拖拽偏移（20261021 用户拍板：支持上划/右滑甩出移除；只允许向右或向上，
+  /// 未达距离/速度阈值松手则弹回原位）
+  Offset _drag = Offset.zero;
+
+  void _onPanUpdate(DragUpdateDetails d) {
+    if (_closing) return; // 已在淡出（timer 到点等）不再跟手
+    setState(() {
+      _drag = Offset(
+        (_drag.dx + d.delta.dx).clamp(0.0, double.infinity),
+        (_drag.dy + d.delta.dy).clamp(double.negativeInfinity, 0.0),
+      );
+    });
+  }
+
+  void _onPanEnd(DragEndDetails d) {
+    if (_closing) return;
+    // 快甩任意方向也视为移除意图（距离阈值只认右上,速度阈值不限方向）
+    final fast = d.velocity.pixelsPerSecond.distanceSquared > 700 * 700;
+    final far = _drag.dx > 60 || -_drag.dy > 48;
+    if (fast || far) {
+      fadeOut();
+    } else {
+      setState(() => _drag = Offset.zero);
+    }
+  }
+
   @override
   void initState() {
     super.initState();
     _ctrl.addStatusListener((status) {
-      if (status == AnimationStatus.dismissed && _closing) _removeEntry();
+      // identity 比对:替换式重入后本 state 已不属于当前 toast,
+      // 不得摘除新 entry(20261021 审查 P3 竞态)
+      if (status == AnimationStatus.dismissed &&
+          _closing &&
+          identical(_toastKey?.currentState, this)) {
+        _removeEntry();
+      }
     });
     _ctrl.forward();
   }
@@ -119,7 +152,8 @@ class _PetToastViewState extends State<_PetToastView>
     final accent = widget.isError
         ? cs.error
         : (widget.isSuccess ? AppTheme.success : cs.primary);
-    final top = MediaQuery.paddingOf(context).top + 12;
+    // 20261021 用户拍板：下移（原 +12 → +22 → +34 → +46 → 再 +4 = +50）
+    final top = MediaQuery.paddingOf(context).top + 50;
     return Positioned(
       top: top,
       left: 16,
@@ -137,55 +171,62 @@ class _PetToastViewState extends State<_PetToastView>
               onTap: dismissPetToast,
               child: GestureDetector(
                 onTap: dismissPetToast,
-                child: Container(
-                padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
-                decoration: BoxDecoration(
-                  color: cs.surface,
-                  borderRadius: BorderRadius.circular(14),
-                  border: Border.all(
-                    color: cs.outlineVariant.withValues(alpha: 0.6),
-                  ),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 16,
-                      offset: const Offset(0, 4),
-                    ),
-                  ],
-                ),
-                child: Row(
-                  children: [
-                    // 宠物元素：爪印圆徽（随消息状态换色）
-                    Container(
-                      width: 28,
-                      height: 28,
-                      decoration: BoxDecoration(
-                        color: accent.withValues(alpha: 0.14),
-                        shape: BoxShape.circle,
+                onPanUpdate: _onPanUpdate,
+                onPanEnd: _onPanEnd,
+                // 手势被系统打断(来电/抢 arena)时弹回原位,不留中途偏移
+                onPanCancel: () => setState(() => _drag = Offset.zero),
+                child: Transform.translate(
+                  offset: _drag,
+                  child: Container(
+                    padding: const EdgeInsets.fromLTRB(10, 8, 14, 8),
+                    decoration: BoxDecoration(
+                      color: cs.surface,
+                      borderRadius: BorderRadius.circular(14),
+                      border: Border.all(
+                        color: cs.outlineVariant.withValues(alpha: 0.6),
                       ),
-                      child: Icon(Icons.pets, size: 15, color: accent),
-                    ),
-                    const SizedBox(width: 10),
-                    Expanded(
-                      child: Text(
-                        widget.message,
-                        maxLines: 5,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                          fontSize: 13,
-                          height: 1.35,
-                          color: cs.onSurface,
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 16,
+                          offset: const Offset(0, 4),
                         ),
-                      ),
+                      ],
                     ),
-                  ],
-                ),                // Row
-              ),                  // Container
-            ),                    // GestureDetector
-          ),                      // Semantics
-        ),                        // Material
-      ),                          // FadeTransition
-    ),                            // SlideTransition
-  );                              // Positioned
+                    child: Row(
+                      children: [
+                        // 宠物元素：爪印圆徽（随消息状态换色）
+                        Container(
+                          width: 28,
+                          height: 28,
+                          decoration: BoxDecoration(
+                            color: accent.withValues(alpha: 0.14),
+                            shape: BoxShape.circle,
+                          ),
+                          child: Icon(Icons.pets, size: 15, color: accent),
+                        ),
+                        const SizedBox(width: 10),
+                        Expanded(
+                          child: Text(
+                            widget.message,
+                            maxLines: 5,
+                            overflow: TextOverflow.ellipsis,
+                            style: TextStyle(
+                              fontSize: 13,
+                              height: 1.35,
+                              color: cs.onSurface,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ), // Row
+                  ), // Container
+                ), // Transform.translate
+              ), // GestureDetector
+            ), // Semantics
+          ), // Material
+        ), // FadeTransition
+      ), // SlideTransition
+    ); // Positioned
   }
 }
