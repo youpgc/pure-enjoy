@@ -24,6 +24,11 @@ class PetService {
     return _instance!;
   }
 
+  /// 总览强刷通知（20261021 用户需求：首页下拉刷新联动宠物状态卡）——
+  /// 任意外部方（首页 RefreshIndicator 等）force 拉取成功后自增；
+  /// 状态卡等常驻监听方据此自动重载，无需向上暴露各自的刷新通道
+  static final ValueNotifier<int> summaryForceRefreshed = ValueNotifier<int>(0);
+
   /// 总开关缓存新鲜度：入口门控属低变配置，1 分钟内视为新鲜
   static const Duration _gateTtl = Duration(minutes: 1);
 
@@ -86,6 +91,7 @@ class PetService {
       if (!summary.petEnabled) return (null, null);
       // 留住 pet_config 快照：背包等页只按 rpc_pet_summary 已回传的配置取数，不再补请求
       _summaryConfig = summary.config;
+      if (forceRefresh) summaryForceRefreshed.value++; // 通知常驻监听方重载
       return (summary, null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');

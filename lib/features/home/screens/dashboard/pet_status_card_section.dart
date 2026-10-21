@@ -27,6 +27,20 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   void initState() {
     super.initState();
     _load();
+    // 首页下拉刷新等外部 force 拉取成功后自动重载（20261021 用户需求）
+    PetService.summaryForceRefreshed.addListener(_onForcedRefresh);
+  }
+
+  void _onForcedRefresh() {
+    // 非 force 读：触发方（下拉刷新等）刚以 force 拉取并写回缓存，
+    // 这里再 force 会自增通知形成无限强刷循环（20261021 审查 P0）
+    if (mounted) _load();
+  }
+
+  @override
+  void dispose() {
+    PetService.summaryForceRefreshed.removeListener(_onForcedRefresh);
+    super.dispose();
   }
 
   /// 拉取总览并刷新状态卡（force=跳过缓存）

@@ -113,10 +113,15 @@ class _DashboardPageState extends State<DashboardPage> with _DashboardLogic {
       ),
       body: RefreshIndicator(
         onRefresh: () async {
+          // 宠物总览仅在系统开启时拉取：rpc_pet_summary 有副作用（首次进入
+          // 幂等发放初始包），后台关闭时不白跑一次写库（与状态卡门控同口径）
+          final petOn = await PetService.instance.isPetEnabled();
           await Future.wait([
             _loadRecentActivities(force: true),
             _loadPendingReminders(force: true),
             _loadAnnouncements(),
+            // 强拉成功后 PetService.summaryForceRefreshed 自增,状态卡监听自动重载
+            if (petOn) PetService.instance.fetchSummary(forceRefresh: true),
           ]);
         },
         child: ListView(
