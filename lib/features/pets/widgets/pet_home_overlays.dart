@@ -71,7 +71,7 @@ class PetAdventureBanner extends StatelessWidget {
 }
 
 /// 边缘浮动操作钮（2026-09-17 改版：文案内置——图标在上、文案在下方按钮内；
-/// [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时/已达上限）
+/// [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时）
 ///
 /// [onTap] 传 null 时整钮置灰（无交互）。
 class PetEdgeButton extends StatelessWidget {
@@ -87,7 +87,7 @@ class PetEdgeButton extends StatelessWidget {
   final IconData icon;
   final String label;
 
-  /// 蒙层文案：冷却倒计时（如「2分30秒」）/「已达上限」；null 表示正常态
+  /// 蒙层文案：冷却倒计时（如「2分30秒」）；null 表示正常态
   final String? overlay;
 
   final VoidCallback? onTap;

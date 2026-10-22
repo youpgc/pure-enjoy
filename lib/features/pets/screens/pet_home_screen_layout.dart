@@ -225,10 +225,10 @@ extension _PetHomeLayout on _PetHomeScreenState {
 
   // ---------- 右侧操作列（金币 + 喂食/抚摸/历险/任务，贴顶） ----------
 
-  /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时；当日次数耗尽提示上限
-  String? _overlay(Duration? cool, int? remain) {
+  /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时
+  /// （每日次数上限不再禁用抚摸,20261021 用户拍板）
+  String? _overlay(Duration? cool) {
     if (cool != null) return _budget.coolText(cool);
-    if (remain != null && remain <= 0) return '已达上限';
     return null;
   }
 
@@ -266,10 +266,12 @@ extension _PetHomeLayout on _PetHomeScreenState {
         _busy ||
         pet.status == PetPetStatus.adventuring ||
         _budget.isFull;
+    // 抚摸不限次（20261021 用户拍板）：不做每日上限禁用/蒙层——达到每日
+    // 亲密度获取上限后服务端自然不再加亲密,交互本身（心情/经验）照常
     final interactOff = pet == null ||
         _busy ||
         pet.status == PetPetStatus.adventuring ||
-        _budget.blocked(interactCool, _budget.interactRemain);
+        _budget.blocked(interactCool, null);
     return Positioned(
       right: 8,
       top: 0,
@@ -293,7 +295,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
             PetEdgeButton(
                 icon: Icons.touch_app_outlined,
                 label: '抚摸',
-                overlay: _overlay(interactCool, _budget.interactRemain),
+                overlay: _overlay(interactCool),
                 // 走 _interact 统一入口：继承历险中静默阻断守卫
                 onTap:
                     interactOff ? null : () => _interact(pet.id)),

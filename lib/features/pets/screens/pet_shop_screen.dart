@@ -70,8 +70,8 @@ class _PetShopScreenState extends State<PetShopScreen> {
     _load();
   }
 
-  Future<void> _load() async {
-    setState(() => _loading = true);
+  Future<void> _load({bool showLoading = true}) async {
+    if (showLoading) setState(() => _loading = true);
     final (items, err) = await PetRpc.fetchShopItems();
     final (records, recErr) = await PetRpc.fetchExpansionRecords();
     if (mounted) {
@@ -156,6 +156,9 @@ class _PetShopScreenState extends State<PetShopScreen> {
         item.isExpansion && !afterExpand
             ? '扩容已生效'
             : '已购买「${item.name}」');
+    // 静默刷新:扩容生效后阶梯过滤显示下一档道具,普通道具数量角标同步
+    // (20261021 用户反馈:购买扩容后列表仍显示旧道具)
+    _load(showLoading: false);
     if (fromDialog && mounted) Navigator.of(context).pop();
   }
 
