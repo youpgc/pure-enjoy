@@ -230,13 +230,13 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
       );
     }
 
-    return RefreshIndicator(
-      onRefresh: () => _load(force: true),
-      child: ListView(
-        padding: const EdgeInsets.all(16),
-        children: [
-          // 余额卡
-          Card(
+    // 布局定版(20261021):余额卡固定不滚动,只有流水列表区滚动
+    return Column(
+      children: [
+        // 固定区:余额卡 + 兑换区块
+        Padding(
+          padding: const EdgeInsets.all(16),
+          child: Card(
             margin: EdgeInsets.zero,
             child: Padding(
               padding: const EdgeInsets.all(20),
@@ -282,52 +282,76 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
               ),
             ),
           ),
-          const SizedBox(height: 16),
-          // 流水列表
-          Card(
-            margin: EdgeInsets.zero,
+        ),
+        // 滚动区:流水列表(标题固定,仅列表滚动;AlwaysScrollable 保证短列表也可下拉刷新)
+        Expanded(
+          child: Card(
+            margin: const EdgeInsets.fromLTRB(16, 0, 16, 16),
             child: Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Text('金币流水', style: Theme.of(context).textTheme.titleSmall),
+                  Text('金币流水',
+                      style: Theme.of(context).textTheme.titleSmall),
                   const SizedBox(height: 4),
-                  if (_records.isEmpty)
-                    Padding(
-                      padding: const EdgeInsets.symmetric(vertical: 32),
-                      child: Center(
-                        child: Text(
-                          '暂无金币流水',
-                          style: TextStyle(
-                            fontSize: 13,
-                            color: colorScheme.onSurfaceVariant,
+                  Expanded(
+                    // 空态也用滚动载体:保证下拉刷新手势可用（AlwaysScrollable）
+                    child: _records.isEmpty
+                        ? ListView(
+                            physics: const AlwaysScrollableScrollPhysics(),
+                            children: [
+                              const SizedBox(height: 80),
+                              Center(
+                                child: Text(
+                                  '暂无金币流水',
+                                  style: TextStyle(
+                                    fontSize: 13,
+                                    color: colorScheme.onSurfaceVariant,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          )
+                        : RefreshIndicator(
+                            onRefresh: () => _load(force: true),
+                            child: ListView.builder(
+                              padding: const EdgeInsets.only(top: 8),
+                              // AlwaysScrollable:流水不足一屏时下拉也能刷新
+                              physics: const AlwaysScrollableScrollPhysics(),
+                              itemCount: _records.length + 1,
+                              itemBuilder: (context, i) {
+                                if (i == _records.length) {
+                                  // 满 50 条才提示截断,不足不误导
+                                  if (_records.length < _kRecordLimit) {
+                                    return const SizedBox.shrink();
+                                  }
+                                  return Padding(
+                                    padding: const EdgeInsets.only(top: 8),
+                                    child: Center(
+                                      child: Text(
+                                        '仅展示最近 $_kRecordLimit 条',
+                                        style: TextStyle(
+                                          fontSize: 12,
+                                          color:
+                                              colorScheme.onSurfaceVariant,
+                                        ),
+                                      ),
+                                    ),
+                                  );
+                                }
+                                return _recordTile(
+                                    _records[i], colorScheme);
+                              },
+                            ),
                           ),
-                        ),
-                      ),
-                    )
-                  else ...[
-                    const SizedBox(height: 8),
-                    ..._records.map((r) => _recordTile(r, colorScheme)),
-                    Padding(
-                      padding: const EdgeInsets.only(top: 8),
-                      child: Center(
-                        child: Text(
-                          '仅展示最近 $_kRecordLimit 条',
-                          style: TextStyle(
-                            fontSize: 12,
-                            color: colorScheme.onSurfaceVariant,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
+                  ),
                 ],
               ),
             ),
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
