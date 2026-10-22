@@ -6,6 +6,7 @@ import '../models/pet_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_avatar_card.dart';
 import 'pet_shop_screen.dart';
 import '../widgets/pet_toast.dart';
 
@@ -80,6 +81,11 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
 
   void _toast(String msg) => showPetToast(context, msg);
 
+  /// 拖拽后的本地顺序（petId 序,20261021）：build 从 summary 过滤会回弹
+  /// 旧序(缓存未变),以本地序覆盖;保存成功后 force 重拉由服务端序接管,
+  /// 失败清本地序回滚
+  List<String>? _localOrderIds;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -114,8 +120,23 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
     final summary = _summary;
     if (summary == null) return const EmptyWidget(message: '暂无宠物');
 
-    final rearing =
-        summary.pets.where((p) => p.status == PetPetStatus.rearing).toList();
+    // 在养组含历险中：历险宠仍占养育格,列表可见便于排序查看;寄养按钮禁用
+    // （服务端 foster 拒 PET_NOT_REARING）——20261021 用户拍板
+    final rearing = summary.pets
+        .where((p) =>
+            p.status == PetPetStatus.rearing ||
+            p.status == PetPetStatus.adventuring)
+        .toList();
+    // 拖拽后的本地序覆盖 summary 序:否则 setState 重建时按缓存序回弹,
+    // 直到服务端落库并重拉才见到新序(20261021 用户实测回弹问题根因)
+    final order = _localOrderIds;
+    if (order != null) {
+      rearing.sort((a, b) {
+        final ia = order.indexOf(a.id);
+        final ib = order.indexOf(b.id);
+        return (ia < 0 ? 1 << 30 : ia).compareTo(ib < 0 ? 1 << 30 : ib);
+      });
+    }
     final fostered =
         summary.pets.where((p) => p.status == PetPetStatus.fostered).toList();
     final fosterCap = summary.capacities?.foster ?? 0;
@@ -152,7 +173,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
           if (other > 0) ...[
             const SizedBox(height: 8),
             Text(
-              '另有 $other 只伙伴正在历险/繁育中，不出现在以下列表',
+              '另有 $other 只伙伴暂不在列表（繁育中等）',
               style: TextStyle(
                 fontSize: 12,
                 color: colorScheme.onSurfaceVariant,
@@ -160,19 +181,40 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
             ),
           ],
           const SizedBox(height: 18),
-          _sectionTitle('身边养育中（${rearing.length}/$rearingCap）', colorScheme),
+          _sectionTitle('身边养育中（${rearing.length}/$rearingCap）—— 长按拖动调整主页切换顺序', colorScheme),
           if (rearing.isEmpty)
             _emptyRow('当前没有在养的宠物', colorScheme)
           else
-            ...rearing.map(
-              (p) => _petRow(
-                p,
-                colorScheme,
-                actionLabel: '送去寄养',
-                actionIcon: Icons.luggage_outlined,
-                enabled: fostered.length < fosterCap,
-                action: 'to_foster',
-              ),
+            // 拖拽排序（20261021 用户拍板）：sort_order 服务端落库,主页左右
+            // 切换顺序跟随;嵌套 shrinkWrap+禁内部滚动,由外层列表统一滚动
+            ReorderableListView(
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
+              buildDefaultDragHandles: true,
+              onReorder: (oldIndex, newIndex) {
+                setState(() {
+                  var idx = newIndex;
+                  if (idx > oldIndex) idx -= 1;
+                  final p = rearing.removeAt(oldIndex);
+                  rearing.insert(idx, p);
+                  _localOrderIds = [for (final q in rearing) q.id];
+                });
+                _saveOrder(rearing);
+              },
+              children: [
+                for (final p in rearing)
+                  _petRow(
+                    p,
+                    colorScheme,
+                    actionLabel: '送去寄养',
+                    actionIcon: Icons.luggage_outlined,
+                    // 历险中禁用寄养（服务端拒 PET_NOT_REARING）
+                    enabled: p.status == PetPetStatus.rearing &&
+                        fostered.length < fosterCap,
+                    action: 'to_foster',
+                    key: ValueKey(p.id),
+                  ),
+              ],
             ),
           const SizedBox(height: 18),
           _sectionTitle('寄养仓库中（${fostered.length}/$fosterCap）', colorScheme),
@@ -284,9 +326,30 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
         ),
       );
 
+  /// 保存拖拽后的顺序到服务端（sort_order 落库,主页切换顺序跟随）。
+  /// 成功:先 force 重拉由服务端序接管,**完成后再清本地序**——清早了会在
+  /// 重拉返回前按旧缓存序渲染闪一次回弹（20261021 复审 P2-1）;失败:清本地
+  /// 序回滚
+  Future<void> _saveOrder(List<PetBriefModel> rearing) async {
+    final err = await PetRpc.reorder([
+      for (var i = 0; i < rearing.length; i++)
+        (petId: rearing[i].id, sortOrder: i),
+    ]);
+    if (!mounted) return;
+    if (err != null) {
+      _toast(petRpcErrorText(err));
+      setState(() => _localOrderIds = null);
+      _load(force: true);
+      return;
+    }
+    await _load(force: true);
+    if (mounted) setState(() => _localOrderIds = null);
+  }
+
   Widget _petRow(
     PetBriefModel pet,
     ColorScheme colorScheme, {
+    Key? key,
     required String actionLabel,
     required IconData actionIcon,
     required bool enabled,
@@ -295,11 +358,16 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
     final moving = _movingId == pet.id;
     final busy = _movingId != null;
     return Card(
+      key: key,
       margin: const EdgeInsets.only(bottom: 8),
       child: Padding(
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [
+            // 头像卡：c1_neutral 中性帧,与舞台形象同源（20261021 用户需求）
+            PetAvatarCard(
+                speciesCode: pet.speciesCode, stage: pet.stage),
+            const SizedBox(width: 10),
             Expanded(
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,

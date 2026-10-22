@@ -521,6 +521,17 @@ class PetRpc {
     return (data, null);
   }
 
+  /// 宠物排序保存（寄养仓库拖拽；服务端 sort_order 落库，summary 按序返回）
+  static Future<String?> reorder(List<({String petId, int sortOrder})> orders) async {
+    final (_, err) = await _call('rpc_pet_reorder', {
+      'p_orders': [
+        for (final o in orders) {'pet_id': o.petId, 'sort_order': o.sortOrder},
+      ],
+    }, 'rpc_pet_reorder 宠物排序');
+    if (err == null) await PetService.instance.invalidateSummary();
+    return err;
+  }
+
   /// 成长时间线（只读，最近 pLimit 条倒序）
   static Future<(Map<String, dynamic>?, String?)> fetchTimeline(String petId, {int limit = 100}) async {
     return _call('rpc_pet_timeline', {
