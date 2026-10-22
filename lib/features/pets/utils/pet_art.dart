@@ -3,11 +3,10 @@
 /// - 一期素材全随包内置（不做线上资源包；3D 资源包懒加载已下线）；
 /// - 因此新增一只宠物的表现 = 投素材 + 重生成下方清单 + 发版，后台 `render2d`
 ///   只能在「包里真有」的范围内选定（校验见 [pet_art_resolver.dart]）；
-/// - cat_ssr1（月萤）三阶：`_01`=基础形(stage0) / `_02`=一阶(stage1) /
-///   `_03`=二阶(stage2)，与进阶图 yueying.png 左→右顺序一致；
-/// - 底图 `cat_ssr1_0N.png` 是 AI 出的 2048² 不透明图（带背景），
-///   `frames/*_idle_N.png` 才是抠好底的透明帧——舞台优先用后者当身体，
-///   别直接拿底图做动作，否则动作期间会闪出方框背景；
+/// - ⚠️ cat_ssr1（月萤）的整只底图 `cat_ssr1_0N.png`（AI 出的 2048² 不透明
+///   带背景图）已弃用删除：形象与舞台不一致（用户 20261021 拍板），清单改为
+///   指向弯曲树中性帧 `anim/ssr/cat_ssr1/sN/c1_neutral.png`（按阶 s0/s1/s2,
+///   与舞台同源同款）；待机透明帧 `frames/*_idle_N.png` 仍保留供动作轮播；
 /// - **本清单只管「底图 + 整图帧序列」两条路**。分层弯曲用的 6 档表情帧在另一棵树
 ///   `assets/pets/anim/<评级>/<种属 code>/<阶 sN>/c*.png`，其目录与几何常量登记在
 ///   `lib/constants/pet_bend.dart`（生成源 `pet_anim_demo`，校验见
@@ -24,11 +23,13 @@ library;
 /// 两表由 `tool/pet_asset_check.mjs --fix` 依据 `assets/pets` 目录实际文件
 /// 重生成——投完素材跑一次即可，勿手改生成区块。
 // BEGIN generated:pet-art
+// cat_ssr1 的整只底图（cat_ssr1_01/02/03.png）已弃用删除（20261021）:
+// 形象与舞台不一致,清单改指向弯曲树中性帧（与舞台同源同款,按阶 s0/s1/s2）
 const Map<String, List<String>> kPetStageArt = {
   'cat_ssr1': [
-    'assets/pets/cat_ssr1_01.png',
-    'assets/pets/cat_ssr1_02.png',
-    'assets/pets/cat_ssr1_03.png',
+    'assets/pets/anim/ssr/cat_ssr1/s0/c1_neutral.png',
+    'assets/pets/anim/ssr/cat_ssr1/s1/c1_neutral.png',
+    'assets/pets/anim/ssr/cat_ssr1/s2/c1_neutral.png',
   ],
 };
 

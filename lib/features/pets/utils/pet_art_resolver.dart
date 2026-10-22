@@ -9,7 +9,7 @@
 ///
 /// ```jsonc
 /// {
-///   "base": "cat_ssr1_02",     // 整只底图素材码 -> assets/pets/<code>.png
+///   "base": "<素材码>",        // 整只底图素材码 -> assets/pets/<code>.png
 ///   "frames": { "idle": 4 }    // 动作 code -> 帧数
 ///                              // -> assets/pets/frames/<species_code>_<action>_N.png，N 从 1 起
 /// }
@@ -51,9 +51,11 @@ String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
 /// 整只底图：`render2d.base` 优先，未配置或未随包则回退该种属该阶位的清单底图。
+/// 清单未登记（如 cat_ssr1 底图已弃用）时回退弯曲树中性帧 c1_neutral——
+/// 与舞台形象同源，不再回退到已删除的旧立绘（20261021 用户拍板）。
 ///
-/// 注意底图是不透明图（带背景），舞台上请用 [petStageFrames] 取透明帧做身体，
-/// 只有无帧素材的种属才直接拿底图演动作。
+/// 注意：清单底图（如仍有）是不透明图（带背景），舞台上请用 [petStageFrames]
+/// 取透明帧做身体，只有无帧素材的种属才直接拿底图演动作。
 String? petBaseArt(String speciesCode, int stage,
     {Map<String, dynamic>? render2d}) {
   final code = render2d?['base'];
@@ -61,8 +63,10 @@ String? petBaseArt(String speciesCode, int stage,
     return 'assets/pets/$code.png';
   }
   final arts = kPetStageArt[speciesCode];
-  if (arts == null || stage < 0 || stage >= arts.length) return null;
-  return arts[stage];
+  if (arts != null && stage >= 0 && stage < arts.length) return arts[stage];
+  final dir = petBendGeo(speciesCode, stage)?.dir;
+  if (dir != null) return '$dir/c1_neutral.png';
+  return null;
 }
 
 /// 某动作配置的真帧序列；未配置该动作或无真帧返回空列表（走程序补间）
