@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../../../utils/date_time_utils.dart';
 
 /// 宠物成长回忆（需求 §3.3 时间线的 App 呈现，2026-10-09 实装）
 ///
@@ -213,7 +214,8 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
                                     fontWeight: FontWeight.w600))),
                         if (item.at != null)
                           Text(
-                            '${item.at!.year}.${item.at!.month}.${item.at!.day}',
+                            // 北京时区统一口径,具体到秒(20261021 用户拍板)
+                            DateTimeUtils.formatStandard(item.at),
                             style: TextStyle(
                                 fontSize: 11, color: cs.onSurfaceVariant),
                           ),
