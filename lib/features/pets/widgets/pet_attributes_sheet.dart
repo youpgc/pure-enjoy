@@ -6,6 +6,7 @@ import '../models/pet_models.dart';
 import '../screens/pet_timeline_screen.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../utils/pet_intimacy_level.dart';
 import 'pet_toast.dart';
 
 /// 属性面板（2026-09-17 属性系统 Phase 2）
@@ -288,7 +289,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               _attrRow(k, cs),
               const SizedBox(height: 8),
             ],
-            const SizedBox(height: 8),
+            // 亲密行:循环内已带 8 间距,不再叠加(20261021 用户反馈间距过大)
             _intimacyRow(cs),
             const SizedBox(height: 10),
             Text(
@@ -504,26 +505,47 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     );
   }
 
-  /// 亲密度行（照料状态）：总值 + 今日已获/上限（config.intimacy_daily_cap 同源；
-  /// 上限用尽时提示明日再来，解释"今天怎么不涨了"）
+  /// 亲密度行（等级制,20261021 用户拍板：不封顶按等级拆分）：
+  /// 进度条结构与四维属性行同构（同宽/同高/同底色）;数值格=累计亲密度,
+  /// 副行=「亲密等级 Lv.X · 级内进度」（20261021 用户定稿文案）。
+  /// 等级曲线 base/growth 读 config（缺键回落 100/1.5）。
   Widget _intimacyRow(ColorScheme cs) {
-    final cap = (widget.config?['intimacy_daily_cap'] as num?)?.toInt();
-    final gain = widget.pet.todayIntimacyGain;
-    final capped = cap != null && cap > 0 && gain >= cap;
-    final suffix = cap == null || cap <= 0
-        ? ''
-        : '（今日 +$gain/$cap${capped ? '，明天再陪陪它吧' : ''}）';
-    return Row(
+    final lv = petIntimacyLevel(widget.pet.intimacy, widget.config);
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
       children: [
-        const SizedBox(
-            width: 56,
-            child: Text('亲密',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
-        Expanded(
-          child: Text(
-              '亲密 ${widget.pet.intimacy}$suffix',
-              style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+        Row(
+          children: [
+            const SizedBox(
+                width: 56,
+                child: Text('亲密',
+                    style:
+                        TextStyle(fontSize: 13, fontWeight: FontWeight.w600))),
+            Expanded(
+              child: ClipRRect(
+                borderRadius: BorderRadius.circular(4),
+                child: LinearProgressIndicator(
+                  value: lv.need <= 0
+                      ? 0
+                      : (lv.intoLevel / lv.need).clamp(0.0, 1.0),
+                  minHeight: 8,
+                  backgroundColor: cs.surfaceContainerHighest,
+                ),
+              ),
+            ),
+            const SizedBox(width: 10),
+            // 数值格 = 已获取亲密度总数(等级换算见下方副行)
+            SizedBox(
+                width: 64,
+                child: Text('${widget.pet.intimacy}',
+                    textAlign: TextAlign.right,
+                    style: const TextStyle(
+                        fontSize: 12, fontWeight: FontWeight.w600))),
+          ],
         ),
+        const SizedBox(height: 4),
+        Text('亲密等级 Lv.${lv.level} · ${lv.intoLevel}/${lv.need}',
+            style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
       ],
     );
   }

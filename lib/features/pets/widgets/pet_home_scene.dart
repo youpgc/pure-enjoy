@@ -278,7 +278,8 @@ class PetGoldBadgeCore extends StatelessWidget {
   }
 }
 
-/// 沉底状态卡：名牌行 + 五维独立行（饱食/心情/亲密/经验/健康，每条一行不并行）
+/// 沉底状态卡：名牌行 + 四维独立行（饱食/心情/经验/健康，每条一行不并行；
+/// 亲密度只在详情面板展示,20261021 用户拍板)
 ///
 /// 点击整卡打开属性面板（属性系统 Phase 2：四维/健康/性格/加点，见
 /// pet_attributes_sheet.dart）。
@@ -346,8 +347,8 @@ class PetBottomStatusCard extends StatelessWidget {
             const SizedBox(height: 6),
             _statRow('心情', 'ui_mood', Icons.mood, pet.mood),
             const SizedBox(height: 6),
-            _statRow('亲密', 'ui_bond', Icons.favorite, pet.intimacy),
-            const SizedBox(height: 6),
+            // 亲密度不在主界面展示：详情面板（属性面板）已有对应字段
+            // （20261021 用户拍板）
             _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
                 max: expMaxed ? null : expNeed,
                 forceFull: expMaxed,
