@@ -47,26 +47,8 @@ class PetReservedModel {
   }
 }
 
-/// 奖励道具行（reward_package.items / rewards.items = [{code,count}]）
-class PetRewardItemModel {
-  const PetRewardItemModel({required this.code, required this.count});
-
-  final String code;
-  final int count;
-
-  /// 道具展示名（由调用方按 item_code 匹配目录后回填，未命中为 null）
-  static List<PetRewardItemModel> parseList(dynamic raw) {
-    if (raw is! List) return const [];
-    return raw
-        .whereType<Map>()
-        .map((e) => PetRewardItemModel(
-              code: e['code'] as String? ?? '',
-              count: (e['count'] as num?)?.toInt() ?? 1,
-            ))
-        .where((e) => e.code.isNotEmpty)
-        .toList();
-  }
-}
+/// 奖励道具行 PetRewardItemModel 已下沉至 pet_rpc_models（底层模型层,
+/// 每日/每周/成就三线共用;本文件经 import 继续可用）。
 
 /// 宠物个体明细（pet_pets 直查，补 rpc_pet_summary 未下发的 species_id / 特性）
 ///
@@ -349,6 +331,7 @@ class PetEggOddsModel {
     required this.families,
     required this.rarities,
     this.maleChance,
+    this.initialChoices = const {},
   });
 
   final String poolCode;
@@ -362,6 +345,10 @@ class PetEggOddsModel {
 
   /// weights.gender.male；female = 1 - male（未配置 → null）
   final double? maleChance;
+
+  /// weights.initial_choices：初始蛋自选种属 {系: [候选 SSR species_code...]}；
+  /// 仅 initial_ssr 池配置；空 = 未开启自选（走 fixed_species 固定产出）
+  final Map<String, List<String>> initialChoices;
 
   List<String> get familyLines => families.entries
       .map((e) => '${_familyLabel(e.key)} ${(e.value * 100).toStringAsFixed(0)}%')
@@ -399,12 +386,24 @@ class PetEggOddsModel {
       };
     }
 
+    Map<String, List<String>> choiceMap(dynamic raw) {
+      if (raw is! Map) return const {};
+      return {
+        for (final e in raw.entries)
+          if (e.value is List)
+            e.key as String: [
+              for (final v in e.value as List) if (v != null) v.toString(),
+            ],
+      };
+    }
+
     return PetEggOddsModel(
       poolCode: json['pool_code'] as String? ?? '',
       configVersion: (json['config_version'] as num?)?.toInt() ?? 0,
       families: numMap(w['families']),
       rarities: numMap(w['rarity']),
       maleChance: numMap(w['gender'])['male']?.toDouble(),
+      initialChoices: choiceMap(w['initial_choices']),
     );
   }
 }

@@ -15,6 +15,7 @@ class PetBagItemModel {
     required this.name,
     required this.category,
     this.subType,
+    this.description,
     this.icon,
     this.effect = const {},
     this.stackLimit,
@@ -28,6 +29,7 @@ class PetBagItemModel {
   final String name;
   final String category; // egg / consumable / tool
   final String? subType; // food/clean/toy/rescue...
+  final String? description; // pet_items.description（无结构化效果时兜底展示）
   final String? icon; // pet_items.icon，形如 icon/<key>
   final Map<String, dynamic> effect;
 
@@ -65,6 +67,7 @@ class PetBagItemModel {
       name: item['name'] as String? ?? '',
       category: item['category'] as String? ?? '',
       subType: item['sub_type'] as String?,
+      description: item['description'] as String?,
       icon: item['icon'] as String?,
       effect: item['effect'] is Map
           ? Map<String, dynamic>.from(item['effect'] as Map)
@@ -158,6 +161,7 @@ class PetQuestModel {
     required this.claimed,
     this.rewardGold = 0,
     this.rewardPoints = 0,
+    this.rewardItems = const [],
   });
 
   final String questId;
@@ -167,6 +171,9 @@ class PetQuestModel {
   final bool claimed;
   final int rewardGold;
   final int rewardPoints;
+
+  /// rewards.items：每日任务与周任务同表同结构（与周任务页道具具名同口径）
+  final List<PetRewardItemModel> rewardItems;
 
   bool get done => progress >= target;
 
@@ -195,11 +202,40 @@ class PetQuestModel {
       claimed: json['reward_claimed'] as bool? ?? false,
       rewardGold: (rw['gold'] as num?)?.toInt() ?? 0,
       rewardPoints: (rw['points'] as num?)?.toInt() ?? 0,
+      rewardItems: PetRewardItemModel.parseList(rw['items']),
     );
   }
 }
 
 /// 历险地（pet_adventure_spots，仅启用行）
+/// 奖励道具行（reward_package.items / rewards.items = [{code,count,name?}]）
+///
+/// 放置在本文件（底层模型层）：成就/周任务/每日任务三线共用，
+/// pet_p2_models 依赖本文件,反向引用会成环。
+class PetRewardItemModel {
+  const PetRewardItemModel({required this.code, required this.count, this.name});
+
+  final String code;
+  final int count;
+
+  /// 道具展示名（成就/周任务由服务端 join pet_items 下发,20261022 起；
+  /// 每日任务等直查来源为 null,由调用方回填或回落 code 展示）
+  final String? name;
+
+  static List<PetRewardItemModel> parseList(dynamic raw) {
+    if (raw is! List) return const [];
+    return raw
+        .whereType<Map>()
+        .map((e) => PetRewardItemModel(
+              code: e['code'] as String? ?? '',
+              count: (e['count'] as num?)?.toInt() ?? 1,
+              name: e['name'] as String?,
+            ))
+        .where((e) => e.code.isNotEmpty)
+        .toList();
+  }
+}
+
 class PetSpotModel {
   const PetSpotModel({
     required this.id,

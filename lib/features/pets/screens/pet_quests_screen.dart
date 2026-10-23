@@ -109,7 +109,9 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
     if (err != null || reward == null) {
       return showPetToast(context, petRpcErrorText(err));
     }
-    showPetToast(context, _claimToast(_rewardParts(reward.gold, reward.points, const [])));
+    // 道具具名用任务配置数据(rewards 与服务端发放同源;claim 返回暂无 items)
+    showPetToast(context,
+        _claimToast(_rewardParts(q.rewardGold, q.rewardPoints, q.rewardItems)));
     _load();
   }
 
@@ -173,7 +175,8 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
             progress: q.progress,
             target: q.target,
             claimed: q.claimed,
-            rewardText: _rewardText(q.rewardGold, q.rewardPoints, const []),
+            rewardText:
+                _rewardText(q.rewardGold, q.rewardPoints, q.rewardItems),
             busy: _claiming.contains(q.questId),
             onClaim: q.done ? () => _claimDaily(q) : null,
           );
@@ -260,17 +263,6 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
                       style: const TextStyle(
                           fontSize: 14, fontWeight: FontWeight.w600)),
                 ),
-                if (rewardText.isNotEmpty) ...[
-                  const SizedBox(width: 8),
-                  Flexible(
-                    child: Text(rewardText,
-                        textAlign: TextAlign.right,
-                        maxLines: 1,
-                        overflow: TextOverflow.ellipsis,
-                        style: TextStyle(
-                            fontSize: 12, color: cs.onSurfaceVariant)),
-                  ),
-                ],
                 if (claimed) ...[
                   const SizedBox(width: 8),
                   Text('已领取',
@@ -288,6 +280,12 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
                 ],
               ],
             ),
+            // 奖励独立行:道具名完整显示(挤在标题行会被截断,20261022 用户反馈)
+            if (rewardText.isNotEmpty) ...[
+              const SizedBox(height: 6),
+              Text(rewardText,
+                  style: TextStyle(fontSize: 12, color: cs.tertiary)),
+            ],
             const SizedBox(height: 10),
             Row(
               children: [
@@ -333,20 +331,23 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   static String _claimToast(String summary) =>
       summary.isEmpty ? '奖励已领取' : '奖励已领取：$summary';
 
-  static String _rewardText(int gold, int points, List<dynamic> items) {
+  static String _rewardText(
+      int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '🪙 $gold',
       if (points > 0) '⭐ $points',
-      if (items.isNotEmpty) '道具 ×${items.length}',
+      // 道具逐个具名(name 由周任务下发补名,20261022;无名回落 code)
+      for (final it in items) '${it.name ?? it.code} ×${it.count}',
     ];
     return parts.isEmpty ? '' : '奖励 ${parts.join(' · ')}';
   }
 
-  static String _rewardParts(int gold, int points, List<dynamic> items) {
+  static String _rewardParts(
+      int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '金币 +$gold',
       if (points > 0) '积分 +$points',
-      if (items.isNotEmpty) '道具 ×${items.length}',
+      for (final it in items) '${it.name ?? it.code} ×${it.count}',
     ];
     return parts.isEmpty ? '奖励已发放' : parts.join('，');
   }

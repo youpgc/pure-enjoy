@@ -1,5 +1,5 @@
 import '../../../constants/pet.dart';
-import 'pet_p2_models.dart';
+import 'pet_rpc_models.dart';
 
 /// 宠物 P2 成就与周任务模型
 ///

@@ -59,7 +59,8 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     final parts = <String>[
       if (result.gold > 0) '金币 +${result.gold}',
       if (result.points > 0) '积分 +${result.points}',
-      if (result.items.isNotEmpty) '道具 ×${result.items.length}',
+      // 道具逐个具名(领取结果 items 由服务端 claim 下发;无名回落 code)
+      for (final it in result.items) '${it.name ?? it.code} ×${it.count}',
     ];
     showPetToast(context,
         '已领取「${result.title}」：${parts.isEmpty ? '奖励已发放' : parts.join('，')}');
@@ -213,24 +214,27 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
                   backgroundColor: cs.surfaceContainerHighest),
             ),
             const SizedBox(height: 8),
-            Text(_rewardText(a),
-                style: TextStyle(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w600,
-                    color: cs.tertiary)),
+            // 奖励行:数据为空时不渲染(20261022 拍板:不向用户展示内部兜底措辞)
+            if (_rewardText(a).isNotEmpty)
+              Text(_rewardText(a),
+                  style: TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w600,
+                      color: cs.tertiary)),
           ],
         ),
       ),
     );
   }
 
-  /// 奖励摘要（读服务端下发的 reward_package，缺项即不展示，不补默认值）
+  /// 奖励摘要（读服务端下发的 reward_package,缺项即不展示,不补默认值;
+  /// 道具逐个具名——name 由成就列表 SQL join pet_items 下发,20261022 起）
   static String _rewardText(PetAchievementModel a) {
     final parts = <String>[
       if (a.rewardGold > 0) '🪙 ${a.rewardGold}',
       if (a.rewardPoints > 0) '⭐ ${a.rewardPoints}',
-      if (a.rewardItems.isNotEmpty) '道具 ×${a.rewardItems.length}',
+      for (final it in a.rewardItems) '${it.name ?? it.code} ×${it.count}',
     ];
-    return parts.isEmpty ? '奖励见后台配置' : '奖励 ${parts.join(' · ')}';
+    return parts.isEmpty ? '' : '奖励 ${parts.join(' · ')}';
   }
 }
