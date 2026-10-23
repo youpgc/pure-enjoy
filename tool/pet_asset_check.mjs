@@ -199,12 +199,45 @@ function checkBendTree() {
   }
 }
 
+/// 字典同步守卫：kLongDropNames（App 兜底字典）须覆盖 SQL 工作区所有
+/// long_only 掉落 code（服务端联查 name 已是主源，此处防兜底字典漏同步）
+function checkLongDropDict() {
+  const SQL_DIR = path.resolve(ROOT, '..', 'sql', 'pet');
+  if (!fs.existsSync(SQL_DIR)) return; // 工作区不在旁侧时跳过（CI 等场景）
+  const dart = fs.readFileSync(path.join(ROOT, 'lib', 'constants', 'pet.dart'), 'utf8');
+  const m = /kLongDropNames = <String, String>\{([\s\S]*?)\};/.exec(dart);
+  if (!m) {
+    add('FAIL', 'constants/pet.dart 未找到 kLongDropNames，长途掉落名字典缺失');
+    return;
+  }
+  const dict = new Set([...m[1].matchAll(/'([a-z0-9_]+)'/g)].map((x) => x[1]));
+  const codes = new Set();
+  for (const f of fs.readdirSync(SQL_DIR).filter((f) => f.endsWith('.sql'))) {
+    const src = fs.readFileSync(path.join(SQL_DIR, f), 'utf8').replace(/\r/g, '');
+    for (const ln of src.split('\n')) {
+      if (!ln.includes('long_only')) continue;
+      // 整张 drop_table 可能压在同一行：只取 long_only 数组段内的 code，
+      // 常规掉落（help/play/memory items）的 code 不属于长途独占清单
+      const seg = /long_only[^[]*\[([^\]]*)\]/.exec(ln);
+      if (!seg) continue;
+      for (const c of seg[1].matchAll(/"code"\s*:\s*"([a-z0-9_]+)"/g)) codes.add(c[1]);
+    }
+  }
+  const missing = [...codes].filter((c) => !dict.has(c));
+  if (missing.length) {
+    add('WARN', `kLongDropNames 漏同步 long_only 掉落码: ${missing.join(', ')}（服务端联查为主，此处仅兜底完整性）`);
+  } else if (codes.size > 0) {
+    add('PASS', `长途掉落名字典同步: ${codes.size} 个 long_only 码全覆盖`);
+  }
+}
+
 const files = walk(ASSETS).filter(
   (f) => /\.(png|jpe?g|webp)$/i.test(f) && !inDir(f, 'items'),
 );
 for (const f of files) checkRaster(f);
 checkBendTree();
 checkIcons();
+checkLongDropDict();
 
 const order = { FAIL: 0, WARN: 1, PASS: 2 };
 for (const i of issues.sort((a, b) => order[a.level] - order[b.level]))
