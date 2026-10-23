@@ -87,7 +87,7 @@ String petBagEffectDesc(PetBagItemModel item) {
           ? '让一枚等待中的蛋提前出壳'
           : '让一枚等待中的蛋提前 $min 分钟出壳');
     case PetItemEffectType.traitWash:
-      parts.add('为一只宠物重掷特性，结果不可回退');
+      parts.add('为一只宠物重掷特性，替换后就换不回来啦');
     case PetItemEffectType.unlock:
       final feature = item.effect['feature'] as String? ?? '';
       parts.add(feature.isEmpty
@@ -101,7 +101,7 @@ String petBagEffectDesc(PetBagItemModel item) {
       } else if (item.subType == 'rescue') {
         parts.add('历险遇险时立即救回宠物');
       } else if (item.subType == 'evolution') {
-        parts.add('进化媒介：进化时由服务端自动扣除，无需手动使用');
+        parts.add('进化时自动使用，无需手动操作');
       } else if ((item.description ?? '').isNotEmpty) {
         // 无结构化效果的道具(如星辰罗盘等钥匙类)回落展示 pet_items.description
         parts.add(item.description!);

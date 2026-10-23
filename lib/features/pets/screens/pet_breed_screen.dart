@@ -70,7 +70,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
       _reserved = reserved;
       _picked.removeWhere((id) => !rearing.contains(id));
       _error = summary == null
-          ? (summaryErr ?? '数据加载失败，请稍后重试')
+          ? (summaryErr ?? '加载失败了，稍后再试一次')
           : (firstErr == null ? null : petRpcErrorText(firstErr));
       _loading = false;
     });
@@ -105,7 +105,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     final b = pair[1];
     if (a.family != b.family) return '需要同一系别（例如猫 × 猫）';
     if (a.gender == null || b.gender == null) {
-      return '性别信息缺失，请下拉刷新后重试';
+      return '伙伴信息还没加载好，刷新一下再试试';
     }
     if (a.gender == b.gender) return '需要一公一母';
     final min = _reserved.breedIntimacyMin;
@@ -157,11 +157,11 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     await _load(force: true);
   }
 
-  /// 手续费文案（读 reserved，未配置不猜数值）
+  /// 手续费文案（读 reserved；未配置时按免费兜底，不出现后台类措辞）
   String _feeText() {
     final fee = _reserved.breedFeeGold;
-    if (fee == null) return '（手续费见后台配置）';
-    return fee == 0 ? '（本次免费）' : '，需付 $fee 金币';
+    if (fee == null || fee == 0) return '（本次免费）';
+    return '，需付 $fee 金币';
   }
 
   Future<void> _claim(PetBreedOrderModel order) async {

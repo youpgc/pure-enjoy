@@ -199,7 +199,10 @@ class _SlotFace extends StatelessWidget {
                 height: 18,
                 child: CircularProgressIndicator(strokeWidth: 2),
               )
+            // Stack 铺满整格：数量角标锚定「格子」右上角而非内容区
+            // （内容仍居中；上/右各留 2px 间距）
             : Stack(
+                fit: StackFit.expand,
                 alignment: Alignment.center,
                 children: [
                   // 2026-09-24 定版：每行 4 格、格内图标 + 名称（单行不换行，
@@ -235,8 +238,8 @@ class _SlotFace extends StatelessWidget {
                   ),
                   if (!item.isEgg && (item.quantity > 1 || item.isStackFull))
                     Positioned(
-                      right: 0,
-                      top: 0,
+                      top: 2,
+                      right: 2,
                       child: Container(
                         padding: const EdgeInsets.symmetric(
                             horizontal: 4, vertical: 1),

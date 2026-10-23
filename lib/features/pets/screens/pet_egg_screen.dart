@@ -11,6 +11,7 @@ import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
+import '../utils/pet_gold_format.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_initial_family_picker.dart';
 import '../widgets/pet_item_icon.dart';
@@ -351,7 +352,7 @@ class _AccelDialog extends StatelessWidget {
                 title: Text('${it.name} ×${it.quantity}'),
                 subtitle: Text(it.effect['minutes'] is num
                     ? '提前 ${(it.effect['minutes'] as num).toInt()} 分钟'
-                    : '提前时长见后台配置'),
+                    : '使用后缩短孵化等待'),
                 trailing: const Text('使用'),
                 onTap: () =>
                     Navigator.pop(context, (itemId: it.itemId, gold: false)),
@@ -365,7 +366,7 @@ class _AccelDialog extends StatelessWidget {
                     Icon(Icons.monetization_on_outlined, color: cs.tertiary),
                 title: Text(cost == 0 ? '金币加速（本次免费）' : '金币加速 · $cost 金币'),
                 subtitle: Text(
-                  goldOk ? '余额 $balance' : '余额不足（$balance）',
+                  goldOk ? '余额 ${petGoldLabel(balance)}' : '余额不足（${petGoldLabel(balance)}）',
                   style: TextStyle(
                       fontSize: 11, color: goldOk ? cs.onSurfaceVariant : cs.error),
                 ),

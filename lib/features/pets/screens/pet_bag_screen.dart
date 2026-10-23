@@ -116,7 +116,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
           break;
         }
       }
-      if (target == null) return _toast('没找到这一格对应的蛋，下拉刷新后重试');
+      if (target == null) return _toast('这颗蛋好像不见了，刷新一下再试试');
       // 等待型蛋（传说蛋等）：即开通道走不了，转孵蛋页计时/加速/领取
       if (!target.isInstant) return _push(const PetEggScreen());
       // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路

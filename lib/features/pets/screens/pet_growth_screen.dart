@@ -176,7 +176,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
       context,
       title: '确认洗练特性',
       content: '使用「${item.name}」重掷「${pet.name}」的特性？'
-          '新特性直接覆盖旧特性，不提供回退。',
+          '新特性会替换旧特性，替换后就换不回来啦，想清楚哦。',
       confirmText: '洗练',
     );
     if (confirmed != true || !mounted) return;
@@ -256,7 +256,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
         Text('伙伴正在${pet.status?.label ?? '外出'}，回到身边后才能进化',
             style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
       ] else if (pet.chainId == null)
-        Text('这个形态还没有配置进化路线',
+        Text('这个形态暂时没有进化路线',
             style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant))
       else if (_optionsLoading)
         const Padding(
@@ -395,7 +395,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
                   busy: _busy, onWash: () => _wash(item)),
         ],
         const SizedBox(height: 12),
-        Text('洗练会重掷这只伙伴的特性，新结果直接覆盖旧特性、不可回退；'
+        Text('洗练会重掷这只伙伴的特性，新结果会替换旧特性、替换后就换不回来啦；'
             '也可能一次洗不出特性（属正常结果）。',
             style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
       ],
