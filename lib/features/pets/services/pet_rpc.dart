@@ -37,7 +37,7 @@ class PetRpc {
       final resp = await ApiClient.get(
         'pet_bag_items',
         select:
-            'id,quantity,slot_index,item:pet_items(id,item_code,name,icon,category,sub_type,effect,stack_limit)',
+            'id,quantity,slot_index,item:pet_items(id,item_code,name,description,icon,category,sub_type,effect,stack_limit)',
         filters: {'user_id': 'eq.$uid'},
         order: 'slot_index.asc',
         limit: 200,
@@ -239,9 +239,14 @@ class PetRpc {
       _call(fn, params, note);
 
   /// 即开孵化 → 成功返回孵化结果
-  static Future<(PetHatchResultModel?, String?)> hatchEgg(String eggId) async {
+  ///
+  /// [family] 仅初始蛋自选种属（initial_ssr 池）携带：cat/dog/rabbit/mouse；
+  /// 其他蛋不传。服务端校验种属在池配置 initial_choices 内，非法即拒。
+  static Future<(PetHatchResultModel?, String?)> hatchEgg(String eggId,
+      {String? family}) async {
     final (data, err) = await _call('rpc_pet_hatch_instant', {
       'p_egg_id': eggId,
+      if (family != null && family.isNotEmpty) 'p_family': family,
     }, 'rpc_pet_hatch_instant 即开孵化');
     if (err != null) return (null, err);
     await PetService.instance.invalidateSummary();

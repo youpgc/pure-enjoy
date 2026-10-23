@@ -12,6 +12,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_home_overlays.dart';
+import '../widgets/pet_initial_family_picker.dart';
 import '../widgets/pet_item_icon.dart';
 import '../widgets/pet_toast.dart';
 
@@ -112,10 +113,19 @@ class _PetEggScreenState extends State<PetEggScreen> {
 
   /// 出宠（instant 蛋直接孵 / wait 蛋到点领取），服务端同一函数
   Future<void> _hatch(PetEggModel egg) => _run(egg.id, () async {
-        final (result, err) = await PetRpc.hatchEgg(egg.id);
-        if (!mounted) return;
-        if (err != null || result == null) {
-          return _toast(petRpcErrorText(err));
+        // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+        PetHatchResultModel? result;
+        if (egg.poolCode == 'initial_ssr') {
+          result = await hatchInitialEggWithChoice(context, eggId: egg.id);
+          if (!mounted) return;
+          if (result == null) return; // 用户取消或孵化失败（已提示）
+        } else {
+          final (r, err) = await PetRpc.hatchEgg(egg.id);
+          if (!mounted) return;
+          if (err != null || r == null) {
+            return _toast(petRpcErrorText(err));
+          }
+          result = r;
         }
         await showPetBirthDialog(
           context,

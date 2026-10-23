@@ -6,6 +6,7 @@ import '../../../services/supabase_service.dart';
 import '../models/pet_p2_breed_models.dart';
 import '../models/pet_p2_models.dart';
 import '../models/pet_p2_progress_models.dart';
+import '../models/pet_rpc_models.dart';
 import '../utils/pet_errors.dart';
 import 'pet_rpc.dart';
 import 'pet_service.dart';

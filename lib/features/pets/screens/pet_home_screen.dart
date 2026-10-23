@@ -24,6 +24,7 @@ import '../widgets/pet_fx_overlay.dart';
 import '../widgets/pet_home_adventure.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
+import '../widgets/pet_initial_family_picker.dart';
 import '../widgets/pet_event_dialog.dart';
 import '../widgets/pet_living_art.dart';
 import 'pet_achievements_screen.dart';

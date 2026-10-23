@@ -12,6 +12,7 @@ import '../widgets/pet_bag_grid.dart';
 import '../widgets/pet_bag_item_dialog.dart';
 import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_home_overlays.dart';
+import '../widgets/pet_initial_family_picker.dart';
 import 'pet_egg_screen.dart';
 import 'pet_growth_screen.dart';
 import 'pet_shop_screen.dart';
@@ -118,10 +119,19 @@ class _PetBagScreenState extends State<PetBagScreen> {
       if (target == null) return _toast('没找到这一格对应的蛋，下拉刷新后重试');
       // 等待型蛋（传说蛋等）：即开通道走不了，转孵蛋页计时/加速/领取
       if (!target.isInstant) return _push(const PetEggScreen());
-      final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
-      if (!mounted) return;
-      if (hatchErr != null || result == null) {
-        return _toast(petRpcErrorText(hatchErr));
+      // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+      PetHatchResultModel? result;
+      if (target.poolCode == 'initial_ssr') {
+        result = await hatchInitialEggWithChoice(context, eggId: target.id);
+        if (!mounted) return;
+        if (result == null) return; // 用户取消或孵化失败（已提示）
+      } else {
+        final (r, hatchErr) = await PetRpc.hatchEgg(target.id);
+        if (!mounted) return;
+        if (hatchErr != null || r == null) {
+          return _toast(petRpcErrorText(hatchErr));
+        }
+        result = r;
       }
       showPetBirthDialog(context, img: null, result: result); // 复用主页诞生弹窗
       await _load(showLoading: false, forceRefresh: true);

@@ -165,11 +165,20 @@ extension _PetHomeActions on _PetHomeScreenState {
       _openEggs();
       return;
     }
-    final (result, hatchErr) = await PetRpc.hatchEgg(target.id);
-    if (!mounted) return;
-    if (hatchErr != null || result == null) {
-      showPetToast(context, petRpcErrorText(hatchErr));
-      return;
+    // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+    PetHatchResultModel? result;
+    if (target.poolCode == 'initial_ssr') {
+      result = await hatchInitialEggWithChoice(context, eggId: target.id);
+      if (!mounted) return;
+      if (result == null) return; // 用户取消或孵化失败（已提示）
+    } else {
+      final (r, hatchErr) = await PetRpc.hatchEgg(target.id);
+      if (!mounted) return;
+      if (hatchErr != null || r == null) {
+        showPetToast(context, petRpcErrorText(hatchErr));
+        return;
+      }
+      result = r;
     }
     // 图片权重：展示基础型形象大图（idle 首帧透明底，未登记种属回退静态底图）
     await showPetBirthDialog(
@@ -244,13 +253,15 @@ extension _PetHomeActions on _PetHomeScreenState {
         onGrowth: _openGrowth);
   }
 
+  /// 历险改浮卡弹窗（20261021 用户拍板）：不再整页跳转,弹窗关闭后刷新总览
   void _openAdventure() {
     final pet = _currentPet;
     if (pet == null) {
       showPetToast(context, '先孵化一只宠物才能历险');
       return;
     }
-    _push(PetAdventureScreen(
+    showPetAdventureSheet(
+      context,
       petId: pet.id,
       petName: pet.name,
       adventure: _currentAdventure,
@@ -259,7 +270,7 @@ extension _PetHomeActions on _PetHomeScreenState {
       petAttrs: pet.attributes,
       petHealth: pet.health,
       healthThreshold: _budget.cfg('adventure_health_threshold'),
-    ));
+    ).then((_) => _load());
   }
 
   // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
