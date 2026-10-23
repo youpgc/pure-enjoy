@@ -82,18 +82,29 @@ class PetMatchBanner extends StatelessWidget {
 /// 判据（未达标仍可出发，claim 判 failed），未达标项红显提示风险
 Widget petSpotCard(
   BuildContext context, {
+  Key? key,
   required PetSpotModel spot,
   required int petLevel,
   required Map<String, int> petAttrs,
   required VoidCallback onTap,
+  bool highlight = false,
 }) {
   final cs = Theme.of(context).colorScheme;
   final req = spot.requiredLevel;
   final locked = req != null && petLevel < req;
   final hasReq = spot.attrRequirements.isNotEmpty;
   return Card(
+    key: key,
+    // 推荐地图高亮边框(20261022 用户拍板):与普通卡视觉区分
+    color: highlight ? cs.primaryContainer.withValues(alpha: 0.35) : null,
+    shape: highlight
+        ? RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(12),
+            side: BorderSide(color: cs.primary, width: 2))
+        : null,
     child: ListTile(
-      leading: Icon(locked ? Icons.lock_outline : Icons.explore_outlined),
+      leading: Icon(locked ? Icons.lock_outline : Icons.explore_outlined,
+          color: highlight ? cs.primary : null),
       title: Text(spot.name),
       subtitle: (req != null || hasReq)
           ? Padding(

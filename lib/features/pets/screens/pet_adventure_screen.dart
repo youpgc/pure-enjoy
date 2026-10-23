@@ -17,13 +17,73 @@ import '../widgets/pet_toast.dart';
 
 /// 历险页
 ///
+/// 交互形态（20261021 用户拍板）：**浮卡弹窗**（参考属性面板），不再整页跳转——
+/// 主页右列历险钮/顶部历险横幅点击均弹出本面板。
 /// 状态机（与 pet_adventures.status 对齐）：
 /// - 无进行中 → 历险地列表 → 选档位（config.adventure_tiers）→ 出发；
 ///   等级 = 硬门槛（不达标灰置）；属性 = 结算判据（不达标红显「有风险」，
 ///   仍可出发，claim 时判 failed 执行惩罚）；健康 = 出发门槛（阈值提示）；
 ///   「为你匹配」推荐卡来自 rpc_pet_adventure_match（可忽略）；
-/// - ongoing  → 倒计时，结束出现「查看结果」（claim roll 四类结果）；
+///   **出发成功即关闭弹窗**（等待期在主页横幅查看，弹窗内不展示等待时间）；
+/// - ongoing  → 弹窗内倒计时 + **历险地图信息**（spotId 匹配历险地名）+
+///   召回；结束出现「查看结果」（claim roll 四类结果）；
 /// - awaiting_rescue → 自救窗口内用救援道具 / 超时 NPC 兜底。
+Future<void> showPetAdventureSheet(
+  BuildContext context, {
+  required String petId,
+  required String petName,
+  PetAdventureBriefModel? adventure,
+  required List<Map<String, dynamic>> tiers,
+  required int petLevel,
+  required Map<String, int> petAttrs,
+  required int petHealth,
+  required int healthThreshold,
+}) {
+  return showModalBottomSheet<void>(
+    context: context,
+    isScrollControlled: true,
+    backgroundColor: Colors.transparent,
+    // 主题把手关闭:弹窗内自绘把手,避免双把手(20261021 用户反馈)
+    showDragHandle: false,
+    isDismissible: true,
+    // 点击弹窗外空白(顶部预留/左右边距)关闭弹窗:margin 区属于 sheet 自身
+    // 布局而非 barrier,命中到不了 ModalBarrier,必须显式捕获
+    builder: (sheetCtx) => GestureDetector(
+      behavior: HitTestBehavior.translucent,
+      onTap: () => Navigator.of(sheetCtx).pop(),
+      child: SafeArea(
+        child: Container(
+          // 顶部预留 300px:内容不顶到状态栏/主页横幅区(20261022 用户拍板)
+          margin: const EdgeInsets.fromLTRB(12, 300, 12, 12),
+          constraints: BoxConstraints(
+              maxHeight: MediaQuery.of(context).size.height * 0.85),
+          decoration: BoxDecoration(
+            color: Theme.of(context).colorScheme.surface,
+            borderRadius: BorderRadius.circular(22),
+          ),
+          padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
+          // 吸收层只包内容区(不含 margin):点击弹窗内部空白不关闭,
+          // 点击弹窗外空白由外层捕获关闭
+          child: GestureDetector(
+            behavior: HitTestBehavior.opaque,
+            onTap: () {},
+            child: PetAdventureScreen(
+              petId: petId,
+              petName: petName,
+              adventure: adventure,
+              tiers: tiers,
+              petLevel: petLevel,
+              petAttrs: petAttrs,
+              petHealth: petHealth,
+              healthThreshold: healthThreshold,
+            ),
+          ),
+        ),
+      ),
+    ),
+  );
+}
+
 class PetAdventureScreen extends StatefulWidget {
   const PetAdventureScreen({
     super.key,
@@ -73,6 +133,12 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   /// 「为你匹配」推荐历险地 id（rpc_pet_adventure_match；静默降级为 null）
   String? _matchedSpotId;
 
+  /// 推荐地图卡片 key：列表加载后自动滚动到推荐位置（20261021 用户拍板）
+  final GlobalKey _matchedCardKey = GlobalKey();
+
+  /// 自动定位只执行一次：已滚动过（或用户手动滚开）不再拉回
+  bool _scrolledToMatch = false;
+
   @override
   void initState() {
     super.initState();
@@ -94,16 +160,41 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
       for (final s in spots) {
         if (s is Map && s['recommended'] == true) {
           setState(() => _matchedSpotId = s['id'] as String?);
+          _scrollToMatched();
           return;
         }
       }
     }
   }
 
+  /// 自动滚动到推荐地图（幂等）：_load/_loadMatch 两路请求谁后就绪谁触发，
+  /// 补齐单侧等待竞态（此前只在 _load 侧触发，match 慢于列表时定位丢失）
+  void _scrollToMatched() {
+    if (_scrolledToMatch || _matchedSpotId == null || _spots.isEmpty) return;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted || _scrolledToMatch) return;
+      final ctx = _matchedCardKey.currentContext;
+      if (ctx == null) return;
+      _scrolledToMatch = true;
+      // alignment 0 = 推荐卡顶到视口顶,上方仅剩横幅底距(与卡间距一致)
+      Scrollable.ensureVisible(ctx,
+          duration: const Duration(milliseconds: 300), alignment: 0);
+    });
+  }
+
   PetSpotModel? get _matchedSpot {
     if (_matchedSpotId == null) return null;
     for (final s in _spots) {
       if (s.id == _matchedSpotId) return s;
+    }
+    return null;
+  }
+
+  /// 历险地名（spotId → 历险地列表匹配；列表未加载/未命中返回 null）
+  String? _spotName(String? spotId) {
+    if (spotId == null) return null;
+    for (final s in _spots) {
+      if (s.id == spotId) return s.name;
     }
     return null;
   }
@@ -124,6 +215,9 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
         _loading = false;
       });
     }
+    // 自动滚动到推荐地图（20261021 用户拍板）：列表就绪后跳到推荐卡位置；
+    // match 接口后返回时由 _loadMatch 侧补触发
+    if (mounted) _scrollToMatched();
   }
 
   Future<void> _start(PetSpotModel spot, Map<String, dynamic> tier) async {
@@ -232,9 +326,33 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      appBar: AppBar(title: const Text('历险')),
-      body: _buildBody(),
+    final cs = Theme.of(context).colorScheme;
+    // 浮卡容器（参考属性面板）：把手 + 标题 + 弹性内容区
+    return Column(
+      mainAxisSize: MainAxisSize.min,
+      crossAxisAlignment: CrossAxisAlignment.stretch,
+      children: [
+        Center(
+          child: Container(
+            width: 32,
+            height: 4,
+            margin: const EdgeInsets.only(bottom: 10),
+            decoration: BoxDecoration(
+              color: cs.onSurfaceVariant.withValues(alpha: 0.4),
+              borderRadius: BorderRadius.circular(4),
+            ),
+          ),
+        ),
+        Center(
+          child: Text('历险',
+              style: Theme.of(context)
+                  .textTheme
+                  .titleSmall
+                  ?.copyWith(fontWeight: FontWeight.w700)),
+        ),
+        const SizedBox(height: 8),
+        Flexible(child: _buildBody()),
+      ],
     );
   }
 
@@ -273,32 +391,47 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final healthLow = widget.healthThreshold > 0 &&
         widget.petHealth < widget.healthThreshold;
     final matched = _matchedSpot;
-    final cards = <Widget>[
-      if (healthLow)
-        Card(
-          color: cs.errorContainer,
-          child: const Padding(
-            padding: EdgeInsets.all(12),
-            child: Text('宠物健康状况不佳，恢复健康后再出发吧'),
+    // 全量构建(历险地仅 30 张):惰性列表下未构建项的 ctx 为 null,
+    // ensureVisible 会静默跳过——全量构建后推荐卡定位才可靠(20261021)
+    // 推荐横幅/健康提示钉在弹窗上部固定展示,滚动体仅地图列表(20261022 用户拍板)
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        if (healthLow)
+          Card(
+            color: cs.errorContainer,
+            child: const Padding(
+              padding: EdgeInsets.all(12),
+              child: Text('宠物健康状况不佳，恢复健康后再出发吧'),
+            ),
+          ),
+        if (matched != null)
+          Padding(
+            // 底距与地图卡间距一致(Card margin 4×2):定位后推荐卡上方留白同卡间
+            padding: const EdgeInsets.only(bottom: 8),
+            child: PetMatchBanner(
+                spotName: matched.name, onTap: () => _showTierSheet(matched)),
+          ),
+        Expanded(
+          child: SingleChildScrollView(
+            child: Column(
+              children: [
+                for (final spot in _spots)
+                  petSpotCard(
+                    context,
+                    spot: spot,
+                    petLevel: widget.petLevel,
+                    petAttrs: widget.petAttrs,
+                    // 推荐卡挂 key:列表就绪后自动滚动到推荐位置;高亮边框
+                    key: spot.id == _matchedSpotId ? _matchedCardKey : null,
+                    highlight: spot.id == _matchedSpotId,
+                    onTap: () => _showTierSheet(spot),
+                  ),
+              ],
+            ),
           ),
         ),
-      if (matched != null)
-        PetMatchBanner(
-            spotName: matched.name, onTap: () => _showTierSheet(matched)),
-      for (final spot in _spots)
-        petSpotCard(
-          context,
-          spot: spot,
-          petLevel: widget.petLevel,
-          petAttrs: widget.petAttrs,
-          onTap: () => _showTierSheet(spot),
-        ),
-    ];
-    return ListView.separated(
-      padding: const EdgeInsets.all(16),
-      itemCount: cards.length,
-      separatorBuilder: (_, __) => const SizedBox(height: 10),
-      itemBuilder: (_, i) => cards[i],
+      ],
     );
   }
 
@@ -346,6 +479,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final end = adv.endAt;
     final finished = end == null || !now.isBefore(end);
     final remaining = end?.difference(now);
+    // 历险地图信息（20261021 用户拍板：弹窗展示具体历险地图）
+    final spotName = _spotName(adv.spotId);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -357,6 +492,20 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             Text('${widget.petName} 正在外出历险',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
+            if (spotName != null) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.place_outlined,
+                      size: 15, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text('历险地图：$spotName',
+                      style: TextStyle(
+                          fontSize: 13, color: cs.onSurfaceVariant)),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             if (!finished) ...[
               Text(
                 '预计 ${remaining!.inMinutes > 0 ? '${remaining.inMinutes} 分钟后' : '即将'}归来',
@@ -394,6 +543,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final cs = Theme.of(context).colorScheme;
     final deadline = adv.rescueDeadline;
     final expired = deadline != null && !DateTime.now().isBefore(deadline);
+    // 遇险地图信息（与进行中视图同源,20261021 用户拍板）
+    final spotName = _spotName(adv.spotId);
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
@@ -405,6 +556,20 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             Text('${widget.petName} 遇到险情！',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
+            if (spotName != null) ...[
+              Row(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  Icon(Icons.place_outlined,
+                      size: 15, color: cs.onSurfaceVariant),
+                  const SizedBox(width: 4),
+                  Text('遇险地图：$spotName',
+                      style: TextStyle(
+                          fontSize: 13, color: cs.onSurfaceVariant)),
+                ],
+              ),
+              const SizedBox(height: 8),
+            ],
             Text(
               expired
                   ? '已超出自救窗口，将由 NPC 兜底救助'
