@@ -6,59 +6,35 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet_bend.dart';
 import '../../../constants/pet_render.dart';
 import '../utils/pet_action_machine.dart';
-import '../utils/pet_art_resolver.dart';
 import 'pet_bend_art.dart';
 
-/// 父约束无界时的宠物显示基准边长（仅用于推算解码宽度与光晕尺寸）
+/// 父约束无界时的宠物显示基准边长（仅用于推算占位尺寸）
 const double _kFallbackArtSize = 320;
 
-/// 2D 宠物生命体（帧序列 + 程序补间姿态 + 进化辉光）
+/// 2D 宠物生命体（分层弯曲 + 骨架占位）
 ///
-/// 2026-09-24 表现层降维定版：3D 一期下线后，宠物「活起来」改由 2D 实现。
-/// 纯帧序列在经济性上不成立（8 动作 × 6 帧 × 930KB ≈ 44MB/形态，且 1024²
-/// RGBA 解码常驻 4MB/帧，64 帧就超过 Flutter 默认 100MB 图片缓存），故走混合
-/// 路线：
-/// - 帧序列：只有 [frames]（idle 眨眼/尾摆）这一种真帧素材，动作期间继续轮播；
-/// - 程序补间：eat/petted/happy/sad/sleep/walk/evolve 全部由同一张图的位移、
-///   旋转、压扁拉伸编排而成（见 `_pose`），零额外素材；
-/// - 进化辉光：evolve 期间叠加径向白光，与粒子层 pet_fx_overlay 共同承担演出。
+/// 2026-10 表现定版：整条演出由 [PetBendArt] 承担——被弯曲的是图像内部的
+/// 一行行像素（归零线以下真·不动），编排读 `kPetBendActs`（用户已验收冻结）。
+/// 本组件只做三件事：
+/// - 给了 [bendGeo] 且该动作在 `kPetBendActs` 有编排 → 全权委托 [PetBendArt]；
+/// - 一次性动作播完按 [PetActionMachine.durationOf] 计时回调 [onActionEnd]，
+///   宿主据此把动作回落到环境态；
+/// - 缺几何 / 缺编排（未登记形态或新动作没进表）→ 画骨架占位剪影
+///   （铁律 8：配置缺码一律不崩溃，素材落位后同路径自动换回真图）。
 ///
-/// 与旧版差别：旧版只有一个 `excited` 布尔位（把帧率 3.5fps 提到 8fps），现在
-/// 由 [action] 驱动完整姿态编排；[onActionEnd] 供宿主把动作回落到环境态。
+/// 着色器本身不可用时的退化由 `PetBendArt` 内部承担，同样不会让宠物消失。
 ///
-/// 2026-10 分层弯曲接入：给了 [bendGeo] 且该动作在 `kPetBendActs` 有编排时，
-/// 整条表现改由 [PetBendArt] 承担——被弯曲的是图像内部的一行行像素（归零线以下
-/// 真·不动），而不是整张图的位姿，故本文件的 `_frame`/`_perf`/`_pose` 全部让位，
-/// 只保留一次性动作的回落计时。缺几何 / 缺编排（新动作没进表）时整条回退到下面
-/// 的整图补间；着色器本身不可用时由 `PetBendArt` 内部退化成整图兜底，
-/// 两条路都不会让宠物消失（铁律 8：配置缺码一律不崩溃）。
-///
-/// 2026-10-10 静默闸门：画面演的是 [PetAction.played]（`kPetActionsSilenced`
-/// 里登记的动作改播 idle），计时/回落/粒子/音效仍按动作本体走——所以喂完食
+/// 静默闸门：画面演的是 [PetAction.played]（`kPetActionsSilenced` 里登记的
+/// 动作改播 idle），计时/回落/粒子/音效仍按动作本体走——所以喂完食
 /// 依然是「宠物呼吸 5 秒后回到待机」，只是不再演那套姿态。
 class PetLivingArt extends StatefulWidget {
   const PetLivingArt({
     super.key,
-    required this.frames,
-    this.fallbackAsset,
-    this.height,
-    this.fit = BoxFit.contain,
     this.action = PetAction.idle,
     this.onActionEnd,
     this.bendGeo,
     this.bendRevealDir,
   });
-
-  /// 真帧序列（`petStageFrames` 解析：该动作有真帧用它，否则沿用 idle 帧）；
-  /// 空 = 无帧素材，走单图 + 补间
-  final List<String> frames;
-
-  /// 无帧序列时的单帧立绘回退
-  final String? fallbackAsset;
-
-  /// 可选固定高度；不传时按父约束 fit 撑满（满屏舞台用）
-  final double? height;
-  final BoxFit fit;
 
   /// 当前动作（环境态循环播放，一次性动作播完回调 [onActionEnd]）
   final PetAction action;
@@ -66,7 +42,7 @@ class PetLivingArt extends StatefulWidget {
   /// 一次性动作播完通知；宿主据此把动作回落到环境态
   final ValueChanged<PetAction>? onActionEnd;
 
-  /// 分层弯曲几何（`petBendGeo` 解析）；null = 该形态无弯曲素材，走整图补间
+  /// 分层弯曲几何（`petBendGeo` 解析）；null = 该形态无弯曲素材，画骨架占位
   final PetBendGeo? bendGeo;
 
   /// 进化末段替换的目标阶目录（`petBendRevealDir` 解析）
@@ -78,11 +54,8 @@ class PetLivingArt extends StatefulWidget {
 
 class _PetLivingArtState extends State<PetLivingArt>
     with TickerProviderStateMixin {
-  /// 帧轮播时钟（常驻 repeat，只在有帧序列时驱动画面）
-  late final AnimationController _frame;
-
-  /// 动作姿态时钟（环境态 repeat，一次性动作 forward 一次）
-  late final AnimationController _perf;
+  /// 占位呼吸时钟（仅在骨架占位路径常驻 repeat）
+  late final AnimationController _clock;
 
   Timer? _endTimer;
   PetAction _playing = PetAction.idle;
@@ -91,63 +64,32 @@ class _PetLivingArtState extends State<PetLivingArt>
   /// [PetAction] 本体仍按真动作计时与回落，粒子/音效不受这张表支配。
   PetAction get _visual => _playing.played;
 
-  /// 帧轮播一圈时长：待机 ~3.5fps，动作期间提速到 ~8fps
-  Duration get _frameCycle {
-    final fps = _visual.ambient ? 3.5 : 8.0;
-    final perFrame = (1000 / fps).round();
-    return Duration(milliseconds: perFrame * math.max(1, widget.frames.length));
-  }
-
   static Duration _duration(PetAction action) =>
       PetActionMachine.durationOf(action);
 
-  /// 当前动作的分层弯曲编排；null = 无编排（新动作或表里没登记），整图补间兜底
+  /// 当前动作的分层弯曲编排；null = 无编排（未登记形态或表里没登记），占位兜底
   PetActDef? get _bendAct =>
       widget.bendGeo == null ? null : kPetBendActs[_visual.code];
 
   @override
   void initState() {
     super.initState();
-    _frame = AnimationController(vsync: this, duration: _frameCycle);
-    _syncFrameClock();
+    _clock = AnimationController(vsync: this, duration: const Duration(seconds: 3));
     _playing = widget.action;
-    _perf = AnimationController(vsync: this, duration: _duration(_playing));
     _applyPlayMode();
   }
 
-  /// 帧轮播时钟只在多帧素材时才跑（单图/无图不需要逐帧刷新）
-  void _syncFrameClock() {
-    if (widget.frames.length > 1) {
-      if (!_frame.isAnimating) _frame.repeat();
-    } else {
-      _frame.stop();
-    }
-  }
-
-  /// 环境态循环播放；一次性动作播完计时回调宿主回落
+  /// 弯曲路径只保留一次性动作的回落计时；占位路径让呼吸时钟常驻
   void _applyPlayMode() {
     _endTimer?.cancel();
     if (_bendAct != null) {
-      // 弯曲路径：逐帧姿态由 PetBendArt 自己的时钟承担，本文件的两个控制器
-      // 不参与画面（留着跑会白刷一层 AnimatedBuilder），只保留回落计时
-      _frame.stop();
-      _perf.stop();
-      if (!_playing.ambient) {
-        _endTimer = Timer(_duration(_playing), () {
-          if (mounted) widget.onActionEnd?.call(_playing);
-        });
-      }
-      return;
+      // 逐帧姿态由 PetBendArt 自己的时钟承担，本文件的控制器不参与画面
+      //（留着跑会白刷一层 AnimatedBuilder）
+      _clock.stop();
+    } else if (!_clock.isAnimating) {
+      _clock.repeat();
     }
-    // 动作期间帧率提速到 ~8fps，环境态回落到 ~3.5fps
-    _frame.duration = _frameCycle;
-    _syncFrameClock();
-    _perf.duration = _duration(_playing);
-    if (_playing.ambient) {
-      if (!_perf.isAnimating) _perf.repeat();
-      return;
-    }
-    _perf.forward(from: 0);
+    if (_playing.ambient) return;
     _endTimer = Timer(_duration(_playing), () {
       if (mounted) widget.onActionEnd?.call(_playing);
     });
@@ -156,12 +98,9 @@ class _PetLivingArtState extends State<PetLivingArt>
   @override
   void didUpdateWidget(covariant PetLivingArt oldWidget) {
     super.didUpdateWidget(oldWidget);
-    if (oldWidget.frames != widget.frames) {
-      _syncFrameClock();
-    }
     if (oldWidget.action != widget.action ||
         oldWidget.bendGeo != widget.bendGeo) {
-      // 换形态也要重算播放模式（弯曲↔补间之间可能切换，控制器不能留在旧状态）
+      // 换形态也要重算播放模式（弯曲↔占位之间可能切换，时钟不能留在旧状态）
       _playing = widget.action;
       _applyPlayMode();
     }
@@ -170,79 +109,8 @@ class _PetLivingArtState extends State<PetLivingArt>
   @override
   void dispose() {
     _endTimer?.cancel();
-    _frame.dispose();
-    _perf.dispose();
+    _clock.dispose();
     super.dispose();
-  }
-
-  int get _frameIndex {
-    final n = widget.frames.length;
-    if (n <= 1) return 0;
-    return (_frame.value * n).floor().clamp(0, n - 1);
-  }
-
-  /// 姿态编排：所有动作共用一张图，靠位移/旋转/压扁拉伸区分（零额外素材）
-  _Pose _pose() {
-    final t = _perf.value;
-    final wave = math.sin(2 * math.pi * t);
-    switch (_visual) {
-      case PetAction.petted:
-        final sway = math.sin(4 * math.pi * t);
-        return _Pose(
-            dx: 5.5 * sway, rotate: 0.08 * sway, sy: 1 + 0.025 * sway.abs());
-      case PetAction.eat:
-        final dip = 0.5 - 0.5 * math.cos(4 * math.pi * t);
-        return _Pose(
-            dy: 9 * dip,
-            rotate: 0.055 * math.sin(4 * math.pi * t),
-            sy: 1 - 0.025 * dip);
-      case PetAction.happy:
-        // 4t(1-t) 抛物线跳起；起跳与落地前后各 14% 时长做压扁
-        final hop = 26 * (4 * t * (1 - t));
-        final squash = math.max(0.0, 1 - math.min(t, 1 - t) / 0.14);
-        return _Pose(dy: -hop, sy: 1 - 0.07 * squash, sx: 1 + 0.07 * squash);
-      case PetAction.sad:
-        return _Pose(
-            dy: 5 + 2.4 * wave, rotate: 0.10, sy: 1 - 0.022 + 0.010 * wave);
-      case PetAction.sleep:
-        return _Pose(dy: 3, rotate: 0.13, sy: 1 + 0.038 * wave);
-      case PetAction.walk:
-        return _Pose(
-            dx: 32 * wave,
-            dy: -3.5 * math.sin(4 * math.pi * t).abs(),
-            rotate: 0.05 * math.sin(4 * math.pi * t));
-      case PetAction.evolve:
-        final pulse = math.sin(math.pi * t);
-        return _Pose(
-            dy: -6 * pulse,
-            rotate: 0.05 * math.sin(10 * math.pi * t) * pulse,
-            sx: 1 + 0.20 * pulse,
-            sy: 1 + 0.20 * pulse);
-      case PetAction.idle:
-        return _Pose(dy: -1.8 * wave, sy: 1 + 0.012 * wave);
-    }
-  }
-
-  /// 进化辉光：径向白→主色→透明的正方形光晕，随 pulse 淡入淡出
-  Widget _glow(ColorScheme cs, double g, double dimension) {
-    return Center(
-      child: SizedBox.square(
-        dimension: dimension,
-        child: DecoratedBox(
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            gradient: RadialGradient(
-              stops: const [0.0, 0.45, 0.85],
-              colors: [
-                Colors.white.withValues(alpha: 0.75 * g),
-                cs.primary.withValues(alpha: 0.25 * g),
-                Colors.transparent,
-              ],
-            ),
-          ),
-        ),
-      ),
-    );
   }
 
   @override
@@ -261,96 +129,21 @@ class _PetLivingArtState extends State<PetLivingArt>
     return LayoutBuilder(builder: (context, constraints) {
       final box = constraints.biggest;
       // 基准边长：无父约束时回退 320（弹窗/列表缩略图等 loose 场景）
-      final ref = widget.height ??
-          (box.width.isFinite && box.height.isFinite
-              ? math.min(box.width, box.height)
-              : _kFallbackArtSize);
-      final cacheWidth =
-          petDecodeWidth(ref, MediaQuery.devicePixelRatioOf(context));
-
-      final path = widget.fallbackAsset;
-      // 素材缺失/清单与包内文件脱节时画动物剪影骨架屏（不抛异常，铁律 8）；
-      // 素材落位后同一解析路径自动换回真帧，占位无需下线
-      final Widget placeholder = _SkeletonPlaceholder(ref: ref, clock: _perf);
-      final Widget art = widget.frames.isNotEmpty
-          ? Image.asset(widget.frames[_frameIndex],
-              height: widget.height,
-              fit: widget.fit,
-              cacheWidth: cacheWidth,
-              gaplessPlayback: true, // 帧切换不闪断
-              errorBuilder: (context, error, stackTrace) => placeholder)
-          : path != null
-              ? Image.asset(path,
-                  height: widget.height,
-                  fit: widget.fit,
-                  cacheWidth: cacheWidth,
-                  errorBuilder: (context, error, stackTrace) => placeholder)
-              : placeholder;
-
-      return AnimatedBuilder(
-        animation: Listenable.merge([_frame, _perf]),
-        builder: (context, child) {
-          final pose = _pose();
-          final glow = _visual == PetAction.evolve
-              ? math.sin(math.pi * _perf.value)
-              : 0.0;
-          return RepaintBoundary(
-            child: Stack(
-              alignment: Alignment.center,
-              children: [
-                if (glow > 0.01) _glow(cs, glow, ref * 1.7),
-                Transform.translate(
-                  offset: Offset(pose.dx, pose.dy),
-                  // 等效 T·R·S：外层平移、中层绕底边中心旋转、内层压扁拉伸
-                  child: Transform(
-                    alignment: Alignment.bottomCenter,
-                    transform: Matrix4.identity()..rotateZ(pose.rotate),
-                    child: Transform.scale(
-                      scaleX: pose.sx,
-                      scaleY: pose.sy,
-                      alignment: Alignment.bottomCenter,
-                      child: child,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          );
-        },
-        child: art,
-      );
+      final ref = box.width.isFinite && box.height.isFinite
+          ? math.min(box.width, box.height)
+          : _kFallbackArtSize;
+      return _SkeletonPlaceholder(ref: ref, clock: _clock);
     });
   }
 }
 
-/// 单帧姿态参数（相对底边中心做刚体变换）
-class _Pose {
-  const _Pose({
-    this.dx = 0,
-    this.dy = 0,
-    this.rotate = 0,
-    this.sx = 1,
-    this.sy = 1,
-  });
-
-  final double dx;
-  final double dy;
-
-  /// 旋转弧度
-  final double rotate;
-
-  /// 横/纵向缩放（压扁拉伸）
-  final double sx;
-  final double sy;
-}
-
 /// 素材未产出形态的骨架占位：四足动物剪影（头+双耳+身+尾），
 /// 剪影内一道斜向亮带随环境态时钟往复扫动（骨架屏 shimmer 蒙层）。
-/// 语义 = 「这里会有一只，素材还在路上」；真帧就位后本占位自动隐退。
+/// 语义 = 「这里会有一只，素材还在路上」；真图就位后本占位自动隐退。
 class _SkeletonPlaceholder extends StatelessWidget {
   const _SkeletonPlaceholder({required this.ref, required this.clock});
 
-  /// 基准边长（与真帧同源，占位尺寸随舞台缩放）
+  /// 基准边长（与真图同源，占位尺寸随舞台缩放）
   final double ref;
 
   /// 环境态时钟：驱动呼吸明暗与扫光相位
@@ -385,7 +178,7 @@ class _SkeletonPlaceholder extends StatelessWidget {
 }
 
 /// 通用宠物骨架画笔（剪影 = 身/头/双耳/前后腿/尾 + 相位扫光）。
-/// 舞台缺帧占位专用（图鉴「未获取」曾复用后改为锁定徽章样式）。
+/// 舞台缺素材占位专用（图鉴「未获取」曾复用后改为锁定徽章样式）。
 /// 静态用法传固定 phase（0~1，0.25 = 扫光居中）。
 class _PetSkeletonPainter extends CustomPainter {
   _PetSkeletonPainter({
@@ -396,6 +189,8 @@ class _PetSkeletonPainter extends CustomPainter {
 
   final Color base;
   final Color shimmer;
+
+  /// 扫光相位（0~1 往复）
   final double phase;
 
   @override

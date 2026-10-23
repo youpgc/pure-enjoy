@@ -1,48 +1,29 @@
-/// 2D 素材解析器：后台 `pet_species.render2d` 叠在随包清单之上的唯一取图出口。
+/// 2D 素材解析器：宠物表现的唯一取图出口。
 ///
-/// 所有立绘消费点（主页舞台、诞生弹窗、进化弹窗、孵蛋页）一律走这里，
+/// 所有立绘消费点（主页舞台、诞生弹窗、进化弹窗、孵蛋页、图鉴）一律走这里，
 /// 不再各自拼路径——目录结构调整时只改本文件。
 ///
-/// ## `pet_species.render2d` 契约（v1）
+/// ## 现行契约：分层弯曲唯一
 ///
-/// jsonb，**只存素材码与帧数，不存路径**（路径规则归本文件所有）：
-///
-/// ```jsonc
-/// {
-///   "base": "<素材码>",        // 整只底图素材码 -> assets/pets/<code>.png
-///   "frames": { "idle": 4 }    // 动作 code -> 帧数
-///                              // -> assets/pets/frames/<species_code>_<action>_N.png，N 从 1 起
-/// }
-/// ```
-///
-/// 键就这两个。分层部件（parts/pivots）、抚摸热区（hotspots）、场景（scene）
-/// 等要等对应表现真落地再加：写了没人消费的键，后台就成了「填了没效果」的
-/// 死配置（3D 那批死字段就是这么清出去的）。
-///
-/// 动作 code 的合法值域 = `PetAction.code`（铁律 12 三处对齐的 App 端）；
-/// 未知键与未知动作一律忽略，不当成错误。
+/// 整只底图与整图帧序列两条路已下线（素材随包移除），`pet_species.render2d`
+/// 的 `base`/`frames` 键不再被 App 消费——服务端仍可携带该块，解析时整体忽略。
+/// 要不要弯曲由 `kPetBendGeo` 是否登记决定，配置无权凭空造资源。
 ///
 /// ## 回退链（铁律 8：配置缺码 / 素材未随包一律不崩溃）
 ///
-/// `render2d` 指定值 → 随包清单（`pet_art.dart`）→ null（调用方画占位图标）。
-///
-/// 后台填了未随包的素材码/超额的帧数时按随包结果裁剪，而不是照着配置去加载
-/// 不存在的文件——一期素材全随包，加素材必然发版，配置无权凭空造资源。
+/// 弯曲树登记 → 中性帧路径 → null（调用方画占位图标）。
 library;
 
 import '../../../constants/pet_bend.dart';
-import '../../../constants/pet_render.dart';
-import 'pet_art.dart';
 
 // 消费方只 import 本文件：解码宽度算法在此统一，避免各处各写一份 1.25 倍余量
 export 'pet_art.dart' show petDecodeWidth;
 export '../../../constants/pet_bend.dart' show PetBendGeo;
 
-/// 分层弯曲的形态几何；查不到 = 该形态没有弯曲素材，调用方走整图补间。
+/// 分层弯曲的形态几何；查不到 = 该形态没有弯曲素材，调用方走占位。
 ///
 /// 弯曲用的 6 档表情帧是**结构性**素材（编排 `expr` 通道按下标点名，缺任一档
-/// 就会在切档瞬间闪透明），因此**不受 `render2d.frames` 支配**——后台改帧数
-/// 只影响整图补间那条路径，要不要用弯曲由 `kPetBendGeo` 是否登记决定。
+/// 就会在切档瞬间闪透明），目录与几何由 `lib/constants/pet_bend.dart` 统一登记。
 PetBendGeo? petBendGeo(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage];
 
@@ -50,61 +31,12 @@ PetBendGeo? petBendGeo(String speciesCode, int stage) =>
 String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
-/// 整只底图：`render2d.base` 优先，未配置或未随包则回退该种属该阶位的清单底图。
-/// 清单未登记（如 cat_ssr1 底图已弃用）时回退弯曲树中性帧 c1_neutral——
-/// 与舞台形象同源，不再回退到已删除的旧立绘（20261021 用户拍板）。
-///
-/// 注意：清单底图（如仍有）是不透明图（带背景），舞台上请用 [petStageFrames]
-/// 取透明帧做身体，只有无帧素材的种属才直接拿底图演动作。
-String? petBaseArt(String speciesCode, int stage,
-    {Map<String, dynamic>? render2d}) {
-  final code = render2d?['base'];
-  if (code is String && code.isNotEmpty && petBaseArtBundled(code)) {
-    return 'assets/pets/$code.png';
-  }
-  final arts = kPetStageArt[speciesCode];
-  if (arts != null && stage >= 0 && stage < arts.length) return arts[stage];
+/// 单帧立绘（弹窗/列表缩略）：弯曲树中性帧 `c1_neutral`，与舞台形象同源同款；
+/// 未登记形态返回 null，调用方画占位图标。
+String? petBaseArt(String speciesCode, int stage) {
   final dir = petBendGeo(speciesCode, stage)?.dir;
-  if (dir != null) return '$dir/c1_neutral.png';
-  return null;
+  return dir == null ? null : '$dir/c1_neutral.png';
 }
 
-/// 某动作配置的真帧序列；未配置该动作或无真帧返回空列表（走程序补间）
-List<String> petActionFrames(String speciesCode, PetAction action,
-    {Map<String, dynamic>? render2d}) {
-  final bundled = petBundledFrameCount(speciesCode, action.code);
-  if (bundled <= 0) return const <String>[];
-  final raw = render2d?['frames'];
-  final configured = raw is Map ? raw[action.code] : null;
-  // 未配置 = 随包帧全放；配了 = 按配置裁剪，但不许超出包里真有的帧数
-  var count = configured is num ? configured.toInt() : bundled;
-  if (count < 1) count = 1;
-  if (count > bundled) count = bundled;
-  return List<String>.generate(
-    count,
-    (i) => 'assets/pets/frames/${speciesCode}_${action.code}_${i + 1}.png',
-  );
-}
-
-/// 舞台身体帧序列：该动作有真帧用该动作的，否则沿用 idle 帧当身体。
-///
-/// 之所以不能「无真帧就退回底图」：idle 帧是抠好底的透明图，底图带背景，
-/// 动作期间换底图会闪出方框背景。透明身体 + 程序补间才是这套 puppet 的前提。
-///
-/// 取的是 [PetAction.played]（静默闸门后的实际演出动作）：被静默的动作即使
-/// 已产出真帧也不上台，归位只需从 `kPetActionsSilenced` 删一项。
-List<String> petStageFrames(String speciesCode, PetAction action,
-    {Map<String, dynamic>? render2d}) {
-  final play = action.played;
-  final own = petActionFrames(speciesCode, play, render2d: render2d);
-  if (own.isNotEmpty || play == PetAction.idle) return own;
-  return petActionFrames(speciesCode, PetAction.idle, render2d: render2d);
-}
-
-/// 弹窗/列表用单帧形象：优先 idle 首帧（透明底），回退底图，皆无返回 null
-String? petPortraitArt(String speciesCode, {Map<String, dynamic>? render2d}) {
-  final frames =
-      petActionFrames(speciesCode, PetAction.idle, render2d: render2d);
-  if (frames.isNotEmpty) return frames.first;
-  return petBaseArt(speciesCode, 0, render2d: render2d);
-}
+/// 弹窗/列表通用形象：基础阶中性帧（[petBaseArt] 的 stage=0 简写）
+String? petPortraitArt(String speciesCode) => petBaseArt(speciesCode, 0);

@@ -327,12 +327,10 @@ class _PetDexScreenState extends State<PetDexScreen> {
   ///
   /// dex 种属行码带阶后缀（cat_ssr1_s1），弯曲树按「种属 + sN 目录」组织，
   /// 先解耦再取材；路径以 kPetBendGeo 登记为准（登记 = 随包，铁律 8）。
-  /// 无弯曲几何的种属回退整只底图，再兜底占位图标。
+  /// 无弯曲几何的种属兜底占位图标。
   Widget _dexPetArt(ColorScheme cs, PetDexStage stage) {
     final (code, st) = _dexArtKey(stage.speciesCode);
-    final dir = petBendGeo(code, st)?.dir;
-    final img =
-        dir != null ? '$dir/c1_neutral.png' : petBaseArt(code, st);
+    final img = petBaseArt(code, st);
     if (img == null) {
       return Icon(Icons.cruelty_free_outlined,
           size: 34, color: cs.onSurfaceVariant);

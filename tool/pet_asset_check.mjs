@@ -1,15 +1,16 @@
 #!/usr/bin/env node
 /**
- * 宠物 2D 素材验收 + 随包清单重生成（纯 node 内置模块，零 npm 依赖）。
+ * 宠物 2D 素材验收（纯 node 内置模块，零 npm 依赖）。
  *
  * 为什么需要它：3D 期的素材验收页（pet_asset_audit_screen + glb_inspector）随
  * 3D 一期下线被删了，但「素材命名即契约」（宠物铁律 9）没丢——降维到 2D 换的是
- * 载体，不是验收。犬/兔/鼠 开系要量产 40 形态 × 多动作素材，靠人眼对文件名必翻车。
+ * 载体，不是验收。犬/兔/鼠 开系要量产 40 形态素材，靠人眼对文件名必翻车。
+ *
+ * 校验三块：光栅体积/边长阈值、分层弯曲树契约（checkBendTree）、
+ * 物品图标两端一致。底图与整图帧序列清单已随两条路的下线移除。
  *
  * 用法（仓库内任意位置）：
- *   node tool/pet_asset_check.mjs         只校验并打印报告
- *   node tool/pet_asset_check.mjs --fix   校验 + 按目录实际文件重生成
- *                                         lib/features/pets/utils/pet_art.dart 的清单区块
+ *   node tool/pet_asset_check.mjs         校验并打印报告
  *
  * 退出码：0 = 无 FAIL；1 = 有 FAIL（可挂进提交前流程）
  */
@@ -19,16 +20,14 @@ import { fileURLToPath } from 'node:url';
 
 const ROOT = path.resolve(path.dirname(fileURLToPath(import.meta.url)), '..');
 const ASSETS = path.join(ROOT, 'assets', 'pets');
-const INVENTORY = path.join(ROOT, 'lib', 'features', 'pets', 'utils', 'pet_art.dart');
-const ACTION_ENUM = path.join(ROOT, 'lib', 'constants', 'pet_render.dart');
 const BEND = path.join(ROOT, 'lib', 'constants', 'pet_bend.dart');
 const PUBSPEC = path.join(ROOT, 'pubspec.yaml');
 const ADMIN_ICONS = path.resolve(ROOT, '..', 'pure-enjoy-admin', 'public', 'pet-icons');
 
-/// 阈值口径（2026-09-24 按实测数据校准，分两类预算）：
-/// - 角色图（底图 + 帧序列）：单只形态 3 阶底图 + 有帧动作合计目标 <1MB，
-///   因此单张 WARN 260KB / FAIL 600KB、边长 WARN 768 / FAIL 1536；
-///   实测 1024² 透明帧 909KB、降采样到 768² 后 462KB，即这套阈值对应「768 够用」。
+/// 阈值口径（分两类预算）：
+/// - 角色图：单张 WARN 260KB / FAIL 600KB、边长 WARN 768 / FAIL 1536
+///   （实测 1024² 透明帧 909KB、降采样到 768² 后 462KB，即这套阈值对应「768 够用」；
+///   弯曲树 384² 表情帧远低于此线，只拦意外混入的大图）。
 /// - 场景背景（scenes/）：全屏 cover、无透明通道，边长必须 ≥ 屏幕短边，
 ///   不适用角色图的 768 口径，单列 1.6MB 上限（实测 scene_dream 832×1216 = 1418KB）。
 const LIMITS = {
@@ -36,9 +35,6 @@ const LIMITS = {
   scene: { edgeWarn: 1536, edgeFail: 2048, sizeWarn: 1024 * 1024, sizeFail: 1600 * 1024 },
 };
 
-const BEGIN = '// BEGIN generated:pet-art';
-const END = '// END generated:pet-art';
-const fix = process.argv.includes('--fix');
 const issues = [];
 
 function add(level, msg) {
@@ -98,28 +94,17 @@ function probe(file) {
   return { sig, w, h, alpha, size: buf.length };
 }
 
-/** 动作值域只有一个真源：lib/constants/pet_render.dart 的 PetAction（铁律 12） */
-function actionCodes() {
-  const src = fs.readFileSync(ACTION_ENUM, 'utf8');
-  const codes = [...src.matchAll(/^  [a-zA-Z]+\('([a-z_]+)'/gm)].map((m) => m[1]);
-  if (codes.length === 0) throw new Error('PetAction 枚举解析失败：检查 constants/pet_render.dart');
-  return new Set(codes);
-}
-
-const STAGE_RE = /^(.+)_(\d{2})\.png$/; // cat_ssr1_01.png -> 基础形 + 阶位
-const FRAME_RE = /^(.+)_(.+)_([0-9]+)\.png$/; // cat_ssr1_idle_1.png -> 种属 + 动作 + 帧号
-
-function checkRaster(file, codes) {
+/** 光栅体检：格式嗅探 + 体积/边长阈值（角色图与场景两套口径） */
+function checkRaster(file) {
   const info = probe(file);
   const name = path.basename(file);
-  const inFrames = inDir(file, 'frames');
   const r = rel(file);
   const kb = (info.size / 1024).toFixed(0);
 
   if (info.sig === 'UNKNOWN') add('FAIL', `${r}: 无法识别的图片格式`);
   if (name.endsWith('.png') && info.sig !== 'PNG')
-    add('FAIL', `${r}: 扩展名 .png 实为 ${info.sig}（${kb}KB）——清单与管线都会误判，且 JPEG 无透明通道，必须重导出真 PNG`);
-  if (info.w === 0) return { info, name, inFrames };
+    add('FAIL', `${r}: 扩展名 .png 实为 ${info.sig}（${kb}KB）——管线会误判，且 JPEG 无透明通道，必须重导出真 PNG`);
+  if (info.w === 0) return { info, name };
 
   const edge = Math.max(info.w, info.h);
   const lim = inDir(file, 'scenes') ? LIMITS.scene : LIMITS.role;
@@ -127,117 +112,7 @@ function checkRaster(file, codes) {
   else if (edge > lim.edgeWarn) add('WARN', `${r}: ${info.w}×${info.h} 大于 ${lim.edgeWarn}，按显示尺寸够用时可再降`);
   if (info.size > lim.sizeFail) add('FAIL', `${r}: ${kb}KB 超体积上限 ${lim.sizeFail / 1024}KB`);
   else if (info.size > lim.sizeWarn) add('WARN', `${r}: ${kb}KB 偏大（上限 ${lim.sizeWarn / 1024}KB）`);
-
-  if (inFrames) {
-    if (info.alpha === false) add('FAIL', `${r}: 帧序列无透明通道，舞台上会把背景方块一起放大`);
-    const m = FRAME_RE.exec(name);
-    if (!m) add('FAIL', `${r}: 帧文件名不合契约 <species_code>_<action>_N.png`);
-    else if (!codes.has(m[2])) add('FAIL', `${r}: 动作码「${m[2]}」不在 PetAction 值域内（改名须三端同批，铁律 12）`);
-  }
-  return { info, name, inFrames };
-}
-
-function collectInventory(codes) {
-  const stageArt = new Map(); // species -> [{stage, file}]
-  const frames = new Map(); // species -> Map(action -> Set(N))
-  // 场景图不参与清单（它是全屏背景，按 BoxFit.cover 用，与种属无关）；
-  // anim/ 是分层弯曲的 6 档表情帧，契约由 checkBendTree 单独校验——它按
-  // 评级/种属/阶 分目录、文件名不带种属前缀，不该套进「底图 + 动作帧」两套清单
-  const files = walk(ASSETS).filter(
-    (f) =>
-      /\.(png|jpe?g|webp)$/i.test(f) &&
-      !inDir(f, 'items') &&
-      !inDir(f, 'scenes') &&
-      !inDir(f, 'anim'),
-  );
-  for (const f of files) {
-    const name = path.basename(f);
-    if (inDir(f, 'frames')) {
-      const m = FRAME_RE.exec(name);
-      if (!m || !codes.has(m[2])) continue;
-      if (!frames.has(m[1])) frames.set(m[1], new Map());
-      if (!frames.get(m[1]).has(m[2])) frames.get(m[1]).set(m[2], new Set());
-      frames.get(m[1]).get(m[2]).add(Number(m[3]));
-      continue;
-    }
-    const m = STAGE_RE.exec(name);
-    if (!m) {
-      add('FAIL', `${rel(f)}: 底图文件名不合契约 <species_code>_<NN>.png（NN 从 01 起=stage0）`);
-      continue;
-    }
-    if (!stageArt.has(m[1])) stageArt.set(m[1], []);
-    stageArt.get(m[1]).push({ stage: Number(m[2]) - 1, file: rel(f) });
-  }
-  for (const [code, acts] of frames) {
-    for (const [action, ns] of acts) {
-      const sorted = [...ns].sort((a, b) => a - b);
-      if (sorted[0] !== 1) add('FAIL', `${code}_${action}: 帧号应从 1 起，实际最小 ${sorted[0]}`);
-      for (let i = 1; i < sorted.length; i++)
-        if (sorted[i] !== sorted[i - 1] + 1) add('FAIL', `${code}_${action}: 帧号断档（${sorted[i - 1]} 之后直接 ${sorted[i]}）`);
-      if (!stageArt.has(code)) add('WARN', `${code}: 只有 ${action} 帧、没有整只底图（无帧动作会没有身体可补间）`);
-    }
-  }
-  return { stageArt, frames, count: files.length };
-}
-
-function dartInventory({ stageArt, frames }) {
-  const byCode = (a, b) => a[0].localeCompare(b[0]);
-  const stageBody = [...stageArt.entries()]
-    .sort(byCode)
-    .map(
-      ([code, list]) =>
-        `  '${code}': [\n` +
-        list
-          .slice()
-          .sort((a, b) => a.stage - b.stage)
-          .map((e) => `    '${e.file}',`)
-          .join('\n') +
-        `\n  ],`,
-    )
-    .join('\n');
-  const frameBody = [...frames.entries()]
-    .sort(byCode)
-    .map(
-      ([code, acts]) =>
-        `  '${code}': {` +
-        [...acts.entries()]
-          .sort(byCode)
-          .map(([action, ns]) => `'${action}': ${Math.max(...ns)}`)
-          .join(', ') +
-        `},`,
-    )
-    .join('\n');
-  return `const Map<String, List<String>> kPetStageArt = {
-${stageBody}
-};
-
-const Map<String, Map<String, int>> kPetActionFrames = {
-${frameBody}
-};`;
-}
-
-function checkInventoryDart(inv) {
-  const src = fs.readFileSync(INVENTORY, 'utf8');
-  const block = src.slice(src.indexOf(BEGIN) + BEGIN.length, src.indexOf(END));
-  if (!src.includes(BEGIN) || !src.includes(END)) {
-    add('FAIL', 'pet_art.dart 缺少 generated:pet-art 标记，无法校验清单');
-    return;
-  }
-  const want = dartInventory(inv).trim();
-  const normalize = (s) => s.replace(/\s+/g, '').replace(/,$/gm, '');
-  if (normalize(block) === normalize(want)) {
-    add('PASS', `pet_art.dart 清单与 ${inv.count} 个随包素材一致`);
-    return;
-  }
-  if (!fix) {
-    add('FAIL', `pet_art.dart 清单与 assets/pets 实际文件不一致（跑 node tool/pet_asset_check.mjs --fix 重生成）`);
-    return;
-  }
-  fs.writeFileSync(
-    INVENTORY,
-    src.replace(new RegExp(`${BEGIN}[\\s\\S]*${END}`), `${BEGIN}\n\n${want}\n\n${END}`),
-  );
-  console.log('已按目录实际文件重生成清单区块，请再跑 dart format + flutter analyze');
+  return { info, name };
 }
 
 function checkIcons() {
@@ -255,7 +130,7 @@ function checkIcons() {
 }
 
 /**
- * 分层弯曲素材契约（`assets/pets/anim/<评级>/<种属 code>/<阶 sN>/`）。
+ * 分层弯曲素材契约（`assets/pets/anim/<系>/<评级>/<种属 code>/<阶 sN>/`）。
  *
  * 为什么单列一道校验：弯曲渲染把「表情分档」当结构用——编排表的 `expr` 通道按
  * **下标**点名第几档，缺任一档就在切档瞬间画出透明像素（闪一下空帧）；而 6 档帧
@@ -324,13 +199,10 @@ function checkBendTree() {
   }
 }
 
-const codes = actionCodes();
 const files = walk(ASSETS).filter(
   (f) => /\.(png|jpe?g|webp)$/i.test(f) && !inDir(f, 'items'),
 );
-for (const f of files) checkRaster(f, codes);
-const inv = collectInventory(codes);
-checkInventoryDart(inv);
+for (const f of files) checkRaster(f);
 checkBendTree();
 checkIcons();
 
@@ -340,5 +212,4 @@ for (const i of issues.sort((a, b) => order[a.level] - order[b.level]))
 const fails = issues.filter((i) => i.level === 'FAIL').length;
 const warns = issues.filter((i) => i.level === 'WARN').length;
 console.log(`\n共 ${issues.length} 条：FAIL ${fails} / WARN ${warns}`);
-console.log(`动作值域 ${codes.size} 个：${[...codes].join(', ')}`);
 process.exit(fails > 0 ? 1 : 0);

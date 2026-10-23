@@ -104,8 +104,10 @@ class PetBriefModel {
   final int todayInteractCount;
   final DateTime? lastInteractAt;
 
-  /// 种属 2D 渲染配置块（pet_species.render2d，素材码引用；
-  /// 3D 一期下线，render3d 字段随之下线，列与数据仍在服务端保留）
+  /// 种属 2D 渲染配置块（pet_species.render2d）。
+  /// 仅供透传保留：底图/帧序列素材下线后 App 已不消费此块
+  /// （表现唯一来源为弯曲树，见 utils/pet_art_resolver.dart），
+  /// 列与数据仍在服务端保留
   final Map<String, dynamic>? render2d;
 
   /// 四维属性当前值（base||bonus 合并，rpc_pet_summary 2026-09-17 属性系统扩展）

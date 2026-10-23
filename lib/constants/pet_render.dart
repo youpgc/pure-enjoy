@@ -14,15 +14,12 @@ library;
 ///
 /// 口径修订记录：`happy` 已并入 petted（正向反馈单槽位，触发点改播 petted）；
 /// `walk` 已移出定版集（无真实交互场景，且逐行弯曲表达不了腿部位移）。
-/// 两枚举值**保留**：素材文件命名（`<species>_<action>_N.png`）与既有关卡
-/// switch 依赖它们，App 内不再触发。
+/// 两枚举值**保留**：服务端动作键域与既有关卡 switch 依赖它们，App 内不再触发。
 ///
-/// 三条用途，新增/改名动作必须三处同批（铁律 12）：
-/// 1. App 动作仲裁与补间编排（`utils/pet_action_machine.dart`
-///    + `widgets/pet_living_art.dart`）；
-/// 2. `pet_species.render2d` 的 `frames` 键（该动作有真帧才走帧序列，
-///    无帧走程序补间；契约与取图见 `utils/pet_art_resolver.dart`）；
-/// 3. 素材文件名（`assets/pets/frames/<species_code>_<action>_N.png`）。
+/// 两条用途，新增/改名动作必须两处同批（铁律 12）：
+/// 1. App 动作仲裁与回落计时（`utils/pet_action_machine.dart`）；
+/// 2. 分层弯曲编排键（`constants/pet_bend.dart` 的 `kPetBendActs`，缺编排
+///    的动作在舞台退骨架占位）。
 enum PetAction {
   idle('idle', '待机', 0),
   walk('walk', '行走（已移出定版集，值保留兼容）', 1),
