@@ -250,8 +250,13 @@ extension _PetHomeLayout on _PetHomeScreenState {
     return delta.isEmpty ? '已喂食' : '已喂食 · $delta';
   }
 
-  /// 抚摸结果文案（服务端加 `interact_mood`，旧实现读不到配置恒显示 +0）
+  /// 抚摸结果文案（服务端加 `interact_mood`，旧实现读不到配置恒显示 +0；
+  /// 心情已满时不显示增量——满值再加是无效增量，改提示关怀文案，20261022 拍板）
   String get _interactMsg {
+    final pet = _currentPet;
+    if (pet != null && pet.mood >= 100) {
+      return '它已经心满意足啦';
+    }
     final delta = _budget.interactDeltaText;
     return delta.isEmpty ? '它很开心' : '它很开心 · $delta';
   }

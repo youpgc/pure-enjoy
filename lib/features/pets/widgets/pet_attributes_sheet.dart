@@ -525,18 +525,18 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: lv.need <= 0
-                      ? 0
-                      : (lv.intoLevel / lv.need).clamp(0.0, 1.0),
+                  // 与四维同口径:以 100 为满(超 100 恒满格,视觉长度对齐);
+                  // 等级细节由副行文案承载,20261021 用户拍板
+                  value: (widget.pet.intimacy / 100).clamp(0.0, 1.0),
                   minHeight: 8,
                   backgroundColor: cs.surfaceContainerHighest,
                 ),
               ),
             ),
             const SizedBox(width: 10),
-            // 数值格 = 已获取亲密度总数(等级换算见下方副行)
+            // 数值格 = 已获取亲密度总数;宽度 52 与四维数值格一致(槽位对齐)
             SizedBox(
-                width: 64,
+                width: 52,
                 child: Text('${widget.pet.intimacy}',
                     textAlign: TextAlign.right,
                     style: const TextStyle(
