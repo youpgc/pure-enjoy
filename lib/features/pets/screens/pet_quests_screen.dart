@@ -227,7 +227,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
     final start = _weekStart;
     return '周任务按北京周一为锚点'
         '${start == null ? '' : '（本周自 $start 起）'}；'
-        '进度从本周第一次打开本页签起算，之前的行为不追溯计入。';
+        '本周任务从你第一次打开这里开始记录，之前的陪伴不会计入哦。';
   }
 
   // ---------- 公共小块 ----------

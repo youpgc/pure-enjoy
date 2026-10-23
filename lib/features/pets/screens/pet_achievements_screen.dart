@@ -103,20 +103,26 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     if (_achs.isEmpty) {
       return const EmptyWidget(message: '成就还在配置中，过阵子再来看看吧');
     }
-    final done = _achs.where((a) => a.completed).length;
+    // 渐进揭示：前置未全部领取的成就不进入列表（树状逐级现身；
+    // 领取前置后下一次 check 刷新即现身），服务端 PREREQ_LOCKED 为兜底闸
+    final claimedCodes =
+        _achs.where((a) => a.claimed).map((a) => a.code).toSet();
+    final visible =
+        _achs.where((a) => !a.prereqLocked(claimedCodes)).toList();
+    final done = visible.where((a) => a.completed).length;
     // 2026-09-24 定版排序：按「领取状态」分三段（可领取置顶 → 进行中 → 已领取沉底），
     // 段内保持服务端原序（tier.sort_order + code），不再按档位分组打标题——
     // 置顶诉求要的是全局次序，档位标题会把可领取的成就拆散到各档下面。
     // 档位信息改由卡片的达成条件行前缀展示，不丢。
-    final claimable = _achs.where((a) => a.completed && !a.claimed).toList();
-    final doing = _achs.where((a) => !a.completed && !a.claimed).toList();
-    final claimed = _achs.where((a) => a.claimed).toList();
+    final claimable = visible.where((a) => a.completed && !a.claimed).toList();
+    final doing = visible.where((a) => !a.completed && !a.claimed).toList();
+    final claimed = visible.where((a) => a.claimed).toList();
     return RefreshIndicator(
       onRefresh: _load,
       child: ListView(
         padding: const EdgeInsets.all(16),
         children: [
-          Text('已达成 $done / ${_achs.length}',
+          Text('已达成 $done / ${visible.length}',
               style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant)),
           const SizedBox(height: 10),
           for (final (label, list) in <(String, List<PetAchievementModel>)>[
@@ -191,19 +197,15 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
                   FilledButton.tonal(
                     onPressed: _claiming.contains(a.id) ? null : () => _claim(a),
                     child: Text(_claiming.contains(a.id) ? '领取中' : '领取'),
-                  )
-                else
-                  Text('${a.progress}/${a.target}',
-                      style: TextStyle(
-                          fontSize: 12, color: cs.onSurfaceVariant)),
+                  ),
               ],
             ),
             const SizedBox(height: 6),
-            // 档位前缀：分组标题改成状态段后，档位（普通/精英/传说）在这行保留
+            // 档位 + 条件 + 进度拼一行；已领的继续报累计进度（只增不减）
             Text(
               tierLabel == null
-                  ? a.conditionLabel
-                  : '$tierLabel · ${a.conditionLabel}',
+                  ? '${a.conditionLabel}  ${a.progress}/${a.target}'
+                  : '$tierLabel · ${a.conditionLabel}  ${a.progress}/${a.target}',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
             const SizedBox(height: 8),
             ClipRRect(
