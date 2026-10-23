@@ -13,6 +13,7 @@ import '../utils/pet_errors.dart';
 import '../widgets/pet_adventure_cards.dart';
 import '../widgets/pet_claim_result_dialog.dart';
 import '../widgets/pet_home_adventure.dart';
+import 'pet_odds_screen.dart';
 import '../widgets/pet_toast.dart';
 
 /// 历险页
@@ -126,6 +127,10 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   bool _loading = true;
   String? _error;
   List<PetSpotModel> _spots = const [];
+
+  /// 已解锁隐秘境 code 集（spot_hidden:<code>；隐藏图未解锁的渲染为锁定卡）
+  Set<String> _hiddenUnlocked = const {};
+  String? _unlockingCode;
   PetAdventureBriefModel? _adv;
   Timer? _tick;
   bool _busy = false;
@@ -185,7 +190,11 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   PetSpotModel? get _matchedSpot {
     if (_matchedSpotId == null) return null;
     for (final s in _spots) {
-      if (s.id == _matchedSpotId) return s;
+      if (s.id == _matchedSpotId) {
+        // 未解锁的秘境不作推荐：横幅会泄露秘境名称，锁定卡也无定位锚点
+        if (s.hidden && !_hiddenUnlocked.contains(s.code)) return null;
+        return s;
+      }
     }
     return null;
   }
@@ -208,9 +217,11 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _load() async {
     setState(() => _loading = true);
     final (spots, err) = await PetRpc.fetchSpots();
+    final unlocked = await PetRpc.fetchUnlockedHiddenSpots();
     if (mounted) {
       setState(() {
         _spots = spots;
+        _hiddenUnlocked = unlocked;
         _error = err == null ? null : petRpcErrorText(err);
         _loading = false;
       });
@@ -266,7 +277,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     if (status == PetAdventureStatus.awaitingRescue) {
       await _reloadSummary();
       if (mounted) {
-        showPetToast(context, '遭遇险情！请在自救窗口内使用救援道具');
+        showPetToast(context, '遭遇险情！在救援时间内使用救援道具，马上接它回家');
       }
       return;
     }
@@ -343,12 +354,30 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             ),
           ),
         ),
-        Center(
-          child: Text('历险',
-              style: Theme.of(context)
-                  .textTheme
-                  .titleSmall
-                  ?.copyWith(fontWeight: FontWeight.w700)),
+        Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 8),
+          child: Row(
+            children: [
+              // 与右侧问号按钮等宽的占位：标题在整行居中，不被按钮挤偏
+              const SizedBox(width: 48),
+              Expanded(
+                child: Center(
+                  child: Text('历险',
+                      style: Theme.of(context)
+                          .textTheme
+                          .titleSmall
+                          ?.copyWith(fontWeight: FontWeight.w700)),
+                ),
+              ),
+              // 规则说明（结果/掉落概率/危险惩罚与珍稀保护边界）
+              IconButton(
+                tooltip: '历险规则说明',
+                onPressed: _showRulesSheet,
+                icon: Icon(Icons.help_outline,
+                    size: 20, color: cs.onSurfaceVariant),
+              ),
+            ],
+          ),
         ),
         const SizedBox(height: 8),
         Flexible(child: _buildBody()),
@@ -369,6 +398,126 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   }
 
   // ---------- 出发前：历险地列表 ----------
+
+  /// 隐秘境锁定卡：与普通卡同构（左星星图标 + 右锁标），名称保密；
+  /// 点卡片确认后消耗罗盘解锁（等级未达也先展示，解锁与等级门槛独立）
+  Widget _hiddenLockedCard(PetSpotModel spot) {
+    final lv = spot.requiredLevel;
+    final cs = Theme.of(context).colorScheme;
+    return Card(
+      child: ListTile(
+        leading: Icon(Icons.auto_awesome, color: cs.tertiary),
+        title: const Text('未解锁的秘境'),
+        subtitle: Text(
+          '深处藏着独有的珍藏${lv != null && widget.petLevel < lv ? '（需 Lv.$lv）' : ''}',
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+        ),
+        trailing: _unlockingCode == spot.code
+            ? const SizedBox(
+                width: 18,
+                height: 18,
+                child: CircularProgressIndicator(strokeWidth: 2))
+            : const Icon(Icons.lock_outline, size: 18),
+        onTap: _unlockingCode == spot.code
+            ? null
+            : () => _confirmUnlockHidden(spot),
+      ),
+    );
+  }
+
+  /// 解锁确认：罗盘是稀有道具，点卡片先确认再消耗
+  Future<void> _confirmUnlockHidden(PetSpotModel spot) async {
+    final ok = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        title: const Text('解锁秘境'),
+        content: const Text('将消耗 1 个「星辰罗盘」解锁这座秘境，确定吗？'),
+        actions: [
+          TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('取消')),
+          FilledButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: const Text('解锁')),
+        ],
+      ),
+    );
+    if (ok == true) await _unlockHidden(spot);
+  }
+
+  /// 罗盘解锁：服务端消耗 1 个星辰罗盘（无罗盘由服务端报错转文案）
+  Future<void> _unlockHidden(PetSpotModel spot) async {
+    setState(() => _unlockingCode = spot.code);
+    final err = await PetRpc.unlockHiddenSpot(spot.code);
+    if (!mounted) return;
+    setState(() => _unlockingCode = null);
+    showPetToast(context,
+        err != null ? petRpcErrorText(err) : '秘境已解锁：「${spot.name}」');
+    if (err == null) await _load();
+  }
+
+  /// 历险规则说明（问号弹窗）：结果类型权重、掉落概率、长途独占与保底、
+  /// 危险惩罚（含珍稀保护的丢物边界）——具体数值按图各异，引导去概率公示页
+  void _showRulesSheet() {
+    showModalBottomSheet<void>(
+      context: context,
+      builder: (ctx) => SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 16, 20, 20),
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              const Row(children: [
+                Icon(Icons.explore_outlined, size: 20),
+                SizedBox(width: 8),
+                Text('历险规则说明',
+                    style:
+                        TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
+              ]),
+              const SizedBox(height: 12),
+              _ruleLine('归来结果', '每次归来可能遇到求助、游玩、回忆或危险事件，收获各不相同'),
+              _ruleLine('收获', '归来可获得经验与金币，走得越远收获越丰厚；长途出行还有机会获得稀有宝贝'),
+              _ruleLine('独占掉落与保底', '进化石/星辰罗盘/系收藏品等仅长途概率获得，80 次未中必得（保底后清零）'),
+              _ruleLine('危险', '可能受伤、心情变差，深处还会掉落金币或一件普通道具'),
+              _ruleLine('珍稀保护', '珍贵收藏和进化材料受特别保护，永远不会丢失'),
+              const SizedBox(height: 12),
+              Align(
+                alignment: Alignment.centerRight,
+                child: TextButton(
+                  onPressed: () => Navigator.push(ctx,
+                      MaterialPageRoute(builder: (_) => const PetOddsScreen())),
+                  child: const Text('查看完整概率公示 →'),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _ruleLine(String title, String body) => Padding(
+        padding: const EdgeInsets.only(bottom: 8),
+        child: Row(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            SizedBox(
+              width: 88,
+              child: Text(title,
+                  style: const TextStyle(
+                      fontSize: 13, fontWeight: FontWeight.w600)),
+            ),
+            Expanded(
+              child: Text(body,
+                  style: TextStyle(
+                      fontSize: 13,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant)),
+            ),
+          ],
+        ),
+      );
 
   Widget _spotsView() {
     final cs = Theme.of(context).colorScheme;
@@ -417,16 +566,18 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             child: Column(
               children: [
                 for (final spot in _spots)
-                  petSpotCard(
-                    context,
-                    spot: spot,
-                    petLevel: widget.petLevel,
-                    petAttrs: widget.petAttrs,
-                    // 推荐卡挂 key:列表就绪后自动滚动到推荐位置;高亮边框
-                    key: spot.id == _matchedSpotId ? _matchedCardKey : null,
-                    highlight: spot.id == _matchedSpotId,
-                    onTap: () => _showTierSheet(spot),
-                  ),
+                  spot.hidden && !_hiddenUnlocked.contains(spot.code)
+                      ? _hiddenLockedCard(spot)
+                      : petSpotCard(
+                          context,
+                          spot: spot,
+                          petLevel: widget.petLevel,
+                          petAttrs: widget.petAttrs,
+                          // 推荐卡挂 key:列表就绪后自动滚动到推荐位置;高亮边框
+                          key: spot.id == _matchedSpotId ? _matchedCardKey : null,
+                          highlight: spot.id == _matchedSpotId,
+                          onTap: () => _showTierSheet(spot),
+                        ),
               ],
             ),
           ),
@@ -437,7 +588,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   void _showTierSheet(PetSpotModel spot) {
     if (widget.tiers.isEmpty) {
-      showPetToast(context, '历险档位未配置，请联系管理员');
+      showPetToast(context, '历险时长还在准备中，稍后再来');
       return;
     }
     showModalBottomSheet<void>(
@@ -572,8 +723,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             ],
             Text(
               expired
-                  ? '已超出自救窗口，将由 NPC 兜底救助'
-                  : '自救窗口截止：${deadline == null ? '-' : DateTimeUtils.formatToMinute(deadline)}',
+                  ? '救援时间已过，NPC 会安全护送它回家'
+                  : '救援时间截止：${deadline == null ? '-' : DateTimeUtils.formatToMinute(deadline)}',
               style: TextStyle(color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 20),
@@ -585,7 +736,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               ),
             const SizedBox(height: 8),
             Text(
-              expired ? '点击下方按钮完成 NPC 救助' : '没有救援道具？等待窗口结束由 NPC 救助',
+              expired ? '点击下方按钮完成 NPC 救助' : '没有救援道具也没关系，时间到了 NPC 会去接它',
               style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
             ),
             if (expired) ...[

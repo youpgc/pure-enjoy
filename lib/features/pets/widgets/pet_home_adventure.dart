@@ -43,13 +43,18 @@ List<({String name, int qty})> buildClaimItems(Map<String, dynamic>? data) {
   }
   final rawLong = data?['long_drops'];
   if (rawLong is List) {
+    // 取名统一口径：服务端联查 name 为主（claim 已逐项下发），
+    // kLongDropNames 字典仅旧版服务端兜底（同步守卫见 tool/pet_asset_check.mjs）
     const longNames = kLongDropNames;
     for (final it in rawLong) {
       if (it is Map) {
         final code = it['code'] as String? ?? '';
         final forced = it['forced'] == true;
+        final name = (it['name'] as String?)?.isEmpty == true
+            ? null
+            : it['name'] as String?;
         items.add((
-          name: '${longNames[code] ?? (code.isEmpty ? '稀有道具' : code)}${forced ? '(保底)' : ''}',
+          name: '${name ?? longNames[code] ?? (code.isEmpty ? '稀有道具' : code)}${forced ? '(保底)' : ''}',
           qty: 1,
         ));
       }

@@ -26,6 +26,9 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   String? _error;
   List<PetEggOddsModel> _pools = const [];
 
+  /// item_code → 中文名（pet_items 服务端真源；失败时空表走字典兜底）
+  Map<String, String> _itemNames = const {};
+
   /// 历险产出公示(2026-10-15 长途收益批):30 地 drop_table + 保底/系数配置
   List<Map<String, dynamic>> _advSpots = const [];
   Map<String, dynamic> _advReserved = const {};
@@ -43,9 +46,11 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     final fPools = PetRpcP2.fetchPublishedEggOdds();
     final fSpots = PetRpc.fetchAdventureOdds();
     final fReserved = PetRpcP2.fetchReserved();
+    final fNames = PetRpc.fetchItemNames();
     final (pools, err) = await fPools;
     final (spots, spotsErr) = await fSpots;
     final (reserved, reservedErr) = await fReserved;
+    final names = await fNames;
     if (!mounted) return;
     setState(() {
       // 繁育产出蛋（breed_*，内部池）不在公示页罗列——说明并入繁育页
@@ -53,6 +58,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
       _error = err == null ? null : petRpcErrorText(err);
       _advSpots = spots;
       _advReserved = reserved.raw;
+      _itemNames = names;
       _advError = spotsErr == null && reservedErr == null
           ? null
           : petRpcErrorText(spotsErr ?? reservedErr);
@@ -65,7 +71,9 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   /// 不造默认值——本页铁律:猜测值不当作对外承诺）
   List<({String code, String title, Map<String, List<String>> zoneMaps, String pct, int? pity})>
       _adventureDrops() {
+    // 取名统一口径：服务端 pet_items 映射为主，kLongDropNames 仅旧版兜底
     const itemNames = kLongDropNames;
+    final srvNames = _itemNames;
     final pityCfg =
         (_advReserved['long_drop_pity'] as Map?)?.cast<String, dynamic>() ?? const {};
     final byCode = <String,
@@ -103,7 +111,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     for (final e in byCode.entries) {
       out.add((
         code: e.key,
-        title: itemNames[e.key] ?? e.key,
+        title: srvNames[e.key] ?? itemNames[e.key] ?? e.key,
         zoneMaps: e.value.zoneMaps,
         // 保留一位小数:<0.5% 的概率用整数会显示成 0%(公示页语义失真)
         pct: e.value.p == null ? '-' : _fmtPct(e.value.p),
@@ -235,14 +243,14 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                   ],
                 ),
                 const SizedBox(height: 12),
-                const Text('长途独占掉落(仅长途派遣概率获得):',
+                const Text('长途限定宝藏（只有长途出行才有机会获得）：',
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 if (_advError != null)
                   Text('产出数据加载失败:$_advError',
                       style: TextStyle(fontSize: 12, color: cs.error))
                 else if (drops.isEmpty)
-                  const Text('暂未配置', style: TextStyle(fontSize: 12))
+                  const Text('敬请期待', style: TextStyle(fontSize: 12))
                 else
                   for (final d in drops) ...[
                     _dropTile(cs, d),
@@ -250,7 +258,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                   ],
                 const SizedBox(height: 2),
                 Text(
-                    '各道具独立计数,概率命中或累计未中达保底次数必得(保底后清零)。',
+                    '每件宝贝单独计数：抽中或攒够保底次数必定获得，获得后重新计数。',
                     style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
               ],
             ),
@@ -327,7 +335,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                   color: cs.tertiaryContainer,
                   borderRadius: BorderRadius.circular(9),
                 ),
-                child: Text(d.pity == null ? '保底未公示' : '${d.pity} 次必得',
+                child: Text(d.pity == null ? '保底待定' : '${d.pity} 次必得',
                     style: TextStyle(
                         fontSize: 11,
                         fontWeight: FontWeight.w600,
@@ -490,7 +498,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
           children: [
             _adventureCard(cs),
             const SizedBox(height: 12),
-            const EmptyWidget(message: '还没有已公示的蛋池'),
+            const EmptyWidget(message: '蛋池还在准备中，敬请期待'),
           ],
         ),
       );
@@ -553,6 +561,8 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   /// 蛋池名转译（ breed_* = 繁育产出蛋：家系+评级可从 code 解析）
   String _poolName(String code) {
     switch (code) {
+      case 'lottery_s1':
+        return '幸运蛋礼盒';
       case 'egg_n':
         return '普通宠物蛋';
       case 'egg_r':

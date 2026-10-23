@@ -103,7 +103,8 @@ Widget petSpotCard(
             side: BorderSide(color: cs.primary, width: 2))
         : null,
     child: ListTile(
-      leading: Icon(locked ? Icons.lock_outline : Icons.explore_outlined,
+      // 左侧统一导航图标（锁定态由右侧锁标示，不换锁图标）
+      leading: Icon(Icons.explore_outlined,
           color: highlight ? cs.primary : null),
       title: Text(spot.name),
       subtitle: (req != null || hasReq)

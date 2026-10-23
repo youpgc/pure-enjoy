@@ -298,7 +298,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final pet = _currentPet;
     if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {
-      showPetToast(context, '历险信息异常，请下拉刷新或重进宠物页重试');
+      showPetToast(context, '历险信息走丢了，刷新一下再试试');
       return;
     }
     if (await run(context, adv.id) && mounted) _load();
