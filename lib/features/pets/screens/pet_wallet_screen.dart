@@ -1,4 +1,5 @@
 import 'package:flutter/foundation.dart';
+import '../utils/pet_gold_format.dart';
 
 import 'package:flutter/material.dart';
 
@@ -259,7 +260,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
                           size: 28, color: colorScheme.primary),
                       const SizedBox(width: 6),
                       Text(
-                        '$_goldBalance',
+                        petGoldLabel(_goldBalance),
                         style: Theme.of(context)
                             .textTheme
                             .headlineMedium

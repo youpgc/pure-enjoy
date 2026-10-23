@@ -1,3 +1,7 @@
+import 'dart:async';
+
+import '../utils/pet_decay_display.dart';
+import '../utils/pet_gold_format.dart';
 import 'package:flutter/material.dart';
 
 import '../models/pet_models.dart';
@@ -267,7 +271,7 @@ class PetGoldBadgeCore extends StatelessWidget {
           const PetItemIcon(
               iconKey: 'ui_coin', fallback: Icons.paid_outlined, size: 15),
           const SizedBox(width: 4),
-          Text('$gold',
+          Text(petGoldLabel(gold),
               style: const TextStyle(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
@@ -287,12 +291,16 @@ class PetGoldBadgeCore extends StatelessWidget {
 String _stageName(int stage) =>
     const ['幼年期', '成长期', '成年期'][stage.clamp(0, 2)];
 
-class PetBottomStatusCard extends StatelessWidget {
+class PetBottomStatusCard extends StatefulWidget {
   const PetBottomStatusCard({
     super.key,
     required this.pet,
     this.expNeed,
     this.expMaxed = false,
+    this.weakHealthAt = 20,
+    this.decayHungerPerHour = 0,
+    this.decayMoodPerHour = 0,
+    this.statsAt,
     this.onTap,
   });
 
@@ -305,13 +313,59 @@ class PetBottomStatusCard extends StatelessWidget {
   /// 已达等级上限（level_max，服务端同源冻结 exp）：经验条满格 + 显示 MAX
   final bool expMaxed;
 
+  /// 虚弱阈值（与历险出发门槛 adventure_health_threshold 同源；缺省 20）——
+  /// 健康低于此值时健康行转红警示
+  final int weakHealthAt;
+
+  /// 展示层实时衰减速率（config 同源；0=不衰减）。寄养冻结由调用方以 0 传入
+  final int decayHungerPerHour;
+  final int decayMoodPerHour;
+
+  /// 数据锚点时刻（summary 拉取时间）；null 不插值
+  final DateTime? statsAt;
+
   /// 打开属性面板（null 时不可点）
   final VoidCallback? onTap;
 
   @override
+  State<PetBottomStatusCard> createState() => _PetBottomStatusCardState();
+}
+
+class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
+  Timer? _tick;
+
+  @override
+  void initState() {
+    super.initState();
+    // 展示层实时衰减：每分钟按速率插值重绘（服务端惰性结算为准）
+    _tick = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted) setState(() {});
+    });
+  }
+
+  @override
+  void dispose() {
+    _tick?.cancel();
+    super.dispose();
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final pet = widget.pet;
+    final expNeed = widget.expNeed;
+    final expMaxed = widget.expMaxed;
+    final anchor = widget.statsAt;
+    // 饱食/心情插值（无锚点/速率 0 = 原值）
+    final hunger = anchor == null
+        ? pet.hunger
+        : petDecayedStat(
+            pet.hunger, anchor, widget.decayHungerPerHour, DateTime.now());
+    final mood = anchor == null
+        ? pet.mood
+        : petDecayedStat(
+            pet.mood, anchor, widget.decayMoodPerHour, DateTime.now());
     return GestureDetector(
-      onTap: onTap,
+      onTap: widget.onTap,
       child: Container(
         margin: const EdgeInsets.symmetric(horizontal: 12),
         padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
@@ -343,9 +397,9 @@ class PetBottomStatusCard extends StatelessWidget {
               ],
             ),
             const SizedBox(height: 8),
-            _statRow('饱食', 'ui_hunger', Icons.restaurant, pet.hunger),
+            _statRow('饱食', 'ui_hunger', Icons.restaurant, hunger),
             const SizedBox(height: 6),
-            _statRow('心情', 'ui_mood', Icons.mood, pet.mood),
+            _statRow('心情', 'ui_mood', Icons.mood, mood),
             const SizedBox(height: 6),
             // 亲密度不在主界面展示：详情面板（属性面板）已有对应字段
             // （20261021 用户拍板）
@@ -356,9 +410,12 @@ class PetBottomStatusCard extends StatelessWidget {
                     ? 'MAX'
                     : (expNeed == null ? null : '${pet.exp}/$expNeed')),
             const SizedBox(height: 6),
-            // 健康行（状态值：历险失败惩罚扣减，恢复途径后续配置）
+            // 健康行（历险失败惩罚扣减；低于出发门槛=虚弱，进度条转红警示）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
-                pet.health),
+                pet.health,
+                valueColor: pet.health < widget.weakHealthAt
+                    ? const Color(0xFFE57373)
+                    : null),
           ],
         ),
       ),
@@ -371,8 +428,12 @@ class PetBottomStatusCard extends StatelessWidget {
   /// （经验行 exp/need），格宽随之放宽。经验需求 >100（2 级起），写死 /100
   /// 会让条恒满——上限必须来自 summary config 同源曲线（petExpNeed）。
   Widget _statRow(String label, String iconKey, IconData fallback, int value,
-      {int? max, bool forceFull = false, String? displayText}) {
+      {int? max,
+      bool forceFull = false,
+      String? displayText,
+      Color? valueColor}) {
     const accent = Color(0xFFFFD37E);
+    final barColor = valueColor ?? accent;
     final denom = (max == null || max <= 0) ? 100 : max;
     return Row(
       children: [
@@ -391,7 +452,7 @@ class PetBottomStatusCard extends StatelessWidget {
               value: forceFull ? 1.0 : (value / denom).clamp(0.0, 1.0),
               minHeight: 5,
               backgroundColor: Colors.white24,
-              valueColor: const AlwaysStoppedAnimation(accent),
+              valueColor: AlwaysStoppedAnimation(barColor),
             ),
           ),
         ),
@@ -405,10 +466,10 @@ class PetBottomStatusCard extends StatelessWidget {
             alignment: Alignment.centerRight,
             child: Text(displayText ?? '$value',
                 textAlign: TextAlign.right,
-                style: const TextStyle(
+                style: TextStyle(
                     fontSize: 11,
                     fontWeight: FontWeight.w600,
-                    color: Color(0xFFF5EFE4))),
+                    color: valueColor ?? const Color(0xFFF5EFE4))),
           ),
         ),
       ],

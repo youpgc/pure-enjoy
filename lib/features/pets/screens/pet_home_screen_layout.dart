@@ -135,6 +135,24 @@ extension _PetHomeLayout on _PetHomeScreenState {
                   pet: pet,
                   expNeed: petExpNeed(pet.level, _summary?.config),
                   expMaxed: petExpMaxed(pet.level, _summary?.config),
+                  weakHealthAt: (_summary?.config[
+                              'adventure_health_threshold'] as num?)
+                          ?.toInt() ??
+                      20,
+                  // 展示层实时衰减：速率同源下发；寄养冻结传 0
+                  decayHungerPerHour:
+                      (pet.status == PetPetStatus.fostered)
+                          ? 0
+                          : (_summary?.config['decay_hunger_per_hour']
+                                  as num?)
+                              ?.toInt() ??
+                              0,
+                  decayMoodPerHour: (pet.status == PetPetStatus.fostered)
+                      ? 0
+                      : (_summary?.config['decay_mood_per_hour'] as num?)
+                              ?.toInt() ??
+                          0,
+                  statsAt: _summary?.fetchedAt,
                   onTap: _openAttributes),
             ],
           ),

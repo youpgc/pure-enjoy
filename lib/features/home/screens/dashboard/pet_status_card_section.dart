@@ -1,8 +1,13 @@
+import 'dart:async';
+
 import 'package:flutter/material.dart';
 
 import '../../../pets/models/pet_models.dart';
 import '../../../pets/screens/pet_home_screen.dart';
+import '../../../../constants/pet.dart';
 import '../../../pets/services/pet_service.dart';
+import '../../../pets/utils/pet_decay_display.dart';
+import '../../../pets/utils/pet_gold_format.dart';
 
 /// 首页「宠物状态卡」常驻区块（宠物系统主入口）
 ///
@@ -22,6 +27,7 @@ class PetStatusCardSection extends StatefulWidget {
 class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   bool _loading = true;
   PetSummaryModel? _summary;
+  Timer? _tick;
 
   @override
   void initState() {
@@ -29,6 +35,10 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
     _load();
     // 首页下拉刷新等外部 force 拉取成功后自动重载（20261021 用户需求）
     PetService.summaryForceRefreshed.addListener(_onForcedRefresh);
+    // 展示层实时衰减：每分钟按速率插值重绘（寄养冻结不衰减；服务端结算为准）
+    _tick = Timer.periodic(const Duration(seconds: 60), (_) {
+      if (mounted) setState(() {});
+    });
   }
 
   void _onForcedRefresh() {
@@ -39,6 +49,7 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
 
   @override
   void dispose() {
+    _tick?.cancel();
     PetService.summaryForceRefreshed.removeListener(_onForcedRefresh);
     super.dispose();
   }
@@ -114,13 +125,64 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
                               overflow: TextOverflow.ellipsis,
                             ),
                             const SizedBox(height: 2),
-                            Text(
-                              '饱食 ${pet.hunger} · 心情 ${pet.mood}',
-                              style: TextStyle(
-                                fontSize: 12,
-                                color: colorScheme.onSurfaceVariant,
-                              ),
-                            ),
+                            Builder(builder: (_) {
+                              // 虚弱阈值与历险出发门槛同源（缺配置回退 20）
+                              final weakAt = (_summary!.config[
+                                          'adventure_health_threshold']
+                                      as num?)
+                                  ?.toInt() ??
+                                  20;
+                              // 展示层实时衰减（寄养冻结；速率缺省 0=不衰减）
+                              final anchor = _summary!.fetchedAt;
+                              final fostered =
+                                  pet.status == PetPetStatus.fostered;
+                              final hunger = fostered || anchor == null
+                                  ? pet.hunger
+                                  : petDecayedStat(
+                                      pet.hunger,
+                                      anchor,
+                                      (_summary!.config[
+                                                  'decay_hunger_per_hour']
+                                              as num?)
+                                          ?.toInt() ??
+                                          0,
+                                      DateTime.now());
+                              final mood = fostered || anchor == null
+                                  ? pet.mood
+                                  : petDecayedStat(
+                                      pet.mood,
+                                      anchor,
+                                      (_summary!.config[
+                                                  'decay_mood_per_hour']
+                                              as num?)
+                                          ?.toInt() ??
+                                          0,
+                                      DateTime.now());
+                              final weak = pet.health < weakAt;
+                              return Text.rich(
+                                TextSpan(
+                                  children: [
+                                    TextSpan(
+                                        text:
+                                            '饱食 $hunger · 心情 $mood · '),
+                                    TextSpan(
+                                      text: weak
+                                          ? '健康 ${pet.health}（虚弱）'
+                                          : '健康 ${pet.health}',
+                                      style: weak
+                                          ? TextStyle(
+                                              color: colorScheme.error,
+                                              fontWeight: FontWeight.bold)
+                                          : null,
+                                    ),
+                                  ],
+                                ),
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: colorScheme.onSurfaceVariant,
+                                ),
+                              );
+                            }),
                           ],
                         )
                       : Column(
@@ -160,7 +222,7 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
                           size: 14, color: colorScheme.onSecondaryContainer),
                       const SizedBox(width: 4),
                       Text(
-                        '${summary.wallet.goldBalance}',
+                        petGoldLabel(summary.wallet.goldBalance),
                         style: TextStyle(
                           fontSize: 12,
                           fontWeight: FontWeight.bold,
