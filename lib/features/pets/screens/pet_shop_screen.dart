@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
+import '../utils/pet_gold_format.dart';
 import '../widgets/pet_category_rail.dart';
 import '../widgets/pet_item_icon.dart';
 import 'pet_bag_screen.dart';
@@ -37,6 +39,10 @@ class _PetShopScreenState extends State<PetShopScreen> {
   bool _loading = true;
   String? _error;
   List<PetShopItemModel> _items = const [];
+
+  /// 幸运抽奖配置（reserved.lottery：price/限购；null=后台未配不展示）
+  Map<String, dynamic>? _lottery;
+  bool _drawing = false;
   final Set<String> _buying = {};
   late int _gold = widget.goldBalance;
 
@@ -53,6 +59,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
   static IconData _labelIcon(String label) => switch (label) {
         '宠物蛋' => Icons.egg_outlined,
         '食物' => Icons.restaurant,
+        '医疗' => Icons.medical_services_outlined,
         '清洁' => Icons.shower_outlined,
         '玩具' => Icons.toys_outlined,
         '救援' => Icons.health_and_safety_outlined,
@@ -74,11 +81,14 @@ class _PetShopScreenState extends State<PetShopScreen> {
     if (showLoading) setState(() => _loading = true);
     final (items, err) = await PetRpc.fetchShopItems();
     final (records, recErr) = await PetRpc.fetchExpansionRecords();
+    final (reserved, _) = await PetRpcP2.fetchReserved();
+    final lot = reserved.raw['lottery'];
     if (mounted) {
       setState(() {
         // 阶梯过滤失败不拦截商城(全量展示,购买时服务端仍校验顺序)——
         // 仅 recErr == null 时应用「只展示当前可购档」
         _items = recErr == null ? _filterLadder(items, records) : items;
+        _lottery = lot is Map ? Map<String, dynamic>.from(lot) : null;
         _error = err == null ? null : petRpcErrorText(err);
         _loading = false;
       });
@@ -180,7 +190,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
               ? '背包 ${result.used}/${result.capacity} 格已用完'
                   '${result.rowsNeeded == null ? '' : '，本次需要 ${result.rowsNeeded} 格'}。'
               : '背包空间不足。'
-          '${expand == null ? '\n已达扩容上限，请清理背包后再试。' : ''}',
+          '${expand == null ? '\n背包已经扩到最大啦，清理一下再试试。' : ''}',
         ),
         actions: [
           TextButton(
@@ -251,19 +261,121 @@ class _PetShopScreenState extends State<PetShopScreen> {
           Center(
             child: Padding(
               padding: const EdgeInsets.only(right: 16),
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Icon(Icons.paid_outlined, size: 18),
-                  const SizedBox(width: 4),
-                  Text('$_gold', style: const TextStyle(fontWeight: FontWeight.w600)),
-                ],
+              child: Tooltip(
+                message: petGoldConverted(_gold) ? '查看完整数额' : '',
+                child: InkWell(
+                  borderRadius: BorderRadius.circular(8),
+                  // 未达转换阈值不触发（数值本就完整）
+                  onTap: petGoldConverted(_gold) ? () => _showGoldDetail() : null,
+                  child: Padding(
+                    padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 2),
+                    child: Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const Icon(Icons.paid_outlined, size: 18),
+                        const SizedBox(width: 4),
+                        Text(petGoldLabel(_gold),
+                            style: const TextStyle(fontWeight: FontWeight.w600)),
+                      ],
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
         ],
       ),
       body: _buildBody(cs),
+    );
+  }
+
+  /// 幸运抽奖卡：价格/限购说明 + 抽取按钮（结果复用孵化结果弹窗）
+  Widget _lotteryCard(ColorScheme cs) {
+    final price = (_lottery?['price'] as num?)?.toInt() ?? 0;
+    return Card(
+      color: cs.tertiaryContainer,
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.auto_awesome, size: 30, color: cs.onTertiaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('幸运蛋礼盒',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onTertiaryContainer)),
+                  const SizedBox(height: 2),
+                  // 面向用户的营销文案（机制与概率数字只在公示页，问号入口可达）
+                  Text('有机会抽中传说级宠物！',
+                      style: TextStyle(
+                          fontSize: 12, color: cs.onTertiaryContainer)),
+                ],
+              ),
+            ),
+            FilledButton.tonal(
+              // 余额预检与 _buy 同口径（不足置灰；服务端仍兜底校验）
+              onPressed: (_drawing || _gold < price) ? null : _drawLottery,
+              child: _drawing
+                  ? const SizedBox(
+                      width: 16,
+                      height: 16,
+                      child: CircularProgressIndicator(strokeWidth: 2))
+                  : Row(mainAxisSize: MainAxisSize.min, children: [
+                      const Icon(Icons.paid_outlined, size: 14),
+                      const SizedBox(width: 3),
+                      Text(petGoldLabel(price)),
+                    ]),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  Future<void> _drawLottery() async {
+    setState(() => _drawing = true);
+    final (data, err) = await PetRpc.lotteryDraw();
+    if (!mounted) return;
+    setState(() => _drawing = false);
+    if (err != null) {
+      showPetToast(context, petRpcErrorText(err));
+      return;
+    }
+    // 本地扣减余额（与 _buy 同口径）+ 刷新商城（限购/阶梯可能变化）
+    setState(() => _gold -= (_lottery?['price'] as num?)?.toInt() ?? 0);
+    await _load(showLoading: false);
+    if (!mounted || data == null) return;
+    final r = PetHatchResultModel.fromJson(data);
+    final nm = r.name.isNotEmpty ? r.name : r.speciesCode;
+    showPetToast(context, '幸运降生！获得「$nm」');
+  }
+
+  /// 完整金币数额（转换值点击查看）
+  void _showGoldDetail() {
+    showDialog<void>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        content: Row(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(Icons.paid_outlined, size: 22),
+            const SizedBox(width: 8),
+            Text('$_gold',
+                style: const TextStyle(
+                    fontSize: 18, fontWeight: FontWeight.w700)),
+          ],
+        ),
+        actionsAlignment: MainAxisAlignment.center,
+        actions: [
+          TextButton(onPressed: () => Navigator.pop(ctx), child: const Text('知道了')),
+        ],
+      ),
     );
   }
 
@@ -292,12 +404,20 @@ class _PetShopScreenState extends State<PetShopScreen> {
           onSelect: (key) => setState(() => _category = key),
         ),
         Expanded(
-          child: _filtered.isEmpty
-              ? (_items.isEmpty
-                  ? const EmptyWidget(message: '商城暂无在售道具')
-                  : const EmptyWidget(message: '该分类下暂无道具'))
-              : RefreshIndicator(
-                  onRefresh: _load,
+          child: Column(
+            children: [
+              // 幸运抽奖（后期玩法入口：仅后台已配且「全部」分类时展示）
+              if (_lottery != null && _category == 'all') ...[
+                _lotteryCard(cs),
+                const SizedBox(height: 8),
+              ],
+              Expanded(
+                child: _filtered.isEmpty
+                    ? (_items.isEmpty
+                        ? const EmptyWidget(message: '商城暂无在售道具')
+                        : const EmptyWidget(message: '该分类下暂无道具'))
+                    : RefreshIndicator(
+                        onRefresh: _load,
                   child: GridView.builder(
                     padding: const EdgeInsets.all(12),
                     // 每行 4 格、正方形物品格（2026-09-24 定版：格内显示图标+名称，
@@ -310,9 +430,12 @@ class _PetShopScreenState extends State<PetShopScreen> {
                       crossAxisSpacing: 8,
                     ),
                     itemCount: _filtered.length,
-                    itemBuilder: (context, i) => _buildCell(_filtered[i], cs),
-                  ),
-                ),
+                        itemBuilder: (context, i) => _buildCell(_filtered[i], cs),
+                      ),
+                    ),
+              ),
+            ],
+          ),
         ),
       ],
     );

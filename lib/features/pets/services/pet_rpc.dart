@@ -121,15 +121,55 @@ class PetRpc {
   }
 
   /// 启用中的历险地列表
+  /// 幸运抽奖（服务端 rpc_pet_lottery_draw：双限购闸+扣金币+复用孵化全链）
+  static Future<(Map<String, dynamic>?, String?)> lotteryDraw() async =>
+      callRpc('rpc_pet_lottery_draw', const {},
+          'rpc_pet_lottery_draw 幸运抽奖');
+
+  /// 已解锁的隐秘境 code 集（pet_user_features 键 spot_hidden:<code>）
+  static Future<Set<String>> fetchUnlockedHiddenSpots() async {
+    final uid = _uid;
+    if (uid == null) return const <String>{};
+    try {
+      final resp = await ApiClient.get(
+        'pet_user_features',
+        select: 'feature_key',
+        filters: {'user_id': 'eq.$uid', 'feature_key': 'like.spot_hidden.*'},
+        limit: 100,
+        note: 'pet_user_features 隐秘境解锁集',
+      );
+      if (!resp.isSuccess) return const <String>{};
+      return (resp.data ?? const <Map<String, dynamic>>[])
+          .map((r) => (r['feature_key'] as String? ?? '')
+              .replaceFirst('spot_hidden:', ''))
+          .where((c) => c.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      return const <String>{};
+    }
+  }
+
+  /// 罗盘解锁隐秘境（消耗 1 个星辰罗盘；服务端 rpc_pet_spot_hidden_unlock）
+  static Future<String?> unlockHiddenSpot(String spotCode) async {
+    final (_, err) = await callRpc(
+      'rpc_pet_spot_hidden_unlock',
+      {'p_spot_code': spotCode},
+      'rpc_pet_spot_hidden_unlock 罗盘解锁隐秘境',
+    );
+    if (err != null) return err;
+    await PetService.instance.invalidateSummary();
+    return null;
+  }
+
   static Future<(List<PetSpotModel>, String?)> fetchSpots() async {
     try {
       final resp = await ApiClient.get(
         'pet_adventure_spots',
         select:
-            'id,code,name,unlock_conditions,attr_requirements',
+            'id,code,name,unlock_conditions,attr_requirements,hidden',
         filters: {'enabled': 'eq.true'},
         order: 'sort_order.asc',
-        limit: 50,
+        limit: 100,
         note: 'pet_adventure_spots 历险地查询',
       );
       if (!resp.isSuccess) return (const <PetSpotModel>[], resp.errorMessage);
@@ -166,6 +206,27 @@ class PetRpc {
 
   /// 历险产出公示（概率/保底展示的判定同源数据）：30 地 drop_table 原始行
   /// （含 long_only 独占掉落）。仅展示；概率判定仍在服务端 RPC（铁律 1）
+  /// 道具名映射（item_code → pet_items.name，服务端真源）——
+  /// 概率公示等读 jsonb 掉落表的场景用它取中文名；kLongDropNames 仅兜底
+  static Future<Map<String, String>> fetchItemNames() async {
+    try {
+      final resp = await ApiClient.get(
+        'pet_items',
+        select: 'item_code,name',
+        limit: 200,
+        note: 'pet_items 道具名映射',
+      );
+      if (!resp.isSuccess) return const {};
+      return {
+        for (final r in (resp.data ?? const <Map<String, dynamic>>[]))
+          if (r['item_code'] is String && r['name'] is String)
+            r['item_code'] as String: r['name'] as String,
+      };
+    } catch (_) {
+      return const {};
+    }
+  }
+
   static Future<(List<Map<String, dynamic>>, String?)> fetchAdventureOdds() async {
     try {
       final resp = await ApiClient.get(
@@ -173,7 +234,7 @@ class PetRpc {
         select: 'code,name,drop_table',
         filters: {'enabled': 'eq.true'},
         order: 'sort_order.asc',
-        limit: 50,
+        limit: 100,
         note: 'pet_adventure_spots 历险产出公示查询',
       );
       if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
