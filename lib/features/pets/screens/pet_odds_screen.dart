@@ -6,6 +6,7 @@ import '../models/pet_p2_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_item_icon.dart';
 
 /// 抽蛋概率公示页（P2）
 ///
@@ -59,22 +60,21 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     });
   }
 
-  /// 长途独占掉落聚合:按道具归组(区名列表 + 概率,同道具各区同值);
+  /// 长途独占掉落聚合:按道具归组(**具体地图名**列表 + 概率,同道具各区同值);
   /// 保底值按道具取自 reserved.long_drop_pity；缺配置为 null（公示「未公示」,
   /// 不造默认值——本页铁律:猜测值不当作对外承诺）
-  List<({String title, String maps, String pct, int? pity})> _adventureDrops() {
-    final zoneNames = <String, String>{
-      'forest': '森林', 'ranch': '牧场', 'beach': '海滩',
-      'mountain': '山地', 'waste': '荒原', 'ruins': '遗迹',
-    };
+  List<({String code, String title, Map<String, List<String>> zoneMaps, String pct, int? pity})>
+      _adventureDrops() {
     const itemNames = kLongDropNames;
     final pityCfg =
         (_advReserved['long_drop_pity'] as Map?)?.cast<String, dynamic>() ?? const {};
-    final byCode = <String, ({String maps, num? p, int? pity})>{};
+    final byCode = <String,
+        ({Map<String, List<String>> zoneMaps, num? p, int? pity})>{};
     for (final row in _advSpots) {
       final code = row['code']?.toString() ?? '';
       final zone = code.startsWith('spot_') ? code.substring(5) : code;
       final zoneKey = zone.contains('_') ? zone.substring(0, zone.indexOf('_')) : zone;
+      final spotName = row['name']?.toString() ?? code;
       final dt = row['drop_table'];
       if (dt is! Map) continue;
       final lo = dt['long_only'];
@@ -83,23 +83,28 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
         if (it is! Map) continue;
         final ic = it['code']?.toString() ?? '';
         if (ic.isEmpty) continue;
-        final zn = zoneNames[zoneKey] ?? zoneKey;
         final p = it['p'] is num ? (it['p'] as num) : null;
         final pity =
             pityCfg[ic] is num ? (pityCfg[ic] as num).toInt() : null;
         final prev = byCode[ic];
-        byCode[ic] = prev == null
-            ? (maps: zn, p: p, pity: pity)
-            : (maps: prev.maps.contains(zn) ? prev.maps : '${prev.maps}·$zn',
-               p: prev.p ?? p,
-               pity: prev.pity ?? pity);
+        if (prev == null) {
+          byCode[ic] = (zoneMaps: {zoneKey: [spotName]}, p: p, pity: pity);
+        } else {
+          final maps = Map<String, List<String>>.of(prev.zoneMaps);
+          final list = List<String>.of(maps[zoneKey] ?? const <String>[]);
+          if (!list.contains(spotName)) list.add(spotName);
+          maps[zoneKey] = list;
+          byCode[ic] = (zoneMaps: maps, p: prev.p ?? p, pity: prev.pity ?? pity);
+        }
       }
     }
-    final out = <({String title, String maps, String pct, int? pity})>[];
+    final out = <({String code, String title,
+        Map<String, List<String>> zoneMaps, String pct, int? pity})>[];
     for (final e in byCode.entries) {
       out.add((
+        code: e.key,
         title: itemNames[e.key] ?? e.key,
-        maps: e.value.maps,
+        zoneMaps: e.value.zoneMaps,
         // 保留一位小数:<0.5% 的概率用整数会显示成 0%(公示页语义失真)
         pct: e.value.p == null ? '-' : _fmtPct(e.value.p),
         pity: e.value.pity,
@@ -121,7 +126,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     return tier;
   }
 
-  /// 历险公示卡(时长系数 + 长途独占掉落 + 保底)
+  /// 历险公示卡(时长系数 + 长途独占掉落:道具图标+概率/保底徽章+地图分支路径)
   Widget _adventureCard(ColorScheme cs) {
     final tierMult =
         (_advReserved['adventure_tier_mult'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -136,82 +141,308 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     final drops = _adventureDrops();
     const tiers = ['short', 'medium', 'long'];
     return Card(
-      child: Padding(
-        padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Text('历险产出说明',
-                style: TextStyle(
-                    fontSize: 15, fontWeight: FontWeight.w700, color: cs.primary)),
-            const SizedBox(height: 8),
-            const Text('派遣时长收益(倍率):',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            Table(
-              border: TableBorder(
-                  horizontalInside:
-                      BorderSide(color: cs.outlineVariant.withValues(alpha: 0.5))),
+      clipBehavior: Clip.antiAlias,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          // 头部横幅:渐变底+罗盘图标,替代纯文字标题
+          Container(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                colors: [cs.primary.withValues(alpha: 0.14), cs.tertiary.withValues(alpha: 0.10)],
+                begin: Alignment.topLeft,
+                end: Alignment.bottomRight,
+              ),
+            ),
+            child: Row(
               children: [
-                TableRow(children: [
-                  const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 3),
-                      child: Text('', style: TextStyle(fontSize: 12))),
-                  for (final t in tiers)
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Text(_tierLabel(t),
-                            style: const TextStyle(
-                                fontSize: 12, fontWeight: FontWeight.w600))),
-                ]),
-                TableRow(children: [
-                  const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 3),
-                      child: Text('经验', style: TextStyle(fontSize: 12))),
-                  for (final t in tiers)
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Text('×${m(expM, t)}',
-                            style: const TextStyle(fontSize: 12))),
-                ]),
-                TableRow(children: [
-                  const Padding(
-                      padding: EdgeInsets.symmetric(vertical: 3),
-                      child: Text('金币', style: TextStyle(fontSize: 12))),
-                  for (final t in tiers)
-                    Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 3),
-                        child: Text('×${m(goldM, t)}',
-                            style: const TextStyle(fontSize: 12))),
-                ]),
+                Container(
+                  width: 34,
+                  height: 34,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(colors: [
+                      cs.primary,
+                      cs.tertiary,
+                    ]),
+                  ),
+                  child: const Icon(Icons.explore, size: 18, color: Colors.white),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: Text('历险产出说明',
+                      style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w700,
+                          color: cs.primary)),
+                ),
               ],
             ),
-            const SizedBox(height: 10),
-            const Text('长途独占掉落(仅长途派遣概率获得):',
-                style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-            const SizedBox(height: 4),
-            if (_advError != null)
-              Text('产出数据加载失败:$_advError',
-                  style: TextStyle(fontSize: 12, color: cs.error))
-            else if (drops.isEmpty)
-              const Text('暂未配置', style: TextStyle(fontSize: 12))
-            else
-              for (final d in drops)
-                Padding(
-                  padding: const EdgeInsets.symmetric(vertical: 2),
-                  child: Text(
-                      '${d.title} · ${d.maps}(长途) 概率 ${d.pct} · ${d.pity == null ? '保底未公示' : '${d.pity} 次必得'}',
-                      style: const TextStyle(fontSize: 12)),
+          ),
+          Padding(
+            padding: const EdgeInsets.fromLTRB(14, 12, 14, 14),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                const Text('派遣时长收益(倍率):',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 4),
+                Table(
+                  border: TableBorder(
+                      horizontalInside: BorderSide(
+                          color: cs.outlineVariant.withValues(alpha: 0.5))),
+                  children: [
+                    TableRow(children: [
+                      const Padding(
+                          padding: EdgeInsets.symmetric(vertical: 3),
+                          child: Text('', style: TextStyle(fontSize: 12))),
+                      for (final t in tiers)
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Text(_tierLabel(t),
+                                style: const TextStyle(
+                                    fontSize: 12, fontWeight: FontWeight.w600))),
+                    ]),
+                    TableRow(children: [
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(children: [
+                            Icon(Icons.auto_awesome, size: 13, color: cs.tertiary),
+                            const SizedBox(width: 4),
+                            const Text('经验', style: TextStyle(fontSize: 12)),
+                          ])),
+                      for (final t in tiers)
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Text('×${m(expM, t)}',
+                                style: const TextStyle(fontSize: 12))),
+                    ]),
+                    TableRow(children: [
+                      Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 3),
+                          child: Row(children: [
+                            Icon(Icons.paid_outlined, size: 13, color: cs.primary),
+                            const SizedBox(width: 4),
+                            const Text('金币', style: TextStyle(fontSize: 12)),
+                          ])),
+                      for (final t in tiers)
+                        Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 3),
+                            child: Text('×${m(goldM, t)}',
+                                style: const TextStyle(fontSize: 12))),
+                    ]),
+                  ],
                 ),
-            const SizedBox(height: 6),
-            Text(
-                '以上概率与后台配置同源,判定由服务端完成并留痕;各道具独立计数,'
-                '概率命中或累计未中达保底次数必得(保底后清零)。',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
-          ],
-        ),
+                const SizedBox(height: 12),
+                const Text('长途独占掉落(仅长途派遣概率获得):',
+                    style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
+                const SizedBox(height: 8),
+                if (_advError != null)
+                  Text('产出数据加载失败:$_advError',
+                      style: TextStyle(fontSize: 12, color: cs.error))
+                else if (drops.isEmpty)
+                  const Text('暂未配置', style: TextStyle(fontSize: 12))
+                else
+                  for (final d in drops) ...[
+                    _dropTile(cs, d),
+                    const SizedBox(height: 10),
+                  ],
+                const SizedBox(height: 2),
+                Text(
+                    '各道具独立计数,概率命中或累计未中达保底次数必得(保底后清零)。',
+                    style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+              ],
+            ),
+          ),
+        ],
       ),
     );
+  }
+
+  /// 掉落道具卡:头部(道具图标+名称+概率/保底徽章)+地图分支路径
+  Widget _dropTile(
+    ColorScheme cs,
+    ({String code, String title, Map<String, List<String>> zoneMaps, String pct, int? pity}) d,
+  ) {
+    final zones = d.zoneMaps.keys.toList();
+    return Container(
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        color: cs.surfaceContainerHighest.withValues(alpha: 0.55),
+        borderRadius: BorderRadius.circular(14),
+        border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.5)),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            children: [
+              Container(
+                width: 40,
+                height: 40,
+                decoration: BoxDecoration(
+                  color: cs.surface,
+                  borderRadius: BorderRadius.circular(10),
+                  border: Border.all(color: cs.outlineVariant.withValues(alpha: 0.6)),
+                ),
+                child: PetItemIcon(
+                  iconKey: d.code,
+                  fallback: _dropFallbackIcon(d.code),
+                  size: 24,
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(d.title,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                    const SizedBox(height: 2),
+                    Text(
+                        '长途历险掉落 · ${zones.length} 地形 ${d.zoneMaps.values.fold<int>(0, (a, l) => a + l.length)} 图',
+                        style: TextStyle(
+                            fontSize: 11, color: cs.onSurfaceVariant)),
+                  ],
+                ),
+              ),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cs.primaryContainer,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text('概率 ${d.pct}',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onPrimaryContainer)),
+              ),
+              const SizedBox(width: 6),
+              Container(
+                padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                decoration: BoxDecoration(
+                  color: cs.tertiaryContainer,
+                  borderRadius: BorderRadius.circular(9),
+                ),
+                child: Text(d.pity == null ? '保底未公示' : '${d.pity} 次必得',
+                    style: TextStyle(
+                        fontSize: 11,
+                        fontWeight: FontWeight.w600,
+                        color: cs.onTertiaryContainer)),
+              ),
+            ],
+          ),
+          if (zones.isNotEmpty) ...[
+            const SizedBox(height: 10),
+            // 游戏地图分支路径:左轨竖线串联地形站点,站点右侧列具体地图
+            for (var i = 0; i < zones.length; i++)
+              _zoneBranchLine(cs, zones[i], d.zoneMaps[zones[i]]!,
+                  first: i == 0, last: i == zones.length - 1),
+          ],
+        ],
+      ),
+    );
+  }
+
+  /// 地图分支行:左侧路径轨(上段线-地形站点圆-下段线)+地形名+具体地图 chips
+  Widget _zoneBranchLine(ColorScheme cs, String zoneKey, List<String> names,
+      {required bool first, required bool last}) {
+    final meta = _zoneMeta[zoneKey];
+    final label = meta?.$1 ?? zoneKey;
+    final icon = meta?.$2 ?? Icons.place_outlined;
+    final color = meta?.$3 ?? cs.primary;
+    final bg = meta?.$4 ?? cs.surfaceContainerHighest;
+    final rail = color.withValues(alpha: 0.35);
+    return IntrinsicHeight(
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.stretch,
+        children: [
+          SizedBox(
+            width: 30,
+            child: Column(
+              children: [
+                if (!first)
+                  Expanded(child: Center(child: Container(width: 2, color: rail)))
+                else
+                  const SizedBox(height: 6),
+                Container(
+                  width: 24,
+                  height: 24,
+                  decoration: BoxDecoration(
+                    shape: BoxShape.circle,
+                    gradient: LinearGradient(
+                        colors: [color, color.withValues(alpha: 0.72)],
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight),
+                    boxShadow: [
+                      BoxShadow(
+                          color: color.withValues(alpha: 0.3),
+                          blurRadius: 5,
+                          offset: const Offset(0, 1.5)),
+                    ],
+                  ),
+                  child: Icon(icon, size: 13, color: Colors.white),
+                ),
+                if (!last)
+                  Expanded(child: Center(child: Container(width: 2, color: rail)))
+                else
+                  const SizedBox(height: 6),
+              ],
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Padding(
+              padding: EdgeInsets.only(
+                  top: first ? 4 : 8, bottom: last ? 4 : 8, right: 2),
+              child: Wrap(
+                spacing: 6,
+                runSpacing: 6,
+                crossAxisAlignment: WrapCrossAlignment.center,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.symmetric(horizontal: 7, vertical: 2),
+                    decoration: BoxDecoration(
+                      color: color.withValues(alpha: 0.16),
+                      borderRadius: BorderRadius.circular(7),
+                    ),
+                    child: Text(label,
+                        style: TextStyle(
+                            fontSize: 11,
+                            fontWeight: FontWeight.w800,
+                            color: color)),
+                  ),
+                  for (final n in names)
+                    Container(
+                      padding:
+                          const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
+                      decoration: BoxDecoration(
+                        color: bg,
+                        borderRadius: BorderRadius.circular(8),
+                        border:
+                            Border.all(color: color.withValues(alpha: 0.25)),
+                      ),
+                      child: Text(n,
+                          style: TextStyle(
+                              fontSize: 11, color: cs.onSurface)),
+                    ),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 长途掉落道具图标回退(按 code 语义选 Material 图标)
+  static IconData _dropFallbackIcon(String code) {
+    if (code.contains('compass')) return Icons.explore_outlined;
+    if (code.startsWith('evo_stone')) return Icons.diamond_outlined;
+    return Icons.inventory_2_outlined;
   }
 
   @override
@@ -271,18 +502,32 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
         physics: const AlwaysScrollableScrollPhysics(),
         children: [
           _adventureCard(cs),
+          const SizedBox(height: 14),
+          // 分隔行:左右细线夹说明,替代孤零零的一行字
+          Row(
+            children: [
+              Expanded(
+                  child: Container(
+                      height: 1,
+                      color: cs.outlineVariant.withValues(alpha: 0.6))),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 10),
+                child: Text('以下为宠物蛋产出说明',
+                    style:
+                        TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
+              ),
+              Expanded(
+                  child: Container(
+                      height: 1,
+                      color: cs.outlineVariant.withValues(alpha: 0.6))),
+            ],
+          ),
           const SizedBox(height: 12),
-          Center(
-              child: Text('— 以下为宠物蛋产出说明 —',
-                  style:
-                      TextStyle(fontSize: 12, color: cs.onSurfaceVariant))),
-          const SizedBox(height: 8),
           for (final p in _pools) ...[
             _poolCard(cs, p),
             const SizedBox(height: 12),
           ],
           Text(
-            '以上概率与后台配置同版本，抽取结果由服务端判定并留痕；'
             '每次抽取的随机结果相互独立，短期内不必然按比例出现。',
             style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant),
           ),
@@ -328,6 +573,18 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     return code;
   }
 
+  /// 蛋池图标键(egg_* 直用;initial_ssr 映射 egg_initial_ssr;breed_* 无专属图)
+  static String? _eggIconKey(String code) {
+    if (code.startsWith('breed_')) return null;
+    if (code == 'initial_ssr') return 'egg_initial_ssr';
+    return code.startsWith('egg_') ? code : null;
+  }
+
+  /// 初始蛋公示文案:不强调种属(20261022 拍板),统一自选/固定口径
+  String _initialOddsText(Map<String, List<String>> choices) {
+    return choices.isEmpty ? '孵化固定获得一只初始 SSR' : '孵化时自选获得一只初始 SSR';
+  }
+
   Widget _poolCard(ColorScheme cs, PetEggOddsModel pool) {
     return Card(
       child: Padding(
@@ -337,19 +594,47 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
           children: [
             Row(
               children: [
+                Container(
+                  width: 40,
+                  height: 40,
+                  decoration: BoxDecoration(
+                    color: cs.primaryContainer.withValues(alpha: 0.45),
+                    borderRadius: BorderRadius.circular(10),
+                  ),
+                  child: PetItemIcon(
+                    iconKey: _eggIconKey(pool.poolCode),
+                    fallback: Icons.egg_outlined,
+                    size: 24,
+                    color: cs.tertiary,
+                  ),
+                ),
+                const SizedBox(width: 10),
                 Expanded(
                   child: Text(_poolName(pool.poolCode),
                       style: const TextStyle(
                           fontSize: 15, fontWeight: FontWeight.w700)),
                 ),
-                Text('配置版本 v${pool.configVersion}',
-                    style: TextStyle(
-                        fontSize: 11, color: cs.onSurfaceVariant)),
               ],
             ),
             const SizedBox(height: 4),
-            Text('孵化后将获得以下说明中的一种（由服务端判定）',
-                style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
+            if (pool.poolCode == 'initial_ssr')
+              // 初始蛋自选种属(20261022 拍板):可选系来自池配置,系内候选由随机取一
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+                decoration: BoxDecoration(
+                  color: cs.tertiaryContainer.withValues(alpha: 0.6),
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: Text(_initialOddsText(pool.initialChoices),
+                    style: TextStyle(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: cs.onTertiaryContainer)),
+              )
+            else
+              Text('孵化后将获得以下说明中的一种',
+                  style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant)),
             const SizedBox(height: 6),
             _oddsGroup(cs, '评级', _rarityLines(pool.rarities)),
             _oddsGroup(cs, '系别', _familyLines(pool.families)),
@@ -430,6 +715,17 @@ static const Map<String, String> _familyNames = {
   'dog': '犬系',
   'rabbit': '兔系',
   'mouse': '鼠系',
+};
+
+/// 地形展示元数据:(中文名, 站点图标, 主题色, 地图 chip 淡底色)——
+/// 地图分支路径的视觉基元;未登记地形走 _zoneBranchLine 内兜底
+static const Map<String, (String, IconData, Color, Color)> _zoneMeta = {
+  'forest': ('森林', Icons.forest, Color(0xFF43A047), Color(0xFFE8F5E9)),
+  'ranch': ('牧场', Icons.grass, Color(0xFF7CB342), Color(0xFFF1F8E9)),
+  'beach': ('海滩', Icons.beach_access, Color(0xFF00ACC1), Color(0xFFE0F7FA)),
+  'mountain': ('山地', Icons.terrain, Color(0xFF8D6E63), Color(0xFFEFEBE9)),
+  'waste': ('荒原', Icons.landscape, Color(0xFFFB8C00), Color(0xFFFFF3E0)),
+  'ruins': ('遗迹', Icons.account_balance, Color(0xFF7E57C2), Color(0xFFEDE7F6)),
 };
 static const Map<String, String> _rarityNames = {
   'N': 'N 级·普通',
