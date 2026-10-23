@@ -32,7 +32,7 @@ class PetBendGeo {
     required this.droopRampMin,
   });
 
-  /// 随包帧档目录（层级＝评级/种属/阶，由导出脚本按实际落盘位置写死，客户端不拼路径）
+  /// 随包帧档目录（层级＝系/评级/种属/阶，由导出脚本按实际落盘位置写死，客户端不拼路径）
   final String dir;
 
   final int side;
@@ -153,7 +153,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 团子（N）
   'cat_n1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/cat_n1/s0',
+      dir: 'assets/pets/anim/cat/n/cat_n1/s0',
       side: 384,
       headTop: 87,
       foot: 383,
@@ -168,7 +168,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 煤球（N）
   'cat_n2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/cat_n2/s0',
+      dir: 'assets/pets/anim/cat/n/cat_n2/s0',
       side: 384,
       headTop: 87,
       foot: 383,
@@ -183,7 +183,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 奶酪（N）
   'cat_n3': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/cat_n3/s0',
+      dir: 'assets/pets/anim/cat/n/cat_n3/s0',
       side: 384,
       headTop: 85,
       foot: 383,
@@ -198,7 +198,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 雾雾（N）
   'cat_n4': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/cat_n4/s0',
+      dir: 'assets/pets/anim/cat/n/cat_n4/s0',
       side: 384,
       headTop: 85,
       foot: 383,
@@ -213,7 +213,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 虎斑仔（R）
   'cat_r1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/cat_r1/s0',
+      dir: 'assets/pets/anim/cat/r/cat_r1/s0',
       side: 384,
       headTop: 91,
       foot: 383,
@@ -228,7 +228,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 三花（R）
   'cat_r2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/cat_r2/s0',
+      dir: 'assets/pets/anim/cat/r/cat_r2/s0',
       side: 384,
       headTop: 84,
       foot: 383,
@@ -243,7 +243,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 蓝宝（R）
   'cat_r3': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/cat_r3/s0',
+      dir: 'assets/pets/anim/cat/r/cat_r3/s0',
       side: 384,
       headTop: 85,
       foot: 383,
@@ -258,7 +258,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 暹罗（SR）
   'cat_sr1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/sr/cat_sr1/s0',
+      dir: 'assets/pets/anim/cat/sr/cat_sr1/s0',
       side: 384,
       headTop: 85,
       foot: 383,
@@ -273,7 +273,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 狸花（SR）
   'cat_sr2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/sr/cat_sr2/s0',
+      dir: 'assets/pets/anim/cat/sr/cat_sr2/s0',
       side: 384,
       headTop: 85,
       foot: 383,
@@ -288,7 +288,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 月萤（SSR）
   'cat_ssr1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/ssr/cat_ssr1/s0',
+      dir: 'assets/pets/anim/cat/ssr/cat_ssr1/s0',
       side: 384,
       headTop: 86,
       foot: 383,
@@ -300,7 +300,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       droopRampMin: 40,
     ), // fill=0.78
     1: PetBendGeo(
-      dir: 'assets/pets/anim/ssr/cat_ssr1/s1',
+      dir: 'assets/pets/anim/cat/ssr/cat_ssr1/s1',
       side: 384,
       headTop: 61,
       foot: 383,
@@ -312,7 +312,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       droopRampMin: 40,
     ), // fill=0.84
     2: PetBendGeo(
-      dir: 'assets/pets/anim/ssr/cat_ssr1/s2',
+      dir: 'assets/pets/anim/cat/ssr/cat_ssr1/s2',
       side: 384,
       headTop: 0,
       foot: 383,
@@ -327,7 +327,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 豆豆（N）
   'dog_n1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/dog_n1/s0',
+      dir: 'assets/pets/anim/dog/n/dog_n1/s0',
       side: 384,
       headTop: 84,
       foot: 383,
@@ -342,7 +342,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 汤圆（N）
   'dog_n2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/dog_n2/s0',
+      dir: 'assets/pets/anim/dog/n/dog_n2/s0',
       side: 384,
       headTop: 120,
       foot: 383,
@@ -357,7 +357,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 阿黄（N）
   'dog_n3': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/dog_n3/s0',
+      dir: 'assets/pets/anim/dog/n/dog_n3/s0',
       side: 384,
       headTop: 99,
       foot: 383,
@@ -372,7 +372,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 小灰（N）
   'dog_n4': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/dog_n4/s0',
+      dir: 'assets/pets/anim/dog/n/dog_n4/s0',
       side: 384,
       headTop: 129,
       foot: 383,
@@ -387,7 +387,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 哈奇（R）
   'dog_r1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/dog_r1/s0',
+      dir: 'assets/pets/anim/dog/r/dog_r1/s0',
       side: 384,
       headTop: 84,
       foot: 383,
@@ -402,7 +402,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 卷卷（R）
   'dog_r2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/dog_r2/s0',
+      dir: 'assets/pets/anim/dog/r/dog_r2/s0',
       side: 384,
       headTop: 114,
       foot: 383,
@@ -417,7 +417,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 柴柴（R）
   'dog_r3': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/r/dog_r3/s0',
+      dir: 'assets/pets/anim/dog/r/dog_r3/s0',
       side: 384,
       headTop: 108,
       foot: 383,
@@ -432,7 +432,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 金金（SR）
   'dog_sr1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/sr/dog_sr1/s0',
+      dir: 'assets/pets/anim/dog/sr/dog_sr1/s0',
       side: 384,
       headTop: 84,
       foot: 383,
@@ -447,7 +447,7 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
   // 墨墨（SR）
   'dog_sr2': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/sr/dog_sr2/s0',
+      dir: 'assets/pets/anim/dog/sr/dog_sr2/s0',
       side: 384,
       headTop: 96,
       foot: 383,
@@ -459,10 +459,25 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       droopRampMin: 40,
     ), // fill=0.7488
   },
+  // 哮天（SSR）
+  'dog_ssr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/dog/ssr/dog_ssr1/s0',
+      side: 384,
+      headTop: 84,
+      foot: 383,
+      pivotX: 130,
+      yn: 287,
+      eyeY: 165,
+      eyeBox: Rect4(86, 159, 182, 196),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.78
+  },
   // 布丁（N）
   'mouse_n1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/mouse_n1/s0',
+      dir: 'assets/pets/anim/mouse/n/mouse_n1/s0',
       side: 384,
       headTop: 168,
       foot: 383,
@@ -474,10 +489,70 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       droopRampMin: 40,
     ), // fill=0.5616
   },
+  // 米粒（N）
+  'mouse_n2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/n/mouse_n2/s0',
+      side: 384,
+      headTop: 168,
+      foot: 383,
+      pivotX: 159,
+      yn: 314,
+      eyeY: 246,
+      eyeBox: Rect4(116, 240, 207, 279),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5616
+  },
+  // 雪球（N）
+  'mouse_n3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/n/mouse_n3/s0',
+      side: 384,
+      headTop: 168,
+      foot: 383,
+      pivotX: 166,
+      yn: 314,
+      eyeY: 243,
+      eyeBox: Rect4(127, 237, 208, 269),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5616
+  },
+  // 芝麻（N）
+  'mouse_n4': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/n/mouse_n4/s0',
+      side: 384,
+      headTop: 168,
+      foot: 383,
+      pivotX: 156,
+      yn: 314,
+      eyeY: 236,
+      eyeBox: Rect4(107, 230, 212, 275),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5616
+  },
+  // 金熊（R）
+  'mouse_r1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/r/mouse_r1/s0',
+      side: 384,
+      headTop: 156,
+      foot: 383,
+      pivotX: 158,
+      yn: 310,
+      eyeY: 227,
+      eyeBox: Rect4(111, 221, 210, 265),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5928
+  },
   // 糯米（N）
   'rabbit_n1': {
     0: PetBendGeo(
-      dir: 'assets/pets/anim/n/rabbit_n1/s0',
+      dir: 'assets/pets/anim/rabbit/n/rabbit_n1/s0',
       side: 384,
       headTop: 114,
       foot: 383,
@@ -485,6 +560,141 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       yn: 297,
       eyeY: 242,
       eyeBox: Rect4(92, 236, 190, 280),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 灰豆（N）
+  'rabbit_n2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/n/rabbit_n2/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 128,
+      yn: 297,
+      eyeY: 229,
+      eyeBox: Rect4(77, 223, 188, 278),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 花卷（N）
+  'rabbit_n3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/n/rabbit_n3/s0',
+      side: 384,
+      headTop: 138,
+      foot: 383,
+      pivotX: 152,
+      yn: 305,
+      eyeY: 212,
+      eyeBox: Rect4(101, 206, 216, 256),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.6396
+  },
+  // 蹦蹦（N）
+  'rabbit_n4': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/n/rabbit_n4/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 118,
+      yn: 297,
+      eyeY: 253,
+      eyeBox: Rect4(75, 247, 169, 287),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 公主（R）
+  'rabbit_r1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/r/rabbit_r1/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 165,
+      yn: 297,
+      eyeY: 213,
+      eyeBox: Rect4(118, 207, 218, 245),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 豆丁（R）
+  'rabbit_r2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/r/rabbit_r2/s0',
+      side: 384,
+      headTop: 138,
+      foot: 383,
+      pivotX: 163,
+      yn: 305,
+      eyeY: 234,
+      eyeBox: Rect4(114, 228, 217, 271),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.6396
+  },
+  // 绒绒（R）
+  'rabbit_r3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/r/rabbit_r3/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 155,
+      yn: 297,
+      eyeY: 228,
+      eyeBox: Rect4(104, 222, 210, 267),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 银狐（SR）
+  'rabbit_sr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/sr/rabbit_sr1/s0',
+      side: 384,
+      headTop: 99,
+      foot: 383,
+      pivotX: 150,
+      yn: 292,
+      eyeY: 214,
+      eyeBox: Rect4(101, 208, 202, 247),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.741
+  },
+  // 岚岚（SR）
+  'rabbit_sr2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/sr/rabbit_sr2/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 169,
+      yn: 297,
+      eyeY: 187,
+      eyeBox: Rect4(116, 181, 230, 231),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 玉兔（SSR）
+  'rabbit_ssr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/rabbit/ssr/rabbit_ssr1/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 158,
+      yn: 297,
+      eyeY: 221,
+      eyeBox: Rect4(117, 215, 205, 248),
       droopRamp: 0.25,
       droopRampMin: 40,
     ), // fill=0.702
