@@ -239,6 +239,7 @@ class PetSummaryModel {
     required this.eggsReadyInstant,
     this.ongoingAdventure,
     this.config = const {},
+    this.fetchedAt,
   });
 
   /// 宠物系统总开关（pet_config.pet_enabled，关闭时三处入口全部隐藏）
@@ -257,6 +258,10 @@ class PetSummaryModel {
   /// 全局配置块（free_feed_daily / points_per_gold / stack_limit_default 等，
   /// B3+ 按需消费；数值零硬编码 —— 客户端不为缺失字段编默认值）
   final Map<String, dynamic> config;
+
+  /// 本份总览的拉取（缓存写入）时刻——展示层实时衰减插值的时间锚，
+  /// 见 utils/pet_decay_display.dart；null 视为「不插值」（旧缓存）
+  final DateTime? fetchedAt;
 
   /// 养育格第一只宠物（状态卡主展示对象）。
   /// 「在养育格」= 未寄养：历险中/繁育中的宠物仍占用养育格（保留舞台）；
@@ -315,6 +320,7 @@ class PetSummaryModel {
           : null,
       config:
           configJson is Map ? Map<String, dynamic>.from(configJson) : const {},
+      fetchedAt: DateTime.now(),
     );
   }
 }

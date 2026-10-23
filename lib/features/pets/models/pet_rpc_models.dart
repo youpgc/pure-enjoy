@@ -243,6 +243,7 @@ class PetSpotModel {
     required this.name,
     this.unlockConditions = const [],
     this.attrRequirements = const [],
+    this.hidden = false,
   });
 
   final String id;
@@ -255,6 +256,9 @@ class PetSpotModel {
   /// [{attr,value}] 结算判据：不达标仍可出发，claim 时判 failed 并执行惩罚
   /// （feature_pet_attributes_20260917.sql rpc_pet_adventure_start / claim）
   final List<Map<String, dynamic>> attrRequirements;
+
+  /// 隐藏图（P3 隐秘境）：须罗盘解锁（pet_user_features 键 spot_hidden:<code>）
+  final bool hidden;
 
   int? get requiredLevel {
     for (final c in unlockConditions) {
@@ -273,6 +277,7 @@ class PetSpotModel {
       name: json['name'] as String? ?? '',
       unlockConditions: mapList(json['unlock_conditions']),
       attrRequirements: mapList(json['attr_requirements']),
+      hidden: json['hidden'] == true,
     );
   }
 }
@@ -326,6 +331,7 @@ class PetShopItemModel {
   static const List<String> categoryLabels = [
     '宠物蛋',
     '食物',
+    '医疗',
     '清洁',
     '玩具',
     '救援',
@@ -338,21 +344,25 @@ class PetShopItemModel {
   ];
 
   /// 分类页签归属：食物 / 清洁 / 玩具 / 救援 / 扩容（P1）+
-  /// 宠物蛋 / 进化 / 加速 / 洗练 / 解锁（P2）
+  /// 宠物蛋 / 进化 / 加速 / 洗练 / 解锁（P2）+ 医疗
   ///
   /// 键域 = `pet_items.sub_type`（无 DDL CHECK，取值见种子
   /// `feature_pet_p2_seed_20260923.sql` §2）；未列出的 sub_type 归「其他」。
+  /// refine 与 trait_wash 同归洗练；exp_double 与孵化加速同归加速。
   String get categoryLabel {
     if (isExpansion) return '扩容';
     return switch (subType) {
       'food' => '食物',
+      'heal' => '医疗',
       'clean' => '清洁',
       'toy' => '玩具',
       'rescue' => '救援',
       'random' => '宠物蛋',
       'evolution' => '进化',
       'accelerate' => '加速',
+      'exp_double' => '加速',
       'trait_wash' => '洗练',
+      'refine' => '洗练',
       'unlock' => '解锁',
       _ => '其他',
     };

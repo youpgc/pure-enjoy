@@ -41,10 +41,21 @@ class PetAchievementModel {
   final int rewardPoints;
   final List<PetRewardItemModel> rewardItems;
 
-  /// 原始条件参数（rarity_owned 需读其 rarity 才能说清条件）
+  /// 原始条件参数（rarity_owned 需读其 rarity；体系树读 prereq 前置码数组）
   final Map<String, dynamic> conditionValue;
 
   bool get claimable => completed && !claimed;
+
+  /// 体系树前置成就码（condition_value.prereq，空数组/缺失 = 无前置）
+  List<String> get prereqCodes {
+    final v = conditionValue['prereq'];
+    if (v is! List) return const [];
+    return v.whereType<String>().toList();
+  }
+
+  /// 前置是否锁定（达成但前置未全部领取）；已领取的本成就恒 false
+  bool prereqLocked(Set<String> claimedCodes) =>
+      !claimed && prereqCodes.any((c) => !claimedCodes.contains(c));
 
   /// 图标资源键（icon/<key> → key），非该格式原样返回，null 表示无图标
   String? get iconKey {
@@ -58,7 +69,11 @@ class PetAchievementModel {
 
   String get conditionLabel {
     final type = conditionType;
-    if (type == null) return '成就条件（后台配置项待校准）';
+    if (type == null) {
+      // 条件类型超出客户端枚举：按目标值给中性描述（App 端不出现后台类措辞）
+      final v = conditionValue['value'];
+      return v is num && v > 0 ? '达成条件 $v' : '达成特殊条件';
+    }
     if (type == PetAchConditionType.rarityOwned) {
       final rarity = conditionValue['rarity'] as String? ?? '';
       return rarity.isEmpty ? type.label : '${type.label} $rarity';

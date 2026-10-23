@@ -257,9 +257,8 @@ enum PetItemEffectType {
 }
 
 /// 可解锁功能（pet_user_features.feature_key = 解锁道具 effect.feature）
-///
-/// batch_feed（批量喂养）后端尚无 RPC，故不列入值域。
 enum PetFeatureKey {
+  batchFeed('batch_feed', '批量喂养'),
   breeding('breeding', '繁育');
 
   const PetFeatureKey(this.code, this.label);
@@ -343,6 +342,14 @@ const kLongDropNames = <String, String>{
   'relic_compass': '星辰罗盘',
   'evo_stone_n': '进化石·凡品',
   'evo_stone_r': '进化石·珍品',
+  'evo_stone_sr': '进化石·极品',
+  // 隐秘境系别收藏品（仅隐藏图 long_only 掉落）
+  'star_shard': '星辉碎片',
+  'wood_ring': '古木年轮',
+  'tide_pearl': '潮汐珍珠',
+  'peak_sigil': '山巅之证',
+  'waste_dust': '荒原星尘',
+  'time_sand': '时之沙',
   // 新增 long_only 道具须同步此表
 };
 
@@ -365,10 +372,17 @@ enum PetQuestDifficulty {
   }
 }
 
-/// 成就档位（pet_achievements.tier；legendary 是唯一「传说蛋」相关档）
+/// 成就档位（pet_achievements.tier；体系树四阶 bronze/silver/gold/legend，
+/// legendary 是旧「传说蛋」相关档，memorial/epic 为纪念性一次性档）
 enum PetAchTier {
-  normal('normal', '普通'),
-  legendary('legendary', '传说');
+  normal('normal', '经典'),
+  bronze('bronze', '铜阶'),
+  silver('silver', '银阶'),
+  gold('gold', '金阶'),
+  legend('legend', '彩阶'),
+  legendary('legendary', '传说'),
+  memorial('memorial', '纪念'),
+  epic('epic', '史诗');
 
   const PetAchTier(this.code, this.label);
 
@@ -383,7 +397,7 @@ enum PetAchTier {
   }
 }
 
-/// 成就条件类型（rpc_pet_achievement_check 的 case 白名单，11 值）
+/// 成就条件类型（rpc_pet_achievement_check 的 case 白名单，18 值）
 ///
 /// 值域外的 condition_type 服务端不报错、进度恒 0，只能靠后台自检发现拼写错误。
 /// 目标值读取优先级 condition_value.value → .target → 1；rarityOwned 另读 rarity 键。
@@ -398,7 +412,14 @@ enum PetAchConditionType {
   levelMax('level_max', '最高等级达到'),
   petsOwned('pets_owned', '拥有宠物数达到'),
   familiesOwned('families_owned', '拥有系别数达到'),
-  rarityOwned('rarity_owned', '拥有指定评级宠物');
+  rarityOwned('rarity_owned', '拥有指定评级宠物'),
+  cleanTotal('clean_total', '累计清洁次数'),
+  playTotal('play_total', '累计游玩次数'),
+  healTotal('heal_total', '累计治疗次数'),
+  exchangeTotal('exchange_total', '累计积分兑换次数'),
+  sceneTotal('scene_total', '累计场景装扮次数'),
+  goldEarnedTotal('gold_earned_total', '累计获得金币'),
+  dexTotal('dex_total', '图鉴收集形态数');
 
   const PetAchConditionType(this.code, this.label);
 
@@ -413,14 +434,21 @@ enum PetAchConditionType {
   }
 }
 
-/// 任务条件类型（服务端 _pet_quest_bump 的 bump 键，四值封闭）
+/// 任务条件类型（服务端 _pet_quest_bump 的 bump 键，11 值）
 ///
-/// 写第五种不会报错，但该任务进度恒为 0。
+/// 值域外的条件类型服务端不报错、进度恒为 0；hatch 仅周任务使用。
 enum PetQuestConditionType {
   feed('feed', '喂养次数'),
   interact('interact', '互动次数'),
   adventure('adventure', '历险次数'),
-  hatch('hatch', '孵化次数');
+  hatch('hatch', '孵化次数'),
+  clean('clean', '清洁次数'),
+  play('play', '游玩次数'),
+  heal('heal', '治疗次数'),
+  exchange('exchange', '积分兑换次数'),
+  scene('scene', '场景装扮次数'),
+  breed('breed', '繁育次数'),
+  evolve('evolve', '进化次数');
 
   const PetQuestConditionType(this.code, this.label);
 

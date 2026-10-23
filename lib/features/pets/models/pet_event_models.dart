@@ -89,6 +89,7 @@ class PetEventChooseResultModel {
     required this.itemCode,
     required this.itemCount,
     required this.bagFull,
+    this.itemName,
   });
 
   final String optionLabel;
@@ -100,6 +101,10 @@ class PetEventChooseResultModel {
   final int hunger;
   final String? itemCode;
   final int itemCount;
+
+  /// 道具真名（服务端按 item_code 联查 pet_items.name 下发；
+  /// 旧版服务端缺键时回退 code，不再展示「道具 ×1」这类无名文案）
+  final String? itemName;
 
   /// 道具奖励因背包满未发放（与每日任务发奖同口径：不中断、如实提示）
   final bool bagFull;
@@ -119,6 +124,9 @@ class PetEventChooseResultModel {
           : json['item_code'] as String?,
       itemCount: r('item_count'),
       bagFull: json['bag_full'] == true,
+      itemName: (json['item_name'] as String?)?.isEmpty == true
+          ? null
+          : json['item_name'] as String?,
     );
   }
 
@@ -142,7 +150,8 @@ class PetEventChooseResultModel {
     add('亲密', intimacy);
     add('饱食', hunger);
     if (itemCode != null) {
-      lines.add(bagFull ? '道具未发放（背包已满）' : '道具 ×$itemCount');
+      final name = itemName ?? itemCode;
+      lines.add(bagFull ? '$name未发放（背包已满）' : '$name ×$itemCount');
     }
     return lines;
   }
