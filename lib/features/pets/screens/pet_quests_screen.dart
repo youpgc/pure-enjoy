@@ -44,11 +44,23 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   /// 正在领取的任务 id（日/周共用一个集合，id 均为 pet_quests 行 uuid）
   final Set<String> _claiming = {};
 
+  /// 道具名映射（item_code → 中文名）：每日任务直查无 name 联查，
+  /// 奖励文案由此回填（周任务服务端已具名，回填只补 null）
+  Map<String, String> _itemNames = const {};
+
   @override
   void initState() {
     super.initState();
     _tabs = TabController(length: 2, vsync: this)..addListener(_onTabChange);
     _load();
+    _loadItemNames();
+  }
+
+  Future<void> _loadItemNames() async {
+    final names = await PetRpc.fetchItemNames();
+    if (mounted && names.isNotEmpty) {
+      setState(() => _itemNames = names);
+    }
   }
 
   @override
@@ -331,23 +343,23 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   static String _claimToast(String summary) =>
       summary.isEmpty ? '奖励已领取' : '奖励已领取：$summary';
 
-  static String _rewardText(
-      int gold, int points, List<PetRewardItemModel> items) {
+  String _rewardText(int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '🪙 $gold',
       if (points > 0) '⭐ $points',
-      // 道具逐个具名(name 由周任务下发补名,20261022;无名回落 code)
-      for (final it in items) '${it.name ?? it.code} ×${it.count}',
+      // 道具逐个具名：服务端下发名(周任务) → 本地目录回填(每日) → 编码兜底
+      for (final it in items)
+        '${it.name ?? _itemNames[it.code] ?? it.code} ×${it.count}',
     ];
     return parts.isEmpty ? '' : '奖励 ${parts.join(' · ')}';
   }
 
-  static String _rewardParts(
-      int gold, int points, List<PetRewardItemModel> items) {
+  String _rewardParts(int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '金币 +$gold',
       if (points > 0) '积分 +$points',
-      for (final it in items) '${it.name ?? it.code} ×${it.count}',
+      for (final it in items)
+        '${it.name ?? _itemNames[it.code] ?? it.code} ×${it.count}',
     ];
     return parts.isEmpty ? '奖励已发放' : parts.join('，');
   }

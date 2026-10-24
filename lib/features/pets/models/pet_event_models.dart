@@ -144,7 +144,6 @@ class PetEventChooseResultModel {
     }
 
     add('金币', gold);
-    add('积分', points);
     add('经验', exp);
     add('心情', mood);
     add('亲密', intimacy);

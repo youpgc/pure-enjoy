@@ -177,13 +177,21 @@ class PetQuestModel {
 
   bool get done => progress >= target;
 
-  /// 展示名（pet_quests 无 title 列，按条件类型生成）
+  /// 展示名（pet_quests 无 title 列，按条件类型生成；值域 = 11 类任务条件，
+  /// 新增条件类型须同步此表，否则落通用标题）
   String get title => switch (conditionType) {
         'feed' => '喂养伙伴',
         'interact' => '互动陪伴',
         'hatch' => '孵化新星',
         'adventure' => '外出历险',
-        _ => '日常任务',
+        'clean' => '清洁伙伴',
+        'play' => '陪它玩耍',
+        'heal' => '治疗伤病',
+        'exchange' => '积分兑换',
+        'scene' => '装扮场景',
+        'breed' => '繁育新生',
+        'evolve' => '见证进化',
+        _ => PetQuestConditionType.fromCode(conditionType)?.label ?? '日常任务',
       };
 
   factory PetQuestModel.fromJson(Map<String, dynamic> json) {
