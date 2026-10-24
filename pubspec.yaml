@@ -133,6 +133,11 @@ flutter:
     - assets/pets/anim/mouse/n/mouse_n3/s0/
     - assets/pets/anim/mouse/n/mouse_n4/s0/
     - assets/pets/anim/mouse/r/mouse_r1/s0/
+    - assets/pets/anim/mouse/r/mouse_r2/s0/
+    - assets/pets/anim/mouse/r/mouse_r3/s0/
+    - assets/pets/anim/mouse/sr/mouse_sr1/s0/
+    - assets/pets/anim/mouse/sr/mouse_sr2/s0/
+    - assets/pets/anim/mouse/ssr/mouse_ssr1/s0/
     - assets/pets/anim/rabbit/n/rabbit_n1/s0/
     - assets/pets/anim/rabbit/n/rabbit_n2/s0/
     - assets/pets/anim/rabbit/n/rabbit_n3/s0/

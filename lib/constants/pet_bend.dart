@@ -549,6 +549,81 @@ const Map<String, Map<int, PetBendGeo>> kPetBendGeo = {
       droopRampMin: 40,
     ), // fill=0.5928
   },
+  // 花枝（R）
+  'mouse_r2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/r/mouse_r2/s0',
+      side: 384,
+      headTop: 144,
+      foot: 383,
+      pivotX: 145,
+      yn: 307,
+      eyeY: 222,
+      eyeBox: Rect4(100, 216, 193, 258),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.624
+  },
+  // 栗子（R）
+  'mouse_r3': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/r/mouse_r3/s0',
+      side: 384,
+      headTop: 114,
+      foot: 383,
+      pivotX: 139,
+      yn: 297,
+      eyeY: 176,
+      eyeBox: Rect4(97, 170, 186, 216),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.702
+  },
+  // 奶茶（SR）
+  'mouse_sr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/sr/mouse_sr1/s0',
+      side: 384,
+      headTop: 168,
+      foot: 383,
+      pivotX: 150,
+      yn: 314,
+      eyeY: 237,
+      eyeBox: Rect4(112, 231, 193, 276),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.5616
+  },
+  // 翼翼（SR）
+  'mouse_sr2': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/sr/mouse_sr2/s0',
+      side: 384,
+      headTop: 144,
+      foot: 383,
+      pivotX: 144,
+      yn: 307,
+      eyeY: 201,
+      eyeBox: Rect4(95, 195, 198, 239),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.624
+  },
+  // 松灵（SSR）
+  'mouse_ssr1': {
+    0: PetBendGeo(
+      dir: 'assets/pets/anim/mouse/ssr/mouse_ssr1/s0',
+      side: 384,
+      headTop: 144,
+      foot: 383,
+      pivotX: 137,
+      yn: 307,
+      eyeY: 199,
+      eyeBox: Rect4(98, 193, 177, 230),
+      droopRamp: 0.25,
+      droopRampMin: 40,
+    ), // fill=0.624
+  },
   // 糯米（N）
   'rabbit_n1': {
     0: PetBendGeo(
