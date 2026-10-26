@@ -126,6 +126,14 @@ class PetRpc {
       callRpc('rpc_pet_lottery_draw', const {},
           'rpc_pet_lottery_draw 幸运抽奖');
 
+  /// 收藏兑换（服务端 rpc_pet_collection_exchange：配方校验+满包预检+扣料入包；
+  /// 配方来自 reserved.collection_exchange，返回 bag_full 状态走腾位流程）
+  static Future<(Map<String, dynamic>?, String?)> collectionExchange(
+          String fromCode, String toCode) async =>
+      callRpc('rpc_pet_collection_exchange',
+          {'p_from_code': fromCode, 'p_to_code': toCode},
+          'rpc_pet_collection_exchange 收藏兑换');
+
   /// 已解锁的隐秘境 code 集（pet_user_features 键 spot_hidden:<code>）
   static Future<Set<String>> fetchUnlockedHiddenSpots() async {
     final uid = _uid;

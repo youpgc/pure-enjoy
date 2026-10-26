@@ -46,6 +46,10 @@ class _PetShopScreenState extends State<PetShopScreen> {
   final Set<String> _buying = {};
   late int _gold = widget.goldBalance;
 
+  /// 收藏兑换组（按收藏品分组；仅持有>0 的收藏品出卡）
+  List<_ExchangeGroup> _exchangeGroups = const [];
+  final Set<String> _exchanging = {};
+
   /// 当前分类（all / [PetShopItemModel.categoryLabels] 之一）
   String _category = 'all';
 
@@ -83,16 +87,55 @@ class _PetShopScreenState extends State<PetShopScreen> {
     final (records, recErr) = await PetRpc.fetchExpansionRecords();
     final (reserved, _) = await PetRpcP2.fetchReserved();
     final lot = reserved.raw['lottery'];
+    // 收藏兑换：配方(reserved) + 持有量(背包) + 道具名(目录)——失败静默不展示
+    final exchange = await _loadExchangeGroups(reserved.raw['collection_exchange']);
     if (mounted) {
       setState(() {
         // 阶梯过滤失败不拦截商城(全量展示,购买时服务端仍校验顺序)——
         // 仅 recErr == null 时应用「只展示当前可购档」
         _items = recErr == null ? _filterLadder(items, records) : items;
         _lottery = lot is Map ? Map<String, dynamic>.from(lot) : null;
+        _exchangeGroups = exchange;
         _error = err == null ? null : petRpcErrorText(err);
         _loading = false;
       });
     }
+  }
+
+  /// 组装收藏兑换组：仅持有 >0 的收藏品出卡；名称取目录，缺名回退编码
+  Future<List<_ExchangeGroup>> _loadExchangeGroups(Object? recipesRaw) async {
+    if (recipesRaw is! List || recipesRaw.isEmpty) return const [];
+    final (bag, _) = await PetRpc.fetchBag();
+    final names = await PetRpc.fetchItemNames();
+    final owned = <String, int>{};
+    for (final b in bag) {
+      if (b.subType != 'collection') continue;
+      owned[b.itemCode] = (owned[b.itemCode] ?? 0) + b.quantity;
+    }
+    final groups = <_ExchangeGroup>[];
+    for (final r in recipesRaw.whereType<Map>()) {
+      final from = r['from']?.toString() ?? '';
+      if (from.isEmpty) continue;
+      var g = groups.where((x) => x.fromCode == from).firstOrNull;
+      if (g == null) {
+        if ((owned[from] ?? 0) <= 0) continue; // 未持有不出卡
+        g = _ExchangeGroup(
+          fromCode: from,
+          fromName: names[from] ?? from,
+          owned: owned[from] ?? 0,
+          recipes: [],
+        );
+        groups.add(g);
+      }
+      final to = r['to']?.toString() ?? '';
+      if (to.isEmpty) continue;
+      g.recipes.add(_ExchangeRecipe(
+        toCode: to,
+        toName: names[to] ?? to,
+        fromCount: (r['from_count'] as num?)?.toInt() ?? 0,
+      ));
+    }
+    return groups;
   }
 
   /// 阶梯道具「只展示当前可购档」(20261021):每套阶梯仅保留「已购最大步 + 1」
@@ -289,6 +332,81 @@ class _PetShopScreenState extends State<PetShopScreen> {
     );
   }
 
+  /// 收藏兑换卡：持有收藏品 → 稀有道具（每件收藏品一卡，配方可兑的目标逐个列出）
+  Widget _exchangeCard(ColorScheme cs, _ExchangeGroup g) {
+    return Card(
+      color: cs.secondaryContainer,
+      margin: const EdgeInsets.fromLTRB(12, 12, 12, 0),
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
+        child: Row(
+          children: [
+            Icon(Icons.workspace_premium_outlined,
+                size: 30, color: cs.onSecondaryContainer),
+            const SizedBox(width: 10),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text('收藏兑换 · ${g.fromName} ×${g.owned}',
+                      style: TextStyle(
+                          fontSize: 14,
+                          fontWeight: FontWeight.w700,
+                          color: cs.onSecondaryContainer)),
+                  const SizedBox(height: 6),
+                  Wrap(
+                    spacing: 6,
+                    runSpacing: 6,
+                    children: [
+                      for (final r in g.recipes)
+                        OutlinedButton(
+                          // 材料不足置灰；兑换中转圈禁点
+                          onPressed: (_exchanging.contains(g.fromCode) ||
+                                  g.owned < r.fromCount)
+                              ? null
+                              : () => _doExchange(g, r),
+                          style: OutlinedButton.styleFrom(
+                            minimumSize: const Size(0, 30),
+                            padding: const EdgeInsets.symmetric(horizontal: 10),
+                            tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                          ),
+                          child: Text(
+                              '${r.toName} · ${r.fromCount} 件换',
+                              style: const TextStyle(fontSize: 12)),
+                        ),
+                    ],
+                  ),
+                ],
+              ),
+            ),
+          ],
+        ),
+      ),
+    );
+  }
+
+  /// 执行兑换：满包走腾位提示口径，成功后刷新持有量
+  Future<void> _doExchange(_ExchangeGroup g, _ExchangeRecipe r) async {
+    setState(() => _exchanging.add(g.fromCode));
+    final (data, err) = await PetRpc.collectionExchange(g.fromCode, r.toCode);
+    if (!mounted) return;
+    setState(() => _exchanging.remove(g.fromCode));
+    if (err != null) {
+      showPetToast(context, petRpcErrorText(err));
+      return;
+    }
+    if (data == null) {
+      showPetToast(context, kPetLocalError);
+      return;
+    }
+    if (data['status'] == 'bag_full') {
+      showPetToast(context, '背包已满，清理后再来兑换');
+      return;
+    }
+    showPetToast(context, '已兑换「${r.toName}」×1');
+    _load(showLoading: false);
+  }
+
   /// 幸运抽奖卡：价格/限购说明 + 抽取按钮（结果复用孵化结果弹窗）
   Widget _lotteryCard(ColorScheme cs) {
     final price = (_lottery?['price'] as num?)?.toInt() ?? 0;
@@ -410,6 +528,13 @@ class _PetShopScreenState extends State<PetShopScreen> {
               if (_lottery != null && _category == 'all') ...[
                 _lotteryCard(cs),
                 const SizedBox(height: 8),
+              ],
+              // 收藏兑换（持有收藏品时展示；「全部」分类）
+              if (_exchangeGroups.isNotEmpty && _category == 'all') ...[
+                for (final g in _exchangeGroups) ...[
+                  _exchangeCard(cs, g),
+                  const SizedBox(height: 8),
+                ],
               ],
               Expanded(
                 child: _filtered.isEmpty
@@ -592,4 +717,31 @@ class _PetShopScreenState extends State<PetShopScreen> {
       _ => Icons.inventory_2_outlined,
     };
   }
+}
+
+/// 收藏兑换组（一件收藏品 = 一张卡，recipes 为它可兑的目标清单）
+class _ExchangeGroup {
+  _ExchangeGroup({
+    required this.fromCode,
+    required this.fromName,
+    required this.owned,
+    required this.recipes,
+  });
+
+  final String fromCode;
+  final String fromName;
+  final int owned;
+  final List<_ExchangeRecipe> recipes;
+}
+
+class _ExchangeRecipe {
+  const _ExchangeRecipe({
+    required this.toCode,
+    required this.toName,
+    required this.fromCount,
+  });
+
+  final String toCode;
+  final String toName;
+  final int fromCount;
 }

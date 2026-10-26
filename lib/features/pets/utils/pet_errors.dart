@@ -36,6 +36,7 @@ String petRpcErrorText(String? error) {
     'PET_ITEM_NOT_FOUND': '道具不存在或已下架',
     'PET_ITEM_NOT_RESCUE': '该道具不是救援道具，无法用于救助',
     'PET_ITEM_PURCHASE_LIMIT': '该商品已达限购数量',
+    'PET_COLLECTION_RECIPE_NOT_FOUND': '该兑换暂不可用，稍后再来看看',
     'PET_BAG_FULL_RACE': '背包已满，请清理后再试',
     'PET_BAG_FULL_CLAIM_RETRY': '背包已满，清理后可重新领取',
     'PET_STATUS_TOO_LOW': '状态太差，先喂饱再出发吧',

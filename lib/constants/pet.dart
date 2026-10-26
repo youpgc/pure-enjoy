@@ -419,7 +419,9 @@ enum PetAchConditionType {
   exchangeTotal('exchange_total', '累计积分兑换次数'),
   sceneTotal('scene_total', '累计场景装扮次数'),
   goldEarnedTotal('gold_earned_total', '累计获得金币'),
-  dexTotal('dex_total', '图鉴收集形态数');
+  dexTotal('dex_total', '图鉴收集形态数'),
+  collectionTotal('collection_total', '累计获得收藏品'),
+  treeFullClaim('tree_full_claim', '成就树圆满度');
 
   const PetAchConditionType(this.code, this.label);
 
