@@ -2,7 +2,7 @@
 
 ## 1. 概述
 
-本文档定义了 `app-client` 项目中所有组件、服务、工具类及通用开发规范的统一使用标准。所有参与项目开发的成员在编写代码时必须遵循本文档中的约定，以确保代码风格一致、可维护性高、减少重复代码和潜在缺陷。
+本文档定义了 `pure_enjoy` 项目中所有组件、服务、工具类及通用开发规范的统一使用标准。所有参与项目开发的成员在编写代码时必须遵循本文档中的约定，以确保代码风格一致、可维护性高、减少重复代码和潜在缺陷。
 
 **适用范围：**
 
@@ -92,7 +92,7 @@ EmptyWidget(
 ```dart
 // 在导入时隐藏 Flutter 内置 ErrorWidget
 import 'package:flutter/material.dart' hide ErrorWidget;
-import 'package:app-client/core/widgets/widgets.dart' show ErrorWidget;
+import '../../../core/widgets/widgets.dart' show ErrorWidget;
 
 ErrorWidget(
   message: '加载失败，请重试',
@@ -120,6 +120,7 @@ Future<bool> showConfirmDialog(
   required String content,
   String confirmText = '确定',
   String cancelText = '取消',
+  bool danger = false,
 })
 ```
 
@@ -131,6 +132,7 @@ final confirmed = await showConfirmDialog(
   title: '删除确认',
   content: '确定要删除这条记录吗？此操作不可撤销。',
   confirmText: '删除',
+  danger: true,
 );
 if (confirmed) {
   _deleteItem();
@@ -140,7 +142,7 @@ if (confirmed) {
 **规范要求：**
 
 - 所有删除/危险操作**必须**使用此方法进行确认，**禁止**直接执行。
-- 根据操作危险程度，可自定义 `confirmText`（如"删除"、"清空"）。
+- 根据操作危险程度，可自定义 `confirmText`（如"删除"、"清空"）；破坏性操作传 `danger: true`（确认钮走 error 色）。
 
 ---
 
@@ -155,23 +157,28 @@ void showSnackBar(
   BuildContext context,
   String message, {
   bool isError = false,
+  bool isSuccess = false,
 })
 ```
 
 **使用示例：**
 
 ```dart
-// 成功提示
-showSnackBar(context, '保存成功');
+// 成功提示（绿底）
+showSnackBar(context, '保存成功', isSuccess: true);
 
-// 错误提示
+// 普通提示
+showSnackBar(context, '已复制');
+
+// 错误提示（红字）
 showSnackBar(context, '操作失败，请重试', isError: true);
 ```
 
 **规范要求：**
 
 - 所有操作结果反馈**统一**使用此方法，**禁止**直接使用 `ScaffoldMessenger.of(context).showSnackBar`。
-- 错误场景传入 `isError: true`。
+- 成功场景传 `isSuccess: true`（绿底），错误场景传 `isError: true`；内部已带 `context.mounted` 守卫。
+- 宠物模块内另有同构轻提示 `showPetToast`（见 §8）。
 
 ---
 
@@ -207,31 +214,23 @@ CategoryChip(
 
 ---
 
-### 3.2 NovelCoverImage — 小说封面
+### 3.2 AsyncSubmitButton — 异步提交按钮
 
-**用途：** 小说封面的统一展示组件，处理图片加载、占位和错误状态。
-
-**参数：**
-
-| 参数 | 类型 | 默认值 | 说明 |
-|------|------|--------|------|
-| `coverUrl` | `String?` | `null` | 封面图片 URL |
-| `width` | `double` | `80` | 封面宽度 |
-| `height` | `double` | `110` | 封面高度 |
+**用途：** 异步提交动作的统一按钮：自动管理 loading 态、请求期间防重复点击。位于 `lib/core/widgets/widgets.dart`。
 
 **使用示例：**
 
 ```dart
-NovelCoverImage(
-  coverUrl: novel.coverUrl,
-  width: 100,
-  height: 140,
+AsyncSubmitButton(
+  label: '保存',
+  onPressed: () => _save(),
 )
 ```
 
 **规范要求：**
 
-- 小说封面**统一**使用此组件，**禁止**自行使用 `Image.network` 展示封面。
+- 异步提交场景**统一**使用此组件，**禁止**自行用 `StatefulWidget` 管理 loading + `onPressed: null` 防抖。
+- 同类复用件：`SheetContainer`（底部弹层统一容器，键盘避让 + 手势条，同文件）、`PaginatedListMixin`（分页列表，`lib/core/widgets/paginated_list_mixin.dart`）。
 
 ---
 
@@ -278,127 +277,103 @@ EditDeletePopupMenu(
 
 ### 4.1 ApiClient — 统一 REST API 客户端
 
-**用途：** 所有与后端 API 的通信统一通过 `ApiClient` 进行。`ApiClient` 采用全静态方法设计，无需实例化。
+**用途：** 所有与后端 API 的通信统一通过 `ApiClient` 进行。全静态方法设计；返回类型统一为非泛型 `ApiResponse`（`isSuccess` / `errorMessage` / `data` / `raw`）。
 
-**方法签名：**
+**方法清单（现行签名）：**
 
 ```dart
 class ApiClient {
-  // 查询列表
-  static Future<ApiResponse<List<Map<String, dynamic>>>> get(
-    String table, {
-    List<String>? select,
-    Map<String, String>? filters,
-    String? order,
-    int? limit,
-    int? offset,
+  // 查询列表（注意：limit 缺省为 10 —— 不传只拿 10 条，全量需显式传）
+  static Future<ApiResponse> get(String table, {
+    List<String>? select, Map<String, String>? filters, String? order,
+    int? limit = 10, int? offset, List<String>? columns,  // columns 为兼容参数
+    String? search, List<String>? searchFields,
+    Duration? timeout, CancelToken? cancelToken, String? note, bool? useETag,
   });
 
-  // 查询单条
-  static Future<ApiResponse<Map<String, dynamic>>> getOne(
-    String table, {
-    Map<String, String>? filters,
-    List<String>? select,
-  });
+  // 新增（body 与 data 二选一，returnRepresentation 控制 Prefer 头）
+  static Future<ApiResponse> post(String table, Map<String, dynamic> data,
+      {Map<String, dynamic>? body, bool returnRepresentation = false, ...});
 
-  // 新增
-  static Future<ApiResponse<Map<String, dynamic>>> post(
-    String table, {
-    required Map<String, dynamic> body,
-    bool returnRepresentation = true,
-    Map<String, String>? extraHeaders,
-  });
+  // 按 id 更新
+  static Future<ApiResponse> patch(String table, Map<String, dynamic> data,
+      {Map<String, dynamic>? body, required String id, Duration? timeout, String? note});
 
-  // 更新
-  static Future<ApiResponse<bool>> patch(
-    String table, {
-    required Map<String, String>? filters,
-    required Map<String, dynamic> body,
-  });
+  // 按 filters 更新（patch 的过滤版）
+  static Future<ApiResponse> patchByFilter(String table,
+      {required Map<String, String> filters, required Map<String, dynamic> body, ...});
 
-  // 删除
-  static Future<ApiResponse<bool>> delete(
-    String table, {
-    required Map<String, String>? filters,
-  });
+  // 按 id 删除 / 批量删除
+  static Future<ApiResponse> delete(String table, {required String id, ...});
+  static Future<ApiResponse> batchDelete(String table, {required List<String> ids, ...});
+  static Future<ApiResponse> batchDeleteByFilter(String table,
+      {required Map<String, String> filters, ...});
+
+  // 聚合与 RPC
+  static Future<ApiResponse> sum(String table, {required String column, ...});
+  static Future<ApiResponse> count(String table, {Map<String, String>? filters, ...});
+  static Future<ApiResponse> rpc(String functionName,
+      {Map<String, dynamic>? params, Duration? timeout, String? note});
 }
 ```
 
 **使用示例：**
 
 ```dart
-// 查询列表
-final result = await ApiClient.get(
-  'novels',
-  filters: {'status': 'eq.published'},
-  order: 'created_at.desc',
-  limit: 20,
-);
-if (result.isSuccess) {
-  final novels = result.data;
-}
-
-// 复杂过滤（Supabase and 语法）
+// 查询列表（显式 limit）
 final result = await ApiClient.get(
   'expenses',
-  filters: {
-    'and': '(amount.gte.100,created_at.lt.2024-01-01)',
-  },
+  select: 'id,amount,created_at',
+  filters: {'user_id': 'eq.$uid'},
+  order: 'created_at.desc',
+  limit: 50,
 );
+if (result.isSuccess) {
+  final rows = result.data ?? [];
+}
 
-// 新增
-final result = await ApiClient.post(
-  'novels',
-  body: novel.toJson(),
-);
+// RPC 调用
+final res = await ApiClient.rpc('rpc_pet_feed', params: {'p_pet_id': petId});
 
-// 更新
-final result = await ApiClient.patch(
-  'novels',
-  filters: {'id': 'eq.$novelId'},
-  body: {'title': '新标题'},
-);
-
-// 删除
-final result = await ApiClient.delete(
-  'novels',
-  filters: {'id': 'eq.$novelId'},
-);
+// 按 id 更新
+await ApiClient.patch('expenses', {'amount': 100}, id: expenseId);
 ```
 
 **规范要求：**
 
 - 所有 API 调用**必须**通过 `ApiClient`，**禁止**直接使用 `http` 包或其他网络请求方式。
-- `filters` 使用 `Map<String, String>` 格式，同名字段需使用 Supabase `and` 语法：
+- `get` 的 `limit` 缺省 **10**：全量/大列表必须显式传 limit，防静默截断。
+- `filters` 使用 `Map<String, String>`；同名字段复合条件用 Supabase `and` 语法：
   ```dart
   filters: {'and': '(field1.gte.val1,field2.lt.val2)'}
   ```
 - **始终**检查 `result.isSuccess` 后再使用 `result.data`，**禁止**未检查直接使用。
-- POST 请求时，`body` 字段名**必须**与数据库表字段完全一致（snake_case）。
+- POST/PATCH 的字段名**必须**与数据库表字段完全一致（snake_case）。
 
 ---
 
 ### 4.2 AuthService — 用户认证服务
 
-**用途：** 管理用户登录、注册、登出等认证相关功能。
+**用途：** 认证门面，位于 `lib/services/supabase_service.dart`（非独立文件）。
 
 **使用示例：**
 
 ```dart
-// 初始化
+// 应用启动初始化
 await AuthService.instance.initialize();
 
-// 登录
-final result = await AuthService.instance.login(email, password);
+// 登录（邮箱 / 账号名两种入口）
+await AuthService.instance.signInWithEmail(email, password);
+await AuthService.instance.signInWithAccount(account, password);
 
 // 登出
-await AuthService.instance.logout();
+await AuthService.instance.signOut();
 ```
 
 **规范要求：**
 
-- 通过 `AuthService.instance` 单例访问，**禁止**自行实例化。
-- 使用前**必须**调用 `initialize()` 进行初始化。
+- 认证操作**统一**走 `AuthService.instance`，**禁止**直接调用 Supabase Auth REST。
+- Token 持久化与 180 天过期检查由 `SessionManager`（`lib/services/session_manager.dart`）负责。
 
 ---
 
@@ -415,23 +390,26 @@ await AuthService.instance.logout();
 
 ### 4.4 DictService — 字典服务
 
-**用途：** 管理下拉选项、标签显示等字典数据的获取。
+**用途：** 字典数据（心情类型、消费分类等）的统一读取，位于 `lib/services/dict_service.dart`；扩展查询在 `dict_queries.dart`。
 
 **使用示例：**
 
 ```dart
-// 获取分类列表
-final categories = await DictService.instance.getCategories();
+// 静态 getter 直取字典项（同步，启动后可用）
+final moods = DictService.moodType;
+final categories = DictService.expenseCategory;
 
-// 获取标签显示名
-final label = DictService.instance.getLabel(code);
+// 异步取列表 / 附加数据
+final items = await DictService.instance.getItemsSync(type: 'mood_type');
+final extra = await DictService.instance.getExtra('mood_type');
+
+// 值转标签（扩展方法，双参数：类型码 + 值）
+final label = dictService.getLabel('mood_type', value);
 ```
 
 **规范要求：**
 
-- 所有下拉选项/标签显示**必须**通过 `DictService` 获取，**禁止**硬编码选项列表。
-- **已废弃：** `AppConstants` 中的 `expenseCategories`、`moodTypes` 等常量，请迁移至 `DictService`。
-- 通过 `DictService.instance` 单例访问。
+- 字典读取**统一**走 `DictService`（静态 getter + instance 方法），**禁止**在 UI 里硬编码字典映射。
 
 ---
 
@@ -446,23 +424,27 @@ final label = DictService.instance.getLabel(code);
 
 ---
 
-### 4.6 SensitiveWordService — 敏感词过滤服务
+### 4.6 SensitiveWordService — 敏感词过滤
 
-**用途：** 对用户输入内容进行敏感词过滤。
-
-**规范要求：**
-
-- 用户输入内容（小说内容、评论等）提交前**必须**通过 `SensitiveWordService` 进行过滤。
-- 通过 `SensitiveWordService.instance` 单例访问。
+**用途：** 用户产生内容的敏感词检测与过滤，位于 `lib/services/sensitive_word_service.dart`。
 
 **使用示例：**
 
 ```dart
-final filteredContent = await SensitiveWordService.instance.filter(content);
-if (filteredContent != content) {
-  showSnackBar(context, '内容包含敏感词，已自动过滤', isError: true);
-}
+// 分域检测
+final r1 = await SensitiveWordService.instance.checkNovelContent(text);
+final r2 = await SensitiveWordService.instance.checkSystemContent(text);
+final r3 = await SensitiveWordService.instance.checkAll(text);
+
+// 过滤并落审计日志
+final filtered = await SensitiveWordService.instance.filterAndLog(
+  text: text, category: 'nickname', source: 'profile',
+);
 ```
+
+**规范要求：**
+
+- 用户昵称/笔记/反馈等输入**必须**过敏感词检测（App 端预检 + 服务端复核双闸）。
 
 ---
 
@@ -502,23 +484,43 @@ final timestamp = DateTimeUtils.toTimestampString(DateTime.now());
 
 ---
 
+### 5.3 EventBus — 事件总线
+
+**用途：** 跨页面/跨模块的轻量事件通信，位于 `lib/core/utils/event_bus.dart`（全项目 20+ 文件复用）。
+
+```dart
+EventBus.instance.on(SomeEvent, (_) => _refresh());   // 订阅（记得 dispose 时 off）
+EventBus.instance.emit(SomeEvent(payload));           // 发布
+```
+
+**规范要求：** 页面间状态通知**优先**用 EventBus / Riverpod，**禁止**为传一个回调层层透传构造参数；订阅必须在 `dispose` 解绑。
+
+---
+
+### 5.4 FormatUtils — 格式化工具
+
+**用途：** 金额/数字等展示格式化，位于 `lib/utils/format_utils.dart`。展示层格式化**统一**用工具方法，**禁止**散落手写 `toStringAsFixed` 拼接。
+
+---
+
 ## 6. 主题规范
 
 > 文件位置：`lib/core/theme/`
 
 ### 6.1 AppTheme — 应用主题
 
-**用途：** 定义应用的全局颜色、字体、间距等主题常量。
+**用途：** 定义应用的全局颜色常量，位于 `lib/core/theme/app_theme.dart`。
+
+**现行色板（摘录）：** `primaryOrange`（主色 0xFFF26522）、`primaryYellow`、`primaryLight`、`primaryDark`、`secondaryColor`、`accentColor`、语义色 `success` / `warning` / `error` / `info`、中性灰阶 `neutral100` ~ `neutral900`。
 
 **规范要求：**
 
 - 所有颜色值**必须**使用 `AppTheme` 中定义的常量，**禁止**硬编码颜色值（如 `Color(0xFF123456)`）。
-
-**使用示例：**
+- 语义场景用语义色（成功 `success`、危险 `error`），**禁止**拿中性灰代替。
 
 ```dart
 // 正确
-Container(color: AppTheme.primaryColor)
+Container(color: AppTheme.primaryOrange)
 
 // 错误
 Container(color: Color(0xFF2196F3))
@@ -528,11 +530,15 @@ Container(color: Color(0xFF2196F3))
 
 ### 6.2 ThemeProvider — 主题状态管理
 
-**用途：** 管理应用的主题切换状态（如深色/浅色模式）。
+**用途：** 主题（8 种配色 + 明暗）状态管理，位于 `lib/core/theme/theme_provider.dart`，经 **Riverpod** 暴露：
+
+```dart
+final themeProvider = ChangeNotifierProvider<ThemeProvider>(...);
+```
 
 **规范要求：**
 
-- 通过 `ThemeProvider.instance` 管理主题状态，**禁止**绕过 ThemeProvider 直接修改主题。
+- 读写主题统一走 `ref.watch(themeProvider)` / `ref.read(themeProvider)`（`ThemeProvider` 无 `instance` 单例），**禁止**绕过 Provider 直接改主题状态。
 
 ---
 
@@ -540,60 +546,28 @@ Container(color: Color(0xFF2196F3))
 
 ### 7.1 Model 规范
 
-所有数据模型**必须**实现以下方法：
-
-| 方法 | 说明 |
-|------|------|
-| `fromJson` | 从 JSON（Map）构造对象，**必须**处理 null 值 |
-| `toJson` | 序列化为 JSON，字段名**必须**与数据库表字段完全一致（snake_case） |
-| `toJsonForUpdate` | 序列化为更新用的 JSON（通常排除只读字段） |
-| `copyWith` | 创建对象副本并修改指定字段 |
-
 **规范要求：**
 
-- `toJson` 字段名**必须**与数据库表字段完全一致（snake_case）。
-- `fromJson` **必须**处理 null 值，使用 `as String? ?? '默认值'` 形式提供默认值。
+- 所有数据模型类放在对应 feature 的 `models/` 目录，文件名小写下划线（如 `expense_model.dart`）。
+- `fromJson`：必填字段直接 `as String` / `as num` 强转（缺字段即报错，尽早暴露脏数据）；可选字段才用 `as String?` + 默认值。
+- 需要把模型 PATCH 回服务端的，实现 `toJsonForUpdate()` 排除只读字段（目前 life 系模型采用；纯展示模型可不做）。
+- 字段名与数据库列一致（snake_case），禁止在 Model 里做驼峰转换。
 
-**使用示例：**
+**示例（现行风格）：**
 
 ```dart
-class Novel {
-  final String id;
-  final String title;
-  final String? coverUrl;
+class ExpenseModel {
+  const ExpenseModel({required this.id, required this.amount, this.note});
 
-  Novel({required this.id, required this.title, this.coverUrl});
+  final String id;      // 必填：强转
+  final double amount;  // 必填：强转
+  final String? note;   // 可选：可空
 
-  factory Novel.fromJson(Map<String, dynamic> json) {
-    return Novel(
-      id: json['id'] as String? ?? '',
-      title: json['title'] as String? ?? '',
-      coverUrl: json['cover_url'] as String?,
-    );
-  }
-
-  Map<String, dynamic> toJson() {
-    return {
-      'id': id,
-      'title': title,
-      'cover_url': coverUrl,
-    };
-  }
-
-  Map<String, dynamic> toJsonForUpdate() {
-    return {
-      'title': title,
-      'cover_url': coverUrl,
-    };
-  }
-
-  Novel copyWith({String? title, String? coverUrl}) {
-    return Novel(
-      id: id,
-      title: title ?? this.title,
-      coverUrl: coverUrl ?? this.coverUrl,
-    );
-  }
+  factory ExpenseModel.fromJson(Map<String, dynamic> json) => ExpenseModel(
+        id: json['id'] as String,
+        amount: (json['amount'] as num).toDouble(),
+        note: json['note'] as String?,
+      );
 }
 ```
 
@@ -659,7 +633,7 @@ try {
 
 | 类别 | 规范 | 示例 |
 |------|------|------|
-| 文件名 | `snake_case.dart` | `novel_model.dart` |
+| 文件名 | `snake_case.dart` | `expense_model.dart` |
 | 类名 | `PascalCase` | `NovelModel` |
 | 方法/变量 | `camelCase` | `loadData()`, `novelList` |
 | 常量 | `camelCase`（Dart 风格） | `maxRetryCount` |
@@ -672,17 +646,45 @@ try {
 **规范要求：**
 
 - 相对路径导入**必须**使用 `../` 形式。
-- **禁止**使用绝对路径导入（如 `package:app-client/...` 之外的绝对路径）。
+- 项目内统一使用**相对路径**导入（`../`、`./`）；少量历史文件用 `package:pure_enjoy/` 自导入属存量，新代码不新增。
 
 **正确示例：**
 
 ```dart
-import '../models/novel_model.dart';
+import '../models/expense_model.dart';
 import '../../services/api_client.dart';
 ```
 
 **错误示例（禁止）：**
 
 ```dart
-import '/workspace/app-client/lib/models/novel_model.dart';
+import 'package:pure_enjoy/features/life/models/expense_model.dart';  // 反例示例
 ```
+
+---
+
+## 8. 宠物模块共享组件与工具
+
+> 位置：`lib/features/pets/widgets/` 与 `lib/features/pets/utils/`——已在模块外（home dashboard）复用的，视同全局规范件。
+
+| 名称 | 位置 | 用途 |
+|------|------|------|
+| `showPetToast` / `dismissPetToast` | `widgets/pet_toast.dart` | 宠物模块统一轻提示（与 showSnackBar 同构），模块内**禁止**混用 SnackBar |
+| `petRpcErrorText` / `kPetLocalError` | `utils/pet_errors.dart` | 服务端错误码 → 用户文案统一转译（22+ 文件复用，含模块外 api_response_handler） |
+| `PetItemIcon` | `widgets/pet_item_icon.dart` | 道具图标统一件（icon/<key> 解析 + 兜底图标） |
+| `PetCategoryRail` | `widgets/pet_category_rail.dart` | 分类横栏（背包/商城共用），分类清单与 `PetShopItemModel.categoryLabels` 同源 |
+| `PetClaimResultDialog` / `buildClaimItems` | `widgets/pet_claim_result_dialog.dart`、`pet_home_adventure.dart` | 历险领取结果弹窗与掉落明细组装（双入口同源） |
+| `petGoldLabel` / `petGoldConverted` | `utils/pet_gold_format.dart` | 金币 K/M 单位转换（截断 1 位小数；≥10万 K、≥100万 M）——**禁止**手写金币格式化 |
+| `petDecayedStat` | `utils/pet_decay_display.dart` | 饱食/心情展示层衰减插值（服务端惰性结算为准） |
+
+**规范要求：**
+
+- 上述件在宠物模块内外复用时**直接引用**，**禁止**复制第二份实现。
+- 新增宠物页面的提示/错误/金币展示一律走本表组件，保持口径唯一。
+
+---
+
+## 9. 文档维护
+
+- 本文档与 README/PET_REQUIREMENTS 每次大版本功能落地后同步校对；API 声明以代码为准（`lib/` 实况），发现失实即改。
+
