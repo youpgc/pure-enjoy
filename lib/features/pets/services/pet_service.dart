@@ -75,16 +75,23 @@ class PetService {
   /// - `summary != null`：正常；
   /// - `summary == null && err == null`：未登录 / 总开关关闭 → 按隐藏处理；
   /// - `err != null`：请求或解析失败 → 页面给可重试的错误态并展示 [err]。
+  ///
+  /// 本次返回值是否来自缓存秒开见 [lastSummaryFromCache]（SWR 路径宠物状态
+  /// 可能滞后，事件触发等强状态判定不得以缓存态为据）。
   Future<(PetSummaryModel?, String?)> fetchSummary({
     bool forceRefresh = false,
   }) async {
-    if (SupabaseService.instance.currentUserId == null) return (null, null);
+    if (SupabaseService.instance.currentUserId == null) {
+      lastSummaryFromCache = false;
+      return (null, null);
+    }
     try {
-      final (data, _, err) = await PetCache.getMap(
+      final (data, cached, err) = await PetCache.getMap(
         PetCache.keySummary,
         () => ApiClient.rpc('rpc_pet_summary', note: 'rpc_pet_summary 总览'),
         forceRefresh: forceRefresh,
       );
+      lastSummaryFromCache = cached && data != null;
       if (data == null) return (null, err ?? '总览无数据');
       final summary = PetSummaryModel.fromJson(data);
       // 总开关关闭时即便缓存有数据也按隐藏处理（兜底，防旧缓存穿透）
@@ -95,11 +102,16 @@ class PetService {
       return (summary, null);
     } catch (e) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');
+      lastSummaryFromCache = false;
       // 客户端解析异常统一文案单一源（此前自造「总览数据解析失败」双源并存；
       // 该 catch 同时兜住缓存写失败，故文案不指名「解析」）
       return (null, kPetLocalError);
     }
   }
+
+  /// 最近一次 [fetchSummary] 是否直接命中本地缓存（SWR 秒开）。
+  /// 并发调用时以各自读取时机为准——本 App 内总览拉取经页面串行触发，无并发竞争。
+  bool lastSummaryFromCache = false;
 
   /// [rpc_pet_summary] 回传的 pet_config 快照（总览未拉到时为空）
   Map<String, dynamic> _summaryConfig = const {};

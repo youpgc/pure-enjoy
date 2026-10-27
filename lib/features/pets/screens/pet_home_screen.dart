@@ -94,6 +94,10 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   bool _homeEventRolled = false;
   bool _eventDialogShowing = false;
 
+  /// 当前 _summary 是否来自本地缓存秒开（SWR 路径）——宠物状态可能滞后，
+  /// 事件触发等强状态判定不得以缓存态为据（见 _maybeShowEvent）
+  bool _summaryFromCache = false;
+
   /// 动作仲裁器（优先级/防抖，逻辑见 [PetActionMachine]）
   final PetActionMachine _machine = PetActionMachine();
 
@@ -193,6 +197,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     }
     final (summary, err) =
         await PetService.instance.fetchSummary(forceRefresh: force);
+    _summaryFromCache = PetService.instance.lastSummaryFromCache;
     if (mounted) {
       setState(() {
         _enabled = true;
@@ -248,6 +253,9 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 本次停留后续仍可再试（20261021 审查：home_open 曾被历险态跳过吞掉）
   Future<bool> _maybeShowEvent(String pContext) async {
     if (!mounted || _eventDialogShowing || _busy) return false;
+    // 缓存秒开的总览宠物状态可能滞后（如刚出发历险）——缓存态不掷事件，
+    // 待网络新帧落地后的装载/动作再掷（跳过不算已掷，配额不亏）
+    if (_summaryFromCache) return false;
     final pet = _currentPet;
     if (pet == null) return false;
     // 历险中不触发随机事件（2026-10-14 服务端 choose 已收口 rearing-only；
@@ -256,7 +264,14 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     final (event, _) = await PetRpc.eventRoll(pContext);
     if (!mounted || _eventDialogShowing) return true; // roll 已发生，计已掷
     if (event == null || event.options.isEmpty) return true;
-    final target = _currentPet ?? pet; // roll 期间切宠则落点当前宠
+    // roll 期间切宠则落点当前宠，但仅限仍可交互（养育中）的宠——
+    // 落到历险/繁育中的宠会让弹窗无法选择（choose 端 rearing-only）
+    final current = _currentPet;
+    final target = (current != null &&
+            current.status == PetPetStatus.rearing)
+        ? current
+        : pet;
+    if (target.status != PetPetStatus.rearing) return true; // 掷骰宠也历险了：弃弹不亏配额
     _eventDialogShowing = true;
     try {
       await showPetEventDialog(context, event: event, petId: target.id);
