@@ -159,6 +159,7 @@ class PetQuestModel {
     required this.target,
     required this.progress,
     required this.claimed,
+    this.conditionTier,
     this.rewardGold = 0,
     this.rewardPoints = 0,
     this.rewardItems = const [],
@@ -169,6 +170,9 @@ class PetQuestModel {
   final int target;
   final int progress;
   final bool claimed;
+
+  /// 历险类条件的时长要求（condition.tier：short/medium/long；null = 不限）
+  final String? conditionTier;
   final int rewardGold;
   final int rewardPoints;
 
@@ -178,21 +182,29 @@ class PetQuestModel {
   bool get done => progress >= target;
 
   /// 展示名（pet_quests 无 title 列，按条件类型生成；值域 = 11 类任务条件，
-  /// 新增条件类型须同步此表，否则落通用标题）
-  String get title => switch (conditionType) {
-        'feed' => '喂养伙伴',
-        'interact' => '互动陪伴',
-        'hatch' => '孵化新星',
-        'adventure' => '外出历险',
-        'clean' => '清洁伙伴',
-        'play' => '陪它玩耍',
-        'heal' => '治疗伤病',
-        'exchange' => '积分兑换',
-        'scene' => '装扮场景',
-        'breed' => '繁育新生',
-        'evolve' => '见证进化',
-        _ => PetQuestConditionType.fromCode(conditionType)?.label ?? '日常任务',
-      };
+  /// 新增条件类型须同步此表，否则落通用标题；历险类带时长要求时前缀区分）
+  String get title {
+    final base = switch (conditionType) {
+      'feed' => '喂养伙伴',
+      'interact' => '互动陪伴',
+      'hatch' => '孵化新星',
+      'adventure' => '外出历险',
+      'clean' => '清洁伙伴',
+      'play' => '陪它玩耍',
+      'heal' => '治疗伤病',
+      'exchange' => '积分兑换',
+      'scene' => '装扮场景',
+      'breed' => '繁育新生',
+      'evolve' => '见证进化',
+      _ => PetQuestConditionType.fromCode(conditionType)?.label ?? '日常任务',
+    };
+    if (conditionType == 'adventure' && conditionTier != null) {
+      const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
+      final t = tierNames[conditionTier];
+      if (t != null) return '$t历险';
+    }
+    return base;
+  }
 
   factory PetQuestModel.fromJson(Map<String, dynamic> json) {
     final quest = (json['quest'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -205,6 +217,7 @@ class PetQuestModel {
     return PetQuestModel(
       questId: quest['id'] as String? ?? '',
       conditionType: cond['type'] as String? ?? '',
+      conditionTier: cond['tier'] as String?,
       target: (json['target'] as num?)?.toInt() ?? 1,
       progress: (json['progress'] as num?)?.toInt() ?? 0,
       claimed: json['reward_claimed'] as bool? ?? false,

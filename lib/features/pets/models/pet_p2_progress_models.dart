@@ -137,12 +137,16 @@ class PetWeeklyQuestModel {
     required this.rewardGold,
     required this.rewardPoints,
     required this.rewardItems,
+    this.conditionTier,
   });
 
   final String questId;
   final String code;
   final PetQuestDifficulty? difficulty;
   final PetQuestConditionType? conditionType;
+
+  /// 历险类条件的时长要求（condition.tier：short/medium/long；null = 不限）
+  final String? conditionTier;
   final int target;
   final int progress;
   final bool claimed;
@@ -154,7 +158,18 @@ class PetWeeklyQuestModel {
   bool get claimable => done && !claimed;
 
   String get difficultyLabel => difficulty?.label ?? '普通';
-  String get conditionLabel => conditionType?.label ?? '本周任务';
+
+  /// 条件中文名；历险类带时长要求时前缀区分（如「长途历险」）
+  String get conditionLabel {
+    final base = conditionType?.label ?? '本周任务';
+    if (conditionType == PetQuestConditionType.adventure &&
+        conditionTier != null) {
+      const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
+      final t = tierNames[conditionTier];
+      if (t != null) return '$t${base.replaceAll('历险次数', '历险')}';
+    }
+    return base;
+  }
 
   factory PetWeeklyQuestModel.fromJson(Map<String, dynamic> json) {
     final cond = json['condition'] is Map
@@ -168,6 +183,7 @@ class PetWeeklyQuestModel {
       code: json['code'] as String? ?? '',
       difficulty: PetQuestDifficulty.fromCode(json['difficulty'] as String?),
       conditionType: PetQuestConditionType.fromCode(cond['type'] as String?),
+      conditionTier: cond['tier'] as String?,
       target: (json['target'] as num?)?.toInt() ?? 1,
       progress: (json['progress'] as num?)?.toInt() ?? 0,
       claimed: json['reward_claimed'] as bool? ?? false,
