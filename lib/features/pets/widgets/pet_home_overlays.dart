@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../../../core/widgets/widgets.dart';
+import 'pet_home_scene.dart';
 import 'pet_toast.dart';
 
 /// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
@@ -468,6 +469,8 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     }
     setState(() => _active = code);
     showPetToast(context, '主题已启用');
+    // 购买即启用即生效：带最新场景码关面板，主页背景立即切换
+    if (mounted) Navigator.of(context).pop(code);
   }
 
   Future<void> _activate(Map<String, dynamic> sc) async {
@@ -482,6 +485,8 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
       return;
     }
     setState(() => _active = code);
+    // 切换即生效：带最新场景码关面板，主页背景立即切换
+    if (mounted) Navigator.of(context).pop(code);
   }
 
   @override
@@ -565,27 +570,94 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
           ),
           if (using)
             Icon(Icons.check_circle, size: 20, color: cs.primary)
-          else if (owned)
-            OutlinedButton(
-              onPressed: _pending == null ? () => _activate(sc) : null,
-              child: _pending == code
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : const Text('使用'),
-            )
-          else
-            FilledButton(
-              onPressed: _pending == null ? () => _purchase(sc) : null,
-              child: _pending == code
-                  ? const SizedBox(
-                      width: 14,
-                      height: 14,
-                      child: CircularProgressIndicator(strokeWidth: 2))
-                  : Text('$price 金币'),
+          else ...[
+            // 买前预览：整屏实景背景（万级买断价必须先看效果）
+            IconButton(
+              tooltip: '预览效果',
+              visualDensity: VisualDensity.compact,
+              onPressed: () => _previewScene(sc),
+              icon: Icon(Icons.visibility_outlined,
+                  size: 20, color: cs.onSurfaceVariant),
             ),
+            if (owned)
+              OutlinedButton(
+                onPressed: _pending == null ? () => _activate(sc) : null,
+                child: _pending == code
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : const Text('使用'),
+              )
+            else
+              FilledButton(
+                onPressed: _pending == null ? () => _purchase(sc) : null,
+                child: _pending == code
+                    ? const SizedBox(
+                        width: 14,
+                        height: 14,
+                        child: CircularProgressIndicator(strokeWidth: 2))
+                    : Text('$price 金币'),
+              ),
+          ],
         ],
+      ),
+    );
+  }
+
+  /// 整屏预览：真实场景背景 + 主题名/操作提示，点任意处关闭
+  Future<void> _previewScene(Map<String, dynamic> sc) async {
+    final code = sc['scene_code']?.toString() ?? 'scene_dream';
+    final label = _sceneLabels[code] ?? code;
+    await showDialog<void>(
+      context: context,
+      barrierColor: Colors.black87,
+      builder: (ctx) => GestureDetector(
+        onTap: () => Navigator.of(ctx).pop(),
+        child: Scaffold(
+          backgroundColor: Colors.transparent,
+          body: Stack(
+            fit: StackFit.expand,
+            children: [
+              PetSceneBackground(sceneCode: code),
+              SafeArea(
+                child: Padding(
+                  padding: const EdgeInsets.all(20),
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: Text(label,
+                            style: const TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white)),
+                      ),
+                      Container(
+                        padding: const EdgeInsets.symmetric(
+                            horizontal: 12, vertical: 6),
+                        decoration: BoxDecoration(
+                          color: Colors.black45,
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                        child: const Text('预览效果 · 点击任意处返回',
+                            style:
+                                TextStyle(fontSize: 12, color: Colors.white70)),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
       ),
     );
   }
