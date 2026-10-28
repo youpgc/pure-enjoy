@@ -73,9 +73,9 @@ String petBagEffectDesc(PetBagItemModel item) {
       addNum('mood', '心情');
       addNum('exp', '经验');
     case PetItemEffectType.heal:
-      parts.add('恢复宠物健康（历险受伤后使用）');
+      parts.add('恢复宠物健康（游历受伤后使用）');
     case PetItemEffectType.rescue:
-      parts.add('历险遇险时立即救回宠物');
+      parts.add('游历遇险时立即救回宠物');
     case PetItemEffectType.refineReassign:
       // 旧洗练剂直洗语义（2026-09-20 下线；历史数据兜底展示）
       parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
@@ -99,7 +99,7 @@ String petBagEffectDesc(PetBagItemModel item) {
             ? '点击孵蛋页孵化（传说蛋需等待）'
             : '点击立即孵化，见证新伙伴诞生');
       } else if (item.subType == 'rescue') {
-        parts.add('历险遇险时立即救回宠物');
+        parts.add('游历遇险时立即救回宠物');
       } else if (item.subType == 'evolution') {
         parts.add('进化时自动使用，无需手动操作');
       } else if ((item.description ?? '').isNotEmpty) {
