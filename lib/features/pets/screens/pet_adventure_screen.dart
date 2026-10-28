@@ -15,6 +15,7 @@ import '../widgets/pet_claim_result_dialog.dart';
 import '../widgets/pet_home_adventure.dart';
 import 'pet_odds_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 历险页
 ///
@@ -362,7 +363,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               const SizedBox(width: 48),
               Expanded(
                 child: Center(
-                  child: Text('历险',
+                  child: Text('游历',
                       style: Theme.of(context)
                           .textTheme
                           .titleSmall
@@ -371,7 +372,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               ),
               // 规则说明（结果/掉落概率/危险惩罚与珍稀保护边界）
               IconButton(
-                tooltip: '历险规则说明',
+                tooltip: '游历规则说明',
                 onPressed: _showRulesSheet,
                 icon: Icon(Icons.help_outline,
                     size: 20, color: cs.onSurfaceVariant),
@@ -386,7 +387,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   }
 
   Widget _buildBody() {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     final adv = _adv;
     if (adv != null && adv.status == PetAdventureStatus.ongoing) {
       return _ongoingView(adv);
@@ -472,7 +473,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               const Row(children: [
                 Icon(Icons.explore_outlined, size: 20),
                 SizedBox(width: 8),
-                Text('历险规则说明',
+                Text('游历规则说明',
                     style:
                         TextStyle(fontSize: 16, fontWeight: FontWeight.w700)),
               ]),
@@ -534,7 +535,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
       );
     }
     if (_spots.isEmpty) {
-      return const EmptyWidget(message: '暂无开放的历险地，敬请期待新地点');
+      return const EmptyWidget(message: '暂无开放的游历地，敬请期待新地点');
     }
     // 健康出发门槛提示（历险失败惩罚会扣健康；阈值 0 = 未配置不提示）
     final healthLow = widget.healthThreshold > 0 &&
@@ -588,7 +589,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   void _showTierSheet(PetSpotModel spot) {
     if (widget.tiers.isEmpty) {
-      showPetToast(context, '历险时长还在准备中，稍后再来');
+      showPetToast(context, '游历时长还在准备中，稍后再来');
       return;
     }
     showModalBottomSheet<void>(
@@ -599,7 +600,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
           children: [
             Padding(
               padding: const EdgeInsets.all(16),
-              child: Text('选择「${spot.name}」的历险时长',
+              child: Text('选择「${spot.name}」的游历时长',
                   style: const TextStyle(fontWeight: FontWeight.w600)),
             ),
             for (final t in widget.tiers)
@@ -640,7 +641,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
           children: [
             Icon(Icons.explore, size: 72, color: cs.primary),
             const SizedBox(height: 16),
-            Text('${widget.petName} 正在外出历险',
+            Text('${widget.petName} 正在外出游历',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
             const SizedBox(height: 8),
             if (spotName != null) ...[
@@ -650,7 +651,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
                   Icon(Icons.place_outlined,
                       size: 15, color: cs.onSurfaceVariant),
                   const SizedBox(width: 4),
-                  Text('历险地图：$spotName',
+                  Text('游历地图：$spotName',
                       style: TextStyle(
                           fontSize: 13, color: cs.onSurfaceVariant)),
                 ],
@@ -663,7 +664,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
                 style: TextStyle(color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 4),
-              const Text('历险结束后回来查看结果', style: TextStyle(fontSize: 12)),
+              const Text('游历结束后回来查看结果', style: TextStyle(fontSize: 12)),
               const SizedBox(height: 8),
               TextButton.icon(
                 onPressed: _busy ? null : _confirmRecall,
@@ -679,7 +680,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
                         height: 18,
                         child: CircularProgressIndicator(strokeWidth: 2))
                     : const Icon(Icons.redeem_outlined),
-                label: const Text('查看历险结果'),
+                label: const Text('查看游历结果'),
               ),
             ],
           ],

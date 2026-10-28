@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 任务页（每日 + 每周两个页签）
 ///
@@ -165,7 +166,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   // ---------- 每日 ----------
 
   Widget _dailyTab(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _daily.isEmpty) {
       return _errorView(cs, _error!, _load);
     }
@@ -202,7 +203,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   Widget _weeklyTabView(ColorScheme cs) {
     // 切到本页签才抽取（见 _onTabChange）；未抽取前不占位显示空态
     if (_weeklyLoading || !_weeklyDrawn) {
-      return const Center(child: LoadingWidget());
+      return const Center(child: PetPawLoading());
     }
     if (_weeklyError != null && _weekly.isEmpty) {
       return _errorView(cs, _weeklyError!, () => _loadWeekly());

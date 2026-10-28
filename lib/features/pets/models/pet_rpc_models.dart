@@ -188,7 +188,7 @@ class PetQuestModel {
       'feed' => '喂养伙伴',
       'interact' => '互动陪伴',
       'hatch' => '孵化新星',
-      'adventure' => '外出历险',
+      'adventure' => '外出游历',
       'clean' => '清洁伙伴',
       'play' => '陪它玩耍',
       'heal' => '治疗伤病',
@@ -201,7 +201,7 @@ class PetQuestModel {
     if (conditionType == 'adventure' && conditionTier != null) {
       const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
       final t = tierNames[conditionTier];
-      if (t != null) return '$t历险';
+      if (t != null) return '$t游历';
     }
     return base;
   }

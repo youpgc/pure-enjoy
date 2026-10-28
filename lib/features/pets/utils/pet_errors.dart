@@ -18,7 +18,7 @@ String petRpcErrorText(String? error) {
     'PET_FREE_FEED_LIMIT': '今日免费喂养次数已用完，可使用背包中的食物',
     'PET_FEED_COOLDOWN': '喂得太快啦，休息一会儿再来',
     // 2026-09-24 饱腹门槛（pet_config.feed_full_hunger，后台可配）
-    'PET_ALREADY_FULL': '它已经吃得饱饱的啦，先陪它玩玩或去历险吧',
+    'PET_ALREADY_FULL': '它已经吃得饱饱的啦，先陪它玩玩或去游历吧',
     'PET_INTERACT_LIMIT': '今天陪它玩够久啦，明天再来互动吧',
     'PET_INTERACT_COOLDOWN': '它还在回味刚才的抚摸，稍等一下',
     'PET_ITEM_NOT_FEED': '该道具不能用于喂养',
@@ -36,6 +36,7 @@ String petRpcErrorText(String? error) {
     'PET_ITEM_NOT_FOUND': '道具不存在或已下架',
     'PET_ITEM_NOT_RESCUE': '该道具不是救援道具，无法用于救助',
     'PET_ITEM_PURCHASE_LIMIT': '该商品已达限购数量',
+    'PET_QTY_LIMIT': '单次最多购买 99 个，请分批购买',
     'PET_COLLECTION_RECIPE_NOT_FOUND': '该兑换暂不可用，稍后再来看看',
     'PET_BAG_FULL_RACE': '背包已满，请清理后再试',
     'PET_BAG_FULL_CLAIM_RETRY': '背包已满，清理后可重新领取',
@@ -47,11 +48,11 @@ String petRpcErrorText(String? error) {
     'PET_NOTHING_TO_REFINE': '这只宠物还没有升级加点，无可重掷的属性',
     'PET_REFINE_POINTS_INSUFFICIENT': '洗练点不足，使用「属性洗练剂」可补充',
     'PET_ITEM_INSUFFICIENT': '道具数量不足',
-    'PET_SPOT_NOT_FOUND': '历险地不可用',
-    'PET_INVALID_TIER': '历险档位无效',
-    'PET_ADV_NOT_FOUND': '未找到历险记录',
-    'PET_ADV_NOT_ONGOING': '历险已结束',
-    'PET_ADV_NOT_FINISHED': '历险还在进行中',
+    'PET_SPOT_NOT_FOUND': '游历地不可用',
+    'PET_INVALID_TIER': '游历档位无效',
+    'PET_ADV_NOT_FOUND': '未找到游历记录',
+    'PET_ADV_NOT_ONGOING': '游历已结束',
+    'PET_ADV_NOT_FINISHED': '游历还在进行中',
     'PET_ADV_NOT_RESCUE': '当前无需救助',
     'PET_ADV_NOT_RECALLABLE': '遇险中的宠物需先救助，无法召回',
     'PET_RESCUE_WINDOW_OPEN': '救援时间内使用救援道具即可接它回家',
@@ -91,7 +92,7 @@ String petRpcErrorText(String? error) {
     // ---------- P2 繁育（§5）：CD/亲密度阈值均为后台配置，文案不写具体数值 ----------
     'PET_BREED_INVALID_PET': '请选择两只养育中的伙伴结配',
     'PET_BREED_NOT_UNLOCKED': '繁育还没开通，可在商城购买「繁育巢穴」',
-    'PET_BREED_BUSY': '这只伙伴正忙着（繁育/历险/寄养），先处理完再来',
+    'PET_BREED_BUSY': '这只伙伴正忙着（繁育/游历/寄养），先处理完再来',
     'PET_BREED_INTIMACY_LOW': '亲密度还不够，多陪陪它们再结配',
     'PET_BREED_NOT_SAME_FAMILY': '只有同系别的伙伴才能结配',
     'PET_BREED_SAME_GENDER': '需要一公一母才能结配',
@@ -128,7 +129,7 @@ String petRpcErrorText(String? error) {
     'PET_RENAME_CARD_MISSING': '更名卡暂时缺货，稍后再来看看',
     'PET_RENAME_SENSITIVE': '这个名字不太合适，换一个吧',
     // ---------- 放生（rpc_pet_release） ----------
-    'PET_RELEASE_NOT_ALLOWED': '它现在正在忙（历险/繁育中），处理完再送别吧',
+    'PET_RELEASE_NOT_ALLOWED': '它现在正在忙（游历/繁育中），处理完再送别吧',
     // ---------- 批量喂养（rpc_pet_feed_all） ----------
     'PET_BATCH_FEED_LOCKED': '尚未解锁批量喂养——商城购买「高级食盆」即可一键喂养全部',
     // ---------- 场景主题（rpc_pet_scene_*） ----------

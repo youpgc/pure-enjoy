@@ -9,6 +9,7 @@ import '../utils/pet_errors.dart';
 import '../widgets/pet_avatar_card.dart';
 import 'pet_shop_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 寄养仓库页（P0-3 补齐：宠物在「养育格 <-> 寄养格」之间搬运）
 ///
@@ -96,7 +97,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
 
   Widget _buildBody() {
     final colorScheme = Theme.of(context).colorScheme;
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (!_enabled) return const EmptyWidget(message: '宠物功能暂未开放');
     if (_error != null) {
       return Center(

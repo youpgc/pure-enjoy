@@ -69,7 +69,7 @@ class PetMatchBanner extends StatelessWidget {
         leading: Icon(Icons.auto_awesome_outlined, color: cs.primary),
         title: Text('为你匹配 · $spotName',
             style: const TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
-        subtitle: const Text('根据宠物当前条件推荐，点击查看历险时长',
+        subtitle: const Text('根据宠物当前条件推荐，点击查看游历时长',
             style: TextStyle(fontSize: 11)),
         trailing: const Icon(Icons.chevron_right, size: 18),
         onTap: onTap,
@@ -78,8 +78,9 @@ class PetMatchBanner extends StatelessWidget {
   }
 }
 
-/// 历险地卡片：等级硬门槛灰置（服务端 start 同校验）；属性要求 = 结算
-/// 判据（未达标仍可出发，claim 判 failed），未达标项红显提示风险
+/// 历险地卡片：等级硬门槛灰置（服务端 start 同校验）；属性要求 = 遇险开关
+/// （20261027 定版：全达标必不遇险，不达标仍可出发但保留遇险判定），
+/// 未达标项红显提示风险
 Widget petSpotCard(
   BuildContext context, {
   Key? key,

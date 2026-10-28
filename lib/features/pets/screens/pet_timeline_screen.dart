@@ -151,11 +151,11 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
         ].join('、');
         return (
           Icons.explore,
-          '历险纪念',
+          '游历纪念',
           gains.isEmpty ? '完成了一次难忘的冒险' : '完成了一次冒险，带回了$gains'
         );
       case 'adventure_failed':
-        return (Icons.shield_outlined, '历险遇险', '在冒险中遇到了危险，所幸平安归来');
+        return (Icons.shield_outlined, '游历遇险', '在冒险中遇到了危险，所幸平安归来');
       case 'adventure_recalled':
         return (Icons.home_outlined, '提前召回', '还没走完旅程，就被你召回了家');
       default:

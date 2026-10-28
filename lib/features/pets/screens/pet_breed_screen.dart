@@ -12,6 +12,7 @@ import '../utils/pet_errors.dart';
 import 'pet_bag_screen.dart';
 import 'pet_shop_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 繁育页（P2）
 ///
@@ -194,7 +195,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_summary == null) {
       return Center(
         child: Column(

@@ -14,6 +14,7 @@ import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 金币钱包页（我的页「金币钱包」入口的独立落点，不进宠物主页）
 ///
@@ -208,7 +209,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   }
 
   Widget _buildBody(ColorScheme colorScheme) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (!_enabled) {
       return const EmptyWidget(message: '宠物功能暂未开放');
     }

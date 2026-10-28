@@ -8,6 +8,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 成就页（P2）
 ///
@@ -87,7 +88,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _achs.isEmpty) {
       return Center(
         child: Column(

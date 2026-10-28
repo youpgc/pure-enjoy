@@ -111,7 +111,7 @@ Future<bool> recallAdventureConfirmed(
   final ok = await showConfirmDialog(
     context,
     title: '召回宠物',
-    content: '宠物将立即结束本次历险返回家中，本次历险不会获得任何奖励。确定召回吗？',
+    content: '宠物将立即结束本次游历返回家中，本次游历不会获得任何奖励。确定召回吗？',
     cancelText: '再等等',
     confirmText: '确定召回',
   );
@@ -122,7 +122,7 @@ Future<bool> recallAdventureConfirmed(
     _toast(context, petRpcErrorText(err));
     return false;
   }
-  _toast(context, '已召回，宠物平安回家（本次历险无奖励）');
+  _toast(context, '已召回，宠物平安回家（本次游历无奖励）');
   return true;
 }
 
@@ -141,8 +141,8 @@ Future<void> showPetDangerDialog(BuildContext context, {String? deadline}) {
         Text('糟糕，遇险了！'),
       ]),
       content: Text(mins > 0
-          ? '宠物在历险中遇到危险，需在 $mins 分钟内完成救助，否则将受到惩罚。'
-          : '宠物在历险中遇到危险，请尽快完成救助。'),
+          ? '宠物在游历中遇到危险，需在 $mins 分钟内完成救助，否则将受到惩罚。'
+          : '宠物在游历中遇到危险，请尽快完成救助。'),
       actions: [
         FilledButton(
             onPressed: () => Navigator.pop(ctx), child: const Text('知道了')),
@@ -174,13 +174,13 @@ Future<void> showPetPenaltyDialog(
       title: const Row(children: [
         Icon(Icons.sentiment_dissatisfied, color: Color(0xFFE05B4C)),
         SizedBox(width: 8),
-        Text('历险失败…'),
+        Text('游历失败…'),
       ]),
       content: Column(
         mainAxisSize: MainAxisSize.min,
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          const Text('这次历险的挑战超出了宠物的能力，它空手而归。'),
+          const Text('这次游历的挑战超出了宠物的能力，它空手而归。'),
           if (rows.isNotEmpty) ...[
             const SizedBox(height: 10),
             Text('惩罚：${rows.join('，')}',
@@ -211,7 +211,7 @@ Widget petAdventureRailButton({
   final finished =
       !awaiting && adv?.endAt != null && !DateTime.now().isBefore(adv!.endAt!);
   final (icon, label, action) = adv == null
-      ? (Icons.explore_outlined, '历险', openAdventure)
+      ? (Icons.explore_outlined, '游历', openAdventure)
       : awaiting
           ? (Icons.healing_outlined, '救助', openAdventure)
           : finished

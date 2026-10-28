@@ -7,6 +7,7 @@ import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
+import '../widgets/pet_loading.dart';
 
 /// 抽蛋概率公示页（P2）
 ///
@@ -179,7 +180,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                 ),
                 const SizedBox(width: 10),
                 Expanded(
-                  child: Text('历险产出说明',
+                  child: Text('游历产出说明',
                       style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w700,
@@ -310,7 +311,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                             fontSize: 14, fontWeight: FontWeight.w700)),
                     const SizedBox(height: 2),
                     Text(
-                        '长途历险掉落 · ${zones.length} 地形 ${d.zoneMaps.values.fold<int>(0, (a, l) => a + l.length)} 图',
+                        '长途游历掉落 · ${zones.length} 地形 ${d.zoneMaps.values.fold<int>(0, (a, l) => a + l.length)} 图',
                         style: TextStyle(
                             fontSize: 11, color: cs.onSurfaceVariant)),
                   ],
@@ -463,7 +464,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _pools.isEmpty) {
       // 蛋池失败也不吞历险卡：历险路独立容错,错误条与重试钮并列其下
       return RefreshIndicator(

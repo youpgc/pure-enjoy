@@ -89,7 +89,7 @@ enum PetEggStatus {
 enum PetPetStatus {
   rearing('rearing', '养育中'),
   fostered('fostered', '寄养中'),
-  adventuring('adventuring', '历险中'),
+  adventuring('adventuring', '游历中'),
   breeding('breeding', '繁育中');
 
   const PetPetStatus(this.code, this.label);
@@ -206,7 +206,7 @@ enum PetWalletSourceType {
   achievement('pet_achievement', '成就发放'),
   exchange('pet_exchange', '积分兑换'),
   adminGrant('pet_admin_grant', '客服调整'),
-  adventurePenalty('pet_adventure_penalty', '历险失败惩罚'),
+  adventurePenalty('pet_adventure_penalty', '游历失败惩罚'),
   featureSpend('pet_feature_spend', '功能消耗');
 
   const PetWalletSourceType(this.code, this.label);
@@ -236,7 +236,7 @@ enum PetItemEffectType {
   clean('clean', '清洁'),
   toy('toy', '玩耍'),
   heal('heal', '疗伤'),
-  rescue('rescue', '历险救助'),
+  rescue('rescue', '游历救助'),
   refinePoint('refine_point', '洗练点补给'),
   refineReassign('refine_reassign', '属性重掷（已下线）'),
   hatchAccel('hatch_accel', '孵化加速'),
@@ -405,7 +405,7 @@ enum PetAchConditionType {
   feedTotal('feed_total', '累计喂养次数'),
   interactTotal('interact_total', '累计互动次数'),
   hatchTotal('hatch_total', '累计孵化次数'),
-  adventureTotal('adventure_total', '累计历险次数'),
+  adventureTotal('adventure_total', '累计游历次数'),
   rescueTotal('rescue_total', '累计救助次数'),
   evolveTotal('evolve_total', '累计进化次数'),
   breedEggTotal('breed_egg_total', '累计繁育产蛋次数'),
@@ -442,7 +442,7 @@ enum PetAchConditionType {
 enum PetQuestConditionType {
   feed('feed', '喂养次数'),
   interact('interact', '互动次数'),
-  adventure('adventure', '历险次数'),
+  adventure('adventure', '游历次数'),
   hatch('hatch', '孵化次数'),
   clean('clean', '清洁次数'),
   play('play', '游玩次数'),

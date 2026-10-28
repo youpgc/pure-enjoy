@@ -16,6 +16,7 @@ import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_initial_family_picker.dart';
 import '../widgets/pet_item_icon.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 孵蛋页（P2：即开 + 等待孵化双通道）
 ///
@@ -182,7 +183,7 @@ class _PetEggScreenState extends State<PetEggScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _eggs.isEmpty) {
       return Center(
         child: Column(

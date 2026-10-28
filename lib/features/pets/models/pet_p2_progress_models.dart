@@ -166,7 +166,7 @@ class PetWeeklyQuestModel {
         conditionTier != null) {
       const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
       final t = tierNames[conditionTier];
-      if (t != null) return '$t${base.replaceAll('历险次数', '历险')}';
+      if (t != null) return '$t${base.replaceAll('游历次数', '游历')}';
     }
     return base;
   }
