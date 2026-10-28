@@ -31,11 +31,23 @@ PetBendGeo? petBendGeo(String speciesCode, int stage) =>
 String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
+/// 种属骨架占位图（assets/pets/placeholders/<系>_s<阶>.png，20261028）：
+/// 系 = species_code 首段（cat/dog/rabbit/mouse）；阶 0~2 钳位；
+/// 资源缺失由调用方 errorBuilder 回退图标。
+String petPlaceholderArt(String speciesCode, int stage) {
+  final family = speciesCode.split('_').isEmpty
+      ? 'cat'
+      : speciesCode.split('_').first;
+  final st = stage.clamp(0, 2);
+  return 'assets/pets/placeholders/${family}_s$st.png';
+}
+
 /// 单帧立绘（弹窗/列表缩略）：弯曲树中性帧 `c1_neutral`，与舞台形象同源同款；
-/// 未登记形态返回 null，调用方画占位图标。
+/// 未登记形态返回系骨架占位图（20261028，四系三阶轮廓）。
 String? petBaseArt(String speciesCode, int stage) {
   final dir = petBendGeo(speciesCode, stage)?.dir;
-  return dir == null ? null : '$dir/c1_neutral.png';
+  if (dir != null) return '$dir/c1_neutral.png';
+  return petPlaceholderArt(speciesCode, stage);
 }
 
 /// 弹窗/列表通用形象：基础阶中性帧（[petBaseArt] 的 stage=0 简写）

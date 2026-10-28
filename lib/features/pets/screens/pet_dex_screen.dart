@@ -276,22 +276,35 @@ class _PetDexScreenState extends State<PetDexScreen> {
               child: stage.owned
                   // 弯曲树中性帧：与舞台渲染同源同款（静态，不跑待机动画）
                   ? _dexPetArt(cs, stage)
-                  // 未获取：中央锁定徽章（克制、不抢已获取格的视觉）
-                  : Center(
-                      child: Container(
-                        width: 32,
-                        height: 32,
-                        decoration: BoxDecoration(
-                          color: cs.surface.withValues(alpha: 0.6),
-                          shape: BoxShape.circle,
-                          border: Border.all(
-                              color:
-                                  rarityColor.withValues(alpha: 0.40)),
+                  // 未获取：系骨架剪影（压暗，不剧透形态细节）+ 锁定徽章叠加
+                  : Stack(
+                      alignment: Alignment.center,
+                      children: [
+                        Opacity(
+                          opacity: 0.45,
+                          child: Image.asset(
+                            petPlaceholderArt(stage.speciesCode,
+                                _dexArtKey(stage.speciesCode).$2),
+                            fit: BoxFit.contain,
+                            errorBuilder: (_, __, ___) =>
+                                const SizedBox(width: 32, height: 32),
+                          ),
                         ),
-                        child: Icon(Icons.lock_outline_rounded,
-                            size: 16,
-                            color: rarityColor.withValues(alpha: 0.80)),
-                      ),
+                        Container(
+                          width: 32,
+                          height: 32,
+                          decoration: BoxDecoration(
+                            color: cs.surface.withValues(alpha: 0.6),
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                                color:
+                                    rarityColor.withValues(alpha: 0.40)),
+                          ),
+                          child: Icon(Icons.lock_outline_rounded,
+                              size: 16,
+                              color: rarityColor.withValues(alpha: 0.80)),
+                        ),
+                      ],
                     ),
             ),
           ),
