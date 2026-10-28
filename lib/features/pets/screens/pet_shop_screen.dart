@@ -11,6 +11,7 @@ import '../widgets/pet_item_icon.dart';
 import 'pet_bag_screen.dart';
 import 'pet_odds_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
 ///
@@ -176,14 +177,18 @@ class _PetShopScreenState extends State<PetShopScreen> {
     /// toast 是替换式单条，扩容先吐一条会被购买结果立即覆盖
     /// （复审批 P3：'扩容已生效' 存活不足百毫秒）
     bool afterExpand = false,
+
+    /// 购买数量（20261028 批量购买：悬浮窗输入 1~99，服务端校验限购/容量）
+    int qty = 1,
   }) async {
     if (_buying.contains(item.id)) return;
-    if (_gold < item.priceCoin) {
-      showPetToast(context, '金币不足，可通过任务/历险获取');
+    final total = item.priceCoin * qty;
+    if (_gold < total) {
+      showPetToast(context, '金币不足，可通过任务/游历获取');
       return;
     }
     setState(() => _buying.add(item.id));
-    final (result, err) = await PetRpc.shopBuy(item.id);
+    final (result, err) = await PetRpc.shopBuy(item.id, qty: qty);
     if (!mounted) return;
     setState(() => _buying.remove(item.id));
     if (err != null) {
@@ -201,14 +206,15 @@ class _PetShopScreenState extends State<PetShopScreen> {
     if (result.isBagFull) {
       // 满格未扣款：走 §5.4 腾位流程（有下一级扩容 → 购买后自动重试；
       // 无 → 引导清理背包）。腾位决策发生在扣款前，不产生资金损失。
-      await _showBagFullDialog(item, result, fromDialog: fromDialog);
+      await _showBagFullDialog(item, result,
+          fromDialog: fromDialog, qty: qty);
       return;
     }
-    setState(() => _gold -= item.priceCoin);
+    setState(() => _gold -= total);
     showPetToast(context,
         item.isExpansion && !afterExpand
             ? '扩容已生效'
-            : '已购买「${item.name}」');
+            : '已购买「${item.name}」${qty > 1 ? ' ×$qty' : ''}');
     // 静默刷新:扩容生效后阶梯过滤显示下一档道具,普通道具数量角标同步
     // (20261021 用户反馈:购买扩容后列表仍显示旧道具)
     _load(showLoading: false);
@@ -222,6 +228,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
     PetShopItemModel item,
     PetShopBuyResultModel result, {
     bool fromDialog = false,
+    int qty = 1,
   }) async {
     final expand = result.nextExpand;
     final action = await showDialog<String>(
@@ -280,7 +287,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
       // 同流程内闭环：扩容成功即重试原购买（§5.4）；结果 toast 由
       // 重试的 _buy 以 afterExpand 合并文案输出（替换式 toast 会覆盖
       // 此处的'扩容已生效'，单独吐等于没说）
-      await _buy(item, fromDialog: fromDialog, afterExpand: true);
+      await _buy(item, fromDialog: fromDialog, afterExpand: true, qty: qty);
     }
   }
 
@@ -498,7 +505,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _items.isEmpty) {
       return Center(
         child: Column(
@@ -624,15 +631,21 @@ class _PetShopScreenState extends State<PetShopScreen> {
     );
   }
 
-  // ---------- 物品悬浮窗（信息 + 购买） ----------
+  // ---------- 物品悬浮窗（信息 + 数量 + 购买） ----------
 
   void _showItemFloat(PetShopItemModel item) {
     final cs = Theme.of(context).colorScheme;
-    final affordable = _gold >= item.priceCoin;
     final busy = _buying.contains(item.id);
+    var qty = 1;
+    final canBatch = !item.isExpansion; // 扩容阶梯道具限购 1 次，不参与批量
     showDialog<void>(
       context: context,
-      builder: (ctx) => Dialog(
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setQty) {
+        final total = item.priceCoin * qty;
+        final affordableNow = _gold >= total;
+        final busyNow = busy || _buying.contains(item.id);
+        return Dialog(
         backgroundColor: cs.surface,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(20)),
         child: Padding(
@@ -687,24 +700,70 @@ class _PetShopScreenState extends State<PetShopScreen> {
                     : (item.isExpansion ? '购买后立即生效' : '购买后放入背包'),
                 style: TextStyle(fontSize: 13, color: cs.onSurfaceVariant),
               ),
-              const SizedBox(height: 18),
+              if (canBatch) ...[
+                const SizedBox(height: 14),
+                Row(
+                  children: [
+                    const Text('购买数量',
+                        style: TextStyle(
+                            fontSize: 13, fontWeight: FontWeight.w600)),
+                    const Spacer(),
+                    // 减
+                    IconButton.outlined(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: qty > 1
+                          ? () => setQty(() => qty = qty - 1)
+                          : null,
+                      icon: const Icon(Icons.remove, size: 18),
+                    ),
+                    SizedBox(
+                      width: 44,
+                      child: Text('$qty',
+                          textAlign: TextAlign.center,
+                          style: const TextStyle(
+                              fontSize: 15, fontWeight: FontWeight.w700)),
+                    ),
+                    // 加（上限 99；金币上限另由按钮禁用态兜底）
+                    IconButton.outlined(
+                      visualDensity: VisualDensity.compact,
+                      onPressed: qty < 99
+                          ? () => setQty(() => qty = qty + 1)
+                          : null,
+                      icon: const Icon(Icons.add, size: 18),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 6),
+              ],
+              const SizedBox(height: 10),
               SizedBox(
                 width: double.infinity,
                 child: FilledButton.icon(
-                  onPressed: affordable && !busy
-                      ? () => _buy(item, fromDialog: true)
+                  onPressed: affordableNow && !busyNow
+                      ? () {
+                          Navigator.of(ctx).pop();
+                          _buy(item, fromDialog: true, qty: qty);
+                        }
                       : null,
                   icon: const Icon(Icons.paid_outlined, size: 18),
                   label: Text(
-                    busy ? '购买中' : (affordable ? '购买' : '金币不足'),
+                    busyNow
+                        ? '购买中'
+                        : (!affordableNow
+                            ? '金币不足'
+                            : (qty > 1
+                                ? '购买 ×$qty（${item.priceCoin * qty} 金币）'
+                                : '购买')),
                   ),
                 ),
               ),
             ],
           ),
         ),
+        );
+      },
       ),
-    );
+      );
   }
 
   IconData _iconFor(PetShopItemModel item) {
