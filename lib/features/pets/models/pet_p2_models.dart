@@ -176,6 +176,55 @@ class PetEvoStageOptionModel {
     }
     return out;
   }
+  /// 条件达成评估（与服务端 rpc_pet_evolve 同构）：level/intimacy 逐条直比；
+  /// gold 多条求和一次比余额；item 同码多条求和比持有量（跨格多行由
+  /// bagByItemCode 先行聚合）。未支持类型/空道具码服务端会拒绝，视为未达成。
+  /// bagByItemCode 缺键 = 未持有（0）；itemNames 供 chips 显中文名，缺键回落编码。
+  ({bool allMet, List<({String label, bool met})> detail}) evaluateConditions({
+    required int level,
+    required int intimacy,
+    required int gold,
+    required Map<String, int> bagByItemCode,
+    Map<String, String> itemNames = const {},
+  }) {
+    final detail = <({String label, bool met})>[];
+    var allMet = true;
+    var goldNeed = 0;
+    final itemNeed = <String, int>{};
+    void add(String label, bool met) {
+      detail.add((label: label, met: met));
+      if (!met) allMet = false;
+    }
+
+    for (final c in conditions) {
+      final type = PetEvoCondType.fromCode(c['type'] as String?);
+      final value = (c['value'] as num?)?.toInt() ?? 0;
+      final cost = (c['cost'] as num?)?.toInt() ?? 1;
+      switch (type) {
+        case PetEvoCondType.level:
+          add('等级 $value', level >= value);
+        case PetEvoCondType.intimacy:
+          add('亲密 $value', intimacy >= value);
+        case PetEvoCondType.gold:
+          goldNeed += value;
+        case PetEvoCondType.item:
+          final code = (c['item'] as String?)?.trim() ?? '';
+          if (code.isEmpty) {
+            add('指定道具 ×$cost', false);
+          } else {
+            itemNeed[code] = (itemNeed[code] ?? 0) + cost;
+          }
+        case null:
+          add('${c['type'] ?? '?'}（未支持的条件类型）', false);
+      }
+    }
+    if (goldNeed > 0) add('金币 $goldNeed', gold >= goldNeed);
+    for (final e in itemNeed.entries) {
+      add('道具 ${itemNames[e.key] ?? e.key} ×${e.value}',
+          (bagByItemCode[e.key] ?? 0) >= e.value);
+    }
+    return (allMet: allMet, detail: detail);
+  }
 
   factory PetEvoStageOptionModel.fromJson(Map<String, dynamic> json) {
     final sp = (json['species'] as Map?)?.cast<String, dynamic>() ?? const {};

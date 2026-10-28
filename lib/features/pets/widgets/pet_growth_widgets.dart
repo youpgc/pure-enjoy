@@ -61,10 +61,13 @@ Widget petGrowthHeadCard(ColorScheme cs, PetPetDetailModel? pet) {
   );
 }
 
-/// 进化条件明细（pet_evo_stages.conditions → 人话 chip，见 conditionLabels）
-Widget petGrowthConditions(ColorScheme cs, PetEvoStageOptionModel o) {
-  final labels = o.conditionLabels;
-  if (labels.isEmpty) {
+/// 进化条件明细 chips：未达成红显（detail 来自 evaluateConditions，
+/// 与服务端 rpc_pet_evolve 判定同口径）
+Widget petGrowthConditionsDetail(
+  ColorScheme cs,
+  List<({String label, bool met})> detail,
+) {
+  if (detail.isEmpty) {
     return Text('无额外条件',
         style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant));
   }
@@ -72,15 +75,19 @@ Widget petGrowthConditions(ColorScheme cs, PetEvoStageOptionModel o) {
     spacing: 6,
     runSpacing: 6,
     children: [
-      for (final label in labels)
+      for (final d in detail)
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 3),
           decoration: BoxDecoration(
             color: cs.surfaceContainerHighest,
             borderRadius: BorderRadius.circular(8),
           ),
-          child: Text(label,
-              style: TextStyle(fontSize: 11.5, color: cs.onSurfaceVariant)),
+          child: Text(d.label,
+              style: TextStyle(
+                fontSize: 11.5,
+                color: d.met ? cs.onSurfaceVariant : cs.error,
+                fontWeight: d.met ? FontWeight.w400 : FontWeight.w700,
+              )),
         ),
     ],
   );
@@ -92,9 +99,11 @@ Widget petGrowthOptionCard(
   PetPetDetailModel pet,
   PetEvoStageOptionModel o, {
   required bool busy,
+  required bool ready,
+  required List<({String label, bool met})> detail,
   VoidCallback? onEvolve,
 }) {
-  final enabled = o.enabled && !busy;
+  final enabled = o.enabled && ready && !busy;
   return Card(
     child: Padding(
       padding: const EdgeInsets.fromLTRB(14, 12, 14, 12),
@@ -113,13 +122,15 @@ Widget petGrowthOptionCard(
             ],
           ),
           const SizedBox(height: 6),
-          petGrowthConditions(cs, o),
+          petGrowthConditionsDetail(cs, detail),
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: FilledButton(
               onPressed: enabled ? onEvolve : null,
-              child: Text(o.enabled ? '进化' : '该形态暂未开放'),
+              child: Text(o.enabled
+                  ? (ready ? '进化' : '条件未达成')
+                  : '该形态暂未开放'),
             ),
           ),
         ],
@@ -133,6 +144,8 @@ Widget petGrowthRollCard(
   ColorScheme cs,
   List<PetEvoStageOptionModel> rolled, {
   required bool busy,
+  required bool anyReady,
+  required List<List<({String label, bool met})>> rolledDetails,
   VoidCallback? onEvolve,
 }) {
   return Card(
@@ -146,16 +159,16 @@ Widget petGrowthRollCard(
           const SizedBox(height: 6),
           Text(rolled.map((o) => '${o.name}（${o.rarityCode}）').join('、'),
               style: TextStyle(fontSize: 12.5, color: cs.onSurfaceVariant)),
-          for (final o in rolled) ...[
+          for (var i = 0; i < rolled.length; i++) ...[
             const SizedBox(height: 8),
-            petGrowthConditions(cs, o),
+            petGrowthConditionsDetail(cs, rolledDetails[i]),
           ],
           const SizedBox(height: 10),
           SizedBox(
             width: double.infinity,
             child: FilledButton.tonal(
-              onPressed: busy ? null : onEvolve,
-              child: const Text('进化（形态随机）'),
+              onPressed: busy || !anyReady ? null : onEvolve,
+              child: Text(anyReady ? '进化（形态随机）' : '条件未达成'),
             ),
           ),
         ],

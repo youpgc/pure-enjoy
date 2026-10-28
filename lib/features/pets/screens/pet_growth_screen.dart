@@ -11,6 +11,7 @@ import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_growth_widgets.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 养成页签（进化 / 特性）——UI 语义，非 DDL 值域，故不进 constants/pet.dart
 enum PetGrowthTab {
@@ -61,12 +62,28 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   String? _optionsError;
   bool _busy = false;
 
+  /// 条件评定数据源：金币（summary 缓存口径）与背包持有量（按 item_code 合计）
+  int _gold = 0;
+  Map<String, int> _bagByCode = const {};
+
+  /// 道具名映射（服务端联查取名，与任务/概率页同口径）：条件 chips 显示
+  /// 中文名，字典缺失回落编码
+  Map<String, String> _itemNames = const {};
+
   @override
   void initState() {
     super.initState();
     _tabs = TabController(
         length: 2, initialIndex: widget.initialTab?.index ?? 0, vsync: this);
     _load();
+    _loadItemNames();
+  }
+
+  Future<void> _loadItemNames() async {
+    final names = await PetRpc.fetchItemNames();
+    if (mounted && names.isNotEmpty) {
+      setState(() => _itemNames = names);
+    }
   }
 
   @override
@@ -88,6 +105,15 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
       }
     }
     keep ??= _firstRearingId(details);
+    final (summary, _) = await PetService.instance.fetchSummary();
+    if (!mounted) return;
+    // 同码可跨格多行（堆叠满溢新行，服务端口径 sum(quantity)）——
+    // 必须累加，覆盖式写法会少计持有量、进化道具条件被误判未达成
+    final byCode = <String, int>{};
+    for (final b in bag) {
+      if (b.itemCode.isEmpty) continue;
+      byCode[b.itemCode] = (byCode[b.itemCode] ?? 0) + b.quantity;
+    }
     setState(() {
       _details = details;
       _petId = keep;
@@ -95,6 +121,8 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
       _washItems = bag
           .where((e) => e.effectType == PetItemEffectType.traitWash.code)
           .toList();
+      _bagByCode = byCode;
+      _gold = summary?.wallet.goldBalance ?? 0;
       _loading = false;
     });
     await _loadOptions();
@@ -208,7 +236,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
         ),
       ),
       body: _loading
-          ? const Center(child: LoadingWidget())
+          ? const Center(child: PetPawLoading())
           : RefreshIndicator(
               onRefresh: () => _load(force: true),
               child: TabBarView(
@@ -292,25 +320,47 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   /// 唯一分支时显式回传目标形态（与服务端「v_cnt=1 直取该行」等价）；
   /// 多分支的 weighted_random 一律回传 null，交服务端按 branch_weight 掷取。
   List<Widget> _evolveOptions(ColorScheme cs, PetPetDetailModel pet) {
+    // 条件达成评估（与服务端 rpc_pet_evolve 同口径）
+    ({bool allMet, List<({String label, bool met})> detail}) evalOf(
+            PetEvoStageOptionModel o) =>
+        o.evaluateConditions(
+            level: pet.level,
+            intimacy: pet.intimacy,
+            gold: _gold,
+            bagByItemCode: _bagByCode,
+            itemNames: _itemNames);
+
     if (_options.length == 1) {
       final only = _options.first;
+      final ev = evalOf(only);
       return [
         petGrowthOptionCard(cs, pet, only,
-            busy: _busy, onEvolve: () => _evolve(only, lockTarget: true))
+            busy: _busy,
+            ready: ev.allMet,
+            detail: ev.detail,
+            onEvolve: () => _evolve(only, lockTarget: true))
       ];
     }
     final chosen =
         _options.where((o) => o.pickMode == PetPickMode.userChoice).toList();
     final rolled =
         _options.where((o) => o.pickMode != PetPickMode.userChoice).toList();
+    final rolledEvs = [for (final o in rolled) evalOf(o)];
     return [
       for (final o in chosen)
         petGrowthOptionCard(cs, pet, o,
-            busy: _busy, onEvolve: () => _evolve(o)),
+            busy: _busy,
+            ready: evalOf(o).allMet,
+            detail: evalOf(o).detail,
+            onEvolve: () => _evolve(o)),
       if (rolled.isNotEmpty) ...[
         const SizedBox(height: 10),
+        // 概率分支：任一分支条件达成即可尝试（服务端按权重掷取后逐支校验）
         petGrowthRollCard(cs, rolled,
-            busy: _busy, onEvolve: () => _evolve(rolled.first)),
+            busy: _busy,
+            anyReady: rolledEvs.any((e) => e.allMet),
+            rolledDetails: [for (final e in rolledEvs) e.detail],
+            onEvolve: () => _evolve(rolled.first)),
       ],
     ];
   }
@@ -334,7 +384,9 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
                       height: 190,
                       fit: BoxFit.contain,
                       cacheWidth: petDecodeWidth(
-                          190, MediaQuery.devicePixelRatioOf(ctx))),
+                          190, MediaQuery.devicePixelRatioOf(ctx)),
+                      // 占位图路径也可能缺资源（新种属未及出图）：收起图区
+                      errorBuilder: (_, __, ___) => const SizedBox.shrink()),
                 ),
               const SizedBox(height: 12),
               Text('✨ 进化完成！',
