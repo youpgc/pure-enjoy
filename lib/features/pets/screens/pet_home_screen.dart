@@ -39,6 +39,7 @@ import 'pet_quests_screen.dart';
 import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 part 'pet_home_screen_layout.dart';
 part 'pet_home_screen_actions.dart';
@@ -86,8 +87,19 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   String? _error;
   bool _busy = false;
 
-  /// 场景主题（§11.1）：当前激活场景码；进页拉一次，主题面板切换后更新
+  /// 场景主题（§11.1）：当前激活场景码；进页拉一次，主题面板切换后更新。
+  /// 初值是占位默认码，真实激活码以 fetchScenes 回落为准
   String _activeScene = 'scene_dream';
+
+  /// 场景资源预热去重标记：_sceneReadyFor 记录已解码的场景码
+  bool _sceneReady = false;
+  String _sceneReadyFor = '';
+
+  /// 初载场景管线完结：fetchScenes 回落 + 激活码解码完成才置真。
+  /// 门禁等它而非 _sceneReady——占位默认码先就绪就开闸，真实主题到位
+  /// 再切换即「默认→已切主题」的一闪（20261028 用户实测反馈）。
+  /// 置真后不再回落：在线切主题先解码后切码（_openThemes），不重锁门禁
+  bool _sceneFetchDone = false;
 
   /// 随机事件（§3.6）：进页后首次 summary 成功时 roll 一次 home_open；
   /// 照料动作成功后 roll action_done。_eventDialogShowing 防弹层叠加。
@@ -131,6 +143,10 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     super.initState();
     _load();
     _loadActiveScene();
+    // 首帧后预热占位默认码：激活码即默认码时秒回，拉取失败时兜底即用
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (mounted) _ensureSceneReady(_activeScene);
+    });
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
       final cooling = _budget.anyCooling;
@@ -146,10 +162,33 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 拉取当前激活场景（独立于 _load：主题切换不触发总览刷新）
   Future<void> _loadActiveScene() async {
     final (data, err) = await PetRpc.fetchScenes();
-    if (!mounted || err != null || data == null) return;
+    if (!mounted) return;
+    // 拉取失败沿用占位默认码（postFrame 预热兜底），不卡 loading
+    final code = (err == null && data != null)
+        ? data['active']?.toString() ?? 'scene_dream'
+        : 'scene_dream';
+    await _ensureSceneReady(code);
+    if (!mounted) return;
     setState(() {
-      _activeScene = data['active']?.toString() ?? 'scene_dream';
+      _activeScene = code;
+      _sceneFetchDone = true;
     });
+  }
+
+  /// 场景主题资源预热：precacheImage 解码完成才返回（loading 双条件之二）。
+  /// 资源异常不卡 loading——放行后由渲染层默认背景兜底。
+  Future<void> _ensureSceneReady(String code) async {
+    if (_sceneReady && _sceneReadyFor == code) return;
+    try {
+      await precacheImage(
+          AssetImage(PetSceneBackground.assetPath(code)), context);
+    } catch (_) {}
+    if (mounted) {
+      setState(() {
+        _sceneReadyFor = code;
+        _sceneReady = true;
+      });
+    }
   }
 
   @override
@@ -305,7 +344,10 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    // 初始 loading 双条件：总览就绪 + 场景管线完结（激活码已定且解码完成）
+    if (_loading || !_sceneFetchDone) {
+      return const Center(child: PetPawLoading());
+    }
     if (!_enabled) return const EmptyWidget(message: '宠物功能暂未开放');
     if (_summary == null) {
       return PetLoadErrorView(

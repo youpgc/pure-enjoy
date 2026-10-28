@@ -55,10 +55,10 @@ class PetAdventureBanner extends StatelessWidget {
               color: awaiting ? cs.onErrorContainer : cs.primary),
           title: Text(
               awaiting
-                  ? '历险遇险，点击去救助'
+                  ? '游历遇险，点击去救助'
                   : finished
-                      ? '历险已结束，点击查看结果'
-                      : '历险进行中',
+                      ? '游历已结束，点击查看结果'
+                      : '游历进行中',
               style: const TextStyle(fontSize: 13)),
           subtitle: awaiting
               ? const Text('需要你的救援！', style: TextStyle(fontSize: 11))
@@ -342,7 +342,9 @@ Future<void> showPetBirthDialog(
                     height: 210,
                     fit: BoxFit.contain,
                     cacheWidth: petDecodeWidth(
-                        210, MediaQuery.devicePixelRatioOf(ctx))),
+                        210, MediaQuery.devicePixelRatioOf(ctx)),
+                    // 占位图路径也可能缺资源（新种属未及出图）：收起图区
+                    errorBuilder: (_, __, ___) => const SizedBox.shrink()),
               ),
             const SizedBox(height: 12),
             Text('🎉 新伙伴诞生！', style: Theme.of(ctx).textTheme.titleMedium),
@@ -384,7 +386,7 @@ class PetAdventureNote extends StatelessWidget {
         borderRadius: BorderRadius.circular(14),
       ),
       child: Text(
-          '🐾 外出历险中，归来后记得查看结果领取奖励',
+          '🐾 外出游历中，归来后记得查看结果领取奖励',
           style: TextStyle(
               fontSize: 12,
               color: Colors.brown.shade700,
@@ -411,6 +413,15 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     'scene_meadow': '晨曦草甸',
     'scene_starry': '星海之栏',
   };
+
+  /// 行名以服务端下发的 name 为准（新增主题零改码），
+  /// 空/缺失时回退本地映射，再回退场景码
+  static String _labelOf(Map<String, dynamic> sc) {
+    final code = sc['scene_code']?.toString() ?? '';
+    final name = sc['name']?.toString() ?? '';
+    if (name.isNotEmpty) return name;
+    return _sceneLabels[code] ?? code;
+  }
 
   List<Map<String, dynamic>>? _scenes;
   String _active = 'scene_dream';
@@ -447,7 +458,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     // 价格缺失时拒绝并提示（此前 ?? 0 会显示「消耗 0 金币」，确认后被
     // 服务端 PET_SCENE_PRICE_MISSING 拒绝，两段体验错位——审计批 20261012）
     final price = (sc['price_coin'] as num?)?.toInt();
-    final label = _sceneLabels[code] ?? code;
+    final label = _labelOf(sc);
     if (price == null) {
       showPetToast(context, '「$label」暂未定价，无法购买');
       return;
@@ -538,7 +549,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     final owned = sc['owned'] == true;
     final using = _active == code;
     final price = (sc['price_coin'] as num?)?.toInt();
-    final label = _sceneLabels[code] ?? code;
+    final label = _labelOf(sc);
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
@@ -608,7 +619,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
   /// 整屏预览：真实场景背景 + 主题名/操作提示，点任意处关闭
   Future<void> _previewScene(Map<String, dynamic> sc) async {
     final code = sc['scene_code']?.toString() ?? 'scene_dream';
-    final label = _sceneLabels[code] ?? code;
+    final label = _labelOf(sc);
     await showDialog<void>(
       context: context,
       barrierColor: Colors.black87,

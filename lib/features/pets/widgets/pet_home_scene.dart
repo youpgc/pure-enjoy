@@ -37,11 +37,15 @@ class PetSceneBackground extends StatelessWidget {
     'scene_isle',
   };
 
+  /// 场景图资源路径（未知码回落默认主题）——预热与渲染同源，防路径漂移
+  static String assetPath(String code) =>
+      'assets/pets/scenes/${assetScenes.contains(code) ? code : 'scene_dream'}.png';
+
   @override
   Widget build(BuildContext context) {
     final code = assetScenes.contains(sceneCode) ? sceneCode : 'scene_dream';
     return Image.asset(
-      'assets/pets/scenes/$code.png',
+      assetPath(code),
       fit: BoxFit.cover,
       alignment: Alignment.center,
       gaplessPlayback: true,
@@ -227,19 +231,20 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
             const SizedBox(height: 6),
             // 亲密度不在主界面展示：详情面板（属性面板）已有对应字段
             // （20261021 用户拍板）
-            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
-                max: expMaxed ? null : expNeed,
-                forceFull: expMaxed,
-                displayText: expMaxed
-                    ? 'MAX'
-                    : (expNeed == null ? null : '${pet.exp}/$expNeed')),
-            const SizedBox(height: 6),
+            // 健康/经验行序：健康紧随心情（20261027 用户拍板互换）
             // 健康行（历险失败惩罚扣减；低于出发门槛=虚弱，进度条转红警示）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
                 pet.health,
                 valueColor: pet.health < widget.weakHealthAt
                     ? const Color(0xFFE57373)
                     : null),
+            const SizedBox(height: 6),
+            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
+                max: expMaxed ? null : expNeed,
+                forceFull: expMaxed,
+                displayText: expMaxed
+                    ? 'MAX'
+                    : (expNeed == null ? null : '${pet.exp}/$expNeed')),
           ],
         ),
       ),

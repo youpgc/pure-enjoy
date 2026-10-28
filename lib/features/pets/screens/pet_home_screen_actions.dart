@@ -231,6 +231,9 @@ extension _PetHomeActions on _PetHomeScreenState {
       builder: (_) => PetThemeSheet(active: _activeScene),
     );
     if (active != null && active != _activeScene && mounted) {
+      // 先解码后切码：新主题首帧不闪旧图/白屏（与初载门禁同一约束）
+      await _ensureSceneReady(active);
+      if (!mounted) return;
       setState(() => _activeScene = active);
       _load(); // 购买扣了金币，首页金币徽章需要新余额
     }
@@ -257,7 +260,7 @@ extension _PetHomeActions on _PetHomeScreenState {
   void _openAdventure() {
     final pet = _currentPet;
     if (pet == null) {
-      showPetToast(context, '先孵化一只宠物才能历险');
+      showPetToast(context, '先孵化一只宠物才能游历');
       return;
     }
     showPetAdventureSheet(
@@ -298,7 +301,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     final pet = _currentPet;
     if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {
-      showPetToast(context, '历险信息走丢了，刷新一下再试试');
+      showPetToast(context, '游历信息走丢了，刷新一下再试试');
       return;
     }
     if (await run(context, adv.id) && mounted) _load();
