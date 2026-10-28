@@ -98,16 +98,7 @@ Future<void> showPetBagItemDialog(
                     ),
                   )
                 else ...[
-                  if (canUse) ...[
-                    Expanded(
-                      child: FilledButton.icon(
-                        onPressed: busy ? null : () => fire(onUse),
-                        icon: const Icon(Icons.touch_app_outlined, size: 18),
-                        label: const Text('使用'),
-                      ),
-                    ),
-                    const SizedBox(width: 10),
-                  ],
+                  // 丢弃左（红描边）/ 使用右（主色实心）：20261028 用户拍板换位
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(
@@ -120,6 +111,15 @@ Future<void> showPetBagItemDialog(
                       label: const Text('丢弃'),
                     ),
                   ),
+                  const SizedBox(width: 10),
+                  if (canUse)
+                    Expanded(
+                      child: FilledButton.icon(
+                        onPressed: busy ? null : () => fire(onUse),
+                        icon: const Icon(Icons.touch_app_outlined, size: 18),
+                        label: const Text('使用'),
+                      ),
+                    ),
                 ],
               ],
             ),

@@ -17,6 +17,7 @@ import 'pet_egg_screen.dart';
 import 'pet_growth_screen.dart';
 import 'pet_shop_screen.dart';
 import '../widgets/pet_toast.dart';
+import '../widgets/pet_loading.dart';
 
 /// 宠物背包页（格位坐标制 + 左侧分类栏 + 拖拽换位）
 ///
@@ -167,25 +168,96 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   Future<void> _discard(PetBagItemModel item) async {
-    // 统一走强制组件（danger=error 色确认钮，保留不可逆警示语义）
-    final confirmed = await showConfirmDialog(
-      context,
-      title: '丢弃确认',
-      content: '确定丢弃「${item.name}」×${item.quantity}？丢弃不可恢复。',
-      confirmText: '丢弃',
-      danger: true,
-    );
-    if (confirmed != true || !mounted) return;
+    // 二次确认带数量选择：默认全部，可减不可超（上限=持有量），下限 1
+    final qty = await _showDiscardConfirm(item);
+    if (qty == null || !mounted) return;
     await _run(() async {
       // 服务端契约：p_rows 为 [{slot_index, quantity}]（rpc_pet_discard_items 定义）
       final err = await PetRpc.discardItems([
-        {'slot_index': item.slotIndex, 'quantity': item.quantity},
+        {'slot_index': item.slotIndex, 'quantity': qty},
       ]);
       if (!mounted) return;
       if (err != null) return _toast(petRpcErrorText(err));
-      _toast('已丢弃');
+      _toast(qty > 1 ? '已丢弃 ×$qty' : '已丢弃');
       await _load(showLoading: false);
     }, item.id);
+  }
+
+  /// 丢弃二次确认（数量可调：默认全部/下限 1/上限=持有量，到顶禁加）
+  /// 返回丢弃数量；null = 取消。按钮规范：取消左 / 确认丢弃右（红）。
+  Future<int?> _showDiscardConfirm(PetBagItemModel item) {
+    final cs = Theme.of(context).colorScheme;
+    var qty = item.quantity; // 默认全部
+    return showDialog<int>(
+      context: context,
+      builder: (ctx) => StatefulBuilder(
+        builder: (ctx, setQty) => AlertDialog(
+          title: const Text('丢弃确认'),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('确定丢弃「${item.name}」？丢弃不可恢复。',
+                  style: TextStyle(
+                      fontSize: 13, color: cs.onSurfaceVariant)),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Text('丢弃数量',
+                      style: TextStyle(
+                          fontSize: 13, fontWeight: FontWeight.w600)),
+                  const Spacer(),
+                  IconButton.outlined(
+                    visualDensity: VisualDensity.compact,
+                    onPressed:
+                        qty > 1 ? () => setQty(() => qty -= 1) : null,
+                    icon: const Icon(Icons.remove, size: 18),
+                  ),
+                  SizedBox(
+                    width: 76,
+                    child: Text('$qty / ${item.quantity}',
+                        textAlign: TextAlign.center,
+                        style: const TextStyle(
+                            fontSize: 14, fontWeight: FontWeight.w700)),
+                  ),
+                  IconButton.outlined(
+                    visualDensity: VisualDensity.compact,
+                    // 已是持有最大数量：禁用增加
+                    onPressed: qty < item.quantity
+                        ? () => setQty(() => qty += 1)
+                        : null,
+                    icon: const Icon(Icons.add, size: 18),
+                  ),
+                ],
+              ),
+            ],
+          ),
+          actions: [
+            Row(
+              children: [
+                Expanded(
+                  child: OutlinedButton(
+                    onPressed: () => Navigator.pop(ctx),
+                    child: const Text('取消'),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Expanded(
+                  child: FilledButton(
+                    style: FilledButton.styleFrom(
+                      backgroundColor: cs.error,
+                      foregroundColor: cs.onError,
+                    ),
+                    onPressed: () => Navigator.pop(ctx, qty),
+                    child: const Text('确认丢弃'),
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
+      ),
+    );
   }
 
   Future<void> _compact() async {
@@ -302,7 +374,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   }
 
   Widget _buildBody(ColorScheme cs) {
-    if (_loading) return const Center(child: LoadingWidget());
+    if (_loading) return const Center(child: PetPawLoading());
     if (_error != null && _items.isEmpty) {
       return Center(
         child: Column(

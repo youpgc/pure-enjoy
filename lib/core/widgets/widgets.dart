@@ -142,19 +142,32 @@ Future<bool> showConfirmDialog(
     builder: (context) => AlertDialog(
       title: Text(title),
       content: Text(content),
+      // 按钮规范：取消左（描边）/ 确认右（实心，danger 时 error 色）——
+      // 全宽并排显式排版，不依赖 M3 actions 的对齐策略
       actions: [
-        TextButton(
-          onPressed: () => Navigator.pop(context, false),
-          child: Text(cancelText),
-        ),
-        FilledButton(
-          style: danger
-              ? FilledButton.styleFrom(
-                  backgroundColor: Theme.of(context).colorScheme.error,
-                  foregroundColor: Theme.of(context).colorScheme.onError)
-              : null,
-          onPressed: () => Navigator.pop(context, true),
-          child: Text(confirmText),
+        Row(
+          children: [
+            Expanded(
+              child: OutlinedButton(
+                onPressed: () => Navigator.pop(context, false),
+                child: Text(cancelText),
+              ),
+            ),
+            const SizedBox(width: 10),
+            Expanded(
+              child: FilledButton(
+                style: danger
+                    ? FilledButton.styleFrom(
+                        backgroundColor:
+                            Theme.of(context).colorScheme.error,
+                        foregroundColor:
+                            Theme.of(context).colorScheme.onError)
+                    : null,
+                onPressed: () => Navigator.pop(context, true),
+                child: Text(confirmText),
+              ),
+            ),
+          ],
         ),
       ],
     ),
