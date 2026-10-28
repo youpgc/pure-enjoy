@@ -16,31 +16,44 @@ extension _PetHomeLayout on _PetHomeScreenState {
       // 底部让位状态面板（让位高度=面板实测值，随内容浮动），其余方向居中
       child: Padding(
         padding: EdgeInsets.fromLTRB(_kEdgeInset + 40, 0, _kEdgeInset + 40, _panelH),
-        // 宠物整体下沉 20%（粒子层同坐标系随动，FX 锚点不脱节）
-        child: FractionalTranslation(
-          translation: const Offset(0, 0.2),
-          child: Stack(
-            fit: StackFit.expand,
-            children: [
-              Center(
-                child: GestureDetector(
-                  behavior: HitTestBehavior.opaque,
-                  onTap: () => _interact(pet.id),
-                  onDoubleTap: _onStageDoubleTap,
-                  onLongPress: _openAttributes,
-                  child: PetLivingArt(
-                    // 分层弯曲：已登记几何的形态走逐行弯曲，其余画骨架占位
-                    bendGeo: petBendGeo(pet.speciesCode, pet.stage),
-                    bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
-                    action: _machine.current,
-                    onActionEnd: _onActionEnd,
-                  ),
+        child: Stack(
+          fit: StackFit.expand,
+          children: [
+            // 宠物底缘锚定面板上固定 30px：方形舞台 = 本体体量（弯曲渲染的
+            // ref=min(边长)，方形容器内本体恰满格），间距不随屏高漂移
+            Positioned(
+              left: 0,
+              right: 0,
+              bottom: 30,
+              child: AspectRatio(
+                aspectRatio: 1,
+                child: Stack(
+                  fit: StackFit.expand,
+                  // 粒子升出箱顶不裁剪（宠物箱=本体体量，头即箱顶，
+                  // 爱心/呼呼需升入上方舞台区域；外层舞台边界兜底）
+                  clipBehavior: Clip.none,
+                  children: [
+                    GestureDetector(
+                      behavior: HitTestBehavior.opaque,
+                      onTap: () => _interact(pet.id),
+                      onDoubleTap: _onStageDoubleTap,
+                      onLongPress: _openAttributes,
+                      child: PetLivingArt(
+                        // 分层弯曲：已登记几何的形态走逐行弯曲，其余画骨架占位
+                        bendGeo: petBendGeo(pet.speciesCode, pet.stage),
+                        bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
+                        action: _machine.current,
+                        onActionEnd: _onActionEnd,
+                      ),
+                    ),
+                    // 粒子层与宠物同框：emit 的 Alignment 锚点 = 宠物箱相对坐标
+                    //（随宠物定位走，定位再改不漂移；粒子升出框顶不受裁剪）
+                    PetFxLayer(fx: _fx),
+                  ],
                 ),
               ),
-              // 粒子层与宠物同坐标系：emit 的 Alignment 锚点即宠物身体位置
-              PetFxLayer(fx: _fx),
-            ],
-          ),
+            ),
+          ],
         ),
       ),
     );
