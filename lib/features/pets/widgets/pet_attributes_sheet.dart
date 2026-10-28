@@ -275,7 +275,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             // 可分配点提示
             Text(
               pet.status == PetPetStatus.adventuring
-                  ? '历险中的宠物暂时无法加点，归来后再分配吧'
+                  ? '游历中的宠物暂时无法加点，归来后再分配吧'
                   : pet.status != PetPetStatus.rearing
                       ? '伙伴不在养育中，回到身边后才能加点'
                       : pet.pendingAttrPoints > 0
@@ -509,6 +509,8 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
   /// 进度条结构与四维属性行同构（同宽/同高/同底色）;数值格=累计亲密度,
   /// 副行=「亲密等级 Lv.X · 级内进度」（20261021 用户定稿文案）。
   /// 等级曲线 base/growth 读 config（缺键回落 100/1.5）。
+  /// 进度条 = 级内进度百分比（intoLevel/need，20261027 用户拍板：不再按固定
+  /// 100 满——累计值超 100 后旧口径恒满格，看不出级内成长）。
   Widget _intimacyRow(ColorScheme cs) {
     final lv = petIntimacyLevel(widget.pet.intimacy, widget.config);
     return Column(
@@ -525,9 +527,9 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  // 与四维同口径:以 100 为满(超 100 恒满格,视觉长度对齐);
-                  // 等级细节由副行文案承载,20261021 用户拍板
-                  value: (widget.pet.intimacy / 100).clamp(0.0, 1.0),
+                  value: lv.need <= 0
+                      ? 0.0
+                      : (lv.intoLevel / lv.need).clamp(0.0, 1.0),
                   minHeight: 8,
                   backgroundColor: cs.surfaceContainerHighest,
                 ),
