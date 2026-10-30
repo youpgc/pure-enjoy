@@ -8,6 +8,7 @@ import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../../../core/widgets/widgets.dart';
 import 'pet_home_scene.dart';
+import 'pet_loading.dart';
 import 'pet_toast.dart';
 
 /// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
@@ -232,7 +233,7 @@ class PetLoadErrorView extends StatelessWidget {
       child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-          const Text('宠物数据加载失败，请稍后重试'),
+          const Text('宠物信息加载失败，请稍后重试'),
           if (message != null) ...[
             const SizedBox(height: 8),
             Padding(
@@ -368,11 +369,8 @@ Future<void> showPetBirthDialog(
   );
 }
 
-String _genderGlyph(String? code) => switch (code) {
-      'male' => '♂',
-      'female' => '♀',
-      _ => '·',
-    };
+String _genderGlyph(String? code) =>
+    PetGender.fromCode(code)?.label ?? '·'; // 20261030 收敛重复实现，单一源=PetGender enum
 
 /// 历险中提示行（宠物保留舞台原位时展示去向文案，白底 pill 适配场景草地）
 class PetAdventureNote extends StatelessWidget {
@@ -408,10 +406,17 @@ class PetThemeSheet extends StatefulWidget {
 }
 
 class _PetThemeSheetState extends State<PetThemeSheet> {
+  // 20261030 对齐资产集 8 主题（原仅 3 项，余 5 个主题缺兜底直落场景码）；
+  // 兜底名与 DB 种子 name 对齐（feature_pet_scene_assets_20261027.sql）
   static const _sceneLabels = {
     'scene_dream': '梦幻夜空',
     'scene_meadow': '晨曦草甸',
+    'scene_sakura': '樱花庭院',
+    'scene_snow': '雪原暖屋',
+    'scene_beach': '椰风海滩',
     'scene_starry': '星海之栏',
+    'scene_glow': '秘境萤光',
+    'scene_isle': '云上浮岛',
   };
 
   /// 行名以服务端下发的 name 为准（新增主题零改码），
@@ -531,7 +536,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
               const Center(
                   child: Padding(
                 padding: EdgeInsets.all(24),
-                child: CircularProgressIndicator(),
+                child: PetPawLoading(),
               ))
             else
               for (final sc in _scenes!) ...[

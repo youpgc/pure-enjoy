@@ -456,6 +456,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(4),
             child: LinearProgressIndicator(
+              // 四维属性为 0~100 结构值，100=结构满值（非业务配置）
               value: ((base + plus) / 100).clamp(0.0, 1.0),
               minHeight: 8,
               backgroundColor: cs.surfaceContainerHighest,
@@ -508,7 +509,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
   /// 亲密度行（等级制,20261021 用户拍板：不封顶按等级拆分）：
   /// 进度条结构与四维属性行同构（同宽/同高/同底色）;数值格=累计亲密度,
   /// 副行=「亲密等级 Lv.X · 级内进度」（20261021 用户定稿文案）。
-  /// 等级曲线 base/growth 读 config（缺键回落 100/1.5）。
+  /// 等级曲线 base/growth 读 config（缺键/非法回退累计值平铺，不造默认值）。
   /// 进度条 = 级内进度百分比（intoLevel/need，20261027 用户拍板：不再按固定
   /// 100 满——累计值超 100 后旧口径恒满格，看不出级内成长）。
   Widget _intimacyRow(ColorScheme cs) {
@@ -527,9 +528,11 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               child: ClipRRect(
                 borderRadius: BorderRadius.circular(4),
                 child: LinearProgressIndicator(
-                  value: lv.need <= 0
+                  value: lv == null
                       ? 0.0
-                      : (lv.intoLevel / lv.need).clamp(0.0, 1.0),
+                      : lv.need <= 0
+                          ? 0.0
+                          : (lv.intoLevel / lv.need).clamp(0.0, 1.0),
                   minHeight: 8,
                   backgroundColor: cs.surfaceContainerHighest,
                 ),
@@ -546,7 +549,10 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           ],
         ),
         const SizedBox(height: 4),
-        Text('亲密等级 Lv.${lv.level} · ${lv.intoLevel}/${lv.need}',
+        Text(
+            lv == null
+                ? '亲密等级 —'
+                : '亲密等级 Lv.${lv.level} · ${lv.intoLevel}/${lv.need}',
             style: TextStyle(fontSize: 12, color: cs.onSurfaceVariant)),
       ],
     );

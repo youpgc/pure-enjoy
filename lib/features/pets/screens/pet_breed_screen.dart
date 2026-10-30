@@ -201,7 +201,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(_error ?? '数据加载失败', style: TextStyle(color: cs.error)),
+            Text(_error ?? '加载失败', style: TextStyle(color: cs.error)),
             const SizedBox(height: 12),
             FilledButton(
                 onPressed: () => _load(force: true), child: const Text('重试')),
@@ -225,7 +225,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
                 child: Column(
                   mainAxisSize: MainAxisSize.min,
                   children: [
-                    Text('繁育数据加载失败',
+                    Text('繁育信息加载失败',
                         style: TextStyle(fontSize: 13, color: cs.error)),
                     const SizedBox(height: 4),
                     Text(_error!,

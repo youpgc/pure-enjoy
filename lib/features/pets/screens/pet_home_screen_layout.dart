@@ -150,8 +150,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                   expMaxed: petExpMaxed(pet.level, _summary?.config),
                   weakHealthAt: (_summary?.config[
                               'adventure_health_threshold'] as num?)
-                          ?.toInt() ??
-                      20,
+                          ?.toInt(),
                   // 展示层实时衰减：速率同源下发；寄养冻结传 0
                   decayHungerPerHour:
                       (pet.status == PetPetStatus.fostered)
@@ -280,6 +279,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
   /// 心情已满时不显示增量——满值再加是无效增量，改提示关怀文案，20261022 拍板）
   String get _interactMsg {
     final pet = _currentPet;
+    // 心情为 0~100 结构值，100=结构满值（非业务配置）
     if (pet != null && pet.mood >= 100) {
       return '它已经心满意足啦';
     }

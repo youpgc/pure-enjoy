@@ -63,7 +63,7 @@ class PetService {
       );
       return (data, cached);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetService] 门控查询失败: $e');
+      if (kDebugMode) debugPrint('[PetService] 门控查询失败');
       return (null, false);
     }
   }
@@ -101,7 +101,7 @@ class PetService {
       if (forceRefresh) summaryForceRefreshed.value++; // 通知常驻监听方重载
       return (summary, null);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetService] 总览拉取失败: $e');
+      if (kDebugMode) debugPrint('[PetService] 总览拉取失败');
       lastSummaryFromCache = false;
       // 客户端解析异常统一文案单一源（此前自造「总览数据解析失败」双源并存；
       // 该 catch 同时兜住缓存写失败，故文案不指名「解析」）

@@ -347,7 +347,6 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   String _rewardText(int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '🪙 $gold',
-      if (points > 0) '⭐ $points',
       // 道具逐个具名：服务端下发名(周任务) → 本地目录回填(每日) → 编码兜底
       for (final it in items)
         '${it.name ?? _itemNames[it.code] ?? it.code} ×${it.count}',
@@ -358,7 +357,6 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   String _rewardParts(int gold, int points, List<PetRewardItemModel> items) {
     final parts = [
       if (gold > 0) '金币 +$gold',
-      if (points > 0) '积分 +$points',
       for (final it in items)
         '${it.name ?? _itemNames[it.code] ?? it.code} ×${it.count}',
     ];

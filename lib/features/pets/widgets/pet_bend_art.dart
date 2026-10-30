@@ -18,7 +18,7 @@ Future<ui.FragmentProgram?> petBendProgram() =>
     }).catchError((Object e) {
       // 失败必须**可见**：静默退化的话，「弯曲已生效」会被误当成结论
       _bendError = '$e';
-      if (kDebugMode) debugPrint('宠物弯曲着色器不可用，退化为整图兜底：$e');
+      if (kDebugMode) debugPrint('宠物弯曲着色器不可用，退化为整图兜底');
       return null;
     });
 
@@ -154,7 +154,7 @@ class _PetBendArtState extends State<PetBendArt>
       return frame.image;
     } catch (e) {
       // 素材与清单脱节时画透明帧，不抛异常（铁律 8）
-      if (kDebugMode) debugPrint('宠物弯曲帧解码失败（$asset）：$e');
+      if (kDebugMode) debugPrint('宠物弯曲帧解码失败（$asset）');
       return null;
     }
   }

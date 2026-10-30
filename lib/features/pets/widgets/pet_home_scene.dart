@@ -125,7 +125,7 @@ class PetBottomStatusCard extends StatefulWidget {
     required this.pet,
     this.expNeed,
     this.expMaxed = false,
-    this.weakHealthAt = 20,
+    this.weakHealthAt,
     this.decayHungerPerHour = 0,
     this.decayMoodPerHour = 0,
     this.statsAt,
@@ -141,9 +141,9 @@ class PetBottomStatusCard extends StatefulWidget {
   /// 已达等级上限（level_max，服务端同源冻结 exp）：经验条满格 + 显示 MAX
   final bool expMaxed;
 
-  /// 虚弱阈值（与历险出发门槛 adventure_health_threshold 同源；缺省 20）——
-  /// 健康低于此值时健康行转红警示
-  final int weakHealthAt;
+  /// 虚弱阈值（历险出发门槛 adventure_health_threshold 同源下发）——
+  /// 健康低于此值时健康行转红警示；null（缺键/旧版服务端）不判定不造默认值
+  final int? weakHealthAt;
 
   /// 展示层实时衰减速率（config 同源；0=不衰减）。寄养冻结由调用方以 0 传入
   final int decayHungerPerHour;
@@ -232,10 +232,12 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
             // 亲密度不在主界面展示：详情面板（属性面板）已有对应字段
             // （20261021 用户拍板）
             // 健康/经验行序：健康紧随心情（20261027 用户拍板互换）
-            // 健康行（历险失败惩罚扣减；低于出发门槛=虚弱，进度条转红警示）
+            // 健康行（历险失败惩罚扣减；低于出发门槛=虚弱，进度条转红警示；
+            // 阈值缺键不判定）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
                 pet.health,
-                valueColor: pet.health < widget.weakHealthAt
+                valueColor: (widget.weakHealthAt != null &&
+                        pet.health < widget.weakHealthAt!)
                     ? const Color(0xFFE57373)
                     : null),
             const SizedBox(height: 6),

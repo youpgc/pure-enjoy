@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../services/pet_rpc.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_loading.dart';
 import '../../../utils/date_time_utils.dart';
 
 /// 宠物成长回忆（需求 §3.3 时间线的 App 呈现，2026-10-09 实装）
@@ -71,7 +72,7 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
     return Scaffold(
       appBar: AppBar(title: Text('${widget.petName}的成长回忆')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: PetPawLoading())
           : _error != null
               ? Center(
                   child: Column(

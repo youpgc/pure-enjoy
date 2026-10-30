@@ -1,14 +1,17 @@
+import 'package:flutter/foundation.dart';
+
 /// 客户端本地异常（字段类型不符、解析失败）的统一文案。
 ///
 /// 原始异常已在各查询点 debugPrint；把 `e.toString()` 直接回给页面会把
-/// `type 'Null' is not a subtype of ...` 这类英文串上屏（[petRpcErrorText]
-/// 对短字符串是原样放行的），用户读不懂，也掩盖了真正的配置问题。
-const String kPetLocalError = '数据读取异常，请刷新重试';
+/// `type 'Null' is not a subtype of ...` 这类英文串上屏，用户读不懂，
+/// 也掩盖了真正的配置问题。
+const String kPetLocalError = '读取出了点问题，请刷新重试';
 
 /// 宠物 RPC 业务错误文案映射
 ///
 /// PostgREST 4xx 时 error 字段为服务端 message（raise exception 的文本，
-/// 如 PET_FREE_FEED_LIMIT）；在此统一转中文，未知码透传原文。
+/// 如 PET_FREE_FEED_LIMIT）；在此统一转中文，未知码只进 debug 日志、
+/// 一律回场景化文案（禁开发腔：原始错误串禁止上屏）。
 String petRpcErrorText(String? error) {
   final msg = error ?? '';
   // 兜底：服务端错误 JSON 里截取 message 值
@@ -36,7 +39,7 @@ String petRpcErrorText(String? error) {
     'PET_ITEM_NOT_FOUND': '道具不存在或已下架',
     'PET_ITEM_NOT_RESCUE': '该道具不是救援道具，无法用于救助',
     'PET_ITEM_PURCHASE_LIMIT': '该商品已达限购数量',
-    'PET_QTY_LIMIT': '单次最多购买 99 个，请分批购买',
+    'PET_QTY_LIMIT': '一次买得太多啦，请分批购买',
     'PET_COLLECTION_RECIPE_NOT_FOUND': '该兑换暂不可用，稍后再来看看',
     'PET_BAG_FULL_RACE': '背包已满，请清理后再试',
     'PET_BAG_FULL_CLAIM_RETRY': '背包已满，清理后可重新领取',
@@ -142,6 +145,7 @@ String petRpcErrorText(String? error) {
     'PET_RELEASE_LAST': '至少要有一只伙伴陪在你身边，先获得新的伙伴吧',
   };
   if (map.containsKey(code)) return map[code]!;
-  if (code.length <= 40) return code;
+  // 未知码不透传原文上屏（禁开发腔），只进 debug 日志
+  if (kDebugMode) debugPrint('[petRpc] unmapped error: $code');
   return '操作失败，请稍后重试';
 }

@@ -126,12 +126,11 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
                             ),
                             const SizedBox(height: 2),
                             Builder(builder: (_) {
-                              // 虚弱阈值与历险出发门槛同源（缺配置回退 20）
+                              // 虚弱阈值与历险出发门槛同源；缺键不判定不造默认值
                               final weakAt = (_summary!.config[
                                           'adventure_health_threshold']
                                       as num?)
-                                  ?.toInt() ??
-                                  20;
+                                  ?.toInt();
                               // 展示层实时衰减（寄养冻结；速率缺省 0=不衰减）
                               final anchor = _summary!.fetchedAt;
                               final fostered =
@@ -158,7 +157,7 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
                                           ?.toInt() ??
                                           0,
                                       DateTime.now());
-                              final weak = pet.health < weakAt;
+                              final weak = weakAt != null && pet.health < weakAt;
                               return Text.rich(
                                 TextSpan(
                                   children: [

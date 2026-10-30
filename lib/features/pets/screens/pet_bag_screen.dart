@@ -150,10 +150,11 @@ class _PetBagScreenState extends State<PetBagScreen> {
       final pet = summary?.petInfoFor(widget.petId);
       if (summary != null && pet == null) return _toast('当前没有在养宠物');
       if (summary != null && pet != null) {
-        final fullLine =
-            (summary.config['feed_full_hunger'] as num?)?.toInt() ?? 100;
+        // 饱腹阈值与主页 PetActionBudget.isFull 同口径：0/缺配 = 不设门槛不阻塞
+        final rawFull = summary.config['feed_full_hunger'] as num?;
+        final fullLine = (rawFull != null && rawFull > 0) ? rawFull.toInt() : null;
         if (pet.status == PetPetStatus.adventuring ||
-            pet.hunger >= fullLine) {
+            (fullLine != null && pet.hunger >= fullLine)) {
           return;
         }
       }

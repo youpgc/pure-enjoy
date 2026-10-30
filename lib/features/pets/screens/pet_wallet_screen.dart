@@ -190,7 +190,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         _loading = false;
       });
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetWallet] 加载失败: $e');
+      if (kDebugMode) debugPrint('[PetWallet] 加载失败');
       if (!mounted) return;
       setState(() {
         _error = '$e';
@@ -218,7 +218,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            const Text('数据加载失败，请稍后重试'),
+            const Text('加载失败，请稍后重试'),
             const SizedBox(height: 12),
             FilledButton(
               onPressed: () {
