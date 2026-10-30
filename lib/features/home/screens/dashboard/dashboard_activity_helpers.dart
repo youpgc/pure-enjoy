@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../../../../services/dict_service.dart';
 import '../../../../utils/date_time_utils.dart';
+import '../../../life/models/expense_model.dart';
 import '../../../life/models/habit_model.dart';
 import './dashboard_helpers.dart';
 
@@ -32,16 +33,17 @@ Map<String, dynamic> buildDiaryActivity(Map<String, dynamic> item) {
   };
 }
 
-/// 由支出记录构建最近活动条目
+/// 由支出/收入记录构建最近活动条目（按 type 区分标题、图标与分类字典）
 Map<String, dynamic> buildExpenseActivity(Map<String, dynamic> item) {
+  final isIncome = item['type'] == ExpenseModel.typeIncome;
   final categoryLabel = DictService.instance.getLabelOrDefault(
-    'expense_category',
+    isIncome ? 'income_category' : 'expense_category',
     item['category'] as String? ?? '',
     defaultValue: item['category'] as String? ?? '其他',
   );
   return {
-    'icon': Icons.attach_money,
-    'title': '支出记录',
+    'icon': isIncome ? Icons.savings_outlined : Icons.attach_money,
+    'title': isIncome ? '收入记录' : '支出记录',
     'subtitle': '$categoryLabel ¥${item['amount'] ?? 0}',
     'time': formatDashboardDisplayDate(item['created_at'], item['date']),
     'created_at_raw': item['created_at'] as String? ?? '',

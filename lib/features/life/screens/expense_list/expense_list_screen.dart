@@ -25,6 +25,7 @@ class ExpenseListScreen extends StatefulWidget {
   const ExpenseListScreen({
     super.key,
     this.initialCategory = 'all',
+    this.initialType = 'all',
     this.initialStartMonth,
     this.initialEndMonth,
     this.readOnly = false,
@@ -32,6 +33,9 @@ class ExpenseListScreen extends StatefulWidget {
 
   /// 从统计页跳转带入的预选分类，默认 'all'（不限分类）。
   final String initialCategory;
+
+  /// 从统计页跳转带入的预选类型，'all'（不限）/ 'expense'（支出）/ 'income'（收入）。
+  final String initialType;
 
   /// 从统计页跳转带入的预置日期区间（月份），为空表示不限日期。
   final DateTime? initialStartMonth;
@@ -57,26 +61,33 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     with PaginatedListMixin, _ExpenseListActionsMixin {
   List<ExpenseModel> _expenses = [];
   bool _isLoading = true;
+  String _selectedType = 'all';
   String _selectedCategory = 'all';
   DateTime? _rangeStart;
   DateTime? _rangeEnd;
   DateTime _displayedMonth = DateTime.now();
-  double _totalAmount = 0.0;
+  double _totalExpense = 0.0;
+  double _totalIncome = 0.0;
   bool _isLoadingTotal = false;
   Timer? _monthUpdateDebounce;
 
   @override
   String? get _userId => AuthService.instance.currentUserId;
 
+  /// 类型对应的分类字典码：支出→expense_category，收入→income_category
+  String get _categoryDictCode =>
+      _selectedType == ExpenseModel.typeIncome ? 'income_category' : 'expense_category';
+
   /// 统计页跳转带入的筛选区间提示文案
   String get _rangeHint {
     final cat = _selectedCategory == 'all'
         ? '全部分类'
         : DictService.instance.getLabelOrDefault(
-            'expense_category',
+            _categoryDictCode,
             _selectedCategory,
             defaultValue: _selectedCategory,
           );
+    final type = _selectedType == 'all' ? '' : (_selectedType == ExpenseModel.typeIncome ? '收入' : '支出');
     final range = (_rangeStart != null && _rangeEnd != null)
         ? '${_rangeStart!.year}年${_rangeStart!.month}月 - ${_rangeEnd!.year}年${_rangeEnd!.month}月'
         : _rangeStart != null
@@ -84,13 +95,15 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
             : _rangeEnd != null
                 ? '至${_rangeEnd!.year}年${_rangeEnd!.month}月'
                 : '';
-    return range.isEmpty ? '统计区间：$cat' : '统计区间：$range · $cat';
+    final suffix = [if (type.isNotEmpty) type, if (cat.isNotEmpty) cat].join(' · ');
+    return range.isEmpty ? '统计区间：$suffix' : '统计区间：$range · $suffix';
   }
 
   @override
   void initState() {
     super.initState();
     _selectedCategory = widget.initialCategory;
+    _selectedType = widget.initialType;
     _rangeStart = widget.initialStartMonth;
     _rangeEnd = widget.initialEndMonth;
     initPagination();
@@ -171,7 +184,9 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     });
   }
 
-  /// 加载指定月份总支出（服务端 RPC SUM 聚合，不受分页限制）
+  /// 加载指定月份总支出/总收入（服务端 RPC SUM 聚合，不受分页限制）。
+  /// 类型筛选为「全部」时并发两次 RPC 分别取支出与收入合计并列展示；
+  /// 指定类型时仅取对应类型，RPC 传入 p_type 过滤。
   Future<void> _loadTotalAmountForMonth(DateTime month) async {
     final userId = _userId;
     if (userId == null) return;
@@ -179,32 +194,55 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
     setState(() => _isLoadingTotal = true);
 
     try {
-      // 'all' 表示不限分类：与列表查询口径一致（:234 对 'all' 跳过分类过滤），
+      // 'all' 表示不限分类：与列表查询口径一致（对 'all' 跳过分类过滤），
       // 故不向 RPC 传 p_category，避免云端按 category='all' 字面匹配导致合计恒为 0。
-      final rpcParams = <String, dynamic>{
+      final baseParams = <String, dynamic>{
         'p_user_id': userId,
         'p_year': month.year,
         'p_month': month.month,
       };
       if (_selectedCategory != 'all') {
-        rpcParams['p_category'] = _selectedCategory;
+        baseParams['p_category'] = _selectedCategory;
       }
-      final result = await ApiClient.rpc(
-        'fn_get_monthly_expense_total',
-        params: rpcParams,
-      );
 
-      double total = 0.0;
-      if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
-        final value = result.data!.first['total'];
-        if (value != null) {
-          total = (value as num).toDouble();
+      double expenseTotal = 0.0;
+      double incomeTotal = 0.0;
+
+      Future<double> fetchTotal(String type) async {
+        final result = await ApiClient.rpc(
+          'fn_get_monthly_expense_total',
+          params: {...baseParams, 'p_type': type},
+        );
+        double total = 0.0;
+        if (result.isSuccess && result.data != null && result.data!.isNotEmpty) {
+          final value = result.data!.first['total'];
+          if (value != null) {
+            total = (value as num).toDouble();
+          }
+        }
+        return total;
+      }
+
+      if (_selectedType == 'all') {
+        final results = await Future.wait([
+          fetchTotal(ExpenseModel.typeExpense),
+          fetchTotal(ExpenseModel.typeIncome),
+        ]);
+        expenseTotal = results[0];
+        incomeTotal = results[1];
+      } else {
+        final total = await fetchTotal(_selectedType);
+        if (_selectedType == ExpenseModel.typeIncome) {
+          incomeTotal = total;
+        } else {
+          expenseTotal = total;
         }
       }
 
       if (mounted) {
         setState(() {
-          _totalAmount = total;
+          _totalExpense = expenseTotal;
+          _totalIncome = incomeTotal;
           _isLoadingTotal = false;
         });
       }
@@ -238,6 +276,10 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
       final filters = <String, String>{
         'user_id': 'eq.$userId',
       };
+
+      if (_selectedType != 'all') {
+        filters['type'] = 'eq.$_selectedType';
+      }
 
       if (_selectedCategory != 'all') {
         filters['category'] = 'eq.$_selectedCategory';
@@ -339,12 +381,23 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
   }
 
   /// 顶部统计卡片金额：区间生效时显示区间内已加载记录的合计（与统计页本地聚合口径一致），
-  /// 否则显示服务端 RPC 的当月合计（_totalAmount）。
-  double get _headlineTotal {
+  /// 否则显示服务端 RPC 的当月合计（_totalExpense / _totalIncome）。
+  double get _headlineExpense {
     if (_rangeStart != null || _rangeEnd != null) {
-      return _expenses.fold(0.0, (sum, e) => sum + e.amount);
+      return _expenses
+          .where((e) => e.type != ExpenseModel.typeIncome)
+          .fold(0.0, (sum, e) => sum + e.amount);
     }
-    return _totalAmount;
+    return _totalExpense;
+  }
+
+  double get _headlineIncome {
+    if (_rangeStart != null || _rangeEnd != null) {
+      return _expenses
+          .where((e) => e.type == ExpenseModel.typeIncome)
+          .fold(0.0, (sum, e) => sum + e.amount);
+    }
+    return _totalIncome;
   }
 
   @override
@@ -355,18 +408,39 @@ class _ExpenseListScreenState extends _ExpenseListActionsHost
       isLoadingTotal: _isLoadingTotal,
       expenses: _expenses,
       displayedMonth: _displayedMonth,
-      headlineTotal: _headlineTotal,
+      headlineExpense: _headlineExpense,
+      headlineIncome: _headlineIncome,
       headlineLabel: _headlineLabel,
       rangeHint: _rangeHint,
       rangeStart: _rangeStart,
       rangeEnd: _rangeEnd,
+      selectedType: _selectedType,
       selectedCategory: _selectedCategory,
+      categoryDictCode: _categoryDictCode,
       readOnly: widget.readOnly,
       scrollController: scrollController,
       onClearRange: () {
         setState(() {
           _rangeStart = null;
           _rangeEnd = null;
+        });
+        _loadExpenses(refresh: true);
+      },
+      onTypeSelect: (type) {
+        // 类型切换后分类筛选条展示的字典随类型变化：
+        // 原选中分类不属于新展示字典（'all' 展示 expense_category）时重置为不限分类，
+        // 避免筛选条无高亮但 filter 仍带旧分类导致列表恒空
+        setState(() {
+          _selectedType = type;
+          final shownDictCode = type == ExpenseModel.typeIncome
+              ? 'income_category'
+              : 'expense_category';
+          if (_selectedCategory != 'all' &&
+              DictService.instance
+                  .getItemsSync(shownDictCode)
+                  .every((item) => item.code != _selectedCategory)) {
+            _selectedCategory = 'all';
+          }
         });
         _loadExpenses(refresh: true);
       },

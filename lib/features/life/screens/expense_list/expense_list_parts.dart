@@ -3,13 +3,15 @@ part of './expense_list_screen.dart';
 /// 支出统计卡片（服务端聚合查询，不受分页限制）
 class _ExpenseStatCard extends StatelessWidget {
   final DateTime displayedMonth;
-  final double totalAmount;
+  final double expenseAmount;
+  final double incomeAmount;
   final bool isLoadingTotal;
   final String? overrideLabel;
 
   const _ExpenseStatCard({
     required this.displayedMonth,
-    required this.totalAmount,
+    required this.expenseAmount,
+    required this.incomeAmount,
     required this.isLoadingTotal,
     this.overrideLabel,
   });
@@ -17,6 +19,7 @@ class _ExpenseStatCard extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final incomeColor = Colors.green.shade600;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -38,10 +41,30 @@ class _ExpenseStatCard extends StatelessWidget {
           const SizedBox(height: 8),
           Row(
             children: [
-              Text(
-                '总支出: ¥${totalAmount.toStringAsFixed(2)}',
-                style: Theme.of(context).textTheme.headlineSmall?.copyWith(
-                  fontWeight: FontWeight.bold,
+              // 支出/收入金额置于同一 FittedBox 内统一等比缩小，避免溢出换行
+              Flexible(
+                child: FittedBox(
+                  fit: BoxFit.scaleDown,
+                  alignment: Alignment.centerLeft,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        '总支出: ¥${expenseAmount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        '总收入: ¥${incomeAmount.toStringAsFixed(2)}',
+                        style: Theme.of(context).textTheme.headlineSmall?.copyWith(
+                          color: incomeColor,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
               ),
               if (isLoadingTotal) ...[
@@ -60,13 +83,13 @@ class _ExpenseStatCard extends StatelessWidget {
   }
 }
 
-/// 分类筛选条
-class _ExpenseCategoryFilter extends StatelessWidget {
-  final String selectedCategory;
+/// 类型筛选条（全部/支出/收入）
+class _ExpenseTypeFilter extends StatelessWidget {
+  final String selectedType;
   final ValueChanged<String> onSelected;
 
-  const _ExpenseCategoryFilter({
-    required this.selectedCategory,
+  const _ExpenseTypeFilter({
+    required this.selectedType,
     required this.onSelected,
   });
 
@@ -80,10 +103,51 @@ class _ExpenseCategoryFilter extends StatelessWidget {
         children: [
           CategoryChip(
             label: '全部',
+            isSelected: selectedType == 'all',
+            onTap: () => onSelected('all'),
+          ),
+          CategoryChip(
+            label: '支出',
+            isSelected: selectedType == ExpenseModel.typeExpense,
+            onTap: () => onSelected(ExpenseModel.typeExpense),
+          ),
+          CategoryChip(
+            label: '收入',
+            isSelected: selectedType == ExpenseModel.typeIncome,
+            onTap: () => onSelected(ExpenseModel.typeIncome),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+/// 分类筛选条（分类选项随收入/支出类型切换到对应字典）
+class _ExpenseCategoryFilter extends StatelessWidget {
+  final String dictCode;
+  final String selectedCategory;
+  final ValueChanged<String> onSelected;
+
+  const _ExpenseCategoryFilter({
+    required this.dictCode,
+    required this.selectedCategory,
+    required this.onSelected,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return SizedBox(
+      height: AppTheme.scaledHeight(context, 40.0),
+      child: ListView(
+        scrollDirection: Axis.horizontal,
+        padding: const EdgeInsets.symmetric(horizontal: 16),
+        children: [
+          CategoryChip(
+            label: '全部分类',
             isSelected: selectedCategory == 'all',
             onTap: () => onSelected('all'),
           ),
-          ...DictService.instance.getItemsSync('expense_category').map((cat) => CategoryChip(
+          ...DictService.instance.getItemsSync(dictCode).map((cat) => CategoryChip(
             label: cat.label,
             isSelected: selectedCategory == cat.code,
             onTap: () => onSelected(cat.code),
@@ -172,10 +236,11 @@ class _ExpenseListItem extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
+    final isIncome = expense.type == ExpenseModel.typeIncome;
     return Card(
       margin: const EdgeInsets.only(bottom: 8),
       child: ListTile(
-        leading: const Icon(Icons.receipt),
+        leading: Icon(isIncome ? Icons.savings_outlined : Icons.receipt),
         title: Text(
           '$categoryLabel${expense.description != null && expense.description!.isNotEmpty ? ' · ${expense.description}' : ''}',
           maxLines: 1,
@@ -189,17 +254,29 @@ class _ExpenseListItem extends StatelessWidget {
         trailing: Row(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Text(
-              '¥${expense.amount.toStringAsFixed(2)}',
-              style: Theme.of(context).textTheme.titleMedium?.copyWith(
-                color: colorScheme.error,
-                fontWeight: FontWeight.bold,
+            // 金额较大时等比缩小，不挤压标题
+            Flexible(
+              child: FittedBox(
+                fit: BoxFit.scaleDown,
+                alignment: Alignment.centerRight,
+                child: Text(
+                  '${isIncome ? '+' : '-'}¥${expense.amount.toStringAsFixed(2)}',
+                  style: Theme.of(context).textTheme.titleMedium?.copyWith(
+                    color: isIncome ? Colors.green.shade600 : colorScheme.error,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
               ),
             ),
             if (onEdit != null || onDelete != null)
-              EditDeletePopupMenu(
-                onEdit: onEdit,
-                onDelete: onDelete,
+              // 右移收回 IconButton 默认内边距造成的过大右侧空隙
+              //（仅本页局部偏移，不改共用 EditDeletePopupMenu）
+              Transform.translate(
+                offset: const Offset(12, 0),
+                child: EditDeletePopupMenu(
+                  onEdit: onEdit,
+                  onDelete: onDelete,
+                ),
               ),
           ],
         ),
@@ -318,6 +395,7 @@ mixin _ExpenseListActionsMixin on _ExpenseListActionsHost {
       final body = {
         'amount': expense.amount,
         'category': expense.category,
+        'type': expense.type,
         'description': expense.description,
         'date': expense.date.toIso8601String().split('T').first,
       };
@@ -349,6 +427,7 @@ mixin _ExpenseListActionsMixin on _ExpenseListActionsHost {
       final body = {
         'amount': expense.amount,
         'category': expense.category,
+        'type': expense.type,
         'description': expense.description,
         'date': expense.date.toIso8601String().split('T').first,
       };

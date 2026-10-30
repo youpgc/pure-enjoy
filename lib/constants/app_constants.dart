@@ -27,6 +27,7 @@ const List<String> dictCodes = [
   'member_level',
   'user_status',
   'expense_category',
+  'income_category',
   'mood_type',
   'habit_frequency',
   'habit_color',

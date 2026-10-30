@@ -63,6 +63,7 @@ class ExpenseEmptyState extends StatelessWidget {
   const ExpenseEmptyState({
     super.key,
     required this.rangeText,
+    required this.typeLabel,
     required this.startMonth,
     required this.endMonth,
     required this.onPickStartMonth,
@@ -70,6 +71,9 @@ class ExpenseEmptyState extends StatelessWidget {
   });
 
   final String rangeText;
+
+  /// 类型中文名（支出/收入），用于空态文案
+  final String typeLabel;
   final DateTime startMonth;
   final DateTime endMonth;
   final VoidCallback onPickStartMonth;
@@ -84,7 +88,7 @@ class ExpenseEmptyState extends StatelessWidget {
           Icon(Icons.receipt_long_outlined, size: 64, color: Theme.of(context).colorScheme.onSurfaceVariant),
           const SizedBox(height: 16),
           Text(
-            '$rangeText暂无消费记录',
+            '$rangeText暂无$typeLabel记录',
             style: Theme.of(context).textTheme.bodyLarge?.copyWith(color: Theme.of(context).colorScheme.onSurfaceVariant),
           ),
           const SizedBox(height: 24),
@@ -117,12 +121,20 @@ class ExpenseEmptyState extends StatelessWidget {
   }
 }
 
-/// 总消费卡片。
+/// 总支出/总收入卡片。
 class ExpenseTotalCard extends StatelessWidget {
-  const ExpenseTotalCard({super.key, required this.total, required this.count});
+  const ExpenseTotalCard({
+    super.key,
+    required this.total,
+    required this.count,
+    this.isIncome = false,
+  });
 
   final double total;
   final int count;
+
+  /// 是否为收入统计：收入金额展示绿色，支出维持红色
+  final bool isIncome;
 
   @override
   Widget build(BuildContext context) {
@@ -132,19 +144,21 @@ class ExpenseTotalCard extends StatelessWidget {
         child: Column(
           children: [
             Text(
-              '总消费',
+              isIncome ? '总收入' : '总支出',
               style: Theme.of(context).textTheme.titleMedium,
             ),
             const SizedBox(height: 8),
             Text(
               '¥${total.toStringAsFixed(2)}',
               style: Theme.of(context).textTheme.headlineMedium?.copyWith(
-                    color: Theme.of(context).colorScheme.error,
+                    color: isIncome
+                        ? Colors.green.shade600
+                        : Theme.of(context).colorScheme.error,
                     fontWeight: FontWeight.bold,
                   ),
             ),
             Text(
-              '$count 笔消费',
+              '$count 笔${isIncome ? '收入' : '消费'}',
               style: Theme.of(context).textTheme.bodySmall,
             ),
           ],
@@ -214,6 +228,8 @@ class ExpensePieChart extends StatelessWidget {
     required this.categories,
     required this.colors,
     required this.total,
+    required this.totalLabel,
+    required this.dictCode,
     required this.selectedIndex,
     required this.onTouched,
   });
@@ -221,6 +237,12 @@ class ExpensePieChart extends StatelessWidget {
   final List<MapEntry<String, double>> categories;
   final List<Color> colors;
   final double total;
+
+  /// 圆环中心未选中时的总额标签（如「支出总额」「收入总额」）
+  final String totalLabel;
+
+  /// 分类标签翻译使用的字典码（expense_category / income_category）
+  final String dictCode;
   final int? selectedIndex;
   final ValueChanged<int> onTouched;
 
@@ -233,7 +255,7 @@ class ExpensePieChart extends StatelessWidget {
     final centerChild = selected != null
         ? PieCenterInfo(
             label: DictService.instance.getLabelOrDefault(
-              'expense_category',
+              dictCode,
               selected.key,
               defaultValue: selected.key,
             ),
@@ -241,7 +263,7 @@ class ExpensePieChart extends StatelessWidget {
             percentage: total > 0 ? selected.value / total * 100 : 0,
           )
         : PieCenterInfo(
-            label: '总支出',
+            label: totalLabel,
             amount: total,
           );
 
@@ -303,12 +325,16 @@ class ExpenseCategoryList extends StatelessWidget {
     super.key,
     required this.categories,
     required this.colors,
+    required this.dictCode,
     required this.selectedIndex,
     required this.onTap,
   });
 
   final List<MapEntry<String, double>> categories;
   final List<Color> colors;
+
+  /// 分类标签翻译使用的字典码（expense_category / income_category）
+  final String dictCode;
   final int? selectedIndex;
   final ValueChanged<int> onTap;
 
@@ -320,7 +346,7 @@ class ExpenseCategoryList extends StatelessWidget {
         final category = entry.value;
         final isSelected = selectedIndex == index;
         final categoryLabel = DictService.instance.getLabelOrDefault(
-          'expense_category',
+          dictCode,
           category.key,
           defaultValue: category.key,
         );

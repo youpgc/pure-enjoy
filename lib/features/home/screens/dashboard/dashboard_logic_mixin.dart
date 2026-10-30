@@ -201,7 +201,7 @@ mixin _DashboardLogic on State<DashboardPage> {
       final futures = [
         ApiClient.get('expenses',
             filters: {'user_id': 'eq.$userId'},
-            select: 'category,amount,created_at,date',
+            select: 'category,amount,type,created_at,date',
             order: 'created_at.desc',
             limit: _kHomeSingleLimit),
         ApiClient.get('mood_diaries',

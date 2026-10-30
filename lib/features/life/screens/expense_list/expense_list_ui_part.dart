@@ -12,15 +12,19 @@ Widget _buildExpenseListBody({
   required bool isLoadingTotal,
   required List<ExpenseModel> expenses,
   required DateTime displayedMonth,
-  required double headlineTotal,
+  required double headlineExpense,
+  required double headlineIncome,
   required String headlineLabel,
   required String rangeHint,
   required DateTime? rangeStart,
   required DateTime? rangeEnd,
+  required String selectedType,
   required String selectedCategory,
+  required String categoryDictCode,
   required bool readOnly,
   required ScrollController scrollController,
   required void Function() onClearRange,
+  required void Function(String) onTypeSelect,
   required void Function(String) onSelectCategory,
   required void Function(ExpenseModel) onEditExpense,
   required void Function(String) onDeleteExpense,
@@ -47,10 +51,11 @@ Widget _buildExpenseListBody({
     ),
     body: Column(
       children: [
-        // 统计卡片（服务端聚合查询，不受分页限制）
+        // 统计卡片（服务端聚合查询，不受分页限制；「全部」类型时支出与收入并列展示）
         _ExpenseStatCard(
           displayedMonth: displayedMonth,
-          totalAmount: headlineTotal,
+          expenseAmount: headlineExpense,
+          incomeAmount: headlineIncome,
           isLoadingTotal: rangeStart != null ? false : isLoadingTotal,
           overrideLabel: rangeStart != null ? headlineLabel : null,
         ),
@@ -64,9 +69,18 @@ Widget _buildExpenseListBody({
           ),
         const SizedBox(height: 8),
 
-        // 分类筛选（只读明细模式下隐藏，避免修改消费分类）
+        // 类型筛选（只读明细模式下隐藏）
+        if (!readOnly)
+          _ExpenseTypeFilter(
+            selectedType: selectedType,
+            onSelected: onTypeSelect,
+          ),
+        if (!readOnly) const SizedBox(height: 8),
+
+        // 分类筛选（选项随类型切换；只读明细模式下隐藏，避免修改消费分类）
         if (!readOnly)
           _ExpenseCategoryFilter(
+            dictCode: categoryDictCode,
             selectedCategory: selectedCategory,
             onSelected: onSelectCategory,
           ),
@@ -94,8 +108,11 @@ Widget _buildExpenseListBody({
                           }
 
                           final expense = expenses[index];
+                          // 分类标签按记录自身的收支类型选字典翻译
                           final categoryLabel = DictService.instance.getLabelOrDefault(
-                            'expense_category',
+                            expense.type == ExpenseModel.typeIncome
+                                ? 'income_category'
+                                : 'expense_category',
                             expense.category,
                             defaultValue: expense.category,
                           );

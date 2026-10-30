@@ -7,6 +7,7 @@ import '../../../../services/api_client.dart';
 import '../../../../utils/date_time_utils.dart';
 import '../../../../core/utils/event_bus.dart';
 import '../../../../core/theme/app_theme.dart';
+import '../../models/expense_model.dart';
 import '../expense_list/expense_list_screen.dart';
 import '../mood_diary/mood_diary_screen.dart';
 import '../note_list/note_list_screen.dart';
@@ -215,10 +216,17 @@ class _LifeScreenState extends State<LifeScreen> {
               summary: _latestExpense != null
                   ? () {
                       final categoryCode = _latestExpense!['category'] as String? ?? '';
+                      // 分类标签按最新记录的收支类型选字典翻译
+                      final isIncome = _latestExpense!['type'] == ExpenseModel.typeIncome;
                       final categoryLabel = categoryCode.isNotEmpty
-                          ? DictService.instance.getLabelOrDefault('expense_category', categoryCode, defaultValue: categoryCode)
+                          ? DictService.instance.getLabelOrDefault(
+                              isIncome ? 'income_category' : 'expense_category',
+                              categoryCode,
+                              defaultValue: categoryCode,
+                            )
                           : '';
-                      return '$categoryLabel ${_latestExpense!['amount'] ?? ''}';
+                      final typePrefix = isIncome ? '收入' : '支出';
+                      return '$typePrefix $categoryLabel ${_latestExpense!['amount'] ?? ''}';
                     }()
                   : null,
               description: _latestExpense?['description'] as String?,

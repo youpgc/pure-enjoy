@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 import '../../../../services/supabase_service.dart';
 import '../../../../services/api_client.dart';
 import '../../../../core/utils/event_bus.dart';
+import '../../models/expense_model.dart';
 import '../../widgets/app_date_picker.dart';
 import './expense_statistics_content.dart';
 
@@ -21,6 +22,9 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
   String _error = '';
   DateTime _startMonth = DateTime.now();
   DateTime _endMonth = DateTime.now();
+
+  /// 统计类型：expense=支出 / income=收入（切换后重新拉取并聚合）
+  String _selectedType = ExpenseModel.typeExpense;
   StreamSubscription<void>? _expenseSub;
 
   @override
@@ -60,6 +64,7 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
         'expenses',
         filters: {
           'user_id': 'eq.$userId',
+          'type': 'eq.$_selectedType',
           'and': '(date.gte.${DateFormat('yyyy-MM-dd').format(startOfRange)},date.lt.${DateFormat('yyyy-MM-dd').format(firstOfNextMonth)})',
         },
         order: 'date.desc',
@@ -165,8 +170,17 @@ class _ExpenseStatisticsScreenState extends State<ExpenseStatisticsScreen> {
         startMonth: _startMonth,
         endMonth: _endMonth,
         rangeText: _rangeText,
+        selectedType: _selectedType,
         onPickStartMonth: _pickStartMonth,
         onPickEndMonth: _pickEndMonth,
+        onSelectType: (type) {
+          if (type == _selectedType) return;
+          setState(() {
+            _selectedType = type;
+            _isLoading = true;
+          });
+          _loadData();
+        },
       ),
     );
   }

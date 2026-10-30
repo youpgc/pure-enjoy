@@ -27,14 +27,19 @@ class _ExpenseFormState extends State<ExpenseForm> {
   final _formKey = GlobalKey<FormState>();
   late final TextEditingController _amountController;
   late final TextEditingController _descriptionController;
+  String _selectedType = ExpenseModel.typeExpense;
   String _selectedCategoryCode = '';
   late DateTime _selectedDate;
 
   bool get _isEditing => widget.expense != null;
 
-  /// 获取支出分类选项列表（从字典服务）
+  /// 当前类型对应的分类字典码：支出→expense_category，收入→income_category
+  String get _dictCode =>
+      _selectedType == ExpenseModel.typeIncome ? 'income_category' : 'expense_category';
+
+  /// 获取当前类型下的分类选项列表（从字典服务）
   List<String> get _categoryCodes {
-    return DictService.instance.getItemsSync('expense_category').map((e) => e.code).toList();
+    return DictService.instance.getItemsSync(_dictCode).map((e) => e.code).toList();
   }
 
   @override
@@ -47,7 +52,8 @@ class _ExpenseFormState extends State<ExpenseForm> {
     _descriptionController = TextEditingController(
       text: expense?.description ?? '',
     );
-    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode('expense_category');
+    _selectedType = expense?.type ?? ExpenseModel.typeExpense;
+    _selectedCategoryCode = expense?.category ?? DictService.instance.getDefaultCode(_dictCode);
     if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
       _selectedCategoryCode = _categoryCodes.first;
     }
@@ -67,6 +73,18 @@ class _ExpenseFormState extends State<ExpenseForm> {
     }
   }
 
+  /// 切换收入/支出类型：分类字典随类型切换，选中分类重置为新字典的默认项（防空选）
+  void _onTypeChanged(String type) {
+    if (type == _selectedType) return;
+    setState(() {
+      _selectedType = type;
+      _selectedCategoryCode = DictService.instance.getDefaultCode(_dictCode);
+      if (_selectedCategoryCode.isEmpty && _categoryCodes.isNotEmpty) {
+        _selectedCategoryCode = _categoryCodes.first;
+      }
+    });
+  }
+
   @override
   void dispose() {
     DictService.instance.refreshNotifier.removeListener(_onDictRefresh);
@@ -82,6 +100,7 @@ class _ExpenseFormState extends State<ExpenseForm> {
         userId: _isEditing ? widget.expense!.userId : widget.userId,
         amount: double.parse(_amountController.text),
         category: _selectedCategoryCode,
+        type: _selectedType,
         description: _descriptionController.text.isEmpty ? null : _descriptionController.text,
         date: _selectedDate,
       );
@@ -101,8 +120,27 @@ class _ExpenseFormState extends State<ExpenseForm> {
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
             Text(
-              '添加支出',
+              '${_isEditing ? '编辑' : '添加'}${_selectedType == ExpenseModel.typeIncome ? '收入' : '支出'}',
               style: Theme.of(context).textTheme.titleLarge,
+            ),
+            const SizedBox(height: 16),
+
+            // 收入/支出类型切换
+            SegmentedButton<String>(
+              segments: const [
+                ButtonSegment(
+                  value: ExpenseModel.typeExpense,
+                  icon: Icon(Icons.remove_circle_outline),
+                  label: Text('支出'),
+                ),
+                ButtonSegment(
+                  value: ExpenseModel.typeIncome,
+                  icon: Icon(Icons.add_circle_outline),
+                  label: Text('收入'),
+                ),
+              ],
+              selected: {_selectedType},
+              onSelectionChanged: (selection) => _onTypeChanged(selection.first),
             ),
             const SizedBox(height: 16),
 
@@ -122,13 +160,13 @@ class _ExpenseFormState extends State<ExpenseForm> {
             ),
             const SizedBox(height: 16),
 
-            // 分类选择
+            // 分类选择（选项随收入/支出类型切换到对应字典）
             Text('分类', style: Theme.of(context).textTheme.bodyLarge),
             const SizedBox(height: 8),
             Wrap(
               spacing: 8,
               children: _categoryCodes.map((code) {
-                final label = DictService.instance.getLabelOrDefault('expense_category', code, defaultValue: code);
+                final label = DictService.instance.getLabelOrDefault(_dictCode, code, defaultValue: code);
                 return ChoiceChip(
                   label: Text(label),
                   selected: _selectedCategoryCode == code,
