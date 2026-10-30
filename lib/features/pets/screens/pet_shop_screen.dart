@@ -13,10 +13,23 @@ import 'pet_odds_screen.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
 
+/// 批量购买单次数量上限（与服务端 rpc_pet_shop_buy 的 PET_QTY_LIMIT 对齐，
+/// 见 fix_pet_shop_qty_cap_20261028.sql；调整须两端同步）。
+const int kShopBuyQtyLimit = 99;
+
+/// 解锁类道具 → 功能键（pet_items.effect.unlock.feature 同源结构映射；
+/// 20261030 定版：unlock 类限购 1 次 + 购买后不再展示——已购在包或功能
+/// 已开通即隐藏，使用后道具从背包移除、功能解锁不反弹）。
+const Map<String, String> kUnlockItemFeatures = {
+  'unlock_feed_basin': 'batch_feed',
+  'unlock_breeding_nest': 'breeding',
+};
+
 /// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
 ///
 /// 布局（2026-09-24 定版）：分类栏在**左侧竖排**（栅格 tile，超出出滚动条），
-/// 右侧物品格网格每行 6 格、正方形格；点击物品弹悬浮窗展示信息与购买按钮。
+/// 右侧物品格网格每行 4 格、只显图标+名称（§5.3 物品格展示定版）；
+/// 点击物品弹悬浮窗展示信息、批量数量与购买按钮。
 /// 分类清单取自 `PetShopItemModel.categoryLabels`（P1 五类 + P2 五类 + 其他）。
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
@@ -88,13 +101,21 @@ class _PetShopScreenState extends State<PetShopScreen> {
     final (records, recErr) = await PetRpc.fetchExpansionRecords();
     final (reserved, _) = await PetRpcP2.fetchReserved();
     final lot = reserved.raw['lottery'];
+    // 解锁类「购买后不再展示」信号：背包在持 + 已开通功能集
+    final (bag, bagErr) = await PetRpc.fetchBag();
+    final unlocked = await PetRpc.fetchUnlockedFeatures();
     // 收藏兑换：配方(reserved) + 持有量(背包) + 道具名(目录)——失败静默不展示
-    final exchange = await _loadExchangeGroups(reserved.raw['collection_exchange']);
+    final exchange = await _loadExchangeGroups(reserved.raw['collection_exchange'], bag);
     if (mounted) {
       setState(() {
         // 阶梯过滤失败不拦截商城(全量展示,购买时服务端仍校验顺序)——
         // 仅 recErr == null 时应用「只展示当前可购档」
-        _items = recErr == null ? _filterLadder(items, records) : items;
+        var visible = recErr == null ? _filterLadder(items, records) : items;
+        // 解锁类隐藏仅在全信号就绪时应用(服务端限购/已解锁校验仍兜底)
+        if (bagErr == null) {
+          visible = _filterUnlockItems(visible, bag, unlocked);
+        }
+        _items = visible;
         _lottery = lot is Map ? Map<String, dynamic>.from(lot) : null;
         _exchangeGroups = exchange;
         _error = err == null ? null : petRpcErrorText(err);
@@ -103,10 +124,23 @@ class _PetShopScreenState extends State<PetShopScreen> {
     }
   }
 
+  /// 解锁类道具「购买后不再展示」(20261030 定版):限购 1 次——
+  /// 已购在包(未使用)或功能已开通即隐藏;使用后道具从背包移除、功能不反弹。
+  List<PetShopItemModel> _filterUnlockItems(List<PetShopItemModel> items,
+      List<PetBagItemModel> bag, Set<String> unlocked) {
+    final bagCodes = bag.map((b) => b.itemCode).toSet();
+    return items.where((e) {
+      final feature = kUnlockItemFeatures[e.itemCode];
+      if (feature == null) return true;
+      return !bagCodes.contains(e.itemCode) && !unlocked.contains(feature);
+    }).toList();
+  }
+
   /// 组装收藏兑换组：仅持有 >0 的收藏品出卡；名称取目录，缺名回退编码
-  Future<List<_ExchangeGroup>> _loadExchangeGroups(Object? recipesRaw) async {
+  /// （背包由 _load 统一拉取后传入，避免同页重复请求）
+  Future<List<_ExchangeGroup>> _loadExchangeGroups(
+      Object? recipesRaw, List<PetBagItemModel> bag) async {
     if (recipesRaw is! List || recipesRaw.isEmpty) return const [];
-    final (bag, _) = await PetRpc.fetchBag();
     final names = await PetRpc.fetchItemNames();
     final owned = <String, int>{};
     for (final b in bag) {
@@ -414,7 +448,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
     _load(showLoading: false);
   }
 
-  /// 幸运抽奖卡：价格/限购说明 + 抽取按钮（结果复用孵化结果弹窗）
+  /// 幸运抽奖卡：价格/限购说明 + 抽取按钮（结果 Toast 轻提示，不走诞生弹窗）
   Widget _lotteryCard(ColorScheme cs) {
     final price = (_lottery?['price'] as num?)?.toInt() ?? 0;
     return Card(
@@ -723,10 +757,10 @@ class _PetShopScreenState extends State<PetShopScreen> {
                           style: const TextStyle(
                               fontSize: 15, fontWeight: FontWeight.w700)),
                     ),
-                    // 加（上限 99；金币上限另由按钮禁用态兜底）
+                    // 加（上限=服务端 PET_QTY_LIMIT 对齐值；金币上限另由按钮禁用态兜底）
                     IconButton.outlined(
                       visualDensity: VisualDensity.compact,
-                      onPressed: qty < 99
+                      onPressed: qty < kShopBuyQtyLimit
                           ? () => setQty(() => qty = qty + 1)
                           : null,
                       icon: const Icon(Icons.add, size: 18),

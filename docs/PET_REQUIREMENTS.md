@@ -76,7 +76,7 @@
 - **防刷口径**：`collection_total` 只计 `biz_type='acquire'` 的收藏品流水——兑换的 consume/exchange 流水不计数，收藏品兑走不减累计。
 - **收藏/圆满成就**：`collection_total`（累计获得收藏品件数，流水口径）——3 件「初代收藏家」(epic：500 金+双倍药) / 10 件「秘境鉴赏家」(legendary：3000 金+极品石)；`tree_full_claim`（成就树已领节点数）——全部领取「十全十美」(memorial：10000 金+传说蛋，跨线彩蛋；目标=全树节点实际数现网 42，动态口径)。
 - **珍稀保护（丢物边界三规则）**：`sub_type ∈ {collection, evolution, key}` 或 `price_coin ≥ 200` 或 `channels ∈ {adventure_drop, system}`——任一命中永不进丢失池。
-- **高级食盆 / 繁育巢穴为不限购道具**：非一次性，购买后可再次购买（解锁状态在 `pet_user_features`）。
+- **高级食盆 / 繁育巢穴为功能解锁道具（20261030 定版）**：`purchase_limit = 1` 限购一次；**已购（在包未用）或功能已开通即从商城不再展示**；使用后道具从背包移除，功能解锁不反弹（`pet_user_features` 常驻，重复使用服务端拒 `PET_FEATURE_ALREADY` 且不扣道具）。
 
 ## 8. 商城分类（12 类）
 
