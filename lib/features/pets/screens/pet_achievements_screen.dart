@@ -59,7 +59,6 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     }
     final parts = <String>[
       if (result.gold > 0) '金币 +${result.gold}',
-      if (result.points > 0) '积分 +${result.points}',
       // 道具逐个具名(领取结果 items 由服务端 claim 下发;无名回落 code)
       for (final it in result.items) '${it.name ?? it.code} ×${it.count}',
     ];
@@ -102,7 +101,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
       );
     }
     if (_achs.isEmpty) {
-      return const EmptyWidget(message: '成就还在配置中，过阵子再来看看吧');
+      return const EmptyWidget(message: '成就还在准备中，过阵子再来看看吧');
     }
     // 渐进揭示：前置未全部领取的成就不进入列表（树状逐级现身；
     // 领取前置后下一次 check 刷新即现身），服务端 PREREQ_LOCKED 为兜底闸
@@ -235,7 +234,6 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
   static String _rewardText(PetAchievementModel a) {
     final parts = <String>[
       if (a.rewardGold > 0) '🪙 ${a.rewardGold}',
-      if (a.rewardPoints > 0) '⭐ ${a.rewardPoints}',
       for (final it in a.rewardItems) '${it.name ?? it.code} ×${it.count}',
     ];
     return parts.isEmpty ? '' : '奖励 ${parts.join(' · ')}';
