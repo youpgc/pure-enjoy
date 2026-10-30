@@ -1,5 +1,6 @@
 import 'dart:async';
 
+import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
 /// 宠物主页库（part 拆分）：本文件是 library 声明与状态主体，
@@ -15,6 +16,7 @@ import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_action_machine.dart';
 import '../utils/pet_art_resolver.dart';
+import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_exp_curve.dart';
 import '../utils/pet_home_budget.dart';
@@ -176,13 +178,15 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   }
 
   /// 场景主题资源预热：precacheImage 解码完成才返回（loading 双条件之二）。
-  /// 资源异常不卡 loading——放行后由渲染层默认背景兜底。
+  /// 资源异常不卡 loading——放行后由渲染层默认背景兜底（失败留痕便于排查素材缺失）。
   Future<void> _ensureSceneReady(String code) async {
     if (_sceneReady && _sceneReadyFor == code) return;
     try {
       await precacheImage(
           AssetImage(PetSceneBackground.assetPath(code)), context);
-    } catch (_) {}
+    } catch (_) {
+      if (kDebugMode) debugPrint('[PetHome] 场景资源预热失败: $code');
+    }
     if (mounted) {
       setState(() {
         _sceneReadyFor = code;
@@ -237,6 +241,8 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     final (summary, err) =
         await PetService.instance.fetchSummary(forceRefresh: force);
     _summaryFromCache = PetService.instance.lastSummaryFromCache;
+    // 字典非阻塞预热（家系等开放值域文案，失败走端内兜底；20261030）
+    if (force || PetDict.isEmpty) unawaited(PetRpc.fetchDicts());
     if (mounted) {
       setState(() {
         _enabled = true;

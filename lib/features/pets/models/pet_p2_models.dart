@@ -1,4 +1,5 @@
 import '../../../constants/pet.dart';
+import '../utils/pet_dict.dart';
 
 /// 宠物 P2 模型（养成线：进化 / 特性 / 孵化等待 / 功能解锁 / 概率公示）
 ///
@@ -98,7 +99,7 @@ class PetPetDetailModel {
   bool get rearing => status == null || status == PetPetStatus.rearing;
 
   /// 展示用：无特性时的占位由 UI 决定，这里只给事实
-  String get genderLabel => gender == PetGender.female ? '♀' : '♂';
+  String get genderLabel => gender?.label ?? '♂'; // 20261030 收敛重复实现
 
   factory PetPetDetailModel.fromJson(Map<String, dynamic> json) {
     final sp = (json['species'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -415,13 +416,7 @@ class PetEggOddsModel {
     return '♂ $pct% / ♀ ${100 - pct}%';
   }
 
-  static String _familyLabel(String code) => switch (code) {
-        'cat' => '猫系',
-        'dog' => '犬系',
-        'rabbit' => '兔系',
-        'mouse' => '鼠系',
-        _ => code,
-      };
+  static String _familyLabel(String code) => PetDict.family(code);
 
   factory PetEggOddsModel.fromJson(Map<String, dynamic> json) {
     final w = json['weights'] is Map

@@ -5,6 +5,7 @@ import '../../../constants/pet.dart';
 import '../models/pet_p2_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_p2.dart';
+import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
 import '../widgets/pet_loading.dart';
@@ -34,6 +35,8 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   List<Map<String, dynamic>> _advSpots = const [];
   Map<String, dynamic> _advReserved = const {};
   String? _advError;
+  /// 游历档位配置（pet_config.adventure_tiers 下发，档位文案同源 20261030）
+  List<Map<String, dynamic>> _tierCfg = const [];
 
   @override
   void initState() {
@@ -43,15 +46,17 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    // 三路并行发起（各自独立容错:历险路失败不拖垮蛋池展示）
+    // 多路并行发起（各自独立容错:历险路失败不拖垮蛋池展示）
     final fPools = PetRpcP2.fetchPublishedEggOdds();
     final fSpots = PetRpc.fetchAdventureOdds();
     final fReserved = PetRpcP2.fetchReserved();
     final fNames = PetRpc.fetchItemNames();
+    final fTiers = PetRpc.fetchAdventureTiers();
     final (pools, err) = await fPools;
     final (spots, spotsErr) = await fSpots;
     final (reserved, reservedErr) = await fReserved;
     final names = await fNames;
+    final tiers = await fTiers;
     if (!mounted) return;
     setState(() {
       // 繁育产出蛋（breed_*，内部池）不在公示页罗列——说明并入繁育页
@@ -60,6 +65,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
       _advSpots = spots;
       _advReserved = reserved.raw;
       _itemNames = names;
+      _tierCfg = tiers;
       _advError = spotsErr == null && reservedErr == null
           ? null
           : petRpcErrorText(spotsErr ?? reservedErr);
@@ -124,16 +130,23 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   }
 
   String _tierLabel(String tier) {
-    switch (tier) {
-      case 'short':
-        return '短途 30分钟';
-      case 'medium':
-        return '中途 2小时';
-      case 'long':
-        return '长途 8小时';
+    // 档位名与时长以 pet_config.adventure_tiers 下发为准（与历险页同源，
+    // 20261030 收敛双真源）；配置缺失回落端内文案（不含时长）
+    for (final t in _tierCfg) {
+      if (t['tier'] == tier) {
+        final label = t['label']?.toString() ?? '';
+        final minutes = (t['minutes'] as num?)?.toInt();
+        if (label.isNotEmpty) {
+          return minutes == null ? label : '$label ${_minutesText(minutes)}';
+        }
+      }
     }
-    return tier;
+    final base = kPetTierNames[tier];
+    return base ?? tier;
   }
+
+  static String _minutesText(int minutes) =>
+      minutes >= 60 ? '${minutes ~/ 60}小时${minutes % 60 > 0 ? '${minutes % 60}分钟' : ''}' : '$minutes分钟';
 
   /// 历险公示卡(时长系数 + 长途独占掉落:道具图标+概率/保底徽章+地图分支路径)
   Widget _adventureCard(ColorScheme cs) {
@@ -248,7 +261,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
                     style: TextStyle(fontSize: 13, fontWeight: FontWeight.w600)),
                 const SizedBox(height: 8),
                 if (_advError != null)
-                  Text('产出数据加载失败:$_advError',
+                  Text('产出数据加载失败，稍后再来看看',
                       style: TextStyle(fontSize: 12, color: cs.error))
                 else if (drops.isEmpty)
                   const Text('敬请期待', style: TextStyle(fontSize: 12))
@@ -577,7 +590,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     }
     final m = RegExp(r'^breed_([a-z]+)_(n|r|sr|ssr)$').firstMatch(code);
     if (m != null) {
-      final fam = _familyNames[m.group(1)] ?? m.group(1)!;
+      final fam = PetDict.family(m.group(1)!);
       final rarity = _rarityShort[m.group(2)] ?? m.group(2)!;
       return '繁育蛋·$fam$rarity';
     }
@@ -679,7 +692,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
           : families[b]!.compareTo(families[a]!));
     return [
       for (final k in keys)
-        '${_familyNames[k] ?? k} ${_pct(families[k]!, total)}',
+        '${PetDict.family(k)} ${_pct(families[k]!, total)}',
     ];
   }
 
@@ -721,13 +734,6 @@ Widget _oddsGroup(ColorScheme cs, String label, List<String> lines) {
 }
 
 /// 转译用常量：家系/评级中文名（与评级展示序 N→SSR 对齐）
-static const Map<String, String> _familyNames = {
-  'cat': '猫系',
-  'dog': '犬系',
-  'rabbit': '兔系',
-  'mouse': '鼠系',
-};
-
 /// 地形展示元数据:(中文名, 站点图标, 主题色, 地图 chip 淡底色)——
 /// 地图分支路径的视觉基元;未登记地形走 _zoneBranchLine 内兜底
 static const Map<String, (String, IconData, Color, Color)> _zoneMeta = {

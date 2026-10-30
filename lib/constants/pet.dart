@@ -353,6 +353,14 @@ const kLongDropNames = <String, String>{
   // 新增 long_only 道具须同步此表
 };
 
+/// 游历档位名（short/medium/long）——任务标题与条件概要共用；
+/// 展示时长以 `pet_config.adventure_tiers` 下发为准，本表不含时长
+const kPetTierNames = <String, String>{
+  'short': '短途',
+  'medium': '中途',
+  'long': '长途',
+};
+
 
 enum PetQuestDifficulty {
   normal('normal', '普通'),
@@ -397,7 +405,7 @@ enum PetAchTier {
   }
 }
 
-/// 成就条件类型（rpc_pet_achievement_check 的 case 白名单，18 值）
+/// 成就条件类型（rpc_pet_achievement_check 的 case 白名单，20 值）
 ///
 /// 值域外的 condition_type 服务端不报错、进度恒 0，只能靠后台自检发现拼写错误。
 /// 目标值读取优先级 condition_value.value → .target → 1；rarityOwned 另读 rarity 键。

@@ -3,7 +3,9 @@ import 'package:flutter/material.dart';
 import '../models/pet_dex_models.dart';
 import '../services/pet_rpc.dart';
 import '../utils/pet_art_resolver.dart';
+import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
+import '../widgets/pet_loading.dart';
 
 /// 宠物图鉴（§2026-10-09 收集功能）
 ///
@@ -23,7 +25,6 @@ class PetDexScreen extends StatefulWidget {
 
 /// 展示序（服务端 family 按字母序返回，展示按此固定）
 const _familyOrder = ['cat', 'dog', 'rabbit', 'mouse'];
-const _familyNames = {'cat': '猫系', 'dog': '犬系', 'rabbit': '兔系', 'mouse': '鼠系'};
 
 const _rarityColors = {
   'N': Colors.grey,
@@ -70,7 +71,7 @@ class _PetDexScreenState extends State<PetDexScreen> {
     return Scaffold(
       appBar: AppBar(title: const Text('宠物图鉴')),
       body: _loading
-          ? const Center(child: CircularProgressIndicator())
+          ? const Center(child: PetPawLoading())
           : _error != null
               ? _errorView(cs)
               : _dex == null || _dex!.families.isEmpty
@@ -156,7 +157,7 @@ class _PetDexScreenState extends State<PetDexScreen> {
         padding: const EdgeInsets.fromLTRB(4, 16, 4, 8),
         child: Row(
           children: [
-            Text(_familyNames[fam.family] ?? fam.family,
+            Text(PetDict.family(fam.family),
                 style:
                     const TextStyle(fontSize: 15, fontWeight: FontWeight.w700)),
             const SizedBox(width: 8),

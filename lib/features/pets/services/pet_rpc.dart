@@ -6,6 +6,7 @@ import '../../../utils/date_time_utils.dart';
 import '../models/pet_dex_models.dart';
 import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
+import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_home_budget.dart';
 import 'pet_service.dart';
@@ -54,7 +55,7 @@ class PetRpc {
         null,
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 背包查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 背包查询失败');
       return (const <PetBagItemModel>[], kPetLocalError);
     }
   }
@@ -80,7 +81,7 @@ class PetRpc {
       final rows = resp.data ?? const <Map<String, dynamic>>[];
       return (rows.map(PetEggModel.fromJson).toList(), null);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 蛋查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 蛋查询失败');
       return (const <PetEggModel>[], kPetLocalError);
     }
   }
@@ -115,7 +116,7 @@ class PetRpc {
         null,
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 任务查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 任务查询失败');
       return (const <PetQuestModel>[], kPetLocalError);
     }
   }
@@ -153,6 +154,34 @@ class PetRpc {
           .where((c) => c.isNotEmpty)
           .toSet();
     } catch (_) {
+      if (kDebugMode) debugPrint('[PetRpc] 隐秘境解锁集查询失败，回退空集');
+      return const <String>{};
+    }
+  }
+
+  /// 已开通功能键集（pet_user_features 全量）。
+  ///
+  /// 消费方：商城解锁类道具「购买后不再展示」（20261030 定版：unlock 类
+  /// 限购 1 次，已购在包或功能已开通即隐藏）；查询失败回退空集不拦截商城，
+  /// 购买时服务端限购/已解锁校验仍兜底。
+  static Future<Set<String>> fetchUnlockedFeatures() async {
+    final uid = _uid;
+    if (uid == null) return const <String>{};
+    try {
+      final resp = await ApiClient.get(
+        'pet_user_features',
+        select: 'feature_key',
+        filters: {'user_id': 'eq.$uid'},
+        limit: 100,
+        note: 'pet_user_features 已开通功能集',
+      );
+      if (!resp.isSuccess) return const <String>{};
+      return (resp.data ?? const <Map<String, dynamic>>[])
+          .map((r) => r['feature_key'] as String? ?? '')
+          .where((k) => k.isNotEmpty)
+          .toSet();
+    } catch (_) {
+      if (kDebugMode) debugPrint('[PetRpc] 已开通功能集查询失败，回退空集');
       return const <String>{};
     }
   }
@@ -184,7 +213,7 @@ class PetRpc {
       final rows = resp.data ?? const <Map<String, dynamic>>[];
       return (rows.map(PetSpotModel.fromJson).toList(), null);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 历险地查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 历险地查询失败');
       return (const <PetSpotModel>[], kPetLocalError);
     }
   }
@@ -207,7 +236,7 @@ class PetRpc {
       if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
       return (resp.data ?? const <Map<String, dynamic>>[], null);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 扩容已购查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 扩容已购查询失败');
       return (const <Map<String, dynamic>>[], kPetLocalError);
     }
   }
@@ -231,7 +260,42 @@ class PetRpc {
             r['item_code'] as String: r['name'] as String,
       };
     } catch (_) {
+      if (kDebugMode) debugPrint('[PetRpc] 道具名映射查询失败，回退空表');
       return const {};
+    }
+  }
+
+  /// 宠物字典（pet_dict_items：家系/商城子类型/时间线事件，20261030 沉淀）——
+  /// 一次拉全填充 [PetDict] 缓存；失败静默（消费点走端内兜底，同场景名模式）。
+  /// rpc 返回单 jsonb 对象（非数组），承载于 resp.raw（resp.data 为空列表）
+  static Future<void> fetchDicts() async {
+    try {
+      final resp = await ApiClient.rpc('rpc_pet_dicts');
+      if (resp.isSuccess) PetDict.fill(resp.raw);
+    } catch (_) {
+      if (kDebugMode) debugPrint('[PetRpc] 字典拉取失败，走端内兜底');
+    }
+  }
+
+  /// 游历档位配置（pet_config.adventure_tiers：[{tier,minutes,label}]）——
+  /// 公示页档位名/时长与此同源；查询失败返回空（调用方回落端内文案）
+  static Future<List<Map<String, dynamic>>> fetchAdventureTiers() async {
+    try {
+      final resp = await ApiClient.get(
+        'pet_config',
+        select: 'adventure_tiers',
+        limit: 1,
+        note: 'pet_config 游历档位配置',
+      );
+      final row = resp.data?.isNotEmpty == true ? resp.data!.first : null;
+      final raw = row?['adventure_tiers'];
+      if (raw is List) {
+        return raw.whereType<Map<String, dynamic>>().toList();
+      }
+      return const <Map<String, dynamic>>[];
+    } catch (_) {
+      if (kDebugMode) debugPrint('[PetRpc] 游历档位配置查询失败，回退端内文案');
+      return const <Map<String, dynamic>>[];
     }
   }
 
@@ -248,7 +312,7 @@ class PetRpc {
       if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
       return (resp.data ?? const <Map<String, dynamic>>[], null);
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 历险产出公示查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 历险产出公示查询失败');
       return (const <Map<String, dynamic>>[], kPetLocalError);
     }
   }
@@ -274,7 +338,7 @@ class PetRpc {
         null,
       );
     } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 商城查询失败: $e');
+      if (kDebugMode) debugPrint('[PetRpc] 商城查询失败');
       return (const <PetShopItemModel>[], kPetLocalError);
     }
   }

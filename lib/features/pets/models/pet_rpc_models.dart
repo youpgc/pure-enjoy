@@ -199,8 +199,7 @@ class PetQuestModel {
       _ => PetQuestConditionType.fromCode(conditionType)?.label ?? '日常任务',
     };
     if (conditionType == 'adventure' && conditionTier != null) {
-      const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
-      final t = tierNames[conditionTier];
+      final t = kPetTierNames[conditionTier];
       if (t != null) return '$t游历';
     }
     return base;

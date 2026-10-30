@@ -164,8 +164,7 @@ class PetWeeklyQuestModel {
     final base = conditionType?.label ?? '本周任务';
     if (conditionType == PetQuestConditionType.adventure &&
         conditionTier != null) {
-      const tierNames = {'short': '短途', 'medium': '中途', 'long': '长途'};
-      final t = tierNames[conditionTier];
+      final t = kPetTierNames[conditionTier];
       if (t != null) return '$t${base.replaceAll('游历次数', '游历')}';
     }
     return base;
