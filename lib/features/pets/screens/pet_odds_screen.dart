@@ -736,6 +736,7 @@ Widget _oddsGroup(ColorScheme cs, String label, List<String> lines) {
 /// 转译用常量：家系/评级中文名（与评级展示序 N→SSR 对齐）
 /// 地形展示元数据:(中文名, 站点图标, 主题色, 地图 chip 淡底色)——
 /// 地图分支路径的视觉基元;未登记地形走 _zoneBranchLine 内兜底
+/// （新增游历地形须同步此表，否则公示页地形标签落英文码——20261030 star/origin 教训）
 static const Map<String, (String, IconData, Color, Color)> _zoneMeta = {
   'forest': ('森林', Icons.forest, Color(0xFF43A047), Color(0xFFE8F5E9)),
   'ranch': ('牧场', Icons.grass, Color(0xFF7CB342), Color(0xFFF1F8E9)),
@@ -743,6 +744,9 @@ static const Map<String, (String, IconData, Color, Color)> _zoneMeta = {
   'mountain': ('山地', Icons.terrain, Color(0xFF8D6E63), Color(0xFFEFEBE9)),
   'waste': ('荒原', Icons.landscape, Color(0xFFFB8C00), Color(0xFFFFF3E0)),
   'ruins': ('遗迹', Icons.account_balance, Color(0xFF7E57C2), Color(0xFFEDE7F6)),
+  // 20261025 100 级扩展批新增两阶（star/origin 共 8 图）——缺失致公示页地形标签落英文码
+  'star': ('星穹', Icons.star_rounded, Color(0xFF5C6BC0), Color(0xFFE8EAF6)),
+  'origin': ('源初', Icons.flare, Color(0xFFF9A825), Color(0xFFFDF6E3)),
 };
 static const Map<String, String> _rarityNames = {
   'N': 'N 级·普通',
