@@ -9,6 +9,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/scheduler.dart';
 
 import '../../game_play_helpers.dart';
+import '../../models/match3_mode.dart';
 import '../../services/game_reward_picker.dart';
 import '../../shared/game_audio.dart';
 import 'candy_component.dart';
@@ -20,8 +21,10 @@ import 'match3_swipe.dart';
 
 // 【文件拆分 2026-09-22】单文件超 500 行红线，按 part + extension 分片（逻辑零变更）：
 // match3_props_engine.dart（六道具引擎侧）、match3_flame_resolve.dart（连锁消除与结算）。
+// match3_flame_brawl.dart（乱斗模式：血量回复/障碍自增/暂停）。
 part 'match3_props_engine.dart';
 part 'match3_flame_resolve.dart';
+part 'match3_flame_brawl.dart';
 
 /// 消消乐（Flame 引擎 · 成熟手感版）
 ///
@@ -67,6 +70,17 @@ class Match3FlameGame extends FlameGame
   bool _over = false;
   bool _busy = false;
   bool _loaded = false;
+
+  /// 手动暂停标记（乱斗模式 · 宿主「暂停」钮置位；引擎 update 循环内跳过
+  /// 乱斗 tick，canInteract 锁交互；App 生命周期 pauseEngine 已由宿主
+  /// 观察者统一处理）。字段必须在主类（Dart 扩展不能声明实例字段）。
+  bool userPaused = false;
+
+  /// 乱斗：血量回复累计器（秒；≥1 时按整点回复，与血量整数口径一致）
+  double _brawlRegenAcc = 0;
+
+  /// 乱斗：障碍自增累计器（秒）
+  double _brawlSpawnAcc = 0;
 
   /// 残局处理器（宿主页注入，道具商城扩展预留，2026-09-09）：
   /// 死局（无可消交换）时调用，返回 true 表示已处理（如用洗牌券洗牌），
@@ -144,7 +158,26 @@ class Match3FlameGame extends FlameGame
     this.rows = 8,
     this.cols = 8,
     this.typeCount = 6,
+    this.freeMode = false,
   });
+
+  /// 自由模式（常驻经典 · 真相源 §21）：延迟结算——首次达成通关目标
+  /// 不立即结束，玩家可继续游玩刷更高分，点「确认结算」落袋；
+  /// 步数耗尽 / 盘面无可消时按已达标自动结算（cleared=true）。
+  final bool freeMode;
+
+  /// 是否已达成通关目标（延迟结算窗口内为 true；notifyHud 驱动结算钮点亮）。
+  bool goalReached = false;
+
+  /// 对局是否已结束（宿主结算钮禁用判定用）。
+  bool get isOver => _over;
+
+  /// 宿主「确认结算」：达标后手动落袋（未达标/已结束时不动作）。
+  void confirmSettle() {
+    if (!_over && goalReached) {
+      _finishByObjective();
+    }
+  }
 
   // ---------- 滑动手势（Match3SwipeMixin 接线）----------
 
@@ -157,7 +190,7 @@ class Match3FlameGame extends FlameGame
   }
 
   @override
-  bool get canInteract => _loaded && !_busy && !_over;
+  bool get canInteract => _loaded && !_busy && !_over && !userPaused;
 
   /// 滑动即交换：目标格越界则忽略，并清掉点选态避免与点选标记冲突。
   @override
@@ -307,6 +340,8 @@ class Match3FlameGame extends FlameGame
   void update(double dt) {
     super.update(dt);
     effects.update(dt);
+    // 乱斗模式：血量自动回复 + 果冻/冰封随机自增（暂停时整循环已停）
+    if (isBrawlMode) brawlTick(dt);
     // 限时模式：倒计时推进，归零即结算
     if (objective.isTimed && _loaded && !_over) {
       objective.secondsLeft -= dt;
@@ -395,7 +430,7 @@ class Match3FlameGame extends FlameGame
   void onTapUp(TapUpEvent event) {
     // 滑动尾部在部分机型会补发 tap，防误触窗口内直接忽略
     if (recentSwipe) return;
-    if (!_loaded || _busy || _over) return;
+    if (!_loaded || _busy || _over || userPaused) return;
     final c = ((event.canvasPosition.x - _offsetX) / _cell).floor();
     final r = ((event.canvasPosition.y - _offsetY) / _cell).floor();
     if (r < 0 || r >= rows || c < 0 || c >= cols) return;
@@ -451,7 +486,10 @@ class Match3FlameGame extends FlameGame
     GameAudio.instance.select();
     GameAudio.instance.haptic(GameHaptic.light);
 
-    Future.delayed(_anim, () {
+    Future.delayed(_anim, () async {
+      if (!isMounted) return;
+      // 乱斗暂停门：暂停期间交换判定挂起（暂停即时间停止）
+      await waitWhilePaused();
       if (!isMounted) return;
       if (findRuns(grid, rows, cols).isEmpty) {
         grid[r1][c1] = a;

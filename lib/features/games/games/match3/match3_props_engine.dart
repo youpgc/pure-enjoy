@@ -184,12 +184,12 @@ extension Match3PropsEngine on Match3FlameGame {
     if (hasAnyMove(grid, rows, cols)) return;
     final handler = stalemateHandler;
     if (handler == null) {
-      _finishByObjective(failReason: '无可消组合，对局结束');
+      _finishByObjective(failReason: '盘面已无可消除的组合');
     } else {
       _busy = false;
       handler().then((handled) {
         if (!handled && isMounted && !_over) {
-          _finishByObjective(failReason: '无可消组合，对局结束');
+          _finishByObjective(failReason: '盘面已无可消除的组合');
         }
       });
     }

@@ -85,6 +85,8 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
     final cols = (cfg['cols'] as num?)?.toInt() ?? 8;
     // 优先按关卡 mode_id → game_modes.play_kind 解析引擎行为（v2 唯一真相源）；
     // play_kind 缺失时回落 config 语义键 / level_no 百位兜底。
+    // 自由模式（真相源 §21）例外：档位即玩法——config.mode（score/clear/
+    // collect/obstacle/boss）优先，free 行 play_kind 不参与（否则锁死计分）。
     String? playKind;
     final lvl = widget.level;
     if (lvl != null && lvl.modeId.isNotEmpty) {
@@ -92,6 +94,9 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
           .where((m) => m.id == lvl.modeId)
           .firstOrNull;
       playKind = mode?.playKind;
+    }
+    if (lvl != null && lvl.isFreeModeLevel && cfg['mode'] is String) {
+      playKind = null;
     }
     _mode = resolveMatch3Mode(
       config: cfg,
@@ -114,6 +119,8 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
       cols: cols,
       // 方块类型数：难度配置项（config['types']，3..6），决定单局渲染几种糖果
       typeCount: (cfg['types'] is num ? (cfg['types'] as num).toInt() : 6),
+      // 自由模式（真相源 §21）：延迟结算——达标后可继续游玩，结算钮点亮后手动落袋
+      freeMode: widget.level?.isFreeModeLevel ?? false,
     );
     if (_mode == Match3Mode.timed) _loadAddTime();
     // 道具商城（数据驱动）：死局处理器常驻注入；道具目录由
@@ -250,7 +257,9 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
         state == AppLifecycleState.hidden) {
       _game.pauseEngine();
     } else if (state == AppLifecycleState.resumed) {
-      _game.resumeEngine();
+      // 乱斗手动暂停中不恢复：观察者 resumeEngine 会穿透用户暂停，
+      // 恢复由「继续游戏」按钮负责
+      if (!_game.userPaused) _game.resumeEngine();
     }
   }
 
@@ -259,7 +268,7 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
     if (_mode == Match3Mode.collect || _mode == Match3Mode.obstacle) {
       return Match3GoalBanner(objective: _objective);
     }
-    if (_mode != Match3Mode.boss) return null;
+    if (_mode != Match3Mode.boss && _mode != Match3Mode.brawl) return null;
     final ratio = _objective.bossHp <= 0
         ? 0.0
         : (_objective.bossLeft / _objective.bossHp).clamp(0.0, 1.0);
@@ -291,6 +300,30 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
     );
   }
 
+  /// 乱斗暂停钮：弹「对局已暂停」弹窗，引擎 update 停转 +
+  /// 交互锁，点「继续游戏」恢复（继续器与恢复原子化，防双击状态错位）。
+  Future<void> _togglePause() async {
+    if (_game.isOver || _game.userPaused) return;
+    _game.setUserPaused(true);
+    await showDialog<void>(
+      context: context,
+      barrierDismissible: false,
+      builder: (ctx) => AlertDialog(
+        title: const Text('对局已暂停'),
+        content: const Text('Boss 回血与障碍自增已同时暂停，随时继续挑战。'),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () {
+              _game.setUserPaused(false);
+              Navigator.of(ctx).pop();
+            },
+            child: const Text('继续游戏'),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return ValueListenableBuilder<int>(
@@ -298,7 +331,7 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
       builder: (_, __, ___) {
         final stats = _objective.stats();
         // 目标糖果不再放 HUD 状态栏：收集/破冰的「目标达成条件」统一在
-        // 游戏容器内上方 banner 展示（图标×N、居中、实时减少，2026-09-07 拍板）
+        // 游戏容器内上方 banner 展示（图标×N、居中、实时减少）
         return GameShell(
           statusItems: stats
               .map(
@@ -315,6 +348,35 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
           
           hint: _objective.hint,
           actions: <GameAction>[
+            // 自由/乱斗模式：重新开始移至最左侧
+            if (_game.freeMode)
+              GameAction(
+                icon: Icons.refresh,
+                label: '重新开始',
+                primary: true,
+                onPressed: widget.onRestart == null ? null : _confirmRestart,
+              ),
+            // 自由模式：确认结算钮——达标（goalReached）后点亮，点击按当前
+            // 成绩提前落袋；未达标置灰。乱斗无续玩逻辑，不展示此钮。
+            // _hudTick 驱动重建：引擎置 goalReached 后 notifyHud 即刷新本钮。
+            if (_game.freeMode && _mode != Match3Mode.brawl)
+              GameAction(
+                icon: Icons.check_circle,
+                label: '确认结算',
+                primary: _game.goalReached,
+                onPressed: (_game.goalReached && !_game.isOver)
+                    ? () => _game.confirmSettle()
+                    : null,
+              ),
+            // 乱斗：暂停钮仅乱斗模式展示
+            if (_mode == Match3Mode.brawl)
+              GameAction(
+                icon: Icons.pause_rounded,
+                label: '暂停',
+                onPressed: (_game.isOver || _game.userPaused)
+                    ? null
+                    : _togglePause,
+              ),
             if (_mode == Match3Mode.timed && _addTimeItem != null)
               GameAction(
                 icon: Icons.timer_outlined,
@@ -331,12 +393,14 @@ class _Match3GameState extends State<Match3Game> with WidgetsBindingObserver {
                       }
                     : null,
               ),
-            GameAction(
-              icon: Icons.refresh,
-              label: '重新开始',
-              primary: true,
-              onPressed: widget.onRestart == null ? null : _confirmRestart,
-            ),
+            // 自由/乱斗模式重开钮已前置到最左，此处仅常规模式展示
+            if (!_game.freeMode)
+              GameAction(
+                icon: Icons.refresh,
+                label: '重新开始',
+                primary: true,
+                onPressed: widget.onRestart == null ? null : _confirmRestart,
+              ),
           ],
           // 道具栏：独立一行，渲染于主控制栏（重新开始）上方；
           // 渲染与否由 game_items.enabled + level.config.propUnlock 数据驱动

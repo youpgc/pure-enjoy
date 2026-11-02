@@ -29,6 +29,11 @@ enum Match3Mode {
 
   /// Boss 战：限定步数内打光 Boss 血量（消除即造成伤害）
   boss,
+
+  /// 乱斗（自由模式专属）：Boss 血条 + 果冻 + 冰封混合，
+  /// 血量随时间自动回复、果冻/冰封随时间随机自增；破格掉血
+  /// 果冻格 ×2、冰封格 ×4，障碍占满盘面判负。不限步数，击破 Boss 即胜。
+  brawl,
 }
 
 extension Match3ModeMeta on Match3Mode {
@@ -47,6 +52,8 @@ extension Match3ModeMeta on Match3Mode {
         return 'timed';
       case Match3Mode.boss:
         return 'boss';
+      case Match3Mode.brawl:
+        return 'brawl';
     }
   }
 
@@ -68,6 +75,8 @@ extension Match3ModeMeta on Match3Mode {
         return '限时模式';
       case Match3Mode.boss:
         return 'Boss 模式';
+      case Match3Mode.brawl:
+        return '乱斗模式';
     }
   }
 
@@ -86,6 +95,8 @@ extension Match3ModeMeta on Match3Mode {
         return '在倒计时结束前达到目标分数';
       case Match3Mode.boss:
         return '在限定步数内消除糖果造成伤害，打光 Boss 血量';
+      case Match3Mode.brawl:
+        return '击破血量持续回复的 Boss；果冻与冰封随机自增，占满盘面即失败';
     }
   }
 
@@ -109,6 +120,10 @@ extension Match3ModeMeta on Match3Mode {
       case Match3Mode.boss:
         return '每消除 1 个糖果对 Boss 造成 1 点伤害，特殊糖伤害翻倍。'
             '在步数用尽前把 Boss 血量清零即获胜。';
+      case Match3Mode.brawl:
+        return 'Boss 血量会随时间自动回复，盘面果冻/冰封也会随机自增。'
+            '消除带果冻的格子伤害 ×2，带冰封的格子伤害 ×4。障碍占满盘面即判负，'
+            '击破 Boss 即获胜；可随时暂停对局。';
     }
   }
 
@@ -126,6 +141,8 @@ extension Match3ModeMeta on Match3Mode {
         return Icons.timer_outlined;
       case Match3Mode.boss:
         return Icons.pest_control_rodent;
+      case Match3Mode.brawl:
+        return Icons.bolt_rounded;
     }
   }
 
@@ -146,6 +163,8 @@ extension Match3ModeMeta on Match3Mode {
         return const Color(0xFFEF5350);
       case Match3Mode.boss:
         return const Color(0xFF8D6E63);
+      case Match3Mode.brawl:
+        return const Color(0xFFD81B60);
     }
   }
 }

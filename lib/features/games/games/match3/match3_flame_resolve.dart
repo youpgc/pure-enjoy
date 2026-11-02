@@ -21,20 +21,44 @@ extension _Match3Resolve on Match3FlameGame {
       _syncHud();
       // 目标达成即刻通关；资源（步数/时间）耗尽则按目标判定成败；
       // 残局判定：盘面无任何可消交换 → 交残局处理器（洗牌道具等，未注入
-      // 则判负，用户 2026-09-09 拍板 B 方案）
-      if (objective.achieved || objective.exhausted) {
+      // 则判负）。
+      // 自由模式（真相源 §21）延迟结算：首次达标不立即结束，置 goalReached
+      // 继续游玩刷更高分；步数耗尽 / 盘面无可消时按已达标自动结算。
+      // 乱斗：连锁清障只会减少障碍，占满只可能由自增触发（brawlTick 内判），
+      // 此处兜底复查防边界（如道具同时铺障碍等未来扩展）。
+      if (isBrawlMode && objective.brawlBoardFull && !objective.achieved) {
+        _finishByObjective(failReason: '果冻与冰封占满盘面，对局失败');
+      } else if (objective.exhausted) {
         _finishByObjective();
+      } else if (objective.achieved) {
+        if (freeMode && !isBrawlMode) {
+          // 自由模式延迟结算：首次达标置 goalReached 并通知结算钮点亮；
+          // 之后每次连锁结束仍走本分支——已达标则继续游玩，盘面无可消
+          // （无事可做）才按达标收局。绝不能因 goalReached 已置位而提前结算。
+          if (!goalReached) {
+            goalReached = true;
+            notifyHud();
+          }
+          if (!hasAnyMove(grid, rows, cols)) {
+            _finishByObjective();
+          } else {
+            _busy = false;
+          }
+        } else {
+          // 常规关卡与乱斗：达标即刻收局（乱斗无续玩逻辑）
+          _finishByObjective();
+        }
       } else if (!hasAnyMove(grid, rows, cols)) {
         final handler = stalemateHandler;
         if (handler == null) {
-          _finishByObjective(failReason: '无可消组合，对局结束');
+          _finishByObjective(failReason: '盘面已无可消除的组合');
         } else {
           // 释放操作锁：洗牌路径 doShuffle 需要可执行；处理器弹窗为模态，
           // 期间玩家触不到盘面，拒绝处理后立即判负
           _busy = false;
           handler().then((handled) {
             if (!handled && isMounted && !_over) {
-              _finishByObjective(failReason: '无可消组合，对局结束');
+              _finishByObjective(failReason: '盘面已无可消除的组合');
             }
           });
         }
@@ -169,7 +193,10 @@ extension _Match3Resolve on Match3FlameGame {
     }
 
     combo++;
-    Future.delayed(Match3FlameGame._anim, () {
+    Future.delayed(Match3FlameGame._anim, () async {
+      if (!isMounted) return;
+      // 乱斗暂停门：暂停期间连锁挂起（暂停即时间停止）
+      await waitWhilePaused();
       if (!isMounted) return;
       _removeCleared(toClear);
       _applyGravity();

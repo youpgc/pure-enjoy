@@ -87,6 +87,17 @@ class Match3Objective {
   /// Boss 总血量（boss）
   final int bossHp;
 
+  /// Boss 每秒自动回复血量（brawl）。
+  /// 推演依据（真相源 §20 容量模型）：t5 实测 D5=9.9 伤害/步、约 25 步/分
+  /// → 玩家输出 ≈4.2 血/秒；回复速率按输出占比分档：简单 1（24%）/
+  /// 普通 1.5（36%）/ 困难 2.5（60%）。
+  final double brawlRegenPerSec;
+
+  /// 障碍（果冻/冰封）随机自增间隔秒（brawl）。
+  /// 推演依据：玩家清格 ≈1 格/步 ≈24 格/分；自增速率远低于清格能力、
+  /// 按难度加压：简单 18s/格（3.3 格/分）/ 普通 12s（5 格/分）/ 困难 8s（7.5 格/分）。
+  final int brawlSpawnEverySec;
+
   /// 果冻层：1 = 有果冻，0 = 已清除（[initBoard] 前为空，渲染需先判空）
   List<List<int>> jelly = <List<int>>[];
 
@@ -130,6 +141,8 @@ class Match3Objective {
     this.jellyCount = 14,
     this.iceCount = 16,
     this.bossHp = 260,
+    this.brawlRegenPerSec = 0,
+    this.brawlSpawnEverySec = 0,
     this.collectGoals = const <CollectGoal>[],
   });
 
@@ -200,6 +213,10 @@ class Match3Objective {
       jellyCount: intOf('jelly', 14, ['jelly_layers']),
       iceCount: intOf('ice', 16),
       bossHp: intOf('bossHp', 260),
+      brawlRegenPerSec: (config['regenPerSec'] is num)
+          ? (config['regenPerSec'] as num).toDouble()
+          : 0,
+      brawlSpawnEverySec: intOf('spawnEverySec', 0),
       collectGoals: goals,
     );
   }
@@ -221,6 +238,20 @@ class Match3Objective {
     } else if (mode == Match3Mode.obstacle) {
       // 冰块需消除两次，撒在中下部区域（避免顶部补充糖果时视觉突兀）
       _scatter(rng, iceCount, (r, c) => ice[r][c] = 2);
+    } else if (mode == Match3Mode.brawl) {
+      // 乱斗：果冻与冰封混合撒布且互不重叠（jellyLeft+iceLeft=占用格数，
+      // 「占满判负」的计数口径依赖不相交）。冰块撒在果冻之外的空格上。
+      _scatter(rng, jellyCount, (r, c) => jelly[r][c] = 1);
+      final free = <(int, int)>[
+        for (var r = 0; r < rows; r++)
+          for (var c = 0; c < cols; c++)
+            if (jelly[r][c] == 0) (r, c),
+      ];
+      free.shuffle(rng);
+      final n = min(iceCount, free.length);
+      for (var i = 0; i < n; i++) {
+        ice[free[i].$1][free[i].$2] = 2;
+      }
     }
     movesLeft = steps > 0 ? steps : 0;
     movesUsed = 0;
@@ -271,6 +302,20 @@ class Match3Objective {
         }
         if (bossLeft < 0) bossLeft = 0;
         break;
+      case Match3Mode.brawl:
+        // 乱斗：消除即对 Boss 掉血；破格倍数——果冻格 ×2、冰封格 ×4
+        // （果冻/冰封撒布互斥，不会同格叠加）；特殊糖翻倍另行叠乘
+        // （特殊糖+冰封 = 8 点）。
+        for (final cell in cells) {
+          var dmg = cell.special ? 2 : 1;
+          if (jelly[cell.row][cell.col] > 0) dmg *= 2;
+          if (ice[cell.row][cell.col] > 0) dmg *= 4;
+          bossLeft -= dmg;
+          if (jelly[cell.row][cell.col] > 0) jelly[cell.row][cell.col] = 0;
+          if (ice[cell.row][cell.col] > 0) ice[cell.row][cell.col] -= 1;
+        }
+        if (bossLeft < 0) bossLeft = 0;
+        break;
       case Match3Mode.score:
       case Match3Mode.timed:
         break;
@@ -299,6 +344,9 @@ class Match3Objective {
     return n;
   }
 
+  /// 乱斗失败判定：果冻 + 冰封占满盘面（撒布互不重叠，格数可直接相加）。
+  bool get brawlBoardFull => jellyLeft + iceLeft >= rows * cols;
+
   /// 目标是否已达成（达成即可立即通关，无需耗尽步数）
   bool get achieved {
     switch (mode) {
@@ -317,6 +365,8 @@ class Match3Objective {
         if (iceLeft > 0) return false;
         return collectGoals.isEmpty || collectGoals.every((g) => g.done);
       case Match3Mode.boss:
+        return bossLeft <= 0;
+      case Match3Mode.brawl:
         return bossLeft <= 0;
     }
   }
@@ -388,6 +438,12 @@ class Match3Objective {
           ObjectiveStat('得分', '$score', color: const Color(0xFFFFB300)),
           if (moveStat != null) moveStat,
         ];
+      case Match3Mode.brawl:
+        return <ObjectiveStat>[
+          ObjectiveStat('Boss 血量', '$bossLeft/$bossHp', color: bossColor),
+          ObjectiveStat('障碍', '$jellyLeft+$iceLeft', color: jellyColor),
+          ObjectiveStat('得分', '$score', color: const Color(0xFFFFB300)),
+        ];
     }
   }
 
@@ -432,6 +488,8 @@ class Match3Objective {
             : '$stepText击碎冰块并收集${extra.join('、')}';
       case Match3Mode.boss:
         return '$stepText击破$bossHp血量Boss';
+      case Match3Mode.brawl:
+        return '击破Boss（血量持续回复）· 果冻冰封占满盘面即失败';
     }
   }
 
