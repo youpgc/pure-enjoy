@@ -199,7 +199,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
               Icon(Icons.error_outline, color: AppTheme.error, size: 18),
               SizedBox(width: 8),
               Expanded(
-                child: Text('奖励结算异常，成绩已记录；可稍后重试或返回大厅。',
+                child: Text('奖励还在路上：成绩已保存，稍后可回来重试领取',
                     style: TextStyle(color: AppTheme.error, fontSize: 13)),
               ),
             ],
@@ -235,7 +235,7 @@ class _GameSettlementSheetState extends State<GameSettlementSheet> {
             SizedBox(width: 8),
             Expanded(
               child: Text(
-                '默认流程（配置未开启或异常）：本次仅记录成绩，不发放积分与成就',
+                '本局为练习模式：成绩已记录，暂不发放奖励',
                 style: TextStyle(fontSize: 13),
               ),
             ),
