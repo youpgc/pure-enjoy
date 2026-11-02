@@ -152,17 +152,21 @@ class _GameBestScreenState extends State<GameBestScreen> {
     if (mounted) setState(() => _loading = false);
   }
 
-  /// 消消乐模式聚合行：play_kind → Match3Mode 定版元数据（含早期 DB 占位码兜底）
+  /// 消消乐模式聚合行：play_kind → Match3Mode 定版元数据（含早期 DB 占位码兜底）。
+  /// 可配置模式行（自由/乱斗）解析码会与常规行撞车——自由行 play_kind
+  /// 同为 score，与「计分模式」行同显「计分」出现两条同名条目，
+  /// 故直接用 DB 模式名命名。
   _ModeBest _match3ModeBest(GameModeModel mode) {
     final m = match3ModeFromAnyCode(mode.playKind) ??
         match3ModeFromAnyCode(mode.code) ??
         Match3Mode.score;
+    final useModeName = mode.isFreeMode && m != Match3Mode.brawl;
     return _ModeBest(
       modeId: mode.id,
-      label: m.label,
-      color: m.color,
+      label: useModeName ? mode.name : m.label,
+      color: useModeName ? modeColorOf(mode.playKind) : m.color,
       iconAsset: mode.icon,
-      fallbackIcon: m.icon,
+      fallbackIcon: useModeName ? Icons.grid_view_rounded : m.icon,
     );
   }
 
