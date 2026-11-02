@@ -151,11 +151,23 @@ extension _G2048EngineOps on _G2048GameState {
     // - 分数目标模式（限时/挑战）：累计分达到 config.target 即通关；
     // - 方块目标模式（经典）：合成到目标方块 且 (未设分数门槛 或 累计分已达标)。
     final scoreTarget = _scoreTarget;
-    _pendingWin = _isScoreGoal
-        ? (_score >= _target)
-        : (_reachedTarget && (scoreTarget == null || _score >= scoreTarget));
-    // 无尽模式：无论是否达成目标都不通关，仅棋盘卡死时结束
-    if (_noClear) _pendingWin = false;
+    // 自由模式延迟结算：达标（_goalReached）后不再重算 _pendingWin——
+    // 分数持续超标会让每一次操作都被算回「达标」而立即收局；此后继续
+    // 游玩只由「确认结算」提前落袋，或棋盘卡死 / 步数耗尽时按达标收局。
+    if (_isFreeMode && _goalReached) {
+      _pendingWin = false;
+    } else {
+      _pendingWin = _isScoreGoal
+          ? (_score >= _target)
+          : (_reachedTarget && (scoreTarget == null || _score >= scoreTarget));
+      // 无尽模式：无论是否达成目标都不通关，仅棋盘卡死时结束
+      if (_noClear) _pendingWin = false;
+      // 自由模式首次达标不立即结束：清 _pendingWin、点亮「确认结算」钮
+      if (_pendingWin && _isFreeMode) {
+        _pendingWin = false;
+        _goalReached = true;
+      }
+    }
     setState(() {});
 
     Future.delayed(_G2048GameState._slide + const Duration(milliseconds: 20), () {
@@ -173,13 +185,14 @@ extension _G2048EngineOps on _G2048GameState {
           _rebuildGrid();
           if (!_hasMoves()) lost = true;
         }
-        // 步数耗尽且未通关 → 失败（优先于棋盘卡死判定）
+        // 步数耗尽且未通关 → 失败（优先于棋盘卡死判定）。
+        // 自由模式已达标（_goalReached）后自然结束按达标结算（cleared=true）。
         if (!_pendingWin && movesLimit != null && _movesUsed >= movesLimit) {
-          _finish(false);
+          _finish(_isFreeMode && _goalReached);
         } else if (_pendingWin) {
           _finish(true);
         } else if (lost) {
-          _finish(false);
+          _finish(_isFreeMode && _goalReached);
         } else {
           // 动画期间缓存的滑动：立即补执行，保证输入不丢、不卡死。
           final buffered = _pendingDir;

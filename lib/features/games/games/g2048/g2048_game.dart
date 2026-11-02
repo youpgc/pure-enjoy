@@ -84,6 +84,13 @@ class _G2048GameState extends State<G2048Game> with WidgetsBindingObserver {
   int _best = 0;
   bool _animating = false;
   bool _finished = false;
+
+  /// 自由模式（真相源 §21）延迟结算：首次达成通关目标后为 true，
+  /// 继续游玩刷更高分，玩家点「确认结算」提前落袋或棋盘卡死自动结算。
+  bool _goalReached = false;
+
+  /// 是否自由模式合成关（决定是否启用延迟结算与确认结算钮）。
+  bool get _isFreeMode => widget.level.isFreeModeLevel;
   bool _pendingWin = false;
   int _movesUsed = 0;
 
@@ -220,6 +227,7 @@ class _G2048GameState extends State<G2048Game> with WidgetsBindingObserver {
     _mergeCount = 0; // 合成计数同归零（审查报告 游戏 G1：_reset 遗漏，复用即跨局累计）
     _lastTickSecond = -1;
     _reachedTarget = false;
+    _goalReached = false; // 自由模式延迟结算状态不跨局
     _bonusSeconds = 0; // 道具加时不跨局保留
     _movesBonus = 0; // 道具加步不跨局保留
     _startTime = DateTime.now(); // 计时基准随新局重置（限时判定/duration 口径）
@@ -307,6 +315,13 @@ class _G2048GameState extends State<G2048Game> with WidgetsBindingObserver {
       },
       durationMs: elapsed,
     ));
+  }
+
+  /// 自由模式「确认结算」（真相源 §21 延迟结算）：达标后按当前成绩提前落袋。
+  void _confirmSettle() {
+    if (!_finished && _goalReached) {
+      _finish(true);
+    }
   }
 
   /// 重新开始按钮：进行中需二次确认，避免误触丢失当前进度。
@@ -412,15 +427,24 @@ class _G2048GameState extends State<G2048Game> with WidgetsBindingObserver {
           ),
       ],
       actions: <GameAction>[
+        // 自由模式：重新开始移至最左侧
         GameAction(
           icon: Icons.refresh,
-          // 三游戏统一文案（2026-09-10）：原「新游戏」与消消乐「重新开始」不一致
+          // 三游戏统一文案：原「新游戏」与消消乐「重新开始」不一致
           label: '重新开始',
           primary: true,
           // 重开统一走宿主 _restartGame（aborted 上报 + 引擎重建），与消消乐同口径；
           // 未接宿主时禁用（GameFlow 体系恒传入，防御性兜底）
           onPressed: widget.onRestart == null ? null : _confirmRestartViaHost,
         ),
+        // 自由模式：确认结算钮——达标后点亮，提前落袋；未达标置灰。
+        if (_isFreeMode)
+          GameAction(
+            icon: Icons.check_circle,
+            label: '确认结算',
+            primary: _goalReached,
+            onPressed: _goalReached ? _confirmSettle : null,
+          ),
       ],
       content: LayoutBuilder(
         builder: (ctx, constraints) => _buildBoard(constraints),
