@@ -55,6 +55,10 @@ class GameScoreService {
     String? statusOverride,
     required int durationMs,
     Map<String, num> values = const <String, num>{},
+
+    /// 通关条件文本（自由/乱斗等合成关对局传入；常规关 null，
+    /// 条件由关卡 config 推导）。随主记录落库供后台成绩看板展示。
+    String? conditionText,
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return null;
@@ -79,6 +83,7 @@ class GameScoreService {
         'mode_id': modeId,
         'status': statusOverride ?? (cleared ? 'cleared' : 'failed'),
         'duration_ms': durationMs,
+        'condition_text': conditionText,
         'played_at': now.toIso8601String(),
         'created_at': now.toIso8601String(),
       },
