@@ -3,6 +3,12 @@
 /// 关卡的布局与通关条件由后台配置下发，App 端只读并按 [config] 渲染关卡。
 /// [target] 描述通关判定条件（按维度阈值），具体语义由各游戏实现解释。
 class GameLevelModel {
+  /// 自由模式合成关 id 前缀（结算/展示按此前缀识别自由模式局）。
+  static const String freeModeIdPrefix = 'free_';
+
+  /// 是否为自由模式合成关（常驻经典 · 只发按局可重复奖励一类）。
+  bool get isFreeModeLevel => id.startsWith(freeModeIdPrefix);
+
   /// 主键（uuid）
   final String id;
 
@@ -169,6 +175,35 @@ class GameLevelModel {
       },
       countForDailyClear: true,
       rewardPoints: 0,
+    );
+  }
+
+  /// 自由模式合成关：难度档位参数与档位积分
+  /// 全部来自后台 `game_modes.config.tiers`（App 不硬编码任何难度/分值）。
+  /// `levelNo=0` 同 [tetrisDaily]：避免 level 型成就/段位被低难度一局全解锁；
+  /// `rewardRepeatable=true`：每次通关经 settleToken 幂等占坑（受双日上限约束）；
+  /// `countForDailyClear=false`：不计每日首通（防低难度刷首通）。
+  /// 成绩照常上报（非 uuid id 由 sanitizeUuid 置 null），供排行榜（P2）聚合。
+  factory GameLevelModel.freeMode({
+    required String gameId,
+    required String gameCode,
+    required String modeId,
+    required String tierKey,
+    required String tierName,
+    required int points,
+    Map<String, dynamic> tierConfig = const <String, dynamic>{},
+    String modeName = '自由模式',
+  }) {
+    return GameLevelModel(
+      id: '$freeModeIdPrefix${gameCode}_$tierKey',
+      gameId: gameId,
+      modeId: modeId,
+      levelNo: 0,
+      name: '$modeName · $tierName',
+      config: tierConfig,
+      countForDailyClear: false,
+      rewardPoints: points,
+      rewardRepeatable: true,
     );
   }
 

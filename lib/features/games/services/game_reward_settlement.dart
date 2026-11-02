@@ -53,6 +53,11 @@ extension GameRewardSettlement on GameRewardService {
     final items = <GameSettlementItem>[];
     final config = await GameService.instance.fetchConfig();
 
+    // 自由模式局（常驻经典 · 真相源 §21）：只发「通关奖励」一类
+    // （可重复坑 + 档位积分），跳过每日首通 / score_range / 成就 / 徽章——
+    // 防止低难度档白嫖终身里程碑与段位（双日上限照常约束）。
+    final isFreePlay = level.isFreeModeLevel;
+
     // 【方案 B 2026-09-22】结算改为「先编排、后发放」两阶段：下方各判定段
     // 只把候选项登记进 steps（不发分），段末统一按本局可发额度决定
     // 「整条链全发」还是「全不发」，消除逐项校验的割裂体验（详见 guardedClaim 注释）。
@@ -121,7 +126,7 @@ extension GameRewardSettlement on GameRewardService {
     //    【方案 B 阶段一：只登记候选，不在此处发放】真实 claim 延迟到段末
     //    额度判定之后，仍统一经 guardedClaim（阶段二）执行，止付语义不变。
     //    不计入每日首通 / 规则关闭时 points 记 0，不占用「应发总额」
-    //    （实际展示原因仍由 claimDailyFirstClear 给出）。
+    //    （实际展示原因仍由 claimDailyFirstClear 给出）。自由模式局跳过。
     final dailyRule = config.globalRewardRules.firstWhere(
       (r) => r.ruleType == GameRewardRuleType.dailyFirstClear && r.enabled,
       orElse: () => const GameRewardRuleModel(
@@ -130,49 +135,58 @@ extension GameRewardSettlement on GameRewardService {
         points: 3,
       ),
     );
-    steps.add(_SettleStep(
-      kind: 'daily_first_clear',
-      label: '每日首次通关',
-      points:
-          level.countForDailyClear && dailyRule.enabled ? dailyRule.points : 0,
-      claimKey: dailyFirstClearClaimKey(),
-      claim: () => claimDailyFirstClear(
-        gameId: game.id,
-        gameName: game.name,
-        level: level,
-      ),
-    ));
+    if (!isFreePlay) {
+      steps.add(_SettleStep(
+        kind: 'daily_first_clear',
+        label: '每日首次通关',
+        points: level.countForDailyClear && dailyRule.enabled
+            ? dailyRule.points
+            : 0,
+        claimKey: dailyFirstClearClaimKey(),
+        claim: () => claimDailyFirstClear(
+          gameId: game.id,
+          gameName: game.name,
+          level: level,
+        ),
+      ));
+    }
 
     // 2) 成绩区间首次达成（按该游戏配置的 score_range 规则）
     //    里程碑式分档：只发「本局成绩落入的最高档」一条，其余档位属非本局区间。
-    final scoreRules = config.rewardRules
-        .where(
-          (r) =>
-              r.gameId == game.id &&
-              r.ruleType == GameRewardRuleType.scoreRange &&
-              r.enabled,
-        )
-        .toList();
-    final topRule = pickTopScoreRangeRule(scoreRules, judgeValues);
-    if (topRule != null) {
-      // 【方案 B 阶段一：只登记候选，不在此处发放】发放见段末 guardedClaim。
-      steps.add(_SettleStep(
-        kind: 'score_range',
-        label: topRule.name ?? '成绩达标',
-        points: topRule.points,
-        claimKey: scoreRangeClaimKey(game.code, topRule.id),
-        claim: () => claimScoreRange(rule: topRule, gameCode: game.code),
-      ));
+    //    自由模式局跳过（防低难度档白嫖终身里程碑）。
+    if (!isFreePlay) {
+      final scoreRules = config.rewardRules
+          .where(
+            (r) =>
+                r.gameId == game.id &&
+                r.ruleType == GameRewardRuleType.scoreRange &&
+                r.enabled,
+          )
+          .toList();
+      final topRule = pickTopScoreRangeRule(scoreRules, judgeValues);
+      if (topRule != null) {
+        // 【方案 B 阶段一：只登记候选，不在此处发放】发放见段末 guardedClaim。
+        steps.add(_SettleStep(
+          kind: 'score_range',
+          label: topRule.name ?? '成绩达标',
+          points: topRule.points,
+          claimKey: scoreRangeClaimKey(game.code, topRule.id),
+          claim: () => claimScoreRange(rule: topRule, gameCode: game.code),
+        ));
+      }
     }
 
     // 3) 成就达成（按该游戏启用的成就条件 + 全局成就 game_id=null）
     //    全局成就（如 first_clear_all 任意通关全局 +3）跨游戏生效，此前
     //    achievementsOf(game.id) 仅按 game_id 过滤，把 game_id=null 的全局成就
     //    排除在外，导致 first_clear_all 永不发放——此处补齐闭环。
-    final achievements = <GameAchievementModel>[
-      ...config.achievementsOf(game.id).where((a) => a.enabled),
-      ...config.achievements.where((a) => a.gameId == null && a.enabled),
-    ];
+    //    自由模式局跳过全部成就判定（空列表短路，3a~3d 自然不产生候选）。
+    final achievements = isFreePlay
+        ? <GameAchievementModel>[]
+        : <GameAchievementModel>[
+            ...config.achievementsOf(game.id).where((a) => a.enabled),
+            ...config.achievements.where((a) => a.gameId == null && a.enabled),
+          ];
 
     // 消消乐全局关序按后台配置动态推导（见 _match3GlobalLevelIndex），
     // 与后台 `game_levels` 实际关数一致，成就 `min_level_no` 阈值按同一口径比对。
@@ -336,8 +350,8 @@ extension GameRewardSettlement on GameRewardService {
     // 4) 模式段位徽章（v2 徽章化 q-0：成就=纯荣誉，0 积分，仅记录解锁）。
     //    判定与落库见 GameBadgeService（体量拆分），此处只编排结果展示。
     //    上限止付命中时整段跳过：徽章发分同样计入单日上限，此时尝试必然被拦
-    //    （不占坑、下次重试），直接跳过省去无效 RPC。
-    final newBadge = capHit
+    //    （不占坑、下次重试），直接跳过省去无效 RPC。自由模式局同样整段跳过。
+    final newBadge = (capHit || isFreePlay)
         ? null
         : await GameBadgeService.instance.unlockTopTier(
       config: config,

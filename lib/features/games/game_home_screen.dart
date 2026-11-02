@@ -16,7 +16,9 @@ import 'models/game_model.dart';
 import 'models/game_mode_model.dart';
 import 'models/match3_mode.dart';
 import 'play/game_best_screen.dart';
+import 'play/game_free_mode_sheet.dart';
 import 'play/game_history_screen.dart';
+import 'play/game_leaderboard_screen.dart';
 import 'services/game_service.dart';
 
 part 'game_home_screen_widgets.dart';
@@ -172,6 +174,14 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
     );
   }
 
+  /// 排行榜（P2）：总榜/周榜，跨玩家最佳成绩（入口仅游戏详情页）
+  void _openLeaderboard() {
+    Navigator.of(context).push(
+      MaterialPageRoute(
+          builder: (_) => GameLeaderboardScreen(game: widget.game)),
+    );
+  }
+
   void _openHistory() {
     Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GameHistoryScreen(game: widget.game)),
@@ -240,6 +250,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     _modeGridGeneric(_modes
                         .where((m) =>
                             m.isEndless ||
+                            m.isFreeMode ||
                             _isDailyMode(m) ||
                             _levels.any((l) => l.modeId == m.id))
                         .toList()),
@@ -255,7 +266,7 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                       _EntryTile(
                         icon: Icons.play_arrow_rounded,
                         label: '开始游戏',
-                        desc: '经典模式 · 默认流程（不发积分）',
+                        desc: '经典模式 · 开局即玩',
                         primary: true,
                         onTap: _startGame,
                       )
@@ -288,6 +299,12 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                     label: '最佳记录',
                     desc: '各模式 / 各维度最佳成绩',
                     onTap: _openBest,
+                  ),
+                  _EntryTile(
+                    icon: Icons.emoji_events_rounded,
+                    label: '排行榜',
+                    desc: '总榜 / 周榜 · 全员最佳成绩排名',
+                    onTap: _openLeaderboard,
                   ),
                   _EntryTile(
                     icon: Icons.history_rounded,
@@ -353,7 +370,11 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
                 ? (_tetrisDailyDone ? '今日已完成' : '0点刷新奖励')
                 : mode.isEndless
                     ? '无尽 · 随时挑战'
-                    : '已通关 $cleared/$total';
+                    : mode.isFreeMode
+                        ? (mode.summary.isNotEmpty
+                            ? mode.summary
+                            : '自选玩法 · 反复挑战')
+                        : '已通关 $cleared/$total';
             return InkWell(
               onTap: () => _onModeTap(mode),
               borderRadius: BorderRadius.circular(14),
@@ -429,12 +450,41 @@ class _GameHomeScreenState extends State<GameHomeScreen> {
   }
 
   /// 模式点击分流：
+  /// - 自由模式：弹难度档位选择，按档合成关开局（反复游玩，按局发分）；
   /// - 无尽模式（endless）：无具体关，直接开合成无尽局；
   /// - 允许选关（后台 level_selectable=true 且 levelSelect 节点开启）：
   ///   打开选关弹窗（按 mode_id 过滤该模式关卡）；
   /// - 关闭选关：不弹选关，直接进该模式的最新关卡（frontier：
   ///   第一个未通关，全通关取末关）。
   Future<void> _onModeTap(GameModeModel mode) async {
+    // 自由模式（常驻经典）：档位来自后台 mode.config.tiers，
+    // 选档后合成关开局；积分=档位配置，结算只发按局可重复奖励一类。
+    if (mode.isFreeMode) {
+      final tier = await GameFreeModeSheet.show(
+        context: context,
+        mode: mode,
+        gameCode: widget.game.code,
+      );
+      if (!mounted || tier == null) return;
+      final lv = GameLevelModel.freeMode(
+        gameId: widget.game.id,
+        gameCode: widget.game.code,
+        modeId: mode.id,
+        tierKey: tier['key']?.toString() ?? 'classic',
+        tierName: tier['name']?.toString() ?? '经典',
+        points: (tier['points'] as num?)?.toInt() ?? 0,
+        tierConfig: (tier['config'] as Map<String, dynamic>?) ??
+            const <String, dynamic>{},
+        modeName: mode.name,
+      );
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => GamePlayScreen(game: widget.game, level: lv),
+        ),
+      );
+      if (mounted) await _load(force: true);
+      return;
+    }
     if (mode.isEndless) {
       final lv = GameLevelModel.endless2048(
         gameId: widget.game.id,

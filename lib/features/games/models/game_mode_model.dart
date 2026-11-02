@@ -89,6 +89,10 @@ class GameModeModel {
   /// 是否为无尽模式（无关卡、由 App 合成无尽局）。
   bool get isEndless => code == 'endless' || playKind == '2048_endless';
 
+  /// 是否为自由模式：config.customizable=true，
+  /// 点击弹难度档位选择（config.tiers），按档合成关开局，反复游玩拿按局积分。
+  bool get isFreeMode => config['customizable'] == true;
+
   /// 拷贝并覆盖指定字段（不可变模型派生用；config 为浅引用，深拷贝由调用方负责）。
   GameModeModel copyWith({
     String? id,

@@ -44,7 +44,7 @@ class GamePlayOutcome {
   /// 是否通关
   final bool cleared;
 
-  /// 失败原因（可选）：如残局判负的「无可消组合，对局结束」；
+  /// 失败原因（可选）：如残局判负的「盘面已无可消除的组合」；
   /// 非空且 [cleared] 为 false 时结算弹窗优先展示该文案。
   final String? reason;
 
@@ -151,13 +151,56 @@ Future<GameSettlementResult?> reportAndSettle({
     if (dim != null) valuesById[dim.id] = entry.value;
   }
 
-  // 失败记录门槛（2026-09-10 用户拍板）：非通关对局，当局步数 <5 不计入
+  // 失败记录门槛：非通关对局，当局步数 <5 不计入
   // 成绩记录（防秒败刷记录）。以 moves 维度取值为准——无 moves 维度的
   // 游戏（sheep 等）不适用此门槛；放弃路径另有 ≥10s 时长门槛。
   final failedMoves = cleared ? null : scoreValuesByCode['moves'];
   final belowMoveFloor = !cleared && failedMoves != null && failedMoves < 5;
 
-  // 放弃：只上报成绩，不结算不弹窗（放弃不发分，防止刷分）
+  
+
+
+/// 自由/乱斗合成关的通关条件文本（档位 config 已含开局随机结果）：
+/// 各游戏条件键不同，按键组装；非合成关返回 null（条件由关卡推导）。
+String? freeConditionDesc(GameLevelModel level) {
+  if (!level.isFreeModeLevel) return null;
+  final c = level.config;
+  String? numOf(String k) => c[k] is num ? (c[k] as num).toString() : null;
+  final parts = <String>[];
+  final boss = numOf('bossHp');
+  if (boss != null) {
+    parts.add('击破 $boss 血 Boss');
+    final jelly = numOf('jelly');
+    final ice = numOf('ice');
+    if (jelly != null && ice != null) parts.add('初始果冻 $jelly + 冰封 $ice');
+  } else {
+    final types = numOf('types');
+    if (types != null && c.containsKey('mode')) parts.add('$types 色');
+    final goal = numOf('goal');
+    if (goal != null) parts.add('得分≥$goal');
+    final jelly = numOf('jelly');
+    if (jelly != null) parts.add('清 $jelly 格果冻');
+    final collect = numOf('collect');
+    if (collect != null) parts.add('收集指定色×$collect');
+    final ice = numOf('ice');
+    if (ice != null) parts.add('碎 $ice 格冰封');
+  }
+  final target = numOf('target');
+  if (target != null) parts.add('合成 $target 方块');
+  final lines = numOf('lines');
+  if (lines != null) parts.add('消除 $lines 行');
+  final types = numOf('types');
+  final per = numOf('perType');
+  final layers = numOf('layers');
+  if (types != null && per != null && layers != null) {
+    // 后台配置值可能是浮点形态（jsonb 数字解码为 double），安全取整防崩
+    final blockCount =
+        ((num.tryParse(types) ?? 0).toInt()) * ((num.tryParse(per) ?? 0).toInt());
+    parts.add('清空 $blockCount 块 $layers 层牌面');
+  }
+  return parts.isEmpty ? null : parts.join(' · ');
+}
+// 放弃：只上报成绩，不结算不弹窗（放弃不发分，防止刷分）
   if (aborted) {
     if (!belowMoveFloor) {
       await GameScoreService.instance.submitScore(
@@ -168,6 +211,7 @@ Future<GameSettlementResult?> reportAndSettle({
         statusOverride: 'aborted',
         durationMs: durationMs,
         values: valuesById,
+        conditionText: freeConditionDesc(level),
       );
     }
     return null;
@@ -185,7 +229,9 @@ Future<GameSettlementResult?> reportAndSettle({
       // 累计型成就计数：每局在主流程至多记录一次（L1 重试只重跑发放、
       // 不重放计数，防重复累加）。放弃局不计；<5 步秒败局不计（与成绩
       // 记录同门槛）。计数与 rewardsAllowed 无关——奖励门禁只管发放。
-      if (!belowMoveFloor) {
+      // 自由模式局不计：累计总量只喂成就判定，
+      // 低难度档反复刷局数不得推进累计成就。
+      if (!belowMoveFloor && !level.isFreeModeLevel) {
         await GameCumulativeService.instance.recordSettle(
           gameCode: game.code,
           cleared: cleared,
@@ -202,6 +248,7 @@ Future<GameSettlementResult?> reportAndSettle({
           cleared: cleared,
           durationMs: durationMs,
           values: valuesById,
+          conditionText: freeConditionDesc(level),
         );
         // 主记录上报成功 → 通知调用方挂靠衍生明细（如无尽局明细数组）
         await onScoreReported?.call(scoreId);
