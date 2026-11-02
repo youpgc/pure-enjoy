@@ -100,7 +100,7 @@ class GameRewardService {
     required GameLevelModel level,
   }) async {
     if (!level.countForDailyClear) {
-      return GameRewardResult.notGranted(reason: '本关不计入每日首通');
+      return GameRewardResult.notGranted(reason: '本局不参与每日首通奖励');
     }
     final rules = (await GameService.instance.fetchConfig()).globalRewardRules;
     final rule = rules.firstWhere(
@@ -112,7 +112,7 @@ class GameRewardService {
       ),
     );
     if (!rule.enabled) {
-      return GameRewardResult.notGranted(reason: '该奖励已关闭');
+      return GameRewardResult.notGranted(reason: '该奖励暂未开放');
     }
 
     return _tryClaim(
@@ -164,7 +164,7 @@ class GameRewardService {
     required GameAchievementModel achievement,
   }) async {
     if (achievement.rewardPoints <= 0) {
-      return GameRewardResult.notGranted(reason: '该成就无积分奖励');
+      return GameRewardResult.notGranted(reason: '荣誉成就，达成即解锁');
     }
     final res = await _tryClaim(
       claimKey: achievementClaimKey(achievement.code),
@@ -208,7 +208,7 @@ class GameRewardService {
     required String gameCode,
   }) async {
     if (!rule.enabled || rule.points <= 0) {
-      return GameRewardResult.notGranted(reason: '该奖励已关闭');
+      return GameRewardResult.notGranted(reason: '该奖励暂未开放');
     }
     return _tryClaim(
       claimKey: scoreRangeClaimKey(gameCode, rule.id),

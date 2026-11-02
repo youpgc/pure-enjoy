@@ -124,7 +124,7 @@ class GameItemService {
       final spent = await PointService.instance.updatePointsStats(
         delta: -item.pointCost,
         type: 'game_spend',
-        remark: '购买道具:${item.name}',
+        remark: '购买道具 · ${item.name}',
       );
       if (!spent) {
         ErrorReporter.reportMessage(
@@ -141,7 +141,7 @@ class GameItemService {
         final refunded = await PointService.instance.updatePointsStats(
           delta: item.pointCost,
           type: 'earn',
-          remark: '购买道具回退:${item.name}',
+          remark: '购买取消 · ${item.name}',
         );
         // 错误上报（2026-09-11）：扣分/回退/入库的中间态失败涉及资金一致性
         ErrorReporter.reportMessage(

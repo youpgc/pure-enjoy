@@ -215,7 +215,7 @@ class GameFlowRunner {
     if (level == null) {
       final adapter = GameFlowRegistry.adapterOf(game.code);
       if (adapter == null) {
-        // 未注册的游戏：合成通用空关（引擎层会展示「暂未实现」）。
+        // 未注册的游戏：合成通用空关（引擎层会展示「正在筹备中」占位）。
         level = GameLevelModel(
           id: '',
           gameId: game.id,

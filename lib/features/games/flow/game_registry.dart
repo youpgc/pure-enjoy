@@ -180,6 +180,6 @@ class GameFlowRegistry {
     _TetrisAdapter().code: _TetrisAdapter(),
   };
 
-  /// 取适配器；未注册的游戏返回 null（调用方回落「该游戏暂未实现」占位）。
+  /// 取适配器；未注册的游戏返回 null（调用方回落「正在筹备中」占位）。
   static GameFlowAdapter? adapterOf(String gameCode) => _adapters[gameCode];
 }

@@ -304,7 +304,7 @@ class _GamePlayScreenState extends State<GamePlayScreen> {
   Widget _buildGame() {
     final adapter = GameFlowRegistry.adapterOf(widget.game.code);
     if (adapter == null) {
-      return const Center(child: Text('该游戏暂未实现'));
+      return const Center(child: Text('这款游戏正在筹备中，敬请期待'));
     }
     // 引擎 Key 随重玩 nonce 变化、随普通 setState 稳定（重建语义由本页控制）
     return adapter.buildEngine(
