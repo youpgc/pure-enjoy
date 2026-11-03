@@ -199,7 +199,8 @@ enum PetAttrKey {
 /// 金币钱包流水来源（pet_wallet_records.source_type）
 ///
 /// CHECK 以 not valid 方式挂在 fix_pet_review_p1_20260921.sql §6（六类），
-/// `pet_feature_spend` 由 feature_pet_p2_rpcs_20260923.sql 新增（金币档孵化加速花费）。
+/// `pet_feature_spend` 由 feature_pet_p2_rpcs_20260923.sql 新增（金币档孵化加速花费）；
+/// `pet_checkin` / `pet_checkin_milestone` 由签到体系新增（value 域探测式扩展）。
 enum PetWalletSourceType {
   shopBuy('pet_shop_buy', '商城消费'),
   systemReward('pet_system_reward', '系统发放'),
@@ -207,7 +208,9 @@ enum PetWalletSourceType {
   exchange('pet_exchange', '积分兑换'),
   adminGrant('pet_admin_grant', '客服调整'),
   adventurePenalty('pet_adventure_penalty', '游历失败惩罚'),
-  featureSpend('pet_feature_spend', '功能消耗');
+  featureSpend('pet_feature_spend', '功能消耗'),
+  checkin('pet_checkin', '签到发放'),
+  checkinMilestone('pet_checkin_milestone', '累计签到发放');
 
   const PetWalletSourceType(this.code, this.label);
 

@@ -1,10 +1,10 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../models/pet_dex_models.dart';
-import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
@@ -135,112 +135,6 @@ class PetRpc {
           {'p_from_code': fromCode, 'p_to_code': toCode},
           'rpc_pet_collection_exchange 收藏兑换');
 
-  /// 已解锁的隐秘境 code 集（pet_user_features 键 spot_hidden:<code>）
-  static Future<Set<String>> fetchUnlockedHiddenSpots() async {
-    final uid = _uid;
-    if (uid == null) return const <String>{};
-    try {
-      final resp = await ApiClient.get(
-        'pet_user_features',
-        select: 'feature_key',
-        filters: {'user_id': 'eq.$uid', 'feature_key': 'like.spot_hidden.*'},
-        limit: 100,
-        note: 'pet_user_features 隐秘境解锁集',
-      );
-      if (!resp.isSuccess) return const <String>{};
-      return (resp.data ?? const <Map<String, dynamic>>[])
-          .map((r) => (r['feature_key'] as String? ?? '')
-              .replaceFirst('spot_hidden:', ''))
-          .where((c) => c.isNotEmpty)
-          .toSet();
-    } catch (_) {
-      if (kDebugMode) debugPrint('[PetRpc] 隐秘境解锁集查询失败，回退空集');
-      return const <String>{};
-    }
-  }
-
-  /// 已开通功能键集（pet_user_features 全量）。
-  ///
-  /// 消费方：商城解锁类道具「购买后不再展示」（20261030 定版：unlock 类
-  /// 限购 1 次，已购在包或功能已开通即隐藏）；查询失败回退空集不拦截商城，
-  /// 购买时服务端限购/已解锁校验仍兜底。
-  static Future<Set<String>> fetchUnlockedFeatures() async {
-    final uid = _uid;
-    if (uid == null) return const <String>{};
-    try {
-      final resp = await ApiClient.get(
-        'pet_user_features',
-        select: 'feature_key',
-        filters: {'user_id': 'eq.$uid'},
-        limit: 100,
-        note: 'pet_user_features 已开通功能集',
-      );
-      if (!resp.isSuccess) return const <String>{};
-      return (resp.data ?? const <Map<String, dynamic>>[])
-          .map((r) => r['feature_key'] as String? ?? '')
-          .where((k) => k.isNotEmpty)
-          .toSet();
-    } catch (_) {
-      if (kDebugMode) debugPrint('[PetRpc] 已开通功能集查询失败，回退空集');
-      return const <String>{};
-    }
-  }
-
-  /// 罗盘解锁隐秘境（消耗 1 个星辰罗盘；服务端 rpc_pet_spot_hidden_unlock）
-  static Future<String?> unlockHiddenSpot(String spotCode) async {
-    final (_, err) = await callRpc(
-      'rpc_pet_spot_hidden_unlock',
-      {'p_spot_code': spotCode},
-      'rpc_pet_spot_hidden_unlock 罗盘解锁隐秘境',
-    );
-    if (err != null) return err;
-    await PetService.instance.invalidateSummary();
-    return null;
-  }
-
-  static Future<(List<PetSpotModel>, String?)> fetchSpots() async {
-    try {
-      final resp = await ApiClient.get(
-        'pet_adventure_spots',
-        select:
-            'id,code,name,unlock_conditions,attr_requirements,hidden',
-        filters: {'enabled': 'eq.true'},
-        order: 'sort_order.asc',
-        limit: 100,
-        note: 'pet_adventure_spots 历险地查询',
-      );
-      if (!resp.isSuccess) return (const <PetSpotModel>[], resp.errorMessage);
-      final rows = resp.data ?? const <Map<String, dynamic>>[];
-      return (rows.map(PetSpotModel.fromJson).toList(), null);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 历险地查询失败');
-      return (const <PetSpotModel>[], kPetLocalError);
-    }
-  }
-
-  /// 扩容阶梯已购记录(本人;商城「只展示当前可购档」的过滤依据)
-  static Future<(List<Map<String, dynamic>>, String?)> fetchExpansionRecords() async {
-    final uid = _uid;
-    if (uid == null) return (const <Map<String, dynamic>>[], '未登录');
-    try {
-      final resp = await ApiClient.get(
-        'pet_expansion_records',
-        select: 'ladder_key,step',
-        filters: {'user_id': 'eq.$uid'},
-        // desc 取最大已购步(超 limit 截掉的才是低 step 旧记录;
-        // asc 会在超 50 条时把已购档当可购档展示)
-        order: 'step.desc',
-        limit: 50,
-        note: 'pet_expansion_records 扩容已购查询',
-      );
-      if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
-      return (resp.data ?? const <Map<String, dynamic>>[], null);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 扩容已购查询失败');
-      return (const <Map<String, dynamic>>[], kPetLocalError);
-    }
-  }
-
   /// 历险产出公示（概率/保底展示的判定同源数据）：30 地 drop_table 原始行
   /// （含 long_only 独占掉落）。仅展示；概率判定仍在服务端 RPC（铁律 1）
   /// 道具名映射（item_code → pet_items.name，服务端真源）——
@@ -250,7 +144,7 @@ class PetRpc {
       final resp = await ApiClient.get(
         'pet_items',
         select: 'item_code,name',
-        limit: 200,
+        limit: 500,
         note: 'pet_items 道具名映射',
       );
       if (!resp.isSuccess) return const {};
@@ -261,6 +155,27 @@ class PetRpc {
       };
     } catch (_) {
       if (kDebugMode) debugPrint('[PetRpc] 道具名映射查询失败，回退空表');
+      return const {};
+    }
+  }
+
+  /// 道具图标映射（item_code → pet_items.icon 资源键）——
+  /// 签到格子/里程碑奖励图标化展示用；缺图由调用方回退兜底
+  static Future<Map<String, String>> fetchItemIcons() async {
+    try {
+      final resp = await ApiClient.get(
+        'pet_items',
+        select: 'item_code,icon',
+        limit: 500,
+        note: 'pet_items 道具图标映射',
+      );
+      if (!resp.isSuccess) return const {};
+      return {
+        for (final r in (resp.data ?? const <Map<String, dynamic>>[]))
+          if (r['item_code'] is String && r['icon'] is String)
+            r['item_code'] as String: r['icon'] as String,
+      };
+    } catch (_) {
       return const {};
     }
   }
@@ -277,84 +192,40 @@ class PetRpc {
     }
   }
 
-  /// 游历档位配置（pet_config.adventure_tiers：[{tier,minutes,label}]）——
-  /// 公示页档位名/时长与此同源；查询失败返回空（调用方回落端内文案）
-  static Future<List<Map<String, dynamic>>> fetchAdventureTiers() async {
-    try {
-      final resp = await ApiClient.get(
-        'pet_config',
-        select: 'adventure_tiers',
-        limit: 1,
-        note: 'pet_config 游历档位配置',
-      );
-      final row = resp.data?.isNotEmpty == true ? resp.data!.first : null;
-      final raw = row?['adventure_tiers'];
-      if (raw is List) {
-        return raw.whereType<Map<String, dynamic>>().toList();
-      }
-      return const <Map<String, dynamic>>[];
-    } catch (_) {
-      if (kDebugMode) debugPrint('[PetRpc] 游历档位配置查询失败，回退端内文案');
-      return const <Map<String, dynamic>>[];
-    }
-  }
-
-  static Future<(List<Map<String, dynamic>>, String?)> fetchAdventureOdds() async {
-    try {
-      final resp = await ApiClient.get(
-        'pet_adventure_spots',
-        select: 'code,name,drop_table',
-        filters: {'enabled': 'eq.true'},
-        order: 'sort_order.asc',
-        limit: 100,
-        note: 'pet_adventure_spots 历险产出公示查询',
-      );
-      if (!resp.isSuccess) return (const <Map<String, dynamic>>[], resp.errorMessage);
-      return (resp.data ?? const <Map<String, dynamic>>[], null);
-    } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 历险产出公示查询失败');
-      return (const <Map<String, dynamic>>[], kPetLocalError);
-    }
-  }
-
-  /// 商城在售道具（扩容阶梯按 step 升序）
-  static Future<(List<PetShopItemModel>, String?)> fetchShopItems() async {
-    try {
-      final resp = await ApiClient.get(
-        'pet_items',
-        select:
-            'id,item_code,name,description,icon,category,sub_type,price_coin,price_points,points_purchasable,ladder_key,ladder_step',
-        filters: {'on_shelf': 'eq.true', 'channels': 'in.(shop,both)'},
-        order: 'ladder_step.asc.nullslast,price_coin.asc',
-        limit: 100,
-        note: 'pet_items 商城在售查询',
-      );
-      if (!resp.isSuccess) {
-        return (const <PetShopItemModel>[], resp.errorMessage);
-      }
-      final rows = resp.data ?? const <Map<String, dynamic>>[];
-      return (
-        rows.map(PetShopItemModel.fromJson).toList(),
-        null,
-      );
-    } catch (e) {
-      if (kDebugMode) debugPrint('[PetRpc] 商城查询失败');
-      return (const <PetShopItemModel>[], kPetLocalError);
-    }
-  }
-
   // ============================================================
   // 写操作（RPC）
   // ============================================================
 
   /// 通用 RPC 调用：成功返回 raw（单对象 jsonb），失败返回错误原文
+  ///
+  /// 错误日志埋点（2026-11-03）：失败分两类——
+  ///   ① 业务拒绝（服务端 raise 的 PET_* 错误码，App 侧转用户文案）→ 不上报，
+  ///      属正常交互语义，入错误日志只会刷屏；
+  ///   ② 其余（网络失败/解析异常/服务端真异常如约束违约）→ 入错误日志
+  ///      （error_logs.module='pets'），后台「系统设置→错误日志」可查。
+  ///      5xx 与 4xx 非 PET_* 记 error（后者多为服务端真 bug，如 23502），
+  ///      网络层失败记 warning（离线常态，不制造告警噪音）。
   static Future<(Map<String, dynamic>?, String?)> _call(
     String fn,
     Map<String, dynamic> params,
     String note,
   ) async {
     final resp = await ApiClient.rpc(fn, params: params, note: note);
-    if (!resp.isSuccess) return (null, resp.errorMessage);
+    if (!resp.isSuccess) {
+      final msg = resp.errorMessage ?? '';
+      // 「请求已取消」= 用户离开页面的正常取消，不入日志；PET_* 业务拒绝同理
+      if (!msg.startsWith('PET_') && msg != '请求已取消') {
+        final code = resp.statusCode ?? 0;
+        ErrorReporter.reportMessage(
+          'RPC $fn 失败(HTTP ${resp.statusCode ?? '-'}): $msg',
+          module: 'pets',
+          // HTTP 层失败（4xx 真异常/5xx）记 error；网络层失败（0/无状态码）记 warning
+          level: code >= 400 ? 'error' : 'warning',
+          stack: StackTrace.current,
+        );
+      }
+      return (null, resp.errorMessage);
+    }
     final raw = resp.raw;
     if (raw is Map) {
       return (Map<String, dynamic>.from(raw), null);
@@ -424,32 +295,6 @@ class PetRpc {
     return err;
   }
 
-  /// 商城购买（扩容道具服务端自动转阶梯 RPC）
-  ///
-  /// 返回 (结果, err)。结果为 [PetShopBuyResultModel.isBagFull] 时表示容量
-  /// 预检未过、**未扣款**，腾位选项（下一级扩容道具 / 容量占用）在结果里——
-  /// UI 据此走「扩容后重试 / 清理背包」引导（需求 §5.4，扣款前决策）。
-  static Future<(PetShopBuyResultModel?, String?)> shopBuy(
-    String itemId, {
-    int qty = 1,
-    // p_currency 服务端支持 'points' 通道，但积分购买入口未实装：
-    // 线上全部在架道具 price_points=null / points_purchasable=false，
-    // points 分支实际不可达（2026-10-12 线上核实），维持恒 'coin'。
-    String currency = 'coin',
-  }) async {
-    final (data, err) = await _call('rpc_pet_shop_buy', {
-      'p_item_id': itemId,
-      'p_qty': qty,
-      'p_currency': currency,
-    }, 'rpc_pet_shop_buy 商城购买');
-    if (err != null) return (null, err);
-    if (data == null) return (null, kPetLocalError);
-    final result = PetShopBuyResultModel.fromJson(data);
-    // 满格未扣款：总览无变化，不失效缓存（与原行为一致）
-    if (!result.isBagFull) await PetService.instance.invalidateSummary();
-    return (result, null);
-  }
-
   /// 抽取/对齐当日任务（幂等，advisory lock 防并发）
   static Future<String?> questsDraw() async {
     final (_, err) = await _call(
@@ -476,99 +321,6 @@ class PetRpc {
       ),
       null,
     );
-  }
-
-  /// 出发历险
-  static Future<String?> adventureStart({
-    required String petId,
-    required String spotId,
-    required String tier,
-  }) async {
-    final (_, err) = await _call('rpc_pet_adventure_start', {
-      'p_pet_id': petId,
-      'p_spot_id': spotId,
-      'p_tier': tier,
-    }, 'rpc_pet_adventure_start 出发历险');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
-  }
-
-  /// 领取历险结果
-  /// 返回 status: claimed（含 gold/exp/result_type）或 awaiting_rescue（遇险）
-  static Future<(Map<String, dynamic>?, String?)> adventureClaim(
-    String adventureId,
-  ) async {
-    final (data, err) = await _call('rpc_pet_adventure_claim', {
-      'p_adventure_id': adventureId,
-    }, 'rpc_pet_adventure_claim 领取历险结果');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return (data, err);
-  }
-
-  /// 召回（进行中历险主动中断，无奖励）
-  static Future<String?> adventureRecall(String adventureId) async {
-    final (_, err) = await _call('rpc_pet_adventure_recall', {
-      'p_adventure_id': adventureId,
-    }, 'rpc_pet_adventure_recall 召回');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
-  }
-
-  /// 救助（self=救援道具 / npc=超时兜底）
-  static Future<String?> adventureRescue(
-    String adventureId, {
-    String? itemId,
-  }) async {
-    final (_, err) = await _call('rpc_pet_adventure_rescue', {
-      'p_adventure_id': adventureId,
-      'p_item_id': itemId,
-    }, 'rpc_pet_adventure_rescue 救助');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
-  }
-
-  /// 背包整理（压缩空洞格位）
-  ///
-  /// 合并同道具堆叠会改变已用格数，故成功后失效总览缓存。
-  static Future<String?> compactBag() async {
-    final (_, err) = await _call(
-        'rpc_pet_compact_bag', {}, 'rpc_pet_compact_bag 背包整理');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
-  }
-
-  /// 背包换位/移入空格（服务端 rpc_pet_swap_slot 坐标交换，零 DDL）
-  ///
-  /// [from]/[to] 均为 slot_index（0 起）；目标为空时退化为移动。
-  /// 服务端不合并同道具堆叠（合并由 rpc_pet_compact_bag 负责），
-  /// 越界抛 PET_INVALID_SLOT，并发改动抛 PET_BAG_FULL_RACE。
-  /// 换位不改变 bagUsed 与容量，故不失效总览缓存。
-  static Future<String?> swapSlot(int from, int to) async {
-    final (_, err) = await _call('rpc_pet_swap_slot', {
-      'p_slot_a': from,
-      'p_slot_b': to,
-    }, 'rpc_pet_swap_slot 背包换位');
-    return err;
-  }
-
-  /// 丢弃道具 rows: [{slot_index, quantity}]（按格位定位，rpc_pet_discard_items 契约）
-  static Future<String?> discardItems(
-    List<Map<String, dynamic>> rows,
-  ) async {
-    final (_, err) = await _call('rpc_pet_discard_items', {
-      'p_rows': rows,
-    }, 'rpc_pet_discard_items 丢弃道具');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
-  }
-
-  /// 积分兑换金币（1 金币 = points_per_gold 积分）
-  static Future<String?> exchange(int gold) async {
-    final (_, err) = await _call('rpc_pet_exchange', {
-      'p_gold': gold,
-    }, 'rpc_pet_exchange 积分兑换');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return err;
   }
 
   /// 寄养搬运（[action]：`to_foster` 养育→寄养 / `from_foster` 寄养→养育）
@@ -617,39 +369,6 @@ class PetRpc {
     return (data, err);
   }
 
-  /// 为你匹配（推荐制）：返回等级达标的候选历险地（含 attr_requirements），
-  /// 其中一个带 recommended=true 标记；服务端同时校验饱食/心情/健康门槛，
-  /// 不达标时返回错误（调用方可静默降级为无推荐）
-  static Future<(Map<String, dynamic>?, String?)> adventureMatch(
-    String petId,
-  ) async {
-    return _call('rpc_pet_adventure_match', {
-      'p_pet_id': petId,
-    }, 'rpc_pet_adventure_match 历险地匹配');
-  }
-
-  /// 场景主题目录 + 拥有态 + 当前激活（§11.1 背景主题购买替换）
-  static Future<(Map<String, dynamic>?, String?)> fetchScenes() async {
-    return _call('rpc_pet_scenes', {}, 'rpc_pet_scenes 场景目录');
-  }
-
-  /// 购买场景主题（扣金+解锁+自动激活，三合一事务）
-  static Future<(Map<String, dynamic>?, String?)> purchaseScene(String sceneCode) async {
-    final (data, err) = await _call('rpc_pet_scene_purchase', {
-      'p_scene_code': sceneCode,
-    }, 'rpc_pet_scene_purchase 购买主题');
-    if (err == null) await PetService.instance.invalidateSummary();
-    return (data, err);
-  }
-
-  /// 切换场景（默认或已拥有方可激活）
-  static Future<(Map<String, dynamic>?, String?)> activateScene(String sceneCode) async {
-    final (data, err) = await _call('rpc_pet_scene_activate', {
-      'p_scene_code': sceneCode,
-    }, 'rpc_pet_scene_activate 切换主题');
-    return (data, err);
-  }
-
     /// 批量喂养（§6.3 高级食盆解锁）：逐宠分流（免费优先/额度尽口粮/冷却跳过）。
   /// 未解锁返回 PET_BATCH_FEED_LOCKED 错误。成功后失效 summary。
   static Future<(Map<String, dynamic>?, String?)> feedAll() async {
@@ -668,14 +387,6 @@ class PetRpc {
     }, 'rpc_pet_reorder 宠物排序');
     if (err == null) await PetService.instance.invalidateSummary();
     return err;
-  }
-
-  /// 成长时间线（只读，最近 pLimit 条倒序）
-  static Future<(Map<String, dynamic>?, String?)> fetchTimeline(String petId, {int limit = 100}) async {
-    return _call('rpc_pet_timeline', {
-      'p_pet_id': petId,
-      'p_limit': limit,
-    }, 'rpc_pet_timeline 成长时间线');
   }
 
     /// 图鉴总览（只读；owned=历史拥有过含已放生，范围=enabled 形态）
@@ -708,34 +419,32 @@ class PetRpc {
     return err;
   }
 
-    /// 随机事件抽取（§3.6）：服务端掷概率 + 加权抽当日未触发事件。
-  /// 未命中返回 (null, null)——fired=false 属正常业务态，不是错误。
-  /// roll 不失效 summary（未改任何数值，配额与流水都在服务端）。
-  static Future<(PetEventModel?, String?)> eventRoll(String context) async {
-    final (data, err) = await _call('rpc_pet_event_roll', {
-      'p_context': context,
-    }, 'rpc_pet_event_roll 随机事件抽取');
+  /// ---------- 宠物签到（宠物模块独享签到体系） ----------
+
+  /// 月度签到状态：奖励表快照（整月，惰性生成后全员统一）+ 已签/补签日期 +
+  /// 里程碑（含已领阈值）+ 衪签限额/持卡数。仅公示与预览，不发任何奖励。
+  static Future<(PetCheckinStatusModel?, String?)> fetchCheckinStatus(
+      int year, int month) async {
+    final (data, err) = await _call('rpc_pet_checkin_status', {
+      'p_year': year,
+      'p_month': month,
+    }, 'rpc_pet_checkin_status 月度签到状态');
     if (err != null) return (null, err);
-    return (PetEventModel.fromJson(data ?? const {}), null);
+    return (PetCheckinStatusModel.fromJson(data ?? const {}), null);
   }
 
-  /// 随机事件选择结算。作用对象传当前查看的在养宠物（多宠用户自主决定加成落点）。
-  /// 成功后失效 summary（心情/经验/亲密/饱食/金币可能变化）。
-  static Future<(PetEventChooseResultModel?, String?)> eventChoose(
-    String eventId,
-    int optionIndex,
-    String petId,
-  ) async {
-    final (data, err) = await _call('rpc_pet_event_choose', {
-      'p_event_id': eventId,
-      'p_option_index': optionIndex,
-      'p_pet_id': petId,
-    }, 'rpc_pet_event_choose 随机事件选择');
+  /// 签到 / 补签。[makeupDate] 非空且非今日 = 补签：消耗 1 张补签卡并发目标日
+  /// 奖励（每自然月上限 4 次，服务端校验）；里程碑达标自动连带发放。
+  /// 成功后失效 summary（金币变化）。
+  static Future<(PetCheckinSignResultModel?, String?)> checkinSign(
+      {DateTime? makeupDate}) async {
+    String key(DateTime d) =>
+        '${d.year.toString().padLeft(4, '0')}-${d.month.toString().padLeft(2, '0')}-${d.day.toString().padLeft(2, '0')}';
+    final (data, err) = await _call('rpc_pet_checkin_sign', {
+      if (makeupDate != null) 'p_makeup_date': key(makeupDate),
+    }, 'rpc_pet_checkin_sign 签到');
     if (err != null) return (null, err);
     await PetService.instance.invalidateSummary();
-    return (
-      PetEventChooseResultModel.fromJson(data ?? const {}),
-      null,
-    );
+    return (PetCheckinSignResultModel.fromJson(data ?? const {}), null);
   }
 }

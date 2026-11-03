@@ -1,6 +1,7 @@
 import 'package:flutter/foundation.dart';
 
 import '../../../services/api_client.dart';
+import '../../../services/error_reporter.dart';
 import '../../../services/supabase_service.dart';
 import '../models/pet_models.dart';
 import '../utils/pet_errors.dart';
@@ -62,8 +63,10 @@ class PetService {
         forceRefresh: forceRefresh,
       );
       return (data, cached);
-    } catch (e) {
+    } catch (e, st) {
       if (kDebugMode) debugPrint('[PetService] 门控查询失败');
+      // 读链路降级入错误日志（module='pets'，warning 级）
+      ErrorReporter.report(e, st, module: 'pets', level: 'warning');
       return (null, false);
     }
   }
@@ -92,7 +95,15 @@ class PetService {
         forceRefresh: forceRefresh,
       );
       lastSummaryFromCache = cached && data != null;
-      if (data == null) return (null, err ?? '总览无数据');
+      if (data == null) {
+        final e = err ?? '总览无数据';
+        // 非异常路径的 RPC 失败同样入错误日志（业务拒绝 PET_* 除外，同 _call 口径）
+        if (e.isNotEmpty && !e.startsWith('PET_')) {
+          ErrorReporter.reportMessage('rpc_pet_summary 失败: $e',
+              module: 'pets', level: 'warning');
+        }
+        return (null, e);
+      }
       final summary = PetSummaryModel.fromJson(data);
       // 总开关关闭时即便缓存有数据也按隐藏处理（兜底，防旧缓存穿透）
       if (!summary.petEnabled) return (null, null);
@@ -100,8 +111,10 @@ class PetService {
       _summaryConfig = summary.config;
       if (forceRefresh) summaryForceRefreshed.value++; // 通知常驻监听方重载
       return (summary, null);
-    } catch (e) {
+    } catch (e, st) {
       if (kDebugMode) debugPrint('[PetService] 总览拉取失败');
+      // 读链路降级入错误日志（module='pets'，warning 级）
+      ErrorReporter.report(e, st, module: 'pets', level: 'warning');
       lastSummaryFromCache = false;
       // 客户端解析异常统一文案单一源（此前自造「总览数据解析失败」双源并存；
       // 该 catch 同时兜住缓存写失败，故文案不指名「解析」）
