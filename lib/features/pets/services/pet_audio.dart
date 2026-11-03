@@ -17,12 +17,17 @@ class PetAudio {
 
   static final PetAudio instance = PetAudio._();
 
+  /// 音效总闸（2026-11-03）：暂停触发音效，待音效矫正后再开启。
+  /// 仅静音——触感反馈保留；恢复时改回 true 即全量生效，调用点零改动。
+  static bool soundEnabled = false;
+
   final AudioPlayer _player = AudioPlayer();
 
   /// 资源缺失属全局性问题，逐次上报会刷屏
   bool _failureReported = false;
 
   Future<void> _play(String file) async {
+    if (!soundEnabled) return;
     try {
       await _player.stop();
       await _player.play(AssetSource('audio/$file'));
