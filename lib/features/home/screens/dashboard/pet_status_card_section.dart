@@ -8,6 +8,7 @@ import '../../../../constants/pet.dart';
 import '../../../pets/services/pet_service.dart';
 import '../../../pets/utils/pet_decay_display.dart';
 import '../../../pets/utils/pet_gold_format.dart';
+import '../../../pets/widgets/pet_item_icon.dart';
 
 /// 首页「宠物状态卡」常驻区块（宠物系统主入口）
 ///
@@ -158,28 +159,44 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
                                           0,
                                       DateTime.now());
                               final weak = weakAt != null && pet.health < weakAt;
-                              return Text.rich(
-                                TextSpan(
+                              // 属性标签以图标呈现（宠物主界面面板同款
+                              // ui_* 属性图标），数值保留
+                              Widget stat(String iconKey, IconData fallback,
+                                          String value, {bool danger = false}) {
+                                return Row(
+                                  mainAxisSize: MainAxisSize.min,
                                   children: [
-                                    TextSpan(
-                                        text:
-                                            '饱食 $hunger · 心情 $mood · '),
-                                    TextSpan(
-                                      text: weak
-                                          ? '健康 ${pet.health}（虚弱）'
-                                          : '健康 ${pet.health}',
-                                      style: weak
-                                          ? TextStyle(
-                                              color: colorScheme.error,
-                                              fontWeight: FontWeight.bold)
-                                          : null,
+                                    PetItemIcon(
+                                        iconKey: iconKey,
+                                        fallback: fallback,
+                                        size: 13),
+                                    const SizedBox(width: 3),
+                                    Text(
+                                      value,
+                                      style: TextStyle(
+                                        fontSize: 12,
+ fontWeight:
+                                            danger ? FontWeight.bold : null,
+                                        color: danger
+                                            ? colorScheme.error
+                                            : colorScheme.onSurfaceVariant,
+                                      ),
                                     ),
                                   ],
-                                ),
-                                style: TextStyle(
-                                  fontSize: 12,
-                                  color: colorScheme.onSurfaceVariant,
-                                ),
+                                );
+                              }
+                              return Row(
+                                children: [
+                                  stat('ui_hunger', Icons.restaurant,
+                                      '$hunger'),
+                                  const SizedBox(width: 12),
+                                  stat('ui_mood', Icons.mood, '$mood'),
+                                  const SizedBox(width: 12),
+                                  stat('ui_health',
+                                      Icons.health_and_safety_outlined,
+                                      '${pet.health}',
+                                      danger: weak),
+                                ],
                               );
                             }),
                           ],

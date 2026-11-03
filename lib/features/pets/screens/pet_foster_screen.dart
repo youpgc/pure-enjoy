@@ -182,7 +182,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
             ),
           ],
           const SizedBox(height: 18),
-          _sectionTitle('身边养育中（${rearing.length}/$rearingCap）—— 长按拖动调整主页切换顺序', colorScheme),
+          _sectionTitle('在养（${rearing.length}/$rearingCap）—— 长按拖动调整主页切换顺序', colorScheme),
           if (rearing.isEmpty)
             _emptyRow('当前没有在养的宠物', colorScheme)
           else
@@ -207,7 +207,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
                   _petRow(
                     p,
                     colorScheme,
-                    actionLabel: '送去寄养',
+                    actionLabel: '寄养',
                     actionIcon: Icons.luggage_outlined,
                     // 历险中禁用寄养（服务端拒 PET_NOT_REARING）
                     enabled: p.status == PetPetStatus.rearing &&
@@ -226,7 +226,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
               (p) => _petRow(
                 p,
                 colorScheme,
-                actionLabel: '接回身边',
+                actionLabel: '接回',
                 actionIcon: Icons.home_outlined,
                 enabled: rearing.length < rearingCap,
                 action: 'from_foster',
@@ -382,7 +382,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
                   ),
                   const SizedBox(height: 3),
                   Text(
-                    '${pet.rarity} · Lv.${pet.level} · 饱食 ${pet.hunger} · 心情 ${pet.mood}',
+                    '${pet.rarity} · Lv.${pet.level}',
                     style: TextStyle(
                       fontSize: 12,
                       color: pet.status == PetPetStatus.fostered
@@ -396,8 +396,10 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
               ),
             ),
             const SizedBox(width: 10),
+            // 两字文案（寄养/接回）走紧凑按钮：去图标收窄宽度。搬运中紧凑态
+            // 只显 spinner（72 宽装不下 spinner+「搬运中」，会 RenderFlex 溢出）
             SizedBox(
-              width: 104,
+              width: actionLabel.length <= 2 ? 72 : 104,
               child: FilledButton.tonalIcon(
                 onPressed: (enabled && !busy) ? () => _move(pet, action) : null,
                 icon: moving
@@ -406,9 +408,12 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
                         height: 14,
                         child: CircularProgressIndicator(strokeWidth: 2),
                       )
-                    : Icon(actionIcon, size: 18),
-                label: Text(moving ? '搬运中' : actionLabel,
-                    style: const TextStyle(fontSize: 12)),
+                    : (actionLabel.length <= 2 ? null : Icon(actionIcon, size: 18)),
+                label: moving
+                    ? (actionLabel.length <= 2
+                        ? const SizedBox.shrink()
+                        : const Text('搬运中', style: TextStyle(fontSize: 12)))
+                    : Text(actionLabel, style: const TextStyle(fontSize: 12)),
               ),
             ),
           ],

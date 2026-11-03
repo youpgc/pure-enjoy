@@ -208,6 +208,30 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   void _openQuests() => _push(const PetQuestsScreen());
 
+  /// 签到弹窗（历险地图弹窗同款形态）：宠物模块独享签到，返回后刷新总览（金币可能变化）
+  void _openCheckin() {
+    if (_sheetOpen) return;
+    _sheetOpen = true;
+    showPetCheckinSheet(context).whenComplete(() {
+      _sheetOpen = false;
+      if (mounted) _load();
+    });
+  }
+
+  /// 道具快捷弹层（右列抚摸下入口）：只列可用消耗品、点击即用；
+  /// 每次使用经 onChanged 失效总览（金币/饱食/心情都可能变化）。
+  /// 弹层内自带使用级防重（_busyId），此处闸的是入口重复点击防叠层。
+  void _showQuickItems() {
+    if (_sheetOpen) return;
+    _sheetOpen = true;
+    showPetQuickItemsSheet(context, petId: _currentPet?.id, onChanged: () {
+      PetService.instance.invalidateSummary();
+    }).whenComplete(() {
+      _sheetOpen = false;
+      if (mounted) _load();
+    });
+  }
+
   void _openWallet() => _push(const PetWalletScreen());
 
   /// 寄养仓库（养育格 <-> 寄养格搬运；寄养格未开启时页内引导商城扩容）

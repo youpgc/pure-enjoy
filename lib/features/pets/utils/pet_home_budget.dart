@@ -1,4 +1,5 @@
 import '../models/pet_models.dart';
+import 'pet_duration_text.dart';
 
 /// 宠物操作预算：喂食/抚摸的冷却与每日次数派生逻辑
 ///
@@ -132,15 +133,9 @@ class PetActionBudget {
     return mood > 0 ? '心情+$mood' : '';
   }
 
-  /// 冷却倒计时文案（「2分30秒」/「45秒」）
+  /// 冷却倒计时文案（模块统一时长规则：90 秒内按秒 / 90 分钟内按分 / 更长按小时）
   ///
-  /// 秒数**向上取整**：剩余 0.4 秒显示「1秒」而非「0秒」——刷新是 1 秒一跳，
+  /// 底层仍秒数向上取整：剩余 0.4 秒显示「1秒」而非「0秒」——刷新是 1 秒一跳，
   /// 截断会出现"停在 0 秒却还点不动"的一秒空窗（2026-09-24 修）。
-  String coolText(Duration d) {
-    final total = (d.inMilliseconds / 1000).ceil();
-    final m = total ~/ 60;
-    final s = total % 60;
-    if (m <= 0) return '$s秒';
-    return s == 0 ? '$m分' : '$m分$s秒';
-  }
+  String coolText(Duration d) => petDurationText(d);
 }

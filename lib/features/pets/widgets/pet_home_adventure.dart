@@ -3,7 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_models.dart';
-import '../services/pet_rpc.dart';
+import '../services/pet_rpc_adventure.dart';
+import '../utils/pet_duration_text.dart';
 import '../utils/pet_errors.dart';
 import 'pet_claim_result_dialog.dart';
 import 'pet_home_overlays.dart';
@@ -68,7 +69,7 @@ Future<bool> claimAdventureResult(
   BuildContext context,
   String adventureId,
 ) async {
-  final (data, err) = await PetRpc.adventureClaim(adventureId);
+  final (data, err) = await PetRpcAdventure.adventureClaim(adventureId);
   if (!context.mounted) return false;
   if (err != null) {
     _toast(context, petRpcErrorText(err));
@@ -116,7 +117,7 @@ Future<bool> recallAdventureConfirmed(
     confirmText: '确定召回',
   );
   if (ok != true) return false;
-  final err = await PetRpc.adventureRecall(adventureId);
+  final err = await PetRpcAdventure.adventureRecall(adventureId);
   if (!context.mounted) return false;
   if (err != null) {
     _toast(context, petRpcErrorText(err));
@@ -141,7 +142,7 @@ Future<void> showPetDangerDialog(BuildContext context, {String? deadline}) {
         Text('糟糕，遇险了！'),
       ]),
       content: Text(mins > 0
-          ? '宠物在游历中遇到危险，需在 $mins 分钟内完成救助，否则将受到惩罚。'
+          ? '宠物在游历中遇到危险，需在 ${petDurationText(Duration(minutes: mins))}内完成救助，否则将受到惩罚。'
           : '宠物在游历中遇到危险，请尽快完成救助。'),
       actions: [
         FilledButton(

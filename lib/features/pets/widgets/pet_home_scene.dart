@@ -118,7 +118,6 @@ class PetGoldBadgeCore extends StatelessWidget {
 /// 形态 0-2 → 幼年期/成长期/成年期（2026-10-10 转译）
 String _stageName(int stage) =>
     const ['幼年期', '成长期', '成年期'][stage.clamp(0, 2)];
-
 class PetBottomStatusCard extends StatefulWidget {
   const PetBottomStatusCard({
     super.key,

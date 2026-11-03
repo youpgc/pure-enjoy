@@ -13,6 +13,7 @@ import '../models/pet_event_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_audio.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_scene.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_action_machine.dart';
 import '../utils/pet_art_resolver.dart';
@@ -24,6 +25,7 @@ import '../widgets/pet_attributes_sheet.dart';
 import '../widgets/pet_feed_sheet.dart';
 import '../widgets/pet_fx_overlay.dart';
 import '../widgets/pet_home_adventure.dart';
+import '../widgets/pet_quick_items_sheet.dart';
 import '../widgets/pet_home_overlays.dart';
 import '../widgets/pet_home_scene.dart';
 import '../widgets/pet_initial_family_picker.dart';
@@ -33,6 +35,7 @@ import 'pet_achievements_screen.dart';
 import 'pet_adventure_screen.dart';
 import 'pet_bag_screen.dart';
 import 'pet_breed_screen.dart';
+import 'pet_checkin_screen.dart';
 import 'pet_dex_screen.dart';
 import 'pet_egg_screen.dart';
 import 'pet_foster_screen.dart';
@@ -88,6 +91,9 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   PetSummaryModel? _summary;
   String? _error;
   bool _busy = false;
+
+  /// 底部弹窗互斥闸（签到/道具快捷弹层）：打开期间拦截重复点击，防叠层
+  bool _sheetOpen = false;
 
   /// 场景主题（§11.1）：当前激活场景码；进页拉一次，主题面板切换后更新。
   /// 初值是占位默认码，真实激活码以 fetchScenes 回落为准
@@ -163,7 +169,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   /// 拉取当前激活场景（独立于 _load：主题切换不触发总览刷新）
   Future<void> _loadActiveScene() async {
-    final (data, err) = await PetRpc.fetchScenes();
+    final (data, err) = await PetRpcScene.fetchScenes();
     if (!mounted) return;
     // 拉取失败沿用占位默认码（postFrame 预热兜底），不卡 loading
     final code = (err == null && data != null)
@@ -306,7 +312,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     // 历险中不触发随机事件（2026-10-14 服务端 choose 已收口 rearing-only；
     // 客户端同步收口入口，避免「弹了窗、选了才报错」的体验）
     if (pet.status != PetPetStatus.rearing) return false;
-    final (event, _) = await PetRpc.eventRoll(pContext);
+    final (event, _) = await PetRpcScene.eventRoll(pContext);
     if (!mounted || _eventDialogShowing) return true; // roll 已发生，计已掷
     if (event == null || event.options.isEmpty) return true;
     // roll 期间切宠则落点当前宠，但仅限仍可交互（养育中）的宠——

@@ -3,7 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
-import '../services/pet_rpc.dart';
+import '../services/pet_rpc_scene.dart';
 import '../utils/pet_art_resolver.dart';
 import '../utils/pet_errors.dart';
 import '../../../core/widgets/widgets.dart';
@@ -442,7 +442,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
 
   Future<void> _load() async {
     setState(() => _err = null);
-    final (data, err) = await PetRpc.fetchScenes();
+    final (data, err) = await PetRpcScene.fetchScenes();
     if (!mounted) return;
     if (err != null || data == null) {
       setState(() => _err = err);
@@ -476,7 +476,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     );
     if (confirmed != true || !mounted) return;
     setState(() => _pending = code);
-    final (data, err) = await PetRpc.purchaseScene(code);
+    final (data, err) = await PetRpcScene.purchaseScene(code);
     if (!mounted) return;
     setState(() => _pending = null);
     if (err != null || data == null) {
@@ -493,7 +493,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     if (_pending != null) return;
     final code = sc['scene_code']?.toString() ?? '';
     setState(() => _pending = code);
-    final (data, err) = await PetRpc.activateScene(code);
+    final (data, err) = await PetRpcScene.activateScene(code);
     if (!mounted) return;
     setState(() => _pending = null);
     if (err != null || data == null) {

@@ -173,7 +173,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  // ---------- 左侧入口列（返回键 + 背包/商城 + 更多，贴顶） ----------
+  // ---------- 左侧入口列（返回键 + 背包/商城/任务/签到 + 更多，贴顶） ----------
 
   /// 左列只留高频直达（2026-09-24 D1）：
   /// 原先 7 枚（返回键 + 6×64dp 按钮 + 5×14 间距）合计约 502dp，Stack 里左列又
@@ -205,6 +205,18 @@ extension _PetHomeLayout on _PetHomeScreenState {
                   label: '商城',
                   onTap: _openShop),
               const SizedBox(height: 14),
+              // 任务入口（签到上方，右列原位移出——20261103 用户拍板）
+              PetEdgeButton(
+                  icon: Icons.task_alt_outlined,
+                  label: '任务',
+                  onTap: _openQuests),
+              const SizedBox(height: 14),
+              // 商城下方签到入口（宠物模块独享签到体系，弹窗形态）
+              PetEdgeButton(
+                  icon: Icons.event_available_outlined,
+                  label: '签到',
+                  onTap: _openCheckin),
+              const SizedBox(height: 14),
               PetEdgeButton(
                   icon: Icons.more_horiz,
                   label: '更多',
@@ -227,7 +239,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
           children: [
             for (final (icon, label, open) in <(IconData, String, void Function())>
                 [
-              (Icons.account_balance_wallet_outlined, '金币钱包', _openWallet),
+              (Icons.account_balance_wallet_outlined, '宠物钱包', _openWallet),
               (Icons.luggage_outlined, '寄养仓库', _openFoster),
               (Icons.workspace_premium_outlined, '成就', _openAchievements),
               (Icons.auto_stories_outlined, '图鉴', _openDex),
@@ -248,7 +260,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
     );
   }
 
-  // ---------- 右侧操作列（金币 + 喂食/抚摸/历险/任务，贴顶） ----------
+  // ---------- 右侧操作列（喂食/抚摸/道具/历险，贴顶） ----------
 
   /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时
   /// （每日次数上限不再禁用抚摸,20261021 用户拍板）
@@ -331,12 +343,16 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 onTap:
                     interactOff ? null : () => _interact(pet.id)),
             const SizedBox(height: 14),
-            _adventureButton(),
-            const SizedBox(height: 14),
+            // 抚摸下方道具快捷入口：仅历险中禁用——道具含饱食/心情/清洁等多维
+            // 消耗品，不随抚摸冷却（单项状态满不置灰，由服务端按道具各自校验）
             PetEdgeButton(
-                icon: Icons.task_alt_outlined,
-                label: '任务',
-                onTap: _openQuests),
+                icon: Icons.medical_services_outlined,
+                label: '道具',
+                onTap: (pet == null || pet.status == PetPetStatus.adventuring)
+                    ? null
+                    : _showQuickItems),
+            const SizedBox(height: 14),
+            _adventureButton(),
           ],
         ),
       ),

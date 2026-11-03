@@ -8,7 +8,9 @@ import '../../../utils/date_time_utils.dart';
 import '../models/pet_models.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_adventure.dart';
 import '../services/pet_service.dart';
+import '../utils/pet_duration_text.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_adventure_cards.dart';
 import '../widgets/pet_claim_result_dialog.dart';
@@ -159,7 +161,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   /// 为你匹配（静默）：门槛不达标/调用失败均降级为无推荐，不打扰用户
   Future<void> _loadMatch() async {
-    final (data, err) = await PetRpc.adventureMatch(widget.petId);
+    final (data, err) = await PetRpcAdventure.adventureMatch(widget.petId);
     if (err != null || data == null || !mounted) return;
     final spots = data['spots'];
     if (spots is List) {
@@ -217,8 +219,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final (spots, err) = await PetRpc.fetchSpots();
-    final unlocked = await PetRpc.fetchUnlockedHiddenSpots();
+    final (spots, err) = await PetRpcAdventure.fetchSpots();
+    final unlocked = await PetRpcAdventure.fetchUnlockedHiddenSpots();
     if (mounted) {
       setState(() {
         _spots = spots;
@@ -235,7 +237,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _start(PetSpotModel spot, Map<String, dynamic> tier) async {
     if (_busy) return;
     setState(() => _busy = true);
-    final err = await PetRpc.adventureStart(
+    final err = await PetRpcAdventure.adventureStart(
       petId: widget.petId,
       spotId: spot.id,
       tier: tier['tier'] as String? ?? '',
@@ -266,7 +268,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _claim() async {
     if (_busy || _adv == null) return;
     setState(() => _busy = true);
-    final (data, err) = await PetRpc.adventureClaim(_adv!.id);
+    final (data, err) = await PetRpcAdventure.adventureClaim(_adv!.id);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
@@ -322,7 +324,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _rescue({String? itemId}) async {
     if (_busy || _adv == null) return;
     setState(() => _busy = true);
-    final err = await PetRpc.adventureRescue(_adv!.id, itemId: itemId);
+    final err = await PetRpcAdventure.adventureRescue(_adv!.id, itemId: itemId);
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null) {
@@ -450,7 +452,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   /// 罗盘解锁：服务端消耗 1 个星辰罗盘（无罗盘由服务端报错转文案）
   Future<void> _unlockHidden(PetSpotModel spot) async {
     setState(() => _unlockingCode = spot.code);
-    final err = await PetRpc.unlockHiddenSpot(spot.code);
+    final err = await PetRpcAdventure.unlockHiddenSpot(spot.code);
     if (!mounted) return;
     setState(() => _unlockingCode = null);
     showPetToast(context,
@@ -607,7 +609,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
               ListTile(
                 leading: const Icon(Icons.schedule_outlined),
                 title: Text(t['label'] as String? ?? t['tier'] as String? ?? ''),
-                subtitle: Text('${t['minutes'] ?? '-'} 分钟'),
+                subtitle: Text(petDurationText(Duration(minutes: (t['minutes'] as num?)?.toInt() ?? 0))),
                 trailing: _busy
                     ? const SizedBox(
                         width: 20,
@@ -660,7 +662,9 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
             ],
             if (!finished) ...[
               Text(
-                '预计 ${remaining!.inMinutes > 0 ? '${remaining.inMinutes} 分钟后' : '即将'}归来',
+                remaining! > Duration.zero
+                    ? '预计 ${petDurationText(remaining)}后归来'
+                    : '即将归来',
                 style: TextStyle(color: cs.onSurfaceVariant),
               ),
               const SizedBox(height: 4),

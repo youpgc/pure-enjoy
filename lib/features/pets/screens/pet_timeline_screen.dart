@@ -1,6 +1,6 @@
 import 'package:flutter/material.dart';
 
-import '../services/pet_rpc.dart';
+import '../services/pet_rpc_scene.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_loading.dart';
 import '../../../utils/date_time_utils.dart';
@@ -43,7 +43,7 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
 
   Future<void> _load() async {
     setState(() => _loading = true);
-    final (data, err) = await PetRpc.fetchTimeline(widget.petId);
+    final (data, err) = await PetRpcScene.fetchTimeline(widget.petId);
     if (!mounted) return;
     setState(() {
       _loading = false;

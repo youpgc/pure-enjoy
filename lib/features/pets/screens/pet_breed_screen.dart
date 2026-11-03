@@ -109,6 +109,8 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
       return '伙伴信息还没加载好，刷新一下再试试';
     }
     if (a.gender == b.gender) return '需要一公一母';
+    // 成年期门槛（20261103 定版）：与服务端 PET_BREED_NOT_ADULT 同口径
+    if (a.stage < 2 || b.stage < 2) return '伙伴需到成年期才能结配';
     final min = _reserved.breedIntimacyMin;
     if (min != null && (a.intimacy < min || b.intimacy < min)) {
       return '亲密度需达到 $min（多喂养互动会涨）';

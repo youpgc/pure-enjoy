@@ -37,6 +37,10 @@ String petBagCategoryLabel(String category) =>
 
 IconData petBagFallbackIcon(PetBagItemModel item) {
   if (item.isEgg) return Icons.egg_outlined;
+  // 签到补签卡（不进可用效果枚举：不能被直接「使用」，由签到链路消耗）
+  if (item.effectType == 'checkin_makeup') {
+    return Icons.event_available_outlined;
+  }
   return switch (petBagItemType(item)) {
     PetItemEffectType.feed => Icons.restaurant,
     PetItemEffectType.clean => Icons.shower_outlined,

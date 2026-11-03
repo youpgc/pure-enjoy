@@ -3,6 +3,8 @@ import 'package:flutter/material.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_adventure.dart';
+import '../services/pet_rpc_shop.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
 import '../utils/pet_gold_format.dart';
@@ -30,7 +32,8 @@ const Map<String, String> kUnlockItemFeatures = {
 /// 布局（2026-09-24 定版）：分类栏在**左侧竖排**（栅格 tile，超出出滚动条），
 /// 右侧物品格网格每行 4 格、只显图标+名称（§5.3 物品格展示定版）；
 /// 点击物品弹悬浮窗展示信息、批量数量与购买按钮。
-/// 分类清单取自 `PetShopItemModel.categoryLabels`（P1 五类 + P2 五类 + 其他）。
+/// 分类清单取自 `PetShopItemModel.categoryLabels`（消耗品等 8 类；食物/医疗/
+/// 清洁/玩具/救援 2026-11-03 合并为「消耗品」）。
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
 class PetShopScreen extends StatefulWidget {
@@ -76,11 +79,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
 
   static IconData _labelIcon(String label) => switch (label) {
         '宠物蛋' => Icons.egg_outlined,
-        '食物' => Icons.restaurant,
-        '医疗' => Icons.medical_services_outlined,
-        '清洁' => Icons.shower_outlined,
-        '玩具' => Icons.toys_outlined,
-        '救援' => Icons.health_and_safety_outlined,
+        '消耗品' => Icons.inventory_2_outlined,
         '扩容' => Icons.unfold_more,
         '进化' => Icons.auto_awesome_outlined,
         '加速' => Icons.speed_outlined,
@@ -97,13 +96,13 @@ class _PetShopScreenState extends State<PetShopScreen> {
 
   Future<void> _load({bool showLoading = true}) async {
     if (showLoading) setState(() => _loading = true);
-    final (items, err) = await PetRpc.fetchShopItems();
-    final (records, recErr) = await PetRpc.fetchExpansionRecords();
+    final (items, err) = await PetRpcShop.fetchShopItems();
+    final (records, recErr) = await PetRpcShop.fetchExpansionRecords();
     final (reserved, _) = await PetRpcP2.fetchReserved();
     final lot = reserved.raw['lottery'];
     // 解锁类「购买后不再展示」信号：背包在持 + 已开通功能集
     final (bag, bagErr) = await PetRpc.fetchBag();
-    final unlocked = await PetRpc.fetchUnlockedFeatures();
+    final unlocked = await PetRpcAdventure.fetchUnlockedFeatures();
     // 收藏兑换：配方(reserved) + 持有量(背包) + 道具名(目录)——失败静默不展示
     final exchange = await _loadExchangeGroups(reserved.raw['collection_exchange'], bag);
     if (mounted) {
@@ -222,7 +221,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
       return;
     }
     setState(() => _buying.add(item.id));
-    final (result, err) = await PetRpc.shopBuy(item.id, qty: qty);
+    final (result, err) = await PetRpcShop.shopBuy(item.id, qty: qty);
     if (!mounted) return;
     setState(() => _buying.remove(item.id));
     if (err != null) {
@@ -306,7 +305,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
     if (action == 'expand' && expand != null) {
       setState(() => _buying.add(expand.itemId));
       final (expandResult, expandErr) =
-          await PetRpc.shopBuy(expand.itemId);
+          await PetRpcShop.shopBuy(expand.itemId);
       if (!mounted) return;
       setState(() => _buying.remove(expand.itemId));
       if (expandErr != null) {
@@ -807,6 +806,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
       'clean' => Icons.shower_outlined,
       'toy' => Icons.toys_outlined,
       'rescue' => Icons.health_and_safety_outlined,
+      'checkin_makeup' => Icons.event_available_outlined,
       _ => Icons.inventory_2_outlined,
     };
   }

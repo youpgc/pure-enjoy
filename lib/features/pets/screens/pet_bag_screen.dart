@@ -4,6 +4,7 @@ import '../../../constants/pet.dart';
 import '../../../core/widgets/widgets.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_shop.dart';
 import '../services/pet_rpc_p2.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_bag_meta.dart';
@@ -174,7 +175,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
     if (qty == null || !mounted) return;
     await _run(() async {
       // 服务端契约：p_rows 为 [{slot_index, quantity}]（rpc_pet_discard_items 定义）
-      final err = await PetRpc.discardItems([
+      final err = await PetRpcShop.discardItems([
         {'slot_index': item.slotIndex, 'quantity': qty},
       ]);
       if (!mounted) return;
@@ -263,7 +264,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
 
   Future<void> _compact() async {
     await _run(() async {
-      final err = await PetRpc.compactBag();
+      final err = await PetRpcShop.compactBag();
       if (!mounted) return;
       if (err != null) return _toast(petRpcErrorText(err));
       _toast('背包已整理');
@@ -285,7 +286,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
     final src = _bySlot[from];
     if (src == null || !_canAccept(from, to)) return;
     await _run(() async {
-      final err = await PetRpc.swapSlot(from, to);
+      final err = await PetRpcShop.swapSlot(from, to);
       if (!mounted) return;
       if (err != null) {
         _toast(petRpcErrorText(err));

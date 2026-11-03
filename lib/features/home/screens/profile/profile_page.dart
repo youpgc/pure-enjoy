@@ -45,7 +45,7 @@ class _ProfilePageState extends State<ProfilePage> {
   /// 不依赖 auth user_metadata 的异步同步，避免「我的」页经常显示默认头像。
   String? _avatarUrl;
 
-  /// 宠物系统总开关（金币钱包入口门控；关闭时入口隐藏）
+  /// 宠物系统总开关（宠物钱包入口门控；关闭时入口隐藏）
   bool _petEnabled = false;
 
   @override

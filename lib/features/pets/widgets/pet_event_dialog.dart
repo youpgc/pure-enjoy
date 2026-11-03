@@ -1,7 +1,7 @@
 import 'package:flutter/material.dart';
 
 import '../models/pet_event_models.dart';
-import '../services/pet_rpc.dart';
+import '../services/pet_rpc_scene.dart';
 import '../utils/pet_errors.dart';
 import 'pet_item_icon.dart';
 
@@ -43,7 +43,7 @@ class _PetEventDialogState extends State<_PetEventDialog> {
     if (_choosing >= 0) return;
     setState(() => _choosing = opt.index);
     final (result, err) =
-        await PetRpc.eventChoose(widget.event.id, opt.index, widget.petId);
+        await PetRpcScene.eventChoose(widget.event.id, opt.index, widget.petId);
     if (!mounted) return;
     if (err != null || result == null) {
       setState(() {

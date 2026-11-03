@@ -233,9 +233,21 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
             // 拖拽把手：M3 同款视觉（onSurfaceVariant 40%、32×4 胶囊），
             // 收进容器内——全局主题把手会画在浮卡外的透明边距区（20261012）
             const _DragHandle(),
-            // 标题行：名字（点笔改名）+ 性格
+            // 标题行：性别图标（公=蓝 / 母=粉）+ 名字（点笔改名）+ 性格
             Row(
               children: [
+                if (pet.gender != null) ...[
+                  Icon(
+                    pet.gender == PetGender.male
+                        ? Icons.male
+                        : Icons.female,
+                    size: 20,
+                    color: pet.gender == PetGender.male
+                        ? const Color(0xFF4A90E2)
+                        : const Color(0xFFF06292),
+                  ),
+                  const SizedBox(width: 4),
+                ],
                 Expanded(
                   child: Text('${pet.name} · Lv.${pet.level}',
                       maxLines: 1,

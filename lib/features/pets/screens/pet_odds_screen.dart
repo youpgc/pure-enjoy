@@ -4,8 +4,10 @@ import '../../../core/widgets/widgets.dart';
 import '../../../constants/pet.dart';
 import '../models/pet_p2_models.dart';
 import '../services/pet_rpc.dart';
+import '../services/pet_rpc_adventure.dart';
 import '../services/pet_rpc_p2.dart';
 import '../utils/pet_dict.dart';
+import '../utils/pet_duration_text.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_item_icon.dart';
 import '../widgets/pet_loading.dart';
@@ -48,10 +50,10 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
     setState(() => _loading = true);
     // 多路并行发起（各自独立容错:历险路失败不拖垮蛋池展示）
     final fPools = PetRpcP2.fetchPublishedEggOdds();
-    final fSpots = PetRpc.fetchAdventureOdds();
+    final fSpots = PetRpcAdventure.fetchAdventureOdds();
     final fReserved = PetRpcP2.fetchReserved();
     final fNames = PetRpc.fetchItemNames();
-    final fTiers = PetRpc.fetchAdventureTiers();
+    final fTiers = PetRpcAdventure.fetchAdventureTiers();
     final (pools, err) = await fPools;
     final (spots, spotsErr) = await fSpots;
     final (reserved, reservedErr) = await fReserved;
@@ -146,7 +148,7 @@ class _PetOddsScreenState extends State<PetOddsScreen> {
   }
 
   static String _minutesText(int minutes) =>
-      minutes >= 60 ? '${minutes ~/ 60}小时${minutes % 60 > 0 ? '${minutes % 60}分钟' : ''}' : '$minutes分钟';
+      petDurationText(Duration(minutes: minutes));
 
   /// 历险公示卡(时长系数 + 长途独占掉落:道具图标+概率/保底徽章+地图分支路径)
   Widget _adventureCard(ColorScheme cs) {

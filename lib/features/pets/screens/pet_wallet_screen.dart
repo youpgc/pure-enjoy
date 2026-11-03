@@ -10,13 +10,13 @@ import '../../../services/api_client.dart';
 import '../../../services/supabase_service.dart';
 import '../../../utils/date_time_utils.dart';
 import '../../profile/services/point_service.dart';
-import '../services/pet_rpc.dart';
+import '../services/pet_rpc_shop.dart';
 import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
 
-/// 金币钱包页（我的页「金币钱包」入口的独立落点，不进宠物主页）
+/// 宠物钱包页（我的页「宠物钱包」入口的独立落点，不进宠物主页）
 ///
 /// 数据源（均本人 RLS 可读）：
 /// - `pet_wallets`：余额行（gold_balance / total_earned / total_spent）；
@@ -105,7 +105,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
     if (!confirmed || !mounted) return;
 
     setState(() => _exchanging = true);
-    final err = await PetRpc.exchange(gold);
+    final err = await PetRpcShop.exchange(gold);
     if (!mounted) return;
     setState(() => _exchanging = false);
     if (err != null) {
@@ -203,7 +203,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     return Scaffold(
-      appBar: AppBar(title: const Text('金币钱包')),
+      appBar: AppBar(title: const Text('宠物钱包')),
       body: _buildBody(colorScheme),
     );
   }
