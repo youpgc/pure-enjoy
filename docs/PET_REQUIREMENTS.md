@@ -100,6 +100,7 @@
 - **长途掉落名字典**：`kLongDropNames` 须覆盖 SQL 全部 `long_only` code（服务端联查为主、字典为旧版兜底），校验工具守卫。
 - **Admin 玩法内容页**：奖励/条件/掉落列一律中文转译并带道具图标（共享 `RewardCells`/`PetItemIcon`，道具目录模块级缓存）；时间线事件 12 类中文标签（`PET_TIMELINE_EVENT_META`）。
 - App/Admin 常量标签值域对齐服务端（成就条件 18 值、任务条件 11 值、特性效果 11 值等），新增值域三处同步。
+- **客户端错误埋点（20261103 定版）**：宠物域 RPC 失败统一走 `PetRpc._call` 单点上报 `error_logs`（module='pets'）——`PET_*` 业务拒绝与「请求已取消」静默（正常交互/离开页面语义），其余入日志（HTTP ≥400 记 error、网络层记 warning，message 带 RPC 名+状态码+原文）；`rpc_pet_summary` 缓存链失败在 `pet_service` 补报；音效资源失败仅首报防刷屏。Admin `OP_MODULE_MAP` 须同步登记客户端 module 值域（app/flutter/platform/games/pets），否则错误日志模块列回退编码。
 
 ## 11. 服务端变更流程
 
