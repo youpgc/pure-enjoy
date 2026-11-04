@@ -22,6 +22,12 @@ abstract class PetCheckinStyle {
   /// 待签格描边
   static const cellFaintBorder = Color(0xFFEADFC8);
 
+  /// 今日待签格底（陶土橙实底，参考样式）
+  static const cellTodayBg = Color(0xFFC97B57);
+
+  /// 今日待签红点徽标
+  static const todayDot = Color(0xFFE6453A);
+
   /// 主强调金（按钮 / 下次描边 / 达标环）
   static const gold = Color(0xFFE8A33D);
 
@@ -58,7 +64,8 @@ abstract class PetCheckinStyle {
   static const badgeFaintBg = Color(0xFFF7F1E4);
 }
 
-/// 虚线圆角描边（下次格 / 补签胶囊 / 里程碑环；Flutter 无内置虚线边框）
+/// 虚线圆角描边（预留画笔；日签待签格改橙底红点实底样式
+///  暂无消费方，保留供补签胶囊/里程碑环等后续复用）
 class DashedRRectPainter extends CustomPainter {
   DashedRRectPainter({
     required this.color,

@@ -3,7 +3,7 @@ import 'dart:async';
 import 'package:flutter/foundation.dart' show kDebugMode;
 import 'package:flutter/material.dart';
 
-/// 宠物主页库（part 拆分）：本文件是 library 声明与状态主体，
+/// 宠物主页库（part 拆分）：本文件是 library 声明与状态主体
 /// 三个 part 共用下列导入（Dart 的 part 文件不能自带 import）。
 import '../../../constants/pet.dart';
 import '../../../constants/pet_render.dart';
@@ -49,30 +49,30 @@ import '../widgets/pet_loading.dart';
 part 'pet_home_screen_layout.dart';
 part 'pet_home_screen_actions.dart';
 
-/// 宠物主页（场景舞台版 2.0，2026-09-17 美化重做）
+/// 宠物主页（场景舞台版）
 ///
 /// 布局原则：宠物是唯一主角（垂直水平居中），其余信息各归其位——
 /// - 场景背景：梦幻夜空场景图（与 App 主题解耦，PetSceneBackground）；
-/// - 顶部通知横幅：当前查看宠的历险态三分类（进行中/归来待领取/待救助，
-///   20261021 单宠口径，切宠即跟随），点击按状态分流；
+/// - 顶部通知横幅：当前查看宠的历险态三分类（进行中/归来待领取/待救助
+///  单宠口径，切宠即跟随），点击按状态分流；
 /// - 左右按钮列贴顶（安全区下留少许间距）：左列 = 返回键 + 背包 / 商城 / 钱包 /
-///   寄养 / 成就 / 繁育（P2 四项里成就与繁育走主页直达，孵蛋走背包蛋行、
-///   进化与特性洗练走属性面板，避免按钮列在小屏上溢出）；
-///   右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
-///   （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
+/// 寄养 / 成就 / 繁育（P2 四项里成就与繁育走主页直达，孵蛋走背包蛋行、
+///  进化与特性洗练走属性面板，避免按钮列在小屏上溢出）；
+/// 右列 = 金币胶囊 + 喂食 / 抚摸 / 历险 / 任务
+/// （历险钮四态：历险/召回/领取/救助），冷却时黑色透明蒙层白色字体居中倒计时；
 /// - 底部状态区：名牌 + 四维独立行沉底（PetBottomStatusCard），历险中附去向提示；
-///   无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
-/// - 中央舞台手势（2026-09-24 2D 动画定版）：单击 = 抚摸（走 interact RPC）、
-///   双击 = 开心演出（纯表现，不发 RPC 不加数值）、长按 = 属性面板；
-///   动作由 [PetActionMachine] 仲裁，粒子由 [PetFxController] 绘制。
+/// 无任何宠物时孵化引导卡垂直水平居中（返回键/金币回独立浮层）。
+/// - 中央舞台手势：单击 = 抚摸（走 interact RPC）、
+/// 双击 = 开心演出（纯表现，不发 RPC 不加数值）、长按 = 属性面板；
+/// 动作由 [PetActionMachine] 仲裁，粒子由 [PetFxController] 绘制。
 /// 浮层组件见 pet_home_overlays / scene / adventure.dart，冷却派生见 PetActionBudget。
 ///
-/// 【文件拆分 2026-09-22】单文件超 500 行红线，按职责拆为三个 part：
+/// 单文件超 500 行红线：按职责拆为三个 part
 /// - 本文件：状态字段 + 生命周期 + 数据装载 + 派生取值 + 整体 Stack 组装
 /// - `pet_home_screen_layout.dart`：舞台 / 顶部横幅 / 底部状态 / 左右两列的浮层构建
 /// - `pet_home_screen_actions.dart`：交互动作（喂食、孵化、跳转、历险四态）
 ///
-/// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留），
+/// 【3D 下线归档 2026-09】3D 渲染层与资源包状态卡一并下线（源码注释保留）
 /// 数据库 render3d_enabled / asset_manifest 列保留，3D 转后期迭代。
 class PetHomeScreen extends StatefulWidget {
   const PetHomeScreen({super.key, this.initialTab});
@@ -105,16 +105,20 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   /// 初载场景管线完结：fetchScenes 回落 + 激活码解码完成才置真。
   /// 门禁等它而非 _sceneReady——占位默认码先就绪就开闸，真实主题到位
-  /// 再切换即「默认→已切主题」的一闪（20261028 用户实测反馈）。
+  /// 再切换即「默认→已切主题」的一闪。
   /// 置真后不再回落：在线切主题先解码后切码（_openThemes），不重锁门禁
   bool _sceneFetchDone = false;
 
   /// 随机事件（§3.6）：进页后首次 summary 成功时 roll 一次 home_open；
   /// 照料动作成功后 roll action_done。_eventDialogShowing 防弹层叠加。
   bool _homeEventRolled = false;
+
+  /// 今日已签：已签 → 主页签到钮隐藏、收进「更多」弹窗栏；
+  /// 未签 → 左列签到钮显示、弹窗栏不出该项。二者只显其一。
+  bool _todaySigned = false;
   bool _eventDialogShowing = false;
 
-  /// 当前 _summary 是否来自本地缓存秒开（SWR 路径）——宠物状态可能滞后，
+  /// 当前 _summary 是否来自本地缓存秒开（SWR 路径）——宠物状态可能滞后
   /// 事件触发等强状态判定不得以缓存态为据（见 _maybeShowEvent）
   bool _summaryFromCache = false;
 
@@ -124,14 +128,14 @@ class _PetHomeScreenState extends State<PetHomeScreen>
   /// 舞台粒子层控制器（爱心/星星/碎屑/进化光柱，空闲自动停表）
   late final PetFxController _fx = PetFxController(vsync: this);
 
-  /// 当前查看的宠 id（20261021 从下标制改 id 制：选中态只认身份不认位置，
-  /// 列表刷新后仍指向同一只；查宠一律走 [PetSummaryModel.petInfoFor] 公共口子）
+  /// 当前查看的宠 id（从下标制改 id 制：选中态只认身份不认位置
+  ///  列表刷新后仍指向同一只；查宠一律走 [PetSummaryModel.petInfoFor] 公共口子）
   String? _selectedPetId;
 
   Timer? _tick; // 冷却倒计时逐秒刷新
 
-  /// 上一帧是否冷却中：冷却清零的那一跳 anyCooling 已翻 false，
-  /// 只按它守卫会跳过清除渲染 → 蒙层冻在「1秒」（2026-10-10 修）
+  /// 上一帧是否冷却中：冷却清零的那一跳 anyCooling 已翻 false
+  /// 只按它守卫会跳过清除渲染 → 蒙层冻在「1秒」
   bool _wasCooling = false;
 
   /// 底部状态面板实测高度：切换箭头按「面板顶 + 10px」对位（首帧前用兜底值）
@@ -215,7 +219,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
 
   /// 当前选中的宠物（无舞台宠物返回 null）
   ///
-  /// 单宠口径总闸（20261021 用户拍板）：切换宠物时只经 [petInfoFor] 取
+  /// 单宠口径总闸：切换宠物时只经 [petInfoFor] 取
   /// 当前宠状态更新 UI，不做他宠内容展示。selected 失效（被放生/出列）
   /// 回落第一只，与旧下标防越界同语义。
   PetBriefModel? get _currentPet {
@@ -247,7 +251,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     final (summary, err) =
         await PetService.instance.fetchSummary(forceRefresh: force);
     _summaryFromCache = PetService.instance.lastSummaryFromCache;
-    // 字典非阻塞预热（家系等开放值域文案，失败走端内兜底；20261030）
+    // 字典非阻塞预热（家系等开放值域文案，失败走端内兜底）
     if (force || PetDict.isEmpty) unawaited(PetRpc.fetchDicts());
     if (mounted) {
       setState(() {
@@ -257,7 +261,7 @@ class _PetHomeScreenState extends State<PetHomeScreen>
         _loading = false;
         // 选中失效（被放生/出列）时回落第一只；指向仍有效则保持不变。
         // summary 拉取失败（_summary=null）不参与失效判定：瞬时网络错误
-        // 不应把选中宠重置回第一只（20261021 审查）
+        // 不应把选中宠重置回第一只
         if (summary != null &&
             _selectedPetId != null &&
             !_stagePets.any((p) => p.id == _selectedPetId)) {
@@ -275,9 +279,17 @@ class _PetHomeScreenState extends State<PetHomeScreen>
       }
     }
     _syncAmbient();
+    // 签到互斥显隐：今日已签查一次（轻 RPC；失败按未签兜底露出按钮）。
+    // 签到弹窗关闭后 _load 重跑 → 签完即换位；跨天进入页面自然翻新。
+    // 置于 ambient 同步之后：不挡环境态切换一拍。
+    final now = DateTime.now();
+    final (checkinSt, _) = await PetRpc.fetchCheckinStatus(now.year, now.month);
+    if (mounted) {
+      setState(() => _todaySigned = checkinSt?.isSigned(now) ?? false);
+    }
   }
 
-  /// 低状态环境态接线（§11.3 2026-10-08 修订）：饱食/心情任一低于历险出发
+  /// 低状态环境态接线（§11.3）：饱食/心情任一低于历险出发
   /// 阈值（同一口径，零新增配置）→ ambient 切 sad；恢复即回 idle。
   /// 阈值缺键（旧版服务端）不启用 sad，回退常态 idle。
   void _syncAmbient() {
@@ -298,18 +310,18 @@ class _PetHomeScreenState extends State<PetHomeScreen>
     }
   }
 
-  /// 随机事件尝试触发：roll 未命中/失败一律静默（插叙彩蛋不打扰主流程），
+  /// 随机事件尝试触发：roll 未命中/失败一律静默（插叙彩蛋不打扰主流程）
   /// 命中才弹层；选择结算后刷新总览（心情/经验/亲密/金币可能变化）。
-  /// 返回「是否真正走到 roll」——busy/历险中这类跳过场景返回 false 不算已掷，
-  /// 本次停留后续仍可再试（20261021 审查：home_open 曾被历险态跳过吞掉）
+  /// 返回「是否真正走到 roll」——busy/历险中这类跳过场景返回 false 不算已掷
+  /// 本次停留后续仍可再试
   Future<bool> _maybeShowEvent(String pContext) async {
     if (!mounted || _eventDialogShowing || _busy) return false;
-    // 缓存秒开的总览宠物状态可能滞后（如刚出发历险）——缓存态不掷事件，
+    // 缓存秒开的总览宠物状态可能滞后（如刚出发历险）——缓存态不掷事件
     // 待网络新帧落地后的装载/动作再掷（跳过不算已掷，配额不亏）
     if (_summaryFromCache) return false;
     final pet = _currentPet;
     if (pet == null) return false;
-    // 历险中不触发随机事件（2026-10-14 服务端 choose 已收口 rearing-only；
+    // 历险中不触发随机事件（服务端 choose 已收口 rearing-only；
     // 客户端同步收口入口，避免「弹了窗、选了才报错」的体验）
     if (pet.status != PetPetStatus.rearing) return false;
     final (event, _) = await PetRpcScene.eventRoll(pContext);

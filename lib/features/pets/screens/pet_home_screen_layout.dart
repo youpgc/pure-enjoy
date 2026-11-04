@@ -1,7 +1,7 @@
 part of 'pet_home_screen.dart';
 
 /// 宠物主页浮层布局（part）：中央舞台 / 多宠切换箭头 / 顶部历险横幅 /
-/// 底部状态区 / 左右两列按钮。交互动作在 `pet_home_screen_actions.dart`，
+/// 底部状态区 / 左右两列按钮。交互动作在 `pet_home_screen_actions.dart`
 /// 同文件的扩展成员之间直接裸调用（`unnecessary_this` 会报冗余的 `this.`）。
 
 /// 左右浮动列占位宽（52px 按钮 + 边距），舞台与切换箭头据此让位
@@ -29,7 +29,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 aspectRatio: 1,
                 child: Stack(
                   fit: StackFit.expand,
-                  // 粒子升出箱顶不裁剪（宠物箱=本体体量，头即箱顶，
+                  // 粒子升出箱顶不裁剪（宠物箱=本体体量，头即箱顶
                   // 爱心/呼呼需升入上方舞台区域；外层舞台边界兜底）
                   clipBehavior: Clip.none,
                   children: [
@@ -61,7 +61,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
 
   /// 点触宠物 == 右列「抚摸」钮（同一条 interact RPC + 同一被抚摸演出）。
   /// 历险中静默阻断：服务端会拒 PET_NOT_REARING，客户端先拦下不弹提示
-  /// （20261021 用户拍板：历险中的喂食/抚摸阻断但不提示）
+  ///
   void _interact(String petId) {
     final pet = _currentPet;
     if (pet == null || pet.status == PetPetStatus.adventuring) return;
@@ -71,7 +71,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
 
   /// 双击只做纯表现（正向反馈），不发 RPC、不加心情——
   /// 照料数值一律由服务端结算，这里不能凭空造进度。
-  /// §11.3 2026-10-08 修订：happy 并入 petted（正向反馈单槽位）。
+  /// §11.3：happy 并入 petted（正向反馈单槽位）。
   void _onStageDoubleTap() => _playAction(PetAction.petted);
 
   List<Widget> _switchArrows() {
@@ -100,7 +100,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
   // ---------- 顶部通知横幅（历险状态） ----------
 
   Widget _topBanner(ColorScheme cs) {
-    // 单宠口径（20261021 用户拍板）：横幅只反映当前查看宠的历险态，
+    // 单宠口径：横幅只反映当前查看宠的历险态
     // 切换宠物即跟随切换，不做其他宠物的状态展示
     final adv = _currentAdventure;
     if (adv == null || !adv.usable) return const SizedBox.shrink();
@@ -175,12 +175,12 @@ extension _PetHomeLayout on _PetHomeScreenState {
 
   // ---------- 左侧入口列（返回键 + 背包/商城/任务/签到 + 更多，贴顶） ----------
 
-  /// 左列只留高频直达（2026-09-24 D1）：
+  /// 左列只留高频直达
   /// 原先 7 枚（返回键 + 6×64dp 按钮 + 5×14 间距）合计约 502dp，Stack 里左列又
   /// 画在底部状态卡之后，小屏必然压住「经验/健康」两行；钱包/寄养/成就/繁育
   /// 收进「更多」弹出菜单后左列约 216dp，不再与底部重叠。
   Widget _leftRail() {
-    // 2026-10-10：操作钮统一 top 140（60+80 下调，与右列同距）；返回键独立位（安全区+6 原位），
+    // 操作钮统一 top 140（60+80 下调，与右列同距）；返回键独立位（安全区+6 原位）
     // 不占操作钮列首（原先内联会把「背包」顶到 ~110，两列首钮不对齐）
     return Stack(
       children: [
@@ -205,17 +205,21 @@ extension _PetHomeLayout on _PetHomeScreenState {
                   label: '商城',
                   onTap: _openShop),
               const SizedBox(height: 14),
-              // 任务入口（签到上方，右列原位移出——20261103 用户拍板）
+              // 任务入口（签到上方，右列原位移出
               PetEdgeButton(
                   icon: Icons.task_alt_outlined,
                   label: '任务',
                   onTap: _openQuests),
+              // 商城下方签到入口（宠物模块独享签到体系，弹窗形态）；
+              // 今日已签即隐藏、收进「更多」弹窗栏（二者只显其一）。
+              // 间距跟按钮走：隐藏时任务↔更多只剩一个 14，两种态间距均匀
+              if (!_todaySigned) ...[
               const SizedBox(height: 14),
-              // 商城下方签到入口（宠物模块独享签到体系，弹窗形态）
               PetEdgeButton(
                   icon: Icons.event_available_outlined,
                   label: '签到',
                   onTap: _openCheckin),
+              ],
               const SizedBox(height: 14),
               PetEdgeButton(
                   icon: Icons.more_horiz,
@@ -239,6 +243,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
           children: [
             for (final (icon, label, open) in <(IconData, String, void Function())>
                 [
+              // 今日已签：左列签到钮隐藏，签到入口改挂本栏（二者只显其一）
+              if (_todaySigned)
+                (Icons.event_available_outlined, '签到', _openCheckin),
               (Icons.account_balance_wallet_outlined, '宠物钱包', _openWallet),
               (Icons.luggage_outlined, '寄养仓库', _openFoster),
               (Icons.workspace_premium_outlined, '成就', _openAchievements),
@@ -263,24 +270,24 @@ extension _PetHomeLayout on _PetHomeScreenState {
   // ---------- 右侧操作列（喂食/抚摸/道具/历险，贴顶） ----------
 
   /// 蒙层策略：正常态无蒙层；冷却中黑蒙层显示倒计时
-  /// （每日次数上限不再禁用抚摸,20261021 用户拍板）
+  /// （每日次数上限不再禁用抚摸）
   String? _overlay(Duration? cool) {
     if (cool != null) return _budget.coolText(cool);
     return null;
   }
 
-  /// 喂食钮文案（2026-09-24 修回归）：免费额度冷却中要显示「还剩多久恢复」——
-  /// 旧版这条信息挂在黑色蒙层上，改成"冷却不置灰（可吃口粮）"时蒙层被一并去掉了，
-  /// 倒计时就再也没出现过。按钮此时仍可点，所以不能挂蒙层（会被读成禁用），
+  /// 喂食钮文案：免费额度冷却中要显示「还剩多久恢复」——
+  /// 旧版这条信息挂在黑色蒙层上，改成"冷却不置灰（可吃口粮）"时蒙层被一并去掉了
+  /// 倒计时就再也没出现过。按钮此时仍可点，所以不能挂蒙层（会被读成禁用）
   /// 直接用文案位；额度用尽但没冷却时文案为「口粮」，明示这一钮现在走背包口粮。
-  /// （20261021 用户拍板：倒计时用全格式「4分59秒」，与抚摸蒙层口径一致）
+  ///
   String get _feedLabel {
     if (_budget.feedFreeAvailable) return '喂食';
     final cool = _budget.feedCooldown;
     return cool == null ? '口粮' : _budget.coolText(cool);
   }
 
-  /// 喂食结果文案：增量全部来自后台配置（与服务端 `_pet_add_progress` 同源），
+  /// 喂食结果文案：增量全部来自后台配置（与服务端 `_pet_add_progress` 同源）
   /// 不再写死「喂饱啦」（旧文案与饱食度无关，20→40 也说"喂饱"，误导用户）
   String get _feedMsg {
     final delta = _budget.feedDeltaText;
@@ -288,7 +295,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
   }
 
   /// 抚摸结果文案（服务端加 `interact_mood`，旧实现读不到配置恒显示 +0；
-  /// 心情已满时不显示增量——满值再加是无效增量，改提示关怀文案，20261022 拍板）
+  ///  心情已满时不显示增量——满值再加是无效增量，改提示关怀文案）
   String get _interactMsg {
     final pet = _currentPet;
     // 心情为 0~100 结构值，100=结构满值（非业务配置）
@@ -302,14 +309,14 @@ extension _PetHomeLayout on _PetHomeScreenState {
   Widget _rightRail() {
     final pet = _currentPet;
     final interactCool = _budget.interactCooldown;
-    // 喂食置灰只看「吃饱了没有」plus 在场状态（2026-09-24 定版 A2）：
-    // 免费额度（次数/冷却）不再把按钮打死——额度用完改吃背包口粮，
+    // 喂食置灰只看「吃饱了没有」plus 在场状态
+    // 免费额度（次数/冷却）不再把按钮打死——额度用完改吃背包口粮
     // 服务端 rpc_pet_feed 道具档不占免费次数、不受冷却限制。
     final feedOff = pet == null ||
         _busy ||
         pet.status == PetPetStatus.adventuring ||
         _budget.isFull;
-    // 抚摸不限次（20261021 用户拍板）：不做每日上限禁用/蒙层——达到每日
+    // 抚摸不限次：不做每日上限禁用/蒙层——达到每日
     // 亲密度获取上限后服务端自然不再加亲密,交互本身（心情/经验）照常
     final interactOff = pet == null ||
         _busy ||
@@ -331,7 +338,7 @@ extension _PetHomeLayout on _PetHomeScreenState {
                 overlay: _budget.isFull ? '已饱' : null,
                 onTap: feedOff ? null : () => _onFeedTap(),
                 // 批量喂养（§6.3 高级食盆解锁后）：长按一键喂养全部在养伙伴。
-                // 门控与单宠状态解耦（审查 2026-10-09）：当前宠已饱/历险中时,
+                // 门控与单宠状态解耦：当前宠已饱/历险中时
                 // 其他宠仍可能需要喂养——只挡无宠与请求中。
                 onLongPress: (pet == null || _busy) ? null : _onFeedAllTap),
             const SizedBox(height: 14),

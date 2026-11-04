@@ -5,9 +5,9 @@ import '../utils/pet_errors.dart';
 import '../widgets/pet_loading.dart';
 import '../../../utils/date_time_utils.dart';
 
-/// 宠物成长回忆（需求 §3.3 时间线的 App 呈现，2026-10-09 实装）
+/// 宠物成长回忆（需求 §3.3 时间线的 App 呈现）
 ///
-/// 纪念卡列表：系统自动写入的成长编年史（升级/进化/改名/送别等），
+/// 纪念卡列表：系统自动写入的成长编年史（升级/进化/改名/送别等）
 /// 用户不可编辑；倒序展示，单次最多拉取 100 条（服务端上限 200）。
 class PetTimelineScreen extends StatefulWidget {
   const PetTimelineScreen({super.key, required this.petId, required this.petName});
@@ -23,8 +23,8 @@ class _Item {
   final String type;
   final Map<String, dynamic> payload;
 
-  /// 事件时间(null = 服务端时间解析失败——不回退 now() 冒充真实日期，
-  /// 隐藏日期行即可，审计批 20261012)
+  /// 事件时间(null = 服务端时间解析失败——不回退 now() 冒充真实日期
+  /// 隐藏日期行即可）
   final DateTime? at;
   _Item(this.type, this.payload, this.at);
 }
@@ -146,9 +146,18 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
       case 'adventure_memory':
         final gold = p['gold'];
         final exp = p['exp'];
+        // 掉落明细
+        final drops = p['items'] is List
+            ? (p['items'] as List)
+                .whereType<Map>()
+                .map((it) =>
+                    '${it['name'] ?? it['code'] ?? '?'}×${it['qty'] ?? 1}')
+                .join('、')
+            : '';
         final gains = [
           if (gold != null) ' $gold 金币',
           if (exp != null) ' $exp 经验',
+          if (drops.isNotEmpty) ' $drops',
         ].join('、');
         return (
           Icons.explore,
@@ -215,7 +224,7 @@ class _PetTimelineScreenState extends State<PetTimelineScreen> {
                                     fontWeight: FontWeight.w600))),
                         if (item.at != null)
                           Text(
-                            // 北京时区统一口径,具体到秒(20261021 用户拍板)
+                            // 北京时区统一口径,具体到秒
                             DateTimeUtils.formatStandard(item.at),
                             style: TextStyle(
                                 fontSize: 11, color: cs.onSurfaceVariant),

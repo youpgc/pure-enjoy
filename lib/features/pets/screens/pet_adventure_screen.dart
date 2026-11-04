@@ -10,6 +10,7 @@ import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_rpc_adventure.dart';
 import '../services/pet_service.dart';
+import '../utils/pet_art_resolver.dart';
 import '../utils/pet_duration_text.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_adventure_cards.dart';
@@ -21,21 +22,23 @@ import '../widgets/pet_loading.dart';
 
 /// 历险页
 ///
-/// 交互形态（20261021 用户拍板）：**浮卡弹窗**（参考属性面板），不再整页跳转——
+/// 交互形态：**浮卡弹窗**（参考属性面板），不再整页跳转——
 /// 主页右列历险钮/顶部历险横幅点击均弹出本面板。
-/// 状态机（与 pet_adventures.status 对齐）：
+/// 状态机（与 pet_adventures.status 对齐）
 /// - 无进行中 → 历险地列表 → 选档位（config.adventure_tiers）→ 出发；
-///   等级 = 硬门槛（不达标灰置）；属性 = 结算判据（不达标红显「有风险」，
-///   仍可出发，claim 时判 failed 执行惩罚）；健康 = 出发门槛（阈值提示）；
-///   「为你匹配」推荐卡来自 rpc_pet_adventure_match（可忽略）；
-///   **出发成功即关闭弹窗**（等待期在主页横幅查看，弹窗内不展示等待时间）；
-/// - ongoing  → 弹窗内倒计时 + **历险地图信息**（spotId 匹配历险地名）+
-///   召回；结束出现「查看结果」（claim roll 四类结果）；
+/// 等级 = 硬门槛（不达标灰置）；属性 = 结算判据（不达标红显「有风险」
+///  仍可出发，claim 时判 failed 执行惩罚）；健康 = 出发门槛（阈值提示）；
+/// 「为你匹配」推荐卡来自 rpc_pet_adventure_match（可忽略）；
+/// **出发成功即关闭弹窗**（等待期在主页横幅查看，弹窗内不展示等待时间）；
+/// - ongoing → 弹窗内倒计时 + **历险地图信息**（spotId 匹配历险地名）+
+/// 召回；结束出现「查看结果」（claim roll 四类结果）；
 /// - awaiting_rescue → 自救窗口内用救援道具 / 超时 NPC 兜底。
 Future<void> showPetAdventureSheet(
   BuildContext context, {
   required String petId,
   required String petName,
+  required String petSpeciesCode,
+  required int petStage,
   PetAdventureBriefModel? adventure,
   required List<Map<String, dynamic>> tiers,
   required int petLevel,
@@ -47,7 +50,7 @@ Future<void> showPetAdventureSheet(
     context: context,
     isScrollControlled: true,
     backgroundColor: Colors.transparent,
-    // 主题把手关闭:弹窗内自绘把手,避免双把手(20261021 用户反馈)
+    // 主题把手关闭:弹窗内自绘把手,避免双把手
     showDragHandle: false,
     isDismissible: true,
     // 点击弹窗外空白(顶部预留/左右边距)关闭弹窗:margin 区属于 sheet 自身
@@ -57,7 +60,7 @@ Future<void> showPetAdventureSheet(
       onTap: () => Navigator.of(sheetCtx).pop(),
       child: SafeArea(
         child: Container(
-          // 顶部预留 300px:内容不顶到状态栏/主页横幅区(20261022 用户拍板)
+          // 顶部预留 300px:内容不顶到状态栏/主页横幅区
           margin: const EdgeInsets.fromLTRB(12, 300, 12, 12),
           constraints: BoxConstraints(
               maxHeight: MediaQuery.of(context).size.height * 0.85),
@@ -66,7 +69,7 @@ Future<void> showPetAdventureSheet(
             borderRadius: BorderRadius.circular(22),
           ),
           padding: const EdgeInsets.fromLTRB(18, 8, 18, 14),
-          // 吸收层只包内容区(不含 margin):点击弹窗内部空白不关闭,
+          // 吸收层只包内容区(不含 margin):点击弹窗内部空白不关闭
           // 点击弹窗外空白由外层捕获关闭
           child: GestureDetector(
             behavior: HitTestBehavior.opaque,
@@ -74,6 +77,8 @@ Future<void> showPetAdventureSheet(
             child: PetAdventureScreen(
               petId: petId,
               petName: petName,
+              petSpeciesCode: petSpeciesCode,
+              petStage: petStage,
               adventure: adventure,
               tiers: tiers,
               petLevel: petLevel,
@@ -93,6 +98,8 @@ class PetAdventureScreen extends StatefulWidget {
     super.key,
     required this.petId,
     required this.petName,
+    required this.petSpeciesCode,
+    required this.petStage,
     required this.adventure,
     required this.tiers,
     required this.petLevel,
@@ -103,6 +110,10 @@ class PetAdventureScreen extends StatefulWidget {
 
   final String petId;
   final String petName;
+
+  /// 形象展示用（进行中/遇险视图 c1_neutral 中性帧）
+  final String petSpeciesCode;
+  final int petStage;
 
   /// 主页传入的进行中历险（null = 无进行中，直接列出险地）
   final PetAdventureBriefModel? adventure;
@@ -141,7 +152,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   /// 「为你匹配」推荐历险地 id（rpc_pet_adventure_match；静默降级为 null）
   String? _matchedSpotId;
 
-  /// 推荐地图卡片 key：列表加载后自动滚动到推荐位置（20261021 用户拍板）
+  /// 推荐地图卡片 key：列表加载后自动滚动到推荐位置
   final GlobalKey _matchedCardKey = GlobalKey();
 
   /// 自动定位只执行一次：已滚动过（或用户手动滚开）不再拉回
@@ -175,8 +186,8 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     }
   }
 
-  /// 自动滚动到推荐地图（幂等）：_load/_loadMatch 两路请求谁后就绪谁触发，
-  /// 补齐单侧等待竞态（此前只在 _load 侧触发，match 慢于列表时定位丢失）
+  /// 自动滚动到推荐地图（幂等）：_load/_loadMatch 两路请求谁后就绪谁触发
+  /// 补齐单侧等待竞态
   void _scrollToMatched() {
     if (_scrolledToMatch || _matchedSpotId == null || _spots.isEmpty) return;
     WidgetsBinding.instance.addPostFrameCallback((_) {
@@ -229,7 +240,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
         _loading = false;
       });
     }
-    // 自动滚动到推荐地图（20261021 用户拍板）：列表就绪后跳到推荐卡位置；
+    // 自动滚动到推荐地图：列表就绪后跳到推荐卡位置；
     // match 接口后返回时由 _loadMatch 侧补触发
     if (mounted) _scrollToMatched();
   }
@@ -258,7 +269,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
   Future<void> _reloadSummary() async {
     final (summary, _) = await PetService.instance.fetchSummary();
     if (mounted) {
-      // 本屏按 petId 私有：直接取该宠自己的历险态（summary 2026-10-15 起逐宠下发；
+      // 本屏按 petId 私有：直接取该宠自己的历险态（summary 逐宠下发；
       // 旧单槽被他宠占据时本宠状态取不到）。usable=false = 形状异常，按无进行中处理
       final mine = summary?.adventureFor(widget.petId);
       setState(() => _adv = (mine != null && mine.usable) ? mine : null);
@@ -313,7 +324,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     await _reloadSummary();
   }
 
-  /// 召回确认：复用主页共享 helper（AlertDialog 二次确认 → 无奖励中断），
+  /// 召回确认：复用主页共享 helper（AlertDialog 二次确认 → 无奖励中断）
   /// 返回 true 表示状态已变化需刷新总览
   Future<void> _confirmRecall() async {
     if (_busy || _adv == null) return;
@@ -543,9 +554,9 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final healthLow = widget.healthThreshold > 0 &&
         widget.petHealth < widget.healthThreshold;
     final matched = _matchedSpot;
-    // 全量构建(历险地仅 30 张):惰性列表下未构建项的 ctx 为 null,
-    // ensureVisible 会静默跳过——全量构建后推荐卡定位才可靠(20261021)
-    // 推荐横幅/健康提示钉在弹窗上部固定展示,滚动体仅地图列表(20261022 用户拍板)
+    // 全量构建(历险地仅 30 张):惰性列表下未构建项的 ctx 为 null
+    // ensureVisible 会静默跳过——全量构建后推荐卡定位才可靠
+    // 推荐横幅/健康提示钉在弹窗上部固定展示,滚动体仅地图列表
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -627,13 +638,26 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
 
   // ---------- 进行中：倒计时 + 领取 ----------
 
+  /// 宠物形象（c1_neutral 中性帧，平铺展示）；取图链失败回退 [fallback]
+  Widget _petArtOr(double size, {required Widget fallback}) {
+    final art = petBaseArt(widget.petSpeciesCode, widget.petStage);
+    if (art == null) return fallback;
+    return Image.asset(
+      art,
+      width: size,
+      height: size,
+      fit: BoxFit.contain,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
+
   Widget _ongoingView(PetAdventureBriefModel adv) {
     final cs = Theme.of(context).colorScheme;
     final now = DateTime.now();
     final end = adv.endAt;
     final finished = end == null || !now.isBefore(end);
     final remaining = end?.difference(now);
-    // 历险地图信息（20261021 用户拍板：弹窗展示具体历险地图）
+    // 历险地图信息
     final spotName = _spotName(adv.spotId);
     return Center(
       child: Padding(
@@ -641,7 +665,9 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.explore, size: 72, color: cs.primary),
+            // 宠物形象平铺：c1_neutral 中性帧，取图失败
+            // 回退原罗盘图标
+            _petArtOr(120, fallback: Icon(Icons.explore, size: 72, color: cs.primary)),
             const SizedBox(height: 16),
             Text('${widget.petName} 正在外出游历',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),
@@ -699,7 +725,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final cs = Theme.of(context).colorScheme;
     final deadline = adv.rescueDeadline;
     final expired = deadline != null && !DateTime.now().isBefore(deadline);
-    // 遇险地图信息（与进行中视图同源,20261021 用户拍板）
+    // 遇险地图信息（与进行中视图同源）
     final spotName = _spotName(adv.spotId);
     return Center(
       child: Padding(
@@ -707,7 +733,26 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            Icon(Icons.warning_amber_rounded, size: 72, color: cs.error),
+            // 宠物形象平铺 + 右上警示角标，取图失败回退原警示图标
+            Stack(
+              clipBehavior: Clip.none,
+              children: [
+                _petArtOr(88,
+                    fallback: Icon(Icons.warning_amber_rounded,
+                        size: 72, color: cs.error)),
+                Positioned(
+                  top: -6,
+                  right: -10,
+                  child: Container(
+                    padding: const EdgeInsets.all(4),
+                    decoration:
+                        BoxDecoration(color: cs.error, shape: BoxShape.circle),
+                    child: const Icon(Icons.warning_amber_rounded,
+                        size: 16, color: Colors.white),
+                  ),
+                ),
+              ],
+            ),
             const SizedBox(height: 16),
             Text('${widget.petName} 遇到险情！',
                 style: const TextStyle(fontSize: 16, fontWeight: FontWeight.w600)),

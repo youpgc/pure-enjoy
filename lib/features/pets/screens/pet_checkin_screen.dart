@@ -14,8 +14,8 @@ import 'pet_shop_screen.dart';
 ///
 /// 展示口径（参考主流签到页样式一比一还原）：**4 列 flex 等分网格**铺排
 /// 当月全部日签格（收起显示前 8 天，可展开全部），列宽恒定相等；
-/// 已签格加深并盖绿色对勾，今日待签格金框高亮，漏签格可点补签
-/// （每自然月 4 次，服务端校验）。奖励锚点 = 累计签到次数（含补签）：
+/// 已签格加深并盖绿色对勾，今日待签格橙底红点高亮，漏签格可点补签
+/// （每自然月 4 次，服务端校验）。奖励锚点 = 累计签到次数（含补签）
 /// 当月第 N 次签到获得模板第 N 天奖励，与日历日期无关。
 Future<void> showPetCheckinSheet(BuildContext context) {
   return showModalBottomSheet<void>(
@@ -26,14 +26,14 @@ Future<void> showPetCheckinSheet(BuildContext context) {
     backgroundColor: Colors.transparent,
     showDragHandle: false,
     isDismissible: true,
-    // 点击弹窗外空白关闭:margin 区属于 sheet 自身布局而非 barrier,
+    // 点击弹窗外空白关闭:margin 区属于 sheet 自身布局而非 barrier
     // 命中到不了 ModalBarrier,必须显式捕获
     builder: (sheetCtx) => GestureDetector(
       behavior: HitTestBehavior.translucent,
       onTap: () => Navigator.of(sheetCtx).pop(),
       child: SafeArea(
         child: Container(
-          // 顶部预留 300px:内容不顶到状态栏/主页横幅区(用户拍板先例);
+          // 顶部预留 300px:内容不顶到状态栏/主页横幅区;
           // 高度上限 0.7:内容超出时面板内滚动
           margin: const EdgeInsets.fromLTRB(12, 300, 12, 12),
           constraints: BoxConstraints(
@@ -321,8 +321,18 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
   }
 
   Widget _buildBody() {
+    final today = _beijingToday();
     if (_loading) {
-      return const Center(child: PetPawLoading(color: PetCheckinStyle.gold));
+      // 加载态：同构骨架栅格撑住高度（与成功态严格一致，零跳变），loading
+      // 半透明浮层盖在两行栅格上，加载完成消失露出真数据。
+      // IgnorePointer 防骨架期误触签到/补签
+      return IgnorePointer(
+        child: _buildStatusBody(_skeletonStatus(today), today,
+            gridOverlay: const ColoredBox(
+              color: Color(0x8CFFFDF8),
+              child: Center(child: PetPawLoading(color: PetCheckinStyle.gold)),
+            )),
+      );
     }
     if (_error != null && _status == null) {
       return ListView(shrinkWrap: true, children: [
@@ -336,21 +346,37 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
     }
     final st = _status;
     if (st == null) return const SizedBox.shrink();
-    final today = _beijingToday();
+    return _buildStatusBody(st, today);
+  }
+
+  /// 加载态骨架模型：空奖励表（格内问号占位）+ 全勤 signedDates
+  /// （漏签 0 天最平静视觉）。行数只随日期走，与数据无关 → 高度严格同构
+  PetCheckinStatusModel _skeletonStatus(DateTime today) {
+    String key(int day) =>
+        '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
+    return PetCheckinStatusModel(
+      monthKey: '',
+      days: const {},
+      totalSigned: 0,
+      makeupCount: 0,
+      makeupLimit: 4,
+      makeupCardCount: 0,
+      signedDates: {
+        // 键格式对齐 PetCheckinStatusModel._key（私有不可引用，就地同式生成）；
+        // 含今日全部置已签 → 漏签 0 天、待签橙底不透出浮层，骨架期最平静
+        for (var d = 1; d <= today.day; d++) key(d): true,
+      },
+    );
+  }
+
+  /// 签到主内容（加载骨架与成功态共用同一版式）；
+  /// [gridOverlay] 非空时以 Stack 浮层盖住网格区（骨架高度不变）
+  Widget _buildStatusBody(PetCheckinStatusModel st, DateTime today,
+      {Widget? gridOverlay}) {
     final lastDay = _lastDayOf(today);
     final missed = _missedDays(st, today);
     final visibleDays = _expanded ? lastDay : (lastDay < 8 ? lastDay : 8);
-    return ListView(
-      padding: const EdgeInsets.only(bottom: 6),
-      shrinkWrap: true,
-      children: [
-        PetCheckinStatsBar(
-          st: st,
-          today: today,
-          missed: missed,
-          onOpenMakeupPicker: _openMakeupPicker,
-        ),
-        const SizedBox(height: 10),
+    final gridRows = <Widget>[
         // 4 列 flex 等分网格：列宽恒定相等、占满整行（行尾空槽留白）
         for (var row = 0; row < (visibleDays + 3) ~/ 4; row++) ...[
           if (row > 0) const SizedBox(height: 6),
@@ -376,6 +402,25 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
             ),
           ),
         ],
+    ];
+    final gridBlock = gridOverlay == null
+        ? Column(mainAxisSize: MainAxisSize.min, children: gridRows)
+        : Stack(children: [
+            Column(mainAxisSize: MainAxisSize.min, children: gridRows),
+            Positioned.fill(child: gridOverlay),
+          ]);
+    return ListView(
+      padding: const EdgeInsets.only(bottom: 6),
+      shrinkWrap: true,
+      children: [
+        PetCheckinStatsBar(
+          st: st,
+          today: today,
+          missed: missed,
+          onOpenMakeupPicker: _openMakeupPicker,
+        ),
+        const SizedBox(height: 10),
+        gridBlock,
         const SizedBox(height: 6),
         // 展开/收起（当月超 8 天时出现）
         if (lastDay > 8)

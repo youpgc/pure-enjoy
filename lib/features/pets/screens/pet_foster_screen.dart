@@ -13,11 +13,11 @@ import '../widgets/pet_loading.dart';
 
 /// 寄养仓库页（P0-3 补齐：宠物在「养育格 <-> 寄养格」之间搬运）
 ///
-/// 数据源：`rpc_pet_summary` 的 `pets`（含 status）与 `capacities`，
+/// 数据源：`rpc_pet_summary` 的 `pets`（含 status）与 `capacities`
 /// 不额外查表——占用量与容量与服务端判据同源（status='fostered' 计数 /
-/// coalesce(capacity, config_init)），避免双真相源。
+///  coalesce(capacity, config_init)），避免双真相源。
 ///
-/// 写路径：唯一入口 `rpc_pet_foster_move`（feature_pet_foster_20260921.sql）。
+/// 写路径：唯一入口 `rpc_pet_foster_move`。
 /// 寄养中的宠物不吃离线衰减（补算只作用于 rearing），也不参与喂养/互动/历险
 /// ——那些 RPC 都带 status='rearing' 门槛，客户端无需重复判定。
 class PetFosterScreen extends StatefulWidget {
@@ -82,8 +82,8 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
 
   void _toast(String msg) => showPetToast(context, msg);
 
-  /// 拖拽后的本地顺序（petId 序,20261021）：build 从 summary 过滤会回弹
-  /// 旧序(缓存未变),以本地序覆盖;保存成功后 force 重拉由服务端序接管,
+  /// 拖拽后的本地顺序（petId 序）：build 从 summary 过滤会回弹
+  /// 旧序(缓存未变),以本地序覆盖;保存成功后 force 重拉由服务端序接管
   /// 失败清本地序回滚
   List<String>? _localOrderIds;
 
@@ -122,14 +122,14 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
     if (summary == null) return const EmptyWidget(message: '暂无宠物');
 
     // 在养组含历险中：历险宠仍占养育格,列表可见便于排序查看;寄养按钮禁用
-    // （服务端 foster 拒 PET_NOT_REARING）——20261021 用户拍板
+    // （服务端 foster 拒 PET_NOT_REARING）
     final rearing = summary.pets
         .where((p) =>
             p.status == PetPetStatus.rearing ||
             p.status == PetPetStatus.adventuring)
         .toList();
-    // 拖拽后的本地序覆盖 summary 序:否则 setState 重建时按缓存序回弹,
-    // 直到服务端落库并重拉才见到新序(20261021 用户实测回弹问题根因)
+    // 拖拽后的本地序覆盖 summary 序:否则 setState 重建时按缓存序回弹
+    // 直到服务端落库并重拉才见到新序
     final order = _localOrderIds;
     if (order != null) {
       rearing.sort((a, b) {
@@ -186,7 +186,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
           if (rearing.isEmpty)
             _emptyRow('当前没有在养的宠物', colorScheme)
           else
-            // 拖拽排序（20261021 用户拍板）：sort_order 服务端落库,主页左右
+            // 拖拽排序：sort_order 服务端落库,主页左右
             // 切换顺序跟随;嵌套 shrinkWrap+禁内部滚动,由外层列表统一滚动
             ReorderableListView(
               shrinkWrap: true,
@@ -329,7 +329,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
 
   /// 保存拖拽后的顺序到服务端（sort_order 落库,主页切换顺序跟随）。
   /// 成功:先 force 重拉由服务端序接管,**完成后再清本地序**——清早了会在
-  /// 重拉返回前按旧缓存序渲染闪一次回弹（20261021 复审 P2-1）;失败:清本地
+  /// 重拉返回前按旧缓存序渲染闪一次回弹;失败:清本地
   /// 序回滚
   Future<void> _saveOrder(List<PetBriefModel> rearing) async {
     final err = await PetRpc.reorder([
@@ -365,7 +365,7 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
         padding: const EdgeInsets.fromLTRB(12, 10, 12, 10),
         child: Row(
           children: [
-            // 头像卡：c1_neutral 中性帧,与舞台形象同源（20261021 用户需求）
+            // 头像卡：c1_neutral 中性帧,与舞台形象同源
             PetAvatarCard(
                 speciesCode: pet.speciesCode, stage: pet.stage),
             const SizedBox(width: 10),
@@ -396,24 +396,20 @@ class _PetFosterScreenState extends State<PetFosterScreen> {
               ),
             ),
             const SizedBox(width: 10),
-            // 两字文案（寄养/接回）走紧凑按钮：去图标收窄宽度。搬运中紧凑态
-            // 只显 spinner（72 宽装不下 spinner+「搬运中」，会 RenderFlex 溢出）
+            // 按钮固定宽度、内容居中（默认样式零干预）；文案 maxLines 1 防
+            // 意外折行。「搬运中」纯文案与寄养/接回同样式（无 spinner）
+            // 宽度统一 84；>2 字长文案（如未来的扩位）维持 104
             SizedBox(
-              width: actionLabel.length <= 2 ? 72 : 104,
+              width: (moving || actionLabel.length <= 2) ? 84 : 104,
               child: FilledButton.tonalIcon(
                 onPressed: (enabled && !busy) ? () => _move(pet, action) : null,
-                icon: moving
-                    ? const SizedBox(
-                        width: 14,
-                        height: 14,
-                        child: CircularProgressIndicator(strokeWidth: 2),
-                      )
-                    : (actionLabel.length <= 2 ? null : Icon(actionIcon, size: 18)),
-                label: moving
-                    ? (actionLabel.length <= 2
-                        ? const SizedBox.shrink()
-                        : const Text('搬运中', style: TextStyle(fontSize: 12)))
-                    : Text(actionLabel, style: const TextStyle(fontSize: 12)),
+                icon: (!moving && actionLabel.length > 2)
+                    ? Icon(actionIcon, size: 18)
+                    : null,
+                label: Text(moving ? '搬运中' : actionLabel,
+                    maxLines: 1,
+                    textAlign: TextAlign.center,
+                    style: const TextStyle(fontSize: 12)),
               ),
             ),
           ],

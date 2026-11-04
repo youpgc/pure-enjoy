@@ -1,7 +1,7 @@
 part of 'pet_home_screen.dart';
 
 // 本文件是 State 的 part + extension，其中的 setState 运行期完全合法（同库、
-// 就是 _PetHomeScreenState 的实例方法），但 @protected 规则不识别 extension 成员，
+// 就是 _PetHomeScreenState 的实例方法），但 @protected 规则不识别 extension 成员
 // 会误报 invalid_use_of_protected_member。搬回 State 类会顶破 500 行拆分，故整文件豁免。
 // ignore_for_file: invalid_use_of_protected_member
 
@@ -86,7 +86,7 @@ extension _PetHomeActions on _PetHomeScreenState {
     }
     int n(String k) => (data[k] as num?)?.toInt() ?? 0;
     final parts = <String>[];
-    if (n('free') > 0) parts.add('免费 ${n('free')}');
+    if (n('free') > 0) parts.add('已喂食 ${n('free')}');
     if (n('item') > 0) parts.add('口粮 ${n('item')}');
     if (n('full') > 0) parts.add('已饱 ${n('full')}');
     if (n('cooldown') > 0) parts.add('刚喂过 ${n('cooldown')}');
@@ -99,15 +99,15 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   // ---------- 喂食（免费额度 与 背包口粮 分流） ----------
 
-  /// 喂食钮统一入口（2026-09-24 定版：喂食不限次数）
+  /// 喂食钮统一入口
   ///
   /// 免费额度可用（无冷却 + 当日次数未尽）→ 走免费档；否则弹口粮浮层改吃背包
   /// 道具（服务端 `rpc_pet_feed` 道具档：不占免费次数、不受冷却限制）。
   /// 只有"吃饱了"（`pet_config.feed_full_hunger`）才置灰，见 `_budget.isFull`。
   Future<void> _onFeedTap() async {
     final pet = _currentPet;
-    // 历险中静默阻断（按钮已禁用，此处防口粮浮层等旁路；不弹提示，
-    // 20261021 用户拍板）
+    // 历险中静默阻断（按钮已禁用，此处防口粮浮层等旁路；不弹提示
+    //）
     if (pet == null || _busy || pet.status == PetPetStatus.adventuring) return;
     if (_budget.feedFreeAvailable) {
       await _run(() => PetRpc.feed(pet.id),
@@ -165,7 +165,7 @@ extension _PetHomeActions on _PetHomeScreenState {
       _openEggs();
       return;
     }
-    // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+    // 初始蛋自选种属：选系孵化，未开启自选走固定产出原路
     PetHatchResultModel? result;
     if (target.poolCode == 'initial_ssr') {
       result = await hatchInitialEggWithChoice(context, eggId: target.id);
@@ -187,7 +187,7 @@ extension _PetHomeActions on _PetHomeScreenState {
       result: result,
     );
     if (!mounted) return;
-    // 弹窗关闭后再演出正向反馈（§11.3 修订：happy 并入 petted，单槽位）
+    // 弹窗关闭后再演出正向反馈（§11.3：happy 并入 petted，单槽位）
     _playAction(PetAction.petted);
     // 点击确认后刷新宠物信息
     _load();
@@ -240,7 +240,7 @@ extension _PetHomeActions on _PetHomeScreenState {
   /// 成就（P2）：进入即幂等对齐一次服务端进度
   void _openAchievements() => _push(const PetAchievementsScreen());
 
-  /// 图鉴（§2026-10-09）：收集总览，只读
+  /// 图鉴（§收集）：收集总览，只读
   void _openDex() => _push(const PetDexScreen());
 
   /// 繁育（P2）：未开通时页内给商城直达，不在主页做二次判断
@@ -280,7 +280,7 @@ extension _PetHomeActions on _PetHomeScreenState {
         onGrowth: _openGrowth);
   }
 
-  /// 历险改浮卡弹窗（20261021 用户拍板）：不再整页跳转,弹窗关闭后刷新总览
+  /// 历险改浮卡弹窗：不再整页跳转,弹窗关闭后刷新总览
   void _openAdventure() {
     final pet = _currentPet;
     if (pet == null) {
@@ -291,6 +291,8 @@ extension _PetHomeActions on _PetHomeScreenState {
       context,
       petId: pet.id,
       petName: pet.name,
+      petSpeciesCode: pet.speciesCode,
+      petStage: pet.stage,
       adventure: _currentAdventure,
       tiers: _tierList(),
       petLevel: pet.level,
@@ -302,10 +304,9 @@ extension _PetHomeActions on _PetHomeScreenState {
 
   // ---------- 主页历险交互（helper 见 pet_home_adventure.dart） ----------
 
-  // 横幅点击分流（2026-10-11 三次修订）：待救助 → 跳历险页救助视图（endAt 已过，
+  // 横幅点击分流：待救助 → 跳历险页救助视图（endAt 已过
   // 不能再走 claim——服务端拒 PET_ADV_NOT_ONGOING，原逻辑在此卡死）；历险结束
   // （到点未领）→ 领取奖励弹窗；仍在历险中 → 跳历险详情页查看进度/归来倒计时
-  // （20261021 横幅改单宠口径：adv 恒为当前查看宠的历险，跨宠切换分支删除）
   VoidCallback _bannerTap() {
     final adv = _currentAdventure;
     if (adv == null) return _openAdventure;
@@ -321,7 +322,6 @@ extension _PetHomeActions on _PetHomeScreenState {
     if (adv == null || _busy) return;
     // 归属防陈旧校验保留（id 须与当前宠一致）：点击到执行之间 summary 可能
     // 已被刷新，该宠历险可能已结束/易主，不一致即忽略本次触发
-    // （20261021 注释修正：原文「单槽可能在他宠间切换」描述的是已删除的单槽语义）
     final pet = _currentPet;
     if (pet != null && adv.petId != pet.id) return;
     if (!adv.usable) {

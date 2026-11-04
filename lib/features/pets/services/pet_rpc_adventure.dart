@@ -11,7 +11,7 @@ import 'pet_service.dart';
 ///
 /// 与 [PetRpc] 分文件的原因：主类超 500 行硬底线，按域拆分；
 /// 调用口径完全一致——复用 [PetRpc.callRpc]（错误原文 + raw jsonb）。
-/// 自 pet_rpc.dart 拆出（20261103），调用方由 PetRpc.xxx 改为 PetRpcAdventure.xxx。
+/// 自 pet_rpc.dart 拆出，调用方由 PetRpc.xxx 改为 PetRpcAdventure.xxx。
 class PetRpcAdventure {
   PetRpcAdventure._();
 
@@ -34,7 +34,8 @@ class PetRpcAdventure {
       final resp = await ApiClient.get(
         'pet_user_features',
         select: 'feature_key',
-        filters: {'user_id': 'eq.$uid', 'feature_key': 'like.spot_hidden.*'},
+         // PostgREST like：仅 * 转通配，其余字面匹配——键是 spot_hidden:<code>（冒号）
+         filters: {'user_id': 'eq.$uid', 'feature_key': 'like.spot_hidden:*'},
         limit: 100,
         note: 'pet_user_features 隐秘境解锁集',
       );
@@ -52,8 +53,8 @@ class PetRpcAdventure {
 
   /// 已开通功能键集（pet_user_features 全量）。
   ///
-  /// 消费方：商城解锁类道具「购买后不再展示」（20261030 定版：unlock 类
-  /// 限购 1 次，已购在包或功能已开通即隐藏）；查询失败回退空集不拦截商城，
+  /// 消费方：商城解锁类道具「购买后不再展示」（unlock 类
+  ///  限购 1 次，已购在包或功能已开通即隐藏）；查询失败回退空集不拦截商城
   /// 购买时服务端限购/已解锁校验仍兜底。
   static Future<Set<String>> fetchUnlockedFeatures() async {
     final uid = _uid;
@@ -198,8 +199,8 @@ class PetRpcAdventure {
     return err;
   }
 
-  /// 为你匹配（推荐制）：返回等级达标的候选历险地（含 attr_requirements），
-  /// 其中一个带 recommended=true 标记；服务端同时校验饱食/心情/健康门槛，
+  /// 为你匹配（推荐制）：返回等级达标的候选历险地（含 attr_requirements）
+  /// 其中一个带 recommended=true 标记；服务端同时校验饱食/心情/健康门槛
   /// 不达标时返回错误（调用方可静默降级为无推荐）
   static Future<(Map<String, dynamic>?, String?)> adventureMatch(
     String petId,

@@ -10,12 +10,12 @@ import 'pet_claim_result_dialog.dart';
 import 'pet_home_overlays.dart';
 import 'pet_toast.dart';
 
-/// 主页历险动作集（2026-09-17 历险闭环修复）
+/// 主页历险动作集
 ///
-/// 主页横幅 / 右列按钮的历险交互统一入口：
+/// 主页横幅 / 右列按钮的历险交互统一入口
 /// - 归来领取：rpc_pet_adventure_claim → 结果弹窗（成功奖励三色演出 /
-///   遇险惩罚提示），不跳历险页（claim 只可调用一次，roll 中 danger 后
-///   转 awaiting_rescue，后续走救助链路）；
+///  遇险惩罚提示），不跳历险页（claim 只可调用一次，roll 中 danger 后
+/// 转 awaiting_rescue，后续走救助链路）；
 /// - 召回确认：进行中历险无奖励中断（rpc_pet_adventure_recall）；
 /// - 右列历险钮四态分支（历险入口 / 召回 / 领取 / 救助）。
 /// 独立成文件以保证 pet_home_screen 行数在 500 以内；
@@ -27,41 +27,43 @@ void _toast(BuildContext context, String msg) => showPetToast(context, msg);
 typedef AdventureAction = Future<bool> Function(
     BuildContext context, String adventureId);
 
-/// claim 返回体 → 掉落明细(items + long_drops 并入;名称映射缺失回退 code,
-/// 保底命中带「保底」标记)。主页弹窗与历险页弹窗共用以防两处漂移(20261020 审查 P1)
+/// claim 返回体 → 掉落明细(items 为主,long_drops 仅旧版服务端兜底;同码合并
+/// 数量
+/// 名称映射缺失回退 code;保底与概率命中展示无差,不另加注)。
+/// 主页弹窗与历险页弹窗共用以防两处漂移
 List<({String name, int qty})> buildClaimItems(Map<String, dynamic>? data) {
-  final items = <({String name, int qty})>[];
+  final byCode = <String, ({String name, int qty})>{};
+  void add(String code, String? name, int qty) {
+    final resolved = (name != null && name.isNotEmpty)
+        ? name
+        : kLongDropNames[code] ?? (code.isEmpty ? '稀有道具' : code);
+    final key = code.isEmpty ? resolved : code;
+    final prev = byCode[key];
+    byCode[key] = (
+      name: prev?.name ?? resolved,
+      qty: (prev?.qty ?? 0) + qty,
+    );
+  }
+
   final rawItems = data?['items'];
   if (rawItems is List) {
     for (final it in rawItems) {
       if (it is Map) {
-        items.add((
-          name: (it['name'] as String?) ?? (it['code'] as String? ?? '道具'),
-          qty: (it['qty'] as num?)?.toInt() ?? 1,
-        ));
+        add(it['code'] as String? ?? '', it['name'] as String?,
+            (it['qty'] as num?)?.toInt() ?? 1);
       }
     }
   }
   final rawLong = data?['long_drops'];
   if (rawLong is List) {
-    // 取名统一口径：服务端联查 name 为主（claim 已逐项下发），
-    // kLongDropNames 字典仅旧版服务端兜底（同步守卫见 tool/pet_asset_check.mjs）
-    const longNames = kLongDropNames;
+    // 旧版服务端 long_drops 单独下发（新版已并入 items,同码合并数量兜底）
     for (final it in rawLong) {
       if (it is Map) {
-        final code = it['code'] as String? ?? '';
-        final forced = it['forced'] == true;
-        final name = (it['name'] as String?)?.isEmpty == true
-            ? null
-            : it['name'] as String?;
-        items.add((
-          name: '${name ?? longNames[code] ?? (code.isEmpty ? '稀有道具' : code)}${forced ? '(保底)' : ''}',
-          qty: 1,
-        ));
+        add(it['code'] as String? ?? '', it['name'] as String?, 1);
       }
     }
   }
-  return items;
+  return byCode.values.toList();
 }
 
 /// 归来领取：claim → 成功奖励弹窗 / 遇险惩罚提示
@@ -108,7 +110,7 @@ Future<bool> recallAdventureConfirmed(
   BuildContext context,
   String adventureId,
 ) async {
-  // 统一走强制组件 showConfirmDialog（此前裸 AlertDialog，审计批 20261012）
+  // 统一走强制组件 showConfirmDialog
   final ok = await showConfirmDialog(
     context,
     title: '召回宠物',
@@ -153,7 +155,7 @@ Future<void> showPetDangerDialog(BuildContext context, {String? deadline}) {
 }
 
 /// 历险失败结算弹窗（claim 返回 status='failed'：属性未达标，惩罚明细
-/// 为服务端 penalty 配置实际生效项：health/mood/gold/lost_item，无奖励）
+///  为服务端 penalty 配置实际生效项：health/mood/gold/lost_item，无奖励）
 Future<void> showPetPenaltyDialog(
   BuildContext context, {
   Map<String, dynamic>? penalty,
@@ -207,7 +209,7 @@ Widget petAdventureRailButton({
 }) {
   // 待救助必须优先于"到点"判定：awaiting_rescue 的 endAt 必然已过，若 finished
   // 先判会永远卡在"领取"分支（claim 被服务端拒 PET_ADV_NOT_ONGOING），救助入口
-  // 不可达 = 状态卡死（2026-10-11 缺陷根因）
+  // 不可达 = 状态卡死
   final awaiting = adv?.status == PetAdventureStatus.awaitingRescue;
   final finished =
       !awaiting && adv?.endAt != null && !DateTime.now().isBefore(adv!.endAt!);

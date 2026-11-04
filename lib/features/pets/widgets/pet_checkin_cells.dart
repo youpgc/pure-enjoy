@@ -6,7 +6,7 @@ import 'pet_item_icon.dart';
 
 /// 签到面板视觉子组件（统计条 + 日签格）
 ///
-/// 自 pet_checkin_screen 拆出（500 行硬底线）；纯展示组件，
+/// 自 pet_checkin_screen 拆出（500 行硬底线）；纯展示组件
 /// 签到/补签动作经回调回到面板状态层。
 
 /// 统计条：N 月已累计签到 N 天 + 漏签提示 + 补签入口
@@ -165,10 +165,17 @@ class PetCheckinDayCell extends StatelessWidget {
     final isNext = isToday && !signed;
 
     final Color cardBg;
+    final Color borderColor;
     if (signed) {
       cardBg = const Color(0xFFEFEBE0); // 浅底 = 已签（参考样式）
+      borderColor = const Color(0xFFE2D8C4);
+    } else if (isNext) {
+      // 今日待签：陶土橙实底 + 右上红点（参考样式），无描边
+      cardBg = PetCheckinStyle.cellTodayBg;
+      borderColor = PetCheckinStyle.cellTodayBg;
     } else {
       cardBg = const Color(0xFFC6BCAB); // 深底 = 未签
+      borderColor = const Color(0xFFA79D8B);
     }
 
     final circleStack = Stack(
@@ -193,12 +200,10 @@ class PetCheckinDayCell extends StatelessWidget {
 
     final card = Material(
       color: cardBg,
-      // 整格描边：与面板底色区分（未签深底配深描边、已签浅底配浅描边）
+      // 整格描边：与面板底色区分（待签橙底描边同色即无描边观感）
       shape: RoundedRectangleBorder(
         borderRadius: BorderRadius.circular(14),
-        side: BorderSide(
-            color: signed ? const Color(0xFFE2D8C4) : const Color(0xFFA79D8B),
-            width: 1.2),
+        side: BorderSide(color: borderColor, width: 1.2),
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
@@ -249,18 +254,22 @@ class PetCheckinDayCell extends StatelessWidget {
       ),
     );
 
+    // 今日待签：陶土橙实底 + 右上红点徽标（参考样式），不再用金色虚线框
     return Stack(
       children: [
-        CustomPaint(
-          foregroundPainter: isNext
-              ? DashedRRectPainter(
-                  color: PetCheckinStyle.gold,
-                  strokeWidth: 1.8,
-                  dash: 5,
-                  gap: 3.5,
-                  radius: 14)
-              : null,
-          child: card,
+        card,
+        if (isNext)
+          Positioned(
+            top: 6,
+            right: 6,
+            child: Container(
+              width: 11,
+              height: 11,
+              decoration: const BoxDecoration(
+                shape: BoxShape.circle,
+                color: PetCheckinStyle.todayDot,
+              ),
+            ),
         ),
       ],
     );

@@ -9,18 +9,18 @@ import '../utils/pet_errors.dart';
 import '../utils/pet_intimacy_level.dart';
 import 'pet_toast.dart';
 
-/// 属性面板（2026-09-17 属性系统 Phase 2）
+/// 属性面板
 ///
 /// - 展示：四维成长属性（智力/体力/力量/敏捷）+ 健康状态值 + 性格；
-///   潜力为隐藏属性（服务端不下发），永不展示；
+/// 潜力为隐藏属性（服务端不下发），永不展示；
 /// - 加点：升级获得的可分配点 [PetBriefModel.pendingAttrPoints] 以步进器
-///   累积，确认后逐维度调用 rpc_pet_allocate_attr（服务端校验余额/白名单）；
+/// 累积，确认后逐维度调用 rpc_pet_allocate_attr（服务端校验余额/白名单）；
 /// - 洗练：属性面板内直接触发 rpc_pet_refine_reassign，每次消耗 1 洗练点
-///   （2026-09-20 语义变更：tool_refine 道具已转 +1 洗练点补给品），
-///   结果经 [showPetRefineResultDialog] 做前后对比演出。
-///   孵化基础属性不可洗练（仅重掷升级加点，总值守恒）。
+///
+/// 结果经 [showPetRefineResultDialog] 做前后对比演出。
+/// 孵化基础属性不可洗练（仅重掷升级加点，总值守恒）。
 
-/// 打开属性面板；[onChanged] 在加点成功后回调（调用方刷新总览），
+/// 打开属性面板；[onChanged] 在加点成功后回调（调用方刷新总览）
 /// [onGrowth] 提供「进化与特性」直达（P2 养成页；先收起面板再跳转）
 Future<void> showPetAttributesSheet(
   BuildContext context, {
@@ -35,7 +35,7 @@ Future<void> showPetAttributesSheet(
     backgroundColor: Colors.transparent,
     // 浮卡式自绘容器（透明背景 + margin）：必须关掉主题的全局拖拽把手
     //（bottomSheetTheme.showDragHandle=true）——否则把手画在容器外的透明
-    // 边距区，视觉悬空在弹窗外（20261012 用户反馈）；把手由容器内部
+    // 边距区，视觉悬空在弹窗外；把手由容器内部
     // [_DragHandle] 自绘，与「更多」菜单等标准弹窗同视觉
     showDragHandle: false,
     builder: (ctx) => _PetAttributesSheet(
@@ -116,7 +116,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
   }
 
   /// 改名（§2.5 更名卡口径）：每宠首次免费（rename_count=0），此后消耗
-  /// 更名卡×1；敏感词客户端预检 + 服务端直查双保险（2026-10-09 接入）。
+  /// 更名卡×1；敏感词客户端预检 + 服务端直查双保险。
   Future<void> _rename() async {
     if (_busy) return;
     if (widget.pet.status != PetPetStatus.rearing) {
@@ -162,7 +162,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
       ),
     );
     final name = controller.text.trim();
-    controller.dispose(); // 弹窗已关、取值完毕即释放（此前每次改名泄漏一个）
+    controller.dispose(); // 弹窗已关、取值完毕即释放
     if (confirmed != true || !mounted) return;
     if (name.isEmpty || name.length > 12) {
       showPetToast(context, '名字要 1~12 个字哦');
@@ -191,7 +191,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     widget.onChanged?.call();
   }
 
-  /// 洗练：消耗 1 洗练点重掷升级加点（2026-09-20 语义）。
+  /// 洗练：消耗 1 洗练点重掷升级加点。
   /// 演出弹窗叠在面板上方；关闭后一并收起面板并刷新——
   /// 面板宠物快照含属性值，洗练后已过期
   Future<void> _refine() async {
@@ -230,8 +230,8 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
           mainAxisSize: MainAxisSize.min,
           crossAxisAlignment: CrossAxisAlignment.stretch,
           children: [
-            // 拖拽把手：M3 同款视觉（onSurfaceVariant 40%、32×4 胶囊），
-            // 收进容器内——全局主题把手会画在浮卡外的透明边距区（20261012）
+            // 拖拽把手：M3 同款视觉（onSurfaceVariant 40%、32×4 胶囊）
+            // 收进容器内——全局主题把手会画在浮卡外的透明边距区
             const _DragHandle(),
             // 标题行：性别图标（公=蓝 / 母=粉）+ 名字（点笔改名）+ 性格
             Row(
@@ -301,7 +301,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               _attrRow(k, cs),
               const SizedBox(height: 8),
             ],
-            // 亲密行:循环内已带 8 间距,不再叠加(20261021 用户反馈间距过大)
+            // 亲密行:循环内已带 8 间距,不再叠加
             _intimacyRow(cs),
             const SizedBox(height: 10),
             Text(
@@ -311,9 +311,9 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               style: TextStyle(fontSize: 11, color: cs.onSurfaceVariant),
             ),
             const SizedBox(height: 10),
-            // 洗练入口（2026-09-20 起：消耗洗练点；仅养育中可洗——
-            // 服务端拦 PET_NOT_REARING，此前客户端只排 adventuring，
-            // breeding/fostered 可点必收拒（审计批 20261012）
+            // 洗练入口（消耗洗练点；仅养育中可洗——
+            // 服务端拦 PET_NOT_REARING，客户端需排除全部非养育态
+            // breeding/fostered 可点必收拒
             OutlinedButton.icon(
               onPressed:
                   !_busy &&
@@ -364,10 +364,10 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
               icon: const Icon(Icons.history_edu, size: 18),
               label: const Text('成长回忆'),
             ),
-            // 放生入口（危险区，§2026-10-09）：历险/繁育中不可放，服务端亦拦。
-            // 月萤（初始种属 cat_ssr1 全阶）不展示送别入口——20261021 用户拍板
-            // 「月萤隐藏送别按钮」。⚠️ 保守近似：按种属码而非「最早个体」判定，
-            // 繁育产出的同种属个体入口也会被隐藏（服务端按 created_at 判定仍放行,
+            // 放生入口（危险区）：历险/繁育中不可放，服务端亦拦。
+            // 月萤（初始种属 cat_ssr1 全阶）不展示送别入口
+            // 「月萤隐藏送别按钮」。⚠️ 保守近似：按种属码而非「最早个体」判定
+            // 繁育产出的同种属个体入口也会被隐藏（服务端按 created_at 判定仍放行
             // 只是 UI 不可达）；如需精确,须服务端下发 is_initial 标志（已登记）。
             if ((pet.status == PetPetStatus.rearing ||
                     pet.status == PetPetStatus.fostered) &&
@@ -394,8 +394,8 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     if (_busy) return;
     final pet = widget.pet;
     // 补偿 = 等级 × 单价（pet_config.release_gold_per_level）× 评级倍率
-    // （reserved.release_gold_mult），两项配置均不下发客户端——预览不造数，
-    // 以结算为准（此前写死 level*3 漏评级倍率，误导不可逆决策，审计批 20261012）
+    // （reserved.release_gold_mult），两项配置均不下发客户端——预览不造数
+    // 以结算为准
     final first = await showDialog<bool>(
       context: context,
       builder: (ctx) => AlertDialog(
@@ -454,7 +454,7 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     final base = pet.attr(key.code);
     final plus = _alloc[key.code] ?? 0;
     // 仅养育中可加点（服务端 allocate 拦 PET_NOT_REARING，四态中三态全拒；
-    // 此前只排 adventuring，breeding/fostered 可点必收拒——审计批 20261012）
+    // breeding/fostered 状态可点必收拒）
     final canAlloc =
         pet.pendingAttrPoints > 0 && pet.status == PetPetStatus.rearing;
     return Row(
@@ -518,12 +518,12 @@ class _PetAttributesSheetState extends State<_PetAttributesSheet> {
     );
   }
 
-  /// 亲密度行（等级制,20261021 用户拍板：不封顶按等级拆分）：
-  /// 进度条结构与四维属性行同构（同宽/同高/同底色）;数值格=累计亲密度,
-  /// 副行=「亲密等级 Lv.X · 级内进度」（20261021 用户定稿文案）。
+  /// 亲密度行（等级制）
+  /// 进度条结构与四维属性行同构（同宽/同高/同底色）;数值格=累计亲密度
+  /// 副行=「亲密等级 Lv.X · 级内进度」。
   /// 等级曲线 base/growth 读 config（缺键/非法回退累计值平铺，不造默认值）。
-  /// 进度条 = 级内进度百分比（intoLevel/need，20261027 用户拍板：不再按固定
-  /// 100 满——累计值超 100 后旧口径恒满格，看不出级内成长）。
+  /// 进度条 = 级内进度百分比（intoLevel/need
+  ///  100 满——累计值超 100 后旧口径恒满格，看不出级内成长）。
   Widget _intimacyRow(ColorScheme cs) {
     final lv = petIntimacyLevel(widget.pet.intimacy, widget.config);
     return Column(
@@ -653,8 +653,8 @@ Widget _refineRow(BuildContext ctx, PetAttrKey key,
 }
 
 /// 浮卡式底部弹窗的拖拽把手：与全局主题把手（M3：onSurfaceVariant 40%、
-/// 32×4 胶囊）同视觉，但画在容器**内部**——透明背景弹窗若不关全局
-/// showDragHandle，把手会落在浮卡外的透明边距区，视觉悬空（20261012 用户反馈）
+///  32×4 胶囊）同视觉，但画在容器**内部**——透明背景弹窗若不关全局
+/// showDragHandle，把手会落在浮卡外的透明边距区，视觉悬空
 class _DragHandle extends StatelessWidget {
   const _DragHandle();
 

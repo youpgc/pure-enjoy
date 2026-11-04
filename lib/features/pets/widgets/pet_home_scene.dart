@@ -6,12 +6,12 @@ import 'package:flutter/material.dart';
 
 import '../models/pet_models.dart';
 import 'pet_item_icon.dart';
-/// 宠物主页场景层（2026-09-17 美化重做 + 拍板背景接入）
+/// 宠物主页场景层
 ///
-/// 与 App 全局主题解耦的独立界面感：
-/// - [PetSceneBackground]：场景背景（2026-09-17 用户拍板选定
-///   assets/pets/scenes/scene_dream.png 梦幻夜空·山/水/宠物屋/小路，
-///   BoxFit.cover 竖版适配；程序化白日草地版本归档于文末注释，可回退）；
+/// 与 App 全局主题解耦的独立界面感
+/// - [PetSceneBackground]：场景背景（选定
+///  assets/pets/scenes/scene_dream.png 梦幻夜空·山/水/宠物屋/小路
+/// BoxFit.cover 竖版适配；程序化白日草地版本归档于文末注释，可回退）；
 /// - [PetGoldBadge]：右上角金币胶囊；
 /// - [PetBottomStatusCard]：沉底状态卡（名牌行 + 四维独立行），状态类内容沉底展示。
 
@@ -55,7 +55,7 @@ class PetSceneBackground extends StatelessWidget {
 
 /// 右上角金币胶囊（与返回键分离）
 ///
-/// 2026-09-17：有宠物时按钮列贴顶，金币核心 [PetGoldBadgeCore] 内联至右列
+/// 有宠物时按钮列贴顶：金币核心 [PetGoldBadgeCore] 内联至右列
 /// 首位避免重叠；本外壳仅无宠物分支使用。
 class PetGoldBadge extends StatelessWidget {
   const PetGoldBadge({super.key, required this.gold});
@@ -111,11 +111,11 @@ class PetGoldBadgeCore extends StatelessWidget {
 }
 
 /// 沉底状态卡：名牌行 + 四维独立行（饱食/心情/经验/健康，每条一行不并行；
-/// 亲密度只在详情面板展示,20261021 用户拍板)
+///  亲密度只在详情面板展示)
 ///
 /// 点击整卡打开属性面板（属性系统 Phase 2：四维/健康/性格/加点，见
-/// pet_attributes_sheet.dart）。
-/// 形态 0-2 → 幼年期/成长期/成年期（2026-10-10 转译）
+///  pet_attributes_sheet.dart）。
+/// 形态 0-2 → 幼年期/成长期/成年期
 String _stageName(int stage) =>
     const ['幼年期', '成长期', '成年期'][stage.clamp(0, 2)];
 class PetBottomStatusCard extends StatefulWidget {
@@ -137,7 +137,8 @@ class PetBottomStatusCard extends StatefulWidget {
   /// null（旧版服务端未下发曲线两键）时经验行回退旧的 /100 展示。
   final int? expNeed;
 
-  /// 已达等级上限（level_max，服务端同源冻结 exp）：经验条满格 + 显示 MAX
+  /// 已达等级上限（level_max，服务端同源冻结 exp）：经验条满格 +
+  /// 数值格展示超出经验 '${exp}/max'
   final bool expMaxed;
 
   /// 虚弱阈值（历险出发门槛 adventure_health_threshold 同源下发）——
@@ -158,8 +159,26 @@ class PetBottomStatusCard extends StatefulWidget {
   State<PetBottomStatusCard> createState() => _PetBottomStatusCardState();
 }
 
-class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
+class _PetBottomStatusCardState extends State<PetBottomStatusCard>
+    with TickerProviderStateMixin {
   Timer? _tick;
+
+  /// 属性点待分配金框呼吸（0↔1 循环渐显渐隐
+  ///  提示挂在主页状态卡——升级后不开详情面板也能看到有待分配点；
+  ///  无待分配点时停表，不空转重建）
+  late final AnimationController _pulse = AnimationController(
+      vsync: this, duration: const Duration(milliseconds: 1100));
+
+  /// 经验条增长动画链（升级时旧条补满→归零→逐级补满
+  ///  →末段到新位置，多级成链）
+  late final AnimationController _expAnim =
+      AnimationController(vsync: this, duration: const Duration(milliseconds: 600));
+  TweenSequence<double>? _expSeq;
+  String? _prevPetId;
+  int? _prevExp;
+  int? _prevLevel;
+  int? _prevNeed;
+  bool _prevMaxed = false;
 
   @override
   void initState() {
@@ -168,11 +187,91 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
     _tick = Timer.periodic(const Duration(seconds: 60), (_) {
       if (mounted) setState(() {});
     });
+    _syncPulse();
+  }
+
+  @override
+  void didUpdateWidget(covariant PetBottomStatusCard oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    _maybeRunExpAnimation();
+    _syncPulse();
+  }
+
+  /// 金框呼吸起停跟随待分配点：有点数时循环，分配完即停（装饰层静止）
+  void _syncPulse() {
+    final shouldGlow = widget.pet.pendingAttrPoints > 0;
+    if (shouldGlow && !_pulse.isAnimating) {
+      _pulse.repeat(reverse: true);
+    } else if (!shouldGlow && _pulse.isAnimating) {
+      _pulse.stop();
+    }
+  }
+
+  /// 经验/等级变化时构建增长链：同级单段缓动；升级 k 级 = 旧条补满 →
+  /// 中间级各 0→满 → 末段到新位置。换宠（id 变化）不动画直接换值。
+  void _maybeRunExpAnimation() {
+    final pet = widget.pet;
+    if (_prevPetId != pet.id) {
+      _prevPetId = pet.id;
+      _prevExp = pet.exp;
+      _prevLevel = pet.level;
+      _prevNeed = widget.expNeed;
+      _prevMaxed = widget.expMaxed;
+      _expSeq = null;
+      return;
+    }
+    if (pet.exp == _prevExp &&
+        pet.level == _prevLevel &&
+        widget.expMaxed == _prevMaxed) {
+      return;
+    }
+    final oldExp = _prevExp ?? pet.exp;
+    final oldLevel = _prevLevel ?? pet.level;
+    final oldNeed = (_prevNeed ?? widget.expNeed) ?? 100;
+    final oldMaxed = _prevMaxed;
+    _prevExp = pet.exp;
+    _prevLevel = pet.level;
+    _prevNeed = widget.expNeed;
+    _prevMaxed = widget.expMaxed;
+
+    final maxed = widget.expMaxed;
+    final need = widget.expNeed;
+    // 缺曲线（need null）时与 _statRow 的 /100 回退口径一致
+    final effNeed = maxed ? null : (need ?? 100);
+    final newFrac =
+        (effNeed == null || effNeed <= 0) ? 1.0 : (pet.exp / effNeed).clamp(0.0, 1.0);
+    final oldFrac = oldMaxed ? 1.0 : (oldExp / oldNeed).clamp(0.0, 1.0);
+    final gained = pet.level - oldLevel;
+    final segs = <TweenSequenceItem<double>>[];
+    if (gained > 0) {
+      segs.add(TweenSequenceItem(
+          tween: Tween(begin: oldFrac, end: 1.0), weight: 1));
+      for (var i = 1; i < gained; i++) {
+        segs.add(TweenSequenceItem(
+            tween: Tween(begin: 0.0, end: 1.0), weight: 1));
+      }
+      segs.add(TweenSequenceItem(
+          tween: Tween(begin: 0.0, end: newFrac), weight: 1));
+    } else if (pet.exp >= oldExp) {
+      // 同级增长（含新满级 0→满）：单段缓动
+      segs.add(TweenSequenceItem(
+          tween: Tween(begin: oldFrac, end: newFrac), weight: 1));
+    } else {
+      // 经验回退（非常规口径）：不动画直接落新值
+      _expSeq = null;
+      return;
+    }
+    _expSeq = TweenSequence<double>(segs);
+    _expAnim.duration =
+        Duration(milliseconds: (500 * segs.length).clamp(600, 3200));
+    _expAnim.forward(from: 0);
   }
 
   @override
   void dispose() {
     _tick?.cancel();
+    _pulse.dispose();
+    _expAnim.dispose();
     super.dispose();
   }
 
@@ -191,15 +290,12 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
         ? pet.mood
         : petDecayedStat(
             pet.mood, anchor, widget.decayMoodPerHour, DateTime.now());
+    // 经验条动画取值移入经验行的 AnimatedBuilder（增长链逐帧只重建本行）
     return GestureDetector(
       onTap: widget.onTap,
-      child: Container(
-        margin: const EdgeInsets.symmetric(horizontal: 12),
-        padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
-        decoration: BoxDecoration(
-          color: const Color(0xCC2E2A24),
-          borderRadius: BorderRadius.circular(18),
-        ),
+      child: AnimatedBuilder(
+        animation: _pulse,
+        // 卡片内容缓存为 child：金框呼吸逐帧只重建装饰层
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
@@ -229,8 +325,7 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
             _statRow('心情', 'ui_mood', Icons.mood, mood),
             const SizedBox(height: 6),
             // 亲密度不在主界面展示：详情面板（属性面板）已有对应字段
-            // （20261021 用户拍板）
-            // 健康/经验行序：健康紧随心情（20261027 用户拍板互换）
+            // 健康/经验行序：健康紧随心情
             // 健康行（历险失败惩罚扣减；低于出发门槛=虚弱，进度条转红警示；
             // 阈值缺键不判定）
             _statRow('健康', 'ui_health', Icons.health_and_safety_outlined,
@@ -240,14 +335,53 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
                     ? const Color(0xFFE57373)
                     : null),
             const SizedBox(height: 6),
-            _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
-                max: expMaxed ? null : expNeed,
-                forceFull: expMaxed,
-                displayText: expMaxed
-                    ? 'MAX'
-                    : (expNeed == null ? null : '${pet.exp}/$expNeed')),
+            // 经验行独立接动画：增长链播放中逐帧取序列插值（静止取实际值），
+            // 只重建本行，不影响卡片其余行
+            AnimatedBuilder(
+              animation: _expAnim,
+              builder: (_, __) {
+                final frac = (_expSeq != null && _expAnim.isAnimating)
+                    ? _expSeq!.evaluate(_expAnim)
+                    : null;
+                return _statRow('经验', 'ui_exp', Icons.trending_up, pet.exp,
+                    max: expMaxed ? null : expNeed,
+                    forceFull: expMaxed,
+                    fractionOverride: frac,
+                    displayText: expMaxed
+                        ? '${pet.exp}/max'
+                        : (expNeed == null ? null : '${pet.exp}/$expNeed'));
+              },
+            ),
           ],
         ),
+        builder: (ctx, content) {
+          // 属性点待分配金框：呼吸脉冲（用户在主页不开面板即感知）
+          final glow = pet.pendingAttrPoints > 0;
+          const glowColor = Color(0xFFE8A33D);
+          final t = _pulse.value;
+          return Container(
+            margin: const EdgeInsets.symmetric(horizontal: 12),
+            padding: const EdgeInsets.fromLTRB(14, 10, 14, 12),
+            decoration: BoxDecoration(
+              color: const Color(0xCC2E2A24),
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: glow
+                    ? glowColor.withValues(alpha: 0.2 + 0.8 * t)
+                    : Colors.transparent,
+                width: 1.6,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: glowColor.withValues(alpha: glow ? 0.25 * t : 0),
+                  blurRadius: 14,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+            child: content,
+          );
+        },
       ),
     );
   }
@@ -261,6 +395,7 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
       {int? max,
       bool forceFull = false,
       String? displayText,
+      double? fractionOverride,
       Color? valueColor}) {
     const accent = Color(0xFFFFD37E);
     final barColor = valueColor ?? accent;
@@ -279,7 +414,8 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
           child: ClipRRect(
             borderRadius: BorderRadius.circular(3),
             child: LinearProgressIndicator(
-              value: forceFull ? 1.0 : (value / denom).clamp(0.0, 1.0),
+              value: fractionOverride ??
+                  (forceFull ? 1.0 : (value / denom).clamp(0.0, 1.0)),
               minHeight: 5,
               backgroundColor: Colors.white24,
               valueColor: AlwaysStoppedAnimation(barColor),
@@ -288,9 +424,10 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
         ),
         const SizedBox(width: 8),
         SizedBox(
-          // 数值格全行统一宽度：经验行 exp/need 与单值行（饱食 85 等）右端对齐，
-          // 五条进度条右缘齐平；FittedBox 防高等级 '1094189813/1094189813' 溢出
-          width: 64,
+          // 数值格全行统一宽度：经验行 exp/need 与单值行（饱食 85 等）右端对齐
+          // 五条进度条右缘齐平；80px 承载后期 13 字符（'144422/144423' ≈79px）
+          // 原字号不缩放；FittedBox 兜底防未来更长文案溢出
+          width: 80,
           child: FittedBox(
             fit: BoxFit.scaleDown,
             alignment: Alignment.centerRight,
@@ -307,7 +444,7 @@ class _PetBottomStatusCardState extends State<PetBottomStatusCard> {
   }
 }
 
-/* ==================== 归档（2026-09-17 程序化白日草地背景，可回退） ====================
+/* ==================== 归档（程序化白日草地背景，可回退） ====================
 
 const Color _skyTop = Color(0xFFA9D7F5);
 const Color _skyBottom = Color(0xFFE8F6E0);

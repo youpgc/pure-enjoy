@@ -11,15 +11,16 @@ import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import 'pet_bag_screen.dart';
 import 'pet_shop_screen.dart';
+import '../widgets/pet_avatar_card.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
 
 /// 繁育页（P2）
 ///
 /// 裁决全在服务端 `rpc_pet_breed_start`（同系、异性、双亲在养、亲密度达
-/// `pet_config.reserved.breeding.intimacy_min`、手续费扣金币）；本页只做
+///  `pet_config.reserved.breeding.intimacy_min`、手续费扣金币）；本页只做
 /// **候选引导**（同系异性才可选），门槛数值全部读后台配置，不写死（铁律 2）。
-/// 领蛋 `rpc_pet_breed_claim` 的 `bag_full` 是 P2 **唯一的软失败**（不抛异常）：
+/// 领蛋 `rpc_pet_breed_claim` 的 `bag_full` 是 P2 **唯一的软失败**（不抛异常）
 /// 亲代已释放、单据停在 ready，清包后重调即可，故此处只引导去背包不清单。
 class PetBreedScreen extends StatefulWidget {
   const PetBreedScreen({super.key});
@@ -52,7 +53,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     final (summary, summaryErr) =
         await PetService.instance.fetchSummary(forceRefresh: force);
     // 解锁清单拉取失败必须并入错误态：吞掉会把已开通繁育的用户误判成
-    // 「尚未解锁」并引导去商城（网络错误篡改业务态，审计批 20261012）
+    // 「尚未解锁」并引导去商城（网络错误篡改业务态）
     final (features, featuresErr) = await PetRpcP2.fetchUnlockedFeatures();
     final (orders, ordersErr) = await PetRpcP2.fetchBreedOrders();
     final (reserved, _) = await PetRpcP2.fetchReserved();
@@ -109,7 +110,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
       return '伙伴信息还没加载好，刷新一下再试试';
     }
     if (a.gender == b.gender) return '需要一公一母';
-    // 成年期门槛（20261103 定版）：与服务端 PET_BREED_NOT_ADULT 同口径
+    // 成年期门槛：与服务端 PET_BREED_NOT_ADULT 同口径
     if (a.stage < 2 || b.stage < 2) return '伙伴需到成年期才能结配';
     final min = _reserved.breedIntimacyMin;
     if (min != null && (a.intimacy < min || b.intimacy < min)) {
@@ -219,8 +220,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
         children: [
           if (_error != null) ...[
             // 明细(含解锁清单)拉取失败:错误态置顶可重试,不渲染「尚未解锁」
-            // 误导卡片——网络错误不得篡改业务态引导用户去商城(审计批 20261012
-            // 复审补:此前错误只在页底小字,解锁卡片照常渲染)
+            // 误导卡片——网络错误不得篡改业务态引导用户去商城，错误卡片照常渲染
             Card(
               child: Padding(
                 padding: const EdgeInsets.all(16),
@@ -267,8 +267,8 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
           _title(cs, '繁育记录'),
           const SizedBox(height: 8),
           if (_orders.isEmpty)
-            // 故障态不陈述业务事实(复审 P3:错误卡片下渲染"还没有结配记录"
-            // 会把网络失败读成没有记录)
+            // 故障态不陈述业务事实（错误卡片下渲染"还没有结配记录"
+            // 会把网络失败读成没有记录）
             Text(
                 _error != null
                     ? '记录加载失败，请重试'
@@ -370,6 +370,12 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
           crossAxisAlignment: CrossAxisAlignment.start,
           mainAxisSize: MainAxisSize.min,
           children: [
+            // 形象：c1_neutral 中性帧，居中置顶
+            Center(
+              child: PetAvatarCard(
+                  speciesCode: pet.speciesCode, stage: pet.stage, size: 48),
+            ),
+            const SizedBox(height: 6),
             Text('${pet.gender?.label ?? ''} ${pet.name}',
                 maxLines: 1,
                 overflow: TextOverflow.ellipsis,
@@ -411,6 +417,7 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
   Widget _orderCard(ColorScheme cs, PetBreedOrderModel order) {
     return Card(
       child: ListTile(
+        leading: _parentsAvatar(order),
         title: Text(_namesOf(order),
             style:
                 const TextStyle(fontSize: 14, fontWeight: FontWeight.w600)),
@@ -431,6 +438,26 @@ class _PetBreedScreenState extends State<PetBreedScreen> {
     }
 
     return '${label(order.petAId)} × ${label(order.petBId)}';
+  }
+
+  /// 结配单双亲形象：双 c1_neutral 头像并排叠放；
+  /// 单据 pet id 经总览反查（与 [_namesOf] 同口径），双亲都查不到则不占位
+  Widget? _parentsAvatar(PetBreedOrderModel order) {
+    final a = _summary?.petInfoFor(order.petAId);
+    final b = _summary?.petInfoFor(order.petBId);
+    if (a == null && b == null) return null;
+    Widget one(PetBriefModel p) => PetAvatarCard(
+        key: ValueKey(p.id), speciesCode: p.speciesCode, stage: p.stage, size: 30);
+    return SizedBox(
+      width: 52,
+      height: 34,
+      child: Stack(
+        children: [
+          if (a != null) Positioned(left: 0, top: 2, child: one(a)),
+          if (b != null) Positioned(right: 0, top: 2, child: one(b)),
+        ],
+      ),
+    );
   }
 
   String _orderHint(PetBreedOrderModel order) {
