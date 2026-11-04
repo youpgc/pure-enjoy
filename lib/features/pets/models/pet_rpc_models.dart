@@ -185,8 +185,8 @@ class PetQuestModel {
 
   bool get done => progress >= target;
 
-  /// 展示名（pet_quests 无 title 列，按条件类型生成；值域 = 11 类任务条件，
-  /// 新增条件类型须同步此表，否则落通用标题；历险类带时长要求时前缀区分）
+  /// 展示名（pet_quests 无 title 列，按条件类型生成；值域 = 11 类任务条件
+  ///  新增条件类型须同步此表，否则落通用标题；历险类带时长要求时前缀区分）
   String get title {
     final base = switch (conditionType) {
       'feed' => '喂养伙伴',
@@ -234,7 +234,7 @@ class PetQuestModel {
 /// 历险地（pet_adventure_spots，仅启用行）
 /// 奖励道具行（reward_package.items / rewards.items = [{code,count,name?}]）
 ///
-/// 放置在本文件（底层模型层）：成就/周任务/每日任务三线共用，
+/// 放置在本文件（底层模型层）：成就/周任务/每日任务三线共用
 /// pet_p2_models 依赖本文件,反向引用会成环。
 class PetRewardItemModel {
   const PetRewardItemModel({required this.code, required this.count, this.name});
@@ -242,8 +242,8 @@ class PetRewardItemModel {
   final String code;
   final int count;
 
-  /// 道具展示名（成就/周任务由服务端 join pet_items 下发,20261022 起；
-  /// 每日任务等直查来源为 null,由调用方回填或回落 code 展示）
+  /// 道具展示名（成就/周任务由服务端 join pet_items 下发
+  ///  每日任务等直查来源为 null,由调用方回填或回落 code 展示）
   final String? name;
 
   static List<PetRewardItemModel> parseList(dynamic raw) {
@@ -278,7 +278,7 @@ class PetSpotModel {
   final List<Map<String, dynamic>> unlockConditions;
 
   /// [{attr,value}] 结算判据：不达标仍可出发，claim 时判 failed 并执行惩罚
-  /// （feature_pet_attributes_20260917.sql rpc_pet_adventure_start / claim）
+  /// （rpc_pet_adventure_start / claim）
   final List<Map<String, dynamic>> attrRequirements;
 
   /// 隐藏图（P3 隐秘境）：须罗盘解锁（pet_user_features 键 spot_hidden:<code>）

@@ -3,7 +3,7 @@ import '../../../constants/pet.dart';
 /// 宠物系统模型层
 ///
 /// 数据源：`rpc_pet_summary()`（jsonb 单对象，经 ApiResponse.raw 承载）。
-/// 字段与 D:\workspace\sql\feature_pet_rpcs_20260916.sql 中
+/// 字段与
 /// rpc_pet_summary 的 jsonb_build_object 返回结构一一对应，禁止臆测字段。
 
 /// 金币钱包概要
@@ -96,7 +96,7 @@ class PetBriefModel {
   final int intimacy;
   final PetPetStatus? status;
 
-  /// 今日已用免费喂养次数 / 最近喂养时间（冷却倒计时数据源，rpc_pet_summary 2026-09-17 扩展）
+  /// 今日已用免费喂养次数 / 最近喂养时间（冷却倒计时数据源，rpc_pet_summary 扩展字段）
   final int todayFreeFeedCount;
   final DateTime? lastFeedAt;
 
@@ -106,11 +106,11 @@ class PetBriefModel {
 
   /// 种属 2D 渲染配置块（pet_species.render2d）。
   /// 仅供透传保留：底图/帧序列素材下线后 App 已不消费此块
-  /// （表现唯一来源为弯曲树，见 utils/pet_art_resolver.dart），
+  /// （表现唯一来源为弯曲树，见 utils/pet_art_resolver.dart）
   /// 列与数据仍在服务端保留
   final Map<String, dynamic>? render2d;
 
-  /// 四维属性当前值（base||bonus 合并，rpc_pet_summary 2026-09-17 属性系统扩展）
+  /// 四维属性当前值（base||bonus 合并，rpc_pet_summary 属性系统扩展字段）
   final Map<String, int> attributes;
 
   /// 健康状态值 /100（历险失败惩罚扣减；药品/自然恢复可配，不参与成长）
@@ -126,16 +126,16 @@ class PetBriefModel {
   final String? personalityCode;
   final String? personalityName;
 
-  /// 今日已获照料亲密度（上限 = config.intimacy_daily_cap；summary 2026-10-08 扩展，
-  /// 旧版服务端缺键按 0 展示，不阻塞）
+  /// 今日已获照料亲密度（上限 = config.intimacy_daily_cap；summary 下发
+  ///  旧版服务端缺键按 0 展示，不阻塞）
   final int todayIntimacyGain;
 
   /// 已改名次数（0=下次改名免费；rpc_pet_rename 首次免费口径的数据源）
   final int renameCount;
 
-  /// 该宠的进行中历险态（summary 2026-10-15 起逐宠下发 pets[].adventure；
-  /// null=无进行中历险。单宠历险 UI 的数据源——顶层 ongoingAdventure 单槽
-  /// 只带一条（待救助优先），他宠历险此前在 UI 上不可见）
+  /// 该宠的进行中历险态（summary 逐宠下发 pets[].adventure；
+  ///  null=无进行中历险。单宠历险 UI 的数据源——顶层 ongoingAdventure 单槽
+  /// 只带一条（待救助优先））
   final PetAdventureBriefModel? adventure;
 
   /// 读取四维属性值（未配置/未下发维度补 0）
@@ -177,7 +177,7 @@ class PetBriefModel {
           ? PetAdventureBriefModel.fromJson({
               ...((json['adventure'] as Map).cast<String, dynamic>()),
               // pet_id 回填本宠 id(双保险):线上 SQL 若未下发该键,宠属守卫
-              // 会因 petId='' 恒拦截「领取/召回」(20261020 批 3 审查 P0)
+              // 会因 petId='' 恒拦截「领取/召回」
               'pet_id': json['id'],
             })
           : null,
@@ -202,8 +202,8 @@ class PetAdventureBriefModel {
   final String id;
   final String petId;
   final String spotId;
-  /// 历险档位（= pet_adventures.tier，text 值域 short/medium/long，
-  /// 与 config.adventure_tiers[].tier 同源；不是数字）
+  /// 历险档位（= pet_adventures.tier，text 值域 short/medium/long
+  ///  与 config.adventure_tiers[].tier 同源；不是数字）
   final String tier;
   final DateTime? endAt;
   /// 历险状态（pet_adventures.status 值域见 PetAdventureStatus；未知值→null）
@@ -211,7 +211,7 @@ class PetAdventureBriefModel {
   final DateTime? rescueDeadline;
 
   /// 是否可发起历险动作（payload 形状异常时 id 取不到，此时任何
-  /// claim/recall/rescue 都会把空串当 uuid 发给后端，必须先挡掉）
+  ///  claim/recall/rescue 都会把空串当 uuid 发给后端，必须先挡掉）
   bool get usable => id.isNotEmpty;
 
   factory PetAdventureBriefModel.fromJson(Map<String, dynamic> json) {
@@ -252,21 +252,21 @@ class PetSummaryModel {
   /// 可即开孵化的蛋数量（status='unopened' 且 mode='instant'）
   final int eggsReadyInstant;
   /// 顶层单槽历险态（旧键）：仅为未发版旧 App 包兼容保留——UI 已全部切
-  /// per-pet 的 pets[].adventure（20261021），服务端只增不删
+  /// per-pet 的 pets[].adventure，服务端只增不删
   final PetAdventureBriefModel? ongoingAdventure;
 
-  /// 全局配置块（free_feed_daily / points_per_gold / stack_limit_default 等，
-  /// B3+ 按需消费；数值零硬编码 —— 客户端不为缺失字段编默认值）
+  /// 全局配置块（free_feed_daily / points_per_gold / stack_limit_default 等
+  ///  B3+ 按需消费；数值零硬编码 —— 客户端不为缺失字段编默认值）
   final Map<String, dynamic> config;
 
-  /// 本份总览的拉取（缓存写入）时刻——展示层实时衰减插值的时间锚，
+  /// 本份总览的拉取（缓存写入）时刻——展示层实时衰减插值的时间锚
   /// 见 utils/pet_decay_display.dart；null 视为「不插值」（旧缓存）
   final DateTime? fetchedAt;
 
   /// 养育格第一只宠物（状态卡主展示对象）。
   /// 「在养育格」= 未寄养：历险中/繁育中的宠物仍占用养育格（保留舞台）；
   /// 已放生个体在 summary SQL 层已被排除，按创建序取第一只——
-  /// 首宠月萤恒定展示（2026-10-10 口径收紧）
+  /// 首宠月萤恒定展示
   PetBriefModel? get primaryPet {
     for (final p in pets) {
       if (p.status != PetPetStatus.fostered) return p;
@@ -275,9 +275,9 @@ class PetSummaryModel {
   }
 
   /// 按宠 id 查宠物信息（公共查询口子）：petId 为空或未命中返回 null。
-  /// 20261021 用户拍板：横幅等 UI 一律单宠口径——切换宠物时只经它取
+  ///：横幅等 UI 一律单宠口径——切换宠物时只经它取
   /// 当前宠状态更新，不做他宠内容展示；传任意 id 亦可查他宠（含寄养/
-  /// 历险中），留作未来扩展。
+  ///  历险中），留作未来扩展。
   PetBriefModel? petInfoFor(String? petId) {
     if (petId == null) return null;
     for (final p in pets) {

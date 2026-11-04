@@ -13,17 +13,17 @@ import 'pet_service.dart';
 
 /// 宠物 P2 RPC 与直查（进化/特性洗练/等待孵化/解锁/繁育/成就/周任务/概率公示）
 ///
-/// 后端契约唯一源：`D:\workspace\sql\feature_pet_p2_rpcs_20260923.sql`（2026-09-23 已上线）。
-/// 与 [PetRpc] 分文件的原因：P1 侧已 406 行，合并会破 500 行硬底线；
+/// 后端契约唯一源：rpc_pet_p2 系列函数与对应直查表。
+/// 与 [PetRpc] 分文件维护；
 /// 调用口径完全一致——复用 [PetRpc.callRpc]，写成功后统一失效总览缓存。
 ///
-/// 三条易错契约（写死在此，改调用前先看）：
+/// 三条易错契约（写死在此，改调用前先看）
 /// 1. 所有 `p_item_id` 都是 **pet_items.id（道具定义 uuid）**，不是背包行 id；
-///    数量恒为 1，服务端自行定位本人背包行；
+/// 数量恒为 1，服务端自行定位本人背包行；
 /// 2. 错误一律 `RAISE EXCEPTION '<CODE>'`（PostgREST message 透传，经
-///    petRpcErrorText 转文案），**唯一软失败**是 breed_claim 的 `ok:false + status:'bag_full'`；
-/// 3. `evolve.items` 是 jsonb **对象**（item-uuid→数量），
-///    成就/周任务 claim 的 `items` 是 jsonb **数组**——两者形状不同，不共用解析。
+///  petRpcErrorText 转文案），**唯一软失败**是 breed_claim 的 `ok:false + status:'bag_full'`；
+/// 3. `evolve.items` 是 jsonb **对象**（item-uuid→数量）
+/// 成就/周任务 claim 的 `items` 是 jsonb **数组**——两者形状不同，不共用解析。
 class PetRpcP2 {
   PetRpcP2._();
 
@@ -219,7 +219,7 @@ class PetRpcP2 {
         traitName: raw['trait_name'] as String?,
         oldTraitCode: raw['old_trait_code'] as String?,
         changed: raw['changed'] as bool? ?? false,
-        // 未命中保留原特性（口径 A，服务端 2026-10-07）
+        // 未命中保留原特性（口径 A）
         missed: raw['missed'] as bool? ?? false,
       ),
       null,
@@ -293,8 +293,8 @@ class PetRpcP2 {
     );
   }
 
-  /// 领取繁育产蛋；背包满时返回 `bagFull=true` 的软失败结果（不是错误，
-  /// 亲代已释放且单据停在 ready——清包后重调即可，服务端幂等不回退）
+  /// 领取繁育产蛋；背包满时返回 `bagFull=true` 的软失败结果（不是错误
+  ///  亲代已释放且单据停在 ready——清包后重调即可，服务端幂等不回退）
   static Future<(PetBreedClaimResultModel?, String?)> breedClaim(String logId) async {
     final (data, err) = await PetRpc.callRpc('rpc_pet_breed_claim', {
       'p_log_id': logId,

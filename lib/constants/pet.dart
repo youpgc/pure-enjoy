@@ -1,33 +1,33 @@
 /// 宠物系统结构枚举单一真源
 ///
-/// 与 Supabase DDL 的 check 约束对齐（D:\workspace\sql\feature_pet_tables_20260916.sql）：
-/// - pet_items.category      → [PetBagCategory]
-/// - pet_eggs.mode           → [PetEggMode]
-/// - pet_eggs.status         → [PetEggStatus]
-/// - pet_pets.status         → [PetPetStatus]
-/// - pet_pets.gender         → [PetGender]
-/// - pet_adventures.status       → [PetAdventureStatus]
-/// - pet_evo_stages.pick_mode      → [PetPickMode]
+/// 与 Supabase DDL 的 check 约束对齐（D:\workspace\sql\）
+/// - pet_items.category → [PetBagCategory]
+/// - pet_eggs.mode → [PetEggMode]
+/// - pet_eggs.status → [PetEggStatus]
+/// - pet_pets.status → [PetPetStatus]
+/// - pet_pets.gender → [PetGender]
+/// - pet_adventures.status → [PetAdventureStatus]
+/// - pet_evo_stages.pick_mode → [PetPickMode]
 /// - pet_wallet_records.source_type → [PetWalletSourceType]（DDL 为 not valid CHECK）
-/// - pet_items.effect->>'type'     → [PetItemEffectType]
+/// - pet_items.effect->>'type' → [PetItemEffectType]
 /// - pet_user_features.feature_key → [PetFeatureKey]
-/// - pet_breed_logs.status         → [PetBreedLogStatus]
+/// - pet_breed_logs.status → [PetBreedLogStatus]
 /// - pet_quests.type / difficulty / condition->>'type'
-///                                 → [PetQuestDifficulty] / [PetQuestConditionType]
+/// → [PetQuestDifficulty] / [PetQuestConditionType]
 /// - pet_achievements.tier / condition_type → [PetAchTier] / [PetAchConditionType]
 ///
 /// 铁律：本文件只放**结构枚举**（值域契约），任何数值/阈值/价格/概率
 /// 均来自后台配置（pet_config / pet_items / pet_rarities 等），严禁在此硬编码。
 ///
 /// 说明：[PetEggMode]/[PetEggStatus]/[PetPickMode]
-/// 当前无页面消费者（对应繁育/蛋背包/扩容购买/社区救助/进化抉择均在 P1/P2 分期），
+/// 当前无页面消费者（对应繁育/蛋背包/扩容购买/社区救助/进化抉择均在 P1/P2 分期）
 /// 按三端 ENUM 对齐铁律作为值域契约保留登记，不视为死代码。
 /// 3D 素材验收常量（标准动画/骨骼/variants/阈值/资源包状态机）已随
-/// 3D 一期下线清理（2026-09-21）。2026-09-24 表现层定版改走 **2D 动画**，
+/// 3D 一期下线清理，表现层改走 **2D 动画**
 /// 动作契约（[PetAction] 等不入库的表现层命名）拆到同级 `pet_render.dart`。
 library;
 
-/// 背包三分区（2026-10-09 修订：装备分区需求移除）
+/// 背包三分区
 enum PetBagCategory {
   egg('egg', '蛋'),
   consumable('consumable', '消耗品'),
@@ -123,12 +123,12 @@ enum PetGender {
   }
 }
 
-/// 历险实例状态机（值域 = 线上 pet_adventures_status_check 定版：
-/// feature_pet_attributes_20260917.sql 在 recall 批基础上补入 failed）
+/// 历险实例状态机（值域 = 线上 pet_adventures_status_check，
+///  含 failed 取值）
 ///
 /// 流转：ongoing →（归来 claim 达标）claimed /（不达标结算）failed；
-///   ongoing →（归来遇险）awaiting_rescue →（自救或 NPC 兜底）claimed；
-///   ongoing →（主动召回，无奖励）recalled；done 为 DDL 预留终态（当前 RPC 不写入）。
+/// ongoing →（归来遇险）awaiting_rescue →（自救或 NPC 兜底）claimed；
+/// ongoing →（主动召回，无奖励）recalled；done 为 DDL 预留终态（当前 RPC 不写入）。
 enum PetAdventureStatus {
   ongoing('ongoing', '进行中'),
   awaitingRescue('awaiting_rescue', '待救助'),
@@ -168,8 +168,8 @@ enum PetPickMode {
   }
 }
 
-/// 成长四维属性（键域契约：rpc_pet_allocate_attr 白名单 / 洗练重掷四维，
-/// 见 feature_pet_attributes_20260917.sql；孵化基础属性不可洗练）
+/// 成长四维属性（键域契约：rpc_pet_allocate_attr 白名单 / 洗练重掷四维
+///  孵化基础属性不可洗练）
 enum PetAttrKey {
   intellect('intellect', '智力'),
   stamina('stamina', '体力'),
@@ -191,15 +191,15 @@ enum PetAttrKey {
 }
 
 // ============================================================
-// P2 键域（2026-09-23 与 Admin src/constants/pet.ts、DDL 注释三端对齐）
+// P2 键域
 // pet_* 配置表除 pet_items_ladder_shape_chk 外无 CHECK 约束，以下值域
 // 纯靠三端枚举纪律兜底（铁律 12）：新增取值必须 DDL 注释 / App / Admin 同批提交。
 // ============================================================
 
 /// 金币钱包流水来源（pet_wallet_records.source_type）
 ///
-/// CHECK 以 not valid 方式挂在 fix_pet_review_p1_20260921.sql §6（六类），
-/// `pet_feature_spend` 由 feature_pet_p2_rpcs_20260923.sql 新增（金币档孵化加速花费）；
+/// CHECK 约束（六类）；
+/// `pet_feature_spend`（金币档孵化加速花费）；
 /// `pet_checkin` / `pet_checkin_milestone` 由签到体系新增（value 域探测式扩展）。
 enum PetWalletSourceType {
   shopBuy('pet_shop_buy', '商城消费'),
@@ -228,11 +228,11 @@ enum PetWalletSourceType {
 /// 道具效果类型（pet_items.effect->>'type'，服务端按此分流）
 ///
 /// 消费点：rpc_pet_use_item 认 feed/clean/toy/heal/refine_point；
-/// rescue 只允许用于历险自救（fix_pet_review_p1_20260921.sql §P1-1，
-/// 判据为 sub_type='rescue' **或** effect.type='rescue' 二者之一）；
+/// rescue 只允许用于历险自救（ §P1-1
+///  判据为 sub_type='rescue' **或** effect.type='rescue' 二者之一）；
 /// P2 三类各由专属 RPC 卡键（hatch_accel→rpc_pet_hatch_accelerate、
-/// trait_wash→rpc_pet_wash_trait 且 category 必须 consumable、unlock→rpc_pet_unlock_feature）。
-/// refine_reassign 是 2026-09-20 旧属性洗练语义（tool_refine 已改 refine_point），
+///  trait_wash→rpc_pet_wash_trait 且 category 必须 consumable、unlock→rpc_pet_unlock_feature）。
+/// refine_reassign 是旧属性洗练语义（tool_refine 已改 refine_point）
 /// 仅作历史数据兜底展示登记，新配置不得再写。
 enum PetItemEffectType {
   feed('feed', '喂养'),
@@ -340,7 +340,7 @@ enum PetEvoCondType {
 }
 
 /// 长途独占掉落（long_only）道具中文名——结算弹窗与历险公示页共用
-/// （20261021 审查收敛双份硬编码；名称随 pet_items.name）
+///
 const kLongDropNames = <String, String>{
   'relic_compass': '星辰罗盘',
   'evo_stone_n': '进化石·凡品',
@@ -383,8 +383,8 @@ enum PetQuestDifficulty {
   }
 }
 
-/// 成就档位（pet_achievements.tier；体系树四阶 bronze/silver/gold/legend，
-/// legendary 是旧「传说蛋」相关档，memorial/epic 为纪念性一次性档）
+/// 成就档位（pet_achievements.tier；体系树四阶 bronze/silver/gold/legend
+///  legendary 是旧「传说蛋」相关档，memorial/epic 为纪念性一次性档）
 enum PetAchTier {
   normal('normal', '经典'),
   bronze('bronze', '铜阶'),

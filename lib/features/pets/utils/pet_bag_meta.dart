@@ -9,7 +9,7 @@ import '../models/pet_rpc_models.dart';
 
 /// 可在背包直接「使用」到在养宠物身上的效果类型
 ///
-/// P2 三类各有专属 RPC，**不走** rpc_pet_use_item：
+/// P2 三类各有专属 RPC，**不走** rpc_pet_use_item
 /// hatch_accel → rpc_pet_hatch_accelerate（蛋详情页）、
 /// trait_wash → rpc_pet_wash_trait（成长页）、
 /// unlock → rpc_pet_unlock_feature（背包内即点即开通）。
@@ -81,7 +81,7 @@ String petBagEffectDesc(PetBagItemModel item) {
     case PetItemEffectType.rescue:
       parts.add('游历遇险时立即救回宠物');
     case PetItemEffectType.refineReassign:
-      // 旧洗练剂直洗语义（2026-09-20 下线；历史数据兜底展示）
+      // 旧洗练剂直洗语义
       parts.add('重新分配宠物升级获得的属性加点（孵化基础属性不受影响）');
     case PetItemEffectType.refinePoint:
       parts.add('使用后获得 1 洗练点（洗练在属性面板进行，每次洗练消耗 1 点）');

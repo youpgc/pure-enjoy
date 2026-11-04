@@ -6,7 +6,7 @@ import 'pet_service.dart';
 ///
 /// 与 [PetRpc] 分文件的原因：主类超 500 行硬底线，按域拆分；
 /// 调用口径完全一致——复用 [PetRpc.callRpc]（错误原文 + raw jsonb）。
-/// 自 pet_rpc.dart 拆出（20261103），调用方由 PetRpc.xxx 改为 PetRpcScene.xxx。
+/// 自 pet_rpc.dart 拆出，调用方由 PetRpc.xxx 改为 PetRpcScene.xxx。
 class PetRpcScene {
   PetRpcScene._();
 

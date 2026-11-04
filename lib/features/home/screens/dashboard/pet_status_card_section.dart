@@ -12,7 +12,7 @@ import '../../../pets/widgets/pet_item_icon.dart';
 
 /// 首页「宠物状态卡」常驻区块（宠物系统主入口）
 ///
-/// 门控策略（pet_enabled 关闭时入口隐藏）：
+/// 门控策略（pet_enabled 关闭时入口隐藏）
 /// - 未登录 / 总开关关闭 / 总览拉取失败 → 不渲染任何内容（零占位）；
 /// - 有宠物 → 头像 + 名字/等级 + 饱食/心情 + 金币余额，点击进入宠物主页；
 /// - 无宠物 → 领养引导（初始蛋按 pet_config 配置在首次进入时幂等发放）。
@@ -34,7 +34,7 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   void initState() {
     super.initState();
     _load();
-    // 首页下拉刷新等外部 force 拉取成功后自动重载（20261021 用户需求）
+    // 首页下拉刷新等外部 force 拉取成功后自动重载
     PetService.summaryForceRefreshed.addListener(_onForcedRefresh);
     // 展示层实时衰减：每分钟按速率插值重绘（寄养冻结不衰减；服务端结算为准）
     _tick = Timer.periodic(const Duration(seconds: 60), (_) {
@@ -43,8 +43,8 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   }
 
   void _onForcedRefresh() {
-    // 非 force 读：触发方（下拉刷新等）刚以 force 拉取并写回缓存，
-    // 这里再 force 会自增通知形成无限强刷循环（20261021 审查 P0）
+    // 非 force 读：触发方（下拉刷新等）刚以 force 拉取并写回缓存
+    // 这里再 force 会自增通知形成无限强刷循环
     if (mounted) _load();
   }
 
@@ -58,7 +58,7 @@ class _PetStatusCardSectionState extends State<PetStatusCardSection> {
   /// 拉取总览并刷新状态卡（force=跳过缓存）
   ///
   /// 先过 `pet_enabled` 门控再调 RPC：`rpc_pet_summary` 有副作用（首次进入幂等
-  /// 发放初始包），后台关闭宠物系统时不应白跑一次写库。门控走 pet_config 轻量
+  ///  发放初始包），后台关闭宠物系统时不应白跑一次写库。门控走 pet_config 轻量
   /// GET（1 分钟新鲜度缓存），成本低于一次 RPC。
   Future<void> _load({bool force = false}) async {
     if (!await PetService.instance.isPetEnabled()) {

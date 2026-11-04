@@ -13,9 +13,9 @@ import 'pet_service.dart';
 
 /// 宠物业务 RPC / 列表查询（B4 交互闭环）
 ///
-/// 约定：
+/// 约定
 /// - 写操作统一走服务端 RPC（行锁 + 流水同事务），成功后 [PetService.invalidateSummary]
-///   失效总览缓存；失败返回错误原文（UI 层经 petRpcErrorText 转中文）；
+/// 失效总览缓存；失败返回错误原文（UI 层经 petRpcErrorText 转中文）；
 /// - 列表查询为表直查（RLS 限本人 + 显式 user_id 过滤双保险）；
 /// - 返回值统一 `(T?, String?)`：成功数据 + 错误原文。
 class PetRpc {
@@ -62,7 +62,7 @@ class PetRpc {
 
   /// 未孵出的蛋列表（unopened / waiting / ready；hatched 已出宠不取）
   ///
-  /// P2 起含等待孵化通道：wait 模式蛋须先 rpc_pet_hatch_wait 计时，
+  /// P2 起含等待孵化通道：wait 模式蛋须先 rpc_pet_hatch_wait 计时
   /// 到点置 ready 后再走 rpc_pet_hatch_instant 领取。
   static Future<(List<PetEggModel>, String?)> fetchEggs() async {
     final uid = _uid;
@@ -100,7 +100,7 @@ class PetRpc {
           'user_id': 'eq.$uid',
           'assign_date': 'eq.$todayBeijing',
           // ★ 只认 daily 任务：周任务复用本表（assign_date=周一），不过滤 type
-          //   时周一「每日」页签会串显周任务（与服务端抽取判定同步修复，P1-1）
+          // 时周一「每日」页签会串显周任务（与服务端抽取判定同步修复，P1-1）
           'quest.type': 'eq.daily',
         },
         limit: 50,
@@ -128,7 +128,7 @@ class PetRpc {
           'rpc_pet_lottery_draw 幸运抽奖');
 
   /// 收藏兑换（服务端 rpc_pet_collection_exchange：配方校验+满包预检+扣料入包；
-  /// 配方来自 reserved.collection_exchange，返回 bag_full 状态走腾位流程）
+  ///  配方来自 reserved.collection_exchange，返回 bag_full 状态走腾位流程）
   static Future<(Map<String, dynamic>?, String?)> collectionExchange(
           String fromCode, String toCode) async =>
       callRpc('rpc_pet_collection_exchange',
@@ -180,7 +180,7 @@ class PetRpc {
     }
   }
 
-  /// 宠物字典（pet_dict_items：家系/商城子类型/时间线事件，20261030 沉淀）——
+  /// 宠物字典（pet_dict_items：家系/商城子类型/时间线事件）——
   /// 一次拉全填充 [PetDict] 缓存；失败静默（消费点走端内兜底，同场景名模式）。
   /// rpc 返回单 jsonb 对象（非数组），承载于 resp.raw（resp.data 为空列表）
   static Future<void> fetchDicts() async {
@@ -198,13 +198,13 @@ class PetRpc {
 
   /// 通用 RPC 调用：成功返回 raw（单对象 jsonb），失败返回错误原文
   ///
-  /// 错误日志埋点（2026-11-03）：失败分两类——
-  ///   ① 业务拒绝（服务端 raise 的 PET_* 错误码，App 侧转用户文案）→ 不上报，
-  ///      属正常交互语义，入错误日志只会刷屏；
-  ///   ② 其余（网络失败/解析异常/服务端真异常如约束违约）→ 入错误日志
-  ///      （error_logs.module='pets'），后台「系统设置→错误日志」可查。
-  ///      5xx 与 4xx 非 PET_* 记 error（后者多为服务端真 bug，如 23502），
-  ///      网络层失败记 warning（离线常态，不制造告警噪音）。
+  /// 错误日志埋点：失败分两类——
+  /// ① 业务拒绝（服务端 raise 的 PET_* 错误码，App 侧转用户文案）→ 不上报
+  /// 属正常交互语义，入错误日志只会刷屏；
+  /// ② 其余（网络失败/解析异常/服务端真异常如约束违约）→ 入错误日志
+  /// （error_logs.module='pets'），后台「系统设置→错误日志」可查。
+  /// 5xx 与 4xx 非 PET_* 记 error（后者多为服务端真 bug，如 23502）
+  /// 网络层失败记 warning（离线常态，不制造告警噪音）。
   static Future<(Map<String, dynamic>?, String?)> _call(
     String fn,
     Map<String, dynamic> params,
@@ -264,9 +264,9 @@ class PetRpc {
       'p_item_id': itemId,
     }, 'rpc_pet_feed 喂养');
     if (err == null) {
-      // 成功即记录本地冷却锚点(吸收服务端/客户端时钟差,20261021)。
-      // 仅免费档记:道具档(口粮)服务端不写 last_feed_at、不占免费冷却,
-      // 记了锚点会把免费档锁进整段假冷却(20261021 审查 P1)
+      // 成功即记录本地冷却锚点(吸收服务端/客户端时钟差）。
+      // 仅免费档记:道具档(口粮)服务端不写 last_feed_at、不占免费冷却
+      // 记了锚点会把免费档锁进整段假冷却
       if (itemId == null) PetActionBudget.noteActionAnchor(petId, 'feed');
       await PetService.instance.invalidateSummary();
     }
@@ -325,7 +325,7 @@ class PetRpc {
 
   /// 寄养搬运（[action]：`to_foster` 养育→寄养 / `from_foster` 寄养→养育）
   ///
-  /// 服务端 `rpc_pet_foster_move`（feature_pet_foster_20260921.sql，零 DDL）：
+  /// 服务端 `rpc_pet_foster_move`（零 DDL）
   /// 占用量按 status 计数、容量 coalesce 后台初始值，满格抛 PET_FOSTER_FULL /
   /// PET_REARING_FULL；双向重置 last_decay_at（寄养期间不吃离线衰减）。
   static Future<String?> fosterMove(String petId, String action) async {
@@ -338,7 +338,7 @@ class PetRpc {
   }
 
   /// 属性加点（升级获得的 pending_attr_points 分配到指定维度；
-  /// 一次可分多点，服务端校验余额与维度白名单）
+  ///  一次可分多点，服务端校验余额与维度白名单）
   static Future<String?> allocateAttr(
     String petId, {
     required String attrKey,
@@ -354,9 +354,9 @@ class PetRpc {
   }
 
   /// 洗练重掷（消耗 1 洗练点，随机重掷加点属性，总值守恒；
-  /// 孵化基础属性不受影响。返回 {before, after, refine_points, attributes} 供演出对比）
-  /// 2026-09-20 语义变更：不再消耗 tool_refine 道具（其已转 +1 洗练点补给品，
-  /// 走 use_item 通道）；[itemId] 参数保留兼容但服务端忽略
+  ///  孵化基础属性不受影响。返回 {before, after, refine_points, attributes} 供演出对比）
+  /// 语义口径：不消耗 tool_refine 道具（其已转 +1 洗练点补给品
+  ///  走 use_item 通道）；[itemId] 参数保留兼容但服务端忽略
   static Future<(Map<String, dynamic>?, String?)> refineReassign(
     String petId, {
     String? itemId,
@@ -409,7 +409,7 @@ class PetRpc {
   }
 
     /// 昵称修改（更名卡口径：每宠首次免费，此后消耗更名卡×1；敏感词在
-  /// 调用方预检，服务端做长度/同名校验）。成功后失效 summary（昵称变化）。
+  ///  调用方预检，服务端做长度/同名校验）。成功后失效 summary（昵称变化）。
   static Future<String?> rename(String petId, String nickname) async {
     final (_, err) = await _call('rpc_pet_rename', {
       'p_pet_id': petId,

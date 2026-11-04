@@ -12,10 +12,10 @@ import '../widgets/pet_loading.dart';
 /// 任务页（每日 + 每周两个页签）
 ///
 /// 日任务：进入即调 `rpc_pet_daily_quests_draw`（幂等：当日已抽直接返回）；
-/// 周任务（P2）：**首次切到该页签才调** `rpc_pet_weekly_quests_draw`，
-/// 与日任务同一惰性语义——进度从「本周首次抽取」起算，本周之前的行为不追溯计入，
+/// 周任务（P2）：**首次切到该页签才调** `rpc_pet_weekly_quests_draw`
+/// 与日任务同一惰性语义——进度从「本周首次抽取」起算，本周之前的行为不追溯计入
 /// 所以不切页签就不会提前锁定本周的起算点。
-/// 两者的 target/progress/claimed 全部由服务端下发（铁律 1），
+/// 两者的 target/progress/claimed 全部由服务端下发（铁律 1）
 /// 周任务复用 `pet_daily_quests`（assign_date 存本北京周一），客户端无需感知。
 class PetQuestsScreen extends StatefulWidget {
   const PetQuestsScreen({super.key});
@@ -45,7 +45,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
   /// 正在领取的任务 id（日/周共用一个集合，id 均为 pet_quests 行 uuid）
   final Set<String> _claiming = {};
 
-  /// 道具名映射（item_code → 中文名）：每日任务直查无 name 联查，
+  /// 道具名映射（item_code → 中文名）：每日任务直查无 name 联查
   /// 奖励文案由此回填（周任务服务端已具名，回填只补 null）
   Map<String, String> _itemNames = const {};
 
@@ -245,10 +245,10 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
 
   // ---------- 公共小块 ----------
 
-  /// 任务卡（2026-09-24 版式定版）：
+  /// 任务卡
   /// 第一行 = 任务介绍（左）+ 奖励（右，奖励相关动作也在这行的右侧）；
   /// 第二行 = 进度条 + 完成度，独占一行。
-  /// 旧版把奖励文案塞进 ListTile 的 trailing 竖列，与 subtitle 的进度条上下错位，
+  /// 旧版把奖励文案塞进 ListTile 的 trailing 竖列，与 subtitle 的进度条上下错位
   /// 一眼对不上"这条奖励属于哪个进度"。
   Widget _questCard(
     ColorScheme cs, {
@@ -293,7 +293,7 @@ class _PetQuestsScreenState extends State<PetQuestsScreen>
                 ],
               ],
             ),
-            // 奖励独立行:道具名完整显示(挤在标题行会被截断,20261022 用户反馈)
+            // 奖励独立行:道具名完整显示(挤在标题行会被截断)
             if (rewardText.isNotEmpty) ...[
               const SizedBox(height: 6),
               Text(rewardText,

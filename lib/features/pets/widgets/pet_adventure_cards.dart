@@ -3,13 +3,13 @@ import 'package:flutter/material.dart';
 import '../../../constants/pet.dart';
 import '../models/pet_rpc_models.dart';
 
-/// 历险页卡片组件（2026-09-17 属性系统 Phase 2 拆分）
+/// 历险页卡片组件
 ///
 /// 承载属性要求行与「为你匹配」推荐卡，保证历险页行数在 500 以内。
-/// 语义对齐服务端（feature_pet_attributes_20260917.sql）：
+/// 语义对齐服务端
 /// - 等级 = 硬门槛（不达标 UI 灰置，start 校验 PET_LEVEL_TOO_LOW）；
 /// - 属性 = 结算判据（不达标仍可出发，claim 时判 failed + 惩罚）→
-///   未达标项红显「有风险」而非禁止。
+/// 未达标项红显「有风险」而非禁止。
 
 /// 属性要求摘要行（智力 20 · 力量 15）：未达标项红显加粗（风险提示）
 class PetAttrReqText extends StatelessWidget {
@@ -50,7 +50,7 @@ class PetAttrReqText extends StatelessWidget {
 }
 
 /// 「为你匹配」推荐卡（rpc_pet_adventure_match 随机标推荐的历险地；
-/// 可一键展开档位选择，也可忽略自行挑）
+///  可一键展开档位选择，也可忽略自行挑）
 class PetMatchBanner extends StatelessWidget {
   const PetMatchBanner({super.key, required this.spotName, this.onTap});
 
@@ -79,7 +79,7 @@ class PetMatchBanner extends StatelessWidget {
 }
 
 /// 历险地卡片：等级硬门槛灰置（服务端 start 同校验）；属性要求 = 遇险开关
-/// （20261027 定版：全达标必不遇险，不达标仍可出发但保留遇险判定），
+///
 /// 未达标项红显提示风险
 Widget petSpotCard(
   BuildContext context, {
@@ -96,7 +96,7 @@ Widget petSpotCard(
   final hasReq = spot.attrRequirements.isNotEmpty;
   return Card(
     key: key,
-    // 推荐地图高亮边框(20261022 用户拍板):与普通卡视觉区分
+    // 推荐地图高亮边框:与普通卡视觉区分
     color: highlight ? cs.primaryContainer.withValues(alpha: 0.35) : null,
     shape: highlight
         ? RoundedRectangleBorder(

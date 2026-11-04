@@ -61,8 +61,8 @@ class PetFxController extends ChangeNotifier {
     _size = size;
   }
 
-  /// 宠物箱内某处迸发特效；[align] 为相对宠物箱的锚点（默认头颈偏上，
-  /// 20261027 属性威胁批同日：粒子层入宠物框，坐标随宠物定位走不漂移）
+  /// 宠物箱内某处迸发特效；[align] 为相对宠物箱的锚点（默认头颈偏上
+  ///  粒子层入宠物框，坐标随宠物定位走不漂移）
   void emit(PetFxKind kind, Color color,
       {Alignment align = const Alignment(0, -0.5)}) {
     if (_size.isEmpty) return;

@@ -11,7 +11,7 @@ import 'pet_service.dart';
 ///
 /// 与 [PetRpc] 分文件的原因：主类超 500 行硬底线，按域拆分；
 /// 调用口径完全一致——复用 [PetRpc.callRpc]（错误原文 + raw jsonb）。
-/// 自 pet_rpc.dart 拆出（20261103），调用方由 PetRpc.xxx 改为 PetRpcShop.xxx。
+/// 自 pet_rpc.dart 拆出，调用方由 PetRpc.xxx 改为 PetRpcShop.xxx。
 class PetRpcShop {
   PetRpcShop._();
 
@@ -83,9 +83,9 @@ class PetRpcShop {
   static Future<(PetShopBuyResultModel?, String?)> shopBuy(
     String itemId, {
     int qty = 1,
-    // p_currency 服务端支持 'points' 通道，但积分购买入口未实装：
-    // 线上全部在架道具 price_points=null / points_purchasable=false，
-    // points 分支实际不可达（2026-10-12 线上核实），维持恒 'coin'。
+    // p_currency 服务端支持 'points' 通道，但积分购买入口未实装
+    // 线上全部在架道具 price_points=null / points_purchasable=false
+    // points 分支实际不可达，维持恒 'coin'。
     String currency = 'coin',
   }) async {
     final (data, err) = await _call('rpc_pet_shop_buy', {
@@ -114,7 +114,7 @@ class PetRpcShop {
   /// 背包换位/移入空格（服务端 rpc_pet_swap_slot 坐标交换，零 DDL）
   ///
   /// [from]/[to] 均为 slot_index（0 起）；目标为空时退化为移动。
-  /// 服务端不合并同道具堆叠（合并由 rpc_pet_compact_bag 负责），
+  /// 服务端不合并同道具堆叠（合并由 rpc_pet_compact_bag 负责）
   /// 越界抛 PET_INVALID_SLOT，并发改动抛 PET_BAG_FULL_RACE。
   /// 换位不改变 bagUsed 与容量，故不失效总览缓存。
   static Future<String?> swapSlot(int from, int to) async {

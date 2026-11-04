@@ -6,10 +6,10 @@ import '../services/pet_rpc_p2.dart';
 import '../utils/pet_errors.dart';
 import 'pet_toast.dart';
 
-/// 初始蛋种属选择卡（initial_ssr 自选种属，20261022 用户拍板）
+/// 初始蛋种属选择卡（initial_ssr 自选种属）
 ///
-/// 可选种属 = 池配置 initial_choices 的键集（后台配置哪些 SSR 可选，
-/// 系别由其推导——后台只配了月萤则只有猫系可选）；同系多候选时由
+/// 可选种属 = 池配置 initial_choices 的键集（后台配置哪些 SSR 可选
+///  系别由其推导——后台只配了月萤则只有猫系可选）；同系多候选时由
 /// 服务端随机取一只，客户端只负责选系。
 ///
 /// 返回选中的系别 code（cat/dog/rabbit/mouse）；点遮罩/取消返回 null。
@@ -120,11 +120,11 @@ Future<String?> showPetInitialFamilyPicker(
 
 /// 初始蛋孵化公共链路（三入口共用：背包/主页首蛋/孵蛋页）
 ///
-/// 拉池公示配置 → 弹种属选择卡 → 带参孵化。返回孵化结果：
+/// 拉池公示配置 → 弹种属选择卡 → 带参孵化。返回孵化结果
 /// - 成功：result（调用方弹诞生弹窗与各自后置刷新）；
 /// - 用户取消或孵化失败：null（失败已 toast）；
-/// - 未开启自选（池无 initial_choices 配置）：按原路固定产出直接孵化，
-///   成功返回结果、失败返回 null（已 toast）。
+/// - 未开启自选（池无 initial_choices 配置）：按原路固定产出直接孵化
+/// 成功返回结果、失败返回 null（已 toast）。
 ///
 /// 仅在 egg 的 poolCode == 'initial_ssr' 时调用；其他蛋由调用方直孵。
 Future<PetHatchResultModel?> hatchInitialEggWithChoice(

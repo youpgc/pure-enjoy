@@ -1,9 +1,9 @@
 /// 随机事件（需求 §3.6）——roll 载荷与选择结算结果
 ///
-/// 服务端契约见 `feature_pet_random_events_20261008.sql`：
+/// 服务端契约见 rpc_pet_random_events 系列函数
 /// - roll 返回 `{fired:false}` 或 `{fired:true, id, code, context, title, text, options:[...]}`；
-///   options 各项 `{label, rewards:{gold,points,exp,mood,intimacy,hunger,item_code,item_count}}`，
-///   奖惩在 roll 时原样下发（§17#1 公示原则：所见即所得）；
+/// options 各项 `{label, rewards:{gold,points,exp,mood,intimacy,hunger,item_code,item_count}}`
+/// 奖惩在 roll 时原样下发（§17#1 公示原则：所见即所得）；
 /// - choose 返回结算明细（gold/points/exp/mood/intimacy/hunger/item_* + bag_full）。
 class PetEventModel {
   const PetEventModel({
@@ -103,7 +103,7 @@ class PetEventChooseResultModel {
   final int itemCount;
 
   /// 道具真名（服务端按 item_code 联查 pet_items.name 下发；
-  /// 旧版服务端缺键时回退 code，不再展示「道具 ×1」这类无名文案）
+  ///  旧版服务端缺键时回退 code，不再展示「道具 ×1」这类无名文案）
   final String? itemName;
 
   /// 道具奖励因背包满未发放（与每日任务发奖同口径：不中断、如实提示）
@@ -133,8 +133,7 @@ class PetEventChooseResultModel {
   /// 到账明细文案（跳过 0 值项；顺序稳定便于测试）
   ///
   /// 事件 rewards 允许负值（需求 §3.6：hunger 可为负=代价型，负向奖惩在
-  /// 结算时已生效）——此前只渲染 >0 项，惩罚被静默吞掉，用户无感知丢资产
-  /// （审计批 20261012 修复：统一判 !=0 并按符号渲染）。
+  ///  结算时已生效）；负值项按符号照常渲染，不静默吞掉
   List<String> get grantedLines {
     final lines = <String>[];
     void add(String label, int v) {

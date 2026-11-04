@@ -6,16 +6,16 @@ import '../../../core/theme/app_theme.dart';
 
 /// 宠物模块专用轻提示（Toast）——替代全局 [showSnackBar]。
 ///
-/// 与 SnackBar 的差异：
+/// 与 SnackBar 的差异
 /// - **层级置顶**：挂 rootNavigator 的 Overlay 最顶层，插入时位于当时
-///   所有内容之上——弹窗打开期间触发的提示会浮在弹窗上方（SnackBar 挂
-///   在 Scaffold 内会被弹窗压住，20261012 用户反馈）；后开的弹窗仍会盖
-///   住先显示的提示（toast 3s 自灭，不抢后续弹窗）；
+/// 所有内容之上——弹窗打开期间触发的提示会浮在弹窗上方（SnackBar 挂
+///  在 Scaffold 内会被弹窗压住）；后开的弹窗仍会盖
+/// 住先显示的提示（toast 3s 自灭，不抢后续弹窗）；
 /// - **宠物元素**：左侧爪印圆徽 + 宠物色系三态（默认主题蓝 / 成功绿 /
-///   失败红）；
+///  失败红）；
 /// - **替换式单条**：连续触发时立即替换上一条，不排队不叠加；
-/// - 顶部安全区下方滑入，3s 自动淡出，点击整条可提前关闭，
-///   上划或右滑甩出（达距离/速度阈值）也可移除；
+/// - 顶部安全区下方滑入，3s 自动淡出，点击整条可提前关闭
+/// 上划或右滑甩出（达距离/速度阈值）也可移除；
 ///
 /// 用法与 showSnackBar 同构：`showPetToast(context, '文案', isError: true)`。
 /// 宠物模块内一律用它替代 showSnackBar（调用点机械替换，文案不变）。
@@ -92,8 +92,8 @@ class _PetToastViewState extends State<_PetToastView>
 
   bool _closing = false;
 
-  /// 拖拽偏移（20261021 用户拍板：支持上划/右滑甩出移除；只允许向右或向上，
-  /// 未达距离/速度阈值松手则弹回原位）
+  /// 拖拽偏移（支持上划/右滑甩出移除；只允许向右或向上
+  ///  未达距离/速度阈值松手则弹回原位）
   Offset _drag = Offset.zero;
 
   void _onPanUpdate(DragUpdateDetails d) {
@@ -122,8 +122,8 @@ class _PetToastViewState extends State<_PetToastView>
   void initState() {
     super.initState();
     _ctrl.addStatusListener((status) {
-      // identity 比对:替换式重入后本 state 已不属于当前 toast,
-      // 不得摘除新 entry(20261021 审查 P3 竞态)
+      // identity 比对:替换式重入后本 state 已不属于当前 toast
+      // 不得摘除新 entry
       if (status == AnimationStatus.dismissed &&
           _closing &&
           identical(_toastKey?.currentState, this)) {
@@ -152,7 +152,7 @@ class _PetToastViewState extends State<_PetToastView>
     final accent = widget.isError
         ? cs.error
         : (widget.isSuccess ? AppTheme.success : cs.primary);
-    // 20261021 用户拍板：下移（原 +12 → +22 → +34 → +46 → 再 +4 = +50）
+    //：下移（原 +12 → +22 → +34 → +46 → 再 +4 = +50）
     final top = MediaQuery.paddingOf(context).top + 50;
     return Positioned(
       top: top,
@@ -164,7 +164,7 @@ class _PetToastViewState extends State<_PetToastView>
           opacity: _fade,
           child: Material(
             color: Colors.transparent,
-            // 对齐原 SnackBar 的 liveRegion：读屏主动播报（复审批 P3）
+            // 对齐原 SnackBar 的 liveRegion：读屏主动播报
             child: Semantics(
               liveRegion: true,
               button: true,

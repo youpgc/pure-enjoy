@@ -1,11 +1,11 @@
-/// 宠物字典缓存（20261030 开放值域文案沉淀 pet_dict_items 表）。
+/// 宠物字典缓存。
 ///
 /// 进宠物模块时经 [PetRpc.fetchDicts] 一次拉取（rpc_pet_dicts 下发
-/// family / item_sub_type / timeline_event 三组），此后取值走
+///  family / item_sub_type / timeline_event 三组），此后取值走
 /// 「服务端 label 优先 → 端内常量兜底 → 原码」三级，与场景主题名同模式。
 /// 运营改字典表即生效，端内常量仅作拉取失败/未回落的兜底。
-/// 消费面（20261030 定版）：family 已接入；item_sub_type 预留（App 归组
-/// 走端内）；timeline_event 不接——App 时间线为纪念卡叙事口径（初见/
+/// 消费面：family 已接入；item_sub_type 预留（App 归组
+///  走端内）；timeline_event 不接——App 时间线为纪念卡叙事口径（初见/
 /// 新生命/游历纪念…），与 Admin 运营口径刻意不同，保持端内文案。
 class PetDict {
   PetDict._();
@@ -33,7 +33,7 @@ class PetDict {
     return fallback[code] ?? code;
   }
 
-  /// 家系名（cat/dog/rabbit/mouse → 猫系…；20261030 收敛原三处副本）
+  /// 家系名（cat/dog/rabbit/mouse → 猫系…；）
   static String family(String code) =>
       _lookup('family', code, kFamilyLabels);
 

@@ -1,6 +1,6 @@
 /// 2D 素材解析器：宠物表现的唯一取图出口。
 ///
-/// 所有立绘消费点（主页舞台、诞生弹窗、进化弹窗、孵蛋页、图鉴）一律走这里，
+/// 所有立绘消费点（主页舞台、诞生弹窗、进化弹窗、孵蛋页、图鉴）一律走这里
 /// 不再各自拼路径——目录结构调整时只改本文件。
 ///
 /// ## 现行契约：分层弯曲唯一
@@ -23,7 +23,7 @@ export '../../../constants/pet_bend.dart' show PetBendGeo;
 /// 分层弯曲的形态几何；查不到 = 该形态没有弯曲素材，调用方走占位。
 ///
 /// 弯曲用的 6 档表情帧是**结构性**素材（编排 `expr` 通道按下标点名，缺任一档
-/// 就会在切档瞬间闪透明），目录与几何由 `lib/constants/pet_bend.dart` 统一登记。
+///  就会在切档瞬间闪透明），目录与几何由 `lib/constants/pet_bend.dart` 统一登记。
 PetBendGeo? petBendGeo(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage];
 
@@ -31,7 +31,7 @@ PetBendGeo? petBendGeo(String speciesCode, int stage) =>
 String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
-/// 种属骨架占位图（assets/pets/placeholders/<系>_s<阶>.png，20261028）：
+/// 种属骨架占位图（assets/pets/placeholders/<系>_s<阶>.png）
 /// 系 = species_code 首段（cat/dog/rabbit/mouse）；阶 0~2 钳位；
 /// 资源缺失由调用方 errorBuilder 回退图标。
 String petPlaceholderArt(String speciesCode, int stage) {
@@ -43,7 +43,7 @@ String petPlaceholderArt(String speciesCode, int stage) {
 }
 
 /// 单帧立绘（弹窗/列表缩略）：弯曲树中性帧 `c1_neutral`，与舞台形象同源同款；
-/// 未登记形态返回系骨架占位图（20261028，四系三阶轮廓）。
+/// 未登记形态返回系骨架占位图。
 String? petBaseArt(String speciesCode, int stage) {
   final dir = petBendGeo(speciesCode, stage)?.dir;
   if (dir != null) return '$dir/c1_neutral.png';

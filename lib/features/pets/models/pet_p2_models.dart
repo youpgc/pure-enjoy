@@ -3,7 +3,7 @@ import '../utils/pet_dict.dart';
 
 /// 宠物 P2 模型（养成线：进化 / 特性 / 孵化等待 / 功能解锁 / 概率公示）
 ///
-/// 字段与 `feature_pet_p2_rpcs_20260923.sql` 的 RPC 返回键、以及 PetRpcP2 各
+/// 字段与 PetRpcP2 各函数的 RPC 返回键、以及 PetRpcP2 各
 /// 直查 select 一一对应，禁止臆测；nullable 一律是服务端真实可空分支
 /// （如 trait_id=null 表示这次没掷出特性，属正常结果不是错误）。
 /// 繁育见 `pet_p2_breed_models.dart`，成就与周任务见 `pet_p2_progress_models.dart`
@@ -11,7 +11,7 @@ import '../utils/pet_dict.dart';
 
 /// P2 门槛参数（`pet_config.reserved` 的 hatch / trait / breeding / weekly 四块）
 ///
-/// `rpc_pet_summary` 的 config 快照不含 reserved（热函数未随 P2 改动），
+/// `rpc_pet_summary` 的 config 快照不含 reserved（热函数未随 P2 改动）
 /// UI 要展示门槛时走 [PetRpcP2.fetchReserved] 轻量直查一次。
 /// **未配置一律 null**：客户端不写默认值（铁律 2），UI 隐藏该行而不是猜。
 class PetReservedModel {
@@ -48,12 +48,12 @@ class PetReservedModel {
   }
 }
 
-/// 奖励道具行 PetRewardItemModel 已下沉至 pet_rpc_models（底层模型层,
-/// 每日/每周/成就三线共用;本文件经 import 继续可用）。
+/// 奖励道具行 PetRewardItemModel 已下沉至 pet_rpc_models（底层模型层
+///  每日/每周/成就三线共用;本文件经 import 继续可用）。
 
 /// 宠物个体明细（pet_pets 直查，补 rpc_pet_summary 未下发的 species_id / 特性）
 ///
-/// 进化要 species_id（判链）、洗练与特性展示要 trait_*，两者都不在总览里，
+/// 进化要 species_id（判链）、洗练与特性展示要 trait_*，两者都不在总览里
 /// 故单独直查（RLS：users read own pets）。
 class PetPetDetailModel {
   const PetPetDetailModel({
@@ -99,7 +99,7 @@ class PetPetDetailModel {
   bool get rearing => status == null || status == PetPetStatus.rearing;
 
   /// 展示用：无特性时的占位由 UI 决定，这里只给事实
-  String get genderLabel => gender?.label ?? '♂'; // 20261030 收敛重复实现
+  String get genderLabel => gender?.label ?? '♂';
 
   factory PetPetDetailModel.fromJson(Map<String, dynamic> json) {
     final sp = (json['species'] as Map?)?.cast<String, dynamic>() ?? const {};
@@ -167,7 +167,7 @@ class PetEvoStageOptionModel {
           out.add('金币 ${(c['value'] as num?)?.toInt() ?? 0}');
         case PetEvoCondType.item:
           // 服务端两种写法都接受：item=item_code，或 item_id=道具 uuid；
-          // 后者客户端没有目录映射时不能渲染成空串（'道具  ×1'）
+          // 后者客户端没有目录映射时不能渲染成空串（'道具 ×1'）
           final code = (c['item'] as String?)?.trim() ?? '';
           final cost = (c['cost'] as num?)?.toInt() ?? 1;
           out.add(code.isEmpty ? '指定道具 ×$cost' : '道具 $code ×$cost');
@@ -179,7 +179,7 @@ class PetEvoStageOptionModel {
   }
   /// 条件达成评估（与服务端 rpc_pet_evolve 同构）：level/intimacy 逐条直比；
   /// gold 多条求和一次比余额；item 同码多条求和比持有量（跨格多行由
-  /// bagByItemCode 先行聚合）。未支持类型/空道具码服务端会拒绝，视为未达成。
+  ///  bagByItemCode 先行聚合）。未支持类型/空道具码服务端会拒绝，视为未达成。
   /// bagByItemCode 缺键 = 未持有（0）；itemNames 供 chips 显中文名，缺键回落编码。
   ({bool allMet, List<({String label, bool met})> detail}) evaluateConditions({
     required int level,
@@ -372,7 +372,7 @@ class PetUnlockResultModel {
 /// 蛋池概率（pet_egg_pools 已发布最高 config_version 行，App 公示与判定同源）
 ///
 /// 公示页只展示服务端已配置的权重，**客户端不做任何概率补默认值**——
-/// 未配置的项（如 gender.male 缺省）显示为 null 并由 UI 隐藏该行，
+/// 未配置的项（如 gender.male 缺省）显示为 null 并由 UI 隐藏该行
 /// 避免把猜测值当成对外承诺的抽中率。
 class PetEggOddsModel {
   const PetEggOddsModel({

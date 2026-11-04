@@ -12,7 +12,7 @@ import '../widgets/pet_loading.dart';
 
 /// 成就页（P2）
 ///
-/// 数据源 `rpc_pet_achievement_check`：**服务端单调推进、永不回退**，
+/// 数据源 `rpc_pet_achievement_check`：**服务端单调推进、永不回退**
 /// 每次进入页面即对齐一次进度（幂等，无副作用）；target/progress/completed
 /// 全部由服务端下发，客户端不做任何达成判定（铁律 1）。
 /// 领取走 `rpc_pet_achievement_claim`，背包不足整单回滚
@@ -110,7 +110,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
     final visible =
         _achs.where((a) => !a.prereqLocked(claimedCodes)).toList();
     final done = visible.where((a) => a.completed).length;
-    // 2026-09-24 定版排序：按「领取状态」分三段（可领取置顶 → 进行中 → 已领取沉底），
+    // 排序：按「领取状态」分三段（可领取置顶 → 进行中 → 已领取沉底）
     // 段内保持服务端原序（tier.sort_order + code），不再按档位分组打标题——
     // 置顶诉求要的是全局次序，档位标题会把可领取的成就拆散到各档下面。
     // 档位信息改由卡片的达成条件行前缀展示，不丢。
@@ -216,7 +216,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
                   backgroundColor: cs.surfaceContainerHighest),
             ),
             const SizedBox(height: 8),
-            // 奖励行:数据为空时不渲染(20261022 拍板:不向用户展示内部兜底措辞)
+            // 奖励行:数据为空时不渲染
             if (_rewardText(a).isNotEmpty)
               Text(_rewardText(a),
                   style: TextStyle(
@@ -230,7 +230,7 @@ class _PetAchievementsScreenState extends State<PetAchievementsScreen> {
   }
 
   /// 奖励摘要（读服务端下发的 reward_package,缺项即不展示,不补默认值;
-  /// 道具逐个具名——name 由成就列表 SQL join pet_items 下发,20261022 起）
+  ///  道具逐个具名——name 由成就列表 SQL join pet_items 下发）
   static String _rewardText(PetAchievementModel a) {
     final parts = <String>[
       if (a.rewardGold > 0) '🪙 ${a.rewardGold}',

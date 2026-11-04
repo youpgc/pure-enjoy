@@ -15,12 +15,12 @@ import 'pet_odds_screen.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
 
-/// 批量购买单次数量上限（与服务端 rpc_pet_shop_buy 的 PET_QTY_LIMIT 对齐，
-/// 见 fix_pet_shop_qty_cap_20261028.sql；调整须两端同步）。
+/// 批量购买单次数量上限（与服务端 rpc_pet_shop_buy 的 PET_QTY_LIMIT 对齐
+///  调整须两端同步）。
 const int kShopBuyQtyLimit = 99;
 
 /// 解锁类道具 → 功能键（pet_items.effect.unlock.feature 同源结构映射；
-/// 20261030 定版：unlock 类限购 1 次 + 购买后不再展示——已购在包或功能
+///  unlock 类限购 1 次 + 购买后不再展示——已购在包或功能
 /// 已开通即隐藏，使用后道具从背包移除、功能解锁不反弹）。
 const Map<String, String> kUnlockItemFeatures = {
   'unlock_feed_basin': 'batch_feed',
@@ -29,11 +29,11 @@ const Map<String, String> kUnlockItemFeatures = {
 
 /// 宠物商城页（左侧分类栏 + 物品格 + 悬浮窗购买）
 ///
-/// 布局（2026-09-24 定版）：分类栏在**左侧竖排**（栅格 tile，超出出滚动条），
-/// 右侧物品格网格每行 4 格、只显图标+名称（§5.3 物品格展示定版）；
+/// 布局：分类栏在**左侧竖排**（栅格 tile，超出出滚动条）
+/// 右侧物品格网格每行 4 格、只显图标+名称（§5.3 物品格展示）；
 /// 点击物品弹悬浮窗展示信息、批量数量与购买按钮。
 /// 分类清单取自 `PetShopItemModel.categoryLabels`（消耗品等 8 类；食物/医疗/
-/// 清洁/玩具/救援 2026-11-03 合并为「消耗品」）。
+///  清洁/玩具/救援已合并为「消耗品」）。
 /// 数据源 pet_items（on_shelf 且 channels 含 shop）；扩容阶梯道具
 /// 购买即生效（服务端转 rpc_pet_buy_expansion，限购/顺序/上限由 RPC 校验）。
 class PetShopScreen extends StatefulWidget {
@@ -123,7 +123,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
     }
   }
 
-  /// 解锁类道具「购买后不再展示」(20261030 定版):限购 1 次——
+  /// 解锁类道具「购买后不再展示」:限购 1 次——
   /// 已购在包(未使用)或功能已开通即隐藏;使用后道具从背包移除、功能不反弹。
   List<PetShopItemModel> _filterUnlockItems(List<PetShopItemModel> items,
       List<PetBagItemModel> bag, Set<String> unlocked) {
@@ -172,7 +172,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
     return groups;
   }
 
-  /// 阶梯道具「只展示当前可购档」(20261021):每套阶梯仅保留「已购最大步 + 1」
+  /// 阶梯道具「只展示当前可购档」:每套阶梯仅保留「已购最大步 + 1」
   /// 的那一档,已购档与未来档不展示;整套购完则整类隐藏(需求 §6.3 达上限不展示)。
   /// 服务端 shop_buy 的顺序校验仍兜底,此处只是把展示做对。
   List<PetShopItemModel> _filterLadder(
@@ -191,7 +191,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
       final totalSteps = items.where((x) => x.ladderKey == lk).length;
       if (bought >= totalSteps) return false; // 全套购完:整类隐藏
       // step 缺失行不参与隐藏:宁可全量展示也不让购买入口不可达
-      // (服务端顺序校验仍兜底;20261021 审查 P2)
+      // （服务端顺序校验仍兜底）
       if (e.ladderStep == null) return true;
       return e.ladderStep == bought + 1; // 只出下一档
     }).toList();
@@ -208,10 +208,10 @@ class _PetShopScreenState extends State<PetShopScreen> {
 
     /// 满格腾位「扩容并重试」的自动重试：结果 toast 合并扩容信息——
     /// toast 是替换式单条，扩容先吐一条会被购买结果立即覆盖
-    /// （复审批 P3：'扩容已生效' 存活不足百毫秒）
+    ///
     bool afterExpand = false,
 
-    /// 购买数量（20261028 批量购买：悬浮窗输入 1~99，服务端校验限购/容量）
+    /// 购买数量
     int qty = 1,
   }) async {
     if (_buying.contains(item.id)) return;
@@ -249,7 +249,6 @@ class _PetShopScreenState extends State<PetShopScreen> {
             ? '扩容已生效'
             : '已购买「${item.name}」${qty > 1 ? ' ×$qty' : ''}');
     // 静默刷新:扩容生效后阶梯过滤显示下一档道具,普通道具数量角标同步
-    // (20261021 用户反馈:购买扩容后列表仍显示旧道具)
     _load(showLoading: false);
     if (fromDialog && mounted) Navigator.of(context).pop();
   }
@@ -332,7 +331,6 @@ class _PetShopScreenState extends State<PetShopScreen> {
         title: const Text('宠物商城'),
         actions: [
           // 概率公示（P2）：读后台已发布蛋池，与抽取判定同版本，纯只读入口
-          // （20261021 用户拍板：入口收敛为问号图标，不占 AppBar 文案位）
           IconButton(
             tooltip: '概率公示',
             onPressed: () => Navigator.push(
@@ -551,7 +549,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
         ),
       );
     }
-    // 左侧分类栏 + 右侧商品网格（2026-09-24 布局定版：分类不再占顶部一行，
+    // 左侧分类栏 + 右侧商品网格（分类不再占顶部一行
     // 分类数不再受屏宽限制，超出时分类栏自身出滚动条）
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
@@ -585,7 +583,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
                         onRefresh: _load,
                   child: GridView.builder(
                     padding: const EdgeInsets.all(12),
-                    // 每行 4 格、正方形物品格（2026-09-24 定版：格内显示图标+名称，
+                    // 每行 4 格、正方形物品格（格内显示图标+名称
                     // 其余信息一律收进详情弹窗，故格子必须放大到能容一行名称）
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(
@@ -609,8 +607,7 @@ class _PetShopScreenState extends State<PetShopScreen> {
   /// 物品格（正方形）：只放图标 + 名称，价格/描述/购买按钮在详情弹窗里
   ///
   /// 图标必须走 [PetItemIcon]（`assets/pets/items/<icon>.svg`，与 `pet_items.icon`
-  /// 同源）。此前这里直接画 Material `Icon(_iconFor(item))`，永远不查 asset，
-  /// 是「商城格子不显示物品图标」的直接原因（2026-09-24 修复）。
+  ///  同源），不可直接画 Material Icon（不查 asset 会不显示物品图标）。
   Widget _buildCell(PetShopItemModel item, ColorScheme cs) {
     final busy = _buying.contains(item.id);
     final affordable = _gold >= item.priceCoin;

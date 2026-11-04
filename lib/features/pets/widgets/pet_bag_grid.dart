@@ -70,8 +70,8 @@ class PetBagCapacityBar extends StatelessWidget {
 
 /// 单个格位（坐标 = pet_bag_items.slot_index，空格也占位）
 ///
-/// 长按拖动到任意格换位/移入；[canAccept] 由页面判定（同道具不落地，
-/// 服务端换位不合并堆叠，引导走「整理」）。
+/// 长按拖动到任意格换位/移入；[canAccept] 由页面判定（同道具不落地
+///  服务端换位不合并堆叠，引导走「整理」）。
 class PetBagSlotCell extends StatelessWidget {
   const PetBagSlotCell({
     super.key,
@@ -153,8 +153,8 @@ class PetBagSlotCell extends StatelessWidget {
       return LongPressDraggable<int>(
         data: slot,
         maxSimultaneousDrags: 1,
-        // child 锚定策略：按下点跟随手指——唤起瞬间物品原地不动（不跳位），
-        // 长按在格心即「手指中心 = 物品中心」（20261021 用户反馈：pointer
+        // child 锚定策略：按下点跟随手指——唤起瞬间物品原地不动（不跳位）
+        // 长按在格心即「手指中心 = 物品中心」（pointer
         // 策略 + 半宽高偏移仍会在唤起瞬间把物品拽向手指，视觉偏右下）。
         // feedback 透明只展示物品本身（图标/名称/数量角标），不带卡片底
         dragAnchorStrategy: childDragAnchorStrategy,
@@ -205,7 +205,7 @@ class _SlotFace extends StatelessWidget {
                 fit: StackFit.expand,
                 alignment: Alignment.center,
                 children: [
-                  // 2026-09-24 定版：每行 4 格、格内图标 + 名称（单行不换行，
+                  // 每行 4 格、格内图标 + 名称（单行不换行
                   // 超宽等比缩小）；其余信息（效果/数量上限/操作）看详情弹窗。
                   // 数量角标保留——一格多份是背包的必要信息，去掉会看不出堆了几张。
                   Column(

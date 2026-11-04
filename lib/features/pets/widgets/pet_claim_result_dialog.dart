@@ -1,9 +1,9 @@
 import 'package:flutter/material.dart';
 
-/// 历险结算弹窗（2026-09-17 历险闭环缺陷修复）
+/// 历险结算弹窗
 ///
 /// 展示 claim 四类结果演出 + 金币/经验 + 掉落明细（items 由
-/// fix_pet_adventure_claim_items SQL 返回：[{code, name, qty}]），
+///  fix_pet_adventure_claim_items SQL 返回：[{code, name, qty}]）
 /// 关闭后由调用方刷新总览。独立成文件以保证历险页行数在 500 以内。
 
 class PetClaimResultDialog extends StatelessWidget {

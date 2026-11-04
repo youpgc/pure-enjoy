@@ -3,9 +3,9 @@ import 'package:flutter/services.dart';
 
 import '../../../services/error_reporter.dart';
 
-/// 宠物音效 + 触感统一封装（2026-09-24 2D 表现层定版）
+/// 宠物音效 + 触感统一封装
 ///
-/// 沿用 `games/shared/game_audio.dart` 的既有范式，**不新增任何依赖**：
+/// 沿用 `games/shared/game_audio.dart` 的既有范式，**不新增任何依赖**
 /// `audioplayers: ^6.1.0` 已在 pubspec（游戏音效在用），触感来自
 /// `flutter/services.dart`（框架自带，游戏模块同款用法）。
 ///
@@ -17,7 +17,7 @@ class PetAudio {
 
   static final PetAudio instance = PetAudio._();
 
-  /// 音效总闸（2026-11-03）：暂停触发音效，待音效矫正后再开启。
+  /// 音效总闸：暂停触发音效，待音效矫正后再开启。
   /// 仅静音——触感反馈保留；恢复时改回 true 即全量生效，调用点零改动。
   static bool soundEnabled = false;
 

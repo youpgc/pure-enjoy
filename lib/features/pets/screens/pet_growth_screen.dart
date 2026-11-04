@@ -25,13 +25,13 @@ enum PetGrowthTab {
 
 /// 宠物养成页（P2：进化 + 特性洗练）
 ///
-/// 两条链路的概率与条件判定都在服务端（铁律 1）：
-/// - 进化 `rpc_pet_evolve`：条件四项（等级/亲密/金币/道具）全过才扣减，
-///   **不可逆**；多分支时按 `pet_evo_stages.pick_mode` 分流——`user_choice`
-///   由玩家选定目标形态并回传 species_id，`weighted_random` 一律回传 null
-///   交服务端按权重掷取（客户端代选会让随机分支失效，属破坏配置语义）；
-/// - 特性洗练 `rpc_pet_wash_trait`：结果即最终结果、不提供回退，
-///   且**洗出空特性是合法结果**（trait_id=null 表示这次没掷中）。
+/// 两条链路的概率与条件判定都在服务端（铁律 1）
+/// - 进化 `rpc_pet_evolve`：条件四项（等级/亲密/金币/道具）全过才扣减
+/// **不可逆**；多分支时按 `pet_evo_stages.pick_mode` 分流——`user_choice`
+/// 由玩家选定目标形态并回传 species_id，`weighted_random` 一律回传 null
+/// 交服务端按权重掷取（客户端代选会让随机分支失效，属破坏配置语义）；
+/// - 特性洗练 `rpc_pet_wash_trait`：结果即最终结果、不提供回退
+/// 且**洗出空特性是合法结果**（trait_id=null 表示这次没掷中）。
 class PetGrowthScreen extends StatefulWidget {
   const PetGrowthScreen({super.key, this.petId, this.initialTab});
 
@@ -57,8 +57,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
   String? _petId;
   bool _optionsLoading = false;
 
-  /// 候选拉取失败（网络/服务端）：区别于「空列表=最终形态」业务态——
-  /// 此前失败被吞成空列表、页面误显「已经是最终形态了」（审计批 20261012）
+  /// 候选拉取失败（网络/服务端）：区别于「空列表=最终形态」业务态（失败被吞成空列表会误显最终形态）：
   String? _optionsError;
   bool _busy = false;
 
@@ -213,7 +212,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
     if (!mounted) return;
     setState(() => _busy = false);
     if (err != null || result == null) return _toast(petRpcErrorText(err));
-    // 洗练提示（口径 A：未命中保留原特性，服务端 2026-10-07）
+    // 洗练提示（口径 A：未命中保留原特性）
     _toast(result.missed
         ? (result.oldTraitCode != null
             ? '洗练未命中：保留原特性'
@@ -259,7 +258,7 @@ class _PetGrowthScreenState extends State<PetGrowthScreen>
         const SizedBox(height: 12),
         if (_error != null) ...[
           // 明细拉取失败：整页错误态（可重试），不落「还没有伙伴」误导空态
-          // （审计批 20261012：此前错误仅 12 号小字、下方仍是空态文案）
+          //
           _errorLine(cs),
           Align(
             alignment: Alignment.centerLeft,

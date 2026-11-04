@@ -1,11 +1,11 @@
-/// 亲密度等级换算（等级制：不封顶、按等级拆分展示，20261021 用户拍板）。
+/// 亲密度等级换算（等级制：不封顶、按等级拆分展示）。
 ///
 /// intimacy 字段存**累计值**（服务端 `_pet_gain_intimacy` 已去 100 封顶持续
-/// 累加），等级为纯展示换算：本级需求 = round(base × growth^(level-1))
+///  累加），等级为纯展示换算：本级需求 = round(base × growth^(level-1))
 /// （Lv1→2 需 base，Lv2→3 需 base×growth，以此类推）。base/growth 来自
 /// summary config（intimacy_level_base / intimacy_level_growth）。
 ///
-/// 缺键或非法（base≤0 / growth≤1）返回 null，调用方回退累计值平铺展示，
+/// 缺键或非法（base≤0 / growth≤1）返回 null，调用方回退累计值平铺展示
 /// 不造默认值——与 petExpNeed 缺键返 null 同一口径。
 library;
 

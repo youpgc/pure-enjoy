@@ -8,7 +8,7 @@ import '../../../utils/cache_helper.dart';
 /// 宠物模块本地缓存层（stale-while-revalidate，与 RequestCache 同策略）
 ///
 /// RequestCache 仅支持 List 形态，而 rpc_pet_summary / pet_config 总开关
-/// 均为单对象响应，故此处提供 Map 形态的 SWR 读取：
+/// 均为单对象响应，故此处提供 Map 形态的 SWR 读取
 /// - 有未过期缓存 → 秒开 + 后台静默刷新（不阻塞渲染）
 /// - 无缓存/已过期 → 等待网络结果
 /// - 写操作后调用 [invalidate] 保证强一致（B4 起各写 RPC 接入）
@@ -44,10 +44,10 @@ class PetCache {
     }
   }
 
-  /// 从 ApiResponse 提取单对象 Map：
+  /// 从 ApiResponse 提取单对象 Map
   /// - RPC 单对象 / 标量响应 → 承载于 raw；
-  /// - 表查询（PostgREST 数组响应，如 pet_config limit=1）→ 数据在 data 列表，
-  ///   取首元素。此前仅认 raw，导致表查询门控永远拿到 null（isPetEnabled 恒 false）。
+  /// - 表查询（PostgREST 数组响应，如 pet_config limit=1）→ 数据在 data 列表
+  /// 取首元素（仅认 raw 会导致表查询门控拿不到值）。
   static Map<String, dynamic>? _extractMap(ApiResponse resp) {
     final raw = resp.raw;
     if (raw is Map) return Map<String, dynamic>.from(raw);
@@ -61,8 +61,8 @@ class PetCache {
   /// 带缓存的 Map 读取。
   ///
   /// 返回 `(data, cached, errorMessage)`：cached=true 表示本次直接用了本地缓存
-  /// （后台已在刷新）；errorMessage 为**请求失败**时的原始文案（成功/命中缓存为 null，
-  /// 后台静默刷新失败也带不回——此时页面有旧数据可展示，无需报错）。
+  /// （后台已在刷新）；errorMessage 为**请求失败**时的原始文案（成功/命中缓存为 null
+  ///  后台静默刷新失败也带不回——此时页面有旧数据可展示，无需报错）。
   /// [fetcher] 返回 [ApiResponse]，成功时经 [_extractMap] 取单对象缓存。
   static Future<(Map<String, dynamic>?, bool, String?)> getMap(
     String key,
@@ -88,7 +88,7 @@ class PetCache {
           await CacheHelper.instance.saveMap(key, map);
           await _writeTs(key);
         } catch (_) {
-          // 缓存写失败不影响主流程（本链经 unawaited 挂后台，
+        // 缓存写失败不影响主流程（本链经 unawaited 挂后台
           // 不捕获会成为无人接住的异步异常）
         }
       }

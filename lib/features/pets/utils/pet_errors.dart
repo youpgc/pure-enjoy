@@ -3,14 +3,14 @@ import 'package:flutter/foundation.dart';
 /// 客户端本地异常（字段类型不符、解析失败）的统一文案。
 ///
 /// 原始异常已在各查询点 debugPrint；把 `e.toString()` 直接回给页面会把
-/// `type 'Null' is not a subtype of ...` 这类英文串上屏，用户读不懂，
+/// `type 'Null' is not a subtype of ...` 这类英文串上屏，用户读不懂
 /// 也掩盖了真正的配置问题。
 const String kPetLocalError = '读取出了点问题，请刷新重试';
 
 /// 宠物 RPC 业务错误文案映射
 ///
-/// PostgREST 4xx 时 error 字段为服务端 message（raise exception 的文本，
-/// 如 PET_FREE_FEED_LIMIT）；在此统一转中文，未知码只进 debug 日志、
+/// PostgREST 4xx 时 error 字段为服务端 message（raise exception 的文本
+///  如 PET_FREE_FEED_LIMIT）；在此统一转中文，未知码只进 debug 日志、
 /// 一律回场景化文案（禁开发腔：原始错误串禁止上屏）。
 String petRpcErrorText(String? error) {
   final msg = error ?? '';
@@ -20,7 +20,7 @@ String petRpcErrorText(String? error) {
   const map = <String, String>{
     'PET_FREE_FEED_LIMIT': '今日免费喂养次数已用完，可使用背包中的食物',
     'PET_FEED_COOLDOWN': '喂得太快啦，休息一会儿再来',
-    // 2026-09-24 饱腹门槛（pet_config.feed_full_hunger，后台可配）
+    // 饱腹门槛（pet_config.feed_full_hunger，后台可配）
     'PET_ALREADY_FULL': '它已经吃得饱饱的啦，先陪它玩玩或去游历吧',
     'PET_INTERACT_LIMIT': '今天陪它玩够久啦，明天再来互动吧',
     'PET_INTERACT_COOLDOWN': '它还在回味刚才的抚摸，稍等一下',
@@ -83,7 +83,7 @@ String petRpcErrorText(String? error) {
     'PET_INVALID_ACTION': '操作类型无效',
     'PET_FOSTER_FULL': '寄养格不够用，可在商城「扩容」分类购买寄养扩容',
     'PET_NOT_FOSTERED': '这只伙伴不在寄养仓库中',
-    // ---------- P2 进化（rpc_pet_evolve，feature_pet_p2_rpcs_20260923.sql §3） ----------
+    // ---------- 进化（rpc_pet_evolve） ----------
     'PET_EVOLVE_CHAIN_MISSING': '这只伙伴还没有进化路线，暂时不能进化',
     'PET_EVOLVE_AT_END': '它已经是最终形态啦',
     'PET_EVOLVE_PICK_REQUIRED': '这一步有多个方向可选，请重新选择目标形态',
@@ -91,15 +91,15 @@ String petRpcErrorText(String? error) {
     'PET_EVOLVE_SPECIES_DISABLED': '这个形态暂未开放，请先选择其他方向',
     'PET_EVOLVE_COND_NOT_MET': '进化条件还没满足，再积累一会儿',
     'PET_EVOLVE_COND_INVALID': '进化条件还在调整中，稍后再试',
-    // ---------- P2 等待孵化与加速（§2） ----------
+    // ---------- 等待孵化与加速 ----------
     'PET_EGG_ALREADY_HATCHED': '这枚蛋已经孵化过了',
     'PET_EGG_NOT_WAITING': '这枚蛋还没开始孵化，先点「孵化」计时',
     'PET_EGG_NOT_READY': '蛋还没成熟，再等一会儿或加速',
     'PET_ACCEL_ALREADY_READY': '这枚蛋已经可以领取了',
-    // ---------- P2 功能解锁（§4） ----------
+    // ---------- 功能解锁 ----------
     'PET_FEATURE_ITEM_INVALID': '该道具不能用于开通功能',
     'PET_FEATURE_ALREADY': '这个功能已经开通了',
-    // ---------- P2 繁育（§5）：CD/亲密度阈值均为后台配置，文案不写具体数值 ----------
+    // ---------- 繁育（CD/亲密度阈值均为后台配置，文案不写具体数值） ----------
     'PET_BREED_INVALID_PET': '请选择两只养育中的伙伴结配',
     'PET_BREED_NOT_UNLOCKED': '繁育还没开通，可在商城购买「繁育巢穴」',
     'PET_BREED_BUSY': '这只伙伴正忙着（繁育/游历/寄养），先处理完再来',
@@ -112,7 +112,7 @@ String petRpcErrorText(String? error) {
     'PET_BREED_ALREADY_CLAIMED': '这枚蛋已经领取过了',
     'PET_BREED_NOT_READY': '宝宝还没足月，再等等',
     'PET_BREED_EGG_ITEM_MISSING': '繁育礼物还在准备中，稍后再试',
-    // ---------- P2 成就（§6） ----------
+    // ---------- 成就 ----------
     'PET_ACH_NOT_FOUND': '该成就暂不可领取，请稍后重试',
     'PET_ACH_ALREADY_CLAIMED': '这份奖励已经领过啦',
     'PET_ACH_NOT_DONE': '这个成就还没达成',
@@ -124,11 +124,11 @@ String petRpcErrorText(String? error) {
     // ---------- 幸运抽奖（P4） ----------
     'PET_LOTTERY_LIMIT_TOTAL': '抽奖终身限购次数已用完',
     'PET_LOTTERY_LIMIT_WINDOW': '本时段抽奖次数已用完，稍后再来',
-    // ---------- P2 周任务（§7） ----------
+    // ---------- 周任务 ----------
     'PET_WEEKLY_NOT_FOUND': '未找到本周任务，请稍后刷新',
     'PET_WEEKLY_ALREADY_CLAIMED': '本周奖励已经领过啦',
     'PET_WEEKLY_NOT_DONE': '本周任务还没完成',
-    // ---------- 随机事件（feature_pet_random_events_20261008.sql） ----------
+    // ---------- 随机事件 ----------
     'PET_EVENT_NOT_FOUND': '这个事件已经不在了，换一个吧',
     'PET_EVENT_BAD_CONTEXT': '事件触发时机无效',
     'PET_EVENT_BAD_OPTION': '这个选项不存在了，重新选一个吧',
@@ -148,7 +148,7 @@ String petRpcErrorText(String? error) {
     'PET_SCENE_ALREADY': '你已经拥有这个主题啦',
     'PET_SCENE_NOT_OWNED': '还没有获得这个主题，先去购买吧',
     'PET_SCENE_PRICE_MISSING': '这个主题暂时无法购买，稍后再来看看',
-    // ---------- 放生守卫（fix_pet_release_guards_20261010） ----------
+    // ---------- 放生守卫 ----------
     'PET_RELEASE_INITIAL': '初始伙伴月萤会一直陪着你，不能送别哦',
     'PET_RELEASE_LAST': '至少要有一只伙伴陪在你身边，先获得新的伙伴吧',
   };

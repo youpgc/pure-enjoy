@@ -10,11 +10,11 @@ import 'pet_toast.dart';
 
 /// 主页右列「道具」快捷弹层：抚摸下方新入口。
 ///
-/// 只列背包中**可直接使用的消耗品**（`petBagItemUsable` 同一口径：
-/// consumable 且 effectType 在可用集内），点击即使用（`rpc_pet_use_item`，
+/// 只列背包中**可直接使用的消耗品**（`petBagItemUsable` 同一口径
+///  consumable 且 effectType 在可用集内），点击即使用（`rpc_pet_use_item`
 /// 与背包页同一条链路）；蛋/洗练剂/加速卡等有专属去向的道具不在此列
 /// （引导走背包页，见 bag_screen._extraAction 的分流）。
-/// 列表逐项展示效果描述（petBagEffectDesc 同源）；使用成功即关闭弹窗，
+/// 列表逐项展示效果描述（petBagEffectDesc 同源）；使用成功即关闭弹窗
 /// 关闭后经 [onChanged] 通知主页刷新总览（金币/状态可能变化）。
 Future<void> showPetQuickItemsSheet(
   BuildContext context, {
@@ -76,7 +76,7 @@ class _QuickItemsSheetState extends State<_QuickItemsSheet> {
       return _load();
     }
     showPetToast(context, '已使用「${item.name}」');
-    // 使用成功即关闭弹窗（20261103 用户拍板）；主页刷新经 onChanged 通知
+    // 使用成功即关闭弹窗；主页刷新经 onChanged 通知
     Navigator.pop(context);
     widget.onChanged();
   }
@@ -161,7 +161,7 @@ class _QuickItemsSheetState extends State<_QuickItemsSheet> {
                                     style: const TextStyle(
                                         fontSize: 13.5,
                                         fontWeight: FontWeight.w600)),
-                                // 效果描述（pet_items.effect 结构化同源，
+                                // 效果描述（pet_items.effect 结构化同源
                                 // 与背包页同一实现，不臆测数值）
                                 Text(
                                   petBagEffectDesc(item),

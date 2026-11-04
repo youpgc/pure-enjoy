@@ -9,7 +9,7 @@ import 'pet_cache.dart';
 
 /// 宠物系统服务（单例 + setState 双轨，禁 Riverpod / supabase_flutter）
 ///
-/// 职责（B2 骨架范围）：
+/// 职责（B2 骨架范围）
 /// - [isPetEnabled]：pet_config 总开关查询（轻量 GET，无副作用，供三处入口门控）；
 /// - [fetchSummary]：rpc_pet_summary 总览（含惰性初始化 + 离线衰减补算，SWR 缓存）；
 /// - [invalidateSummary]：写操作后使总览缓存失效（B4 起各写 RPC 接入）。
@@ -25,7 +25,7 @@ class PetService {
     return _instance!;
   }
 
-  /// 总览强刷通知（20261021 用户需求：首页下拉刷新联动宠物状态卡）——
+  /// 总览强刷通知——
   /// 任意外部方（首页 RefreshIndicator 等）force 拉取成功后自增；
   /// 状态卡等常驻监听方据此自动重载，无需向上暴露各自的刷新通道
   static final ValueNotifier<int> summaryForceRefreshed = ValueNotifier<int>(0);
@@ -44,9 +44,8 @@ class PetService {
 
   /// 门控配置读取（pet_config 总开关，SWR 共享 keyGate 缓存）。
   ///
-  /// 2026-09-21 精简：曾一并取回 `render3d_enabled`/`asset_manifest` 供 3D 渲染
-  /// 分层开关使用，3D 一期下线后无消费方，故只查总开关（原为兜 42703 的
-  /// 「三列失败降级单列」分支也随之删除）。
+  /// 只查总开关；3D 渲染分层开关（`render3d_enabled`/`asset_manifest`）
+  /// 已无消费方，不再取回。
   Future<(Map<String, dynamic>?, bool)> _gateConfig({
     bool forceRefresh = false,
   }) async {
@@ -73,14 +72,13 @@ class PetService {
 
   /// 拉取宠物总览（rpc_pet_summary；SWR：缓存秒开 + 静默刷新）。
   ///
-  /// 返回 `(summary, errorMessage)`，三种情形分得清（此前统一返回 null，
-  /// 页面只能把「网络失败」也写成「功能暂未开放 / 加载失败，请稍后重试」）：
+  /// 返回 `(summary, errorMessage)`，三种情形分得清（统一返回 null 会把网络失败混写成业务未开放）
   /// - `summary != null`：正常；
   /// - `summary == null && err == null`：未登录 / 总开关关闭 → 按隐藏处理；
   /// - `err != null`：请求或解析失败 → 页面给可重试的错误态并展示 [err]。
   ///
   /// 本次返回值是否来自缓存秒开见 [lastSummaryFromCache]（SWR 路径宠物状态
-  /// 可能滞后，事件触发等强状态判定不得以缓存态为据）。
+  ///  可能滞后，事件触发等强状态判定不得以缓存态为据）。
   Future<(PetSummaryModel?, String?)> fetchSummary({
     bool forceRefresh = false,
   }) async {
@@ -116,8 +114,7 @@ class PetService {
       // 读链路降级入错误日志（module='pets'，warning 级）
       ErrorReporter.report(e, st, module: 'pets', level: 'warning');
       lastSummaryFromCache = false;
-      // 客户端解析异常统一文案单一源（此前自造「总览数据解析失败」双源并存；
-      // 该 catch 同时兜住缓存写失败，故文案不指名「解析」）
+      // 客户端异常统一文案单一源；该 catch 同时兜住缓存写失败，故文案不指名「解析」
       return (null, kPetLocalError);
     }
   }

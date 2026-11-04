@@ -61,8 +61,8 @@ Widget petGrowthHeadCard(ColorScheme cs, PetPetDetailModel? pet) {
   );
 }
 
-/// 进化条件明细 chips：未达成红显（detail 来自 evaluateConditions，
-/// 与服务端 rpc_pet_evolve 判定同口径）
+/// 进化条件明细 chips：未达成红显（detail 来自 evaluateConditions
+///  与服务端 rpc_pet_evolve 判定同口径）
 Widget petGrowthConditionsDetail(
   ColorScheme cs,
   List<({String label, bool met})> detail,

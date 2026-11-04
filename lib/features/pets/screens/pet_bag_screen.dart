@@ -22,11 +22,11 @@ import '../widgets/pet_loading.dart';
 
 /// 宠物背包页（格位坐标制 + 左侧分类栏 + 拖拽换位）
 ///
-/// - 网格严格按 `pet_bag_items.slot_index` 定位：`itemCount = 背包容量`，
-///   第 i 格即 slot_index=i，无行的格位渲染为空格（与服务端坐标系一致）；
+/// - 网格严格按 `pet_bag_items.slot_index` 定位：`itemCount = 背包容量`
+/// 第 i 格即 slot_index=i，无行的格位渲染为空格（与服务端坐标系一致）；
 /// - 分类栏只置灰不过滤（方案 A）：过滤会改变格号与坐标的对应关系；
 /// - 拖拽换位走 `rpc_pet_swap_slot`（交换/移入空格）；服务端换位不合并
-///   堆叠，故同道具格位禁止落点，合并交由「整理」`rpc_pet_compact_bag`；
+/// 堆叠，故同道具格位禁止落点，合并交由「整理」`rpc_pet_compact_bag`；
 /// - 丢弃走 `rpc_pet_discard_items`（按 slot_index + quantity），不可恢复。
 class PetBagScreen extends StatefulWidget {
   const PetBagScreen({super.key, required this.petId});
@@ -57,7 +57,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
         PetBagCategory.tool => Icons.build_outlined,
       };
 
-  /// 页签取自 PetBagCategory（2026-10-09 修订：装备分区已移除）
+  /// 页签取自 PetBagCategory
   static List<(String, String, IconData)> get _tabs => [
         ('all', '全部', Icons.grid_view_outlined),
         for (final c in PetBagCategory.values)
@@ -99,7 +99,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   // ---------- 操作 ----------
 
   Future<void> _run(Future<void> Function() action, String id) async {
-    if (_busyId != null) return; // 防重入（与 pet_egg_screen 同口径，审计批 20261012）
+    if (_busyId != null) return; // 防重入（与 pet_egg_screen 同口径）
     setState(() => _busyId = id);
     await action();
     if (mounted) setState(() => _busyId = null);
@@ -121,7 +121,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
       if (target == null) return _toast('这颗蛋好像不见了，刷新一下再试试');
       // 等待型蛋（传说蛋等）：即开通道走不了，转孵蛋页计时/加速/领取
       if (!target.isInstant) return _push(const PetEggScreen());
-      // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+      // 初始蛋自选种属：选系孵化，未开启自选走固定产出原路
       PetHatchResultModel? result;
       if (target.poolCode == 'initial_ssr') {
         result = await hatchInitialEggWithChoice(context, eggId: target.id);
@@ -143,7 +143,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
   Future<void> _useItem(PetBagItemModel item) async {
     if (widget.petId == null) return _toast('当前没有在养宠物');
     // 喂食类道具：历险中/已饱静默阻断——服务端必拒（PET_NOT_REARING /
-    // PET_ALREADY_FULL），提前拦下不弹错误（20261021 用户拍板口径）。
+    // PET_ALREADY_FULL），提前拦下不弹错误。
     // summary 拉取失败时放行走 RPC 由服务端兜底——不拦也不给误导文案
     if (item.effectType == PetItemEffectType.feed.code) {
       final (summary, _) = await PetService.instance.fetchSummary();
@@ -392,7 +392,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
       );
     }
     if (_items.isEmpty) return _emptyView(cs);
-    // 左侧分类栏 + 右侧格位网格（2026-09-24 布局定版：分类不再占顶部一行）
+    // 左侧分类栏 + 右侧格位网格
     return Row(
       crossAxisAlignment: CrossAxisAlignment.stretch,
       children: [
@@ -420,7 +420,7 @@ class _PetBagScreenState extends State<PetBagScreen> {
                     padding: const EdgeInsets.all(12),
                     // 格子少时也要能下拉刷新
                     physics: const AlwaysScrollableScrollPhysics(),
-                    // 每行 4 格、正方形（2026-09-24 定版：格内加物品名称，与商城统一）；
+                    // 每行 4 格、正方形；
                     // 格号恒等于 slot_index——改列数只改排布，不违反坐标不变量（铁律 15）
                     gridDelegate:
                         const SliverGridDelegateWithFixedCrossAxisCount(

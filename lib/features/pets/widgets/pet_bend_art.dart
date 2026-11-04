@@ -30,8 +30,8 @@ String? get petBendError => _bendError;
 
 /// 画布外扩边距（栅格单位）。
 ///
-/// 样片把 384 帧贴进 `384+2×64` 的画布里演弯曲，64 是按「托举＋放大合量」倒推的余量，
-/// 作用是让脚底在 `dy>0`（委屈/睡觉整身下沉）时不被画布边裁掉。App 同样留这份余量，
+/// 样片把 384 帧贴进 `384+2×64` 的画布里演弯曲，64 是按「托举＋放大合量」倒推的余量
+/// 作用是让脚底在 `dy>0`（委屈/睡觉整身下沉）时不被画布边裁掉。App 同样留这份余量
 /// 但用 [OverflowBox] 把画布外扩而不是缩小宠物，屏幕上的宠物尺寸与换渲染器之前一致。
 const double _kCanvasPad = 64;
 
@@ -143,7 +143,7 @@ class _PetBendArtState extends State<PetBendArt>
     _tick.value++;
   }
 
-  /// 按原尺寸解码——缩放解码（`cacheWidth`）会把 384 栅格换成别的尺寸，
+  /// 按原尺寸解码——缩放解码（`cacheWidth`）会把 384 栅格换成别的尺寸
   /// 而弯曲几何、归零线、眼区行程全部定义在 384 上，一改尺寸就逐像素错位。
   Future<ui.Image?> _decode(String asset) async {
     try {
@@ -246,11 +246,11 @@ class _PetBendArtState extends State<PetBendArt>
     );
   }
 
-  /// uniform 装配（顺序＝着色器声明顺序，采样器不占浮点槽位）：
+  /// uniform 装配（顺序＝着色器声明顺序，采样器不占浮点槽位）
   /// `uPose`(0~3) `uGeo`(4~7) `uXf`(8~11) `uRes`(12~15)
   ///
   /// 四段全部按 vec4 对齐摆放（`uPose` 在着色器里声明成 vec4，第四分量留空）——
-  /// 这样「按声明顺序累加浮点下标」与「按 std140 补齐」两种布局算出的下标完全相同，
+  /// 这样「按声明顺序累加浮点下标」与「按 std140 补齐」两种布局算出的下标完全相同
   /// 不必赌引擎到底给 vec3 补不补那 4 个字节。
   void _feedShader(
       ui.FragmentShader s, PetBendPose p, ui.Image img, double ref) {

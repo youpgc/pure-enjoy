@@ -7,7 +7,7 @@ import 'pet_item_icon.dart';
 /// 背包物品悬浮窗（信息 + 操作按钮）
 ///
 /// 按钮先关闭弹窗再回调，调用方无需自行 pop；[busy] 为 true 时按钮全部禁用。
-/// [extraAction] 是 P2 道具的专属去向（开通功能 / 去养成页洗练 / 去孵蛋页加速），
+/// [extraAction] 是 P2 道具的专属去向（开通功能 / 去养成页洗练 / 去孵蛋页加速）
 /// 与「使用」「丢弃」并列显示；null 即无附加动作。
 Future<void> showPetBagItemDialog(
   BuildContext context, {
@@ -98,7 +98,7 @@ Future<void> showPetBagItemDialog(
                     ),
                   )
                 else ...[
-                  // 丢弃左（红描边）/ 使用右（主色实心）：20261028 用户拍板换位
+                  // 丢弃左（红描边）/ 使用右（主色实心）
                   Expanded(
                     child: OutlinedButton.icon(
                       style: OutlinedButton.styleFrom(

@@ -8,18 +8,18 @@ import '../utils/pet_errors.dart';
 import 'pet_item_icon.dart';
 import 'pet_toast.dart';
 
-/// 主页「口粮」选择浮层（2026-09-24 新增）
+/// 主页「口粮」选择浮层
 ///
-/// 定版口径：喂食**不限次数**——`free_feed_daily` 是每日**免费额度**，额度不可用
+/// 口径：喂食**不限次数**——`free_feed_daily` 是每日**免费额度**，额度不可用
 /// （冷却中 / 当日次数用完）时改吃背包里的口粮道具（服务端同一条 `rpc_pet_feed`
-/// 的道具档：不占免费次数、不受冷却限制，见 feature_pet_feed_full_20260924.sql §2）。
+///  的道具档：不占免费次数、不受冷却限制，见 §2）。
 /// 因此主页喂食钮只要"没吃饱"就可点，本浮层就是免费额度不可用时的出口。
 ///
 /// 返回 true 表示成功喂掉一份口粮（调用方据此刷新总览并庆祝）。
 ///
-/// [full] = 宠物已饱（饱食 ≥ feed_full_hunger，调用方按 summary 同口径判定）：
-/// 道具行整列禁用并标注「已饱」——饱时喂食会被服务端拒绝（口粮不消耗），
-/// 提前禁用杜绝无效操作（20261021 用户拍板：满 100 禁用）。
+/// [full] = 宠物已饱（饱食 ≥ feed_full_hunger，调用方按 summary 同口径判定）
+/// 道具行整列禁用并标注「已饱」——饱时喂食会被服务端拒绝（口粮不消耗）
+/// 提前禁用杜绝无效操作。
 Future<bool> showPetFeedSheet(BuildContext context, String petId,
     {bool full = false}) async {
   final (items, err) = await PetRpc.fetchBag();
@@ -36,7 +36,7 @@ Future<bool> showPetFeedSheet(BuildContext context, String petId,
   await showModalBottomSheet<void>(
     context: context,
     showDragHandle: true,
-    // 与「更多」菜单弹窗同款配置：不带 isScrollControlled/constraints，
+    // 与「更多」菜单弹窗同款配置：不带 isScrollControlled/constraints
     // 全宽贴底；长列表由内部 Flexible + shrinkWrap 兜底
     builder: (_) => _PetFeedSheet(
         petId: petId, foods: foods, full: full, onFed: () => fed = true),

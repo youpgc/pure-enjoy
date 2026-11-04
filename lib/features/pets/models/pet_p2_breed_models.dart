@@ -2,7 +2,7 @@ import '../../../constants/pet.dart';
 
 /// 宠物 P2 繁育模型（单据 / 结配结果 / 领蛋结果 / 功能开通）
 ///
-/// 字段与 `feature_pet_p2_rpcs_20260923.sql` 的返回键、pet_breed_logs 直查
+/// 字段与 rpc_pet_breed_start / rpc_pet_breed_claim 的返回键、pet_breed_logs 直查
 /// select 一一对应，禁止臆测。
 
 /// 繁育单据（pet_breed_logs 直查本人行）
@@ -86,7 +86,7 @@ class PetBreedClaimResultModel {
   final String rarity;
   final DateTime? nextBreedAt;
 
-  /// **P2 唯一的软失败分支**（不抛异常）：背包已满，亲代已释放、单据停在 ready，
+  /// **P2 唯一的软失败分支**（不抛异常）：背包已满，亲代已释放、单据停在 ready
   /// 清包后重新调用即可（服务端幂等不回退）。
   final bool bagFull;
   final int capacity;

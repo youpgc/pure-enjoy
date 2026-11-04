@@ -13,19 +13,19 @@ const double _kFallbackArtSize = 320;
 
 /// 2D 宠物生命体（分层弯曲 + 骨架占位）
 ///
-/// 2026-10 表现定版：整条演出由 [PetBendArt] 承担——被弯曲的是图像内部的
+/// 整条演出由 [PetBendArt] 承担——被弯曲的是图像内部的
 /// 一行行像素（归零线以下真·不动），编排读 `kPetBendActs`（用户已验收冻结）。
-/// 本组件只做三件事：
+/// 本组件只做三件事
 /// - 给了 [bendGeo] 且该动作在 `kPetBendActs` 有编排 → 全权委托 [PetBendArt]；
-/// - 一次性动作播完按 [PetActionMachine.durationOf] 计时回调 [onActionEnd]，
-///   宿主据此把动作回落到环境态；
+/// - 一次性动作播完按 [PetActionMachine.durationOf] 计时回调 [onActionEnd]
+/// 宿主据此把动作回落到环境态；
 /// - 缺几何 / 缺编排（未登记形态或新动作没进表）→ 画骨架占位剪影
-///   （铁律 8：配置缺码一律不崩溃，素材落位后同路径自动换回真图）。
+/// （铁律 8：配置缺码一律不崩溃，素材落位后同路径自动换回真图）。
 ///
 /// 着色器本身不可用时的退化由 `PetBendArt` 内部承担，同样不会让宠物消失。
 ///
 /// 静默闸门：画面演的是 [PetAction.played]（`kPetActionsSilenced` 里登记的
-/// 动作改播 idle），计时/回落/粒子/音效仍按动作本体走——所以喂完食
+///  动作改播 idle），计时/回落/粒子/音效仍按动作本体走——所以喂完食
 /// 依然是「宠物呼吸 5 秒后回到待机」，只是不再演那套姿态。
 class PetLivingArt extends StatefulWidget {
   const PetLivingArt({
@@ -137,7 +137,7 @@ class _PetLivingArtState extends State<PetLivingArt>
   }
 }
 
-/// 素材未产出形态的骨架占位：四足动物剪影（头+双耳+身+尾），
+/// 素材未产出形态的骨架占位：四足动物剪影（头+双耳+身+尾）
 /// 剪影内一道斜向亮带随环境态时钟往复扫动（骨架屏 shimmer 蒙层）。
 /// 语义 = 「这里会有一只，素材还在路上」；真图就位后本占位自动隐退。
 class _SkeletonPlaceholder extends StatelessWidget {

@@ -7,14 +7,14 @@ import '../utils/pet_dict.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_loading.dart';
 
-/// 宠物图鉴（§2026-10-09 收集功能）
+/// 宠物图鉴（§收集功能）
 ///
 /// 收集语义：owned = 历史拥有过（含已放生，软删除不熄灭）；
 /// 范围 = enabled 形态（三系开闸前仅猫系 30 项，开闸自动扩容无需发版）。
-/// 已拥有展示弯曲树中性帧 c1_neutral（与舞台渲染同源同款、静态不动画，
-/// 20261021 用户拍板）；无弯曲几何的种属回退整只底图。
+/// 已拥有展示弯曲树中性帧 c1_neutral（与舞台渲染同源同款、静态不动画
+///  ）；无弯曲几何的种属回退整只底图。
 /// 未拥有展示中央锁定徽章、名称照常展示。
-/// 格子背景板按评级分级：N 素净 → R 淡蓝 → SR 淡紫 → SSR 淡金 + 光晕，
+/// 格子背景板按评级分级：N 素净 → R 淡蓝 → SR 淡紫 → SSR 淡金 + 光晕
 /// 越高级越稀有越突显（渐变顶部混白提质感）。
 class PetDexScreen extends StatefulWidget {
   const PetDexScreen({super.key});
@@ -33,7 +33,7 @@ const _rarityColors = {
   'SSR': Color(0xFFD9A441),
 };
 
-/// 评级背景板强度分级（20261021 用户需求）：渐变浓度/边框/光晕随评级递增
+/// 评级背景板强度分级：渐变浓度/边框/光晕随评级递增
 typedef _PlateSpec = ({double gradTop, double gradBottom, double border, double glow});
 
 _PlateSpec _plateOf(String rarity) => switch (rarity) {
@@ -320,8 +320,8 @@ class _PetDexScreenState extends State<PetDexScreen> {
                 fontSize: 11,
                 color: stage.owned ? cs.onSurface : cs.onSurfaceVariant),
           ),
-          // 日期行恒占位等高：只有已获取格有「获得日」时该格会撑高整行，
-          // 同排其余格被拉出基线（20261021 用户截图实证的错位根因）
+          // 日期行恒占位等高：只有已获取格有「获得日」时该格会撑高整行
+          // 同排其余格被拉出基线
           SizedBox(
             height: 13,
             child: (stage.owned && stage.firstAt != null)
@@ -337,9 +337,9 @@ class _PetDexScreenState extends State<PetDexScreen> {
   }
 
   /// 图鉴格静态形象：弯曲树的中性帧 c1_neutral（舞台渲染的基底图，与主页
-  /// 形象同源同款；不跑待机动画——20261021 用户拍板）。
+  ///  形象同源同款；不跑待机动画
   ///
-  /// dex 种属行码带阶后缀（cat_ssr1_s1），弯曲树按「种属 + sN 目录」组织，
+  /// dex 种属行码带阶后缀（cat_ssr1_s1），弯曲树按「种属 + sN 目录」组织
   /// 先解耦再取材；路径以 kPetBendGeo 登记为准（登记 = 随包，铁律 8）。
   /// 无弯曲几何的种属兜底占位图标。
   Widget _dexPetArt(ColorScheme cs, PetDexStage stage) {

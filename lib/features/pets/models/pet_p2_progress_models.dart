@@ -3,9 +3,9 @@ import 'pet_rpc_models.dart';
 
 /// 宠物 P2 成就与周任务模型
 ///
-/// 字段与 `feature_pet_p2_rpcs_20260923.sql` §6/§7 两个 RPC 的返回键一一对应。
-/// 关键口径：成就的 `target` 是**服务端归一后的顶层键**（value → target → 1，
-/// 见 `_pet_ach_target`），客户端不得再回读 condition_value 自行推算；
+/// 字段与成就、周任务两组 RPC 的返回键一一对应。
+/// 关键口径：成就的 `target` 是**服务端归一后的顶层键**（value → target → 1
+///  见 `_pet_ach_target`），客户端不得再回读 condition_value 自行推算；
 /// 周任务的 quest_id 是 **pet_quests.id**（配置行 id），不是实例行 id。
 
 /// 成就（rpc_pet_achievement_check 的 achievements 数组元素）

@@ -3,11 +3,11 @@ import 'pet_duration_text.dart';
 
 /// 宠物操作预算：喂食/抚摸的冷却与每日次数派生逻辑
 ///
-/// 数据源为 rpc_pet_summary 2026-09-17 扩展字段：
+/// 数据源为 rpc_pet_summary 扩展字段
 /// - config：`free_feed_cooldown_min` / `free_feed_daily` /
-///   `interact_cooldown_min` / `interact_daily` 等；
+/// `interact_cooldown_min` / `interact_daily` 等；
 /// - pet：`todayFreeFeedCount` / `lastFeedAt` /
-///   `todayInteractCount` / `lastInteractAt`。
+/// `todayInteractCount` / `lastInteractAt`。
 ///
 /// 约定：配置缺省或为 0 视为「未配置」→ 不限次、无冷却、不展示角标。
 class PetActionBudget {
@@ -27,9 +27,9 @@ class PetActionBudget {
   /// 冷却结束时刻 = 服务端 last_xxx_at + 冷却,而 last_xxx_at 的写入时刻
   /// **晚于**客户端发起请求(网络往返),再叠加客户机与服务端的时钟偏移——
   /// 直接拿服务端锚减客户端 now,会把这些全算进冷却:10 分钟喂食显示 11 分、
-  /// 1 分钟抚摸显示 63 秒(20261021 用户报告)。锚点用客户端自己的时间轴,
+  /// 1 分钟抚摸显示 63 秒。锚点用客户端自己的时间轴
   /// 保证展示自洽;注意锚点只管展示,倒计时走完后服务端仍可能拒
-  /// (PET_FEED_COOLDOWN 提示兜底)。锚点仅在 App 存活期有效,
+  /// (PET_FEED_COOLDOWN 提示兜底)。锚点仅在 App 存活期有效
   /// 重进后回落服务端 last_xxx_at(偏差亚秒级)。
   static final Map<String, DateTime> _actionAnchor = <String, DateTime>{};
 
@@ -38,7 +38,7 @@ class PetActionBudget {
     _actionAnchor['$petId:$kind'] = DateTime.now();
   }
 
-  /// 冷却计算(秒级;20261021 配置单位下沉,_sec 新键优先,_min×60 兜底旧缓存)
+  /// 冷却计算(秒级;_sec 新键优先,_min×60 兜底旧缓存)
   Duration? _cooldownLeftSec(DateTime? lastAt, int? cooldownSec) {
     if (lastAt == null || cooldownSec == null || cooldownSec <= 0) return null;
     final end = lastAt.add(Duration(seconds: cooldownSec));
@@ -46,8 +46,8 @@ class PetActionBudget {
   }
 
   /// 锚点优先的冷却计算(锚点在冷却期内用锚点;**锚点过期穿透服务端锚**——
-  /// 批量喂养等路径不写本地锚,过期即 return null 会永久遮蔽服务端新冷却,
-  /// 喂食钮误示可点(20261021 复审 P1);秒级配置缺键时由调用方传入
+  /// 批量喂养等路径不写本地锚,过期即 return null 会永久遮蔽服务端新冷却
+  /// 喂食钮误示可点;秒级配置缺键时由调用方传入
   /// null → 无冷却,与「不为缺失字段编默认值」一致)
   Duration? _cooldownAnchored(String petId, String kind, DateTime? lastAt, int? cooldownSec) {
     if (cooldownSec == null || cooldownSec <= 0) return null;
@@ -69,7 +69,7 @@ class PetActionBudget {
   Duration? get interactCooldown => _cooldownAnchored(pet?.id ?? '', 'interact',
       pet?.lastInteractAt, _cooldownSec('interact_cooldown_sec', 'interact_cooldown_min'));
 
-  /// 秒级冷却配置(20261021)。⚠️ [cfg] 对缺失键返回 0 而非 null——
+  /// 秒级冷却配置。⚠️ [cfg] 对缺失键返回 0 而非 null——
   /// 故 0 视为「键未下发」回落旧键×60(SWR 旧缓存/服务端未升级时);
   /// 运营若要禁用冷却请配 1 秒(不支持显式 0)。
   int? _cooldownSec(String secKey, String minKey) {
@@ -108,7 +108,7 @@ class PetActionBudget {
   /// 饱腹阈值（`pet_config.feed_full_hunger`，后台可配；0/缺配 = 不设门槛）
   int get feedFullHunger => cfg('feed_full_hunger');
 
-  /// 是否已吃饱：唯一让喂食钮置灰的业务条件（2026-09-24 定版）
+  /// 是否已吃饱：唯一让喂食钮置灰的业务条件
   ///
   /// 阈值未下发（旧版 rpc_pet_summary）时为 false，不阻塞喂食。
   bool get isFull {
@@ -135,7 +135,7 @@ class PetActionBudget {
 
   /// 冷却倒计时文案（模块统一时长规则：90 秒内按秒 / 90 分钟内按分 / 更长按小时）
   ///
-  /// 底层仍秒数向上取整：剩余 0.4 秒显示「1秒」而非「0秒」——刷新是 1 秒一跳，
-  /// 截断会出现"停在 0 秒却还点不动"的一秒空窗（2026-09-24 修）。
+  /// 底层仍秒数向上取整：剩余 0.4 秒显示「1秒」而非「0秒」——刷新是 1 秒一跳
+  /// 截断会出现"停在 0 秒却还点不动"的一秒空窗。
   String coolText(Duration d) => petDurationText(d);
 }

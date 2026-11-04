@@ -5,7 +5,7 @@
 /// 「真机上的画面」是两套数学，任何一次复测都分不清差在素材还是差在插值。
 /// 数据表（关键帧、周期、呼吸参数）也不在这里，见 `constants/pet_bend.dart`。
 ///
-/// 三条硬约束（随编排表冻结，改任何数值都要回样片复跑门禁）：
+/// 三条硬约束（随编排表冻结，改任何数值都要回样片复跑门禁）
 /// 1. `|θ| ≤ 1°`；2. 表情档之间硬切（[PetBendPose.frame] 只做整数换档，绝不做混合）；
 /// 3. 归零线以下真·不动（权重场在着色器与 [PetBendGeo.wR] 里是同一条公式）。
 library;
@@ -45,7 +45,7 @@ int faceAt(PetActDef act, double u) {
   return e[i][1].round();
 }
 
-/// 一个时刻的完整姿态。空间量的单位全在 `side×side` 生产栅格上：
+/// 一个时刻的完整姿态。空间量的单位全在 `side×side` 生产栅格上
 /// px 位移要乘显示缩放才落到逻辑像素，角度与压扁倍率不随尺寸变。
 class PetBendPose {
   const PetBendPose({
@@ -102,7 +102,7 @@ PetBendPose evalAct(PetActDef act, double side, double clockSec,
     final br = math.sin(_tau * clockSec / b.per);
     sx *= 1 - amp * 0.6 * br;
     sy *= 1 + amp * br;
-    // 样片 v4 定版的微漂移（幅度 0.6% 时约 ±1.4px / ±0.9px）；
+    // 与样片基准的微漂移（幅度 0.6% 时约 ±1.4px / ±0.9px）；
     // dy 统一「向下为正」并居中去均值，所以常量项是 0.1 而不是 0.3
     dx += 0.6 * amp * side * math.sin(_tau * clockSec / (b.per * 1.2));
     dy += 0.1 * amp * side -

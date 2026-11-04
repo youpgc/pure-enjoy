@@ -11,7 +11,7 @@ import 'pet_home_scene.dart';
 import 'pet_loading.dart';
 import 'pet_toast.dart';
 
-/// 宠物主页浮层展示组件（2026-09-17 满屏舞台版拆分）
+/// 宠物主页浮层展示组件
 ///
 /// 纯展示层：数据与回调由 pet_home_screen 传入，本文件不持有业务状态。
 /// 包含顶部提示信息（名牌/四维状态/历险横幅/孵化引导）、左右边缘浮动按钮、
@@ -19,7 +19,7 @@ import 'pet_toast.dart';
 /// 多宠切换箭头、加载失败视图与诞生弹窗。
 
 /// 历险横幅（进行中 / 待救助 / 已结束待领取）
-/// （20261021 单宠口径：只展示当前查看宠的历险态，宠名消歧前缀删除）
+///
 class PetAdventureBanner extends StatelessWidget {
   const PetAdventureBanner({super.key, required this.adv, this.onTap});
 
@@ -30,7 +30,7 @@ class PetAdventureBanner extends StatelessWidget {
   Widget build(BuildContext context) {
     final cs = Theme.of(context).colorScheme;
     // 待救助优先于"到点"：awaiting_rescue 的 endAt 必然已过，若 finished 先判
-    // 横幅会写"已结束，点击查看结果"——与点击行为（跳救助视图）不符（20261011）。
+    // 横幅会写"已结束，点击查看结果"——与点击行为（跳救助视图）不符。
     // finished 仍要求 endAt 非空：字段异常/未返回时不能乐观判结束（否则点进去报错）。
     final awaiting = adv.status == PetAdventureStatus.awaitingRescue;
     final finished =
@@ -72,8 +72,8 @@ class PetAdventureBanner extends StatelessWidget {
   }
 }
 
-/// 边缘浮动操作钮（2026-09-17 改版：文案内置——图标在上、文案在下方按钮内；
-/// [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时）
+/// 边缘浮动操作钮（文案内置——图标在上、文案在下方按钮内；
+///  [overlay] 非空时整钮覆盖黑色透明蒙层，白色字体居中显示冷却倒计时）
 ///
 /// [onTap] 传 null 时整钮置灰（无交互）。
 class PetEdgeButton extends StatelessWidget {
@@ -162,7 +162,7 @@ class PetEdgeButton extends StatelessWidget {
 
 /// 无宠物孵化引导卡（首蛋就绪时展示立即孵化）
 ///
-/// [onGoEggs]：无即开蛋时的出口。等待孵化型的蛋要先到蛋页点「孵化」计时，
+/// [onGoEggs]：无即开蛋时的出口。等待孵化型的蛋要先到蛋页点「孵化」计时
 /// 否则这里是一条死路（只能干等初始蛋文案），故给一个直达蛋页的按钮。
 class PetHatchGuide extends StatelessWidget {
   const PetHatchGuide({
@@ -253,7 +253,7 @@ class PetLoadErrorView extends StatelessWidget {
 
 /// 左上角浮动返回键（金币已独立为 PetGoldBadge，置于右上角场景层）
 ///
-/// 2026-09-17：有宠物时按钮列贴顶，返回键核心 [PetBackButtonCore] 内联至左列
+/// 有宠物时按钮列贴顶：返回键核心 [PetBackButtonCore] 内联至左列
 /// 首位避免重叠；本外壳仅无宠物分支使用。
 class PetBackButton extends StatelessWidget {
   const PetBackButton({super.key, required this.onBack});
@@ -370,7 +370,7 @@ Future<void> showPetBirthDialog(
 }
 
 String _genderGlyph(String? code) =>
-    PetGender.fromCode(code)?.label ?? '·'; // 20261030 收敛重复实现，单一源=PetGender enum
+    PetGender.fromCode(code)?.label ?? '·'; // 单一源=PetGender enum
 
 /// 历险中提示行（宠物保留舞台原位时展示去向文案，白底 pill 适配场景草地）
 class PetAdventureNote extends StatelessWidget {
@@ -406,8 +406,8 @@ class PetThemeSheet extends StatefulWidget {
 }
 
 class _PetThemeSheetState extends State<PetThemeSheet> {
-  // 20261030 对齐资产集 8 主题（原仅 3 项，余 5 个主题缺兜底直落场景码）；
-  // 兜底名与 DB 种子 name 对齐（feature_pet_scene_assets_20261027.sql）
+  // 主题缺兜底时直落场景码；
+  // 兜底名与 DB 种子 name 对齐
   static const _sceneLabels = {
     'scene_dream': '梦幻夜空',
     'scene_meadow': '晨曦草甸',
@@ -419,7 +419,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
     'scene_isle': '云上浮岛',
   };
 
-  /// 行名以服务端下发的 name 为准（新增主题零改码），
+  /// 行名以服务端下发的 name 为准（新增主题零改码）
   /// 空/缺失时回退本地映射，再回退场景码
   static String _labelOf(Map<String, dynamic> sc) {
     final code = sc['scene_code']?.toString() ?? '';
@@ -460,8 +460,7 @@ class _PetThemeSheetState extends State<PetThemeSheet> {
   Future<void> _purchase(Map<String, dynamic> sc) async {
     if (_pending != null) return;
     final code = sc['scene_code']?.toString() ?? '';
-    // 价格缺失时拒绝并提示（此前 ?? 0 会显示「消耗 0 金币」，确认后被
-    // 服务端 PET_SCENE_PRICE_MISSING 拒绝，两段体验错位——审计批 20261012）
+    // 价格缺失时拒绝并提示（放行会显示「消耗 0 金币」后被服务端拒绝，两段体验错位
     final price = (sc['price_coin'] as num?)?.toInt();
     final label = _labelOf(sc);
     if (price == null) {

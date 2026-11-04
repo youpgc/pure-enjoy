@@ -1,19 +1,19 @@
-// ignore_for_file: prefer_const_constructors —— 爪印字号随画布尺寸运行时定，
+// ignore_for_file: prefer_const_constructors —— 爪印字号随画布尺寸运行时定
 // TextSpan/TextStyle 无法 const 构造；本文件为自包含动画绘制器，关闭该 lint。
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
 
-/// 宠物模块专属 loading：爪印漫步（20261028）
+/// 宠物模块专属 loading：爪印漫步
 ///
-/// 设计映射：
+/// 设计映射
 /// - 四枚爪印 = 四系宠物（猫/犬/兔/鼠），也暗合四维陪伴维度；
 /// - 爪印全 90°、上下两行奇偶错位——左右脚印交替前行的行进感；
-/// - 加载推进 = 宠物一步步走过：爪印依次点亮回弹、点亮瞬间脉冲圈、先前的渐隐，
-///   循环重启即「旅程继续」。
-/// - 爪印字形与提示弹窗同源（Material Icons.pets，20261028 按用户反馈重绘）。
+/// - 加载推进 = 宠物一步步走过：爪印依次点亮回弹、点亮瞬间脉冲圈、先前的渐隐
+/// 循环重启即「旅程继续」。
+/// - 爪印字形与提示弹窗同源（Material Icons.pets）。
 ///
-/// 实现：单 AnimationController 循环 + CustomPaint 确定性绘制（无外部资源），
+/// 实现：单 AnimationController 循环 + CustomPaint 确定性绘制（无外部资源）
 /// 纯装饰组件（不含交互）。颜色取主题 primary。
 class PetPawLoading extends StatefulWidget {
   const PetPawLoading({super.key, this.width = 84, this.color});

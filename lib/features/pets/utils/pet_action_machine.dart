@@ -3,13 +3,13 @@ import '../../../constants/pet_render.dart';
 
 /// 2D 动作仲裁器：决定「此刻舞台上应该播哪个动作」。
 ///
-/// 口径来自需求 §11.3（2026-10-08 修订：核心 5 + 氛围 1；happy 并入 petted、
-/// walk 移出定版集）——优先级与互斥沿用原触发矩阵：
-/// `evolve`（独占）> `eat` = `petted` > `sad` > `sleep` > `idle`，
+/// 口径来自需求 §11.3（核心 5 + 氛围 1；happy 并入 petted、
+///  walk 移出触发集）——优先级与互斥沿用原触发矩阵
+/// `evolve`（独占）> `eat` = `petted` > `sad` > `sleep` > `idle`
 /// 高优先级打断低优先级，一次性动作演完回落到环境态（低状态时回落到 sad）。
 ///
 /// **只做仲裁，不做计时**：播放时长是本文件的编排常量（表现层属性，不是业务
-/// 阈值，故不受铁律 2 的「数值必须后台可配」约束）；业务阈值（饱食/心情/时段/
+///  阈值，故不受铁律 2 的「数值必须后台可配」约束）；业务阈值（饱食/心情/时段/
 /// 空闲秒数）一律读 `pet_config`，本类不写任何数值默认。
 ///
 /// 纯 Dart，无 Flutter 依赖，便于单测与被成长/孵化页复用。
@@ -24,8 +24,8 @@ class PetActionMachine {
   /// 当前正在播放的动作
   PetAction get current => _current;
 
-  /// 环境态覆盖（2026-10-08 §11.3 修订接线）：低状态（饱食/心情低于历险出发
-  /// 阈值，同一口径零新增配置）时由页面注入 [PetAction.sad]，恢复后置回 null。
+  /// 环境态覆盖：低状态（饱食/心情低于历险出发
+  ///  阈值，同一口径零新增配置）时由页面注入 [PetAction.sad]，恢复后置回 null。
   /// null = 常态 idle；sleep（夜间/久无操作）仍待 pet_config 阈值接线
   /// （铁律 2：客户端不写默认值），接线后在同一点扩展。
   PetAction? ambientOverride;
@@ -52,8 +52,8 @@ class PetActionMachine {
     return true;
   }
 
-  /// 一次性动作播完：回落到环境态（[_current] 仍是 [action] 时才回落，
-  /// 避免迟到的定时器把更高优先级的新动作打回 idle）
+  /// 一次性动作播完：回落到环境态（[_current] 仍是 [action] 时才回落
+  ///  避免迟到的定时器把更高优先级的新动作打回 idle）
   void finish(PetAction action) {
     if (_current == action && !action.ambient) _current = ambient;
   }

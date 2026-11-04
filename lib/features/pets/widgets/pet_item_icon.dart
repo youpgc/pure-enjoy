@@ -2,15 +2,15 @@ import 'package:flutter/foundation.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
-/// 宠物道具/界面图标（洛克风 SVG，2026-09-17 拍板稿落地）
+/// 宠物道具/界面图标（洛克风 SVG）
 ///
 /// 资源约定：pet_items.icon 形如 icon/<key>，双端资源
 /// assets/pets/items/<key>.svg（App）与 public/pet-icons/<key>.svg（Admin）。
 /// 无键或资源缺失时回退 [fallback] Material 图标（与旧版渲染一致）。
 ///
-/// 主题道具特例（icon/theme_<x>，20261027）：直用场景实景缩略图
+/// 主题道具特例（icon/theme_<x>）：直用场景实景缩略图
 /// assets/pets/scenes/scene_<x>.png（双端同名同步，实景比通用 svg 可辨识；
-/// 新增场景主题无需再补 svg，缺失时仍回退 [fallback]）。
+///  新增场景主题无需再补 svg，缺失时仍回退 [fallback]）。
 class PetItemIcon extends StatelessWidget {
   const PetItemIcon({
     super.key,

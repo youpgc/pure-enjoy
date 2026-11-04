@@ -20,11 +20,11 @@ import '../widgets/pet_loading.dart';
 
 /// 孵蛋页（P2：即开 + 等待孵化双通道）
 ///
-/// 状态机与服务端一致（[PetEggStatus]）：
+/// 状态机与服务端一致（[PetEggStatus]）
 /// - instant 蛋：unopened →（rpc_pet_hatch_instant）出宠；
 /// - wait 蛋：unopened →（rpc_pet_hatch_wait）waiting →（到点或加速）ready
-///   →（rpc_pet_hatch_instant）出宠；服务端闸门 PET_EGG_NOT_READY。
-/// 加速两档（rpc_pet_hatch_accelerate）：道具档读 pet_items.effect.minutes，
+/// →（rpc_pet_hatch_instant）出宠；服务端闸门 PET_EGG_NOT_READY。
+/// 加速两档（rpc_pet_hatch_accelerate）：道具档读 pet_items.effect.minutes
 /// 金币档读 pet_config.reserved.hatch.accel_gold——**均不在客户端写死**。
 class PetEggScreen extends StatefulWidget {
   const PetEggScreen({super.key});
@@ -48,7 +48,7 @@ class _PetEggScreenState extends State<PetEggScreen> {
 
   /// 已触发过到点重拉的蛋 id：重拉后服务端仍未翻转（时钟偏差）或拉取失败时
   /// 不再逐秒重试（否则退化为 1Hz 轮询打点服务端）——用户可下拉手动刷新
-  /// （复审批 20261012）
+  ///
   final Set<String> _reloadedEggs = {};
 
   @override
@@ -58,8 +58,8 @@ class _PetEggScreenState extends State<PetEggScreen> {
     // 倒计时逐秒刷新（仅在有 waiting 蛋时重绘，避免无谓 setState）
     _tick = Timer.periodic(const Duration(seconds: 1), (_) {
       if (!mounted) return;
-      // wait 蛋到点：ready 是服务端状态，客户端倒计时归零必须重拉，
-      // 否则主按钮恒为禁用的 00:00:00、「领取」永不出现（审计批 20261012）
+      // wait 蛋到点：ready 是服务端状态，客户端倒计时归零必须重拉
+      // 否则主按钮恒为禁用的 00:00:00、「领取」永不出现
       final due = _eggs.where((e) =>
           e.remaining == Duration.zero && !_reloadedEggs.contains(e.id));
       if (!_reloadingForReady && due.isNotEmpty) {
@@ -115,7 +115,7 @@ class _PetEggScreenState extends State<PetEggScreen> {
 
   /// 出宠（instant 蛋直接孵 / wait 蛋到点领取），服务端同一函数
   Future<void> _hatch(PetEggModel egg) => _run(egg.id, () async {
-        // 初始蛋自选种属（20261022 拍板）：选系孵化，未开启自选走固定产出原路
+        // 初始蛋自选种属：选系孵化，未开启自选走固定产出原路
         PetHatchResultModel? result;
         if (egg.poolCode == 'initial_ssr') {
           result = await hatchInitialEggWithChoice(context, eggId: egg.id);

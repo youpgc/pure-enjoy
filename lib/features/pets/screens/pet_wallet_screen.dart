@@ -18,13 +18,13 @@ import '../widgets/pet_loading.dart';
 
 /// 宠物钱包页（我的页「宠物钱包」入口的独立落点，不进宠物主页）
 ///
-/// 数据源（均本人 RLS 可读）：
+/// 数据源（均本人 RLS 可读）
 /// - `pet_wallets`：余额行（gold_balance / total_earned / total_spent）；
-///   行可能尚未创建（未发生过任何金币变动），按 0 兜底展示。
+/// 行可能尚未创建（未发生过任何金币变动），按 0 兜底展示。
 /// - `pet_wallet_records`：append-only 流水（delta / balance_after /
-///   source_type / remark），倒序取最近 50 条。
+///  source_type / remark），倒序取最近 50 条。
 /// - `pet_config.points_per_gold` + users 统计列 available_points：兑换区块的
-///   汇率与可用积分（走轻量 GET，不触发 rpc_pet_summary 的初始包发放副作用）。
+/// 汇率与可用积分（走轻量 GET，不触发 rpc_pet_summary 的初始包发放副作用）。
 ///
 /// 兑换为**单向**（积分 → 金币，服务端 rpc_pet_exchange 同一事务双账本）；
 /// 金币 → 积分禁止，页内不提供反向入口。
@@ -47,18 +47,16 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   int _totalSpent = 0;
   List<Map<String, dynamic>> _records = const [];
 
-  /// 积分 → 金币兑换（P1 经济闭环：服务端 rpc_pet_exchange 早已部署，
-  /// 此前 App 无入口，用户只能攒积分换不到金币）
+  /// 积分 → 金币兑换（P1 经济闭环：服务端 rpc_pet_exchange）
   final TextEditingController _goldCtrl = TextEditingController();
   int _availablePoints = 0;
   /// 积分→金币汇率（pet_config.points_per_gold；null = 配置未取到——
-  /// 此前静默兜底 10 参与预检与文案，与 rpc_pet_exchange 真实汇率漂移
-  /// （审计批 20261012）：缺配置时禁用兑换区，不造默认值）
+  ///  缺配置时禁用兑换区，不造默认值）
   int? _pointsPerGold;
   bool _exchanging = false;
 
-  /// 流水来源中文（值域单一源 = [PetWalletSourceType]，铁律 12：不再另立一张表，
-  /// 否则新增来源如 P2 `pet_feature_spend` 会在页面上直接露出英文码）
+  /// 流水来源中文（值域单一源 = [PetWalletSourceType]，铁律 12：不再另立一张表
+  ///  否则新增来源如 P2 `pet_feature_spend` 会在页面上直接露出英文码）
   static String _sourceLabel(String code) {
     if (code.isEmpty) return '其他';
     return PetWalletSourceType.fromCode(code)?.label ?? code;
@@ -76,7 +74,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
     super.dispose();
   }
 
-  /// 兑换成功后积分账本已由服务端改写（point_records + users 统计列），
+  /// 兑换成功后积分账本已由服务端改写（point_records + users 统计列）
   /// 广播 pointsUpdated 让积分页/我的页同步刷新（与游戏发奖同一套路）
   Future<void> _exchange() async {
     if (_exchanging) return;
@@ -232,7 +230,7 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
       );
     }
 
-    // 布局定版(20261021):余额卡固定不滚动,只有流水列表区滚动
+    // 布局：余额卡固定不滚动,只有流水列表区滚动
     return Column(
       children: [
         // 固定区:余额卡 + 兑换区块

@@ -34,8 +34,8 @@ class PetShopItemModel {
   final bool pointsPurchasable;
   final String? ladderKey; // 扩容阶梯道具（购买即生效）
 
-  /// 阶梯步号（扩容道具专用；商城「只展示当前可购档」过滤依据，
-  /// summary/shop items 2026-10-21 起下发）
+  /// 阶梯步号（扩容道具专用；商城「只展示当前可购档」过滤依据
+  ///  summary/shop items 下发）
   final int? ladderStep;
   final String? description;
 
@@ -51,7 +51,7 @@ class PetShopItemModel {
   /// 商城分类栏的**全部**分类（左侧栏按此顺序出项）。
   ///
   /// 与 [categoryLabel] 的返回值一一对应，**新增分类必须两处同补**（同文件相邻
-  /// 位置），否则会出现点了没有商品的分类、或有商品却进不去任何分类。
+  ///  位置），否则会出现点了没有商品的分类、或有商品却进不去任何分类。
   static const List<String> categoryLabels = [
     '宠物蛋',
     '消耗品',
@@ -63,11 +63,11 @@ class PetShopItemModel {
     '其他',
   ];
 
-  /// 分类页签归属：消耗品（食物/医疗/清洁/玩具/救援合并展示，2026-11-03）+
+  /// 分类页签归属：消耗品（食物/医疗/清洁/玩具/救援合并展示）+
   /// 扩容 + 宠物蛋 / 进化 / 加速 / 洗练 / 解锁
   ///
-  /// 键域 = `pet_items.sub_type`（无 DDL CHECK，取值见种子
-  /// `feature_pet_p2_seed_20260923.sql` §2）；未列出的 sub_type 归「其他」。
+  /// 键域 = `pet_items.sub_type`（无 DDL CHECK）；
+  /// 种子未列出的 sub_type 归「其他」。
   /// refine 与 trait_wash 同归洗练；exp_double 与孵化加速同归加速。
   String get categoryLabel {
     if (isExpansion) return '扩容';
@@ -138,7 +138,7 @@ class PetHatchResultModel {
 }
 
 /// 商城满格腾位选项（rpc_pet_shop_buy 返回 status='bag_full' 时的 next_expand；
-/// null = 已达扩容上限、无可购的下一级）
+///  null = 已达扩容上限、无可购的下一级）
 class PetBagFullExpandModel {
   const PetBagFullExpandModel({
     required this.itemId,
@@ -166,9 +166,7 @@ class PetBagFullExpandModel {
 ///
 /// - status='ok'：已扣款入包；
 /// - status='bag_full'：容量预检未过、**未扣款**，携带腾位所需信息——按需求
-///   §5.4 走腾位流程（有下一级扩容 → 引导购买后重试；无 → 引导清理背包）。
-///   此前服务层仅透传 'bag_full' 字符串、丢弃腾位载荷，决策链在服务层断链
-///   （审计批 20261012 修复）。
+/// §5.4 走腾位流程（有下一级扩容 → 引导购买后重试；无 → 引导清理背包）。
 class PetShopBuyResultModel {
   const PetShopBuyResultModel({
     required this.status,

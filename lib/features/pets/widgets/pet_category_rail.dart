@@ -11,12 +11,12 @@ class PetCategoryItem {
 
 /// 宠物模块分类导航（背包页 / 商城页共用）
 ///
-/// 定版布局（2026-09-24 二次修订）：左侧竖排**贴边栅格**——项与项之间零间距、
+/// 布局：左侧竖排**贴边栅格**——项与项之间零间距、
 /// 无圆角无边框，只用一条分隔线隔离相邻分类；选中态靠整格底色区分。
 /// 分类从顶部横排 chip 改来时解决的问题仍然成立：一屏放得下的分类数不受横向
 /// 宽度限制，超出时右侧显形滚动条。
 ///
-/// 自带 [ScrollController]：`thumbVisibility` 与拖动都依赖 controller，
+/// 自带 [ScrollController]：`thumbVisibility` 与拖动都依赖 controller
 /// 不显式给出时只能靠 PrimaryScrollController 兜底（嵌套在 Row 里时不保证命中）。
 class PetCategoryRail extends StatefulWidget {
   const PetCategoryRail({
