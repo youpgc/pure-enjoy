@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·羊力大仙（车迟国）（elite） -->
+
+  <path d="M14 46 Q8 30 18 20 Q28 12 40 16 Q52 20 54 32 Q56 44 48 48 Z" fill="#4A463E"/>
+  <path d="M18 48 L16 58 L22 58 L24 49 Z" fill="#2E3442"/>
+  <path d="M30 49 L29 58 L35 58 L35 49 Z" fill="#2E3442"/>
+  <path d="M40 49 L41 58 L47 58 L45 48 Z" fill="#2E3442"/>
+  <path d="M46 18 Q54 10 58 14 L52 24 Z" fill="#4A463E"/>
+  <path d="M48 12 L46 4 L54 10 Z" fill="#2E3442"/>
+  <path d="M56 13 L60 6 L60 15 Z" fill="#2E3442"/>
+  <circle cx="52" cy="19" r="1.8" fill="#B98F3E"/>
+  <path d="M20 34 Q30 28 44 34 Q34 40 20 34 Z" fill="#B98F3E" opacity="0.35"/>
+</svg>

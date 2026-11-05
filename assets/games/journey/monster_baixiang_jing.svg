@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·白象精（狮驼岭）（elite） -->
+
+  <path d="M12 48 Q8 30 20 20 Q34 12 46 20 Q56 28 52 42 Q50 50 42 50 Z" fill="#4E5054"/>
+  <path d="M16 50 L14 58 L21 58 L23 51 Z" fill="#2E3442"/>
+  <path d="M34 51 L33 58 L40 58 L40 51 Z" fill="#2E3442"/>
+  <path d="M48 26 Q58 28 56 38 Q54 46 48 44 Q52 40 50 34 Q48 30 46 30 Z" fill="#4E5054"/>
+  <path d="M50 32 L56 34 L50 36 Z" fill="#B98F3E"/>
+  <circle cx="50" cy="24" r="1.8" fill="#B98F3E"/>
+  <path d="M20 36 Q32 30 44 36 Q32 42 20 36 Z" fill="#B98F3E" opacity="0.25"/>
+</svg>

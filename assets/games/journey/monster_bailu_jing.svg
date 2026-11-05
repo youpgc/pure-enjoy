@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·白鹿精（比丘国·国丈）（boss） -->
+
+  <path d="M16 48 Q12 34 22 26 Q32 20 42 26 Q50 32 48 42 Q46 48 38 48 Z" fill="#4E4A3E"/>
+  <path d="M17 50 L15 58 L22 58 L24 51 Z" fill="#2E3442"/>
+  <path d="M35 51 L34 58 L41 58 L41 51 Z" fill="#2E3442"/>
+  <path d="M40 26 Q40 12 34 8 M40 26 Q46 14 52 10 M34 10 L34 4 M52 10 L56 4" stroke="#2E3442" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <circle cx="46" cy="24" r="1.8" fill="#E8C470"/>
+  <path d="M20 38 Q32 33 44 38 Q32 43 20 38 Z" fill="#E8C470" opacity="0.3"/>
+</svg>

@@ -94,7 +94,7 @@ flutter:
     - assets/audio/
     - assets/games/icons/
     - assets/games/backgrounds/
-    - assets/games/backgrounds/
+    - assets/games/journey/
     - assets/games/achievements/
     - assets/games/match3/
     - assets/games/items/

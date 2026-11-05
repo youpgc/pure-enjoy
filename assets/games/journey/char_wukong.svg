@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 悟空：金箍 + 红金战甲 + 金箍棒 + 尾巴 -->
+  <defs>
+    <linearGradient id="wkArmor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D8543A"/>
+      <stop offset="1" stop-color="#8E3120"/>
+    </linearGradient>
+    <linearGradient id="wkGold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6E3B4"/>
+      <stop offset="1" stop-color="#C79A45"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 尾巴 -->
+  <path d="M148 190 C186 184 196 156 182 136 C176 128 168 130 170 138 C180 154 168 172 144 178 Z" fill="#B8622F"/>
+
+  <g>
+    <!-- 战裙下摆 -->
+    <path d="M80 172 C76 214 68 244 62 266 L158 266 C152 244 144 214 140 172 Z" fill="url(#wkArmor)"/>
+    <path d="M92 176 L128 176 L124 210 L96 210 Z" fill="url(#wkGold)" opacity="0.85"/>
+    <!-- 虎皮裙 -->
+    <path d="M84 208 Q110 222 136 208 L140 236 Q110 250 80 236 Z" fill="#E8B44C"/>
+    <g stroke="#5C3A12" stroke-width="2.4" opacity="0.7">
+      <path d="M92 212 L98 234" fill="none"/>
+      <path d="M110 216 L110 240" fill="none"/>
+      <path d="M128 212 L122 234" fill="none"/>
+    </g>
+    <!-- 躯干 -->
+    <path d="M88 128 Q110 118 132 128 L138 176 Q110 188 82 176 Z" fill="url(#wkArmor)"/>
+    <!-- 披肩金环 -->
+    <path d="M88 132 Q110 144 132 132" fill="none" stroke="url(#wkGold)" stroke-width="4"/>
+    <!-- 头 -->
+    <circle cx="110" cy="96" r="26" fill="#F0C89A"/>
+    <!-- 猴脸 -->
+    <path d="M92 96 Q110 84 128 96 Q128 116 110 120 Q92 116 92 96 Z" fill="#F6DDB8"/>
+    <circle cx="101" cy="99" r="3" fill="#3A2416"/>
+    <circle cx="119" cy="99" r="3" fill="#3A2416"/>
+    <path d="M103 110 Q110 115 117 110" stroke="#8E4A22" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- 毛腮 -->
+    <path d="M84 88 Q80 104 88 118" stroke="#B8622F" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <path d="M136 88 Q140 104 132 118" stroke="#B8622F" stroke-width="3" fill="none" stroke-linecap="round"/>
+    <!-- 金箍 -->
+    <path d="M87 82 Q110 72 133 82" fill="none" stroke="url(#wkGold)" stroke-width="5.5" stroke-linecap="round"/>
+    <!-- 雉鸡翎 -->
+    <path d="M128 66 Q152 44 168 50 Q152 58 140 74 Z" fill="#4A7A4E"/>
+    <!-- 帅盔翎翅 -->
+    <path d="M92 64 Q74 56 68 44 Q84 50 96 60 Z" fill="#D8543A"/>
+  </g>
+
+  <!-- 金箍棒（斜扛） -->
+  <g stroke-linecap="round">
+    <line x1="58" y1="252" x2="178" y2="76" stroke="#C79A45" stroke-width="9"/>
+    <line x1="58" y1="252" x2="178" y2="76" stroke="#8E3120" stroke-width="9" stroke-dasharray="10 16" opacity="0.9"/>
+    <circle cx="58" cy="252" r="7" fill="url(#wkGold)"/>
+    <circle cx="178" cy="76" r="7" fill="url(#wkGold)"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 272 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#E8C470" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

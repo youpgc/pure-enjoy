@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 舍利子 -->
+  <circle cx="24" cy="23" r="9" fill="#E8C470"/>
+  <path d="M24 15 Q30 20 28 27 Q26 32 24 32 Q22 32 20 27 Q18 20 24 15 Z" fill="#F6E3B4"/>
+  <path d="M12 38 q12 -6 24 0" stroke="#E8C470" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <path d="M14 42 h20" stroke="#E8C470" stroke-width="1.4" opacity="0.6" stroke-linecap="round"/>
+</svg>

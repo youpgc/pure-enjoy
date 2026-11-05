@@ -1,0 +1,30 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·百眼魔君（黄花观·蜈蚣精）（boss） -->
+
+  <circle cx="32" cy="34" r="12" fill="#3E4432"/>
+  <circle cx="32" cy="18" r="6" fill="#3E4432"/>
+  <path d="M24 24 Q17 13 10 14" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M24 28 Q16 21 8 26" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M26 32 Q19 31 12 42" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M28 36 Q23 37 18 50" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M40 24 Q47 13 54 14" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M40 28 Q48 21 56 26" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M38 32 Q45 31 52 42" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <path d="M36 36 Q41 37 46 50" stroke="#2E3442" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+  <circle cx="26" cy="15" r="0.9" fill="#E8C470"/>
+  <circle cx="26" cy="18" r="0.9" fill="#E8C470"/>
+  <circle cx="26" cy="21" r="0.9" fill="#E8C470"/>
+  <circle cx="29" cy="15" r="0.9" fill="#E8C470"/>
+  <circle cx="29" cy="18" r="0.9" fill="#E8C470"/>
+  <circle cx="29" cy="21" r="0.9" fill="#E8C470"/>
+  <circle cx="32" cy="15" r="0.9" fill="#E8C470"/>
+  <circle cx="32" cy="18" r="0.9" fill="#E8C470"/>
+  <circle cx="32" cy="21" r="0.9" fill="#E8C470"/>
+  <circle cx="35" cy="15" r="0.9" fill="#E8C470"/>
+  <circle cx="35" cy="18" r="0.9" fill="#E8C470"/>
+  <circle cx="35" cy="21" r="0.9" fill="#E8C470"/>
+  <circle cx="38" cy="15" r="0.9" fill="#E8C470"/>
+  <circle cx="38" cy="18" r="0.9" fill="#E8C470"/>
+  <circle cx="38" cy="21" r="0.9" fill="#E8C470"/>
+  <path d="M26 30 Q32 26 38 30" stroke="#E8C470" stroke-width="1.4" fill="none" opacity="0.4"/>
+</svg>

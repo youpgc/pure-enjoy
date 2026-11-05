@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 宝箱：鎏金木箱 + 锁扣 -->
+  <ellipse cx="24" cy="43" rx="12" ry="2.5" fill="#4A3220" opacity="0.3"/>
+  <rect x="10" y="24" width="28" height="14" rx="2" fill="#8A5A3A"/>
+  <path d="M10 24 Q10 14 24 14 Q38 14 38 24 Z" fill="#A06C44"/>
+  <path d="M10 24 h28" stroke="#5C3A1D" stroke-width="2"/>
+  <rect x="21" y="22" width="6" height="8" rx="1.5" fill="#E8C470"/>
+  <circle cx="24" cy="26" r="1.4" fill="#5C3A1D"/>
+  <path d="M12 18 L16 22 M36 18 L32 22" stroke="#F6E3B4" stroke-width="1.4" opacity="0.8"/>
+</svg>

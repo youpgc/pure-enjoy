@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 捆仙索 -->
+  <path d="M10 16 Q24 6 38 16 Q46 22 38 28 Q24 36 14 26 Q8 20 10 16 Z" fill="none" stroke="#E8C470" stroke-width="3.2"/>
+  <path d="M14 24 Q20 30 28 30" stroke="#B98F3E" stroke-width="2.6" fill="none" stroke-linecap="round"/>
+  <path d="M34 30 q4 4 1 8" stroke="#D4593F" stroke-width="2" fill="none" stroke-linecap="round"/>
+  <circle cx="36" cy="14" r="2" fill="#F6E3B4"/>
+</svg>

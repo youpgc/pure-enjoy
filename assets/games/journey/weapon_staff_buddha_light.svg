@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 禅杖·佛光弹 -->
+  <line x1="17" y1="42" x2="17" y2="18" stroke="#8A5A3A" stroke-width="4" stroke-linecap="round"/>
+  <circle cx="17" cy="12" r="7" fill="none" stroke="#F6E3B4" stroke-width="2.6"/>
+  <circle cx="17" cy="12" r="2" fill="#F6E3B4"/>
+  <circle cx="34" cy="20" r="5" fill="#F6E3B4" opacity="0.9"/>
+  <circle cx="34" cy="20" r="8.5" fill="none" stroke="#E8C470" stroke-width="1.2" opacity="0.7"/>
+  <path d="M30 30 L38 30 L34 36 Z" fill="#D4593F"/>
+</svg>

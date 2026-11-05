@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·有来有去（朱紫国小妖）（elite） -->
+
+  <path d="M24 54 Q20 40 25 30 Q32 25 39 30 Q44 40 40 54 Z" fill="#4E4438"/>
+  <circle cx="32" cy="22" r="8" fill="#4E4438"/>
+  <circle cx="29" cy="21" r="1.4" fill="#B98F3E"/>
+  <circle cx="35" cy="21" r="1.4" fill="#B98F3E"/>
+  <path d="M44 10 L44 34" stroke="#2E3442" stroke-width="2"/>
+  <path d="M44 10 L56 14 L44 20 Z" fill="#B98F3E" opacity="0.7"/>
+</svg>

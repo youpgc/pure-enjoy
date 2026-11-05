@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" width="24" height="24">
+  <!-- 功德铜钱（UI） -->
+  <circle cx="12" cy="12" r="10" fill="#D8B25E"/>
+  <circle cx="12" cy="12" r="10" fill="none" stroke="#8E6E28" stroke-width="1.6"/>
+  <rect x="8.5" y="8.5" width="7" height="7" fill="#8E6E28"/>
+  <rect x="9.8" y="9.8" width="4.4" height="4.4" fill="#5C3A1D"/>
+</svg>

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·山魈 -->
+  <ellipse cx="32" cy="42" rx="15" ry="13" fill="#4E5A44"/>
+  <circle cx="32" cy="27" r="11.5" fill="#5C6A50"/>
+  <path d="M24 16 L28 6 L32 15 L36 6 L40 16 Z" fill="#3A4432"/>
+  <circle cx="28" cy="26" r="1.8" fill="#E8C470"/><circle cx="36" cy="26" r="1.8" fill="#E8C470"/>
+  <path d="M28 32 q4 2 8 0" stroke="#2E3828" stroke-width="1.5" fill="none"/>
+  <path d="M20 40 Q12 38 12 30" stroke="#5C6A50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <path d="M44 40 Q52 38 52 30" stroke="#5C6A50" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

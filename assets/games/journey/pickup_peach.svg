@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 蟠桃（治疗） -->
+  <ellipse cx="24" cy="42" rx="10" ry="2.5" fill="#4A3220" opacity="0.3"/>
+  <path d="M24 14 Q10 16 11 28 Q12 38 24 40 Q36 38 37 28 Q38 16 24 14 Z" fill="#E88A8A"/>
+  <path d="M24 14 Q18 20 20 30 Q22 36 24 40" fill="none" stroke="#C05A5A" stroke-width="1.4"/>
+  <path d="M24 12 Q24 6 30 5 Q30 11 24 12 Z" fill="#6A8A5A"/>
+  <line x1="24" y1="12" x2="24" y2="15" stroke="#5C3A1D" stroke-width="1.6"/>
+  <ellipse cx="18" cy="24" rx="3" ry="5" fill="#F6C8C8" opacity="0.7" transform="rotate(-20 18 24)"/>
+</svg>

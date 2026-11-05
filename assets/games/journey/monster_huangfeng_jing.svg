@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·黄风怪（妖王） -->
+  <path d="M16 44 Q12 22 24 15 Q32 10 40 15 Q52 22 48 44 Z" fill="#B08E3E"/>
+  <path d="M24 18 L20 2 L30 12 L32 0 L34 12 L44 2 L40 18 Z" fill="#8E6E28"/>
+  <circle cx="26" cy="23" r="2.4" fill="#F6E3B4"/><circle cx="38" cy="23" r="2.4" fill="#F6E3B4"/>
+  <path d="M26 31 q6 3 12 0" stroke="#6E5218" stroke-width="2" fill="none"/>
+  <path d="M12 30 Q2 24 6 14 Q14 18 18 24 Z" fill="#D9C68A" opacity="0.85"/>
+  <path d="M52 30 Q62 24 58 14 Q50 18 46 24 Z" fill="#D9C68A" opacity="0.85"/>
+  <path d="M22 44 Q32 50 42 44 L40 54 Q32 58 24 54 Z" fill="#8E6E28"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

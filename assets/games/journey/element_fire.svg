@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 56 56" width="56" height="56">
+  <!-- 火：离火三焰 -->
+  <circle cx="28" cy="28" r="24" fill="#3A221C"/>
+  <circle cx="28" cy="28" r="24" fill="none" stroke="#D4593F" stroke-width="2"/>
+  <path d="M28 8 Q36 18 34 26 Q40 22 40 28 Q40 42 28 46 Q16 42 16 28 Q16 20 22 14 Q20 22 26 24 Q24 16 28 8 Z" fill="#D4593F"/>
+  <path d="M28 26 Q32 32 30 36 Q28 40 26 36 Q24 32 28 26 Z" fill="#F6C870"/>
+</svg>

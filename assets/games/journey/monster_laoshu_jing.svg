@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·金鼻白毛老鼠精（无底洞）（boss） -->
+
+  <path d="M16 46 Q12 34 22 28 Q32 22 42 28 Q50 32 48 42 Q46 48 38 48 Z" fill="#4E463C"/>
+  <path d="M22 28 Q16 16 24 18 Q28 22 27 27 Z" fill="#2E3442"/>
+  <path d="M38 28 Q44 16 36 18 Q32 22 33 27 Z" fill="#2E3442"/>
+  <path d="M48 40 Q58 40 56 32" stroke="#2E3442" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <path d="M44 34 Q50 34 49 38 Q46 40 44 37 Z" fill="#E8C470"/>
+  <circle cx="40" cy="31" r="1.5" fill="#E8C470"/>
+  <circle cx="34" cy="31" r="1.5" fill="#E8C470"/>
+</svg>

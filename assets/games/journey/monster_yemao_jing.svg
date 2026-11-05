@@ -1,0 +1,13 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·野猫精（精英） -->
+  <ellipse cx="32" cy="43" rx="15" ry="12" fill="#5A4A3E"/>
+  <circle cx="32" cy="26" r="11" fill="#6A5A4C"/>
+  <path d="M22 17 L26 5 L31 15 Z" fill="#5A4A3E"/><path d="M42 17 L38 5 L33 15 Z" fill="#5A4A3E"/>
+  <ellipse cx="32" cy="30" rx="5" ry="3.5" fill="#D8C8B0"/>
+  <circle cx="29.5" cy="25" r="2" fill="#E8C470"/><circle cx="34.5" cy="25" r="2" fill="#E8C470"/>
+  <circle cx="29.5" cy="25" r="0.8" fill="#1A1208"/><circle cx="34.5" cy="25" r="0.8" fill="#1A1208"/>
+  <path d="M27 32 h10" stroke="#3A2E24" stroke-width="1.5"/>
+  <path d="M18 40 Q10 44 12 52 M46 40 Q54 44 52 52" stroke="#5A4A3E" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <circle cx="32" cy="41" r="21" fill="none" stroke="#E8C470" stroke-width="1.5" opacity="0.6"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

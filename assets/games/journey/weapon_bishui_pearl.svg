@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 避水珠 -->
+  <circle cx="24" cy="25" r="11" fill="#5B9BD5" opacity="0.85"/>
+  <path d="M17 21 q5 -5 10 0" stroke="#E8F4F8" stroke-width="2" fill="none" opacity="0.85"/>
+  <ellipse cx="19.5" cy="29" rx="2.5" ry="1.4" fill="#E8F4F8" opacity="0.6"/>
+  <path d="M10 40 q7 -4 14 0 q7 4 14 0" stroke="#5B9BD5" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+  <circle cx="31" cy="19" r="2" fill="#F6E3B4" opacity="0.9"/>
+</svg>

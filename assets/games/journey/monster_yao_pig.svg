@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·野猪精 -->
+  <ellipse cx="32" cy="42" rx="17" ry="13" fill="#8C7A94"/>
+  <ellipse cx="32" cy="46" rx="12" ry="8" fill="#B8A8C4"/>
+  <circle cx="32" cy="30" r="11" fill="#B8A8C4"/>
+  <ellipse cx="32" cy="33" rx="6" ry="4.5" fill="#E8C4B0"/>
+  <circle cx="30" cy="33" r="1.4" fill="#3A2A1C"/><circle cx="34" cy="33" r="1.4" fill="#3A2A1C"/>
+  <path d="M23 22 q-3 -7 2 -9 q4 3 3 8" fill="#8C7A94"/><path d="M41 22 q3 -7 -2 -9 q-4 3 -3 8" fill="#8C7A94"/>
+  <path d="M27 27 q5 -3 10 0" stroke="#6A5A7A" stroke-width="1.5" fill="none"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

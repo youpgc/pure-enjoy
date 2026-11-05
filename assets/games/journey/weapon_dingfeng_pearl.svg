@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 定风珠 -->
+  <circle cx="24" cy="24" r="10" fill="#8E6E9E" opacity="0.9"/>
+  <circle cx="24" cy="24" r="10" fill="none" stroke="#C79AC0" stroke-width="1.6"/>
+  <path d="M8 24 Q14 18 20 24 Q26 30 32 24 Q36 20 40 24" stroke="#E8D9F4" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.8"/>
+  <path d="M36 12 L42 8 M40 16 L44 14" stroke="#F6E3B4" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

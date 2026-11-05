@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 反伤荆棘 -->
+  <path d="M8 34 Q16 26 24 32 Q32 38 40 30" stroke="#5C7A4E" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <g stroke="#7A9E6A" stroke-width="2.2" stroke-linecap="round">
+    <path d="M14 29 L12 20"/><path d="M20 27 L19 17"/><path d="M27 29 L28 18"/><path d="M34 28 L37 19"/>
+  </g>
+  <path d="M12 20 l-3 2 M19 17 l-3 1.6 M28 18 l3 1.4 M37 19 l3 1.8" stroke="#7A9E6A" stroke-width="2" stroke-linecap="round"/>
+  <path d="M36 36 q4 2 6 -1" stroke="#D4593F" stroke-width="2" fill="none" stroke-linecap="round"/>
+</svg>

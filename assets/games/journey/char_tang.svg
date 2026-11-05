@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 唐僧：五佛冠 + 金襕袈裟 + 禅杖 + 背光 -->
+  <defs>
+    <radialGradient id="tangHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F6E3B4" stop-opacity="0.55"/>
+      <stop offset="0.7" stop-color="#F6E3B4" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#F6E3B4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tangRobe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F3D98A"/>
+      <stop offset="1" stop-color="#C79A45"/>
+    </linearGradient>
+    <linearGradient id="tangKasaya" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#B8543A"/>
+      <stop offset="1" stop-color="#7C3423"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#tangHalo)"/>
+
+  <!-- 身影 -->
+  <g>
+    <!-- 袈裟下摆 -->
+    <path d="M74 160 C70 210 62 246 56 268 L164 268 C158 246 150 210 146 160 Z" fill="url(#tangRobe)"/>
+    <!-- 袈裟披巾（左肩至右腰） -->
+    <path d="M78 148 C82 190 96 224 110 244 C124 224 138 190 142 148 C132 162 88 162 78 148 Z" fill="url(#tangKasaya)"/>
+    <path d="M86 152 L134 152" stroke="#F6E3B4" stroke-width="2" opacity="0.6"/>
+    <!-- 胸前襟口 -->
+    <path d="M96 150 L110 176 L124 150" fill="none" stroke="#8A5A2B" stroke-width="2"/>
+    <!-- 双手合十 -->
+    <circle cx="110" cy="188" r="9" fill="#F0D5B0"/>
+    <!-- 头 -->
+    <circle cx="110" cy="118" r="24" fill="#F6DFC0"/>
+    <!-- 五佛冠 -->
+    <path d="M86 108 L98 92 L110 86 L122 92 L134 108 L134 100 Q122 82 110 82 Q98 82 86 100 Z" fill="url(#tangRobe)"/>
+    <rect x="86" y="104" width="48" height="7" rx="3" fill="#B8543A"/>
+    <circle cx="98" cy="90" r="3.2" fill="#F6E3B4"/>
+    <circle cx="110" cy="85" r="3.6" fill="#F6E3B4"/>
+    <circle cx="122" cy="90" r="3.2" fill="#F6E3B4"/>
+    <!-- 容颜 -->
+    <circle cx="102" cy="120" r="2.2" fill="#4A3222"/>
+    <circle cx="118" cy="120" r="2.2" fill="#4A3222"/>
+    <path d="M105 130 Q110 133 115 130" stroke="#8A5A2B" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <!-- 耳垂（福相） -->
+    <circle cx="86" cy="122" r="4" fill="#F6DFC0"/>
+    <circle cx="134" cy="122" r="4" fill="#F6DFC0"/>
+  </g>
+
+  <!-- 禅杖（右手侧） -->
+  <g stroke-linecap="round">
+    <line x1="166" y1="120" x2="166" y2="262" stroke="#8A5A2B" stroke-width="5"/>
+    <circle cx="166" cy="106" r="13" fill="none" stroke="#D8B25E" stroke-width="4"/>
+    <circle cx="166" cy="106" r="4" fill="#F6E3B4"/>
+    <path d="M155 96 l-4 -6 M177 96 l4 -6 M155 116 l-4 6 M177 116 l4 6" stroke="#D8B25E" stroke-width="3"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 272 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#E8C470" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

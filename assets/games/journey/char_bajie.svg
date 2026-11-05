@@ -1,0 +1,54 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 八戒：大耳长吻 + 皂色直裰 + 九齿钉耙 -->
+  <defs>
+    <linearGradient id="bjRobe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#3E4A3A"/>
+      <stop offset="1" stop-color="#232B22"/>
+    </linearGradient>
+    <linearGradient id="bjSash" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8B44C"/>
+      <stop offset="1" stop-color="#B07C2C"/>
+    </linearGradient>
+  </defs>
+
+  <g>
+    <!-- 直裰下摆 -->
+    <path d="M70 168 C66 214 58 246 52 268 L168 268 C162 246 154 214 150 168 Z" fill="url(#bjRobe)"/>
+    <path d="M52 268 L168 268 L164 252 L56 252 Z" fill="#1A211A"/>
+    <!-- 躯干 -->
+    <path d="M80 122 Q110 112 140 122 L148 174 Q110 190 72 174 Z" fill="url(#bjRobe)"/>
+    <!-- 肚兜袒露 -->
+    <path d="M94 130 Q110 124 126 130 L128 168 Q110 178 92 168 Z" fill="#E8C49A"/>
+    <path d="M94 130 Q110 140 126 130" fill="none" stroke="url(#bjSash)" stroke-width="3"/>
+    <!-- 腰带 -->
+    <path d="M74 172 Q110 186 146 172 L148 184 Q110 198 72 184 Z" fill="url(#bjSash)"/>
+    <!-- 头 -->
+    <circle cx="110" cy="94" r="30" fill="#E8B48C"/>
+    <!-- 大耳 -->
+    <path d="M80 82 Q54 60 62 44 Q84 52 90 74 Z" fill="#E8B48C"/>
+    <path d="M140 82 Q166 60 158 44 Q136 52 130 74 Z" fill="#E8B48C"/>
+    <path d="M78 78 Q64 64 68 54" fill="none" stroke="#C08858" stroke-width="2.4"/>
+    <path d="M142 78 Q156 64 152 54" fill="none" stroke="#C08858" stroke-width="2.4"/>
+    <!-- 猪吻 -->
+    <ellipse cx="110" cy="108" rx="17" ry="12" fill="#D89A6E"/>
+    <circle cx="104" cy="107" r="2.6" fill="#7C4A2C"/>
+    <circle cx="116" cy="107" r="2.6" fill="#7C4A2C"/>
+    <!-- 眯眼憨笑 -->
+    <path d="M94 90 Q99 86 104 90" stroke="#3A2416" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M116 90 Q121 86 126 90" stroke="#3A2416" stroke-width="2.2" fill="none" stroke-linecap="round"/>
+    <path d="M104 120 Q110 124 116 120" stroke="#7C4A2C" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- 黑头巾 -->
+    <path d="M82 76 Q88 60 110 58 Q132 60 138 76 Q124 68 110 68 Q96 68 82 76 Z" fill="#1A211A"/>
+  </g>
+
+  <!-- 九齿钉耙（右手侧，耙齿朝上） -->
+  <g stroke-linecap="round">
+    <line x1="172" y1="140" x2="172" y2="252" stroke="#6B4423" stroke-width="6"/>
+    <path d="M158 140 L172 108 L186 140" fill="none" stroke="#B8B2A6" stroke-width="5"/>
+    <path d="M163 132 L163 116 M172 128 L172 108 M181 132 L181 116" stroke="#B8B2A6" stroke-width="4"/>
+    <circle cx="172" cy="144" r="5" fill="url(#bjSash)"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 276 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#E8C470" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

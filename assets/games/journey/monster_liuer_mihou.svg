@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·六耳猕猴（真假猴王）（boss） -->
+
+  <path d="M22 52 Q18 36 24 28 Q32 22 40 28 Q46 36 42 52 Z" fill="#463A30"/>
+  <circle cx="32" cy="19" r="7.5" fill="#463A30"/>
+  <circle cx="25" cy="16" r="3.4" fill="#2E3442"/>
+  <circle cx="39" cy="16" r="3.4" fill="#2E3442"/>
+  <circle cx="29" cy="18" r="1.4" fill="#E8C470"/>
+  <circle cx="35" cy="18" r="1.4" fill="#E8C470"/>
+  <path d="M42 50 Q52 48 50 40" stroke="#2E3442" stroke-width="3" fill="none" stroke-linecap="round"/>
+  <path d="M26 38 Q32 34 38 38" stroke="#E8C470" stroke-width="1.5" fill="none" opacity="0.45"/>
+</svg>

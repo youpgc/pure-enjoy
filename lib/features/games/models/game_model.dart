@@ -52,9 +52,9 @@ class GameModel {
   /// 顺序通关（[levelSelectable]=false）时不参与逻辑。
   final String levelSelectMode;
 
-  /// 测试环境标记（2026-09-10）：true = 开发/测试中的游戏。
-  /// 生产包不展示；**测试包判定口径 = App 能匹配到该游戏的图标资源**
-  /// （测试包打包了新游戏 assets，生产包没有）→ 匹配到则展示供测试开发。
+  /// 测试环境标记：true = 未发布游戏。
+  /// 环境口径：debug 包=测试环境（未发布游戏可见），release 包=正式环境
+  /// （一律隐藏）。过滤收敛在大厅 `_filterVisibleGames`，其他模块不自行判断。
   final bool testOnly;
 
   /// 创建时间（UTC）

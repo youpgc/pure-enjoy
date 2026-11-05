@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·南山大王（隐雾山·豹子精）（boss） -->
+
+  <path d="M12 48 Q8 32 18 24 Q30 16 42 22 Q52 28 50 40 Q48 48 40 50 Z" fill="#3E3A34"/>
+  <path d="M42 20 L44 8 L50 16 Z" fill="#2E3442"/>
+  <path d="M50 24 L58 14 L58 26 Z" fill="#2E3442"/>
+  <circle cx="48" cy="27" r="2" fill="#E8C470"/>
+  <path d="M26 32 L26 40 M32 30 L32 42 M38 32 L38 40" stroke="#2E3442" stroke-width="2.4"/>
+  <path d="M15 50 L13 58 L20 58 L22 51 Z" fill="#2E3442"/>
+  <path d="M33 51 L32 58 L39 58 L39 51 Z" fill="#2E3442"/>
+</svg>

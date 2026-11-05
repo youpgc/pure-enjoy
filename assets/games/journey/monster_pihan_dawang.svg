@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·辟寒大王（金平府·犀牛精）（boss） -->
+
+  <path d="M12 48 Q8 32 20 24 Q32 16 44 22 Q54 28 52 40 Q50 48 42 50 Z" fill="#3E424E"/>
+  <path d="M46 24 L58 12 L56 28 Z" fill="#E8C470" opacity="0.8"/>
+  <path d="M15 50 L13 58 L20 58 L22 51 Z" fill="#2E3442"/>
+  <path d="M33 51 L32 58 L39 58 L39 51 Z" fill="#2E3442"/>
+  <circle cx="46" cy="28" r="1.8" fill="#E8C470"/>
+  <path d="M20 40 Q32 35 44 40 Q32 45 20 40 Z" fill="#E8C470" opacity="0.25"/>
+</svg>

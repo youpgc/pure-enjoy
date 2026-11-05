@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 暴击雷引 -->
+  <path d="M26 6 L16 24 L23 24 L18 40 L34 18 L26 18 L32 6 Z" fill="#F6E3B4"/>
+  <path d="M26 6 L16 24 L23 24 L18 40" fill="none" stroke="#E8C470" stroke-width="1.4" opacity="0.8"/>
+  <path d="M10 12 L14 10 M36 10 L40 8 M8 30 L12 28" stroke="#C79AC0" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

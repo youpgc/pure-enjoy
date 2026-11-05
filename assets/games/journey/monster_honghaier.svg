@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·红孩儿（号山·圣婴大王）（boss） -->
+
+  <path d="M24 52 Q20 38 26 28 Q32 23 38 28 Q44 38 40 52 Z" fill="#5C3232"/>
+  <circle cx="32" cy="21" r="8" fill="#5C3232"/>
+  <path d="M26 12 Q28 4 32 8 Q34 4 38 12 Q35 10 32 11 Q29 10 26 12 Z" fill="#C44"/>
+  <circle cx="29" cy="21" r="1.4" fill="#E8C470"/>
+  <circle cx="35" cy="21" r="1.4" fill="#E8C470"/>
+  <path d="M18 40 Q14 30 20 24 Q18 32 22 36 Z" fill="#C44" opacity="0.8"/>
+  <path d="M46 40 Q50 30 44 24 Q46 32 42 36 Z" fill="#C44" opacity="0.8"/>
+  <path d="M27 40 Q32 36 37 40" stroke="#E8C470" stroke-width="1.5" fill="none" opacity="0.5"/>
+</svg>

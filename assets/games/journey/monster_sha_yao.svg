@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·沙妖 -->
+  <ellipse cx="32" cy="42" rx="16" ry="13" fill="#9A8462"/>
+  <circle cx="32" cy="28" r="11" fill="#AC946E"/>
+  <path d="M23 22 Q28 12 36 14 Q42 16 41 22 Q36 18 32 19 Q27 18 23 22 Z" fill="#7A6648"/>
+  <circle cx="28" cy="27" r="1.7" fill="#2A1E14"/><circle cx="36" cy="27" r="1.7" fill="#2A1E14"/>
+  <path d="M28 33 q4 2 8 0" stroke="#5A4A32" stroke-width="1.5" fill="none"/>
+  <path d="M18 42 Q10 46 12 54" stroke="#9A8462" stroke-width="3.5" fill="none" stroke-linecap="round"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

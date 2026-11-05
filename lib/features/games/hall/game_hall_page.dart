@@ -1,3 +1,4 @@
+import 'package:flutter/foundation.dart' show kReleaseMode;
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
@@ -5,6 +6,8 @@ import 'package:pure_enjoy/core/theme/app_theme.dart';
 
 import './game_total_dashboard.dart';
 import '../game_home_screen.dart';
+import '../games/journey/journey_access.dart';
+import '../games/journey/screens/journey_hub_screen.dart';
 import '../shared/duration_format.dart';
 import '../shared/game_local_loading.dart';
 import '../game_play_helpers.dart';
@@ -21,7 +24,7 @@ class GameHallPage extends StatefulWidget {
 }
 
 class _GameHallPageState extends State<GameHallPage> {
-  /// 大厅展示的游戏（已按 test_only + 资源匹配过滤）
+  /// 大厅展示的游戏（已按环境过滤：未发布游戏仅测试包可见）
   List<GameModel> _games = <GameModel>[];
   List<GameBestScore> _best = <GameBestScore>[];
   bool _loading = true;
@@ -32,14 +35,13 @@ class _GameHallPageState extends State<GameHallPage> {
     _load();
   }
 
-  /// 测试游戏过滤（2026-09-10）：test_only=true 且本包**没有**匹配到该游戏
-  /// 的图标资源 → 隐藏（生产包）；资源能匹配 = 测试/开发包 → 展示。
-  Future<List<GameModel>> _filterVisibleGames(List<GameModel> all) async {
-    final out = <GameModel>[];
-    for (final g in all) {
-      if (!g.testOnly || await hasBundledGameAsset(g.icon)) out.add(g);
+  /// 环境过滤：debug 包=测试环境，release 包=正式环境。
+  /// test_only=true 的未发布游戏仅在 debug 包展示；正式包一律隐藏。
+  List<GameModel> _filterVisibleGames(List<GameModel> all) {
+    if (kReleaseMode) {
+      return all.where((g) => !g.testOnly).toList(growable: false);
     }
-    return out;
+    return all;
   }
 
   /// SWR 加载（2026-09-07）：缓存命中立即展示（不等网络），随后静默请求
@@ -53,7 +55,7 @@ class _GameHallPageState extends State<GameHallPage> {
       final cachedBest = await GameScoreService.instance.loadCachedBestScores();
       if (cachedConfig != null || cachedBest.isNotEmpty) {
         final games = cachedConfig != null
-            ? await _filterVisibleGames(cachedConfig.games)
+            ? _filterVisibleGames(cachedConfig.games)
             : <GameModel>[];
         if (mounted) {
           setState(() {
@@ -68,7 +70,7 @@ class _GameHallPageState extends State<GameHallPage> {
     // 2) 静默请求 / 下拉强拉：成功后更新缓存（service 内部已回写）与展示
     final config = await GameService.instance.fetchConfig(force: refresh);
     final best = await GameScoreService.instance.fetchBestScores();
-    final games = await _filterVisibleGames(config.games);
+    final games = _filterVisibleGames(config.games);
     if (!mounted) return;
     // 静默失败（空快照）不覆盖已展示的非空缓存，避免刷新把页面打空
     setState(() {
@@ -93,12 +95,24 @@ class _GameHallPageState extends State<GameHallPage> {
     return '${b.bestValue.toInt()}${b.unit ?? ''}';
   }
 
-  /// 点击游戏入口：统一进入该游戏的「主界面」([GameHomeScreen])。
-  /// 主界面内再决定「开始游戏 / 选关 / 查看说明 / 查看记录」，
-  /// 选关逻辑已抽到 [GameLevelPicker]，按 [GameModel.levelSelectMode] 决定锁状态。
+  /// 点击游戏入口：西行（journey）入口条件单独判断，满足则**直达其主界面**
+  /// （无中间页）；其余游戏统一进入通用 [GameHomeScreen]。
   /// 返回后刷新（对局可能产生新成绩 → 最佳记录需更新）。
   Future<void> _openGame(GameModel game) async {
     if (!mounted) return;
+    if (game.code == 'journey') {
+      if (!await JourneyAccess.canEnter(game)) return;
+      if (!mounted) return;
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          // 命名路由：对局内「放弃本难/结算退出」popUntil 直达主页
+          settings: const RouteSettings(name: 'journey_hub'),
+          builder: (_) => JourneyHubScreen(game: game),
+        ),
+      );
+      if (mounted) await _load();
+      return;
+    }
     await Navigator.of(context).push(
       MaterialPageRoute(builder: (_) => GameHomeScreen(game: game)),
     );
@@ -175,6 +189,7 @@ class _GameBannerCard extends StatelessWidget {
     'sheep': <Color>[Color(0xFF26A69A), Color(0xFF004D40)],
     'g2048': <Color>[Color(0xFFFF7043), Color(0xFF8D2A0C)],
     'tetris': <Color>[Color(0xFF3F51B5), Color(0xFF101331)],
+    'journey': <Color>[Color(0xFFE8C470), Color(0xFF4A2B12)],
   };
 
   List<Color> get _colors =>

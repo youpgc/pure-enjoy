@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 蟠桃 -->
+  <path d="M24 14 Q12 16 13 27 Q14 36 24 38 Q34 36 35 27 Q36 16 24 14 Z" fill="#E88A8A"/>
+  <path d="M24 14 Q19 20 21 29" fill="none" stroke="#C05A5A" stroke-width="1.3"/>
+  <path d="M24 12 Q24 7 29 6 Q29 11 24 12 Z" fill="#6A8A5A"/>
+  <ellipse cx="19" cy="23" rx="2.4" ry="4" fill="#F6C8C8" opacity="0.75" transform="rotate(-18 19 23)"/>
+</svg>

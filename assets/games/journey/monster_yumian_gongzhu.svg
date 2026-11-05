@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·玉面公主（积雷山）（elite） -->
+
+  <path d="M18 46 Q14 36 24 30 Q34 24 44 30 Q50 36 46 44 Q42 48 34 48 Z" fill="#50383E"/>
+  <path d="M24 30 L20 16 L30 26 Z" fill="#2E3442"/>
+  <path d="M36 28 L42 16 L44 30 Z" fill="#2E3442"/>
+  <path d="M46 42 Q58 44 54 34 Q52 28 46 30" stroke="#2E3442" stroke-width="4" fill="none" stroke-linecap="round"/>
+  <circle cx="44" cy="34" r="1.6" fill="#B98F3E"/>
+  <circle cx="38" cy="34" r="1.6" fill="#B98F3E"/>
+</svg>

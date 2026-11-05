@@ -1,0 +1,117 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 480 920" width="480" height="920">
+  <!-- 西行·主界面背景：月夜山峦 + 古道西行 + 祥云飞雁（水墨鎏金） -->
+  <defs>
+    <linearGradient id="sky" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#241811"/>
+      <stop offset="0.42" stop-color="#3D2717"/>
+      <stop offset="0.68" stop-color="#6B4423"/>
+      <stop offset="0.86" stop-color="#8A5A2B"/>
+      <stop offset="1" stop-color="#5C3A1D"/>
+    </linearGradient>
+    <linearGradient id="gold" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#F6E3B4"/>
+      <stop offset="1" stop-color="#C79A45"/>
+    </linearGradient>
+    <radialGradient id="moonGlow" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F6E3B4" stop-opacity="0.5"/>
+      <stop offset="0.6" stop-color="#F6E3B4" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#F6E3B4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ridge1" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#7A5228"/>
+      <stop offset="1" stop-color="#4A2E14"/>
+    </linearGradient>
+    <linearGradient id="ridge2" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#553518"/>
+      <stop offset="1" stop-color="#33200E"/>
+    </linearGradient>
+    <linearGradient id="ridge3" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#2E1D0E"/>
+      <stop offset="1" stop-color="#1C1208"/>
+    </linearGradient>
+    <linearGradient id="road" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8C470" stop-opacity="0.05"/>
+      <stop offset="0.5" stop-color="#E8C470" stop-opacity="0.12"/>
+      <stop offset="1" stop-color="#E8C470" stop-opacity="0.05"/>
+    </linearGradient>
+  </defs>
+
+  <rect width="480" height="920" fill="url(#sky)"/>
+
+  <!-- 月与月晕 -->
+  <circle cx="352" cy="150" r="130" fill="url(#moonGlow)"/>
+  <circle cx="352" cy="150" r="52" fill="#F6E3B4" opacity="0.92"/>
+  <circle cx="352" cy="150" r="62" fill="none" stroke="#E8C470" stroke-width="1.4" opacity="0.55"/>
+  <circle cx="352" cy="150" r="76" fill="none" stroke="#E8C470" stroke-width="0.8" opacity="0.3"/>
+
+  <!-- 星子 -->
+  <g fill="#F6E3B4">
+    <circle cx="66" cy="92" r="1.6" opacity="0.8"/>
+    <circle cx="132" cy="58" r="1.2" opacity="0.55"/>
+    <circle cx="204" cy="120" r="1.4" opacity="0.7"/>
+    <circle cx="288" cy="66" r="1.1" opacity="0.5"/>
+    <circle cx="424" cy="88" r="1.5" opacity="0.65"/>
+    <circle cx="94" cy="170" r="1.1" opacity="0.45"/>
+    <circle cx="252" cy="182" r="1.2" opacity="0.5"/>
+    <circle cx="392" cy="236" r="1.0" opacity="0.4"/>
+  </g>
+
+  <!-- 祥云（鎏金勾边） -->
+  <g fill="none" stroke="url(#gold)" stroke-width="1.6" opacity="0.5" stroke-linecap="round">
+    <path d="M46 214 q22 -16 44 -4 q16 -14 36 -6 q20 -10 36 4"/>
+    <path d="M296 300 q20 -14 40 -4 q14 -12 34 -4"/>
+    <path d="M60 356 q18 -12 38 -4 q16 -10 32 0" opacity="0.7"/>
+  </g>
+
+  <!-- 飞雁 -->
+  <g stroke="#F6E3B4" stroke-width="1.6" fill="none" opacity="0.6" stroke-linecap="round">
+    <path d="M118 128 q6 -7 12 0 q6 -7 12 0"/>
+    <path d="M152 148 q5 -6 10 0 q5 -6 10 0" opacity="0.75"/>
+    <path d="M96 156 q4 -5 8 0 q4 -5 8 0" opacity="0.55"/>
+  </g>
+
+  <!-- 远山三层 -->
+  <path d="M0 470 L54 402 L96 448 L150 380 L208 452 L262 396 L318 460 L372 408 L428 462 L480 416 L480 920 L0 920 Z" fill="url(#ridge1)" opacity="0.85"/>
+  <path d="M0 560 L64 496 L120 548 L184 478 L246 552 L310 500 L376 556 L436 506 L480 548 L480 920 L0 920 Z" fill="url(#ridge2)" opacity="0.92"/>
+  <path d="M0 664 L70 604 L138 656 L210 590 L282 660 L352 610 L420 664 L480 622 L480 920 L0 920 Z" fill="url(#ridge3)"/>
+
+  <!-- 山巅塔影（远山之上） -->
+  <g fill="#1A1209" opacity="0.9">
+    <rect x="206" y="404" width="14" height="40"/>
+    <path d="M204 404 L213 392 L222 404 Z"/>
+    <rect x="203" y="412" width="20" height="3"/>
+    <rect x="203" y="422" width="20" height="3"/>
+    <rect x="203" y="432" width="20" height="3"/>
+  </g>
+
+  <!-- 古道（蜿蜒向西的路面） -->
+  <path d="M188 920 C160 820 226 740 196 660 C170 588 226 520 206 448 C190 390 226 340 214 292 C206 258 224 226 218 198 L262 198 C256 232 272 268 264 306 C252 356 288 404 272 456 C252 522 308 586 286 654 C262 728 322 816 296 920 Z" fill="url(#road)" stroke="#E8C470" stroke-opacity="0.22" stroke-width="1.2"/>
+
+  <!-- 西行足迹（沿古道向上） -->
+  <g fill="#F6E3B4" opacity="0.5">
+    <ellipse cx="222" cy="868" rx="7" ry="4" transform="rotate(-12 222 868)"/>
+    <ellipse cx="252" cy="848" rx="7" ry="4" transform="rotate(8 252 848)"/>
+    <ellipse cx="218" cy="806" rx="6.4" ry="3.6" transform="rotate(-14 218 806)"/>
+    <ellipse cx="250" cy="786" rx="6.4" ry="3.6" transform="rotate(10 250 786)"/>
+    <ellipse cx="226" cy="742" rx="5.8" ry="3.2" transform="rotate(-10 226 742)"/>
+    <ellipse cx="254" cy="722" rx="5.8" ry="3.2" transform="rotate(12 254 722)"/>
+    <ellipse cx="232" cy="678" rx="5.2" ry="3" transform="rotate(-8 232 678)"/>
+    <ellipse cx="256" cy="660" rx="5.2" ry="3" transform="rotate(8 256 660)"/>
+    <ellipse cx="238" cy="616" rx="4.8" ry="2.8" transform="rotate(-10 238 616)"/>
+    <ellipse cx="258" cy="600" rx="4.8" ry="2.8" transform="rotate(10 258 600)"/>
+    <ellipse cx="242" cy="556" rx="4.4" ry="2.5" transform="rotate(-6 242 556)"/>
+    <ellipse cx="260" cy="542" rx="4.4" ry="2.5" transform="rotate(6 260 542)"/>
+    <ellipse cx="244" cy="498" rx="4" ry="2.3" transform="rotate(-8 244 498)"/>
+    <ellipse cx="260" cy="486" rx="4" ry="2.3" transform="rotate(8 260 486)"/>
+  </g>
+
+  <!-- 近景草木剪影 -->
+  <g fill="#150E07">
+    <path d="M0 920 L0 848 Q20 820 40 848 Q30 812 52 792 Q70 816 62 848 Q84 824 96 852 L96 920 Z"/>
+    <path d="M384 920 L384 856 Q404 824 428 852 Q420 808 446 788 Q464 816 456 852 Q472 836 480 852 L480 920 Z"/>
+  </g>
+
+  <!-- 顶部暗角 + 底部暗角（保 UI 可读） -->
+  <rect width="480" height="120" fill="url(#sky)" opacity="0.35"/>
+  <rect y="800" width="480" height="120" fill="#120C06" opacity="0.45"/>
+</svg>

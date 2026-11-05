@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·大鹏金翅雕（狮驼岭）（boss） -->
+
+  <path d="M32 30 Q18 18 8 24 Q18 32 26 38 Z" fill="#333E52"/>
+  <path d="M32 30 Q46 18 56 24 Q46 32 38 38 Z" fill="#333E52"/>
+  <path d="M24 36 Q28 52 32 56 Q36 52 40 36 Q36 32 32 32 Q28 32 24 36 Z" fill="#333E52"/>
+  <path d="M32 34 Q26 44 32 50 Q38 44 32 34 Z" fill="#E8C470" opacity="0.3"/>
+  <path d="M32.0 26 Q32.0 14 34.0 10 Q40.0 12 32.0 18 Z" fill="#333E52"/>
+  <circle cx="34.0" cy="12" r="2.4" fill="#333E52"/>
+  <path d="M34.0 10 L42.0 12 L34.0 13 Z" fill="#E8C470"/>
+</svg>

@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 乾坤圈 -->
+  <circle cx="24" cy="24" r="13" fill="none" stroke="#E8C470" stroke-width="4.5"/>
+  <circle cx="24" cy="24" r="6.5" fill="none" stroke="#F6E3B4" stroke-width="2" opacity="0.85"/>
+  <path d="M24 11 L24 4 M24 37 L24 44 M11 24 L4 24 M37 24 L44 24" stroke="#D4593F" stroke-width="2.6" stroke-linecap="round"/>
+</svg>

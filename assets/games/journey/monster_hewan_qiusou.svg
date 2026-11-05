@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·河湾妖酋（妖王） -->
+  <path d="M14 44 Q12 24 24 17 Q32 12 40 17 Q52 24 50 44 Z" fill="#3E5044"/>
+  <path d="M20 16 L16 2 L28 12 L32 4 L36 12 L48 2 L44 16 Z" fill="#2E3E34"/>
+  <circle cx="26" cy="23" r="2.2" fill="#F6D98A"/><circle cx="38" cy="23" r="2.2" fill="#F6D98A"/>
+  <path d="M24 31 q8 4 16 0" stroke="#C79A45" stroke-width="2" fill="none"/>
+  <path d="M10 32 Q0 26 4 14 Q14 20 16 28 Z" fill="#5E7058" opacity="0.85"/>
+  <path d="M54 32 Q64 26 60 14 Q50 20 48 28 Z" fill="#5E7058" opacity="0.85"/>
+  <path d="M22 44 Q32 50 42 44 L40 55 Q32 59 24 55 Z" fill="#2E3E34"/>
+  <circle cx="32" cy="34" r="25" fill="none" stroke="#E8C470" stroke-width="1.4" opacity="0.5" stroke-dasharray="4 5"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>

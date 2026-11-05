@@ -223,7 +223,8 @@ class GameService {
     ]);
 
     final snapshot = GameConfigSnapshot(
-      games: _toModels<GameModel>(results[0], GameModel.fromJson),
+      games: _withTestEnvGames(
+          _toModels<GameModel>(results[0], GameModel.fromJson)),
       dimensions:
           _toModels<GameDimensionModel>(results[1], GameDimensionModel.fromJson),
       levels: _toModels<GameLevelModel>(results[2], GameLevelModel.fromJson),
@@ -262,6 +263,14 @@ class GameService {
     _memory = null;
     _lastFetchAt = null;
     await CacheHelper.instance.clear(CacheHelper.keyGames);
+  }
+
+  /// 测试环境（debug 包）向游戏目录注入未发布的本地测试游戏；
+  /// 远端 games 表出现同名行后以远端为准（不重复注入）。
+  /// release 包原样返回——正式环境只认后台目录，正式包一律隐藏。
+  List<GameModel> _withTestEnvGames(List<GameModel> games) {
+    if (!kDebugMode) return games;
+    return games;
   }
 
   /// 各配置表的按需 select 列清单（**只查模型与逻辑实际消费的列**，

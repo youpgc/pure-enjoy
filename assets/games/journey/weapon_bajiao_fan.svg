@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 芭蕉扇 -->
+  <path d="M12 10 Q30 4 38 18 Q30 26 14 24 Q10 18 12 10 Z" fill="#4E7A4E"/>
+  <path d="M15 13 Q27 10 34 19" stroke="#7AA87A" stroke-width="1.6" fill="none"/>
+  <path d="M17 17 Q26 15 31 21" stroke="#7AA87A" stroke-width="1.6" fill="none"/>
+  <path d="M14 24 Q22 28 34 24" stroke="#2E542E" stroke-width="1.8" fill="none"/>
+  <line x1="14" y1="23" x2="10" y2="42" stroke="#8A5A3A" stroke-width="4" stroke-linecap="round"/>
+  <path d="M30 30 q6 2 10 -2" stroke="#5B9BD5" stroke-width="2" fill="none" stroke-linecap="round" opacity="0.8"/>
+</svg>

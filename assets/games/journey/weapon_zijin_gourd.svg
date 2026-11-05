@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 西行·法宝 紫金葫芦 -->
+  <circle cx="24" cy="29" r="10" fill="#9A5A8E"/>
+  <circle cx="24" cy="29" r="10" fill="none" stroke="#E8C470" stroke-width="1.6" opacity="0.8"/>
+  <circle cx="24" cy="15" r="5.5" fill="#B070A4"/>
+  <rect x="22.6" y="8" width="2.8" height="3.5" fill="#B98F3E"/>
+  <ellipse cx="20" cy="26" rx="2.5" ry="3.5" fill="#C79AC0" opacity="0.7"/>
+  <path d="M24 40 q-6 3 -12 1" stroke="#E8C470" stroke-width="1.4" fill="none" opacity="0.6"/>
+</svg>

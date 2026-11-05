@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 沙僧：骷髅珠链 + 降妖宝杖 + 深褐短打 -->
+  <defs>
+    <linearGradient id="ssRobe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#5C4A38"/>
+      <stop offset="1" stop-color="#33261A"/>
+    </linearGradient>
+    <linearGradient id="ssBead" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C8BFAE"/>
+      <stop offset="1" stop-color="#8A8272"/>
+    </linearGradient>
+  </defs>
+
+  <g>
+    <!-- 下摆 -->
+    <path d="M76 164 C72 212 64 246 58 268 L162 268 C156 246 148 212 144 164 Z" fill="url(#ssRobe)"/>
+    <!-- 躯干（袒右肩短打） -->
+    <path d="M84 126 Q110 116 136 126 L142 170 Q110 184 78 170 Z" fill="url(#ssRobe)"/>
+    <path d="M84 126 Q96 148 92 170 L78 170 Z" fill="#7C5A3A"/>
+    <!-- 骷髅珠链 -->
+    <path d="M92 132 Q110 152 128 132" fill="none" stroke="url(#ssBead)" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="92" cy="132" r="5" fill="url(#ssBead)"/>
+    <circle cx="110" cy="146" r="6" fill="url(#ssBead)"/>
+    <circle cx="128" cy="132" r="5" fill="url(#ssBead)"/>
+    <circle cx="110" cy="146" r="2.2" fill="#33261A"/>
+    <!-- 头 -->
+    <circle cx="110" cy="96" r="26" fill="#C89070"/>
+    <!-- 络腮胡 -->
+    <path d="M88 104 Q90 122 110 126 Q130 122 132 104 Q124 116 110 116 Q96 116 88 104 Z" fill="#3A2A1C"/>
+    <circle cx="101" cy="97" r="2.6" fill="#241811"/>
+    <circle cx="119" cy="97" r="2.6" fill="#241811"/>
+    <path d="M104 108 Q110 111 116 108" stroke="#241811" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- 忿怒眉 -->
+    <path d="M95 90 L106 93" stroke="#241811" stroke-width="2.4" stroke-linecap="round"/>
+    <path d="M125 90 L114 93" stroke="#241811" stroke-width="2.4" stroke-linecap="round"/>
+    <!-- 发髻 -->
+    <path d="M92 76 Q96 58 110 56 Q124 58 128 76 Q120 66 110 66 Q100 66 92 76 Z" fill="#2A1E14"/>
+    <circle cx="110" cy="58" r="6" fill="#2A1E14"/>
+    <!-- 月牙额饰 -->
+    <path d="M104 74 Q110 68 116 74 Q110 78 104 74 Z" fill="#E8C470"/>
+  </g>
+
+  <!-- 降妖宝杖（右手侧，杖头月牙铲） -->
+  <g stroke-linecap="round">
+    <line x1="168" y1="128" x2="168" y2="258" stroke="#5C4228" stroke-width="6"/>
+    <path d="M156 118 Q168 96 180 118 Q168 112 156 118 Z" fill="#D8D2C4" stroke="#8A8272" stroke-width="1.6"/>
+    <circle cx="168" cy="122" r="4.4" fill="#E8C470"/>
+    <path d="M162 128 L174 128" stroke="#E8C470" stroke-width="3"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 276 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#E8C470" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

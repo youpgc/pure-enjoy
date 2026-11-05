@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <!-- 西行·白骨妖卒 -->
+  <circle cx="32" cy="25" r="9" fill="#DCD6C4"/>
+  <path d="M24 20 Q26 12 34 12 Q40 14 40 20 Q36 17 32 18 Q28 17 24 20 Z" fill="#8A5A3A"/>
+  <circle cx="28.5" cy="24" r="1.8" fill="#D4593F"/><circle cx="35.5" cy="24" r="1.8" fill="#D4593F"/>
+  <path d="M29 29 h6" stroke="#2A1E14" stroke-width="1.4"/>
+  <path d="M25 37 Q32 34 39 37 L41 52 Q32 55 23 52 Z" fill="#C8C2B0"/>
+  <path d="M22 38 L14 42 M42 38 L50 42" stroke="#C8C2B0" stroke-width="3" stroke-linecap="round"/>
+  <path d="M44 14 Q50 8 54 12" stroke="#D4593F" stroke-width="2" fill="none" opacity="0.7"/>
+  <ellipse cx="32" cy="58" rx="16" ry="3.5" fill="#4A3220" opacity="0.3"/>
+</svg>
