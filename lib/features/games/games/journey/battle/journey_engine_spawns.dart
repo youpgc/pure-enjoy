@@ -28,10 +28,12 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
 }
 
 /// 本关妖王编码：
+/// - 无尽/游历（虚拟关 kind=endless/daily）：无妖王模式，恒 null；
 /// - 远端区域行存在：boss_code 即定稿口径（NULL=原著无妖章回，无妖王战，
 ///   引擎走「坚持通关」口径）；
 /// - 区域行缺失/内置兜底快照：回落关卡号区间映射（保可玩，每关有妖王）。
 String? resolveBossCode(JourneyFlameGame game) {
+  if (_isEndless(game) || _isDaily(game)) return null;
   final region = game.config?.regionOf(game.level.regionCode);
   if (game.config?.fromSeed != true && region != null) {
     final configured = region.bossCode;
@@ -56,14 +58,20 @@ String? _fallbackBossCode(int levelNo) {
 JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) {
   final code = resolveBossCode(game);
   if (code == null) return null;
-  final remote = game.config?.monsters ?? const <JourneyMonsterModel>[];
-  final source = remote.isNotEmpty
-      ? remote
-      : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
+  final source = _monsterSource(game);
   for (final m in source) {
     if (m.code == code && m.isBoss) return m;
   }
   return null;
+}
+
+/// 怪物全源（远端优先，种子兜底）：妖王波判定/指定怪种刷怪共用——
+/// 无尽妖潮刷怪池不含妖王，波次配置的怪种语义需在全源上判定。
+List<JourneyMonsterModel> _monsterSource(JourneyFlameGame game) {
+  final remote = game.config?.monsters ?? const <JourneyMonsterModel>[];
+  return remote.isNotEmpty
+      ? List<JourneyMonsterModel>.of(remote)
+      : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
 }
 
 /// 怪物生成与妖王据点（平铺大地图口径）：
@@ -74,6 +82,15 @@ JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) {
 /// - 妖王据点开局即驻守 + 周边守卫群，罗盘指引玩家前往。
 mixin JourneySpawnMixin {
   double _spawnTimer = 0;
+
+  // ---- 无尽妖潮（虚拟关 kind=endless）波次状态 ----
+  int _endlessWave = 1; // 当前波（1 起，999 封顶）
+  int _endlessSpawned = 0; // 本波已刷只数
+  double _endlessTimer = 0; // 波内刷怪间隔计时
+  double _endlessRest = 0; // 波间休整倒计时（>0 休整中）
+
+  // ---- 每日游历（虚拟关 kind=daily）铜钱雨状态 ----
+  double _dailyCoinTimer = 0;
 
   /// 波次刷怪进度（index 对齐 game.runtime.waves）。
   final List<List<double>> _waveProgress = <List<double>>[]; // [spawned, timer]
@@ -88,9 +105,17 @@ mixin JourneySpawnMixin {
   }
 
   void updateSpawns(JourneyFlameGame game, double dt) {
+    // 模式分支：无尽妖潮=波次生成器全权刷怪；每日游历=兜底刷怪+铜钱雨
+    if (_isEndless(game)) {
+      _updateEndless(game, dt);
+      return;
+    }
+    if (_isDaily(game)) {
+      _updateDailyCoinRain(game, dt);
+    }
     // 波次驱动（关卡配置了波次时由波次定刷怪内容与节奏）；
-    // 波次全部播完后返回 true → 回落兜底节奏补怪：坚持难（无妖难 300s）
-    // 与绕路找据点的长局在后半程仍维持遭遇密度，不空场。
+    // loop=true 循环层永不判完成（持续补怪至怪量上限）——含循环层的关卡
+    // 不会回落兜底节奏，循环层全权承担时间轴播完后的遭遇密度。
     if (game.runtime.waves.isNotEmpty && !_updateWaves(game, dt)) return;
     // 兜底：0.8s 起刷随局内时间渐密；批量 1~3 只（3 分钟后拉满）
     _spawnTimer += dt;
@@ -106,7 +131,7 @@ mixin JourneySpawnMixin {
     }
   }
 
-  /// 波次推进。返回 true=全部波次已播完（计数达成）。
+  /// 波次推进。返回 true=全部波次已播完（计数达成；循环层恒不计完成）。
   bool _updateWaves(JourneyFlameGame game, double dt) {
     final elapsed = game._elapsed;
     var allDone = true;
@@ -118,17 +143,21 @@ mixin JourneySpawnMixin {
       }
       final prog = _waveProgress.isEmpty ? null : _waveProgress[i];
       if (prog == null) return false;
-      if (prog[0] >= wave.count) continue;
+      // 循环层不消费 count（种子置 1 占位），恒不判完成；
+      // 时间轴波计数达成后跳过
+      if (!wave.loop && prog[0] >= wave.count) continue;
       allDone = false;
 
       prog[1] += dt;
       final interval = (wave.spawnIntervalMs / 1000.0).clamp(0.05, 10.0);
-      while (prog[1] >= interval && prog[0] < wave.count) {
+      while (prog[1] >= interval &&
+          (wave.loop || prog[0] < wave.count)) {
         prog[1] -= interval;
         if (game.monsters.length >= game.monsterCap) return false;
         final model = _modelOf(game, wave.monsterCode);
         if (model == null) {
-          // 怪种映射缺失：整波跳过（config service 已做同口径过滤，双保险）
+          // 怪种映射缺失：整波跳过（config service 已做同口径过滤，双保险）；
+          // 循环层怪种缺失同样封口（标记计数达成防死循环空转）
           prog[0] = wave.count.toDouble();
           break;
         }
@@ -163,7 +192,10 @@ mixin JourneySpawnMixin {
         .toList();
 
     Vector2 pick() {
-      if (dens.isNotEmpty && game.rng.nextDouble() < 0.70) {
+      // 妖穴集中概率走 journey_globals.spawn_den_ratio（0~1，后台可调；
+      // 调低=玩家沿途遭遇更均匀）
+      final denRatio = game.config?.spawnDenRatio ?? 0.70;
+      if (dens.isNotEmpty && game.rng.nextDouble() < denRatio) {
         final z = dens[game.rng.nextInt(dens.length)];
         final a = game.rng.nextDouble() * math.pi * 2;
         final r = z.radius * math.sqrt(game.rng.nextDouble());
@@ -240,9 +272,12 @@ mixin JourneySpawnMixin {
   }
 
   /// 开局铺场：进局立即在玩家周围布置一圈怪（500~1200 环带随机方位），
-  /// 避免新手期「走好远才见到怪」的空旷感（波次关卡跳过——波次全权接管）。
-  void seedInitialPack(JourneyFlameGame game, {int count = 24}) {
-    if (game.runtime.waves.isNotEmpty) return;
+  /// 避免新手期「走好远才见到怪」的空旷感。数量走 journey_globals.
+  /// initial_pack_size（缺省 24，0=关闭）；波次关不再跳过（循环层负责
+  /// 持续补怪，铺场只解决开局空场）。
+  void seedInitialPack(JourneyFlameGame game) {
+    final count = game.config?.initialPackSize ?? 24;
+    if (count <= 0) return;
     for (var i = 0; i < count; i++) {
       if (game.monsters.length >= game.monsterCap) return;
       final pick = _pickMonster(game);
@@ -266,6 +301,12 @@ mixin JourneySpawnMixin {
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
+    // 妖王名照写；血条比例由首次进侦测圈（bossEngaged）时按当前血量写入，
+    // 开局不再预写常显（领地显隐口径见 monsters part）。
+    // onLoad 挂载期 HUD 通知调度帧尾（防 markNeedsBuild during build）。
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      game.controller.hud.bossName.value = model.name;
+    });
 
     // 据点守卫：妖王周边环状 10 只精英/普通怪
     final guards = game.pool.where((m) => !m.isBoss).toList();
@@ -300,6 +341,137 @@ mixin JourneySpawnMixin {
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
+    // 妖王名照写；血条比例由再次进侦测圈时按当前血量写入（下场增强再战，
+    // 新体满血；respawn 后仍未 engaged，罗盘与横幅等待玩家重回领地）
+    game.controller.hud.bossName.value = model.name;
     game.controller.onBossSpawn('${game._bossStage + 1} 打 · ${model.name}');
   }
+
+  // ---- 无尽妖潮 / 每日游历（虚拟关 level_no=0，纯 App 端模式）----
+
+  /// 无尽妖潮波次生成器（除尽推进制）：当前波怪全灭才进下一波；
+  /// 波次配置 journey_endless_waves（上限 99）优先——monster_code 命中
+  /// 妖王即妖王波（一次性 1 只），否则按 count 分批刷怪，buff_mult 覆盖
+  /// 增强曲线；未配置波回落内置公式 count=10+3n、interval=max(0.2,
+  /// 0.9-0.018n)、buff=1+n*0.10（逐波更强）；怪池=普通怪（n≥10 混精英，
+  /// n≥60 精英概率 0.4）。末波（99）刷完清空→「妖潮无尽·功成」可结算。
+  void _updateEndless(JourneyFlameGame game, double dt) {
+    final hud = game.controller.hud;
+    if (hud.endlessWave.value != game._endlessWave) {
+      hud.endlessWave.value = game._endlessWave;
+    }
+    if (game._endlessRest > 0) {
+      game._endlessRest -= dt;
+      return;
+    }
+    final n = game._endlessWave;
+    final waveConf = game.config?.endlessWaveOf(n);
+    final count = waveConf?.count ?? 10 + 3 * n;
+    final buff = waveConf?.buffMult ?? 1 + n * 0.10;
+    // 波次怪种（后台逐波自由配置，不限定波次）：选妖王=该波刷妖王
+    // （数量按波次配置，不强制 1 只）；普通/精英怪=该波只刷该怪；
+    // NULL/空=内置曲线随机刷怪（_pickEndlessMonster）
+    final configuredCode = waveConf?.monsterCode ?? '';
+    final isBossWave = configuredCode.isNotEmpty &&
+        _monsterSource(game).any((m) => m.code == configuredCode && m.isBoss);
+
+    if (game._endlessSpawned >= count) {
+      // 除尽推进：本波怪（含妖王）全灭才进下一波
+      final alive =
+          game.monsters.any((m) => !m.isDead && m.endlessWave == n);
+      if (alive) return;
+      if (n >= 99) {
+        // 末波（第 99 波）清空 → 终局：挂功成横幅（endless 预置
+        // _bossDefeated=true，不走门控直接标记），2.4s 播报完整后自动
+        // 结算（期间玩家也可点常亮的结算按钮提前结算）
+        if (!game._endlessSettleScheduled) {
+          game._endlessSettleScheduled = true;
+          game._markClearedAvailable('妖潮无尽·功成');
+          dart_async.Timer(const Duration(milliseconds: 2400), () {
+            if (!game.isEnded) game.settleNow();
+          });
+        }
+        return;
+      }
+      game._endlessWave = n + 1;
+      game._endlessSpawned = 0;
+      game._endlessRest = 1.2;
+      return;
+    }
+    game._endlessTimer += dt;
+    final interval = (0.9 - 0.018 * n).clamp(0.2, 0.9);
+    if (game._endlessTimer < interval) return;
+    if (game.monsters.length >= game.monsterCap) return;
+    final model = isBossWave
+        ? _bossModelOf(game, configuredCode)
+        : _pickEndlessMonster(game, n, configuredCode);
+    if (model == null) return;
+    game._endlessTimer = 0;
+    spawnMonsterAt(game, model, buffMult: buff, position: null);
+    game.monsters.last.endlessWave = n;
+    game._endlessSpawned++;
+    // 妖王波首只现身：走 onBossSpawn 统一播报「妖王降临 · X」（HUD 状态同步）
+    if (isBossWave && game._endlessSpawned == 1) {
+      game.controller.onBossSpawn(model.name);
+    }
+  }
+
+  /// 妖王波取怪：怪物全源按 code 取妖王（endless 刷怪池不含妖王）。
+  JourneyMonsterModel? _bossModelOf(JourneyFlameGame game, String code) {
+    for (final m in _monsterSource(game)) {
+      if (m.code == code && m.isBoss) return m;
+    }
+    return null;
+  }
+
+  /// 无尽怪池挑选：波次配置怪种时只刷该怪（配置断裂回落随机）；
+  /// 未配置走 n<10 全普通、10≤n<60 普通+精英混池、n≥60 精英概率 0.4。
+  JourneyMonsterModel? _pickEndlessMonster(
+      JourneyFlameGame game, int n, String configuredCode) {
+    if (configuredCode.isNotEmpty) {
+      final hit = game.pool
+          .where((m) => m.code == configuredCode)
+          .toList(growable: false);
+      if (hit.isNotEmpty) return hit[game.rng.nextInt(hit.length)];
+      // 配置怪种不在池（断裂行/已删怪）：回落随机池防死局
+    }
+    final normal = game.pool.where((m) => !m.isBoss && !m.isElite).toList();
+    final elite = game.pool.where((m) => m.isElite).toList();
+    final rollElite = elite.isNotEmpty &&
+        (n >= 60
+            ? game.rng.nextDouble() < 0.4
+            : n >= 10 && game.rng.nextDouble() < elite.length / (normal.length + elite.length));
+    final pool = rollElite ? elite : (normal.isEmpty ? elite : normal);
+    if (pool.isEmpty) return null;
+    return pool[game.rng.nextInt(pool.length)];
+  }
+
+  /// 每日游历·铜钱雨：每 4s 在玩家环带 spawn 5 枚功德铜钱，
+  /// 每枚价值=pickupConfigOf('gongde_tongqian').value×10（缺省 30）。
+  void _updateDailyCoinRain(JourneyFlameGame game, double dt) {
+    game._dailyCoinTimer += dt;
+    if (game._dailyCoinTimer < 4) return;
+    game._dailyCoinTimer = 0;
+    final unit = (game.config?.pickupConfigOf('gongde_tongqian')?.value ?? 3) * 10;
+    final size = game.worldSize;
+    for (var i = 0; i < 5; i++) {
+      final angle = game.rng.nextDouble() * math.pi * 2;
+      final dist = 420.0 + game.rng.nextDouble() * 780.0;
+      game._spawnPickup(
+        game,
+        JourneyPickupKind.meritCoin,
+        Vector2(
+          (game.player.position.x + math.cos(angle) * dist)
+              .clamp(80.0, size - 80),
+          (game.player.position.y + math.sin(angle) * dist)
+              .clamp(80.0, size - 80),
+        ),
+        unit,
+      );
+    }
+  }
 }
+
+/// 虚拟关模式判定（kind 约定见 JourneyLevelModel；level_no=0 不落主线）。
+bool _isEndless(JourneyFlameGame game) => game.level.kind == 'endless';
+bool _isDaily(JourneyFlameGame game) => game.level.kind == 'daily';

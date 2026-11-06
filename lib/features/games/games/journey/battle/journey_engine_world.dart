@@ -10,6 +10,7 @@ class JourneyWorldBackground extends Component {
     required this.seed,
     required this.bossPos,
     this.mapObjects = const <JourneyMapObjectModel>[],
+    this.isObjDestroyed,
   });
 
   final double worldSize;
@@ -19,6 +20,10 @@ class JourneyWorldBackground extends Component {
 
   /// 关卡配置的地图参照物（后台 journey_map_objects 维护）。
   final List<JourneyMapObjectModel> mapObjects;
+
+  /// 参照物破坏回调（下标对齐 mapObjects）：已破坏 breakable 不再绘制
+  /// （残屑视觉由 fx 层呈现）。null=全部照画。
+  final bool Function(int index)? isObjDestroyed;
 
   Color get _theme {
     final hex = themeColor.replaceAll('#', '');
@@ -161,8 +166,13 @@ class JourneyWorldBackground extends Component {
       _drawMarker(canvas, m);
     }
 
-    // ---- 关卡参照物（journey_map_objects 配置，kind 着色圆斑）----
-    for (final o in mapObjects) {
+    // ---- 关卡参照物（journey_map_objects 配置，kind 着色圆斑；
+    // 已破坏 breakable 由 isObjDestroyed 过滤不画）----
+    for (var i = 0; i < mapObjects.length; i++) {
+      final o = mapObjects[i];
+      if (isObjDestroyed != null && isObjDestroyed!(i)) {
+        continue;
+      }
       final c = Offset(o.x, o.y);
       if (c.dx < vp.left - o.radius - 40 ||
           c.dx > vp.right + o.radius + 40 ||
@@ -237,6 +247,19 @@ class JourneyWorldBackground extends Component {
   }
 
   void _drawMarker(Canvas canvas, _MarkerDeco m) {
+    // 道具精灵优先（石碑/驿亭），缺失回落手绘几何
+    final pic = JourneySprites.get(JourneySprites.prop(m.isPagoda ? 'yiting' : 'shibei'));
+    if (pic != null) {
+      JourneySprites.draw(
+        canvas,
+        pic,
+        dstRect: Rect.fromCenter(
+            center: m.center.translate(0, -5), width: 48, height: 48),
+        srcWidth: 48,
+        srcHeight: 48,
+      );
+      return;
+    }
     final stone = Paint()..color = const Color(0xFF6E5844);
     final dark = Paint()..color = const Color(0xFF4A3A28);
     if (m.isPagoda) {
@@ -278,9 +301,33 @@ class JourneyWorldBackground extends Component {
     }
   }
 
-  /// 参照物绘制：kind 着色 + 边界勾线（可击破=陶褐 / 不可破=灰岩 /
-  /// 宝箱点=鎏金 / 里程碑=黛青 / 驿站路标=月白）。
+  /// 参照物绘制：道具精灵优先（可击破=香火供台 / 不可破=山石，缺失回落
+  /// kind 着色圆斑），其余 kind 沿用着色圆斑 + 边界勾线（宝箱点=鎏金 /
+  /// 里程碑=黛青 / 驿站路标=月白）。
   void _drawMapObject(Canvas canvas, JourneyMapObjectModel o, Offset c) {
+    const spriteByKind = <String, String>{
+      'breakable': 'gongtai',
+      'unbreakable': 'shikuai',
+    };
+    final propName = spriteByKind[o.kind];
+    if (propName != null) {
+      final pic = JourneySprites.get(JourneySprites.prop(propName));
+      if (pic != null) {
+        // 精灵略大于碰撞圈（视觉更实），底部对齐圆心（物件立于地面）
+        final size = o.radius * 2.4;
+        JourneySprites.draw(
+          canvas,
+          pic,
+          dstRect: Rect.fromCenter(
+              center: c.translate(0, -o.radius * 0.35),
+              width: size,
+              height: size),
+          srcWidth: 48,
+          srcHeight: 48,
+        );
+        return;
+      }
+    }
     const colors = <String, Color>{
       'breakable': Color(0xFFB07C5A),
       'unbreakable': Color(0xFF8A8A80),
@@ -344,144 +391,4 @@ class _MarkerDeco {
   const _MarkerDeco({required this.center, required this.isPagoda});
   final Offset center;
   final bool isPagoda;
-}
-
-/// 玩家（鎏金圆 + 朝向指示；环绕法宝由 JourneyOrbitWeapons 独立渲染）。
-class JourneyPlayerComponent extends PositionComponent {
-  JourneyPlayerComponent({
-    required this.game,
-    required super.position,
-    this.maxHp = 100,
-  }) : hp = maxHp;
-
-  final JourneyFlameGame game;
-
-  double maxHp;
-  double hp;
-  double regen = 0;
-  double armor = 0;
-  double pickupRange = 80;
-  double _regenTimer = 0;
-
-  static const double _radius = 20;
-  static const double _baseSpeed = 240;
-
-  Vector2 facing = Vector2(0, -1);
-
-  @override
-  void update(double dt) {
-    super.update(dt);
-    if (game._ended) return;
-
-    // 摇杆驱动（屏幕向量直接映射世界向量，全向自由移动）
-    final v = game.controller.input.vector;
-    if (v.distanceSquared > 0.001) {
-      position += Vector2(v.dx, v.dy) * _baseSpeed * game.moveSpeedAmp * dt;
-      facing = Vector2(v.dx, v.dy)..normalize();
-    }
-    position.x = position.x
-        .clamp(_radius + 8, game.worldSize - _radius - 8);
-    position.y = position.y
-        .clamp(_radius + 8, game.worldSize - _radius - 8);
-
-    // 木系自动回复
-    if (regen > 0) {
-      _regenTimer += dt;
-      if (_regenTimer >= 1) {
-        _regenTimer -= 1;
-        if (hp < maxHp) {
-          hp = (hp + regen).clamp(0.0, maxHp);
-          game.onPlayerHpChanged();
-        }
-      }
-    }
-
-    _reportCompass();
-  }
-
-  /// 妖王罗盘上报（低频去重）：bearing=指向据点的世界角，progress=接近度
-  /// （0=刚出发，1=已抵达据点圈）。
-  void _reportCompass() {
-    final boss = game.boss;
-    if (boss == null) return;
-    final hud = game.controller.hud;
-    final to = boss.position - position;
-
-    final brg = math.atan2(to.y, to.x);
-    var d = brg - hud.bearing.value;
-    if (d > math.pi) d -= math.pi * 2;
-    if (d < -math.pi) d += math.pi * 2;
-    if (d.abs() > 0.03) {
-      hud.bearing.value = brg;
-    }
-
-    final ratio = 1 - to.length / game.bossStartDist;
-    final near = ratio.clamp(0.0, 1.0);
-    if ((near - hud.progress.value).abs() > 0.005) {
-      hud.progress.value = near;
-    }
-  }
-
-  @override
-  void render(Canvas canvas) {
-    // 注意：PositionComponent 的 render 画布已平移到本组件局部坐标，
-    // 绘制必须围绕原点，禁止再叠加 position（双重偏移会画出屏外）。
-    // 角色立绘优先（char_<code>.svg）；失败回落几何
-    final pic = JourneySprites.get(JourneySprites.character(game.character.code));
-    if (pic != null) {
-      const size = 76.0;
-      JourneySprites.draw(
-        canvas,
-        pic,
-        dstRect: Rect.fromCenter(
-          center: const Offset(0, -14),
-          width: size * 0.74,
-          height: size,
-        ),
-        srcWidth: 220,
-        srcHeight: 300,
-      );
-      return;
-    }
-    // 底环
-    canvas.drawCircle(
-      Offset.zero,
-      _radius + 4,
-      Paint()
-        ..color = const Color(0x33E8C470)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    // 本体
-    canvas.drawCircle(
-      Offset.zero,
-      _radius,
-      Paint()..color = const Color(0xFFF6E3B4),
-    );
-    canvas.drawCircle(
-      Offset.zero,
-      _radius,
-      Paint()
-        ..color = const Color(0xFFB98F3E)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2,
-    );
-    // 朝向点
-    canvas.drawCircle(
-      (facing * _radius * 0.62).toOffset(),
-      4,
-      Paint()..color = const Color(0xFFD4593F),
-    );
-  }
-
-  void takeDamage(double amount) {
-    if (hp <= 0) return;
-    hp = (hp - amount).clamp(0.0, maxHp);
-    game.onPlayerHpChanged();
-  }
-
-  void heal(double amount) {
-    hp = (hp + amount).clamp(0.0, maxHp);
-    game.onPlayerHpChanged();
-  }
 }

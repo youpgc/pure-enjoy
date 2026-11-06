@@ -118,13 +118,18 @@ class _ChoiceCard extends StatelessWidget {
                 choice.title,
                 style: JourneyTheme.title.copyWith(fontSize: 14),
                 textAlign: TextAlign.center,
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
               ),
               const SizedBox(height: 6),
-              Text(
-                choice.desc,
-                style: JourneyTheme.faint,
-                textAlign: TextAlign.center,
-                maxLines: 3,
+              Flexible(
+                child: Text(
+                  choice.desc,
+                  style: JourneyTheme.faint,
+                  textAlign: TextAlign.center,
+                  maxLines: 3,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ),
             ],
           ),

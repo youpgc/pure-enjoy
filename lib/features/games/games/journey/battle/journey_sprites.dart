@@ -16,6 +16,8 @@ class JourneySprites {
   static String pickup(String kind) => 'assets/games/journey/pickup_$kind.svg';
   static String weapon(String code) => 'assets/games/journey/weapon_$code.svg';
   static String character(String code) => 'assets/games/journey/char_$code.svg';
+  /// 场景道具（参照物/里程碑装饰；name=gongtai/shikuai/shibei/yiting）
+  static String prop(String name) => 'assets/games/journey/prop_$name.svg';
 
   /// 预热一批键；重复调用自动去重；并行加载（进关精灵数量多时显著提速）。
   static Future<void> warmUp(

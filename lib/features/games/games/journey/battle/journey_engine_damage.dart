@@ -18,25 +18,64 @@ mixin JourneyDamageTickMixin {
   }
 
   void updateDamageTick(JourneyFlameGame game, double dt) {
+    // 扩展特效计时（金刚琢/阴阳二气瓶）：每帧推进，暂停时随引擎冻结
+    game.updateTriggerWeapons(dt);
     _hurtTimer += dt;
     if (_hurtTimer < hurtInterval) return;
     _hurtTimer = 0;
 
     final player = game.player;
     var strongest = 0.0;
-    for (final m in game.monsters) {
+    JourneyMonsterComponent? strongestM;
+    // 空间哈希（节点12）：接触判定只查玩家附近候选（一个格径覆盖最大怪半径）
+    final candidates = game.spatialGrid
+        .queryRange(player.position, JourneySpatialGrid.cellSize);
+    for (final m in candidates) {
       if (m.isDead) continue;
       final overlap = (m.position - player.position).length <=
           m.radius + JourneyPlayerComponent._radius;
       if (overlap && m._contactDamage > strongest) {
         strongest = m._contactDamage;
+        strongestM = m;
       }
     }
-    if (strongest > 0) {
-      final afterArmor =
+    if (strongestM != null) {
+      // 虚弱（金刚琢）：虚弱期接触伤害减半（在护甲折算前生效）
+      if (strongestM.weakenTimer > 0) {
+        strongest *= 0.5;
+      }
+      var afterArmor =
           (strongest * (1 - armorReductionRatio(player.armor)))
               .clamp(1.0, double.maxFinite);
+      // 铜皮铁骨（bajie 特殊能力）：受击后窗口内额外减伤 30%
+      if (game._bajieGuard > 0) {
+        afterArmor *= 0.70;
+      }
       player.takeDamage(afterArmor);
+      // 反伤荆棘（§6 特效法宝）：对造成伤害的怪反弹 thorns 比例护甲后
+      // 伤害（params.thorns，直接 takeDamage，不计暴击）
+      if (game.effectWeapons.contains('fanshang_thorns')) {
+        strongestM.takeDamage(
+          afterArmor * game.weaponParam('fanshang_thorns', 'thorns', 0.30),
+        );
+      }
+      // 妖王接触附带控制/毒（西游记扩展）：
+      // 金光缚身（百眼魔君）定身；倒马毒桩（蝎子精）禁疗（时长可配）
+      switch (strongestM.model.abilityKey) {
+        case 'spider_web':
+          player.rootTimer = game.monsterParam(
+              strongestM.model.code, 'web_root', 0.8);
+          break;
+        case 'poison_mist':
+          player.healBlockTimer = game.monsterParam(
+              strongestM.model.code, 'poison_block', 3.0);
+          game.spawnFloatText(
+            player.position + Vector2(0, -36),
+            '倒马毒桩·禁疗',
+            const Color(0xFF8E2F3C),
+          );
+          break;
+      }
     }
 
     // 分离力：随机抽样两两推开（几何占位轻量做法，防完全叠点）

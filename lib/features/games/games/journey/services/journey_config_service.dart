@@ -3,6 +3,7 @@ import 'package:flutter/foundation.dart';
 import '../../../../../services/api_client.dart';
 import '../../../../../services/error_reporter.dart';
 import '../models/journey_models.dart';
+import '../models/journey_talent_models.dart';
 import 'journey_seed.dart';
 
 /// 西行·配置快照（一次聚合全部 journey_* 静态配置）。
@@ -11,7 +12,9 @@ class JourneyConfigSnapshot {
   final List<JourneyLevelModel> levels;
   final List<JourneyCharacterModel> characters;
   final List<JourneyWeaponModel> weapons;
-  final List<JourneyTalentModel> talents;
+
+  /// 五行天赋分支（4 角色 × 5 系 × 3 分支 = 60 行；v4 分支树制）。
+  final List<JourneyTalentBranchModel> talentBranches;
 
   /// 怪物池（journey_monsters 远端配置；空=引擎回落内置种子池）。
   final List<JourneyMonsterModel> monsters;
@@ -23,6 +26,41 @@ class JourneyConfigSnapshot {
   /// 空=引擎回落内置基准数值。
   final Map<String, List<JourneyWeaponLevelModel>> weaponLevels;
 
+  /// 掉落表（journey_drops，table_code 分组）；空=消费侧回落内置种子。
+  final List<JourneyDropModel> drops;
+
+  /// 炼化配方（journey_evo_recipes，seq 升序=判定优先级）；
+  /// 空=消费侧回落内置种子。
+  final List<JourneyEvoRecipeModel> evoRecipes;
+
+  /// 图鉴解锁（journey_relic_unlocks，seq 升序）；空=消费侧回落内置种子。
+  final List<JourneyRelicUnlockModel> relicUnlocks;
+
+  /// 拾取物配置（journey_pickups，code 升序）；空=消费侧回落内置种子。
+  final List<JourneyPickupConfigModel> pickupConfigs;
+
+  /// 每日游历地图列表（journey_daily_maps，后台可配）；空=消费侧回落种子。
+  final List<JourneyDailyMapModel> dailyMaps;
+
+  /// 无尽妖潮波次配置（journey_endless_waves，上限 99；空=全部内置公式）。
+  final List<JourneyEndlessWaveModel> endlessWaves;
+
+  /// 法宝数值参数（journey_weapon_params，code 分组：weaponCode→{code→值}；
+  /// 空=引擎全部走内置兜底）。
+  final Map<String, Map<String, double>> weaponParams;
+
+  /// 妖王能力参数（journey_monster_params，code 分组：monsterCode→{code→值}；
+  /// 空=引擎全部走内置兜底）。
+  final Map<String, Map<String, double>> monsterParams;
+
+  /// journey_globals 原始行（通用成长卡/经验曲线等扩展列直读；
+  /// 列缺失/seed 快照为 null 时消费侧回落内置兜底）。
+  final Map<String, dynamic>? globalsRaw;
+
+  /// 还魂复活功德基准价（journey_globals.revive_merit_base）；
+  /// 实际消耗=基准 × 关卡号。
+  final int reviveMeritBase;
+
   /// 西行游戏 id（games.code='journey'；成绩上报用，空=未就绪不上报）。
   final String gameId;
 
@@ -33,6 +71,21 @@ class JourneyConfigSnapshot {
   /// 同屏怪物实体上限（journey_globals.monster_cap，运营可在后台调整）。
   final int monsterCap;
 
+  /// 开局铺场只数（journey_globals.initial_pack_size，0=关闭）；
+  /// 波次关恢复铺场（修「接配置后开局空场走远看不到怪」）。
+  final int initialPackSize;
+
+  /// 妖穴集中概率（journey_globals.spawn_den_ratio，0~1；调低=沿途遭遇
+  /// 更均匀）。刷怪点落入 demon_den 热区的比例。
+  final double spawnDenRatio;
+
+  /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；末场伏诛
+  /// 判定命中后全部角色点池各 +1）。
+  final double talentDropRate;
+
+  /// 角色等级上限（journey_globals.char_level_cap；满级经验条恒满）。
+  final int charLevelCap;
+
   /// true = 全部来自内置兜底（journey_* 表未部署或拉取失败）。
   final bool fromSeed;
 
@@ -41,13 +94,27 @@ class JourneyConfigSnapshot {
     required this.levels,
     required this.characters,
     required this.weapons,
-    required this.talents,
+    required this.talentBranches,
     this.monsters = const <JourneyMonsterModel>[],
     this.slotDefs = const <JourneySlotDefModel>[],
     this.weaponLevels = const <String, List<JourneyWeaponLevelModel>>{},
+    this.drops = const <JourneyDropModel>[],
+    this.evoRecipes = const <JourneyEvoRecipeModel>[],
+    this.relicUnlocks = const <JourneyRelicUnlockModel>[],
+    this.pickupConfigs = const <JourneyPickupConfigModel>[],
+    this.dailyMaps = const <JourneyDailyMapModel>[],
+    this.endlessWaves = const <JourneyEndlessWaveModel>[],
+    this.weaponParams = const <String, Map<String, double>>{},
+    this.monsterParams = const <String, Map<String, double>>{},
+    this.globalsRaw,
+    this.reviveMeritBase = 20,
     this.gameId = '',
     this.scoreDimIds = const <String, String>{},
     this.monsterCap = 120,
+    this.initialPackSize = 24,
+    this.spawnDenRatio = 0.70,
+    this.talentDropRate = 0.10,
+    this.charLevelCap = 99,
     required this.fromSeed,
   });
 
@@ -73,9 +140,132 @@ class JourneyConfigSnapshot {
     return null;
   }
 
+  /// 每日游历地图（code 匹配；仅内置兜底快照回落种子）。
+  JourneyDailyMapModel? dailyMapOf(String code) {
+    for (final m in dailyMapList()) {
+      if (m.code == code) return m;
+    }
+    return null;
+  }
+
+  /// 无尽妖潮波次（wave_no 匹配；未配置该波走引擎内置公式）。
+  JourneyEndlessWaveModel? endlessWaveOf(int waveNo) {
+    for (final w in endlessWaves) {
+      if (w.waveNo == waveNo) return w;
+    }
+    return null;
+  }
+
+  /// 每日游历地图列表：远端就绪时如实返回后台配置（空列表=后台全部
+  /// 禁用，App 显示「今日暂无游历」）；仅内置兜底快照回落种子保离线可玩。
+  List<JourneyDailyMapModel> dailyMapList() {
+    if (!fromSeed) return dailyMaps;
+    return kJourneyDailyMapSeed.map(JourneyDailyMapModel.fromJson).toList();
+  }
+
+  /// 法宝数值参数（weaponCode+参数 code 读取；行缺失回落 fallback）。
+  double weaponParam(String weaponCode, String code, double fallback) {
+    return weaponParams[weaponCode]?[code] ?? fallback;
+  }
+
+  /// 妖王能力参数（monsterCode+参数 code 读取；行缺失回落 fallback）。
+  double monsterParam(String monsterCode, String code, double fallback) {
+    return monsterParams[monsterCode]?[code] ?? fallback;
+  }
+
+  // ---- 通用成长卡/经验曲线（journey_globals 列；缺省走内置兜底）----
+
+  /// 三选一通用成长卡·移动速度加成（upgrade_move）。
+  double get upgradeMove => _globalDouble('upgrade_move', 0.09);
+
+  /// 三选一通用成长卡·生命上限（upgrade_hp）。
+  double get upgradeHp => _globalDouble('upgrade_hp', 20);
+
+  /// 三选一通用成长卡·自动回复（upgrade_regen）。
+  double get upgradeRegen => _globalDouble('upgrade_regen', 1);
+
+  /// 三选一通用成长卡·拾取范围（upgrade_pickup）。
+  double get upgradePickup => _globalDouble('upgrade_pickup', 18);
+
+  /// 经验曲线基数（exp_base：升级所需 = base + 当前等级 × exp_per_lv）。
+  double get expBase => _globalDouble('exp_base', 12);
+
+  /// 经验曲线每级增量（exp_per_lv）。
+  double get expPerLv => _globalDouble('exp_per_lv', 7);
+
+  double _globalDouble(String key, double fallback) {
+    // globals 原始行直读（列缺失/seed 快照 null 时回落内置兜底）
+    return (globalsRaw?[key] as num?)?.toDouble() ?? fallback;
+  }
+
   List<JourneyLevelModel> levelsOfRegion(String regionCode) =>
       levels.where((l) => l.regionCode == regionCode).toList()
         ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
+
+  /// 掉落表行（tableCode 组；未配置返回空列表，消费侧兜底）。
+  List<JourneyDropModel> dropTableOf(String tableCode) =>
+      drops.where((d) => d.tableCode == tableCode).toList();
+
+  /// 武器第一条炼化配方（seq 升序首条；无配方返回 null）。
+  JourneyEvoRecipeModel? evoRecipeOf(String weaponCode) {
+    for (final r in evoRecipes) {
+      if (r.weaponCode == weaponCode) return r;
+    }
+    return null;
+  }
+
+  /// 武器图鉴解锁定价（未配置返回 null）。
+  JourneyRelicUnlockModel? relicOf(String weaponCode) {
+    for (final r in relicUnlocks) {
+      if (r.weaponCode == weaponCode) return r;
+    }
+    return null;
+  }
+
+  /// 拾取物配置（未配置返回 null）。
+  JourneyPickupConfigModel? pickupConfigOf(String code) {
+    for (final p in pickupConfigs) {
+      if (p.code == code) return p;
+    }
+    return null;
+  }
+
+  /// 某角色的五行天赋分支（element/seq 升序）；该角色无远端行 → 内置
+  /// 60 行种子按同角色过滤兜底，消费侧不死局。
+  List<JourneyTalentBranchModel> branchesOf(String char) {
+    final own =
+        talentBranches.where((b) => b.characterCode == char).toList();
+    if (own.isEmpty) {
+      return buildJourneyTalentBranchSeed()
+          .where((row) => row['character_code'] == char)
+          .map(JourneyTalentBranchModel.fromJson)
+          .toList();
+    }
+    return own..sort((a, b) {
+      final byElement = a.element.compareTo(b.element);
+      return byElement != 0 ? byElement : a.seq.compareTo(b.seq);
+    });
+  }
+
+  /// 某角色某系某分支（远端行缺失回落内置种子行）。
+  JourneyTalentBranchModel branchOf(
+      String char, String element, String branchType) {
+    for (final b in branchesOf(char)) {
+      if (b.element == element && b.branchType == branchType) return b;
+    }
+    // 异常配置（分支行被删）：给中性默认分支
+    return JourneyTalentBranchModel(
+        id: '',
+        characterCode: char,
+        element: element,
+        branchType: branchType,
+        branchCode: journeyBranchCode(char, element, branchType),
+        name: branchType,
+        attrKey: branchType);
+  }
+
+  /// 还魂复活功德价 = 基准价 × 关卡号。
+  int reviveCostFor(int levelNo) => reviveMeritBase * levelNo;
 }
 
 /// 西行·配置服务：远端配置优先，失败回落内置兜底。
@@ -125,7 +315,8 @@ class JourneyConfigService {
             ),
       _fetchRows('journey_characters', order: 'unlock_level_no.asc'),
       _fetchRows('journey_weapons', order: 'code.asc'),
-      _fetchRows('journey_talents', order: 'seq.asc'),
+      _fetchRows('journey_talent_branches',
+          order: 'character_code.asc,seq.asc'),
       _fetchRows('journey_globals', order: 'code.asc'),
       _fetchRows('journey_monsters', order: 'code.asc'),
       _fetchRows('journey_weapon_slots', order: 'sort_order.asc'),
@@ -140,6 +331,21 @@ class JourneyConfigService {
               order: 'sort_order.asc',
               filters: <String, String>{'game_id': 'eq.$journeyGameId'},
               select: 'id,code'),
+      _fetchRows('journey_drops', order: 'table_code.asc'),
+      // 炼化配方/图鉴解锁：weapon_id 需经法宝表映射为 code（断裂行丢弃）
+      _fetchRows('journey_evo_recipes', order: 'seq.asc'),
+      _fetchRows('journey_relic_unlocks', order: 'seq.asc'),
+      _fetchRows('journey_pickups', order: 'code.asc'),
+      // 每日游历地图（表未部署时返回 null，消费侧回落内置种子；只取启用行）
+      _fetchRows('journey_daily_maps',
+          order: 'sort.asc',
+          filters: <String, String>{'enabled': 'eq.true'}),
+      // 无尽妖潮波次（后台可配，上限 99；表未部署返回 null 走内置公式）
+      _fetchRows('journey_endless_waves', order: 'wave_no.asc'),
+      // 法宝数值参数（后台可配；weapon_id 需经法宝表映射为 code，断裂行丢弃）
+      _fetchRows('journey_weapon_params', order: 'weapon_id.asc'),
+      // 妖王能力参数（后台可配；monster_id 需经怪物表映射为 code，断裂行丢弃）
+      _fetchRows('journey_monster_params', order: 'monster_id.asc'),
     ]);
 
     final regionRows = results[0] ?? const <Map<String, dynamic>>[];
@@ -165,14 +371,17 @@ class JourneyConfigService {
         'difficulty': row['difficulty'],
       });
     }).toList();
+    // 角色：客户端过滤禁用行（enabled 列后台开关；列未部署时解析缺省
+    // true 不丢行，比 SQL filter 更抗表结构就绪时序）
     final characters = (results[2] ?? const <Map<String, dynamic>>[])
         .map(JourneyCharacterModel.fromJson)
+        .where((c) => c.enabled)
         .toList();
     final weapons = (results[3] ?? const <Map<String, dynamic>>[])
         .map(JourneyWeaponModel.fromJson)
         .toList();
-    final talents = (results[4] ?? const <Map<String, dynamic>>[])
-        .map(JourneyTalentModel.fromJson)
+    final talentBranches = (results[4] ?? const <Map<String, dynamic>>[])
+        .map(JourneyTalentBranchModel.fromJson)
         .toList();
     // 全局参数单行表：行缺失或列缺失均回落模拟值（不阻塞配置就绪判定）
     final globalsRow = (results[5] ?? const <Map<String, dynamic>>[]).isEmpty
@@ -180,6 +389,15 @@ class JourneyConfigService {
         : (results[5] as List<Map<String, dynamic>>).first;
     final monsterCap =
         (globalsRow?['monster_cap'] as num?)?.toInt() ?? 120;
+    // 还魂复活功德基准价（journey_globals 全列拉取，直接取行键）
+    final reviveMeritBase = (globalsRow?['revive_merit_base'] as num?)?.toInt() ?? 60;
+    // 开局铺场只数（journey_globals.initial_pack_size，0=关闭；缺省 24）
+    final initialPackSize = (globalsRow?['initial_pack_size'] as num?)?.toInt() ?? 24;
+    final spawnDenRatio = (globalsRow?['spawn_den_ratio'] as num?)?.toDouble() ?? 0.70;
+    // 妖王天赋点掉率（0~1；缺省回落 0.10）
+    final talentDropRate = (globalsRow?['talent_drop_rate'] as num?)?.toDouble() ?? 0.10;
+    // 角色等级上限（缺省回落 99）
+    final charLevelCap = (globalsRow?['char_level_cap'] as num?)?.toInt() ?? 99;
     // 怪物池远端配置（关卡刷怪/妖王归属的数据源）；空→引擎回落内置种子池
     final monsters = (results[6] ?? const <Map<String, dynamic>>[])
         .map(JourneyMonsterModel.fromJson)
@@ -207,6 +425,74 @@ class JourneyConfigService {
         if (row['id'] is String && row['code'] is String)
           row['code'] as String: row['id'] as String,
     };
+    // 掉落表（第 11 张聚合表）
+    final drops = (results[10] ?? const <Map<String, dynamic>>[])
+        .map(JourneyDropModel.fromJson)
+        .toList();
+    // 炼化配方/图鉴解锁：weapon_id → code（经远端法宝行映射；断裂行丢弃）
+    final evoRecipes = <JourneyEvoRecipeModel>[];
+    for (final row in results[11] ?? const <Map<String, dynamic>>[]) {
+      final code = weaponIdToCode[row['weapon_id'] as String?];
+      final passive = weaponIdToCode[row['required_passive_id'] as String?];
+      if (code == null || passive == null) continue;
+      evoRecipes.add(JourneyEvoRecipeModel.fromJson(<String, dynamic>{
+        'seq': row['seq'],
+        'weapon_code': code,
+        'required_passive_code': passive,
+        'required_passive_lv': row['required_passive_lv'],
+        'result_code': row['result_code'],
+        'result_name': row['result_name'],
+        'evo_mult': row['evo_mult'],
+      }));
+    }
+    final relicUnlocks = <JourneyRelicUnlockModel>[];
+    for (final row in results[12] ?? const <Map<String, dynamic>>[]) {
+      final code = weaponIdToCode[row['weapon_id'] as String?];
+      if (code == null) continue;
+      relicUnlocks.add(JourneyRelicUnlockModel.fromJson(<String, dynamic>{
+        'seq': row['seq'],
+        'weapon_code': code,
+        'achievement_code': row['achievement_code'],
+        'merit_cost': row['merit_cost'],
+      }));
+    }
+    // 拾取物配置（第 14 张聚合表）
+    final pickupConfigs = (results[13] ?? const <Map<String, dynamic>>[])
+        .map(JourneyPickupConfigModel.fromJson)
+        .toList();
+    // 每日游历地图（第 15 张聚合表，后台可配）
+    final dailyMaps = (results[14] ?? const <Map<String, dynamic>>[])
+        .map(JourneyDailyMapModel.fromJson)
+        .toList();
+    // 无尽妖潮波次（第 16 张聚合表，后台可配）
+    final endlessWaves = (results[15] ?? const <Map<String, dynamic>>[])
+        .map(JourneyEndlessWaveModel.fromJson)
+        .toList();
+    // 法宝数值参数（第 17 张聚合表）：weapon_id → code 聚合为
+    // {weaponCode: {paramCode: value}}；映射断裂行丢弃
+    final weaponParams = <String, Map<String, double>>{};
+    for (final row in results[16] ?? const <Map<String, dynamic>>[]) {
+      final code = weaponIdToCode[row['weapon_id'] as String?];
+      final paramCode = row['code'] as String?;
+      final value = (row['value_num'] as num?)?.toDouble();
+      if (code == null || paramCode == null || value == null) continue;
+      (weaponParams[code] ??= <String, double>{})[paramCode] = value;
+    }
+    // 妖王能力参数（第 18 张聚合表）：monster_id → code 聚合为
+    // {monsterCode: {paramCode: value}}；映射断裂行丢弃
+    final monsterIdToCode = <String, String>{
+      for (final row in results[6] ?? const <Map<String, dynamic>>[])
+        if (row['id'] is String && row['code'] is String)
+          row['id'] as String: row['code'] as String,
+    };
+    final monsterParams = <String, Map<String, double>>{};
+    for (final row in results[17] ?? const <Map<String, dynamic>>[]) {
+      final code = monsterIdToCode[row['monster_id'] as String?];
+      final paramCode = row['code'] as String?;
+      final value = (row['value_num'] as num?)?.toDouble();
+      if (code == null || paramCode == null || value == null) continue;
+      (monsterParams[code] ??= <String, double>{})[paramCode] = value;
+    }
 
     final remoteReady = regions.isNotEmpty && levels.isNotEmpty;
     if (remoteReady) {
@@ -218,13 +504,30 @@ class JourneyConfigService {
             ? kJourneyCharacterSeed.map(JourneyCharacterModel.fromJson).toList()
             : characters,
         weapons: weapons,
-        talents: talents,
+        // 天赋分支表缺失时不产生「无枝可点」死局：回落内置分支
+        talentBranches: talentBranches.isEmpty
+            ? buildJourneyTalentBranchSeed().map(JourneyTalentBranchModel.fromJson).toList()
+            : talentBranches,
         monsters: monsters,
         slotDefs: slotDefs,
         weaponLevels: weaponLevels,
+        drops: drops,
+        evoRecipes: evoRecipes,
+        relicUnlocks: relicUnlocks,
+        pickupConfigs: pickupConfigs,
+        dailyMaps: dailyMaps,
+        endlessWaves: endlessWaves,
+        weaponParams: weaponParams,
+        monsterParams: monsterParams,
+        globalsRaw: globalsRow,
+        reviveMeritBase: reviveMeritBase,
         gameId: journeyGameId ?? '',
         scoreDimIds: scoreDimIds,
         monsterCap: monsterCap,
+        initialPackSize: initialPackSize,
+        spawnDenRatio: spawnDenRatio,
+        talentDropRate: talentDropRate,
+        charLevelCap: charLevelCap,
         fromSeed: false,
       );
       return _memory!;
@@ -233,11 +536,8 @@ class JourneyConfigService {
     // 远端未就绪：内置兜底（SQL 种子的镜像），低噪音上报一次
     if (!_seedReported) {
       _seedReported = true;
-      ErrorReporter.reportMessage(
-        '西行配置表未就绪，使用内置兜底配置',
-        module: 'games.journey',
-        level: 'info',
-      );
+      ErrorReporter.reportMessage('西行配置表未就绪，使用内置兜底配置',
+          module: 'games.journey', level: 'info');
     }
     _memory = _buildSeedSnapshot();
     return _memory!;
@@ -250,7 +550,21 @@ class JourneyConfigService {
       characters:
           kJourneyCharacterSeed.map(JourneyCharacterModel.fromJson).toList(),
       weapons: kJourneyWeaponSeed.map(JourneyWeaponModel.fromJson).toList(),
-      talents: buildJourneyTalentSeed().map(JourneyTalentModel.fromJson).toList(),
+      talentBranches: buildJourneyTalentBranchSeed()
+          .map(JourneyTalentBranchModel.fromJson).toList(),
+      drops: kJourneyDropSeed.map(JourneyDropModel.fromJson).toList(),
+      evoRecipes:
+          kJourneyEvoRecipeSeed.map(JourneyEvoRecipeModel.fromJson).toList(),
+      relicUnlocks:
+          kJourneyRelicUnlockSeed.map(JourneyRelicUnlockModel.fromJson).toList(),
+      pickupConfigs: kJourneyPickupConfigSeed
+          .map(JourneyPickupConfigModel.fromJson)
+          .toList(),
+      reviveMeritBase: kJourneyReviveMeritBase,
+      initialPackSize: kJourneyInitialPackSize,
+      spawnDenRatio: kJourneySpawnDenRatio,
+      talentDropRate: kJourneyTalentDropRate,
+      charLevelCap: kJourneyCharLevelCap,
       fromSeed: true,
     );
   }

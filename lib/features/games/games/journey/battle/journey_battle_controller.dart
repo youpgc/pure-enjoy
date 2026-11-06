@@ -1,3 +1,4 @@
+import 'package:flame/components.dart' show Vector2;
 import 'package:flutter/foundation.dart' show ValueNotifier;
 import 'package:flutter/material.dart' show Offset;
 
@@ -19,7 +20,10 @@ class JourneyBattleController {
     required this.onLevelUp,
     required this.onFinished,
     required this.onBossSpawn,
-  });
+    Future<bool> Function(int cost)? onRevivePrompt,
+    Future<bool> Function(String resultName)? onAlchemyPrompt,
+  })  : onRevivePrompt = onRevivePrompt ?? _defaultRevivePrompt,
+        onAlchemyPrompt = onAlchemyPrompt ?? _defaultAlchemyPrompt;
 
   final String themeColor;
   final void Function(int newLevel, {required bool paused}) onLevelUp;
@@ -31,6 +35,19 @@ class JourneyBattleController {
     required int durationSec,
   }) onFinished;
   final void Function(String bossName) onBossSpawn;
+
+  /// 还魂复活确认（§3）：入参=还魂功德价；返回 true=已扣功德允许复活。
+  /// 缺省实现=拒绝（对局页注入真实弹窗 + JourneyProgressService.spendRevive）。
+  final Future<bool> Function(int cost) onRevivePrompt;
+
+  /// 宝箱炼化确认（§6）：入参=炼化结果名；返回 true=确认炼化。
+  /// 缺省实现=放弃（宝箱已消耗，引擎直接恢复运行）。
+  final Future<bool> Function(String resultName) onAlchemyPrompt;
+
+  static Future<bool> _defaultRevivePrompt(int cost) =>
+      Future<bool>.value(false);
+  static Future<bool> _defaultAlchemyPrompt(String resultName) =>
+      Future<bool>.value(false);
 
   final hud = JourneyBattleHud();
 
@@ -47,10 +64,10 @@ class JourneyBattleController {
   final List<String> passiveSlots = <String>[];
 }
 
-/// 局外预注入（对局页组装）：天赋层增量 + 角色光环/特性法宝的效果包。
+/// 局外预注入（对局页组装）：五行天赋树线性增量 + 加强点能力标记。
 ///
-/// 数值口径：每系已修层数 × 系权重，标志层走独立效果键；
-/// 灼烧/暴击/击退等战斗未支持的系统暂不接入（轻量映射，后续迭代补全）。
+/// v3 线性层制数值口径：金/火层数→伤害、木层数→生命上限、水层数→
+/// 环绕转速、土层数→护甲（每层数值取天赋轨迹配置）。
 class JourneyLoadout {
   final double damageAmp;
   final double spinAmp; // 环绕转速加成注入
@@ -59,7 +76,16 @@ class JourneyLoadout {
   final double regenFlat;
   final double pickupRangeFlat;
   final double expAmp;
-  final Set<String> signatures; // 如 signature_metal / signature_wood
+  final double critRateFlat; // 暴击率增量（引擎钳 ≤0.60）
+  final double critDamageBonus; // 暴击伤害增量（引擎基准 1.5，钳 [1.0, 2.0]）
+
+  /// 已点亮标志强化（sig 化形枝）效果键：wood=回复翻倍+生命+10%，
+  /// earth=拾取磁吸全屏；其余系走数值字段。
+  final Set<String> signatures;
+
+  /// 已点亮加强点解锁的角色特殊能力（'ability_tang' 等；引擎按能力
+  /// 标记挂对应钩子，永久生效）。
+  final Set<String> abilities;
 
   const JourneyLoadout({
     this.damageAmp = 0,
@@ -69,7 +95,10 @@ class JourneyLoadout {
     this.regenFlat = 0,
     this.pickupRangeFlat = 0,
     this.expAmp = 1.0,
+    this.critRateFlat = 0,
+    this.critDamageBonus = 0,
     this.signatures = const <String>{},
+    this.abilities = const <String>{},
   });
 }
 
@@ -80,6 +109,15 @@ class JourneyBattleHud {
   final ValueNotifier<double> exp = ValueNotifier<double>(0);
   final ValueNotifier<double> expNeed = ValueNotifier<double>(12);
   final ValueNotifier<int> level = ValueNotifier<int>(1);
+
+  /// 经验条两段式动画的归零计数：每次「充满→归零」+1，进度条监听后按
+  /// 新 key 重建 TweenAnimationBuilder（重建即落位，无从满倒退的反向
+  /// tween）。写入口径见引擎 exp part。
+  final ValueNotifier<int> expReset = ValueNotifier<int>(0);
+
+  /// 妖王伏诛标记：末场击杀后置 true（暂停面板「提前结算」按钮与
+  /// 伏诛抉择弹层的显隐依据）。
+  final ValueNotifier<bool> bossDefeated = ValueNotifier<bool>(false);
   final ValueNotifier<int> kills = ValueNotifier<int>(0);
   final ValueNotifier<int> meritCoins = ValueNotifier<int>(0);
 
@@ -94,6 +132,56 @@ class JourneyBattleHud {
 
   /// 法宝槽位变更计数：入槽/升级后 +1，槽栏监听重建（读 controller 槽表）。
   final ValueNotifier<int> slotsRevision = ValueNotifier<int>(0);
+
+  /// 里程碑播报（milestone 参照物接近触发，同一参照物只报一次；
+  /// null=无播报，对局页监听展示后可清回 null）。
+  final ValueNotifier<String?> milestoneText = ValueNotifier<String?>(null);
+
+  /// 横幅位（节点11）：开场难名/妖王降临/里程碑共用展示槽；
+  /// null=无横幅，覆盖层监听展示 2.4s 后自行隐去。
+  final ValueNotifier<String?> banner = ValueNotifier<String?>(null);
+
+  /// 妖王大血条（节点11）：ratio=妖王血量比例 0~1（0=已倒下不显示），
+  /// name=妖王名（无妖章回恒空串）；
+  /// bossEngaged=玩家进入妖王侦测圈（横幅血条仅交战时可见，脱战/死亡熄灭）。
+  final ValueNotifier<double> bossHpRatio = ValueNotifier<double>(0);
+  final ValueNotifier<String> bossName = ValueNotifier<String>('');
+  final ValueNotifier<bool> bossEngaged = ValueNotifier<bool>(false);
+
+  /// 妖王罗盘·据点基准距离（出生点到据点，进关时引擎写入一次）：
+  /// 罗盘距离文案=接近度 × 基准距离换算「里」（1 里=25 世界单位）。
+  final ValueNotifier<double> bossStartDist = ValueNotifier<double>(1);
+
+  /// 无尽妖潮当前波数（1 起；0=非无尽模式，罗盘位回退坚持倒计时口径）。
+  final ValueNotifier<int> endlessWave = ValueNotifier<int>(0);
+
+  /// 小地图点阵快照（节点11）：引擎每 0.25s 采样一次，无变化不写；
+  /// null=尚未采样（覆盖层画空窗）。
+  final ValueNotifier<JourneyMinimapData?> minimap =
+      ValueNotifier<JourneyMinimapData?>(null);
+}
+
+/// 小地图采样快照（节点11）：怪点=相对玩家的世界偏移（≤span，上限 60）；
+/// bossPos=相对玩家的偏移（超范围用 bearing 方向 ×span 近似点，骷髅常显）。
+class JourneyMinimapData {
+  /// 玩家世界坐标（备用参考位；渲染以偏移为准）。
+  final Vector2 playerPos;
+
+  /// 妖王相对玩家的偏移（null=本关无妖王）。
+  final Vector2? bossPos;
+
+  /// 相对玩家的怪物偏移（上限 60，均在 span 内）。
+  final List<Vector2> monsterOffsets;
+
+  /// 采样半径（世界单位）。
+  final double span;
+
+  const JourneyMinimapData({
+    required this.playerPos,
+    required this.monsterOffsets,
+    this.bossPos,
+    this.span = 1000,
+  });
 }
 
 /// 局内成长三选一选项（维度槽 + 被动加持 + 通用成长）。
@@ -101,6 +189,7 @@ enum JourneyUpgradeKind {
   slotLearn, // 习得新维度入空槽（[code] 载荷，Lv1）
   slotUpgrade, // 已有维度升级 +1（[code] 载荷，上限由配置驱动）
   passiveGrant, // 获得被动加持入被动槽（[code] 载荷，入槽即生效）
+  effectGrant, // 触发型法宝激活（[code] 载荷，命中/受击/暴击时结算）
   moveSpeed,
   maxHp,
   regen,

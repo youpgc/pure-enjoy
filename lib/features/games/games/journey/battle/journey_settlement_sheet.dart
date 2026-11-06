@@ -79,7 +79,8 @@ class JourneySettlementSheet extends StatelessWidget {
             const SizedBox(height: 4),
             Center(
               child: Text(
-                '第 ${result.levelNo} 难 · ${result.levelTitle}',
+                // levelTitle 已统一带关号（battle screen 结算入参拼接）
+                result.levelTitle,
                 style: JourneyTheme.caption,
               ),
             ),

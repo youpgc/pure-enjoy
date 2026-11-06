@@ -11,12 +11,15 @@ class JourneyScoreReporter {
 
   /// 上报一局成绩。[result] 为引擎结算结果；[cleared] 决定状态与
   /// farthest_level 维度取值（未通关传 0，max 聚合不受污染）。
+  /// 非主线模式（level_no≤0 的无尽/游历）不上报：farthest_level 维度
+  /// 无意义，避免 0 值污染成绩看板/排行榜。
   static void report({
     required JourneyRunResult result,
     required bool cleared,
     required String levelId,
     JourneyConfigSnapshot? snapshot,
   }) {
+    if (result.levelNo <= 0) return;
     final dims = snapshot?.scoreDimIds ?? const <String, String>{};
     final gameId = snapshot?.gameId ?? '';
     if (gameId.isEmpty || dims.isEmpty) return;
