@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 紫金铃（特效）：赛太岁紫金铃，摇铃妖火 -->
+  <path d="M14 30 C14 18 18 10 24 10 C30 10 34 18 34 30 L34 34 L14 34 Z" fill="#8E5AA8"/>
+  <path d="M16 30 C16 20 19 13 24 13 C29 13 32 20 32 30 L32 32 L16 32 Z" fill="#B07CD4"/>
+  <rect x="12" y="34" width="24" height="4" rx="2" fill="#6E4590"/>
+  <circle cx="24" cy="40" r="3.4" fill="#E8C470"/>
+  <path d="M24 4 V9" stroke="#E8C470" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="24" cy="3.5" r="1.8" fill="#D4593F"/>
+</svg>

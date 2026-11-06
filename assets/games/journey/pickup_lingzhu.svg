@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 灵珠：碧水灵珠，回血意象 -->
+  <ellipse cx="24" cy="43" rx="10" ry="2.5" fill="#1E4A42" opacity="0.35"/>
+  <circle cx="24" cy="24" r="14" fill="#5BC4B0"/>
+  <circle cx="24" cy="24" r="14" fill="none" stroke="#2E7A6C" stroke-width="2"/>
+  <path d="M18 27 q6 -12 12 0 q-6 6 -12 0" fill="#DFF7F1" opacity="0.85"/>
+  <circle cx="19.5" cy="17.5" r="3" fill="#F2FFFC" opacity="0.85"/>
+</svg>

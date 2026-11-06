@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 阴阳二气瓶（特效）：金角大王之宝，吸入化浆 -->
+  <path d="M19 5 H29 L28 11 C33 17 35 25 33 34 C31.5 40 28 43 24 43 C20 43 16.5 40 15 34 C13 25 15 17 20 11 Z" fill="#3E5A8E"/>
+  <path d="M20.5 12 C16.5 18 15 25 16.6 33 C17.8 38.4 20.4 41 24 41 C27.6 41 30.2 38.4 31.4 33 C33 25 31.5 18 27.5 12 Z" fill="#5B7DBE"/>
+  <path d="M24 14 C21 20 20 27 21 34" fill="none" stroke="#B8CCEF" stroke-width="2" stroke-linecap="round"/>
+  <path d="M28 15 C31 21 31.6 28 30.4 34" fill="none" stroke="#2B3E66" stroke-width="2" stroke-linecap="round"/>
+  <ellipse cx="24" cy="6" rx="5.6" ry="2.2" fill="#8FA9D9"/>
+</svg>

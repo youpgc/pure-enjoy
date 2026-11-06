@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 驿亭：两柱 + 攒尖顶（西行路旁歇脚亭） -->
+  <path d="M6 22 L24 6 L42 22 L38 22 L24 10 L10 22 Z" fill="#4A3A28"/>
+  <rect x="12" y="22" width="24" height="3" rx="1.5" fill="#5A4636"/>
+  <rect x="13" y="25" width="5" height="19" rx="1.5" fill="#8A5A3B"/>
+  <rect x="30" y="25" width="5" height="19" rx="1.5" fill="#8A5A3B"/>
+  <path d="M18 25 V44 M24 25 V44 M30 25 V44" stroke="#7A4E32" stroke-width="2"/>
+  <circle cx="24" cy="8" r="1.8" fill="#E8C470"/>
+</svg>

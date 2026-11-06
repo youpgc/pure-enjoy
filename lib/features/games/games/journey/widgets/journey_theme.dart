@@ -63,22 +63,35 @@ class JourneyTheme {
   static const double strokeW = 1.0;
 
   // ---- 字级 ----
+  // 显式关闭继承装饰：App 全局主题链路可能向 DefaultTextStyle 注入
+  // underline（对局内所有 Text 均继承合并），西行文字一律无下划线。
   static const TextStyle titleLg = TextStyle(
     fontSize: 22,
     fontWeight: FontWeight.bold,
     color: textPrimary,
+    decoration: TextDecoration.none,
   );
   static const TextStyle title = TextStyle(
     fontSize: 17,
     fontWeight: FontWeight.bold,
     color: textPrimary,
+    decoration: TextDecoration.none,
   );
-  static const TextStyle body = TextStyle(fontSize: 14, color: textPrimary);
+  static const TextStyle body = TextStyle(
+    fontSize: 14,
+    color: textPrimary,
+    decoration: TextDecoration.none,
+  );
   static const TextStyle caption = TextStyle(
     fontSize: 12,
     color: textSecondary,
+    decoration: TextDecoration.none,
   );
-  static const TextStyle faint = TextStyle(fontSize: 11, color: textFaint);
+  static const TextStyle faint = TextStyle(
+    fontSize: 11,
+    color: textFaint,
+    decoration: TextDecoration.none,
+  );
 
   /// 页面统一底（深墨渐变，全页面共用）
   static BoxDecoration pageDecoration() => const BoxDecoration(

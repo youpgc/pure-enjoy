@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 穿刺：箭头贯穿目标 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M2.5 12h15"/>
+    <path d="M14.5 8.5l3.5 3.5-3.5 3.5"/>
+    <circle cx="11" cy="12" r="3.2"/>
+  </g>
+</svg>

@@ -1,0 +1,53 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 太上老君：紫金道冠 + 白须道袍 + 拂尘 + 炉火背光 -->
+  <defs>
+    <radialGradient id="ljHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#B07CD4" stop-opacity="0.5"/>
+      <stop offset="0.7" stop-color="#B07CD4" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#B07CD4" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="ljRobe" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8E6BB8"/>
+      <stop offset="1" stop-color="#5A3E86"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 炉火背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#ljHalo)"/>
+
+  <g>
+    <!-- 道袍下摆 -->
+    <path d="M72 164 C66 210 60 244 54 268 L166 268 C160 244 154 210 148 164 Z" fill="url(#ljRobe)"/>
+    <!-- 鹤氅对襟 -->
+    <path d="M80 152 C84 200 96 232 110 252 C124 232 136 200 140 152 C128 166 92 166 80 152 Z" fill="none" stroke="#F3E6C8" stroke-width="2.4" opacity="0.6"/>
+    <path d="M96 154 L110 190 L124 154" fill="none" stroke="#F3E6C8" stroke-width="2" opacity="0.7"/>
+    <!-- 阴阳纹 -->
+    <circle cx="110" cy="196" r="10" fill="none" stroke="#F3E6C8" stroke-width="1.8" opacity="0.7"/>
+    <path d="M110 186 a5 5 0 0 1 0 10 a5 5 0 0 0 0 10" fill="none" stroke="#F3E6C8" stroke-width="1.6" opacity="0.7"/>
+    <!-- 双手拱礼 -->
+    <circle cx="110" cy="214" r="9" fill="#F6DFC0"/>
+    <!-- 头 -->
+    <circle cx="110" cy="116" r="24" fill="#F6DFC0"/>
+    <!-- 紫金道冠 -->
+    <path d="M88 102 L110 84 L132 102 L132 94 Q110 74 88 94 Z" fill="#D8B25E"/>
+    <circle cx="110" cy="82" r="4.5" fill="#F3E6C8"/>
+    <!-- 白须（长髯垂胸） -->
+    <path d="M96 128 Q98 158 110 168 Q122 158 124 128 Q117 136 110 136 Q103 136 96 128 Z" fill="#F3EFE6"/>
+    <path d="M100 126 Q104 146 110 152 Q116 146 120 126" fill="none" stroke="#E0D8C8" stroke-width="1.6"/>
+    <!-- 容颜（慈和长眉） -->
+    <path d="M98 116 q5 -4 9 0 M113 116 q5 -4 9 0" stroke="#E0D8C8" stroke-width="2.4" fill="none" stroke-linecap="round"/>
+    <circle cx="103" cy="118" r="2" fill="#4A3222"/>
+    <circle cx="117" cy="118" r="2" fill="#4A3222"/>
+    <path d="M106 128 Q110 131 114 128" stroke="#B08968" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 拂尘（右手侧） -->
+  <g stroke-linecap="round">
+    <line x1="164" y1="120" x2="164" y2="238" stroke="#8A5A2B" stroke-width="5"/>
+    <path d="M164 120 q-12 -18 -6 -34 M164 120 q12 -18 6 -34 M164 120 q0 -22 0 -34" stroke="#F3EFE6" stroke-width="3" fill="none"/>
+    <circle cx="164" cy="126" r="6" fill="#D8B25E"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 272 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#B07CD4" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

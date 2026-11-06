@@ -1,6 +1,9 @@
 import 'package:flutter/material.dart';
+import 'dart:math' as math;
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/journey_models.dart';
+import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
 import '../widgets/journey_theme.dart';
@@ -69,7 +72,12 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     final progress = JourneyProgressService.instance;
     final unlocked = _progress.characterUnlocked(c.code);
     final selected = progress.selectedCharacterCode == c.code;
-    final progressMet = _progress.farthestLevelNo >= c.unlockLevelNo;
+    // 解锁门槛：纯种子模式（远端 81 难未部署）内置关卡仅 1~20，
+    // 扩展角色难号（25~49）压缩到 20，保「离线可玩」口径不永锁
+    final levelNeed = (_config?.fromSeed ?? false)
+        ? math.min(c.unlockLevelNo, 20)
+        : c.unlockLevelNo;
+    final progressMet = _progress.farthestLevelNo >= levelNeed;
     final meritMet = _progress.meritBalance >= c.unlockMeritCost;
     final canUnlock = !unlocked && progressMet && meritMet;
 
@@ -85,7 +93,7 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: <Widget>[
-          // 立绘占位徽章
+          // 立绘徽章：角色 SVG 资源（未解锁降透明度）
           Container(
             width: 52,
             height: 52,
@@ -100,12 +108,23 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
                 width: selected ? 1.6 : 1,
               ),
             ),
-            child: Text(
-              c.name.characters.first,
-              style: JourneyTheme.titleLg.copyWith(
-                color: unlocked
-                    ? JourneyTheme.goldSoft
-                    : JourneyTheme.textFaint,
+            child: ClipOval(
+              child: Opacity(
+                opacity: unlocked ? 1.0 : 0.4,
+                child: SvgPicture.asset(
+                  'assets/games/journey/char_${c.code}.svg',
+                  width: 44,
+                  height: 44,
+                  fit: BoxFit.contain,
+                  errorBuilder: (_, __, ___) => Text(
+                    c.name.characters.first,
+                    style: JourneyTheme.titleLg.copyWith(
+                      color: unlocked
+                          ? JourneyTheme.goldSoft
+                          : JourneyTheme.textFaint,
+                    ),
+                  ),
+                ),
               ),
             ),
           ),
@@ -139,6 +158,18 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
                 const SizedBox(height: 4),
                 Text('初始血量 ${c.baseHp} · 专属法宝 ${_weaponName(c.weaponCode)}',
                     style: JourneyTheme.faint),
+                if (_abilityPreview(c.code) != null) ...<Widget>[
+                  const SizedBox(height: 4),
+                  Text(
+                    _abilityPreview(c.code)!,
+                    style: JourneyTheme.faint.copyWith(
+                      // 已解锁（加强点点亮）金字高亮，未解锁灰字
+                      color: _progress.talentEnhanceLit(c.code)
+                          ? JourneyTheme.gold
+                          : JourneyTheme.textFaint,
+                    ),
+                  ),
+                ],
               ],
             ),
           ),
@@ -157,6 +188,10 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     if (unlocked) {
       return const SizedBox.shrink();
     }
+    // 与解锁判定同口径：种子模式展示压缩后的门槛难号
+    final levelNeed = (_config?.fromSeed ?? false)
+        ? math.min(c.unlockLevelNo, 20)
+        : c.unlockLevelNo;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
@@ -165,7 +200,7 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
         Text(
           progressMet
               ? '功德 ${c.unlockMeritCost}'
-              : '通关第 ${c.unlockLevelNo} 难',
+              : '通关第 $levelNeed 难',
           style: JourneyTheme.faint,
         ),
         if (progressMet && !meritMet)
@@ -180,7 +215,50 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     return w?.name ?? code;
   }
 
+  /// 角色特殊能力预览文案：能力名 + 解锁口径（天赋树加强点点亮）；
+  /// 已解锁附一句能力描述。常量表未覆盖的角色返回 null（不显示该行）。
+  String? _abilityPreview(String char) {
+    final ability = kJourneyCharAbilities[char];
+    if (ability == null) return null;
+    final unlocked = _progress.talentEnhanceLit(char);
+    return unlocked
+        ? '特殊能力「${ability.$1}」· ${ability.$2}'
+        : '特殊能力「${ability.$1}」· 天赋树加强点点亮解锁';
+  }
+
   Future<void> _unlock(JourneyCharacterModel c) async {
+    // 二次确认：高价功德消耗（3000+）误触代价大，弹窗核对余额再扣
+    final balance = JourneyProgressService.instance.state.meritBalance;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: JourneyTheme.panel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+          side: const BorderSide(color: JourneyTheme.panelStroke),
+        ),
+        title: Text('请 ${c.name} 上路？', style: JourneyTheme.title),
+        content: Text(
+          '将消耗 ${c.unlockMeritCost} 功德解锁「${c.name}」。\n'
+          '当前功德余额 $balance，确认后即时扣除。',
+          style: JourneyTheme.body,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('再想想', style: JourneyTheme.body),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              '确认解锁',
+              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
     final progress = JourneyProgressService.instance;
     final ok =
         await progress.unlockCharacter(c.code, meritCost: c.unlockMeritCost);

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 灼烧：火焰 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8.5 14.5A2.5 2.5 0 0 0 11 12c0-1.38-.5-2-1-3 2.5.5 5 2.24 5 5a4 4 0 0 1-8 0c0-1.153.433-2.294 1-3a2.5 2.5 0 0 0 .5 2.5z"/>
+    <path d="M12 2c1 2.5 3.5 4 3.5 7"/>
+  </g>
+</svg>

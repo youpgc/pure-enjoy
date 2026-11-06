@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 三根毫毛（被动）：救命毫毛，金毫三缕 -->
+  <path d="M24 44 C20 32 18 22 22 8" fill="none" stroke="#E8C470" stroke-width="3" stroke-linecap="round"/>
+  <path d="M24 44 C26 32 28 20 24 6" fill="none" stroke="#F6E3B4" stroke-width="3" stroke-linecap="round"/>
+  <path d="M24 44 C28 32 32 22 28 10" fill="none" stroke="#C9A227" stroke-width="3" stroke-linecap="round"/>
+  <circle cx="22" cy="7" r="2.2" fill="#F6E3B4"/>
+  <circle cx="24" cy="5" r="2.2" fill="#E8C470"/>
+  <circle cx="28" cy="9" r="2.2" fill="#C9A227"/>
+</svg>

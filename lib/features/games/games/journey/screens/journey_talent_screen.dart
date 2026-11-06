@@ -2,16 +2,21 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../models/journey_models.dart';
+import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
+import '../widgets/journey_loading.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
-import '../widgets/journey_loading.dart';
 
-/// S5 五行天赋页。
+/// S5 五行天赋页（角色专属树 · v3 线性层制）。
 ///
-/// 天赋点总量 81（首通 1 点/难）；每系 16 层常规+第 17 层标志强化；
-/// 相生相克前置（高层需先修生源，标志层需本系满+克我者≥4）。
+/// 每角色一棵五行树（5 系 × 16 层，按序点亮）+ 第 81 点加强点：点亮
+/// 纯消耗 1 天赋点（角色独立 81 点池，关卡首通各 +1 / 击败妖王概率
+/// 掉落），每层点亮即得该系属性加强；五系修满后点亮加强点，额外
+/// 解锁角色特殊能力（引擎侧永久生效）。两级切换：顶部角色 pill
+/// （未解锁置灰+「解锁后可修」角标，树可浏览不可点亮）→ 五行 Tab
+/// → 轨迹卡 + 加强点卡。
 class JourneyTalentScreen extends StatefulWidget {
   const JourneyTalentScreen({super.key});
 
@@ -19,14 +24,31 @@ class JourneyTalentScreen extends StatefulWidget {
   State<JourneyTalentScreen> createState() => _JourneyTalentScreenState();
 }
 
-class _JourneyTalentScreenState extends State<JourneyTalentScreen> {
+class _JourneyTalentScreenState extends State<JourneyTalentScreen>
+    with SingleTickerProviderStateMixin {
+  /// 五行系序（Tab 顺序）。
+  static const List<String> _elements = kJourneyTalentElements;
+
+  // TabController 手动持有：升级/切角色后 setState 重建不重置所选系 Tab
+  late final TabController _tabController =
+      TabController(length: _elements.length, vsync: this);
+
   JourneyConfigSnapshot? _config;
   JourneyProgressModel _progress = const JourneyProgressModel();
+
+  /// 当前浏览的角色树（默认唐僧）。
+  String _char = 'tang';
 
   @override
   void initState() {
     super.initState();
     _load();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _load() async {
@@ -36,11 +58,23 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen> {
       progress.ensureLoaded(),
     ]);
     if (!mounted) return;
+    final chars =
+        JourneyConfigService.instance.cached?.characters ??
+            const <JourneyCharacterModel>[];
     setState(() {
       _config = JourneyConfigService.instance.cached;
       _progress = progress.state;
+      // 角色清单不含当前浏览角色（异常配置）→ 回落首角色
+      if (chars.isNotEmpty && !chars.any((c) => c.code == _char)) {
+        _char = chars.first.code;
+      }
     });
   }
+
+  List<JourneyCharacterModel> get _chars =>
+      _config?.characters ?? const <JourneyCharacterModel>[];
+
+  bool get _charUnlocked => _progress.characterUnlocked(_char);
 
   @override
   Widget build(BuildContext context) {
@@ -53,193 +87,325 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen> {
         ),
       );
     }
-    final allocated = _progress.talentPoints.length;
     return JourneyPageScaffold(
       title: '五行天赋',
-      body: ListView(
-        padding: const EdgeInsets.all(16),
+      body: Column(
         children: <Widget>[
-          JourneyPanel(
-            child: Row(
+          _buildCharPills(),
+          TabBar(
+            controller: _tabController,
+            // 不画选中下划线（文案下的金色装饰线已移除），
+            // 选中态由 labelColor 金字区分
+            indicatorColor: Colors.transparent,
+            labelColor: JourneyTheme.goldSoft,
+            unselectedLabelColor: JourneyTheme.textSecondary,
+            dividerColor: JourneyTheme.panelStroke,
+            labelStyle: const TextStyle(
+              fontSize: 13,
+              fontWeight: FontWeight.bold,
+            ),
+            unselectedLabelStyle: const TextStyle(fontSize: 13),
+            tabs: <Widget>[for (final e in _elements) _buildTab(e)],
+          ),
+          Expanded(
+            child: TabBarView(
+              controller: _tabController,
               children: <Widget>[
-                Expanded(
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: <Widget>[
-                      Text(
-                        '天赋点 $_progressText',
-                        style: JourneyTheme.title,
-                      ),
-                      const SizedBox(height: 6),
-                      ClipRRect(
-                        borderRadius: BorderRadius.circular(4),
-                        child: LinearProgressIndicator(
-                          value: allocated /
-                              JourneyProgressService.talentPoolTotal,
-                          minHeight: 6,
-                          backgroundColor: JourneyTheme.bgDeep,
-                          color: JourneyTheme.gold,
-                        ),
-                      ),
-                      const SizedBox(height: 6),
-                      const Text(
-                        '点数来源：每难首通 +1（81 难=81 点）· 相生前置，不可一次点满',
-                        style: JourneyTheme.faint,
-                      ),
-                    ],
-                  ),
-                ),
-                const SizedBox(width: 12),
-                JourneyCurrencyBar(merit: _progress.meritBalance),
+                for (final e in _elements) _buildElementTab(config, e),
               ],
             ),
           ),
-          ..._buildElementSections(config),
         ],
       ),
     );
   }
 
-  String get _progressText {
-    final allocated = _progress.talentPoints.length;
-    const total = JourneyProgressService.talentPoolTotal;
-    return '$allocated / $total · 余 ${_progress.talentPool} 点';
+  // ---- 第一级：角色 pill（每角色一棵专属树） ----
+
+  Widget _buildCharPills() {
+    return SingleChildScrollView(
+      scrollDirection: Axis.horizontal,
+      padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
+      child: Row(
+        children: <Widget>[
+          for (final c in _chars) _buildCharPill(c),
+        ],
+      ),
+    );
   }
 
-  List<Widget> _buildElementSections(JourneyConfigSnapshot config) {
-    const elements = <String>['metal', 'wood', 'water', 'fire', 'earth'];
-    return elements.map((e) {
-      final rows = config.talents.where((t) => t.element == e).toList()
-        ..sort((a, b) => a.seq.compareTo(b.seq));
-      final color = JourneyTheme.elementColors[e] ?? JourneyTheme.gold;
-      final name = JourneyTheme.elementNames[e] ?? e;
-      final generator = JourneyProgressService.generatorOf[e]!;
-      final generatorName =
-          JourneyProgressService.restrainerOfName(generator);
-      final taken = _progress.talentLevelsOf(e);
-      return Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: <Widget>[
-          const SizedBox(height: 14),
-          Row(
+  Widget _buildCharPill(JourneyCharacterModel c) {
+    final unlocked = _progress.characterUnlocked(c.code);
+    final selected = _char == c.code;
+    return Padding(
+      padding: const EdgeInsets.only(right: 8),
+      child: GestureDetector(
+        onTap: () => setState(() => _char = c.code),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 7),
+          decoration: BoxDecoration(
+            color: selected
+                ? JourneyTheme.gold.withValues(alpha: 0.18)
+                : JourneyTheme.panel,
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(
+              color: selected ? JourneyTheme.gold : JourneyTheme.panelStroke,
+            ),
+          ),
+          child: Row(
+            mainAxisSize: MainAxisSize.min,
             children: <Widget>[
-              SvgPicture.asset(
-                'assets/games/journey/element_$e.svg',
-                width: 24,
-                height: 24,
-                errorBuilder: (_, __, ___) => Container(
-                  width: 22,
-                  height: 22,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    color: color.withValues(alpha: 0.2),
-                    shape: BoxShape.circle,
-                    border: Border.all(color: color),
-                  ),
-                  child: Text(name,
-                      style: TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.bold,
-                          color: color)),
+              Text(
+                c.name,
+                style: JourneyTheme.body.copyWith(
+                  color: selected
+                      ? JourneyTheme.goldSoft
+                      : (unlocked
+                          ? JourneyTheme.textPrimary
+                          : JourneyTheme.textFaint),
                 ),
               ),
-              const SizedBox(width: 8),
-              Text('$name 系', style: JourneyTheme.title),
-              const SizedBox(width: 8),
-              Text(
-                taken >= 16
-                    ? '已满 16 层 · 标志层可点'
-                    : '已修 $taken/16 · 高层需「$generatorName」系相生',
-                style: JourneyTheme.faint,
-              ),
+              // 未解锁角色：置灰 + 「解锁后可修」角标（树可浏览不可升级）
+              if (!unlocked) ...<Widget>[
+                const SizedBox(width: 5),
+                const Icon(Icons.lock,
+                    size: 11, color: JourneyTheme.locked),
+                const SizedBox(width: 3),
+                const Text(
+                  '解锁后可修',
+                  style: TextStyle(fontSize: 9, color: JourneyTheme.locked),
+                ),
+              ],
             ],
           ),
-          const SizedBox(height: 8),
-          ...rows.map((t) => _buildTalentRow(t, color)),
-        ],
-      );
-    }).toList();
-  }
-
-  Widget _buildTalentRow(JourneyTalentModel talent, Color color) {
-    final taken = _progress.talentPointsOf(talent.element, talent.seq);
-    final blockReason = JourneyProgressService.instance
-        .talentBlockReason(talent);
-    final canSpend = taken == 0 && blockReason == null;
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 6),
-      child: JourneyCard(
-        onTap: canSpend ? () => _spend(talent) : null,
-        qualityColor: talent.isSignature
-            ? color
-            : (taken > 0 ? color : null),
-        locked: !canSpend,
-        child: Row(
-          children: <Widget>[
-            Expanded(
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: <Widget>[
-                  Row(
-                    children: <Widget>[
-                      Text(
-                        talent.name,
-                        style: talent.isSignature
-                            ? JourneyTheme.title.copyWith(color: color)
-                            : JourneyTheme.body,
-                      ),
-                      if (talent.isSignature) ...<Widget>[
-                        const SizedBox(width: 6),
-                        Container(
-                          padding: const EdgeInsets.symmetric(
-                              horizontal: 6, vertical: 1),
-                          decoration: BoxDecoration(
-                            color: color.withValues(alpha: 0.16),
-                            borderRadius: BorderRadius.circular(999),
-                          ),
-                          child: Text('标志',
-                              style: TextStyle(
-                                  fontSize: 9, color: color)),
-                        ),
-                      ],
-                    ],
-                  ),
-                  const SizedBox(height: 2),
-                  Text(
-                    taken > 0
-                        ? '已点亮'
-                        : (talent.isSignature
-                            ? talent.signatureDesc
-                            : (blockReason ?? '消耗 1 天赋点')),
-                    style: JourneyTheme.faint,
-                  ),
-                ],
-              ),
-            ),
-            Icon(
-              taken > 0
-                  ? Icons.check_circle
-                  : (talent.isSignature
-                      ? Icons.workspace_premium
-                      : Icons.circle_outlined),
-              color: taken > 0 ? color : JourneyTheme.locked,
-              size: 18,
-            ),
-          ],
         ),
       ),
     );
   }
 
-  Future<void> _spend(JourneyTalentModel talent) async {
-    final ok = await JourneyProgressService.instance.spendTalent(talent);
-    if (!mounted) return;
-    if (ok) {
-      await _load();
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('前置条件未满足')),
+  Widget _buildTab(String element) {
+    final color = JourneyTheme.elementColors[element] ?? JourneyTheme.gold;
+    final name = JourneyTheme.elementNames[element] ?? element;
+    return Tab(
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: <Widget>[
+          SvgPicture.asset(
+            'assets/games/journey/element_$element.svg',
+            width: 16,
+            height: 16,
+            errorBuilder: (_, __, ___) => Container(
+              width: 14,
+              height: 14,
+              decoration: BoxDecoration(
+                color: color.withValues(alpha: 0.2),
+                shape: BoxShape.circle,
+                border: Border.all(color: color),
+              ),
+            ),
+          ),
+          const SizedBox(width: 5),
+          Text(name),
+        ],
+      ),
+    );
+  }
+
+  // ---- 第二级：单系页（头部信息 + 三分支卡 + 加强点卡） ----
+
+  Widget _buildElementTab(JourneyConfigSnapshot config, String element) {
+    final color = JourneyTheme.elementColors[element] ?? JourneyTheme.gold;
+    final spent = _progress.talentSpentLayers(_char);
+    final pool = _progress.talentPoolOf(_char);
+    final branches = config
+        .branchesOf(_char)
+        .where((b) => b.element == element)
+        .toList()
+      ..sort((a, b) => a.seq.compareTo(b.seq));
+    return ListView(
+      padding: const EdgeInsets.all(16),
+      children: <Widget>[
+        JourneyPanel(
+          child: Row(
+            children: <Widget>[
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: <Widget>[
+                    Text(
+                      '剩余 $pool 点 · 本树已修 $spent/81 层'
+                      ' · 本系 ${_progress.talentElementLv(_char, element)}/16 层',
+                      style: JourneyTheme.title,
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      _charUnlocked
+                          ? '点亮消耗 1 天赋点 + 功德 · 相生循环节制点亮顺序'
+                          : '解锁该角色后可修行其专属天赋树（当前可浏览）',
+                      style: JourneyTheme.faint,
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(width: 12),
+              JourneyCurrencyBar(merit: _progress.meritBalance),
+            ],
+          ),
+        ),
+        const SizedBox(height: 10),
+        for (final b in branches) ...<Widget>[
+          _buildBranchCard(config, b, color),
+          const SizedBox(height: 8),
+        ],
+        _buildEnhanceCard(),
+      ],
+    );
+  }
+
+  /// 分支卡（core 本源/growth 生息/sig 化形：Lv x/max + 每层效果）。
+  Widget _buildBranchCard(
+      JourneyConfigSnapshot config, JourneyTalentBranchModel b, Color color) {
+    final service = JourneyProgressService.instance;
+    final lv = _progress.talentLevelOf(_char, b.branchCode);
+    final maxed = lv >= b.maxLv;
+    final desc = b.effectDesc.isNotEmpty
+        ? b.effectDesc
+        : '每层 ${kJourneyTalentAttrLabels[b.attrKey] ?? b.attrKey}'
+            ' +${b.valuePerLevel}';
+    final locked = !maxed &&
+        _charUnlocked &&
+        service.talentBlockReason(_char, b.element, b.branchType) != null;
+    return JourneyCard(
+      onTap: (maxed || !_charUnlocked)
+          ? null
+          : () => _spend(b.element, b.branchType),
+      qualityColor: lv > 0 ? color : null,
+      locked: locked,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(b.name, style: JourneyTheme.title.copyWith(color: color)),
+              const Spacer(),
+              Text('Lv $lv/${b.maxLv}', style: JourneyTheme.caption),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(desc, style: JourneyTheme.faint),
+          const SizedBox(height: 6),
+          Text(
+            '●' * lv +
+                '○' *
+                    (b.maxLv - lv).clamp(0, b.maxLv).toInt(),
+            style: TextStyle(fontSize: 10, color: color),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            !_charUnlocked
+                ? '解锁角色后可修'
+                : (maxed
+                    ? '已修满'
+                    : '消耗 1 天赋点 + '
+                        '${service.talentMeritCost(_char, b.element, b.branchType)} 功德'),
+            style: JourneyTheme.caption.copyWith(
+              color: maxed ? JourneyTheme.jade : JourneyTheme.gold,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 加强点卡（第 81 点：五系修满后点亮，解锁角色特殊能力）。
+  Widget _buildEnhanceCard() {
+    final ability = kJourneyCharAbilities[_char];
+    if (ability == null) {
+      // 扩展角色暂无特殊能力映射：占位说明（避免 81 点池滞留无解释）
+      return const JourneyCard(
+        locked: true,
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            Text('第 81 点 · 加强点', style: JourneyTheme.title),
+            SizedBox(height: 4),
+            Text('特殊能力研发中，点亮通道暂未开放', style: JourneyTheme.faint),
+          ],
+        ),
       );
     }
+    final service = JourneyProgressService.instance;
+    final lit = _progress.talentEnhanceLit(_char);
+    final ready = kJourneyTalentElements.every(
+      (e) => _progress.talentElementLv(_char, e) >= 16,
+    );
+    final locked = !lit &&
+        _charUnlocked &&
+        service.talentBlockReason(
+                _char, kJourneyTalentEnhanceKey, kJourneyTalentEnhanceKey) !=
+            null;
+    return JourneyCard(
+      onTap: (lit || !_charUnlocked || !ready)
+          ? null
+          : () => _spend(
+              kJourneyTalentEnhanceKey, kJourneyTalentEnhanceKey),
+      qualityColor: lit ? JourneyTheme.gold : null,
+      locked: locked,
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: <Widget>[
+          Row(
+            children: <Widget>[
+              Text(
+                '加强点·${ability.$1}',
+                style: JourneyTheme.title.copyWith(color: JourneyTheme.gold),
+              ),
+              const Spacer(),
+              Text(lit ? '已点亮' : '未点亮', style: JourneyTheme.caption),
+            ],
+          ),
+          const SizedBox(height: 4),
+          Text(ability.$2, style: JourneyTheme.faint),
+          const SizedBox(height: 6),
+          Text(
+            lit
+                ? '特殊能力生效中'
+                : (!_charUnlocked
+                    ? '解锁角色后可修'
+                    : (ready
+                        ? '消耗 1 天赋点 + '
+                            '${service.talentMeritCost(_char, kJourneyTalentEnhanceKey, kJourneyTalentEnhanceKey)} 功德'
+                        : '五系修满 80 层后可点亮')),
+            style: JourneyTheme.caption.copyWith(
+              color: lit
+                  ? JourneyTheme.jade
+                  : (ready ? JourneyTheme.gold : JourneyTheme.textSecondary),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _spend(String element, String branch) async {
+    final service = JourneyProgressService.instance;
+    if (!_charUnlocked) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(content: Text('解锁该角色后可修行其专属天赋树')),
+      );
+      return;
+    }
+    final reason = service.talentBlockReason(_char, element, branch);
+    if (reason != null) {
+      ScaffoldMessenger.of(context)
+          .showSnackBar(SnackBar(content: Text(reason)));
+      return;
+    }
+    final ok = await service.spendTalent(_char, element, branch);
+    if (!mounted) return;
+    ScaffoldMessenger.of(context).showSnackBar(
+      SnackBar(content: Text(ok ? '已点亮' : '点亮未成功')),
+    );
+    if (ok) await _load();
   }
 }

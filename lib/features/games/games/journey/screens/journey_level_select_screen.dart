@@ -1,4 +1,4 @@
-import 'package:flutter/material.dart';
+﻿import 'package:flutter/material.dart';
 
 import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
@@ -8,10 +8,13 @@ import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import 'journey_battle_screen.dart';
 
-/// S3 关卡选择页（八十一难）。
+/// S3 关卡选择页（八十一难，主线西行专用）。
 ///
-/// 取经路线按区域分段展示；解锁口径：关卡号 ≤ 最远关卡+1（顺序推进制），
-/// 已通关可重复挑战；挑战进入对局。
+/// 无尽妖潮/每日游历已拆分为 hub 独立入口（游历地图选择见
+/// JourneyDailyScreen），本页只展示主线西行列表：按区域折叠面板
+/// （自绘 header：主题色条+区域名+「已清 X/Y 难」+展开箭头；初始展开
+/// 当前进行中关卡所在区域并滚动定位）。主线解锁口径：关卡号 ≤ 最远
+/// 关卡+1（顺序推进制），已通关可重复挑战；挑战进入对局。
 class JourneyLevelSelectScreen extends StatefulWidget {
   const JourneyLevelSelectScreen({super.key});
 
@@ -23,6 +26,12 @@ class JourneyLevelSelectScreen extends StatefulWidget {
 class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
   JourneyConfigSnapshot? _config;
   JourneyProgressModel _progress = const JourneyProgressModel();
+
+  /// 已展开的区域编码集合（折叠面板状态）。
+  final Set<String> _expanded = <String>{};
+
+  /// 区域 header 定位键（Scrollable.ensureVisible 滚动到当前关区域）。
+  final Map<String, GlobalKey> _regionKeys = <String, GlobalKey>{};
 
   @override
   void initState() {
@@ -41,6 +50,39 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
       _config = JourneyConfigService.instance.cached;
       _progress = progress.state;
     });
+    _prepareExpansion();
+  }
+
+  /// 初始展开：当前进行中关卡（最远+1）所在区域，其余折叠；
+  /// 全通关（最远≥最大关号）展开最后一个区域；postFrame 滚动定位。
+  void _prepareExpansion() {
+    final config = _config;
+    if (config == null || config.regions.isEmpty) return;
+    final levels = config.levels.toList()
+      ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
+    final farthest = _progress.farthestLevelNo;
+    final upcoming = levels.where((l) => l.levelNo > farthest).toList();
+    // 进行中=首个未通关难；全部清完=最后一难（前期 20 难封顶口径）
+    final target = upcoming.isNotEmpty
+        ? upcoming.first
+        : (levels.isNotEmpty ? levels.last : null);
+    var code = target?.regionCode ?? '';
+    if (!config.regions.any((r) => r.code == code)) {
+      code = config.regions.last.code;
+    }
+    _expanded
+      ..clear()
+      ..add(code);
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final ctx = _regionKeys[code]?.currentContext;
+      if (ctx != null && mounted) {
+        Scrollable.ensureVisible(
+          ctx,
+          duration: const Duration(milliseconds: 320),
+          alignment: 0.05,
+        );
+      }
+    });
   }
 
   @override
@@ -55,38 +97,93 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
       );
     }
     return JourneyPageScaffold(
-      title: '八十一难',
-      body: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: config.regions.length,
-        itemBuilder: (ctx, i) {
-          final region = config.regions[i];
-          final levels = config.levelsOfRegion(region.code);
-          return Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: <Widget>[
-              Row(
-                children: <Widget>[
-                  Container(
-                    width: 10,
-                    height: 10,
-                    decoration: BoxDecoration(
-                      color: _regionColor(region),
-                      shape: BoxShape.circle,
-                    ),
-                  ),
-                  const SizedBox(width: 8),
-                  Text(region.name, style: JourneyTheme.title),
-                  const SizedBox(width: 8),
-                  Text('共 ${levels.length} 难', style: JourneyTheme.faint),
-                ],
+      title: '西行启程',
+      body: _mainList(config),
+    );
+  }
+
+  // ---- 主线：区域折叠面板 ----
+
+  Widget _mainList(JourneyConfigSnapshot config) {
+    return ListView.builder(
+      padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
+      itemCount: config.regions.length,
+      itemBuilder: (ctx, i) {
+        final region = config.regions[i];
+        final levels = config.levelsOfRegion(region.code);
+        final expanded = _expanded.contains(region.code);
+        final cleared = levels
+            .where((l) => l.levelNo <= _progress.farthestLevelNo)
+            .length;
+        return Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: <Widget>[
+            _regionHeader(region, levels.length, cleared, expanded),
+            if (expanded) ...levels.map(_buildLevelCard),
+            const SizedBox(height: 12),
+          ],
+        );
+      },
+    );
+  }
+
+  /// 区域折叠 header：主题色条 + 区域名 + 「已清 X/Y 难」+ 展开箭头。
+  Widget _regionHeader(
+    JourneyRegionModel region,
+    int total,
+    int cleared,
+    bool expanded,
+  ) {
+    final key = _regionKeys.putIfAbsent(region.code, GlobalKey.new);
+    final color = _regionColor(region);
+    return Padding(
+      key: key,
+      padding: const EdgeInsets.only(bottom: 8),
+      child: Material(
+        color: Colors.transparent,
+        child: InkWell(
+          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+          onTap: () => setState(() {
+            expanded ? _expanded.remove(region.code) : _expanded.add(region.code);
+          }),
+          child: Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+            decoration: BoxDecoration(
+              color: JourneyTheme.panel,
+              borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+              border: Border.all(
+                color: expanded ? color : JourneyTheme.panelStroke,
+                width: 1.2,
               ),
-              const SizedBox(height: 8),
-              ...levels.map(_buildLevelCard),
-              const SizedBox(height: 16),
-            ],
-          );
-        },
+            ),
+            child: Row(
+              children: <Widget>[
+                Container(
+                  width: 4,
+                  height: 18,
+                  decoration: BoxDecoration(
+                    color: color,
+                    borderRadius: BorderRadius.circular(2),
+                  ),
+                ),
+                const SizedBox(width: 10),
+                Text(region.name, style: JourneyTheme.title),
+                const SizedBox(width: 8),
+                Text('已清 $cleared/$total 难', style: JourneyTheme.faint),
+                const Spacer(),
+                AnimatedRotation(
+                  turns: expanded ? 0.5 : 0,
+                  duration: const Duration(milliseconds: 200),
+                  child: const Icon(
+                    Icons.expand_more,
+                    color: JourneyTheme.textSecondary,
+                    size: 20,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
       ),
     );
   }
@@ -146,7 +243,9 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
-                  Text(level.title, style: JourneyTheme.title),
+                  // 关卡统一映射展示：第 N 难 · 关卡名称
+                  Text('第 ${level.levelNo} 难 · ${level.title}',
+                      style: JourneyTheme.title),
                   const SizedBox(height: 2),
                   Text(
                     unlocked

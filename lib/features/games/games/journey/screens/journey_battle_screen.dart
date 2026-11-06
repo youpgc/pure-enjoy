@@ -1,18 +1,17 @@
-import 'dart:math' as math;
-
 import 'package:flame/game.dart' hide Matrix4;
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
+import '../../../../../utils/cache_helper.dart';
 import '../models/journey_models.dart';
+import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
 import '../services/journey_score_reporter.dart';
 import '../services/journey_seed.dart' show kJourneyMonsterSeed;
 import '../widgets/journey_theme.dart';
-import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import '../battle/journey_battle_controller.dart';
+import '../battle/journey_battle_overlays.dart';
 import '../battle/journey_attributes_sheet.dart';
 import '../battle/journey_flame_game.dart';
 import '../battle/journey_sprites.dart';
@@ -43,8 +42,12 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
   bool _loading = true;
   bool _paused = false;
   int _runNonce = 0;
-  Offset _stickDelta = Offset.zero;
-  Offset? _stickBase; // 底座浮现位置（跟随触点，动态摇杆）
+
+  /// 出战角色 code（HUD 顶部头像用；配置异常兜底时保持默认）。
+  String _characterCode = 'tang';
+
+  /// 三步引导（节点12）：标记不存在且 levelNo<=1 时展示（边玩边看）。
+  bool _guideVisible = false;
 
   @override
   void initState() {
@@ -68,24 +71,6 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
         state == AppLifecycleState.inactive) {
       if (!_paused) _togglePause();
     }
-  }
-
-  void _onStickUpdate(DragUpdateDetails d) {
-    if (_stickBase == null) return;
-    final delta = d.localPosition - _stickBase!;
-    const maxR = 46.0;
-    final clamped =
-        delta.distance <= maxR ? delta : delta / delta.distance * maxR;
-    setState(() => _stickDelta = clamped);
-    _controller?.input.vector = clamped / maxR;
-  }
-
-  void _onStickEnd(DragEndDetails d) {
-    setState(() {
-      _stickBase = null;
-      _stickDelta = Offset.zero;
-    });
-    _controller?.input.reset();
   }
 
   /// 本关怪物精灵预热名单：远端怪物池优先（后台新增怪种即时生效），
@@ -124,11 +109,12 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     }
 
     final controller = JourneyBattleController(
-      themeColor:
-          snapshot.regionOf(widget.level.regionCode)?.themeColor ?? '#E8C470',
+      themeColor: _themeColorOf(snapshot),
       onLevelUp: _onLevelUp,
       onFinished: _onFinished,
       onBossSpawn: _onBossSpawn,
+      onRevivePrompt: _onRevivePrompt,
+      onAlchemyPrompt: _onAlchemyPrompt,
     );
     controller.farthestAtStart = progress.state.farthestLevelNo;
     // 预热战斗精灵（怪种池/拾取物/出战角色/武器臂法器+被动加持）；
@@ -144,6 +130,11 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       // 初始武器 + 被动加持资源（武器 SVG=纯武器内容）
       JourneySprites.weapon(character.weaponCode),
       for (final c in kJourneyPassiveEffects.keys) JourneySprites.weapon(c),
+      // 场景道具（参照物供台/山石 + 路旁石碑/驿亭装饰）
+      JourneySprites.prop('gongtai'),
+      JourneySprites.prop('shikuai'),
+      JourneySprites.prop('shibei'),
+      JourneySprites.prop('yiting'),
     ]);
     if (!mounted) return;
     _runNonce++;
@@ -152,38 +143,131 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     final runtime = await JourneyConfigService.instance
         .fetchLevelRuntime(widget.level.id);
     if (!mounted) return;
+    // 局外设置：环绕旋转方向（hub 设置面板可切换，默认顺时针）
+    final spinRaw = await CacheHelper.instance.loadMap('journey_spin_dir');
+    if (!mounted) return;
     final newGame = JourneyFlameGame(
       level: widget.level,
       character: character,
       controller: controller,
-      loadout: _buildLoadout(progress.state),
+      loadout: _buildLoadout(progress.state, character.code),
       monsterCap: snapshot.monsterCap,
       config: snapshot,
       runtime: runtime,
     );
+    newGame.spinDirection =
+        (spinRaw?['dir'] as String? ?? 'cw') == 'ccw' ? -1.0 : 1.0;
     setState(() {
       _controller = controller;
       _game = newGame;
+      _characterCode = character.code;
       _gameWidget = GameWidget(key: ValueKey(_runNonce), game: newGame);
       _loading = false;
     });
+    // 开场横幅（节点11）：难名展示（覆盖层挂载后由横幅 host 补播本值）；
+    // 无尽/游历为虚拟关（level_no=0），横幅直接用模式名/地图名
+    controller.hud.banner.value = widget.level.levelNo > 0
+        ? '第${widget.level.levelNo}难 · ${widget.level.title}'
+        : widget.level.title;
+    if (widget.level.kind == 'daily') {
+      _scheduleDailyMilestone(controller);
+    }
+    _maybeShowGuide();
   }
 
-  /// 局外预注入：已点天赋层映射为对局初始增量（轻量口径，灼烧/暴击/击退
-  /// 等战斗未支持的属性暂不接入，标志层走独立效果）。
-  JourneyLoadout _buildLoadout(JourneyProgressModel p) {
-    int lv(String e) => p.talentLevelsOf(e);
-    bool sig(String e) => p.talentPointsOf(e, 17) > 0;
+  /// 每日游历里程碑：开场横幅（2.4s）之后播报一次「已游历 N 里」
+  /// （每图里数=journey_daily_maps 后台配置，缺行回落内置种子）。
+  void _scheduleDailyMilestone(JourneyBattleController controller) {
+    final map = JourneyConfigService.instance.cached
+        ?.dailyMapOf(widget.level.regionCode);
+    if (map == null) return;
+    Future<void>.delayed(const Duration(milliseconds: 2600), () {
+      if (!mounted) return;
+      controller.hud.milestoneText.value = '已游历 ${map.milestoneLi} 里';
+    });
+  }
+
+  /// 主题色：游历图走 journey_daily_maps 后台配置；主线走远端区域
+  /// 配置（缺省鎏金）。
+  String _themeColorOf(JourneyConfigSnapshot snapshot) {
+    if (widget.level.kind == 'daily') {
+      return snapshot.dailyMapOf(widget.level.regionCode)?.themeColor ??
+          '#E8C470';
+    }
+    return snapshot.regionOf(widget.level.regionCode)?.themeColor ?? '#E8C470';
+  }
+
+  /// 首次进关三步引导（节点12）：标记不存在且 levelNo<=1 时展示，
+  /// 进关横幅之后延迟 2.5s 出现；轻引导不暂停引擎（边玩边看）。
+  Future<void> _maybeShowGuide() async {
+    if (widget.level.levelNo > 1 || _guideVisible) return;
+    final raw = await CacheHelper.instance.loadMap('journey_guide_done');
+    if (raw?['done'] == true || !mounted) return;
+    Future<void>.delayed(const Duration(milliseconds: 2500), () {
+      if (mounted && !_guideVisible) {
+        setState(() => _guideVisible = true);
+      }
+    });
+  }
+
+  /// 局外预注入：出战角色五行天赋树分支增量（每系 core/growth/sig 三
+  /// 分支，每层数值取分支配置，远端缺行按内置口径兜底）；加强点点亮 →
+  /// 特殊能力（引擎按角色标记挂钩）。
+  JourneyLoadout _buildLoadout(JourneyProgressModel p, String charCode) {
+    final snapshot = JourneyConfigService.instance.cached;
+    double bv(String e, String b) {
+      final branch = snapshot?.branchOf(charCode, e, b);
+      return (branch?.valuePerLevel ??
+              kJourneyBranchFallbackValue[b]?[e] ??
+              1)
+          .toDouble();
+    }
+
+    int bl(String e, String b) =>
+        p.talentLevelOf(charCode, journeyBranchCode(charCode, e, b));
+
+    // core 本源枝：金/火→伤害、木→生命、水→转速、土→护甲
+    final metalCore = bl('metal', 'core');
+    final fireCore = bl('fire', 'core');
+    final woodCore = bl('wood', 'core');
+    final waterCore = bl('water', 'core');
+    final earthCore = bl('earth', 'core');
+    // growth 生息枝：金→暴击伤害、火→暴击率、木→回复、水→经验、土→拾取
+    final metalGrowth = bl('metal', 'growth');
+    final fireGrowth = bl('fire', 'growth');
+    final woodGrowth = bl('wood', 'growth');
+    final waterGrowth = bl('water', 'growth');
+    final earthGrowth = bl('earth', 'growth');
+    // sig 化形枝：金/火→伤害、水→转速、土→护甲+磁吸、木→回复特效
+    final metalSig = bl('metal', 'sig');
+    final fireSig = bl('fire', 'sig');
+    final waterSig = bl('water', 'sig');
+    final woodSig = bl('wood', 'sig');
+    final earthSig = bl('earth', 'sig');
+
+    final maxHpGain = woodCore * bv('wood', 'core');
+    var regenGain = woodGrowth * bv('wood', 'growth');
+    if (woodSig >= 3) regenGain += 1; // 回春 3 层：回复 +1/秒
+
     return JourneyLoadout(
-      damageAmp: lv('metal') * 0.02 + lv('fire') * 0.03,
-      spinAmp: lv('water') * 0.03,
-      armorFlat: lv('earth') * 0.8,
-      bonusMaxHp: lv('wood') * 6.0,
-      regenFlat: lv('wood') * 0.15,
-      pickupRangeFlat: lv('earth') * 5.0,
+      damageAmp: metalCore * bv('metal', 'core') +
+          fireCore * bv('fire', 'core') +
+          (metalSig + fireSig) * 0.05,
+      spinAmp: waterCore * bv('water', 'core') + waterSig * 0.05,
+      armorFlat: earthCore * bv('earth', 'core') + earthSig * 1.5,
+      bonusMaxHp: maxHpGain,
+      regenFlat: regenGain,
+      pickupRangeFlat: earthGrowth * bv('earth', 'growth'),
+      expAmp: 1.0 + waterGrowth * bv('water', 'growth'),
+      critRateFlat: fireGrowth * bv('fire', 'growth'),
+      critDamageBonus: metalGrowth * bv('metal', 'growth'),
       signatures: <String>{
-        for (final e in const <String>['metal', 'wood', 'water', 'fire', 'earth'])
-          if (sig(e)) 'signature_$e',
+        if (woodSig > 0) 'signature_wood',
+        if (earthSig > 0) 'signature_earth',
+      },
+      // 加强点：本树五系修满后点亮 → 角色特殊能力（引擎钩子生效）
+      abilities: <String>{
+        if (p.talentEnhanceLit(charCode)) 'ability_$charCode',
       },
     );
   }
@@ -240,7 +324,10 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       durationSec: durationSec,
       firstClearMerit: widget.level.firstClearMerit,
       levelNo: widget.level.levelNo,
-      levelTitle: widget.level.title,
+      // 对局记录/结算标题统一带关号（虚拟关保持模式名/地图名）
+      levelTitle: widget.level.levelNo > 0
+          ? '第${widget.level.levelNo}难 · ${widget.level.title}'
+          : widget.level.title,
     );
     // 首通判定：通关且超越进关时的最远记录（与引擎发奖口径一致）。
     final firstClear =
@@ -249,8 +336,15 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
         await JourneyProgressService.instance.settleRun(
       merit: result.meritTotal,
       kills: kills,
-      levelNo: cleared ? widget.level.levelNo : 0,
+      levelNo: widget.level.levelNo,
+      durationMs: durationSec * 1000,
+      cleared: cleared,
+      kind: widget.level.levelNo > 0 ? 'mainline' : widget.level.kind,
+      // 对局记录标题统一带关号（与结算浮层同源）
+      levelTitle: result.levelTitle,
     );
+    // 每日游历 gate 已在进关入口写入（进入即计次，主动放弃同样占次），
+    // 此处不再重复写。
     // 成绩上报（成绩看板/排行榜/数据分析链路；未就绪静默跳过）
     JourneyScoreReporter.report(
       result: result,
@@ -282,6 +376,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
           _controller = null;
           _gameWidget = null;
           _paused = false;
+          _guideVisible = false;
           _loading = true;
         });
         _setup();
@@ -312,24 +407,55 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     );
   }
 
+  /// 属性详情面板：顶部状态面板与暂停菜单共用同一 sheet。
+  void _showAttributes() {
+    final game = _game;
+    if (game != null && mounted) {
+      JourneyAttributesSheet.show(context, game: game);
+    }
+  }
+
   void _onBossSpawn(String bossName) {
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text('妖王降临 · $bossName'),
-        backgroundColor: JourneyTheme.danger,
-        duration: const Duration(seconds: 2),
-      ),
+    // 妖王降临（节点11）：改用开场横幅位展示（引擎 respawn 前调用）
+    _controller?.hud.banner.value = '妖王降临 · $bossName';
+    if (mounted) {
+      setState(() {});
+    }
+  }
+
+  // ---- 还魂/炼化弹窗（节点5/8）：引擎弹窗期已 pauseEngine，UI 返回 bool ----
+
+  Future<bool> _onRevivePrompt(int cost) async {
+    if (!mounted) return false;
+    final balance = JourneyProgressService.instance.state.meritBalance;
+    return JourneyPromptSheets.showRevive(
+      context,
+      cost: cost,
+      meritBalance: balance,
     );
   }
 
-  // ---- 摇杆（处理器见 _onStickStart/_onStickUpdate/_onStickEnd） ----
+  Future<bool> _onAlchemyPrompt(String resultName) async {
+    if (!mounted) return false;
+    return JourneyPromptSheets.showAlchemy(context, resultName: resultName);
+  }
+
+  /// 主动结算（满足通关条件后的「结算」按钮/暂停面板「提前结算」）：
+  /// 结算浮层由 _onFinished 链路弹出。
+  void _earlySettle() {
+    _game?.settleNow();
+    if (mounted) setState(() => _paused = false);
+  }
 
   @override
   Widget build(BuildContext context) {
+    // 全屏沉浸：不包 SafeArea（状态栏/手势区也画游戏与蒙层，修「蒙层
+    // 上下留白」）；DefaultTextStyle 显式无装饰（文字继承链路出现金色
+    // 下划线，对局内一律无下划线）。
     return Container(
       color: JourneyTheme.bgDeep,
-      child: SafeArea(
+      child: DefaultTextStyle(
+        style: const TextStyle(decoration: TextDecoration.none),
         child: Stack(
           children: <Widget>[
             // 战斗画布（key 随重建计数变化，保证重试时引擎完全重建）
@@ -338,93 +464,97 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
               const Center(
                 child: JourneyLoading(label: '进入此难…'),
               ),
-            // HUD 覆盖层（血条/经验/状态行 + 妖王罗盘）
+            // HUD 覆盖层（头像/血条/经验/状态行 + 槽栏 + 妖王罗盘 + 大血条/小地图/横幅）
             if (_controller != null)
-              JourneyHudOverlay(controller: _controller!),
-            // 虚拟摇杆（左下，动态浮现）
-            _buildJoystick(),
-            // 暂停按钮（右上角第一位，罗盘列在其下方，避免重叠）
-            Positioned(
-              top: 4,
-              right: 10,
-              child: IconButton(
-                onPressed: _togglePause,
-                icon: const Icon(Icons.pause_circle_outline,
-                    color: JourneyTheme.textPrimary, size: 30),
+              JourneyHudOverlay(
+                controller: _controller!,
+                characterCode: _characterCode,
+                onTopPanelTap: _showAttributes,
               ),
+            // 虚拟摇杆（左下，动态浮现；手势状态由组件自管）
+            if (_controller != null)
+              JourneyJoystick(controller: _controller!),
+            // 暂停按钮（右下角摇杆操作区上方，让开常用拇指区；
+            // 独立覆盖层叠在摇杆触控区之上，命中优先暂停；触控区 56 +
+            // 图标 40 放大辨识度，与小地图（bottom:210 起）不重叠）
+            if (_controller != null)
+              Positioned(
+                right: 16,
+                bottom: 150,
+                child: SizedBox(
+                  width: 56,
+                  height: 56,
+                  child: IconButton(
+                    onPressed: _togglePause,
+                    padding: EdgeInsets.zero,
+                    icon: const Icon(Icons.pause_circle_outline,
+                        color: JourneyTheme.textPrimary, size: 40),
+                  ),
+                ),
+              ),
+            // 「结算」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
+            // 功成/无尽末波）后亮出，点击即主动结算；未满足时隐藏
+            if (_controller != null)
+              ValueListenableBuilder<bool>(
+                valueListenable: _controller!.hud.bossDefeated,
+              builder: (context, available, _) => available
+                  ? Positioned(
+                      right: 16,
+                      bottom: 218,
+                      child: Material(
+                        color: Colors.transparent,
+                        child: InkWell(
+                          onTap: _earlySettle,
+                          borderRadius: BorderRadius.circular(28),
+                          child: Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              gradient: const LinearGradient(
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                                colors: <Color>[
+                                  JourneyTheme.goldSoft,
+                                  JourneyTheme.gold,
+                                ],
+                              ),
+                              border: Border.all(
+                                  color: JourneyTheme.goldDeep, width: 1),
+                            ),
+                            alignment: Alignment.center,
+                            child: const Text(
+                              '结算',
+                              style: TextStyle(
+                                fontSize: 15,
+                                fontWeight: FontWeight.bold,
+                                color: Color(0xFF3A2A12),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    )
+                  : const SizedBox.shrink(),
             ),
-            if (_paused) _buildPauseOverlay(),
+            if (_paused)
+              JourneyPauseOverlay(
+                onResume: _togglePause,
+                onAttributes: _showAttributes,
+                onQuit: _popToHub,
+                // 妖王伏诛后可用：提前结算（金色主按钮）
+                onEarlySettle:
+                    (_game?.bossDefeated ?? false) ? _earlySettle : null,
+              ),
+            // 三步引导（节点12）：首次进关逐页点按推进，边玩边看
+            if (_guideVisible)
+              JourneyGuideOverlay(
+                onFinished: () => setState(() => _guideVisible = false),
+              ),
           ],
         ),
       ),
     );
-  }
-
-
-  /// 虚拟摇杆：触点处动态浮现底座（左下操作区），拖移驱动摇杆帽。
-  Widget _buildJoystick() {
-    return Positioned(
-      left: 0,
-      right: 0,
-      bottom: 0,
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          // 底座 104：触点贴边时中心钳进安全区，底座始终完整可见不截断
-          const half = 52.0;
-          double clampX(double x) =>
-              x.clamp(half, math.max(half, constraints.maxWidth - half));
-          double clampY(double y) =>
-              y.clamp(half, math.max(half, constraints.maxHeight - half));
-          return GestureDetector(
-            behavior: HitTestBehavior.translucent,
-            onPanStart: (d) => _onStickStart(d, clampX, clampY),
-            onPanUpdate: _onStickUpdate,
-            onPanEnd: _onStickEnd,
-            child: Container(
-              height: 170,
-              color: Colors.transparent,
-              child: _stickBase == null
-                  ? const SizedBox.expand()
-                  : Stack(
-                      children: <Widget>[
-                        Positioned(
-                          left: _stickBase!.dx - 52,
-                          top: _stickBase!.dy - 52,
-                          child: SvgPicture.asset(
-                            'assets/games/journey/stick_base.svg',
-                            width: 104,
-                            height: 104,
-                          ),
-                        ),
-                        Positioned(
-                          left: _stickBase!.dx + _stickDelta.dx - 24,
-                          top: _stickBase!.dy + _stickDelta.dy - 24,
-                          child: SvgPicture.asset(
-                            'assets/games/journey/stick_cap.svg',
-                            width: 48,
-                            height: 48,
-                          ),
-                        ),
-                      ],
-                    ),
-            ),
-          );
-        },
-      ),
-    );
-  }
-
-  void _onStickStart(
-    DragStartDetails d,
-    double Function(double) clampX,
-    double Function(double) clampY,
-  ) {
-    setState(() {
-      // 中心钳进安全区：贴边触点也完整显示底座；拖移 delta 以可见中心为基准
-      _stickBase =
-          Offset(clampX(d.localPosition.dx), clampY(d.localPosition.dy));
-      _stickDelta = Offset.zero;
-    });
   }
 
   void _togglePause() {
@@ -439,45 +569,5 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       // 恢复由最后一张选卡后的 applyUpgrade 负责。
       if (!game.isPausedForLevelUp) game.resumeEngine();
     }
-  }
-
-  Widget _buildPauseOverlay() {
-    return Container(
-      color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-      alignment: Alignment.center,
-      child: SizedBox(
-        width: 240,
-        child: JourneyPanel(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: <Widget>[
-              const Text('暂 停', style: JourneyTheme.titleLg),
-              const SizedBox(height: 14),
-              JourneyButton(
-                text: '继续战斗',
-                onTap: _togglePause,
-              ),
-              const SizedBox(height: 10),
-              JourneyButton(
-                text: '属性详情',
-                secondary: true,
-                onTap: () {
-                  final game = _game;
-                  if (game != null) {
-                    JourneyAttributesSheet.show(context, game: game);
-                  }
-                },
-              ),
-              const SizedBox(height: 10),
-              JourneyButton(
-                text: '放弃本难（不发奖）',
-                secondary: true,
-                onTap: _popToHub,
-              ),
-            ],
-          ),
-        ),
-      ),
-    );
   }
 }

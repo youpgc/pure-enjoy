@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 火眼金睛（被动）：金瞳竖目，识破妖邪 -->
+  <path d="M6 24 C14 12 34 12 42 24 C34 36 14 36 6 24 Z" fill="#4A3220"/>
+  <path d="M8 24 C15 14 33 14 40 24 C33 34 15 34 8 24 Z" fill="#E8C470"/>
+  <circle cx="24" cy="24" r="8" fill="#2B1C10"/>
+  <circle cx="24" cy="24" r="4.5" fill="#D4593F"/>
+  <circle cx="24" cy="24" r="2" fill="#F6E3B4"/>
+</svg>

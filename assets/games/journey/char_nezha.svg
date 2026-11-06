@@ -1,0 +1,59 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 哪吒：莲花化身 + 双髻 + 红绫 + 乾坤圈 + 风火轮 -->
+  <defs>
+    <radialGradient id="nezhaHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F0906B" stop-opacity="0.5"/>
+      <stop offset="0.7" stop-color="#F0906B" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#F0906B" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="nezhaDudou" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8654A"/>
+      <stop offset="1" stop-color="#B23A28"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#nezhaHalo)"/>
+
+  <g>
+    <!-- 莲台 -->
+    <path d="M70 262 q20 -12 40 -4 q20 -8 40 0 q20 -8 40 4 q-18 12 -40 8 q-20 6 -40 0 q-22 4 -40 -8 Z" fill="#F3B6C8"/>
+    <!-- 双腿盘坐 -->
+    <path d="M84 250 q26 -14 52 0 q-8 10 -26 10 q-18 0 -26 -10 Z" fill="#F6DFC0"/>
+    <!-- 红绫飘带（绕身） -->
+    <path d="M60 150 C80 120 60 96 84 76 M160 150 C140 120 160 96 136 76" fill="none" stroke="#D4593F" stroke-width="7" stroke-linecap="round" opacity="0.85"/>
+    <!-- 肚兜身躯 -->
+    <path d="M88 168 C84 206 88 228 96 244 L124 244 C132 228 136 206 132 168 Z" fill="url(#nezhaDudou)"/>
+    <!-- 臂（叉腰） -->
+    <path d="M88 176 Q74 196 84 214" fill="none" stroke="#F6DFC0" stroke-width="9" stroke-linecap="round"/>
+    <path d="M132 176 Q146 196 136 214" fill="none" stroke="#F6DFC0" stroke-width="9" stroke-linecap="round"/>
+    <!-- 头 -->
+    <circle cx="110" cy="122" r="24" fill="#F6DFC0"/>
+    <!-- 双髻 -->
+    <circle cx="94" cy="96" r="10" fill="#3A2A20"/>
+    <circle cx="126" cy="96" r="10" fill="#3A2A20"/>
+    <circle cx="94" cy="96" r="4" fill="#D4593F"/>
+    <circle cx="126" cy="96" r="4" fill="#D4593F"/>
+    <path d="M96 108 Q110 100 124 108" fill="none" stroke="#3A2A20" stroke-width="4"/>
+    <!-- 容颜（灵气红晕） -->
+    <circle cx="102" cy="124" r="2.2" fill="#4A3222"/>
+    <circle cx="118" cy="124" r="2.2" fill="#4A3222"/>
+    <circle cx="98" cy="130" r="3" fill="#F0906B" opacity="0.6"/>
+    <circle cx="122" cy="130" r="3" fill="#F0906B" opacity="0.6"/>
+    <path d="M105 133 Q110 138 115 133" stroke="#8A5A2B" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- 额间红纹 -->
+    <path d="M110 106 l3 5 h-6 Z" fill="#D4593F"/>
+  </g>
+
+  <!-- 乾坤圈（左手侧手持） -->
+  <g>
+    <circle cx="64" cy="196" r="20" fill="none" stroke="#D8B25E" stroke-width="8"/>
+    <circle cx="64" cy="196" r="20" fill="none" stroke="#F6E3B4" stroke-width="2" stroke-dasharray="6 5"/>
+  </g>
+
+  <!-- 风火轮（右足侧） -->
+  <g>
+    <circle cx="158" cy="248" r="16" fill="none" stroke="#E8654A" stroke-width="5"/>
+    <path d="M158 228 l4 8 h-8 Z M158 268 l4 -8 h-8 Z M138 248 l8 4 v-8 Z M178 248 l-8 4 v-8 Z" fill="#E8A13F"/>
+  </g>
+</svg>

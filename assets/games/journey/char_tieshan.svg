@@ -1,0 +1,60 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 铁扇公主：华髻双环 + 青罗裙 + 芭蕉扇 -->
+  <defs>
+    <radialGradient id="tsHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#6FBF9A" stop-opacity="0.5"/>
+      <stop offset="0.7" stop-color="#6FBF9A" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#6FBF9A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="tsSkirt" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#4E9E7E"/>
+      <stop offset="1" stop-color="#2E6B54"/>
+    </linearGradient>
+    <linearGradient id="tsShawl" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#8FCBB0"/>
+      <stop offset="1" stop-color="#5FA98A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#tsHalo)"/>
+
+  <g>
+    <!-- 罗裙下摆 -->
+    <path d="M72 176 C66 216 60 246 54 268 L166 268 C160 246 154 216 148 176 Z" fill="url(#tsSkirt)"/>
+    <path d="M78 200 L142 200 M74 232 L146 232" stroke="#F3E6C8" stroke-width="2" opacity="0.45"/>
+    <!-- 披帛 -->
+    <path d="M66 160 C86 176 134 176 154 160 C138 190 82 190 66 160 Z" fill="url(#tsShawl)" opacity="0.9"/>
+    <!-- 上身 -->
+    <path d="M88 150 C86 164 88 172 92 180 L128 180 C132 172 134 164 132 150 Z" fill="url(#tsShawl)"/>
+    <!-- 双手（右手扶扇柄） -->
+    <circle cx="92" cy="186" r="8" fill="#F6DFC0"/>
+    <circle cx="138" cy="150" r="8" fill="#F6DFC0"/>
+    <!-- 头 -->
+    <circle cx="110" cy="118" r="24" fill="#F6DFC0"/>
+    <!-- 华髻（双环髻） -->
+    <path d="M90 100 q-8 -16 6 -22 q4 10 14 10 q10 0 14 -10 q14 6 6 22 q-10 6 -20 6 q-10 0 -20 -6 Z" fill="#3A2A20"/>
+    <circle cx="94" cy="86" r="5" fill="#D8B25E"/>
+    <circle cx="126" cy="86" r="5" fill="#D8B25E"/>
+    <path d="M96 106 Q110 100 124 106" fill="none" stroke="#3A2A20" stroke-width="4"/>
+    <!-- 容颜（端庄） -->
+    <circle cx="102" cy="120" r="2.2" fill="#4A3222"/>
+    <circle cx="118" cy="120" r="2.2" fill="#4A3222"/>
+    <circle cx="98" cy="127" r="3" fill="#E8A1A1" opacity="0.5"/>
+    <circle cx="122" cy="127" r="3" fill="#E8A1A1" opacity="0.5"/>
+    <path d="M106 131 Q110 134 114 131" stroke="#8A5A2B" stroke-width="1.6" fill="none" stroke-linecap="round"/>
+    <!-- 额饰 -->
+    <circle cx="110" cy="106" r="2.6" fill="#D8B25E"/>
+  </g>
+
+  <!-- 芭蕉扇（右手高举侧） -->
+  <g>
+    <path d="M138 96 C120 60 138 32 158 24 C182 34 194 60 180 94 C166 82 150 84 138 96 Z" fill="#4E9E7E"/>
+    <path d="M138 96 C128 66 140 42 158 32 M148 96 C142 70 150 48 160 38 M170 96 C176 70 172 48 162 38" fill="none" stroke="#2E6B54" stroke-width="2" opacity="0.7"/>
+    <line x1="158" y1="98" x2="152" y2="158" stroke="#8A5A2B" stroke-width="5" stroke-linecap="round"/>
+    <circle cx="139" cy="148" r="7" fill="#F6DFC0"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 272 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#8FCBB0" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

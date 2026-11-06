@@ -1,0 +1,62 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 金角大王：金甲 + 头角 + 紫金葫芦 -->
+  <defs>
+    <radialGradient id="jjHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#E8C470" stop-opacity="0.5"/>
+      <stop offset="0.7" stop-color="#E8C470" stop-opacity="0.16"/>
+      <stop offset="1" stop-color="#E8C470" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="jjArmor" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#D8B25E"/>
+      <stop offset="1" stop-color="#9C7A2E"/>
+    </linearGradient>
+    <linearGradient id="jjGourd" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#C98FD4"/>
+      <stop offset="1" stop-color="#7C3E96"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#jjHalo)"/>
+
+  <g>
+    <!-- 战裙下摆 -->
+    <path d="M74 178 C68 214 62 246 56 268 L164 268 C158 246 152 214 146 178 Z" fill="#5A4A2E"/>
+    <path d="M74 196 L146 196 M68 232 L152 232" stroke="#D8B25E" stroke-width="2.4" opacity="0.6"/>
+    <!-- 金甲胸身 -->
+    <path d="M86 150 C84 164 86 172 90 182 L130 182 C134 172 136 164 134 150 Z" fill="url(#jjArmor)"/>
+    <path d="M96 152 L96 180 M110 152 L110 180 M124 152 L124 180" stroke="#7A5E1E" stroke-width="1.6" opacity="0.6"/>
+    <!-- 肩甲 -->
+    <path d="M78 150 q10 -12 22 -6 l-2 14 q-12 2 -20 -8 Z" fill="url(#jjArmor)"/>
+    <path d="M142 150 q-10 -12 -22 -6 l2 14 q12 2 20 -8 Z" fill="url(#jjArmor)"/>
+    <!-- 臂（左叉腰右托葫芦） -->
+    <path d="M86 158 Q70 182 80 202" fill="none" stroke="url(#jjArmor)" stroke-width="10" stroke-linecap="round"/>
+    <path d="M134 158 Q152 172 152 190" fill="none" stroke="url(#jjArmor)" stroke-width="10" stroke-linecap="round"/>
+    <circle cx="82" cy="204" r="8" fill="#F6DFC0"/>
+    <circle cx="152" cy="194" r="8" fill="#F6DFC0"/>
+    <!-- 头 -->
+    <circle cx="110" cy="116" r="24" fill="#E8C89A"/>
+    <!-- 双角 -->
+    <path d="M92 100 q-12 -12 -8 -26 q10 8 14 20 Z" fill="#D8B25E"/>
+    <path d="M128 100 q12 -12 8 -26 q-10 8 -14 20 Z" fill="#D8B25E"/>
+    <!-- 虬髯 -->
+    <path d="M98 130 Q104 142 110 142 Q116 142 122 130 Q116 136 110 136 Q104 136 98 130 Z" fill="#3A2A20"/>
+    <path d="M100 134 q-4 8 2 12 M120 134 q4 8 -2 12" stroke="#3A2A20" stroke-width="2" fill="none" stroke-linecap="round"/>
+    <!-- 容颜（威猛浓眉） -->
+    <path d="M98 112 l10 2 M122 112 l-10 2" stroke="#3A2A20" stroke-width="3" stroke-linecap="round"/>
+    <circle cx="103" cy="118" r="2.2" fill="#2A1C12"/>
+    <circle cx="117" cy="118" r="2.2" fill="#2A1C12"/>
+    <path d="M104 126 Q110 128 116 126" stroke="#7A5E3E" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+  </g>
+
+  <!-- 紫金葫芦（右手托举侧） -->
+  <g>
+    <circle cx="162" cy="212" r="16" fill="url(#jjGourd)"/>
+    <circle cx="162" cy="192" r="10" fill="url(#jjGourd)"/>
+    <rect x="157" y="178" width="10" height="7" rx="2" fill="#D8B25E"/>
+    <path d="M152 204 q10 -6 20 0" stroke="#F3E6C8" stroke-width="2" fill="none" opacity="0.6"/>
+  </g>
+
+  <!-- 底座云纹 -->
+  <path d="M48 272 q22 -14 44 -2 q20 -12 40 -2 q22 -12 44 0 q18 -8 36 4" fill="none" stroke="#E8C470" stroke-width="2" opacity="0.65" stroke-linecap="round"/>
+</svg>

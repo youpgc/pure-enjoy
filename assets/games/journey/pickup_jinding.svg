@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 功德金锭：元宝鎏金，大额功德意象 -->
+  <ellipse cx="24" cy="43" rx="12" ry="2.5" fill="#4A3220" opacity="0.35"/>
+  <path d="M10 30 q14 -14 28 0 q-3 8 -14 8 q-11 0 -14 -8" fill="#E8B84E"/>
+  <path d="M10 30 q14 -14 28 0" fill="none" stroke="#8E6E28" stroke-width="2"/>
+  <path d="M14 22 q10 -8 20 0 q-10 5 -20 0" fill="#F6E3B4"/>
+  <ellipse cx="24" cy="33" rx="9" ry="2.6" fill="#C99B3A"/>
+  <circle cx="17" cy="26" r="1.6" fill="#FFF7DE" opacity="0.9"/>
+</svg>

@@ -1,0 +1,57 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 220 300" width="220" height="300">
+  <!-- 红孩儿：烈焰背光 + 红肚兜 + 火尖枪 -->
+  <defs>
+    <radialGradient id="hhHalo" cx="0.5" cy="0.5" r="0.5">
+      <stop offset="0" stop-color="#F26B3A" stop-opacity="0.55"/>
+      <stop offset="0.7" stop-color="#F26B3A" stop-opacity="0.18"/>
+      <stop offset="1" stop-color="#F26B3A" stop-opacity="0"/>
+    </radialGradient>
+    <linearGradient id="hhDudou" x1="0" y1="0" x2="0" y2="1">
+      <stop offset="0" stop-color="#E8654A"/>
+      <stop offset="1" stop-color="#A82E20"/>
+    </linearGradient>
+    <linearGradient id="hhFlame" x1="0" y1="1" x2="0" y2="0">
+      <stop offset="0" stop-color="#E8654A"/>
+      <stop offset="1" stop-color="#F3C34A"/>
+    </linearGradient>
+  </defs>
+
+  <!-- 烈焰背光 -->
+  <circle cx="110" cy="104" r="78" fill="url(#hhHalo)"/>
+  <!-- 火舌 -->
+  <path d="M56 120 q-8 -26 10 -40 q-2 18 8 24 q2 -30 22 -38 q-4 20 6 30 q6 -22 26 -26 q-8 16 0 28 q10 -14 26 -10 q-14 8 -12 22 Z" fill="url(#hhFlame)" opacity="0.75"/>
+
+  <g>
+    <!-- 火轮脚踏 -->
+    <path d="M72 262 q18 -10 38 -4 q18 -8 38 -2 q-16 10 -38 6 q-20 4 -38 0 Z" fill="#E8A13F" opacity="0.8"/>
+    <!-- 腿 -->
+    <path d="M92 240 L88 258 M128 240 L132 258" stroke="#F6DFC0" stroke-width="10" stroke-linecap="round"/>
+    <!-- 红肚兜身躯 -->
+    <path d="M90 166 C86 204 90 224 96 240 L124 240 C130 224 134 204 130 166 Z" fill="url(#hhDudou)"/>
+    <path d="M90 172 L130 172" stroke="#F3C34A" stroke-width="3" opacity="0.8"/>
+    <!-- 臂（举枪姿） -->
+    <path d="M92 174 Q72 186 70 204" fill="none" stroke="#F6DFC0" stroke-width="9" stroke-linecap="round"/>
+    <path d="M128 174 Q148 166 154 150" fill="none" stroke="#F6DFC0" stroke-width="9" stroke-linecap="round"/>
+    <!-- 头 -->
+    <circle cx="110" cy="122" r="24" fill="#F6DFC0"/>
+    <!-- 前发髻 -->
+    <circle cx="110" cy="94" r="11" fill="#3A2A20"/>
+    <circle cx="110" cy="94" r="4.5" fill="#D4593F"/>
+    <path d="M94 108 Q110 100 126 108" fill="none" stroke="#3A2A20" stroke-width="4"/>
+    <!-- 容颜（桀骜） -->
+    <circle cx="102" cy="124" r="2.2" fill="#4A3222"/>
+    <circle cx="118" cy="124" r="2.2" fill="#4A3222"/>
+    <path d="M100 115 l6 3 M120 115 l-6 3" stroke="#4A3222" stroke-width="1.8" stroke-linecap="round"/>
+    <path d="M104 134 Q110 130 116 134" stroke="#8A5A2B" stroke-width="1.8" fill="none" stroke-linecap="round"/>
+    <!-- 额间火纹 -->
+    <path d="M110 105 q4 5 0 9 q-4 -4 0 -9 Z" fill="#E8654A"/>
+  </g>
+
+  <!-- 火尖枪（右手举持，枪尖带焰） -->
+  <g stroke-linecap="round">
+    <line x1="156" y1="86" x2="162" y2="252" stroke="#8A5A2B" stroke-width="5"/>
+    <path d="M156 86 L162 60 L167 88 Z" fill="#D8B25E"/>
+    <path d="M162 56 q6 8 0 14 q-6 -6 0 -14 Z" fill="#F26B3A"/>
+    <path d="M154 92 q-5 6 0 12 M170 92 q5 6 0 12" stroke="#F3C34A" stroke-width="2.4" fill="none"/>
+  </g>
+</svg>

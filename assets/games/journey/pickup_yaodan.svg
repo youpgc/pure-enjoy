@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 妖丹：紫曜丹珠，内蕴妖气涡纹 -->
+  <ellipse cx="24" cy="43" rx="10" ry="2.5" fill="#2A1E4A" opacity="0.35"/>
+  <circle cx="24" cy="24" r="14" fill="#6C4BD5"/>
+  <circle cx="24" cy="24" r="14" fill="none" stroke="#3A2680" stroke-width="2"/>
+  <path d="M24 12 a12 12 0 0 1 0 24 a7 7 0 0 1 0-14 a3.5 3.5 0 0 0 0-7" fill="none" stroke="#B9A2F5" stroke-width="1.6" opacity="0.85"/>
+  <circle cx="19" cy="18" r="3.2" fill="#E4D9FF" opacity="0.75"/>
+</svg>

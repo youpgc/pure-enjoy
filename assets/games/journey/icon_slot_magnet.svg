@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 磁吸：马蹄磁铁 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 3h3.6v8a1.4 1.4 0 0 0 2.8 0V3H17v8a5 5 0 0 1-10 0V3z"/>
+    <path d="M7 7h3.6M13.4 7H17"/>
+  </g>
+</svg>
