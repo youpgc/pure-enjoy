@@ -45,6 +45,7 @@ import 'pet_shop_screen.dart';
 import 'pet_wallet_screen.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
+import '../widgets/pet_theme_sheet.dart';
 
 part 'pet_home_screen_layout.dart';
 part 'pet_home_screen_actions.dart';

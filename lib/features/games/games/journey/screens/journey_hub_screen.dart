@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../models/game_model.dart';
-import '../../../play/game_leaderboard_screen.dart';
 import '../../../../../utils/cache_helper.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
@@ -19,7 +18,8 @@ import 'journey_character_screen.dart';
 import 'journey_talent_screen.dart';
 import 'journey_compendium_screen.dart';
 import 'journey_records_screen.dart';
-import 'journey_hub_settings_sheet.dart';
+import 'journey_hub_actions.dart';
+import '../widgets/journey_entry_card.dart';
 
 /// S2 西行主界面（hub·场景舞台版）。
 ///
@@ -198,7 +198,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
         children: <Widget>[
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.groups,
               label: '取经队伍',
               onTap: () => _push(const JourneyCharacterScreen()),
@@ -206,7 +206,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.auto_fix_high,
               label: '五行天赋',
               onTap: () => _push(const JourneyTalentScreen()),
@@ -214,7 +214,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.auto_stories,
               label: '法宝图鉴',
               onTap: () => _push(const JourneyCompendiumScreen()),
@@ -222,7 +222,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.receipt_long,
               label: '功德流水',
               onTap: () => _push(const JourneyMeritRecordsScreen()),
@@ -230,7 +230,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.sports_esports,
               label: '对局记录',
               onTap: () => _push(const JourneyRunRecordsScreen()),
@@ -238,7 +238,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.emoji_events,
               label: '成就',
               onTap: () => _push(const JourneyAchievementsScreen()),
@@ -246,18 +246,21 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.leaderboard,
               label: '西行排行',
-              onTap: _openLeaderboard,
+              onTap: () => openJourneyLeaderboard(context,
+                  snapshotGameId: _config?.gameId ?? '',
+                  fallbackGameId: widget.game.id,
+                  gameCode: widget.game.code),
             ),
           ),
           SizedBox(
             width: 68,
-            child: _EntryCard(
+            child: JourneyEntryCard(
               icon: Icons.settings,
               label: '设置',
-              onTap: _openSettings,
+              onTap: () => openJourneySettings(context),
             ),
           ),
         ],
@@ -467,70 +470,4 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
     await _push(const JourneyDailyScreen());
   }
 
-  void _openSettings() {
-    showModalBottomSheet<void>(
-      context: context,
-      backgroundColor: JourneyTheme.panel,
-      shape: const RoundedRectangleBorder(
-        borderRadius: BorderRadius.vertical(
-            top: Radius.circular(JourneyTheme.radiusPanel)),
-      ),
-      builder: (_) => const JourneySettingsSheet(),
-    );
-  }
-
-  /// 西行排行（节点6）：跳通用排行榜页；gameId 未配置时提示暂未开放。
-  void _openLeaderboard() {
-    final snapshotId = _config?.gameId ?? '';
-    final gameId =
-        snapshotId.isNotEmpty ? snapshotId : widget.game.id;
-    if (gameId.isEmpty) {
-      ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('排行榜暂未开放')),
-      );
-      return;
-    }
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => GameLeaderboardScreen(
-          game: GameModel(id: gameId, code: widget.game.code, name: '西行'),
-        ),
-      ),
-    );
-  }
 }
-
-class _EntryCard extends StatelessWidget {
-  final IconData icon;
-  final String label;
-  final VoidCallback onTap;
-
-  const _EntryCard({
-    required this.icon,
-    required this.label,
-    required this.onTap,
-  });
-
-  @override
-  Widget build(BuildContext context) {
-    return Material(
-      color: Colors.transparent,
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
-        child: Container(
-          padding: const EdgeInsets.symmetric(vertical: 10),
-          decoration: JourneyTheme.panelDecoration(),
-          child: Column(
-            children: <Widget>[
-              Icon(icon, color: JourneyTheme.gold, size: 18),
-              const SizedBox(height: 4),
-              Text(label, style: JourneyTheme.caption),
-            ],
-          ),
-        ),
-      ),
-    );
-  }
-}
-

@@ -3,11 +3,11 @@ import 'package:flutter/material.dart';
 
 import '../../../../../utils/cache_helper.dart';
 import '../models/journey_models.dart';
-import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
 import '../services/journey_score_reporter.dart';
 import '../services/journey_seed.dart' show kJourneyMonsterSeed;
+import 'journey_battle_setup.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_loading.dart';
 import '../battle/journey_battle_controller.dart';
@@ -109,7 +109,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     }
 
     final controller = JourneyBattleController(
-      themeColor: _themeColorOf(snapshot),
+      themeColor: journeyThemeColorOf(widget.level, snapshot),
       onLevelUp: _onLevelUp,
       onFinished: _onFinished,
       onBossSpawn: _onBossSpawn,
@@ -150,7 +150,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       level: widget.level,
       character: character,
       controller: controller,
-      loadout: _buildLoadout(progress.state, character.code),
+      loadout: buildJourneyLoadout(progress.state, character.code),
       monsterCap: snapshot.monsterCap,
       config: snapshot,
       runtime: runtime,
@@ -170,31 +170,10 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
         ? '第${widget.level.levelNo}难 · ${widget.level.title}'
         : widget.level.title;
     if (widget.level.kind == 'daily') {
-      _scheduleDailyMilestone(controller);
+      scheduleDailyMilestone(controller, widget.level,
+          stillMounted: () => mounted);
     }
     _maybeShowGuide();
-  }
-
-  /// 每日游历里程碑：开场横幅（2.4s）之后播报一次「已游历 N 里」
-  /// （每图里数=journey_daily_maps 后台配置，缺行回落内置种子）。
-  void _scheduleDailyMilestone(JourneyBattleController controller) {
-    final map = JourneyConfigService.instance.cached
-        ?.dailyMapOf(widget.level.regionCode);
-    if (map == null) return;
-    Future<void>.delayed(const Duration(milliseconds: 2600), () {
-      if (!mounted) return;
-      controller.hud.milestoneText.value = '已游历 ${map.milestoneLi} 里';
-    });
-  }
-
-  /// 主题色：游历图走 journey_daily_maps 后台配置；主线走远端区域
-  /// 配置（缺省鎏金）。
-  String _themeColorOf(JourneyConfigSnapshot snapshot) {
-    if (widget.level.kind == 'daily') {
-      return snapshot.dailyMapOf(widget.level.regionCode)?.themeColor ??
-          '#E8C470';
-    }
-    return snapshot.regionOf(widget.level.regionCode)?.themeColor ?? '#E8C470';
   }
 
   /// 首次进关三步引导（节点12）：标记不存在且 levelNo<=1 时展示，
@@ -208,68 +187,6 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
         setState(() => _guideVisible = true);
       }
     });
-  }
-
-  /// 局外预注入：出战角色五行天赋树分支增量（每系 core/growth/sig 三
-  /// 分支，每层数值取分支配置，远端缺行按内置口径兜底）；加强点点亮 →
-  /// 特殊能力（引擎按角色标记挂钩）。
-  JourneyLoadout _buildLoadout(JourneyProgressModel p, String charCode) {
-    final snapshot = JourneyConfigService.instance.cached;
-    double bv(String e, String b) {
-      final branch = snapshot?.branchOf(charCode, e, b);
-      return (branch?.valuePerLevel ??
-              kJourneyBranchFallbackValue[b]?[e] ??
-              1)
-          .toDouble();
-    }
-
-    int bl(String e, String b) =>
-        p.talentLevelOf(charCode, journeyBranchCode(charCode, e, b));
-
-    // core 本源枝：金/火→伤害、木→生命、水→转速、土→护甲
-    final metalCore = bl('metal', 'core');
-    final fireCore = bl('fire', 'core');
-    final woodCore = bl('wood', 'core');
-    final waterCore = bl('water', 'core');
-    final earthCore = bl('earth', 'core');
-    // growth 生息枝：金→暴击伤害、火→暴击率、木→回复、水→经验、土→拾取
-    final metalGrowth = bl('metal', 'growth');
-    final fireGrowth = bl('fire', 'growth');
-    final woodGrowth = bl('wood', 'growth');
-    final waterGrowth = bl('water', 'growth');
-    final earthGrowth = bl('earth', 'growth');
-    // sig 化形枝：金/火→伤害、水→转速、土→护甲+磁吸、木→回复特效
-    final metalSig = bl('metal', 'sig');
-    final fireSig = bl('fire', 'sig');
-    final waterSig = bl('water', 'sig');
-    final woodSig = bl('wood', 'sig');
-    final earthSig = bl('earth', 'sig');
-
-    final maxHpGain = woodCore * bv('wood', 'core');
-    var regenGain = woodGrowth * bv('wood', 'growth');
-    if (woodSig >= 3) regenGain += 1; // 回春 3 层：回复 +1/秒
-
-    return JourneyLoadout(
-      damageAmp: metalCore * bv('metal', 'core') +
-          fireCore * bv('fire', 'core') +
-          (metalSig + fireSig) * 0.05,
-      spinAmp: waterCore * bv('water', 'core') + waterSig * 0.05,
-      armorFlat: earthCore * bv('earth', 'core') + earthSig * 1.5,
-      bonusMaxHp: maxHpGain,
-      regenFlat: regenGain,
-      pickupRangeFlat: earthGrowth * bv('earth', 'growth'),
-      expAmp: 1.0 + waterGrowth * bv('water', 'growth'),
-      critRateFlat: fireGrowth * bv('fire', 'growth'),
-      critDamageBonus: metalGrowth * bv('metal', 'growth'),
-      signatures: <String>{
-        if (woodSig > 0) 'signature_wood',
-        if (earthSig > 0) 'signature_earth',
-      },
-      // 加强点：本树五系修满后点亮 → 角色特殊能力（引擎钩子生效）
-      abilities: <String>{
-        if (p.talentEnhanceLit(charCode)) 'ability_$charCode',
-      },
-    );
   }
 
   // ---- 引擎回调 ----

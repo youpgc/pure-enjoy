@@ -25,6 +25,7 @@ import 'match3_swipe.dart';
 part 'match3_props_engine.dart';
 part 'match3_flame_resolve.dart';
 part 'match3_flame_brawl.dart';
+part 'match3_flame_input.dart';
 
 /// 消消乐（Flame 引擎 · 成熟手感版）
 ///
@@ -470,49 +471,6 @@ class Match3FlameGame extends FlameGame
     final adjacent = (sr - r).abs() + (sc - c).abs() == 1;
     if (!adjacent) return;
     _trySwap(sr, sc, r, c);
-  }
-
-  void _trySwap(int r1, int c1, int r2, int c2) {
-    final a = grid[r1][c1];
-    final b = grid[r2][c2];
-    if (a == null || b == null) return;
-    grid[r1][c1] = b;
-    grid[r2][c2] = a;
-    a.row = r2;
-    a.col = c2;
-    b.row = r1;
-    b.col = c1;
-    _busy = true;
-    GameAudio.instance.select();
-    GameAudio.instance.haptic(GameHaptic.light);
-
-    Future.delayed(_anim, () async {
-      if (!isMounted) return;
-      // 乱斗暂停门：暂停期间交换判定挂起（暂停即时间停止）
-      await waitWhilePaused();
-      if (!isMounted) return;
-      if (findRuns(grid, rows, cols).isEmpty) {
-        grid[r1][c1] = a;
-        grid[r2][c2] = b;
-        a.row = r1;
-        a.col = c1;
-        b.row = r2;
-        b.col = c2;
-        GameAudio.instance.tap();
-        Future.delayed(_anim, () {
-          if (isMounted) _busy = false;
-        });
-      } else {
-        // 全模式统计已用步数（结算 moves 维度）；限步模式同步递减剩余，
-        // 限时/不限步（steps<=0）不递减
-        objective.movesUsed++;
-        if (!objective.isTimed && objective.steps > 0) movesLeft--;
-        _syncHud();
-        combo = 1;
-        _moveScore = 0;
-        _resolveCascade(r1, c1, r2, c2);
-      }
-    });
   }
 
 }

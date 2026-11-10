@@ -18,6 +18,7 @@ import './sheep_tile.dart';
 // 【文件拆分 2026-09-22】单文件超 500 行红线，按 part + extension 分片（逻辑零变更）：
 // sheep_game_props.dart（三道具：确认弹窗/扣额度/移出·撤回·洗牌效果）。
 part 'sheep_game_props.dart';
+part 'sheep_game_rules.dart';
 
 /// 羊了个羊（成熟手感版）
 ///
@@ -231,107 +232,6 @@ class _SheepGameState extends State<SheepGame> with WidgetsBindingObserver {
     }
   }
 
-  void _tapTile(SheepTile tile) {
-    if (_finished || _busy) return;
-    // 槽位已满（7/7）：不允许再放入任何方块，仅道具（移出/撤回）腾位后恢复点击。
-    // 无可用错误音效，重触感提示即可。
-    if (_slots.length >= _slotCapacity) {
-      GameAudio.instance.haptic(GameHaptic.heavy);
-      return;
-    }
-    if (tile.covered || tile.state != SheepTileState.board) {
-      return;
-    }
-    _pushSnapshot();
-    tile.state = SheepTileState.slot;
-    // 按类型归组：插入到同类方块之后（无同类则追加到末尾），保证同类三连在槽位中相邻
-    var insertAt = _slots.length;
-    for (var i = _slots.length - 1; i >= 0; i--) {
-      if (_slots[i].type == tile.type) {
-        insertAt = i + 1;
-        break;
-      }
-    }
-    _slots.insert(insertAt, tile);
-    _reindexSlots();
-    // 满槽（7/7）记一次失误：火眼金睛成就判定口径（mistakes ≤ 0 通关）
-    if (_slots.length >= _slotCapacity) {
-      _mistakes++;
-    }
-    GameAudio.instance.select();
-    GameAudio.instance.haptic(GameHaptic.light);
-    _computeCoverage();
-    setState(() {});
-    _busy = true;
-    Future.delayed(const Duration(milliseconds: 150), () {
-      if (!mounted) return;
-      _busy = false;
-      _resolveAfterMove();
-    });
-  }
-
-  bool _clearTriples() {
-    final counts = <int, int>{};
-    for (final t in _slots) {
-      counts[t.type] = (counts[t.type] ?? 0) + 1;
-    }
-    int? type;
-    for (final e in counts.entries) {
-      if (e.value >= 3) {
-        type = e.key;
-        break;
-      }
-    }
-    if (type == null) return false;
-    final toRemove = <SheepTile>[];
-    var r = 0;
-    _slots.removeWhere((t) {
-      if (t.type == type && r < 3) {
-        r++;
-        toRemove.add(t);
-        return true;
-      }
-      return false;
-    });
-    for (final t in toRemove) {
-      _tiles.remove(t);
-    }
-    _reindexSlots();
-    return true;
-  }
-
-  void _resolveAfterMove() {
-    // ★ 循环消除（审查报告 游戏 S2）：道具撤回等路径可在槽内同时存在两组三连，
-    //   单次只清一组会让另一组滞留到下一次点击
-    var clearedAny = false;
-    while (_clearTriples()) {
-      clearedAny = true;
-      GameAudio.instance.match();
-      GameAudio.instance.haptic(GameHaptic.medium);
-    }
-    final boardLeft = _tiles.any((t) => t.state == SheepTileState.board);
-    if (!boardLeft && _slots.isEmpty) {
-      _finish(true);
-      return;
-    }
-    if (_slots.length > _slotCapacity) {
-      _finish(false);
-      return;
-    }
-    if (!boardLeft && _slots.isNotEmpty) {
-      _finish(false); // 棋盘已空但槽位无解（死局）
-      return;
-    }
-    // ★ 满槽死局兜底（审查报告 游戏 S1）：槽满、盘面未清、本步无可消，
-    //   且移出/撤回/洗牌均无免费额度无库存 → 对局不可推进，判负
-    //   （对齐原版满槽判负；持有任一道具时保留腾位机会，不触发）
-    if (_slots.length >= _slotCapacity && boardLeft && !clearedAny && !_hasAnySlotRelief()) {
-      _finish(false);
-      return;
-    }
-    _computeCoverage();
-    setState(() {});
-  }
 
   @override
   void dispose() {

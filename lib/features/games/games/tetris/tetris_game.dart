@@ -12,13 +12,17 @@ import '../../shared/game_audio.dart';
 import '../../shared/game_shell.dart';
 import 'tetris_mode.dart';
 import 'tetris_props.dart';
+part 'tetris_settlement.dart';
+part 'tetris_timers.dart';
 
 // 【文件拆分】单文件 ≤500 行红线：本文件为宿主 State（配置/HUD/流程），
 // 引擎逻辑见 tetris_engine.dart（part）、渲染见 tetris_board.dart（part）、
 // 手势与按钮行见 tetris_input.dart（part）、垃圾行系统见 tetris_garbage.dart（part）、
 // 道具栏与道具执行见 tetris_props_actions.dart（part，二期）。
 part 'tetris_engine.dart';
+part 'tetris_engine_scoring.dart';
 part 'tetris_board.dart';
+part 'tetris_board_painters.dart';
 part 'tetris_input.dart';
 part 'tetris_garbage.dart';
 part 'tetris_props_actions.dart';
@@ -337,106 +341,7 @@ class _TetrisGameState extends State<TetrisGame> with WidgetsBindingObserver {
 
   /// survival 垃圾顶起定时器（周期恒定 = config `garbage_interval`）；
   /// 顶起溢出（顶行有块/当前块碰撞）按 Block Out 结算（survival 口径 lines 判定）。
-  void _startGarbageTimer() {
-    _garbageTimer?.cancel();
-    if (_garbageInterval <= 0) return;
-    _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
-    _garbageTimer = Timer.periodic(Duration(seconds: _garbageInterval), (_) {
-      if (_finished) {
-        _garbageTimer?.cancel();
-        return;
-      }
-      if (_isPaused) return; // 暂停冻结（防御未在册重建，恢复时整体替换）
-      _garbageNextPushAt = DateTime.now().add(Duration(seconds: _garbageInterval));
-      if (!_pushGarbageRow()) {
-        _onBlockOut();
-      }
-    });
-  }
 
-  void _restartGravityTimer() {
-    _gravityTimer?.cancel();
-    // 时缓卡生效期间下落间隔 ×2（与 marathon 局内加速叠加）
-    final ms = _currentFallMs * (_isSlowed ? 2 : 1);
-    _gravityTimer = Timer.periodic(Duration(milliseconds: ms), (_) {
-      _gravityTick();
-    });
-  }
-
-  void _startLockTimer() {
-    _lockTimer?.cancel();
-    _lockTimer = Timer(const Duration(milliseconds: _kLockDelayMs), () {
-      _lockPiece();
-    });
-  }
-
-  void _restartLockTimer() => _startLockTimer();
-
-  void _cancelLockTimer() {
-    _lockTimer?.cancel();
-    _lockTimer = null;
-  }
-
-  /// blitz 倒计时 / survival 顶起倒计时轮询（250ms 轮询、整秒变化才重建，g2048 同款节流）
-  void _startTickTimer() {
-    _tickTimer?.cancel();
-    if (_timeLimit == null && _garbageInterval <= 0) return;
-    _tickTimer = Timer.periodic(const Duration(milliseconds: 250), (timer) {
-      if (_finished) {
-        timer.cancel();
-        return;
-      }
-      if (_isPaused) return; // 暂停冻结（恢复时整体重启）
-      if (_timeLimit != null && _remainingSeconds() <= 0) {
-        _finish(_scoreTarget > 0 && _score >= _scoreTarget,
-            reason: '时间到');
-        return;
-      }
-      final s = _hudSecond();
-      if (s != _lastTickSecond) {
-        _lastTickSecond = s;
-        if (mounted) setState(() {});
-      }
-    });
-  }
-
-  // ───────── 暂停 / 恢复（2026-10-12 用户需求） ─────────
-
-  /// 暂停对局：取消全部周期 Timer；消行闪烁 Timer 保留但回调按 [_isPaused]
-  /// 冻结（删行/计分/补块链不推进，恢复后动画续播）。截线制时刻在恢复时
-  /// 统一平移，见 [_resumeGame]。
-  void _pauseGame() {
-    if (_finished || _isPaused || !mounted) return;
-    _pausedAt = DateTime.now();
-    _gravityTimer?.cancel();
-    _cancelLockTimer();
-    _tickTimer?.cancel();
-    _garbageTimer?.cancel();
-    if (mounted) setState(() {});
-  }
-
-  /// 恢复对局：暂停时长从全部截线制时刻中扣除（暂停不流逝）——blitz 倒计时
-  /// 与结算用时（[_startTime] 基准）、survival 顶起点（[_garbageNextPushAt]）、
-  /// 时缓卡截止（[_slowUntil]）。
-  void _resumeGame() {
-    if (_finished || !_isPaused || !mounted) return;
-    final paused = DateTime.now().difference(_pausedAt!);
-    _pausedAt = null;
-    _startTime = _startTime.add(paused);
-    _garbageNextPushAt = _garbageNextPushAt.add(paused);
-    _slowUntil = _slowUntil?.add(paused);
-    _restartGravityTimer();
-    _startTickTimer();
-    _resumeGarbageTimer();
-    // 暂停时已触底：锁定延迟冻结重启（悬空则由重力 tick 自然接管）
-    if (_current != null && _isResting) _startLockTimer();
-    if (mounted) setState(() {});
-  }
-
-  void _togglePause() => _isPaused ? _resumeGame() : _pauseGame();
-
-  /// survival 顶起定时器恢复：按暂停冻结的剩余时间接续首个顶起点（暂停不
-  /// 白送新周期），其后交回 [_startGarbageTimer] 恒定周期。
   void _resumeGarbageTimer() {
     _garbageTimer?.cancel();
     if (_garbageInterval <= 0 || _finished) return;
@@ -488,102 +393,6 @@ class _TetrisGameState extends State<TetrisGame> with WidgetsBindingObserver {
   }
 
   // ───────── 结束 / 结算 ─────────
-
-  void _finish(bool cleared, {String? reason}) {
-    if (_finished) return;
-    _finished = true;
-    _pausedAt = null; // 结束即脱离暂停态（恢复路径全部失效）
-    _gravityTimer?.cancel();
-    _cancelLockTimer();
-    _tickTimer?.cancel();
-    _garbageTimer?.cancel();
-    _flashTimer?.cancel();
-    _flashTimer = null;
-    _flashRows = <int>[];
-    if (cleared) {
-      GameAudio.instance.win();
-      // 每日挑战：通关写本地完成标记（当日模式卡置灰；奖励走 daily_first_clear
-      // 的 claim_key 日期幂等，本地标记仅控制展示）
-      if (_seedDaily && _dailyDateKey.isNotEmpty) {
-        SharedPreferences.getInstance().then((sp) => sp.setString(
-            'tetris_daily_done_$_dailyDateKey', '1'));
-      }
-    } else {
-      GameAudio.instance.fail();
-    }
-    final elapsed = DateTime.now().difference(_startTime).inMilliseconds;
-    widget.onFinished(GamePlayOutcome(
-      cleared: cleared,
-      reason: reason,
-      values: <String, num>{
-        'score': _score,
-        'lines': _linesTotal,
-        'duration_ms': elapsed,
-        'pieces': _piecesPlaced,
-        'tetris_count': _tetrisCount,
-        'tspin_count': _tspinCount,
-        'max_b2b': _maxB2b,
-        'max_combo': _maxCombo,
-        'perfect_clears': _perfectClears,
-        'level_reached': _scoreLevel,
-        if (_garbageCleared > 0) 'garbage_cleared': _garbageCleared,
-      },
-      durationMs: elapsed,
-    ));
-  }
-
-  /// 重新开始：二次确认后交宿主 _restartGame（aborted 上报 + 引擎重建）。
-  Future<void> _confirmRestartViaHost() async {
-    final sure = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        title: const Text('放弃当前游戏？'),
-        content: const Text('点击「重新开始」将放弃当前进度，确定要重新开始吗？'),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('取消'),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: const Text('放弃并重新开始'),
-          ),
-        ],
-      ),
-    );
-    if (sure == true && mounted) widget.onRestart?.call();
-  }
-
-  // ───────── HUD 文案 ─────────
-
-  String get _targetLabel {
-    // 达成后仍显示初始目标值（2026-10-11 用户口径）：不切「已达成 ✓」，
-    // 达成状态由右下角结算钮点亮 + 「目标达成」fx 提示承载
-    switch (_mode) {
-      case TetrisMode.marathon:
-      case TetrisMode.sprint:
-      case TetrisMode.survival:
-      case TetrisMode.daily:
-        // 目标固定显示总量，不随消行递减（2026-10-10 用户反馈）
-        return '$_linesTarget 行';
-      case TetrisMode.blitz:
-      case TetrisMode.challenge:
-        return '$_scoreTarget 分';
-      case TetrisMode.dig:
-        // 挖掘固定显示预填总量；现场剩余量在 fx/玩法中呈现
-        return '$_digRows 行垃圾';
-      case TetrisMode.boss:
-        return '血量 $_bossHp';
-    }
-  }
-
-  /// Frenzy 当前倍率（blitz 专属；×1 不展示；终局最后 10s 归 1 与计分同口径）。
-  bool get _frenzyActive =>
-      _frenzyEnabled &&
-      _combo >= 1 &&
-      !(_timeLimit != null && _remainingSeconds() <= 10);
-
-  double get _frenzyMult => 1 + 0.5 * min(_combo, 6);
 
   @override
   Widget build(BuildContext context) {

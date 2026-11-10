@@ -15,6 +15,7 @@ import '../services/pet_service.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_toast.dart';
 import '../widgets/pet_loading.dart';
+part 'pet_wallet_exchange_block.dart';
 
 /// 宠物钱包页（我的页「宠物钱包」入口的独立落点，不进宠物主页）
 ///
@@ -356,76 +357,6 @@ class _PetWalletScreenState extends State<PetWalletScreen> {
   }
 
   /// 积分兑换金币区块（单向；服务端 rpc_pet_exchange 同事务双账本）
-  Widget _exchangeBlock(ColorScheme colorScheme) {
-    final gold = int.tryParse(_goldCtrl.text.trim()) ?? 0;
-    final rate = _pointsPerGold;
-    final cost = (gold > 0 && rate != null) ? gold * rate : 0;
-    final canSubmit =
-        !_exchanging && rate != null && cost > 0 && cost <= _availablePoints;
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Row(
-          children: [
-            Icon(Icons.autorenew_outlined, size: 18, color: colorScheme.primary),
-            const SizedBox(width: 6),
-            Text('积分兑换金币', style: Theme.of(context).textTheme.titleSmall),
-            const Spacer(),
-            Text(
-              '可用积分 $_availablePoints',
-              style: TextStyle(
-                fontSize: 12,
-                color: colorScheme.onSurfaceVariant,
-              ),
-            ),
-          ],
-        ),
-        const SizedBox(height: 10),
-        Row(
-          children: [
-            Expanded(
-              child: TextField(
-                controller: _goldCtrl,
-                keyboardType: TextInputType.number,
-                enabled: !_exchanging,
-                onChanged: (_) => setState(() {}),
-                decoration: const InputDecoration(
-                  isDense: true,
-                  hintText: '输入金币数',
-                  suffixText: '金币',
-                  border: OutlineInputBorder(),
-                ),
-              ),
-            ),
-            const SizedBox(width: 10),
-            FilledButton(
-              onPressed: canSubmit ? _exchange : null,
-              child: _exchanging
-                  ? const SizedBox(
-                      width: 16,
-                      height: 16,
-                      child: CircularProgressIndicator(strokeWidth: 2),
-                    )
-                  : Text('兑换${cost > 0 ? '（-$cost）' : ''}',
-                      style: const TextStyle(fontSize: 13)),
-            ),
-          ],
-        ),
-        const SizedBox(height: 6),
-        Text(
-          rate == null
-              ? '兑换汇率未加载，请下拉刷新；只支持积分 → 金币，金币不可换回积分。'
-              : '1 金币 = $rate 积分；只支持积分 → 金币，金币不可换回积分。',
-          style: TextStyle(
-            fontSize: 12,
-            color: cost > _availablePoints
-                ? colorScheme.error
-                : colorScheme.onSurfaceVariant,
-          ),
-        ),
-      ],
-    );
-  }
 
   Widget _summaryItem(String label, int value, ColorScheme colorScheme) {
     return Column(
