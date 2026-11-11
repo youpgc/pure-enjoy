@@ -4,7 +4,7 @@ part of 'journey_flame_game.dart';
 /// - 空槽且维度未入槽 → 「习得·X」（占 1 槽，Lv1）；
 /// - 已入槽且未达上限 → 「X · 顿悟」（等级 +1，展示下一级效果）；
 /// - 槽满：只出已有槽升级 + 通用成长项（不出现新维度）；
-/// - 通用成长项常驻（伤害卡无条件入池，候选永不为空）；
+/// - 通用成长项常驻（攻击卡累计达上限后不再入池，候选永不为空）；
 /// - 特效触发法宝卡：入池=图鉴已解锁且未持有。
 List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
   final pool = <JourneyUpgradeChoice>[];
@@ -62,6 +62,15 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
   }
 
   // 通用成长项（槽满后仍可选的基础属性增长；数值走 globals 后台配置）
+  final attackCap =
+      game.config?.attackUpgradeCap ?? kJourneyAttackUpgradeCap;
+  if (game.cardAttackTotal < attackCap) {
+    pool.add(JourneyUpgradeChoice(
+      JourneyUpgradeKind.attack,
+      title: '伏魔真力',
+      desc: '基础攻击 +${(game.config?.upgradeAttack ?? kJourneyUpgradeAttack).round()}',
+    ));
+  }
   pool
     ..add(JourneyUpgradeChoice(
       JourneyUpgradeKind.moveSpeed,

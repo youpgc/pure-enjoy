@@ -1,5 +1,30 @@
 part of 'journey_flame_game.dart';
 
+/// 恢复门禁：点继续/选卡只解除界面，世界保持时停，玩家按下摇杆才恢复，
+/// 消除两次操作之间世界自行推进的时间差。
+mixin JourneyResumeGateMixin on FlameGame {
+  JourneyBattleController get controller;
+
+  bool _resumeOnJoystick = false;
+
+  /// 引擎是否正等待摇杆接管（HUD 提示与恢复判定依据）。
+  bool get resumeOnJoystick => _resumeOnJoystick;
+
+  /// 进入等待接管态：保持暂停，只亮提示。
+  void armJoystickResume() {
+    _resumeOnJoystick = true;
+    controller.hud.awaitingJoystick.value = true;
+  }
+
+  /// 玩家按下摇杆：正式恢复对局，同一手势同时开始驱动移动。
+  void resumeFromJoystick() {
+    if (!_resumeOnJoystick) return;
+    _resumeOnJoystick = false;
+    controller.hud.awaitingJoystick.value = false;
+    resumeEngine();
+  }
+}
+
 /// 对局生命周期（extension，同 library 访问宿主私有成员）：
 /// 击杀结算、通关条件达成、主动结算、三选一应用、死亡与还魂、浮动文字。
 extension JourneyLifecycle on JourneyFlameGame {
@@ -39,6 +64,9 @@ extension JourneyLifecycle on JourneyFlameGame {
       // 妖王大血条：死亡清零并熄灭领地显隐（多场战重进侦测圈再亮）
       controller.hud.bossHpRatio.value = 0;
       controller.hud.bossEngaged.value = false;
+      controller.hud.bossHp.value = 0;
+      // 末场伏诛后罗盘与妖王点一并熄灭；多场战重生时再置回 true
+      controller.hud.bossPresent.value = false;
       final totalFights = level.bossFights > 1 ? level.bossFights : 1;
       if (_bossStage < totalFights - 1) {
         _bossStage++;
@@ -115,13 +143,19 @@ extension JourneyLifecycle on JourneyFlameGame {
       case JourneyUpgradeKind.pickupRange:
         player.pickupRange += config?.upgradePickup ?? 18;
         break;
+      case JourneyUpgradeKind.attack:
+        final step = config?.upgradeAttack ?? kJourneyUpgradeAttack;
+        final cap = config?.attackUpgradeCap ?? kJourneyAttackUpgradeCap;
+        cardAttackTotal = math.min(cardAttackTotal + step, cap);
+        _refreshWeaponGrade();
+        break;
     }
     _pendingLevelUps--;
     if (_pendingLevelUps > 0) {
       controller.onLevelUp(_charLv, paused: true);
     } else {
       _pausedByLevelUp = false;
-      resumeEngine();
+      armJoystickResume();
     }
   }
 
@@ -197,6 +231,8 @@ extension JourneyLifecycle on JourneyFlameGame {
   void _finish({required bool cleared}) {
     if (_ended) return;
     _ended = true;
+    _resumeOnJoystick = false;
+    controller.hud.awaitingJoystick.value = false;
     pauseEngine();
     // 首通奖励仅首次通关该难发放（首通判定基准=进关时最远记录）。
     final firstClear = level.levelNo > controller.farthestAtStart;

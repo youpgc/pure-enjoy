@@ -19,6 +19,13 @@ extension JourneyExp on JourneyFlameGame {
     while (_exp >= _expNeed && _charLv < _charLevelCap) {
       _exp -= _expNeed;
       _charLv++;
+      levelAttackTotal +=
+          config?.levelAttackPerLv ?? kJourneyLevelAttackPerLv;
+      final hpUp = config?.levelHpPerLv ?? kJourneyLevelHpPerLv;
+      player.maxHp += hpUp;
+      player.hp += hpUp;
+      controller.hud.maxHp.value = player.maxHp;
+      controller.hud.hp.value = player.hp;
       // 经验曲线（journey_globals.exp_base/exp_per_lv 后台可调，缺省 12/7）
       _expNeed =
           (config?.expBase ?? 12) + _charLv * (config?.expPerLv ?? 7);

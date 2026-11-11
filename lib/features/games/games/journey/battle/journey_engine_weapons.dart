@@ -171,7 +171,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         }
       }
       if (!hit) continue;
-      _hitMonster(game, m, arm.damage * game.damageMult,
+      _hitMonster(game, m, game.hitDamageBase * game.damageMult,
           pierceLv: pierceLv,
           knockLv: knockLv,
           lifestealLv: lifestealLv,
@@ -314,8 +314,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   void _lingBurst(JourneyFlameGame game, JourneyMonsterComponent m) {
     final arm = game.weaponArm;
     if (arm == null) return;
-    final damage =
-        arm.damage * game.damageMult * game.weaponParam('zijin_ling', 'damage', 0.6);
+    final damage = game.hitDamageBase *
+        game.damageMult * game.weaponParam('zijin_ling', 'damage', 0.6);
     final range = game.weaponParam('zijin_ling', 'range', 120);
     for (final other in game.monsters) {
       if (other.isDead || identical(other, m)) continue;
@@ -379,7 +379,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         }
       }
       if (!hit) continue;
-      game.damageMapObject(i, arm.damage * game.damageMult);
+      game.damageMapObject(i, game.hitDamageBase * game.damageMult);
       game._mapObjHitCd[i] = 0.3;
     }
   }

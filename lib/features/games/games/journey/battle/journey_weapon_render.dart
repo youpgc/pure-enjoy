@@ -141,7 +141,7 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
         if (target != null && !target.isDead) {
           _zhuoTimer = 0;
           target.takeDamage(
-            arm.damage *
+            hitDamageBase *
                 damageMult *
                 weaponParam('jinggang_zhuo', 'damage', 2.5),
           );
@@ -166,7 +166,7 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
           _pingTimer = 0;
           target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
           target.ignite(
-            burnDps: arm.damage *
+            burnDps: hitDamageBase *
                 damageMult *
                 weaponParam('yinyang_ping', 'burn', 0.4),
             seconds: weaponParam('yinyang_ping', 'root', 2.5),

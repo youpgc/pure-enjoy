@@ -1,85 +1,11 @@
 part of 'journey_flame_game.dart';
 
-/// 怪物池与妖王归属解析（远端配置优先、内置种子兜底）：
-
-/// 怪物池：远端 journey_monsters 配置优先，内置种子兜底（SQL 未就绪
-/// 或远端行缺失时保证可玩）。
-/// - 关卡配置了波次：池=波次怪种 ∪ 本关妖王（波次全权定刷怪内容，
-///   区域原著妖怪口径由配置保证）；
-/// - 无波次：池=全部普通/精英 + 本关妖王（兜底全向刷怪）。
-List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
-  final remote = game.config?.monsters ?? const <JourneyMonsterModel>[];
-  final source = remote.isNotEmpty
-      ? List<JourneyMonsterModel>.of(remote)
-      : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
-  final bossCode = resolveBossCode(game);
-  final boss = source
-      .where((m) => m.isBoss && m.code == bossCode)
-      .toList(growable: false);
-  if (game.runtime.waves.isNotEmpty) {
-    // 波次关：池=波次怪种（映射断裂的行已在 config service 过滤）∪ 妖王
-    final waveCodes = <String>{for (final w in game.runtime.waves) w.monsterCode};
-    final mobs = source
-        .where((m) => !m.isBoss && waveCodes.contains(m.code))
-        .toList();
-    return <JourneyMonsterModel>[...mobs, ...boss];
-  }
-  return source.where((m) => !m.isBoss || m.code == bossCode).toList();
-}
-
-/// 本关妖王编码：
-/// - 无尽/游历（虚拟关 kind=endless/daily）：无妖王模式，恒 null；
-/// - 远端区域行存在：boss_code 即定稿口径（NULL=原著无妖章回，无妖王战，
-///   引擎走「坚持通关」口径）；
-/// - 区域行缺失/内置兜底快照：回落关卡号区间映射（保可玩，每关有妖王）。
-String? resolveBossCode(JourneyFlameGame game) {
-  if (_isEndless(game) || _isDaily(game)) return null;
-  final region = game.config?.regionOf(game.level.regionCode);
-  if (game.config?.fromSeed != true && region != null) {
-    final configured = region.bossCode;
-    return (configured != null && configured.isNotEmpty) ? configured : null;
-  }
-  return _fallbackBossCode(game.level.levelNo);
-}
-
-/// 兜底映射：区域配置未就绪时按关卡区间取妖王（近似原著章回；
-/// 无妖章回返回 null，走坚持通关口径，与远端 boss_code=NULL 语义一致）。
-String? _fallbackBossCode(int levelNo) {
-  if (levelNo <= 4) return null; // 序章·长安
-  if (levelNo <= 7) return 'yin_jiangjun'; // 双叉岭·寅将军
-  if (levelNo <= 9) return null; // 五行山/鹰愁涧
-  if (levelNo <= 11) return 'heixiong_jing'; // 黑风山·黑熊精
-  if (levelNo <= 12) return null; // 高老庄
-  if (levelNo <= 14) return 'huangfeng_jing'; // 黄风岭·黄风怪
-  if (levelNo <= 19) return null; // 流沙河/五庄观
-  return 'baigu_jing'; // 白虎岭起
-}
-
-JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) {
-  final code = resolveBossCode(game);
-  if (code == null) return null;
-  final source = _monsterSource(game);
-  for (final m in source) {
-    if (m.code == code && m.isBoss) return m;
-  }
-  return null;
-}
-
-/// 怪物全源（远端优先，种子兜底）：妖王波判定/指定怪种刷怪共用——
-/// 无尽妖潮刷怪池不含妖王，波次配置的怪种语义需在全源上判定。
-List<JourneyMonsterModel> _monsterSource(JourneyFlameGame game) {
-  final remote = game.config?.monsters ?? const <JourneyMonsterModel>[];
-  return remote.isNotEmpty
-      ? List<JourneyMonsterModel>.of(remote)
-      : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
-}
-
 /// 怪物生成与妖王据点（平铺大地图口径）：
 /// - **波次优先**：关卡配置了 journey_waves 时按时间轴刷怪（start_sec 起
 ///   每 spawn_interval_ms 刷 count 只 monster_code，该波乘 buff_mult）；
 /// - 无波次配置回落全向兜底刷怪（探索沿途持续遭遇）；
 /// - 生成点感知密度热区：妖穴（demon_den）内集中刷怪、安全谷排除；
-/// - 妖王据点开局即驻守 + 周边守卫群，罗盘指引玩家前往。
+/// - 妖王据点延迟降临 + 周边守卫群，降临后罗盘指引玩家前往。
 mixin JourneySpawnMixin {
   double _spawnTimer = 0;
 
@@ -161,9 +87,17 @@ mixin JourneySpawnMixin {
           prog[0] = wave.count.toDouble();
           break;
         }
+        // 保护期内波次指定的强怪回落普通怪，避免开局被打断发育
+        final protectSec =
+            (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
+                .toDouble();
+        final spawnModel =
+            (game._elapsed < protectSec && (model.isElite || model.isBoss))
+                ? (_pickMonster(game, allowElite: false) ?? model)
+                : model;
         spawnMonsterAt(
           game,
-          model,
+          spawnModel,
           buffMult: game.buffMult * wave.buffMult,
           position: _spawnPosition(game),
         );
@@ -224,18 +158,30 @@ mixin JourneySpawnMixin {
     return pos;
   }
 
-  JourneyMonsterModel? _pickMonster(JourneyFlameGame game) {
-    final normal = game.pool.where((m) => !m.isBoss).toList();
-    if (normal.isEmpty) return null;
-    final minute = game._elapsed / 60.0;
-    final eliteRate = 0.10 + minute * 0.06;
-    if (game.rng.nextDouble() < eliteRate) {
-      final elites = normal.where((m) => m.isElite).toList();
-      return elites.isEmpty
-          ? normal[game.rng.nextInt(normal.length)]
-          : elites[game.rng.nextInt(elites.length)];
+  JourneyMonsterModel? _pickMonster(
+    JourneyFlameGame game, {
+    bool allowElite = true,
+  }) {
+    final pool = game.pool.where((m) => !m.isBoss).toList();
+    if (pool.isEmpty) return null;
+    final protectSec =
+        (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
+            .toDouble();
+    final elapsed = game._elapsed;
+    // 保护期内不产生精英；保护期过后按局内时间线性增长并钳上限
+    final eliteRate = (elapsed < protectSec || !allowElite)
+        ? 0.0
+        : (((elapsed - protectSec) / 60.0) *
+                (game.config?.eliteRatePerMin ?? kJourneyEliteRatePerMin))
+            .clamp(0.0, kJourneyEliteRateCap);
+    if (eliteRate > 0 && game.rng.nextDouble() < eliteRate) {
+      final elites = pool.where((m) => m.isElite).toList();
+      if (elites.isNotEmpty) return elites[game.rng.nextInt(elites.length)];
     }
-    return normal[game.rng.nextInt(normal.length)];
+    // 普通怪单独取样：未命中精英率时也不把精英混进随机结果
+    final commons = pool.where((m) => !m.isElite).toList();
+    final candidates = commons.isNotEmpty ? commons : pool;
+    return candidates[game.rng.nextInt(candidates.length)];
   }
 
   void spawnMonster(JourneyFlameGame game, JourneyMonsterModel model) {
@@ -280,14 +226,14 @@ mixin JourneySpawnMixin {
     if (count <= 0) return;
     for (var i = 0; i < count; i++) {
       if (game.monsters.length >= game.monsterCap) return;
-      final pick = _pickMonster(game);
+      final pick = _pickMonster(game, allowElite: false);
       if (pick == null) return;
       spawnMonster(game, pick);
     }
   }
 
-  /// 妖王据点：开局即驻守（驻点待机，玩家进入侦测半径才交战），
-  /// 并在据点周围布置守卫群；属性乘区统一走 buffMult（含关卡难度乘区）。
+  /// 妖王据点：降临计时结束后驻守（驻点待机，玩家进入侦测半径才交战），
+  /// 并在据点周围布置守卫群；妖王血量走只含时间项的乘区，守卫仍走 buffMult。
   void spawnBossAtPost(JourneyFlameGame game) {
     final model = game.bossModel;
     if (model == null) return;
@@ -296,6 +242,7 @@ mixin JourneySpawnMixin {
       game: game,
       model: model,
       buffMult: game.buffMult,
+      hpBuffMult: game.bossHpBuffMult,
       position: bossPos.clone(),
     );
     game.boss = comp;
@@ -305,7 +252,11 @@ mixin JourneySpawnMixin {
     // 开局不再预写常显（领地显隐口径见 monsters part）。
     // onLoad 挂载期 HUD 通知调度帧尾（防 markNeedsBuild during build）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      game.controller.hud.bossName.value = model.name;
+      final hud = game.controller.hud;
+      hud.bossName.value = model.name;
+      hud.bossPresent.value = true;
+      hud.bossMaxHp.value = comp.maxHp.round();
+      hud.bossHp.value = comp.hp.round();
     });
 
     // 据点守卫：妖王周边环状 10 只精英/普通怪
@@ -335,15 +286,21 @@ mixin JourneySpawnMixin {
       game: game,
       model: model,
       buffMult: game.buffMult * (1.0 + game._bossStage * 0.55),
+      hpBuffMult: game.bossHpBuffMult *
+          (1.0 + game._bossStage * 0.55),
       position: game.bossPos.clone(),
     );
     comp.scaleStageDamage(game._bossStage);
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
-    // 妖王名照写；血条比例由再次进侦测圈时按当前血量写入（下场增强再战，
-    // 新体满血；respawn 后仍未 engaged，罗盘与横幅等待玩家重回领地）
-    game.controller.hud.bossName.value = model.name;
+    // 妖王名与绝对血量照写；比例由再次进侦测圈时按当前血量写入
+    // （下场增强再战，新体满血；respawn 后仍未 engaged）
+    final hud = game.controller.hud;
+    hud.bossName.value = model.name;
+    hud.bossPresent.value = true;
+    hud.bossMaxHp.value = comp.maxHp.round();
+    hud.bossHp.value = comp.hp.round();
     game.controller.onBossSpawn('${game._bossStage + 1} 打 · ${model.name}');
   }
 

@@ -240,6 +240,8 @@ class JourneyPlayerComponent extends PositionComponent {
     // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
     if (invulnTimer > 0) return;
     hp = (hp - amount).clamp(0.0, maxHp);
+    // 有效受击：屏幕边框呼吸灯按脉冲重启一次泛红提示
+    game.controller.hud.hitPulse.value++;
     // 铜皮铁骨（bajie 特殊能力）：受击后 3s 内进入减伤/击退强化窗口
     if (game.hasAbility('bajie')) {
       game._bajieGuard = 3;

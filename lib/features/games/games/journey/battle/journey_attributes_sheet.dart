@@ -7,8 +7,8 @@ import '../services/journey_seed.dart';
 import 'journey_flame_game.dart';
 import '../widgets/journey_theme.dart';
 
-/// 属性详情面板（暂停时查看）：基础战斗属性 + 武器维度槽（等级/上限/
-/// 每级效果）+ 被动加持——玩家当前强度的完整视图。
+/// 属性详情面板：由对局页先进入暂停态再展示，面板不改变引擎运行状态。
+/// 基础战斗属性 + 武器维度槽（等级/上限/每级效果）+ 被动加持。
 abstract final class JourneyAttributesSheet {
   /// 维度槽简称（HUD/面板空间有限，取两字简称；全名见维度定义表）。
   static const Map<String, String> slotNames = <String, String>{
@@ -39,9 +39,10 @@ abstract final class JourneyAttributesSheet {
     rows.addAll(<Widget>[
       const Text('基础属性', style: JourneyTheme.title),
       const SizedBox(height: 6),
-      // 面板口径与实际伤害/角速度同源：damageMult（≤3.0 钳）与
-      // displayAngularSpeed（2 圈/秒钳），见主类 getter
-      _attrRow('武器伤害', '${(arm.damage * game.damageMult).toStringAsFixed(1)}/击'),
+      // 面板口径与实际伤害/角速度同源：hitDamageBase（法宝品阶+基础攻击）、
+      // damageMult（≤3.0 钳）与 displayAngularSpeed（2 圈/秒钳）
+      _attrRow('单次伤害',
+          '${(game.hitDamageBase * game.damageMult).toStringAsFixed(1)}/击'),
       _attrRow(
         '环绕转速',
         '${game.displayAngularSpeed.toStringAsFixed(1)}/秒 · '
@@ -103,9 +104,6 @@ abstract final class JourneyAttributesSheet {
       ]);
     }
 
-    // 打开属性详情主动暂停（已在暂停/选卡暂停中则保持原状），关闭后恢复
-    final wasPaused = game.paused;
-    if (!wasPaused) game.pauseEngine();
     await showModalBottomSheet<void>(
       context: context,
       backgroundColor: Colors.transparent,
@@ -146,9 +144,6 @@ abstract final class JourneyAttributesSheet {
         ),
       ),
     );
-    if (!wasPaused && !game.isPausedForLevelUp && !game.paused) {
-      game.resumeEngine();
-    }
   }
 
   static Map<String, JourneySlotDefModel> _slotDefs() {
