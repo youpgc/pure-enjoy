@@ -13,6 +13,9 @@ import '../models/journey_talent_models.dart'
         kJourneyBranchMaxLv,
         journeyBranchCode;
 
+export 'journey_curve_constants.dart';
+export 'journey_growth_constants.dart';
+
 const List<Map<String, dynamic>> kJourneyRegionSeed = <Map<String, dynamic>>[
   {'code': 'wuxingshan', 'name': '五行山', 'seq': 1, 'theme_color': '#5B9BD5'},
   {'code': 'gaolaozhuang', 'name': '高老庄', 'seq': 2, 'theme_color': '#6FBF9A'},
@@ -395,6 +398,20 @@ const double kJourneySpawnDenRatio = 0.70;
 /// 妖王天赋点掉率（journey_globals.talent_drop_rate 镜像，0~1；
 /// 末场伏诛判定命中后全部角色点池各 +1；点池不设上限）。
 const double kJourneyTalentDropRate = 0.10;
+
+/// 妖王首次降临延迟（秒；journey_globals.boss_spawn_delay_sec 可覆盖）。
+const int kJourneyBossSpawnDelaySec = 300;
+
+/// 前期发育保护期（秒；journey_globals.early_game_protect_sec 可覆盖）：
+/// 期间只刷普通怪，留出发育窗口。
+const int kJourneyEarlyGameProtectSec = 60;
+
+/// 保护期结束后精英率每分钟增量（journey_globals.elite_rate_per_min
+/// 可覆盖）；实际精英率随时间线性增长并钳到 [kJourneyEliteRateCap]。
+const double kJourneyEliteRatePerMin = 0.06;
+
+/// 精英率上限：后期仍保留普通怪，避免盘面全为精英。
+const double kJourneyEliteRateCap = 0.60;
 
 /// 掉落表种子（journey_drops；4 组 11 行镜像 SQL 种子，weight=0 行
 /// 不掉落，breakable 组「空掉落」行 pickup_code 为 null）。

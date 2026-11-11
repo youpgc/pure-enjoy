@@ -85,6 +85,49 @@ class JourneyConfigSnapshot {
   /// true = 全部来自内置兜底（journey_* 表未部署或拉取失败）。
   final bool fromSeed;
 
+  /// 全局参数数值读取：numeric 列经 PostgREST 可能返回数字或字符串。
+  static double? _globalNum(Map<String, dynamic>? row, String key) {
+    final v = row?[key];
+    if (v is num) return v.toDouble();
+    if (v is String) return double.tryParse(v);
+    return null;
+  }
+
+  /// 妖王首次降临延迟（秒）；列缺失或未配值时回落内置兜底。
+  int get bossSpawnDelaySec =>
+      _globalNum(globalsRaw, 'boss_spawn_delay_sec')?.toInt() ??
+      kJourneyBossSpawnDelaySec;
+
+  /// 前期发育保护期（秒）；期间不产生精英怪。
+  int get earlyGameProtectSec =>
+      _globalNum(globalsRaw, 'early_game_protect_sec')?.toInt() ??
+      kJourneyEarlyGameProtectSec;
+
+  /// 保护期结束后精英率每分钟增量。
+  double get eliteRatePerMin =>
+      _globalNum(globalsRaw, 'elite_rate_per_min') ??
+      kJourneyEliteRatePerMin;
+
+  /// 局内强度每分钟增长斜率；列缺失或未配值回落内置兜底。
+  double get buffTimeSlope =>
+      _globalNum(globalsRaw, 'buff_time_slope') ??
+      kJourneyBuffTimeSlope;
+
+  /// 每点关卡难度的强度乘区增量。
+  double get buffLevelMult =>
+      _globalNum(globalsRaw, 'buff_level_mult') ??
+      kJourneyBuffLevelMult;
+
+  /// 生效强度乘区上限。
+  double get buffMultCap =>
+      _globalNum(globalsRaw, 'buff_mult_cap') ??
+      kJourneyBuffMultCap;
+
+  /// 怪物最终移速上限（px/s）。
+  double get monsterSpeedCap =>
+      _globalNum(globalsRaw, 'monster_speed_cap') ??
+      kJourneyMonsterSpeedCap;
+
   const JourneyConfigSnapshot({
     required this.regions,
     required this.levels,
@@ -188,6 +231,26 @@ class JourneyConfigSnapshot {
 
   /// 经验曲线每级增量（exp_per_lv）。
   double get expPerLv => _globalDouble('exp_per_lv', 7);
+
+  /// 每次升级提升的基础攻击力（level_attack_per_lv）。
+  double get levelAttackPerLv =>
+      _globalNum(globalsRaw, 'level_attack_per_lv') ?? kJourneyLevelAttackPerLv;
+
+  /// 每次升级提升的生命上限（level_hp_per_lv）。
+  double get levelHpPerLv =>
+      _globalNum(globalsRaw, 'level_hp_per_lv') ?? kJourneyLevelHpPerLv;
+
+  /// 攻击力成长卡单次提升量（upgrade_attack）。
+  double get upgradeAttack =>
+      _globalNum(globalsRaw, 'upgrade_attack') ?? kJourneyUpgradeAttack;
+
+  /// 攻击力成长卡累计提升上限（attack_upgrade_cap）。
+  double get attackUpgradeCap =>
+      _globalNum(globalsRaw, 'attack_upgrade_cap') ?? kJourneyAttackUpgradeCap;
+
+  /// 妖王血量时间项系数（boss_hp_time_k）。
+  double get bossHpTimeK =>
+      _globalNum(globalsRaw, 'boss_hp_time_k') ?? kJourneyBossHpTimeK;
 
   double _globalDouble(String key, double fallback) {
     // globals 原始行直读（列缺失/seed 快照 null 时回落内置兜底）
