@@ -29,10 +29,14 @@ part 'journey_engine_fx.dart';
 part 'journey_engine_loot.dart';
 part 'journey_engine_damage.dart';
 part 'journey_engine_spawns.dart';
+part 'journey_engine_spawns_pool.dart';
 part 'journey_engine_interact.dart';
 part 'journey_engine_grid.dart';
 part 'journey_engine_exp.dart';
 part 'journey_engine_minimap.dart';
+part 'journey_engine_bounds.dart';
+part 'journey_engine_curve.dart';
+part 'journey_engine_growth.dart';
 
 /// 西行·Flame 对局主类。
 ///
@@ -40,7 +44,7 @@ part 'journey_engine_minimap.dart';
 /// 循罗盘找到并击杀通关。接触伤害全局 0.5s 节拍。
 class JourneyFlameGame extends FlameGame
     with JourneyWeaponMixin, JourneyDamageTickMixin, JourneyLootMixin,
-        JourneySpawnMixin
+        JourneySpawnMixin, JourneyResumeGateMixin
     implements JourneyWeaponHost {
   JourneyFlameGame({
     required this.level,
@@ -104,6 +108,9 @@ class JourneyFlameGame extends FlameGame
 
   // ---- 运行状态 ----
   double _elapsed = 0, _exp = 0, _expNeed = 12;
+
+  /// 妖王首次降临倒计时（秒）：0 = 本关无据点妖王或妖王已降临。
+  double _bossSpawnCountdown = 0;
   int _charLv = 1, _kills = 0, _meritCoins = 0;
   bool _ended = false;
   bool get isEnded => _ended;
@@ -289,16 +296,15 @@ class JourneyFlameGame extends FlameGame
   double damageAmp = 1.0;
   double moveSpeedAmp = 1.0;
 
+  /// 等级成长累计的基础攻击力（每级叠加，独立于法宝品阶）。
+  double levelAttackTotal = 0;
+
+  /// 攻击力成长卡累计值（钳在 attackUpgradeCap 内）。
+  double cardAttackTotal = 0;
+
+
   /// 经验获取乘区（八戒「贪食」光环）。
   double expAmp = 1.0;
-
-  /// 局内强度随时间缓升 × 关卡难度乘区（怪物增强为主轴）。
-  double get buffMult =>
-      (1.0 + (_elapsed / 60.0) * (0.6 + level.levelNo * 0.05)) * levelMult;
-
-  /// 关卡难度乘区：game_levels.difficulty（后台可调，缺省=难号）驱动，
-  /// 每点难度 +6%；替代原先散落的 levelNo*0.03 等零散口径，全关统一乘区。
-  double get levelMult => 1.0 + level.difficulty * 0.06;
 
   /// 角色法宝内置基准伤害（分级表缺失时的兜底，_buildStarterArm 写入）。
   double weaponBaseDamage = 14.0;
@@ -377,7 +383,11 @@ class JourneyFlameGame extends FlameGame
     world.add(fxLayer);
     camera.follow(player);
 
-    spawnBossAtPost(this);
+    // 妖王首次降临延迟：留出发育窗口；每日游历/无尽妖潮无据点妖王，
+    // 不进入计时。到点在 update 内生成守卫群并播「妖王降临」横幅。
+    _bossSpawnCountdown = bossModel == null
+        ? 0
+        : (config?.bossSpawnDelaySec ?? kJourneyBossSpawnDelaySec).toDouble();
     seedInitialPack(this);
     // 面包屑铜钱：沿出生点→据点直线均匀撒 6 枚（无妖章回落随机方向）
     _seedBreadcrumbCoins();
@@ -455,6 +465,15 @@ class JourneyFlameGame extends FlameGame
       }
       if (_elapsed >= surviveTargetSec && !_bossDefeated) {
         _markClearedAvailable('坚持功成');
+      }
+    }
+
+    if (_bossSpawnCountdown > 0) {
+      _bossSpawnCountdown -= dt;
+      if (_bossSpawnCountdown <= 0) {
+        _bossSpawnCountdown = 0;
+        spawnBossAtPost(this);
+        controller.onBossSpawn(bossModel?.name ?? '妖王');
       }
     }
 

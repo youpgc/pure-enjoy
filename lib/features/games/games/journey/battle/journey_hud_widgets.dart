@@ -7,10 +7,10 @@ import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import 'journey_battle_controller.dart';
 
-/// 妖王大血条（节点11）：6+6 槽栏正下方 40px 居中位，宽 81% 屏、
-/// 金框暗底、左侧妖王名 + 红金渐变填充，300ms 宽度隐式动画。
-/// 显示条件：hasBoss 且 bossEngaged（玩家进入妖王侦测圈）且 ratio>0
-/// （开局驻守不显示，进入领地才亮；妖王倒下/脱战/无妖章回隐藏）。
+/// 妖王大血条：6+6 槽栏正下方居中，铺满横幅宽度、金框暗底、
+/// 左侧妖王名 + 红金渐变填充 + 进度条内右端绝对血量，300ms 宽度动画。
+/// 显示条件：妖王已降临且进入侦测圈且 ratio>0；未降临、脱战、
+/// 妖王倒下或无妖章回均隐藏。
 class JourneyBossHpBar extends StatelessWidget {
   const JourneyBossHpBar({super.key, required this.controller});
 
@@ -19,93 +19,117 @@ class JourneyBossHpBar extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hud = controller.hud;
-    return ValueListenableBuilder<bool>(
-      valueListenable: hud.hasBoss,
-      builder: (context, hasBoss, _) => !hasBoss
-          ? const SizedBox.shrink()
-          : ValueListenableBuilder<bool>(
-              valueListenable: hud.bossEngaged,
-              builder: (context, engaged, _) => !engaged
-                  ? const SizedBox.shrink()
-                  : ValueListenableBuilder<double>(
-                      valueListenable: hud.bossHpRatio,
-                      builder: (context, ratio, _) => ratio <= 0
-                          ? const SizedBox.shrink()
-                          : ValueListenableBuilder<String>(
-                              valueListenable: hud.bossName,
-                              builder: (context, name, _) {
-                                final label = name.isEmpty ? '妖王' : name;
-                        return Container(
-                          width: MediaQuery.of(context).size.width * 0.81,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 12,
-                            vertical: 5,
-                          ),
-                          decoration: BoxDecoration(
-                            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+    return AnimatedBuilder(
+      animation: Listenable.merge(<Listenable>[
+        hud.hasBoss,
+        hud.bossPresent,
+        hud.bossEngaged,
+        hud.bossHpRatio,
+        hud.bossName,
+        hud.bossHp,
+        hud.bossMaxHp,
+      ]),
+      builder: (context, _) {
+        if (!hud.hasBoss.value ||
+            !hud.bossPresent.value ||
+            !hud.bossEngaged.value ||
+            hud.bossHpRatio.value <= 0) {
+          return const SizedBox.shrink();
+        }
+        final ratio = hud.bossHpRatio.value;
+        final label =
+            hud.bossName.value.isEmpty ? '妖王' : hud.bossName.value;
+        final hpText = hud.bossMaxHp.value > 0
+            ? '${hud.bossHp.value}/${hud.bossMaxHp.value}'
+            : '';
+        return Container(
+          width: double.infinity,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+          decoration: BoxDecoration(
+            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+            borderRadius: BorderRadius.circular(999),
+            border: Border.all(color: JourneyTheme.gold, width: 1.4),
+          ),
+          child: Row(
+            children: <Widget>[
+              Flexible(
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: JourneyTheme.faint.copyWith(
+                    color: JourneyTheme.goldSoft,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 16,
+                  child: Stack(
+                    children: <Widget>[
+                      Positioned.fill(
+                        child: TweenAnimationBuilder<double>(
+                          tween: Tween<double>(end: ratio.clamp(0.0, 1.0)),
+                          duration: const Duration(milliseconds: 300),
+                          curve: Curves.easeOut,
+                          builder: (context, v, _) => ClipRRect(
                             borderRadius: BorderRadius.circular(999),
-                            border: Border.all(
-                              color: JourneyTheme.gold,
-                              width: 1.4,
-                            ),
-                          ),
-                          child: Row(
-                            children: [
-                              Flexible(
-                                child: Text(
-                                  label,
-                                  maxLines: 1,
-                                  overflow: TextOverflow.ellipsis,
-                                  style: JourneyTheme.faint.copyWith(
-                                    color: JourneyTheme.goldSoft,
-                                  ),
+                            child: Stack(
+                              children: <Widget>[
+                                Container(
+                                  height: 16,
+                                  color:
+                                      Colors.black.withValues(alpha: 0.45),
                                 ),
-                              ),
-                              const SizedBox(width: 10),
-                              Expanded(
-                                child: TweenAnimationBuilder<double>(
-                                  tween: Tween(end: ratio.clamp(0.0, 1.0)),
-                                  duration: const Duration(milliseconds: 300),
-                                  curve: Curves.easeOut,
-                                  builder: (context, v, _) => ClipRRect(
-                                    borderRadius: BorderRadius.circular(999),
-                                    child: Stack(
-                                      children: [
-                                        Container(
-                                          height: 10,
-                                          color: Colors.black
-                                              .withValues(alpha: 0.45),
+                                Align(
+                                  alignment: Alignment.centerLeft,
+                                  child: FractionallySizedBox(
+                                    widthFactor: v.clamp(0.0, 1.0),
+                                    child: Container(
+                                      height: 16,
+                                      decoration: const BoxDecoration(
+                                        gradient: LinearGradient(
+                                          colors: <Color>[
+                                            Color(0xFFB93A4A),
+                                            Color(0xFFE8C470),
+                                          ],
                                         ),
-                                        Align(
-                                          alignment: Alignment.centerLeft,
-                                          child: FractionallySizedBox(
-                                            widthFactor:
-                                                v.clamp(0.0, 1.0),
-                                            child: Container(
-                                              height: 10,
-                                              decoration: const BoxDecoration(
-                                                gradient: LinearGradient(
-                                                  colors: <Color>[
-                                                    Color(0xFFB93A4A),
-                                                    Color(0xFFE8C470),
-                                                  ],
-                                                ),
-                                              ),
-                                            ),
-                                          ),
-                                        ),
-                                      ],
+                                      ),
                                     ),
                                   ),
                                 ),
-                              ),
-                            ],
+                              ],
+                            ),
                           ),
-                        );
-                      },
-                    ),
+                        ),
+                      ),
+                      if (hpText.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              hpText,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                shadows: <Shadow>[
+                                  Shadow(color: Colors.black, blurRadius: 3),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
                   ),
-            ),
+                ),
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 }

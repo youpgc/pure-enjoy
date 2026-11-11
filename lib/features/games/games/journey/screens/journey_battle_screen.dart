@@ -18,6 +18,9 @@ import '../battle/journey_sprites.dart';
 import '../battle/journey_levelup_sheet.dart';
 import '../battle/journey_settlement_sheet.dart';
 import '../battle/journey_hud_overlay.dart';
+import '../battle/journey_hit_vignette.dart';
+import '../widgets/journey_busy.dart';
+import '../battle/journey_settle_button.dart';
 
 /// 局内对局页：Flame 战斗 + HUD 覆盖层 + 虚拟摇杆 + 升级/结算弹窗。
 ///
@@ -249,16 +252,19 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     // 首通判定：通关且超越进关时的最远记录（与引擎发奖口径一致）。
     final firstClear =
         cleared && widget.level.levelNo > (_controller?.farthestAtStart ?? 0);
-    final (granted, earnedPoint) =
-        await JourneyProgressService.instance.settleRun(
-      merit: result.meritTotal,
-      kills: kills,
-      levelNo: widget.level.levelNo,
-      durationMs: durationSec * 1000,
-      cleared: cleared,
-      kind: widget.level.levelNo > 0 ? 'mainline' : widget.level.kind,
-      // 对局记录标题统一带关号（与结算浮层同源）
-      levelTitle: result.levelTitle,
+    final (granted, earnedPoint) = await JourneyBusy.run(
+      context,
+      () => JourneyProgressService.instance.settleRun(
+        merit: result.meritTotal,
+        kills: kills,
+        levelNo: widget.level.levelNo,
+        durationMs: durationSec * 1000,
+        cleared: cleared,
+        kind: widget.level.levelNo > 0 ? 'mainline' : widget.level.kind,
+        // 对局记录标题统一带关号（与结算浮层同源）
+        levelTitle: result.levelTitle,
+      ),
+      label: '结算中…',
     );
     // 每日游历 gate 已在进关入口写入（进入即计次，主动放弃同样占次），
     // 此处不再重复写。
@@ -284,6 +290,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       result: result,
       meritGranted: _lastGranted,
       firstClear: _lastFirstClear,
+      allowRetry: widget.level.kind != 'daily',
       onRetry: () {
         _lastResult = null; // 出口按钮已处理，关闭后无需重弹
         Navigator.of(context).pop(); // 关结算浮层
@@ -325,11 +332,17 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
   }
 
   /// 属性详情面板：顶部状态面板与暂停菜单共用同一 sheet。
+  /// 查看属性先进入暂停浮层（引擎暂停、摇杆输入清空），关闭属性窗口后
+  /// 仍保持暂停态，由浮层「继续战斗」统一恢复。
   void _showAttributes() {
     final game = _game;
-    if (game != null && mounted) {
-      JourneyAttributesSheet.show(context, game: game);
+    if (game == null || !mounted) return;
+    if (!_paused) {
+      setState(() => _paused = true);
+      game.pauseEngine();
+      _controller?.input.reset();
     }
+    JourneyAttributesSheet.show(context, game: game);
   }
 
   void _onBossSpawn(String bossName) {
@@ -366,9 +379,14 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
 
   @override
   Widget build(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
+    final topInset = MediaQuery.of(context).viewPadding.top;
+    final bottoms = journeyControlBottoms(screenH: screenH, topInset: topInset);
+    final double pauseBottom = bottoms.$1;
+    final settleBottom = bottoms.$2;
     // 全屏沉浸：不包 SafeArea（状态栏/手势区也画游戏与蒙层，修「蒙层
-    // 上下留白」）；DefaultTextStyle 显式无装饰（文字继承链路出现金色
-    // 下划线，对局内一律无下划线）。
+    // 上下留白」），HUD 自行下移状态栏高度；DefaultTextStyle 显式无装饰
+    // （文字继承链路出现金色下划线，对局内一律无下划线）。
     return Container(
       color: JourneyTheme.bgDeep,
       child: DefaultTextStyle(
@@ -381,6 +399,11 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
               const Center(
                 child: JourneyLoading(label: '进入此难…'),
               ),
+            // 受击提醒：屏幕边缘泛红呼吸，位于 HUD 之下不遮挡信息
+            if (_controller != null)
+              Positioned.fill(
+                child: JourneyHitVignette(controller: _controller!),
+              ),
             // HUD 覆盖层（头像/血条/经验/状态行 + 槽栏 + 妖王罗盘 + 大血条/小地图/横幅）
             if (_controller != null)
               JourneyHudOverlay(
@@ -388,72 +411,28 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
                 characterCode: _characterCode,
                 onTopPanelTap: _showAttributes,
               ),
-            // 虚拟摇杆（左下，动态浮现；手势状态由组件自管）
+            // 虚拟摇杆（下半屏任意触点按下；手势状态由组件自管）
             if (_controller != null)
-              JourneyJoystick(controller: _controller!),
-            // 暂停按钮（右下角摇杆操作区上方，让开常用拇指区；
-            // 独立覆盖层叠在摇杆触控区之上，命中优先暂停；触控区 56 +
-            // 图标 40 放大辨识度，与小地图（bottom:210 起）不重叠）
-            if (_controller != null)
-              Positioned(
-                right: 16,
-                bottom: 150,
-                child: SizedBox(
-                  width: 56,
-                  height: 56,
-                  child: IconButton(
-                    onPressed: _togglePause,
-                    padding: EdgeInsets.zero,
-                    icon: const Icon(Icons.pause_circle_outline,
-                        color: JourneyTheme.textPrimary, size: 40),
-                  ),
-                ),
+              JourneyJoystick(
+                controller: _controller!,
+                onEngage: _onJoystickEngage,
               ),
-            // 「结算」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
+            // 暂停按钮：叠在摇杆触控区之上，命中优先按钮；与功成按钮
+            // 同款圆形底板，位置随摇杆区顶边上移
+            if (_controller != null)
+              JourneyPauseButton(onTap: _togglePause, bottom: pauseBottom),
+            // 「功成」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
             // 功成/无尽末波）后亮出，点击即主动结算；未满足时隐藏
             if (_controller != null)
               ValueListenableBuilder<bool>(
                 valueListenable: _controller!.hud.bossDefeated,
-              builder: (context, available, _) => available
-                  ? Positioned(
-                      right: 16,
-                      bottom: 218,
-                      child: Material(
-                        color: Colors.transparent,
-                        child: InkWell(
-                          onTap: _earlySettle,
-                          borderRadius: BorderRadius.circular(28),
-                          child: Container(
-                            width: 56,
-                            height: 56,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              gradient: const LinearGradient(
-                                begin: Alignment.topCenter,
-                                end: Alignment.bottomCenter,
-                                colors: <Color>[
-                                  JourneyTheme.goldSoft,
-                                  JourneyTheme.gold,
-                                ],
-                              ),
-                              border: Border.all(
-                                  color: JourneyTheme.goldDeep, width: 1),
-                            ),
-                            alignment: Alignment.center,
-                            child: const Text(
-                              '结算',
-                              style: TextStyle(
-                                fontSize: 15,
-                                fontWeight: FontWeight.bold,
-                                color: Color(0xFF3A2A12),
-                              ),
-                            ),
-                          ),
-                        ),
-                      ),
-                    )
-                  : const SizedBox.shrink(),
-            ),
+                builder: (context, available, _) => available
+                    ? JourneySettleButton(
+                        onTap: _earlySettle,
+                        bottom: settleBottom,
+                      )
+                    : const SizedBox.shrink(),
+              ),
             if (_paused)
               JourneyPauseOverlay(
                 onResume: _togglePause,
@@ -484,7 +463,10 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     } else {
       // 升级选卡造成的引擎暂停不在此恢复：选卡期间世界必须静止，
       // 恢复由最后一张选卡后的 applyUpgrade 负责。
-      if (!game.isPausedForLevelUp) game.resumeEngine();
+      if (!game.isPausedForLevelUp) game.armJoystickResume();
     }
   }
+
+  /// 玩家按下摇杆：结束等待接管态，正式恢复对局运行。
+  void _onJoystickEngage() => _game?.resumeFromJoystick();
 }

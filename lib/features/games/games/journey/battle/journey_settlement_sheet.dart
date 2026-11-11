@@ -13,6 +13,7 @@ class JourneySettlementSheet extends StatelessWidget {
     required this.firstClear,
     required this.onRetry,
     required this.onExit,
+    this.allowRetry = true,
   });
 
   final JourneyRunResult result;
@@ -21,6 +22,9 @@ class JourneySettlementSheet extends StatelessWidget {
   final VoidCallback onRetry;
   final VoidCallback onExit;
 
+  /// 每日游历不提供「再战此难」（进入即计次，次数有限）。
+  final bool allowRetry;
+
   static Future<void> show(
     BuildContext context, {
     required JourneyRunResult result,
@@ -28,6 +32,7 @@ class JourneySettlementSheet extends StatelessWidget {
     required bool firstClear,
     required VoidCallback onRetry,
     required VoidCallback onExit,
+    bool allowRetry = true,
   }) {
     return showModalBottomSheet<void>(
       context: context,
@@ -44,6 +49,7 @@ class JourneySettlementSheet extends StatelessWidget {
           firstClear: firstClear,
           onRetry: onRetry,
           onExit: onExit,
+          allowRetry: allowRetry,
         ),
       ),
     );
@@ -105,14 +111,15 @@ class JourneySettlementSheet extends StatelessWidget {
             const SizedBox(height: 14),
             Row(
               children: <Widget>[
-                Expanded(
-                  child: JourneyButton(
-                    text: '再战此难',
-                    secondary: true,
-                    onTap: onRetry,
+                if (allowRetry)
+                  Expanded(
+                    child: JourneyButton(
+                      text: '再战此难',
+                      secondary: true,
+                      onTap: onRetry,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 10),
+                if (allowRetry) const SizedBox(width: 10),
                 Expanded(
                   child: JourneyButton(
                     text: cleared ? '继续西行' : '返回',

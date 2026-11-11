@@ -14,9 +14,16 @@ import 'journey_battle_controller.dart';
 /// 虚拟摇杆（左下角，触点动态浮现）：拖移驱动摇杆帽，输入向量直写
 /// controller.input（引擎每帧读取），本组件自管手势状态。
 class JourneyJoystick extends StatefulWidget {
-  const JourneyJoystick({super.key, required this.controller});
+  const JourneyJoystick({
+    super.key,
+    required this.controller,
+    this.onEngage,
+  });
 
   final JourneyBattleController controller;
+
+  /// 玩家按下摇杆：对局页据此结束等待接管态并恢复对局运行。
+  final VoidCallback? onEngage;
 
   @override
   State<JourneyJoystick> createState() => _JourneyJoystickState();
@@ -46,9 +53,11 @@ class _JourneyJoystickState extends State<JourneyJoystick> {
 
   @override
   Widget build(BuildContext context) {
+    final screenH = MediaQuery.of(context).size.height;
     return Positioned(
       left: 0,
       right: 0,
+      top: screenH / 2,
       bottom: 0,
       child: LayoutBuilder(
         builder: (context, constraints) {
@@ -64,7 +73,6 @@ class _JourneyJoystickState extends State<JourneyJoystick> {
             onPanUpdate: _onStickUpdate,
             onPanEnd: _onStickEnd,
             child: Container(
-              height: 170,
               color: Colors.transparent,
               child: _stickBase == null
                   ? const SizedBox.expand()
@@ -108,6 +116,7 @@ class _JourneyJoystickState extends State<JourneyJoystick> {
           Offset(clampX(d.localPosition.dx), clampY(d.localPosition.dy));
       _stickDelta = Offset.zero;
     });
+    widget.onEngage?.call();
   }
 }
 

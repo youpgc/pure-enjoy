@@ -133,6 +133,9 @@ class JourneyBattleHud {
   /// 法宝槽位变更计数：入槽/升级后 +1，槽栏监听重建（读 controller 槽表）。
   final ValueNotifier<int> slotsRevision = ValueNotifier<int>(0);
 
+  /// 等待玩家接管摇杆：点继续/选卡后世界仍时停，按下摇杆才恢复。
+  final ValueNotifier<bool> awaitingJoystick = ValueNotifier<bool>(false);
+
   /// 里程碑播报（milestone 参照物接近触发，同一参照物只报一次；
   /// null=无播报，对局页监听展示后可清回 null）。
   final ValueNotifier<String?> milestoneText = ValueNotifier<String?>(null);
@@ -148,6 +151,17 @@ class JourneyBattleHud {
   final ValueNotifier<String> bossName = ValueNotifier<String>('');
   final ValueNotifier<bool> bossEngaged = ValueNotifier<bool>(false);
 
+  /// 受击脉冲计数：玩家每次有效受击 +1，屏幕边框呼吸灯据此重启动画。
+  final ValueNotifier<int> hitPulse = ValueNotifier<int>(0);
+
+  /// 妖王绝对血量（当前/上限）：大血条内右侧的数值展示；
+  /// 未降临或已倒下时当前值为 0。
+  final ValueNotifier<int> bossHp = ValueNotifier<int>(0);
+  final ValueNotifier<int> bossMaxHp = ValueNotifier<int>(0);
+
+  /// 妖王已降临且未伏诛：罗盘导航与小地图标记的共同显隐依据。
+  final ValueNotifier<bool> bossPresent = ValueNotifier<bool>(false);
+
   /// 妖王罗盘·据点基准距离（出生点到据点，进关时引擎写入一次）：
   /// 罗盘距离文案=接近度 × 基准距离换算「里」（1 里=25 世界单位）。
   final ValueNotifier<double> bossStartDist = ValueNotifier<double>(1);
@@ -162,12 +176,12 @@ class JourneyBattleHud {
 }
 
 /// 小地图采样快照（节点11）：怪点=相对玩家的世界偏移（≤span，上限 60）；
-/// bossPos=相对玩家的偏移（超范围用 bearing 方向 ×span 近似点，骷髅常显）。
+/// bossPos=相对玩家的偏移（超范围时按 bearing 方向贴窗缘）。
 class JourneyMinimapData {
   /// 玩家世界坐标（备用参考位；渲染以偏移为准）。
   final Vector2 playerPos;
 
-  /// 妖王相对玩家的偏移（null=本关无妖王）。
+  /// 妖王相对玩家的偏移（null = 未降临或已清剿）。
   final Vector2? bossPos;
 
   /// 相对玩家的怪物偏移（上限 60，均在 span 内）。
@@ -194,6 +208,7 @@ enum JourneyUpgradeKind {
   maxHp,
   regen,
   pickupRange,
+  attack, // 基础攻击力成长（累计达上限后不再入池）
 }
 
 class JourneyUpgradeChoice {

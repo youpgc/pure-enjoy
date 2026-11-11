@@ -35,10 +35,12 @@ class JourneyHudOverlay extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    // 状态栏与摄像头挖孔区不画 HUD：整块内容下移安全区高度，内部相对间距不变
+    final safeTop = MediaQuery.of(context).viewPadding.top;
     return Stack(
       children: <Widget>[
         Positioned(
-          top: 8,
+          top: safeTop + 8,
           left: 10,
           // 信息栏自适应宽度：右缘与右侧小地图列（132+12）保持 20px 间距
           right: 164,
@@ -51,28 +53,47 @@ class JourneyHudOverlay extends StatelessWidget {
           ),
         ),
         Positioned(
-          top: _kSlotBarTop,
+          top: safeTop + _kSlotBarTop,
           left: 10,
           child: JourneyHudSlotBar(controller: controller),
         ),
         // 妖王大血条：6+6 槽栏正下方 40px，水平居中，宽 81% 屏
         Positioned(
-          top: _kSlotBarTop + _kSlotBarHeight + _kBossBarGap,
+          top: safeTop + _kSlotBarTop + _kSlotBarHeight + _kBossBarGap,
           left: 0,
           right: 0,
           child: Center(child: JourneyBossHpBar(controller: controller)),
         ),
         // 小地图点阵窗：右上角（原罗盘位）；罗盘移至其正下方
         Positioned(
-          top: 8,
+          top: safeTop + 8,
           right: 12,
           child: JourneyMinimapWindow(controller: controller),
         ),
         // 对局横幅（节点11）：开场难名/妖王降临/里程碑共用位
         JourneyBattleBanner(controller: controller),
+        // 等待接管摇杆：世界仍时停，提示玩家按下即继续
+        ValueListenableBuilder<bool>(
+          valueListenable: controller.hud.awaitingJoystick,
+          builder: (context, waiting, _) => waiting
+              ? const Align(
+                  alignment: Alignment(0, 0.2),
+                  child: IgnorePointer(
+                    child: Text(
+                      '拖动摇杆 · 继续战斗',
+                      style: TextStyle(
+                        fontSize: 13,
+                        color: JourneyTheme.gold,
+                        decoration: TextDecoration.none,
+                      ),
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
+        ),
         Positioned(
           // 罗盘在小地图（132 高 + 上下间距）正下方
-          top: 150,
+          top: safeTop + 150,
           right: 12,
           child: _Compass(controller: controller),
         ),
@@ -233,7 +254,7 @@ class _HudPanel extends StatelessWidget {
   }
 }
 
-/// 妖王罗盘：箭头指向妖王据点 + 距离接近度文案。
+/// 妖王罗盘：箭头指向妖王据点 + 距离接近度文案；无有效引导信息时整块隐藏。
 /// 无妖章回（hasBoss=false）：切换为坚持通关倒计时。
 class _Compass extends StatelessWidget {
   const _Compass({required this.controller});
@@ -246,12 +267,19 @@ class _Compass extends StatelessWidget {
       valueListenable: controller.hud.hasBoss,
       builder: (context, hasBoss, _) => hasBoss
           ? ValueListenableBuilder<bool>(
-              // 清剿结束（末场伏诛/坚持功成）：移除妖王距离导航；
-              // 多场战（三打白骨精等）重生期间 bossDefeated 未置位，
-              // 导航保持指向，全部击败才消失。
-              valueListenable: controller.hud.bossDefeated,
-              builder: (context, defeated, _) =>
-                  defeated ? const SizedBox.shrink() : _bossCompass(controller),
+              // 妖王未降临时没有可导航的目标，整块隐藏
+              valueListenable: controller.hud.bossPresent,
+              builder: (context, present, _) => !present
+                  ? const SizedBox.shrink()
+                  : ValueListenableBuilder<bool>(
+                      // 清剿结束（末场伏诛/坚持功成）：移除妖王距离导航；
+                      // 多场战（三打白骨精等）重生期间 bossDefeated 未置位，
+                      // 导航保持指向，全部击败才消失。
+                      valueListenable: controller.hud.bossDefeated,
+                      builder: (context, defeated, _) => defeated
+                          ? const SizedBox.shrink()
+                          : _bossCompass(controller),
+                    ),
             )
           : _surviveCountdown(controller),
     );
@@ -323,7 +351,7 @@ class _Compass extends StatelessWidget {
   }
 
   /// 无妖章回：坚持满时长即功成（倒计时圆盘 + 剩余秒文案）；
-  /// 无尽妖潮（endlessWave>0）：同位展示当前波数。
+  /// 倒计时归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
   Widget _surviveCountdown(JourneyBattleController controller) {
     final hud = controller.hud;
     return ValueListenableBuilder<int>(
@@ -332,42 +360,46 @@ class _Compass extends StatelessWidget {
           ? _endlessWaveView(wave)
           : ValueListenableBuilder<int>(
               valueListenable: hud.surviveLeft,
-              builder: (context, left, _) => Column(
-                children: <Widget>[
-                  Container(
-                    width: 58,
-                    height: 58,
-                    alignment: Alignment.center,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-                      border: Border.all(
-                          color: JourneyTheme.gold.withValues(alpha: 0.85),
-                          width: 1.6),
-                    ),
-                    child: const Icon(Icons.hourglass_bottom,
-                        color: JourneyTheme.gold, size: 28),
-                  ),
-                  const SizedBox(height: 3),
-                  Container(
-                    padding: const EdgeInsets.symmetric(
-                        horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
-                      borderRadius: BorderRadius.circular(6),
-                    ),
-                    child: Text(
-                      '此难无妖 · 坚持 ${left}s',
-                      style: const TextStyle(
-                        fontSize: 11,
-                        color: JourneyTheme.textPrimary,
-                        fontWeight: FontWeight.w600,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
+              builder: (context, left, _) =>
+                  left <= 0 ? const SizedBox.shrink() : _surviveView(left),
             ),
+    );
+  }
+
+  Widget _surviveView(int left) {
+    return Column(
+      children: <Widget>[
+        Container(
+          width: 58,
+          height: 58,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+            border: Border.all(
+                color: JourneyTheme.gold.withValues(alpha: 0.85),
+                width: 1.6),
+          ),
+          child: const Icon(Icons.hourglass_bottom,
+              color: JourneyTheme.gold, size: 28),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            '此难无妖 · 坚持 ${left}s',
+            style: const TextStyle(
+              fontSize: 11,
+              color: JourneyTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
     );
   }
 
