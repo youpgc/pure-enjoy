@@ -58,7 +58,16 @@ void _removeEntry() {
   final entry = _toastEntry;
   _toastEntry = null;
   _toastKey = null;
-  if (entry != null && entry.mounted) entry.remove();
+  // 不以 entry.mounted 作移除门槛：该属性语义是「条目 State 已构建」而非
+  // 「已插入」，插入后首帧构建前仍为 false，会漏移除致残留。remove() 对
+  // 未构建条目安全（仅从 _entries 摘除并标记重建）。
+  if (entry != null) {
+    try {
+      entry.remove();
+    } catch (_) {
+      // 条目已被 Overlay 自行回收时忽略
+    }
+  }
 }
 
 class _PetToastView extends StatefulWidget {

@@ -52,7 +52,18 @@ abstract final class JourneyBusy {
     } finally {
       finished = true;
       timer.cancel();
-      if (inserted && entry.mounted) entry.remove();
+      // 只要已插入就移除，不得以 entry.mounted 作为门槛：mounted 在本 SDK
+      // 语义为「条目 State 已构建」而非「已插入」，插入后首帧构建前仍为
+      // false——任务恰在插入与首帧构建之间完成时会跳过移除，遮罩永久残留
+      // （rootOverlay 级、跨页面不消失）。remove() 对未构建条目安全：仅从
+      // _entries 移除并标记脏重建，不会触碰未挂载的 State。
+      if (inserted) {
+        try {
+          entry.remove();
+        } catch (_) {
+          // 极端时序下条目已被 Overlay 自行回收，无需处理
+        }
+      }
     }
   }
 }
