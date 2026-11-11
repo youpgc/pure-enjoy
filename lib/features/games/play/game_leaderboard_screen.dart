@@ -16,7 +16,7 @@ import '../shared/game_local_loading.dart';
 /// 数据源 `get_game_leaderboard` RPC（security definer 跨玩家聚合）：
 /// - 总榜 / 周榜（北京自然周，周一 0 点重置）双榜切换；
 /// - 模式筛选（全部模式 / 单模式，含自由模式）；
-/// - 排行维度 = 该游戏唯一计分维度（sheep=level，其余=score，后台配置驱动）；
+/// - 排行维度 = 该游戏主维度（is_primary：西行=farthest_level、g2048/match3/tetris=score、sheep=level，后台配置驱动）；
 /// - 仅展示 昵称/头像/最佳值/游玩次数/最近游玩，不含其他敏感字段；
 /// - 底部常驻「我的排名」（不在榜内显示未上榜）。
 class GameLeaderboardScreen extends StatefulWidget {
@@ -75,7 +75,7 @@ class _GameLeaderboardScreenState extends State<GameLeaderboardScreen> {
   /// 模式筛选：null=全部模式
   String? _modeId;
 
-  /// 排行维度码（后台配置驱动：sheep=level，其余=score）
+  /// 排行维度码（后台主维度配置驱动：西行=farthest_level、sheep=level、g2048/match3/tetris=score）
   String? _dimension;
   String? _dimensionName;
 
@@ -104,9 +104,11 @@ class _GameLeaderboardScreenState extends State<GameLeaderboardScreen> {
           .where((d) => d.enabled)
           .toList(growable: false);
       GameDimensionModel? dim;
+      // 排行维度 = 该游戏的「主维度」(is_primary，任意 code 均可；
+      // 如西行=farthest_level、g2048/match3/tetris=score、sheep=level)。
+      // 旧式 score/level 码仅在无主维度时兜底，保持向后兼容。
       for (final d in dims) {
-        if (d.isPrimary &&
-            (d.code == 'score' || d.code == 'level')) {
+        if (d.isPrimary) {
           dim = d;
           break;
         }
