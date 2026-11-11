@@ -9,6 +9,7 @@ import '../services/journey_progress_service.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_busy.dart';
 
 /// S4 取经队伍（角色选择/图鉴）。
 ///
@@ -86,7 +87,11 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
       onTap: unlocked
           ? () async {
               // 走服务层：持久化出战选择（直接写字段会在重启后丢失）
-              await progress.selectCharacter(c.code);
+              await JourneyBusy.run(
+                context,
+                () => progress.selectCharacter(c.code),
+                label: '切换中…',
+              );
               if (mounted) setState(() {});
             }
           : (canUnlock ? () => _unlock(c) : null),
@@ -260,9 +265,17 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     );
     if (confirmed != true) return;
     final progress = JourneyProgressService.instance;
-    final ok =
-        await progress.unlockCharacter(c.code, meritCost: c.unlockMeritCost);
-    await _load();
+    if (!mounted) return;
+    final ok = await JourneyBusy.run(
+      context,
+      () async {
+        final unlocked = await progress.unlockCharacter(c.code,
+            meritCost: c.unlockMeritCost);
+        await _load();
+        return unlocked;
+      },
+      label: '请人中…',
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(

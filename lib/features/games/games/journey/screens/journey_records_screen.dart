@@ -6,6 +6,7 @@ import '../services/journey_progress_service.dart';
 import '../services/journey_progress_sync.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
+import '../widgets/journey_loading.dart';
 
 /// 西行履历（三页拆分，hub 独立入口）：功德流水 / 对局记录 / 成就
 /// （本地流水，新的在前，上限 50）。共享格式化与来源标签。
@@ -223,6 +224,7 @@ class JourneyAchievementsScreen extends StatefulWidget {
 class _JourneyAchievementsScreenState extends State<JourneyAchievementsScreen> {
   /// 成就定义行（节点10）：gameId 拉取 game_achievements（内存缓存）。
   List<JourneyAchievementDef> _achievements = const <JourneyAchievementDef>[];
+  bool _loading = true;
 
   @override
   void initState() {
@@ -237,11 +239,20 @@ class _JourneyAchievementsScreenState extends State<JourneyAchievementsScreen> {
     final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
     final defs = await JourneyProgressSync.fetchAchievements(gameId);
     if (!mounted) return;
-    setState(() => _achievements = defs);
+    setState(() {
+      _achievements = defs;
+      _loading = false;
+    });
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loading) {
+      return const JourneyPageScaffold(
+        title: '成就',
+        body: Center(child: JourneyLoading(label: '加载中…')),
+      );
+    }
     final unlocked = JourneyProgressService.instance.state.unlockedAchievements;
     return JourneyPageScaffold(
       title: '成就',

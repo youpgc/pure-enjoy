@@ -8,6 +8,7 @@ import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import 'journey_battle_screen.dart';
+import '../widgets/journey_busy.dart';
 
 /// S3-2 每日游历·地图选择页（hub「每日游历」入口直达）。
 ///
@@ -155,8 +156,12 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
   Future<void> _startDaily(JourneyDailyMapModel map) async {
     if (_dailyPlayed) return;
     // 进入即计次：先写当日 gate 再进对局（主动放弃同样占次）
-    await CacheHelper.instance.saveMap('journey_daily_v1',
-        <String, dynamic>{'date': journeyBjDateKey()});
+    await JourneyBusy.run(
+      context,
+      () => CacheHelper.instance.saveMap('journey_daily_v1',
+          <String, dynamic>{'date': journeyBjDateKey()}),
+      label: '准备游历…',
+    );
     if (!mounted) return;
     setState(() => _dailyPlayed = true);
     await Navigator.of(context).push(

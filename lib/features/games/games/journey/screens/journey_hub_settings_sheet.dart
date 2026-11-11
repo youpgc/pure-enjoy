@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../../../../../utils/cache_helper.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
+import '../widgets/journey_busy.dart';
 
 /// 西行设置浮层（音乐/音效开关，本地 CacheHelper 持久化）。
 /// 自 hub 抽出独立文件以控制 hub 页行数（≤500 约定）。
@@ -44,17 +45,25 @@ class _JourneySettingsSheetState extends State<JourneySettingsSheet> {
   }
 
   Future<void> _save() async {
-    await CacheHelper.instance.saveMap(_storeKey, <String, dynamic>{
-      'music': _music,
-      'sfx': _sfx,
-    });
+    await JourneyBusy.run(
+      context,
+      () => CacheHelper.instance.saveMap(_storeKey, <String, dynamic>{
+        'music': _music,
+        'sfx': _sfx,
+      }),
+      label: '保存中…',
+    );
   }
 
   /// 旋转方向即时写缓存（下一次进局生效）。
   Future<void> _saveSpinDir(bool clockwise) async {
-    await CacheHelper.instance.saveMap(_spinKey, <String, dynamic>{
-      'dir': clockwise ? 'cw' : 'ccw',
-    });
+    await JourneyBusy.run(
+      context,
+      () => CacheHelper.instance.saveMap(_spinKey, <String, dynamic>{
+        'dir': clockwise ? 'cw' : 'ccw',
+      }),
+      label: '保存中…',
+    );
   }
 
   @override

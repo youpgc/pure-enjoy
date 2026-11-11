@@ -8,6 +8,7 @@ import '../services/journey_progress_sync.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_busy.dart';
 
 /// S6 法宝图鉴页（节点9 解锁链路）：功德+达成条件混合解锁口径的展示层。
 ///
@@ -69,25 +70,29 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     if (_unlocking) return;
     _unlocking = true;
     try {
-      final progress = JourneyProgressService.instance;
-      await progress.evaluateAchievements();
-      _refreshProgress();
-      final relic = _config?.relicOf(w.code);
-      // 无成就配置（achievement_code 空）= 纯功德直购，跳过成就判定
-      final achieved = relic == null ||
-          relic.achievementCode.isEmpty ||
-          _unlockedAchievements.contains(relic.achievementCode);
-      if (!achieved) {
-        _toast('成就未达成，暂无法解锁');
-        return;
-      }
-      final ok = await progress.unlockWeaponWithMerit(w.code);
-      _refreshProgress();
-      _toast(ok ? '「${w.name}」已入池' : '功德不足，暂无法解锁');
-      if (ok && mounted) setState(() {});
+      await JourneyBusy.run(context, () => _unlockFlow(w), label: '解锁中…');
     } finally {
       _unlocking = false;
     }
+  }
+
+  Future<void> _unlockFlow(JourneyWeaponModel w) async {
+    final progress = JourneyProgressService.instance;
+    await progress.evaluateAchievements();
+    _refreshProgress();
+    final relic = _config?.relicOf(w.code);
+    // 无成就配置（achievement_code 空）= 纯功德直购，跳过成就判定
+    final achieved = relic == null ||
+        relic.achievementCode.isEmpty ||
+        _unlockedAchievements.contains(relic.achievementCode);
+    if (!achieved) {
+      _toast('成就未达成，暂无法解锁');
+      return;
+    }
+    final ok = await progress.unlockWeaponWithMerit(w.code);
+    _refreshProgress();
+    _toast(ok ? '「${w.name}」已入池' : '功德不足，暂无法解锁');
+    if (ok && mounted) setState(() {});
   }
 
   String _achievementName(String code) {

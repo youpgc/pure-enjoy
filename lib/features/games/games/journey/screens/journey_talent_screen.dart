@@ -8,6 +8,7 @@ import '../services/journey_progress_service.dart';
 import '../widgets/journey_loading.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
+import '../widgets/journey_busy.dart';
 
 /// S5 五行天赋页（角色专属树 · v3 线性层制）。
 ///
@@ -401,11 +402,18 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
           .showSnackBar(SnackBar(content: Text(reason)));
       return;
     }
-    final ok = await service.spendTalent(_char, element, branch);
+    final ok = await JourneyBusy.run(
+      context,
+      () async {
+        final lit = await service.spendTalent(_char, element, branch);
+        if (lit) await _load();
+        return lit;
+      },
+      label: '点亮中…',
+    );
     if (!mounted) return;
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text(ok ? '已点亮' : '点亮未成功')),
     );
-    if (ok) await _load();
   }
 }
