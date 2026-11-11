@@ -209,6 +209,20 @@ abstract final class JourneyPromptSheets {
     );
   }
 
+  /// 退出对局确认：返回 true=确认退出（放弃本局进度）；false=继续游戏。
+  static Future<bool> showQuitConfirm(BuildContext context) {
+    return _show(
+      context,
+      title: '退出对局',
+      lines: const <String>[
+        '确定要退出当前对局吗？',
+        '本局进度将不会保存',
+      ],
+      confirmText: '退出对局',
+      cancelText: '继续游戏',
+    );
+  }
+
   static Future<bool> _show(
     BuildContext context, {
     required String title,

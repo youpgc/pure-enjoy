@@ -11,6 +11,7 @@ import 'journey_battle_setup.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_loading.dart';
 import '../battle/journey_battle_controller.dart';
+import '../battle/journey_battle_exit.dart';
 import '../battle/journey_battle_overlays.dart';
 import '../battle/journey_attributes_sheet.dart';
 import '../battle/journey_flame_game.dart';
@@ -35,7 +36,7 @@ class JourneyBattleScreen extends StatefulWidget {
 }
 
 class _JourneyBattleScreenState extends State<JourneyBattleScreen>
-    with WidgetsBindingObserver {
+    with WidgetsBindingObserver, JourneyBattleExitMixin<JourneyBattleScreen> {
   JourneyFlameGame? _game;
   JourneyBattleController? _controller;
 
@@ -45,6 +46,16 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
   bool _loading = true;
   bool _paused = false;
   int _runNonce = 0;
+
+  // 退出拦截 mixin 所需的运行态（见 journey_battle_exit.dart）。
+  @override
+  JourneyFlameGame? get exitGame => _game;
+
+  @override
+  JourneyBattleController? get exitController => _controller;
+
+  @override
+  bool get exitPaused => _paused;
 
   /// 出战角色 code（HUD 顶部头像用；配置异常兜底时保持默认）。
   String _characterCode = 'tang';
@@ -143,8 +154,8 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     _runNonce++;
     // 单关运行时配置（波次/热区/参照物）：远端行 id 为空（内置兜底关卡）
     // 时返回空配置，引擎走兜底刷怪——按需拉取，不预载全关卡。
-    final runtime = await JourneyConfigService.instance
-        .fetchLevelRuntime(widget.level.id);
+    final runtime =
+        await JourneyConfigService.instance.fetchLevelRuntime(widget.level.id);
     if (!mounted) return;
     // 局外设置：环绕旋转方向（hub 设置面板可切换，默认顺时针）
     final spinRaw = await CacheHelper.instance.loadMap('journey_spin_dir');
@@ -308,7 +319,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
       onExit: () {
         _lastResult = null;
         // 结算退出直达西行主页（结算浮层随 popUntil 一并出栈）
-        _popToHub();
+        popToHub();
       },
     ).then((_) {
       if (!mounted) return;
@@ -321,14 +332,6 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
         });
       }
     });
-  }
-
-  /// 退回西行主页：沿途弹掉结算/暂停浮层与对局、关卡选择页。
-  /// isFirst 保底：路由名缺失时至少停在栈根，避免把整栈弹空。
-  void _popToHub() {
-    Navigator.of(context).popUntil(
-      (r) => r.settings.name == 'journey_hub' || r.isFirst,
-    );
   }
 
   /// 属性详情面板：顶部状态面板与暂停菜单共用同一 sheet。
@@ -387,67 +390,77 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     // 全屏沉浸：不包 SafeArea（状态栏/手势区也画游戏与蒙层，修「蒙层
     // 上下留白」），HUD 自行下移状态栏高度；DefaultTextStyle 显式无装饰
     // （文字继承链路出现金色下划线，对局内一律无下划线）。
-    return Container(
-      color: JourneyTheme.bgDeep,
-      child: DefaultTextStyle(
-        style: const TextStyle(decoration: TextDecoration.none),
-        child: Stack(
-          children: <Widget>[
-            // 战斗画布（key 随重建计数变化，保证重试时引擎完全重建）
-            if (_gameWidget != null) _gameWidget!,
-            if (_loading)
-              const Center(
-                child: JourneyLoading(label: '进入此难…'),
-              ),
-            // 受击提醒：屏幕边缘泛红呼吸，位于 HUD 之下不遮挡信息
-            if (_controller != null)
-              Positioned.fill(
-                child: JourneyHitVignette(controller: _controller!),
-              ),
-            // HUD 覆盖层（头像/血条/经验/状态行 + 槽栏 + 妖王罗盘 + 大血条/小地图/横幅）
-            if (_controller != null)
-              JourneyHudOverlay(
-                controller: _controller!,
-                characterCode: _characterCode,
-                onTopPanelTap: _showAttributes,
-              ),
-            // 虚拟摇杆（下半屏任意触点按下；手势状态由组件自管）
-            if (_controller != null)
-              JourneyJoystick(
-                controller: _controller!,
-                onEngage: _onJoystickEngage,
-              ),
-            // 暂停按钮：叠在摇杆触控区之上，命中优先按钮；与功成按钮
-            // 同款圆形底板，位置随摇杆区顶边上移
-            if (_controller != null)
-              JourneyPauseButton(onTap: _togglePause, bottom: pauseBottom),
-            // 「功成」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
-            // 功成/无尽末波）后亮出，点击即主动结算；未满足时隐藏
-            if (_controller != null)
-              ValueListenableBuilder<bool>(
-                valueListenable: _controller!.hud.bossDefeated,
-                builder: (context, available, _) => available
-                    ? JourneySettleButton(
-                        onTap: _earlySettle,
-                        bottom: settleBottom,
-                      )
-                    : const SizedBox.shrink(),
-              ),
-            if (_paused)
-              JourneyPauseOverlay(
-                onResume: _togglePause,
-                onAttributes: _showAttributes,
-                onQuit: _popToHub,
-                // 妖王伏诛后可用：提前结算（金色主按钮）
-                onEarlySettle:
-                    (_game?.bossDefeated ?? false) ? _earlySettle : null,
-              ),
-            // 三步引导（节点12）：首次进关逐页点按推进，边玩边看
-            if (_guideVisible)
-              JourneyGuideOverlay(
-                onFinished: () => setState(() => _guideVisible = false),
-              ),
-          ],
+    // PopScope 拦截系统返回键：对局中误触返回直接退出会丢进度，故改为弹
+    // 确认弹窗（确认才退出，取消留局）。程序化退出走命令式 popUntil，可
+    // 绕过本 PopScope（见 journey_battle_exit.dart 头注），故 canPop 恒 false。
+    return PopScope(
+      canPop: false,
+      onPopInvokedWithResult: (didPop, _) {
+        if (didPop) return;
+        requestQuit();
+      },
+      child: Container(
+        color: JourneyTheme.bgDeep,
+        child: DefaultTextStyle(
+          style: const TextStyle(decoration: TextDecoration.none),
+          child: Stack(
+            children: <Widget>[
+              // 战斗画布（key 随重建计数变化，保证重试时引擎完全重建）
+              if (_gameWidget != null) _gameWidget!,
+              if (_loading)
+                const Center(
+                  child: JourneyLoading(label: '进入此难…'),
+                ),
+              // 受击提醒：屏幕边缘泛红呼吸，位于 HUD 之下不遮挡信息
+              if (_controller != null)
+                Positioned.fill(
+                  child: JourneyHitVignette(controller: _controller!),
+                ),
+              // HUD 覆盖层（头像/血条/经验/状态行 + 槽栏 + 妖王罗盘 + 大血条/小地图/横幅）
+              if (_controller != null)
+                JourneyHudOverlay(
+                  controller: _controller!,
+                  characterCode: _characterCode,
+                  onTopPanelTap: _showAttributes,
+                ),
+              // 虚拟摇杆（下半屏任意触点按下；手势状态由组件自管）
+              if (_controller != null)
+                JourneyJoystick(
+                  controller: _controller!,
+                  onEngage: _onJoystickEngage,
+                ),
+              // 暂停按钮：叠在摇杆触控区之上，命中优先按钮；与功成按钮
+              // 同款圆形底板，位置随摇杆区顶边上移
+              if (_controller != null)
+                JourneyPauseButton(onTap: _togglePause, bottom: pauseBottom),
+              // 「功成」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
+              // 功成/无尽末波）后亮出，点击即主动结算；未满足时隐藏
+              if (_controller != null)
+                ValueListenableBuilder<bool>(
+                  valueListenable: _controller!.hud.bossDefeated,
+                  builder: (context, available, _) => available
+                      ? JourneySettleButton(
+                          onTap: _earlySettle,
+                          bottom: settleBottom,
+                        )
+                      : const SizedBox.shrink(),
+                ),
+              if (_paused)
+                JourneyPauseOverlay(
+                  onResume: _togglePause,
+                  onAttributes: _showAttributes,
+                  onQuit: requestQuit,
+                  // 妖王伏诛后可用：提前结算（金色主按钮）
+                  onEarlySettle:
+                      (_game?.bossDefeated ?? false) ? _earlySettle : null,
+                ),
+              // 三步引导（节点12）：首次进关逐页点按推进，边玩边看
+              if (_guideVisible)
+                JourneyGuideOverlay(
+                  onFinished: () => setState(() => _guideVisible = false),
+                ),
+            ],
+          ),
         ),
       ),
     );
