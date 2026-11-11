@@ -7,8 +7,9 @@ part of 'journey_progress_service.dart';
 /// 前置规则（生态循环）：
 /// · 分支内按层序点亮；
 /// · 枝间顺序：growth 开亮需本系 core≥3；sig 开亮需本系 core 修满 8；
-/// · 相生 1:1 循环锁：每系自第 2 层起，需「生我者」系总层数 ≥ 本系
-///   点亮后总层数（金→水→木→火→土→金）；
+/// · 相生阶梯锁：每系自第 2 层起，需「生我者」系总层数 ≥ 本系
+///   点亮后总层数 − 1（即任一系最多比其生源系深 1 层；金→水→木→火→土→金，
+///   借此打破五系闭环、避免循环死锁，仍保留按相生顺序节制的设计意图）；
 /// · 相克制衡：sig 点亮需「克我者」系 ≥4 层；
 /// · 加强点：五系修满 80 层后消耗第 81 点，解锁角色特殊能力。
 extension JourneyProgressTalent on JourneyProgressService {
@@ -82,13 +83,14 @@ extension JourneyProgressTalent on JourneyProgressService {
       final rLv = _state.talentElementLv(char, restrainer);
       if (rLv < 4) return '需「${_elementName(restrainer)}」系 ≥4 层';
     }
-    // 相生 1:1 循环锁：自第 2 层起需「生我者」系总层数 ≥ 点亮后本系总层数
+    // 相生阶梯锁：自第 2 层起需「生我者」系总层数 ≥ 点亮后本系总层数 − 1
+    // （任一系最多比其生源系深 1 层；原 1:1 等深约束在五系闭环上会循环死锁）
     final myTotalNew = _state.talentElementLv(char, element) + 1;
     if (myTotalNew >= 2) {
       final generator = JourneyProgressService.generatorOf[element]!;
       final gLv = _state.talentElementLv(char, generator);
-      if (gLv < myTotalNew) {
-        return '需「${_elementName(generator)}」系 ≥$myTotalNew 层';
+      if (gLv < myTotalNew - 1) {
+        return '需「${_elementName(generator)}」系 ≥${myTotalNew - 1} 层';
       }
     }
     return _poolOrMeritBlock(char, cost);
