@@ -72,30 +72,63 @@ class JourneyHudOverlay extends StatelessWidget {
         ),
         // 对局横幅（节点11）：开场难名/妖王降临/里程碑共用位
         JourneyBattleBanner(controller: controller),
-        // 等待接管摇杆：世界仍时停，提示玩家按下即继续
-        ValueListenableBuilder<bool>(
-          valueListenable: controller.hud.awaitingJoystick,
-          builder: (context, waiting, _) => waiting
-              ? const Align(
-                  alignment: Alignment(0, 0.2),
-                  child: IgnorePointer(
-                    child: Text(
-                      '拖动摇杆 · 继续战斗',
-                      style: TextStyle(
-                        fontSize: 13,
-                        color: JourneyTheme.gold,
-                        decoration: TextDecoration.none,
-                      ),
-                    ),
-                  ),
-                )
-              : const SizedBox.shrink(),
-        ),
         Positioned(
           // 罗盘在小地图（132 高 + 上下间距）正下方
           top: safeTop + 150,
           right: 12,
           child: _Compass(controller: controller),
+        ),
+        // 等待接管摇杆：世界仍时停，半透明蒙层聚焦注意力 + 引导文案，
+        // 提示玩家移动摇杆即可继续；整块 IgnorePointer 确保手势穿透到下层摇杆控件。
+        ValueListenableBuilder<bool>(
+          valueListenable: controller.hud.awaitingJoystick,
+          builder: (context, waiting, _) => waiting
+              ? Positioned.fill(
+                  child: IgnorePointer(
+                    child: Stack(
+                      children: <Widget>[
+                        // 蒙层：暗化世界、突出引导（手势穿透，不拦截摇杆）
+                        Container(
+                          color: Colors.black.withValues(alpha: 0.55),
+                        ),
+                        // 居中偏下引导内容（避开顶部状态/血条区）
+                        const Align(
+                          alignment: Alignment(0, 0.18),
+                          child: Column(
+                            mainAxisSize: MainAxisSize.min,
+                            children: <Widget>[
+                              Icon(
+                                Icons.gamepad,
+                                size: 44,
+                                color: JourneyTheme.goldSoft,
+                              ),
+                              SizedBox(height: 14),
+                              Text(
+                                '移动即可继续游戏',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.w600,
+                                  color: JourneyTheme.gold,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                '按住并推动左下角虚拟摇杆',
+                                style: TextStyle(
+                                  fontSize: 13,
+                                  color: JourneyTheme.textSecondary,
+                                  decoration: TextDecoration.none,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                )
+              : const SizedBox.shrink(),
         ),
       ],
     );
