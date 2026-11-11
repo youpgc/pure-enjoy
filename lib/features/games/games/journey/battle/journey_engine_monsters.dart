@@ -1,17 +1,22 @@
 part of 'journey_flame_game.dart';
 
 /// 怪物实体：驻守→追击→归位三态；精灵渲染 + 体型缩放。
+/// 血量/速度/接触伤害走钳制后的生效乘区；妖王血量可传入独立的时间乘区，
+/// 使其不随关卡难度放大，速度/接触伤害口径不变。
 class JourneyMonsterComponent extends PositionComponent {
   JourneyMonsterComponent({
     required this.game,
     required this.model,
-    required this.buffMult,
+    required double buffMult,
+    double? hpBuffMult,
     required super.position,
-  })  : hp = model.baseHp * buffMult,
-        maxHp = model.baseHp * buffMult,
-        _speed = model.baseSpeed * (0.9 + buffMult * 0.12),
-        _contactDamageVal =
-            model.contactDamage * (0.85 + buffMult * 0.2) {
+  })  : buffMult = clampJourneyBuff(game, buffMult),
+        hp = model.baseHp * clampJourneyBuff(game, hpBuffMult ?? buffMult),
+        maxHp = model.baseHp * clampJourneyBuff(game, hpBuffMult ?? buffMult),
+        _speed = model.baseSpeed *
+            (0.9 + clampJourneyBuff(game, buffMult) * 0.12),
+        _contactDamageVal = model.contactDamage *
+            (0.85 + clampJourneyBuff(game, buffMult) * 0.2) {
     // 妖王附加护甲（journey_monster_params.armor；缺省按能力兜底）
     bonusArmor = game.monsterParam(model.code, 'armor',
         model.abilityKey == 'unmovable'
@@ -172,6 +177,8 @@ class JourneyMonsterComponent extends PositionComponent {
       hud.bossEngaged.value = _aggro;
       if (_aggro) {
         hud.bossHpRatio.value = (hp / maxHp).clamp(0.0, 1.0);
+        hud.bossMaxHp.value = maxHp.round();
+        hud.bossHp.value = hp.clamp(0.0, maxHp).round();
       }
     }
 
@@ -186,27 +193,26 @@ class JourneyMonsterComponent extends PositionComponent {
     if (_aggro) {
       if (_chargePhase == 0 && !rooted && dist > 1) {
         // 追击：直线朝玩家（分离力在 game 层统一做）
-        position += toPlayer.normalized() * _speed * _speedMult * dt;
+        position += toPlayer.normalized() * cappedMonsterSpeed(this) * dt;
       } else if (_chargePhase == 3 && !rooted && dist > 1) {
         // 收招：缓速归位追击
-        position += toPlayer.normalized() * _speed * 0.4 * dt;
+        position += toPlayer.normalized() * cappedMonsterSlowSpeed(this) * dt;
       }
       // 蓄力（1）原地预警；突进（2）位移由冲撞状态机锁定方向推进
     } else {
       // 驻守：向驻守点缓慢归位 + 小幅游荡
       final toHome = home - position;
       if (!rooted && toHome.length > 4) {
-        position += toHome.normalized() * _speed * 0.4 * dt;
+        position += toHome.normalized() * cappedMonsterSlowSpeed(this) * dt;
       }
       // 脱战快速回血：未追击玩家即回，上限 maxHp（进入追击态即停）
       if (hp < maxHp) {
         hp = math.min(hp + maxHp * _regenPerSec * dt, maxHp);
       }
     }
-    position.x =
-        position.x.clamp(radius, game.worldSize - radius);
-    position.y =
-        position.y.clamp(radius, game.worldSize - radius);
+    // 禁止进入角色内圈：停在接触边界，随后统一钳回世界边界
+    clampMonsterOutOfInnerCircle(this, player.position);
+    clampMonsterToWorld(this, game.worldSize);
   }
 
   /// 妖王冲撞状态机：追击近距触发→蓄力 0.7s 预警→锁定方向突进 0.55s
@@ -238,7 +244,7 @@ class JourneyMonsterComponent extends PositionComponent {
         // 突进同样生效），突进时长照常消耗（root 中即原地停摆）
         _chargeTimer -= dt;
         if (!rooted) {
-          position += _chargeDir * _speed * _speedMult * 3.2 * dt;
+          position += _chargeDir * cappedMonsterSpeed(this) * 3.2 * dt;
         }
         if (_chargeTimer <= 0) {
           _chargePhase = 3;
@@ -376,6 +382,8 @@ class JourneyMonsterComponent extends PositionComponent {
       if ((hud.bossHpRatio.value - ratio).abs() > 0.005) {
         hud.bossHpRatio.value = ratio;
       }
+      final hpNow = hp.clamp(0.0, maxHp).round();
+      if (hud.bossHp.value != hpNow) hud.bossHp.value = hpNow;
     }
     if (hp <= 0) {
       isDead = true;
