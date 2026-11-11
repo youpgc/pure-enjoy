@@ -43,7 +43,7 @@ class JourneyBossHpBar extends StatelessWidget {
             ? '${hud.bossHp.value}/${hud.bossMaxHp.value}'
             : '';
         return Container(
-          width: double.infinity,
+          width: MediaQuery.of(context).size.width * 0.81,
           padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
           decoration: BoxDecoration(
             color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
