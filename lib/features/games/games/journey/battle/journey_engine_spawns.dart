@@ -432,3 +432,22 @@ mixin JourneySpawnMixin {
 /// 虚拟关模式判定（kind 约定见 JourneyLevelModel；level_no=0 不落主线）。
 bool _isEndless(JourneyFlameGame game) => game.level.kind == 'endless';
 bool _isDaily(JourneyFlameGame game) => game.level.kind == 'daily';
+
+/// 妖王降临倒计时推进：归零即召唤并写「妖王降临」横幅；剩余时间进入
+/// 后台提醒窗口（journey_globals.boss_warn_sec，默认 10s）后写入 HUD，
+/// 罗盘位展示「妖王将至 · Xs」（ValueNotifier 等值不重复通知，每秒至多
+/// 一次），0=关闭提醒。
+void tickBossSpawnCountdown(JourneyFlameGame game, double dt) {
+  if (game._bossSpawnCountdown <= 0) return;
+  game._bossSpawnCountdown -= dt;
+  if (game._bossSpawnCountdown <= 0) {
+    game.controller.hud.bossSpawnIn.value = 0;
+    game.spawnBossAtPost(game);
+    game.controller.onBossSpawn(game.bossModel?.name ?? '妖王');
+    return;
+  }
+  final left = game._bossSpawnCountdown.ceil();
+  if (left <= (game.config?.bossWarnSec ?? kJourneyBossWarnSec)) {
+    game.controller.hud.bossSpawnIn.value = left;
+  }
+}

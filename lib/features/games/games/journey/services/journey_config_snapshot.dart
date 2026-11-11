@@ -98,6 +98,12 @@ class JourneyConfigSnapshot {
       _globalNum(globalsRaw, 'boss_spawn_delay_sec')?.toInt() ??
       kJourneyBossSpawnDelaySec;
 
+  /// 妖王降临倒计时提醒窗口（秒）；剩余 ≤ 该值时罗盘位展示倒计时，
+  /// 0=关闭提醒。列缺失或未配值时回落内置兜底。
+  int get bossWarnSec =>
+      _globalNum(globalsRaw, 'boss_warn_sec')?.toInt() ??
+      kJourneyBossWarnSec;
+
   /// 前期发育保护期（秒）；期间不产生精英怪。
   int get earlyGameProtectSec =>
       _globalNum(globalsRaw, 'early_game_protect_sec')?.toInt() ??

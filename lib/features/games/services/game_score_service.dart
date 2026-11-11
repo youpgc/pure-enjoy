@@ -59,6 +59,10 @@ class GameScoreService {
     /// 通关条件文本（自由/乱斗等合成关对局传入；常规关 null，
     /// 条件由关卡 config 推导）。随主记录落库供后台成绩看板展示。
     String? conditionText,
+
+    /// 对局详情快照（可选，jsonb）：使用角色与局内属性等，供游戏记录/
+    /// 排障/后续排行榜与成就使用；西行首个接入，其他游戏可复用。
+    Map<String, dynamic>? runDetail,
   }) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return null;
@@ -84,6 +88,7 @@ class GameScoreService {
         'status': statusOverride ?? (cleared ? 'cleared' : 'failed'),
         'duration_ms': durationMs,
         'condition_text': conditionText,
+        if (runDetail != null) 'run_detail': runDetail,
         'played_at': now.toIso8601String(),
         'created_at': now.toIso8601String(),
       },
@@ -198,7 +203,6 @@ class GameScoreService {
     String? gameId,
     bool force = false,
   }) async {
-
     final result = await ApiClient.rpc(
       'get_game_best_scores',
       params: <String, dynamic>{'p_game_id': gameId},
@@ -223,8 +227,8 @@ class GameScoreService {
 
     if (gameId == null) {
       _memoryBest = list;
-      await CacheHelper.instance
-          .saveList(CacheHelper.keyGameScores, list.map((e) => e.toJson()).toList());
+      await CacheHelper.instance.saveList(
+          CacheHelper.keyGameScores, list.map((e) => e.toJson()).toList());
     }
     return list;
   }
@@ -283,8 +287,7 @@ class GameScoreService {
 
     // score 维度 id（用于从嵌入 values 提取单局得分）
     String? scoreDimId;
-    for (final d
-        in GameService.instance.cachedConfig.dimensionsOf(gameId)) {
+    for (final d in GameService.instance.cachedConfig.dimensionsOf(gameId)) {
       if (d.code == 'score') {
         scoreDimId = d.id;
         break;
@@ -346,7 +349,8 @@ class GameScoreService {
         if (raw is! Map<String, dynamic>) continue;
         final score = GameScoreModel.fromJson(raw);
         final values = <String, num>{};
-        final vals = (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
+        final vals =
+            (raw['game_score_values'] as List<dynamic>?) ?? <dynamic>[];
         for (final v in vals) {
           if (v is! Map<String, dynamic>) continue;
           final dim = dims

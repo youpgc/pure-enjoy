@@ -150,8 +150,8 @@ class _HudPanel extends StatelessWidget {
       decoration: BoxDecoration(
         color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
         borderRadius: BorderRadius.circular(10),
-        border: Border.all(
-            color: JourneyTheme.panelStroke.withValues(alpha: 0.6)),
+        border:
+            Border.all(color: JourneyTheme.panelStroke.withValues(alpha: 0.6)),
       ),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.center,
@@ -300,11 +300,11 @@ class _Compass extends StatelessWidget {
       valueListenable: controller.hud.hasBoss,
       builder: (context, hasBoss, _) => hasBoss
           ? ValueListenableBuilder<bool>(
-              // 妖王未降临时没有可导航的目标，整块隐藏
+              // 妖王未降临时没有可导航的目标：进入提醒窗口（boss_spawn_in
+              // >0）展示降临倒计时，窗口外整块隐藏
               valueListenable: controller.hud.bossPresent,
-              builder: (context, present, _) => !present
-                  ? const SizedBox.shrink()
-                  : ValueListenableBuilder<bool>(
+              builder: (context, present, _) => present
+                  ? ValueListenableBuilder<bool>(
                       // 清剿结束（末场伏诛/坚持功成）：移除妖王距离导航；
                       // 多场战（三打白骨精等）重生期间 bossDefeated 未置位，
                       // 导航保持指向，全部击败才消失。
@@ -312,6 +312,12 @@ class _Compass extends StatelessWidget {
                       builder: (context, defeated, _) => defeated
                           ? const SizedBox.shrink()
                           : _bossCompass(controller),
+                    )
+                  : ValueListenableBuilder<int>(
+                      valueListenable: controller.hud.bossSpawnIn,
+                      builder: (context, left, _) => left > 0
+                          ? _bossSpawnCountdownView(left)
+                          : const SizedBox.shrink(),
                     ),
             )
           : _surviveCountdown(controller),
@@ -330,8 +336,7 @@ class _Compass extends StatelessWidget {
             // 距妖王（里）= 接近度缺口 × 出生点基准距离 ÷ 25
             // （1 里=25 世界单位；同屏内数值收敛到个位十里，消除
             // 「同屏却显示 200 里」的观感失真）
-            final dist =
-                ((1 - near) * startDist).clamp(0.0, double.infinity);
+            final dist = ((1 - near) * startDist).clamp(0.0, double.infinity);
             final li = dist / 25.0;
             return Column(
               children: <Widget>[
@@ -383,6 +388,48 @@ class _Compass extends StatelessWidget {
     );
   }
 
+  /// 罗盘位通用「圆盘 + 徽标文案」视图：妖王降临倒计时/无妖坚持/
+  /// 无尽波数三处同构展示的唯一实现。
+  Widget _radarBadge(IconData icon, String text) {
+    return Column(
+      children: <Widget>[
+        Container(
+          width: 58,
+          height: 58,
+          alignment: Alignment.center,
+          decoration: BoxDecoration(
+            shape: BoxShape.circle,
+            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+            border: Border.all(
+                color: JourneyTheme.gold.withValues(alpha: 0.85), width: 1.6),
+          ),
+          child: Icon(icon, color: JourneyTheme.gold, size: 28),
+        ),
+        const SizedBox(height: 3),
+        Container(
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
+            borderRadius: BorderRadius.circular(6),
+          ),
+          child: Text(
+            text,
+            style: const TextStyle(
+              fontSize: 11,
+              color: JourneyTheme.textPrimary,
+              fontWeight: FontWeight.w600,
+            ),
+          ),
+        ),
+      ],
+    );
+  }
+
+  /// 妖王降临倒计时提醒（进入 boss_warn_sec 窗口后展示），
+  /// 降临后由引擎归零自然隐藏。
+  Widget _bossSpawnCountdownView(int left) =>
+      _radarBadge(Icons.hourglass_top, '妖王将至 · ${left}s');
+
   /// 无妖章回：坚持满时长即功成（倒计时圆盘 + 剩余秒文案）；
   /// 倒计时归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
   Widget _surviveCountdown(JourneyBattleController controller) {
@@ -390,86 +437,13 @@ class _Compass extends StatelessWidget {
     return ValueListenableBuilder<int>(
       valueListenable: hud.endlessWave,
       builder: (context, wave, _) => wave > 0
-          ? _endlessWaveView(wave)
+          ? _radarBadge(Icons.waves, '妖潮 · 第 $wave 波')
           : ValueListenableBuilder<int>(
               valueListenable: hud.surviveLeft,
-              builder: (context, left, _) =>
-                  left <= 0 ? const SizedBox.shrink() : _surviveView(left),
+              builder: (context, left, _) => left <= 0
+                  ? const SizedBox.shrink()
+                  : _radarBadge(Icons.hourglass_bottom, '此难无妖 · 坚持 ${left}s'),
             ),
-    );
-  }
-
-  Widget _surviveView(int left) {
-    return Column(
-      children: <Widget>[
-        Container(
-          width: 58,
-          height: 58,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-            border: Border.all(
-                color: JourneyTheme.gold.withValues(alpha: 0.85),
-                width: 1.6),
-          ),
-          child: const Icon(Icons.hourglass_bottom,
-              color: JourneyTheme.gold, size: 28),
-        ),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '此难无妖 · 坚持 ${left}s',
-            style: const TextStyle(
-              fontSize: 11,
-              color: JourneyTheme.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
-  /// 无尽妖潮罗盘位：波数徽标 + 当前波文案（波间休整/刷怪节奏见 spawns part）。
-  Widget _endlessWaveView(int wave) {
-    return Column(
-      children: <Widget>[
-        Container(
-          width: 58,
-          height: 58,
-          alignment: Alignment.center,
-          decoration: BoxDecoration(
-            shape: BoxShape.circle,
-            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-            border: Border.all(
-                color: JourneyTheme.gold.withValues(alpha: 0.85),
-                width: 1.6),
-          ),
-          child: const Icon(Icons.waves, color: JourneyTheme.gold, size: 28),
-        ),
-        const SizedBox(height: 3),
-        Container(
-          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-          decoration: BoxDecoration(
-            color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
-            borderRadius: BorderRadius.circular(6),
-          ),
-          child: Text(
-            '妖潮 · 第 $wave 波',
-            style: const TextStyle(
-              fontSize: 11,
-              color: JourneyTheme.textPrimary,
-              fontWeight: FontWeight.w600,
-            ),
-          ),
-        ),
-      ],
     );
   }
 }

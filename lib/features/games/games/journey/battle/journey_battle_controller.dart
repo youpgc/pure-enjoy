@@ -162,6 +162,11 @@ class JourneyBattleHud {
   /// 妖王已降临且未伏诛：罗盘导航与小地图标记的共同显隐依据。
   final ValueNotifier<bool> bossPresent = ValueNotifier<bool>(false);
 
+  /// 妖王降临倒计时（秒）：剩余时间进入后台提醒窗口（journey_globals.
+  /// boss_warn_sec，默认 10s）后由引擎写入，罗盘位展示「妖王将至 · Xs」；
+  /// 降临/无妖/窗口外恒为 0。
+  final ValueNotifier<int> bossSpawnIn = ValueNotifier<int>(0);
+
   /// 妖王罗盘·据点基准距离（出生点到据点，进关时引擎写入一次）：
   /// 罗盘距离文案=接近度 × 基准距离换算「里」（1 里=25 世界单位）。
   final ValueNotifier<double> bossStartDist = ValueNotifier<double>(1);

@@ -1,18 +1,22 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
+import '../battle/journey_sprites.dart';
 import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
+import '../services/journey_kill_stats_service.dart';
 import '../services/journey_progress_service.dart';
 import '../services/journey_progress_sync.dart';
+import '../services/journey_seed.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import '../widgets/journey_busy.dart';
 
-/// S6 法宝图鉴页（节点9 解锁链路）：功德+达成条件混合解锁口径的展示层。
+/// 图鉴页（节点9 解锁链路 + 妖怪击杀图鉴）：法宝=功德+达成条件混合解锁
+/// 口径的展示层；妖怪=分类型击杀累计（击杀≥1 解锁，展示累计击杀数）。
 ///
-/// 图鉴=入池资格：未解锁法宝局内三选一不出现；达成条件对应
+/// 法宝图鉴=入池资格：未解锁法宝局内三选一不出现；达成条件对应
 /// game_achievements 对局成就（随 SQL 种子生效）。有 relic 配置的法宝
 /// 未解锁时展示解锁条件+功德价+「解锁」按钮；无配置法宝默认已解锁。
 class JourneyCompendiumScreen extends StatefulWidget {
@@ -28,6 +32,9 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
   Set<String> _unlockedWeapons = const <String>{};
   Set<String> _unlockedAchievements = const <String>{};
   List<JourneyAchievementDef> _achievements = const <JourneyAchievementDef>[];
+
+  /// 分类型击杀累计（monster_code → 次数）：妖怪页签解锁与计数展示。
+  Map<String, int> _killStats = const <String, int>{};
   String _tab = 'active';
   bool _unlocking = false;
 
@@ -45,11 +52,14 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     await progress.evaluateAchievements();
     final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
     final defs = await JourneyProgressSync.fetchAchievements(gameId);
+    // 击杀图鉴数据（失败/未登录回落空表=全未解锁）
+    final kills = await JourneyKillStatsService.fetchKills();
     _refreshProgress();
     if (!mounted) return;
     setState(() {
       _config = JourneyConfigService.instance.cached;
       _achievements = defs;
+      _killStats = kills;
     });
   }
 
@@ -116,31 +126,157 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
       );
     }
     final tabs = <String, String>{
+      'monster': '妖怪',
       'active': '主动法宝',
       'passive': '被动加持',
       'effect': '特效触发',
     };
     final list = config.weapons.where((w) => w.category == _tab).toList();
     return JourneyPageScaffold(
-      title: '法宝图鉴',
+      title: '图鉴',
       body: Column(
         children: <Widget>[
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
-              children: tabs.entries
-                  .map((e) => _tabChip(e.key, e.value))
-                  .toList(),
+              children:
+                  tabs.entries.map((e) => _tabChip(e.key, e.value)).toList(),
             ),
           ),
           Expanded(
-            child: ListView.separated(
-              padding: const EdgeInsets.all(16),
-              itemCount: list.length,
-              separatorBuilder: (_, __) => const SizedBox(height: 8),
-              itemBuilder: (ctx, i) => _buildWeaponCard(list[i]),
+            child: _tab == 'monster'
+                ? _buildMonsterList()
+                : ListView.separated(
+                    padding: const EdgeInsets.all(16),
+                    itemCount: list.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 8),
+                    itemBuilder: (ctx, i) => _buildWeaponCard(list[i]),
+                  ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  /// 妖怪图鉴列表：journey_monsters 远端配置优先，空回落内置种子池；
+  /// 击杀≥1 解锁（头像彩色+累计击杀数），未解锁灰度剪影。
+  Widget _buildMonsterList() {
+    final config = _config;
+    final monsters = (config != null && config.monsters.isNotEmpty)
+        ? config.monsters
+        : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
+    return ListView.separated(
+      padding: const EdgeInsets.all(16),
+      itemCount: monsters.length,
+      separatorBuilder: (_, __) => const SizedBox(height: 8),
+      itemBuilder: (ctx, i) => _buildMonsterCard(monsters[i]),
+    );
+  }
+
+  Widget _buildMonsterCard(JourneyMonsterModel m) {
+    final kills = _killStats[m.code] ?? 0;
+    final unlocked = kills > 0;
+    final isBoss = m.aiTier == 'boss';
+    final tierLabel = switch (m.aiTier) {
+      'boss' => '妖王',
+      'elite' => '精英',
+      _ => '普通',
+    };
+    return JourneyCard(
+      qualityColor: isBoss ? JourneyTheme.gold : JourneyTheme.panelStroke,
+      child: Row(
+        children: <Widget>[
+          Container(
+            width: 44,
+            height: 44,
+            alignment: Alignment.center,
+            decoration: BoxDecoration(
+              color: JourneyTheme.bgDeep,
+              borderRadius: BorderRadius.circular(10),
+              border: Border.all(
+                color: unlocked
+                    ? (isBoss ? JourneyTheme.gold : JourneyTheme.panelStroke)
+                    : JourneyTheme.locked,
+                width: 1.2,
+              ),
+            ),
+            child: unlocked
+                ? SvgPicture.asset(
+                    JourneySprites.monster(m.code),
+                    width: 36,
+                    height: 36,
+                    errorBuilder: (_, __, ___) => const Icon(
+                      Icons.cruelty_free,
+                      color: JourneyTheme.gold,
+                      size: 22,
+                    ),
+                  )
+                : Opacity(
+                    // 未解锁弱化剪影：保留轮廓、压暗细节
+                    opacity: 0.28,
+                    child: SvgPicture.asset(
+                      JourneySprites.monster(m.code),
+                      width: 36,
+                      height: 36,
+                      errorBuilder: (_, __, ___) => const Icon(
+                        Icons.help_outline,
+                        color: JourneyTheme.locked,
+                        size: 22,
+                      ),
+                    ),
+                  ),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: <Widget>[
+                Row(
+                  children: <Widget>[
+                    Flexible(
+                      child: Text(
+                        unlocked ? m.name : '？？？',
+                        style: JourneyTheme.title,
+                      ),
+                    ),
+                    const SizedBox(width: 6),
+                    Container(
+                      padding: const EdgeInsets.symmetric(
+                          horizontal: 6, vertical: 1),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(999),
+                        border: Border.all(
+                          color: isBoss
+                              ? JourneyTheme.gold
+                              : JourneyTheme.panelStroke,
+                        ),
+                      ),
+                      child: Text(
+                        tierLabel,
+                        style: TextStyle(
+                          fontSize: 10,
+                          color: isBoss
+                              ? JourneyTheme.goldSoft
+                              : JourneyTheme.textSecondary,
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  unlocked ? '累计击杀 $kills' : '击败后解锁',
+                  style: unlocked
+                      ? JourneyTheme.caption.copyWith(color: JourneyTheme.gold)
+                      : JourneyTheme.faint,
+                ),
+              ],
             ),
           ),
+          if (unlocked)
+            const Icon(Icons.verified, color: JourneyTheme.gold, size: 18)
+          else
+            const Icon(Icons.lock, color: JourneyTheme.locked, size: 18),
         ],
       ),
     );
@@ -182,15 +318,16 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
 
   Widget _buildWeaponCard(JourneyWeaponModel w) {
     final qualityIdx = w.isActive ? 3 : (w.isPassive ? 2 : 1);
-    final quality =
-        JourneyTheme.qualityColors[qualityIdx.clamp(0, 3)];
+    final quality = JourneyTheme.qualityColors[qualityIdx.clamp(0, 3)];
     // 解锁口径（节点9）：无 relic 配置=默认已解锁；有配置看进度。
     // 角色绑定法宝（character_code 非空）额外门控：归属角色未解锁则锁定，
-    // 主动法宝跟随角色一起解锁（角色解锁时自动入池）。
+    // 主动法宝跟随角色一起解锁（角色解锁时自动入池）。唐僧为初始角色
+    // （isCharacterUnlocked 内 code=='tang' 特判，集合中无记录），绑定
+    // 法宝须走同一口径，否则初始禅杖误显示为未解锁。
     final boundChar = w.characterCode;
     final charLocked = boundChar.isNotEmpty &&
-        !JourneyProgressService.instance.state.unlockedCharacters
-            .contains(boundChar);
+        !JourneyProgressService.instance.state
+            .characterUnlocked(boundChar);
     final relic = _config?.relicOf(w.code);
     final noAchievement = relic != null && relic.achievementCode.isEmpty;
     final unlocked =
@@ -250,8 +387,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
                         : '归属角色：${_charName(boundChar)}',
                     style: charLocked
                         ? JourneyTheme.faint
-                        : JourneyTheme.faint.copyWith(
-                            color: JourneyTheme.gold),
+                        : JourneyTheme.faint.copyWith(color: JourneyTheme.gold),
                   ),
                 ],
                 // 出处（非取经角色法宝来源，如 哪吒/太上老君；纯展示）
@@ -259,8 +395,8 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
                   const SizedBox(height: 2),
                   Text(
                     '出处：${w.ownerName}',
-                    style: JourneyTheme.faint.copyWith(
-                        color: JourneyTheme.gold),
+                    style:
+                        JourneyTheme.faint.copyWith(color: JourneyTheme.gold),
                   ),
                 ],
                 if (!unlocked) ...<Widget>[

@@ -71,10 +71,12 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
   List<JourneyCharacterModel> get _characters =>
       _config?.characters ?? const <JourneyCharacterModel>[];
 
-  /// 已解锁角色（切换只在这些角色间循环；唐僧恒可用）。
+  /// 已解锁角色（切换只在这些角色间循环；唐僧为初始角色恒可用）。
+  /// 统一走模型解锁口径 isCharacterUnlocked（含 tang 特判），
+  /// 避免与图鉴侧各自维护特判造成口径漂移。
   List<JourneyCharacterModel> get _unlocked => _characters
       .where((c) =>
-          c.code == 'tang' || _progress.unlockedCharacters.contains(c.code))
+          JourneyProgressService.instance.state.characterUnlocked(c.code))
       .toList();
 
   JourneyCharacterModel get _currentCharacter {
@@ -216,7 +218,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
             width: 68,
             child: JourneyEntryCard(
               icon: Icons.auto_stories,
-              label: '法宝图鉴',
+              label: '图鉴',
               onTap: () => _push(const JourneyCompendiumScreen()),
             ),
           ),

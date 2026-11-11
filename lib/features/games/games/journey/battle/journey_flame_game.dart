@@ -43,8 +43,12 @@ part 'journey_engine_growth.dart';
 /// 平铺大地图全向自由探索；周身环绕法宝周期收割；妖王驻守地图据点，
 /// 循罗盘找到并击杀通关。接触伤害全局 0.5s 节拍。
 class JourneyFlameGame extends FlameGame
-    with JourneyWeaponMixin, JourneyDamageTickMixin, JourneyLootMixin,
-        JourneySpawnMixin, JourneyResumeGateMixin
+    with
+        JourneyWeaponMixin,
+        JourneyDamageTickMixin,
+        JourneyLootMixin,
+        JourneySpawnMixin,
+        JourneyResumeGateMixin
     implements JourneyWeaponHost {
   JourneyFlameGame({
     required this.level,
@@ -112,6 +116,9 @@ class JourneyFlameGame extends FlameGame
   /// 妖王首次降临倒计时（秒）：0 = 本关无据点妖王或妖王已降临。
   double _bossSpawnCountdown = 0;
   int _charLv = 1, _kills = 0, _meritCoins = 0;
+
+  /// 分类型击杀累计（monster_code → 本局次数；击杀图鉴上报源）。
+  final Map<String, int> killsByCode = <String, int>{};
   bool _ended = false;
   bool get isEnded => _ended;
 
@@ -302,7 +309,6 @@ class JourneyFlameGame extends FlameGame
   /// 攻击力成长卡累计值（钳在 attackUpgradeCap 内）。
   double cardAttackTotal = 0;
 
-
   /// 经验获取乘区（八戒「贪食」光环）。
   double expAmp = 1.0;
 
@@ -459,7 +465,8 @@ class JourneyFlameGame extends FlameGame
     // 无妖章回：坚持满时长即满足通关条件（不主动结算，由玩家决定）；
     // 满足后罗盘倒计时停 0，结算按钮亮起，游玩照常
     if (bossModel == null && !_isEndless(this)) {
-      final left = (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
+      final left =
+          (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
       if (left != controller.hud.surviveLeft.value) {
         controller.hud.surviveLeft.value = left;
       }
@@ -468,14 +475,7 @@ class JourneyFlameGame extends FlameGame
       }
     }
 
-    if (_bossSpawnCountdown > 0) {
-      _bossSpawnCountdown -= dt;
-      if (_bossSpawnCountdown <= 0) {
-        _bossSpawnCountdown = 0;
-        spawnBossAtPost(this);
-        controller.onBossSpawn(bossModel?.name ?? '妖王');
-      }
-    }
+    tickBossSpawnCountdown(this, dt);
 
     updateSpawns(this, dt);
     // 空间哈希（节点12）：刷怪后每帧重建，供武器/接触伤害查询附近候选
@@ -489,5 +489,4 @@ class JourneyFlameGame extends FlameGame
     monsters.removeWhere((m) => m.isDead);
     pickups.removeWhere((p) => p.isMounted == false);
   }
-
 }

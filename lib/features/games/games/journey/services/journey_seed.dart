@@ -402,6 +402,10 @@ const double kJourneyTalentDropRate = 0.10;
 /// 妖王首次降临延迟（秒；journey_globals.boss_spawn_delay_sec 可覆盖）。
 const int kJourneyBossSpawnDelaySec = 300;
 
+/// 妖王降临倒计时提醒窗口（秒；journey_globals.boss_warn_sec 可覆盖）：
+/// 剩余时间 ≤ 该值时罗盘位展示倒计时，0=关闭提醒。
+const int kJourneyBossWarnSec = 10;
+
 /// 前期发育保护期（秒；journey_globals.early_game_protect_sec 可覆盖）：
 /// 期间只刷普通怪，留出发育窗口。
 const int kJourneyEarlyGameProtectSec = 60;

@@ -1,9 +1,12 @@
+import 'dart:async';
+
 import 'package:flame/game.dart' hide Matrix4;
 import 'package:flutter/material.dart';
 
 import '../../../../../utils/cache_helper.dart';
 import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
+import '../services/journey_kill_stats_service.dart';
 import '../services/journey_progress_service.dart';
 import '../services/journey_score_reporter.dart';
 import '../services/journey_seed.dart' show kJourneyMonsterSeed;
@@ -279,13 +282,25 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
     );
     // 每日游历 gate 已在进关入口写入（进入即计次，主动放弃同样占次），
     // 此处不再重复写。
-    // 成绩上报（成绩看板/排行榜/数据分析链路；未就绪静默跳过）
+    // 成绩上报（成绩看板/排行榜/数据分析链路；未就绪静默跳过）。
+    // run_detail 对局详情快照（角色/属性，与局内属性面板同源口径，组装
+    // 见 reporter），终局无论胜败随主记录落库。
     JourneyScoreReporter.report(
       result: result,
       cleared: cleared,
       levelId: widget.level.id,
       snapshot: JourneyConfigService.instance.cached,
+      runDetail: JourneyScoreReporter.buildRunDetail(
+        _game,
+        characterCode: _characterCode,
+      ),
     );
+    // 击杀图鉴上报（分类型击杀 RPC 原子累加；终局无论胜败，best-effort）
+    if (_game != null && _game!.killsByCode.isNotEmpty) {
+      unawaited(JourneyKillStatsService.report(
+        Map<String, int>.of(_game!.killsByCode),
+      ));
+    }
     if (!mounted) return;
     _lastResult = result;
     _lastGranted = granted;

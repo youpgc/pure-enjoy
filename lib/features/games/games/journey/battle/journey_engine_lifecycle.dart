@@ -32,6 +32,8 @@ extension JourneyLifecycle on JourneyFlameGame {
   void onMonsterKilled(JourneyMonsterComponent m) {
     _kills++;
     controller.hud.kills.value = _kills;
+    // 分类型击杀累计（击杀图鉴数据源；妖怪/妖王共用 model.code）
+    killsByCode.update(m.model.code, (v) => v + 1, ifAbsent: () => 1);
 
     // 妖王固定功德入账（merit_drop 配置列，计入铜钱明细）
     if (m.model.meritDrop > 0) {
@@ -96,8 +98,7 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
     dart_async.unawaited(
         JourneyProgressService.instance.grantTalentDrop().then((granted) {
-      _markClearedAvailable(
-          granted ? '妖王已伏诛 · 天赋点掉落 +1' : '妖王已伏诛');
+      _markClearedAvailable(granted ? '妖王已伏诛 · 天赋点掉落 +1' : '妖王已伏诛');
     }));
     _markClearedAvailable('妖王已伏诛');
   }
