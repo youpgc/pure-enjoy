@@ -380,12 +380,14 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
     final missed = _missedDays(st, today);
     final totalSlots =
         petCheckinTotalSlots(st, _daysInMonth(today));
-    // 签到后 totalSigned 递增，窗口随下一个待签槽主动前移
-    final next = st.totalSigned + 1 > totalSlots
-        ? totalSlots
-        : st.totalSigned + 1;
+    // 收起窗口锚定「今日对应槽」：今日已签取 totalSigned、未签取
+    // totalSigned+1，不论今日是否签到都落在同一组，使当前进度与下一个
+    // 待签组（其后一组）同时可见；签到后 totalSigned 变化，窗口随锚点前移
+    final todaySlot = st.isSigned(today)
+        ? st.totalSigned
+        : (st.totalSigned + 1 > totalSlots ? totalSlots : st.totalSigned + 1);
     final (winStart, winEnd) =
-        petCheckinCollapsedWindow(next, totalSlots);
+        petCheckinCollapsedWindow(todaySlot, totalSlots);
     final slots = _expanded
         ? [for (var s = 1; s <= totalSlots; s++) s]
         : [for (var s = winStart; s <= winEnd; s++) s];
