@@ -314,7 +314,7 @@ class _PetAdventureScreenState extends State<PetAdventureScreen> {
     final gold = (data?['gold'] as num?)?.toInt() ?? 0;
     final exp = (data?['exp'] as num?)?.toInt() ?? 0;
     final result = data?['result_type'] as String? ?? 'play';
-    // 掉落明细(含长途独占 long_drops;共享 helper 与主页弹窗同源)
+    // 掉落明细（共享 helper 与主页弹窗同源，长途独占掉落已并入 items）
     final items = buildClaimItems(data);
     // 结算弹窗：结果类型 + 金币/经验 + 掉落明细，关闭后再刷新总览
     if (mounted) {

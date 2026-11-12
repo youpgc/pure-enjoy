@@ -27,18 +27,19 @@ void _toast(BuildContext context, String msg) => showPetToast(context, msg);
 typedef AdventureAction = Future<bool> Function(
     BuildContext context, String adventureId);
 
-/// claim 返回体 → 掉落明细(items 为主,long_drops 仅旧版服务端兜底;同码合并
-/// 数量
-/// 名称映射缺失回退 code;保底与概率命中展示无差,不另加注)。
+/// claim 返回体 → 掉落明细(items 为唯一真源；long_drops 只在 items 缺该码时
+/// 补入，避免同一笔掉落双计；名称映射缺失回退 code；保底与概率命中展示无差)。
 /// 主页弹窗与历险页弹窗共用以防两处漂移
 List<({String name, int qty})> buildClaimItems(Map<String, dynamic>? data) {
   final byCode = <String, ({String name, int qty})>{};
-  void add(String code, String? name, int qty) {
+  void add(String code, String? name, int qty, {bool onlyIfAbsent = false}) {
     final resolved = (name != null && name.isNotEmpty)
         ? name
         : kLongDropNames[code] ?? (code.isEmpty ? '稀有道具' : code);
     final key = code.isEmpty ? resolved : code;
     final prev = byCode[key];
+    // 长途掉落已并入 items 时，long_drops 的同码项不再累加
+    if (onlyIfAbsent && prev != null) return;
     byCode[key] = (
       name: prev?.name ?? resolved,
       qty: (prev?.qty ?? 0) + qty,
@@ -56,10 +57,11 @@ List<({String name, int qty})> buildClaimItems(Map<String, dynamic>? data) {
   }
   final rawLong = data?['long_drops'];
   if (rawLong is List) {
-    // 旧版服务端 long_drops 单独下发（新版已并入 items,同码合并数量兜底）
+    // 同一笔掉落可能同时出现在 items 与 long_drops，仅在 items 缺码时补入
     for (final it in rawLong) {
       if (it is Map) {
-        add(it['code'] as String? ?? '', it['name'] as String?, 1);
+        add(it['code'] as String? ?? '', it['name'] as String?, 1,
+            onlyIfAbsent: true);
       }
     }
   }
