@@ -74,3 +74,43 @@ List<JourneyMonsterModel> _monsterSource(JourneyFlameGame game) {
       : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
 }
 
+/// 经验池兜底曲线：后台未配该波或新列未部署时，按波号推演每波总量、
+/// 精英数与强度倍率，保证「每波 50~120 只、每波有精英」的节奏始终成立。
+/// 总量与倍率都用整数算式取整，和后台、线上配置同口径：浮点累加在
+/// 半整数边界会取整偏 1 只，整数算式不受表示误差影响。
+int endlessWaveCount(int waveNo) =>
+    math.min(120, (505 + 7 * (waveNo - 1)) ~/ 10);
+
+int endlessEliteCount(int waveNo) => math.min(14, 2 + waveNo ~/ 8);
+
+double endlessWaveBuff(int waveNo) => (100 + 3 * waveNo) / 100;
+
+/// 分阶怪池：普通段前期只出低血小妖，避免高血「伪普通」怪打断发育；
+/// 精英段按波号取对应经验档，强度随波次递进且不会前期撞上顶阶精英。
+List<JourneyMonsterModel> endlessTierPool(
+  JourneyFlameGame game, {
+  required int waveNo,
+  required bool elite,
+}) {
+  final all = game.pool.where((m) => !m.isBoss).toList(growable: false);
+  if (elite) {
+    final lo = waveNo <= 10
+        ? 0
+        : (waveNo <= 30 ? 70 : (waveNo <= 60 ? 115 : 155));
+    final hi = waveNo <= 10
+        ? 30
+        : (waveNo <= 30 ? 115 : (waveNo <= 60 ? 155 : 200));
+    final band = all
+        .where((m) => m.isElite && m.expDrop >= lo && m.expDrop <= hi)
+        .toList(growable: false);
+    if (band.isNotEmpty) return band;
+    return all.where((m) => m.isElite).toList(growable: false);
+  }
+  final commons = all.where((m) => !m.isElite).toList(growable: false);
+  if (waveNo < 40) {
+    final low = commons.where((m) => m.baseHp <= 200).toList(growable: false);
+    if (low.isNotEmpty) return low;
+  }
+  return commons.isNotEmpty ? commons : all;
+}
+

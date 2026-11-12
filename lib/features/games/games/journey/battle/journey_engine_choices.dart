@@ -113,7 +113,7 @@ const Map<String, (String, String)> kJourneyPassiveEffects =
   'pantao': ('蟠桃', '生命上限 +25，回复 +0.5/秒'),
   'renshen_guo': ('人参果', '经验获取 +25%'),
   'bishui_pearl': ('避水珠', '环绕转速 +15%'),
-  'dingfeng_pearl': ('定风珠', '武器臂长 +18'),
+  'dingfeng_pearl': ('定风丹', '武器臂长 +18'),
   'shelizi': ('舍利子', '武器伤害 +15%'),
   // 西游扩展批（功德解锁，图鉴直购）
   'sanheng_mao': ('三根毫毛', '致命伤免死一次，回 30% 生命'),
@@ -138,7 +138,7 @@ JourneyUpgradeChoice _passiveGrantChoice(
 /// updateDamageTick；激活即入 game.effectWeapons。
 const Map<String, (String, String)> kJourneyEffectWeapons =
     <String, (String, String)>{
-  'kunxian_rope': ('捆仙索', '命中 12% 概率定身 1.5 秒'),
+  'kunxian_rope': ('幌金绳', '命中 12% 概率定身 1.5 秒'),
   'fanshang_thorns': ('反伤荆棘', '受击反弹 30% 伤害'),
   'baoji_thunder': ('暴击雷引', '暴击引发闪电链，波及最多 2 个妖物'),
   // 西游扩展批（功德解锁，图鉴直购）

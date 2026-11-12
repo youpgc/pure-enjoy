@@ -88,8 +88,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'unlock_level_no': 16,
     'unlock_merit_cost': 6000,
   },
-  // ---- 非取经扩展角色（5，镜像 SQL 批次 feature_journey_ext_chars_20261106；
-  //      解锁难号按西游记原著出场章节锚定 81 难关名）----
+  // ---- 非取经扩展角色（5；解锁难号按西游记原著出场章节锚定 81 难关名）----
   {
     'code': 'jinjiao',
     'name': '金角大王',
@@ -145,34 +144,33 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
 const List<Map<String, dynamic>> kJourneyWeaponSeed = <Map<String, dynamic>>[
   // 角色对应（4，初始环绕参数=引擎兜底口径，后台 journey_weapons 可调）
   {'code': 'jingubang', 'name': '金箍棒', 'category': 'active', 'attack_kind': 'orbit', 'description': '多段快转环，收割节奏最快', 'character_code': 'wukong',
-   'orbit_speed': 3.2, 'inner_radius': 26, 'outer_radius': 96, 'blade_width': 22, 'base_damage': 13, 'starter_effect': 'pierce'},
+   'orbit_speed': 4.0, 'inner_radius': 26, 'outer_radius': 96, 'blade_width': 22, 'base_damage': 13, 'starter_effect': 'pierce'},
   {'code': 'jiuchi_paba', 'name': '九齿钉耙', 'category': 'active', 'attack_kind': 'orbit', 'description': '多件宽环慢转，覆盖面最大', 'character_code': 'bajie',
-   'orbit_speed': 1.9, 'inner_radius': 22, 'outer_radius': 126, 'blade_width': 30, 'base_damage': 11, 'starter_effect': 'knockback'},
+   'orbit_speed': 2.4, 'inner_radius': 22, 'outer_radius': 126, 'blade_width': 30, 'base_damage': 11, 'starter_effect': 'knockback'},
   {'code': 'jiangyao_bangzhang', 'name': '降妖宝杖', 'category': 'active', 'attack_kind': 'orbit', 'description': '少件慢转重击', 'character_code': 'shaseng',
-   'orbit_speed': 1.6, 'inner_radius': 26, 'outer_radius': 92, 'blade_width': 26, 'base_damage': 21, 'starter_effect': 'burn'},
-  {'code': 'staff_buddha_light', 'name': '禅杖·佛光', 'category': 'active', 'attack_kind': 'orbit', 'description': '均衡环绕，附带佛光回血光环', 'character_code': 'tang',
-   'orbit_speed': 2.6, 'inner_radius': 26, 'outer_radius': 104, 'blade_width': 24, 'base_damage': 14, 'starter_effect': 'lifesteal'},
-  // 常规主动（5；已改角色绑定特性法宝——orbit 形态+环绕参数，
-  // 跟随角色解锁自动入池，镜像 SQL 批次 feature_journey_ext_chars_20261106）
+   'orbit_speed': 2.0, 'inner_radius': 26, 'outer_radius': 92, 'blade_width': 26, 'base_damage': 21, 'starter_effect': 'burn'},
+  {'code': 'staff_buddha_light', 'name': '九环锡杖·佛光', 'category': 'active', 'attack_kind': 'orbit', 'description': '观音所赐九环锡杖：均衡环绕，佛光回血光环', 'character_code': 'tang',
+   'orbit_speed': 3.3, 'inner_radius': 26, 'outer_radius': 104, 'blade_width': 24, 'base_damage': 14, 'starter_effect': 'lifesteal'},
+  // 常规主动（5）：随角色解锁自动入池，绑定特性法宝的环绕形态与参数。
   {'code': 'qiankun_circle', 'name': '乾坤圈', 'category': 'active', 'attack_kind': 'orbit', 'description': '乾坤圈掷出砸击：快转中距，命中击退', 'character_code': 'nezha',
-   'orbit_speed': 2.9, 'inner_radius': 24, 'outer_radius': 98, 'blade_width': 24, 'base_damage': 16, 'starter_effect': 'knockback'},
-  {'code': 'sanmei_fire', 'name': '三昧真火', 'category': 'active', 'attack_kind': 'orbit', 'description': '三昧真火炉焰：少件重击带灼烧', 'character_code': 'laojun',
-   'orbit_speed': 1.8, 'inner_radius': 26, 'outer_radius': 94, 'blade_width': 26, 'base_damage': 17, 'starter_effect': 'burn'},
+   'orbit_speed': 3.6, 'inner_radius': 24, 'outer_radius': 98, 'blade_width': 24, 'base_damage': 16, 'starter_effect': 'knockback'},
+  {'code': 'sanmei_fire', 'name': '八卦炉真火', 'category': 'active', 'attack_kind': 'orbit', 'description': '兜率宫八卦炉焰：少件重击带灼烧', 'character_code': 'laojun',
+   'orbit_speed': 2.3, 'inner_radius': 26, 'outer_radius': 94, 'blade_width': 26, 'base_damage': 17, 'starter_effect': 'burn'},
   {'code': 'huojian_spear', 'name': '火尖枪', 'category': 'active', 'attack_kind': 'orbit', 'description': '火尖枪燎原：长杆点火，命中灼烧', 'character_code': 'honghaier',
-   'orbit_speed': 2.5, 'inner_radius': 26, 'outer_radius': 110, 'blade_width': 20, 'base_damage': 18, 'starter_effect': 'burn'},
+   'orbit_speed': 3.1, 'inner_radius': 26, 'outer_radius': 110, 'blade_width': 20, 'base_damage': 18, 'starter_effect': 'burn'},
   {'code': 'bajiao_fan', 'name': '芭蕉扇', 'category': 'active', 'attack_kind': 'orbit', 'description': '芭蕉扇罡风：宽扇慢转，覆盖面最大', 'character_code': 'tieshan',
-   'orbit_speed': 2.0, 'inner_radius': 22, 'outer_radius': 120, 'blade_width': 32, 'base_damage': 12, 'starter_effect': 'knockback'},
+   'orbit_speed': 2.5, 'inner_radius': 22, 'outer_radius': 120, 'blade_width': 32, 'base_damage': 12, 'starter_effect': 'knockback'},
   {'code': 'zijin_gourd', 'name': '紫金葫芦', 'category': 'active', 'attack_kind': 'orbit', 'description': '紫金葫芦摄魂：命中回血，续航抗压', 'character_code': 'jinjiao',
-   'orbit_speed': 2.3, 'inner_radius': 24, 'outer_radius': 102, 'blade_width': 26, 'base_damage': 14, 'starter_effect': 'lifesteal'},
+   'orbit_speed': 2.9, 'inner_radius': 24, 'outer_radius': 102, 'blade_width': 26, 'base_damage': 14, 'starter_effect': 'lifesteal'},
   // 被动加持（6）
   {'code': 'jindou_cloud', 'name': '筋斗云', 'category': 'passive', 'attack_kind': '', 'description': '移速提升', 'attr_key': 'move_speed'},
   {'code': 'pantao', 'name': '蟠桃', 'category': 'passive', 'attack_kind': '', 'description': '生命上限+回复', 'attr_key': 'max_hp'},
   {'code': 'renshen_guo', 'name': '人参果', 'category': 'passive', 'attack_kind': '', 'description': '经验加成', 'attr_key': 'exp_gain'},
   {'code': 'bishui_pearl', 'name': '避水珠', 'category': 'passive', 'attack_kind': '', 'description': '攻速提升（=冷却缩减）', 'attr_key': 'attack_speed'},
-  {'code': 'dingfeng_pearl', 'name': '定风珠', 'category': 'passive', 'attack_kind': '', 'description': '全环半径提升（法宝随之变大）', 'attr_key': 'orbit_radius'},
+  {'code': 'dingfeng_pearl', 'name': '定风丹', 'category': 'passive', 'attack_kind': '', 'description': '灵吉菩萨定风丹：全环半径提升', 'attr_key': 'orbit_radius'},
   {'code': 'shelizi', 'name': '舍利子', 'category': 'passive', 'attack_kind': '', 'description': '伤害提升', 'attr_key': 'damage_amp'},
   // 特效触发（3）
-  {'code': 'kunxian_rope', 'name': '捆仙索', 'category': 'effect', 'attack_kind': '', 'description': '概率定身'},
+  {'code': 'kunxian_rope', 'name': '幌金绳', 'category': 'effect', 'attack_kind': '', 'description': '莲花洞幌金绳：概率定身'},
   {'code': 'fanshang_thorns', 'name': '反伤荆棘', 'category': 'effect', 'attack_kind': '', 'description': '受击反伤'},
   {'code': 'baoji_thunder', 'name': '暴击雷引', 'category': 'effect', 'attack_kind': '', 'description': '暴击闪电链'},
   // 西游扩展批（功德解锁：3 被动 + 3 特效；relic_unlocks 定价）
@@ -249,8 +247,7 @@ const List<Map<String, dynamic>> kJourneyMonsterSeed = <Map<String, dynamic>>[
   {'code': 'xiao_zuanfeng', 'name': '小钻风', 'ai_tier': 'normal', 'base_hp': 2000, 'base_speed': 70, 'contact_damage': 26, 'size_scale': 1.2, 'exp_drop': 40},
 ];
 
-/// 五行天赋分支种子（4 角色 × 5 系 × 3 分支 = 60 行；镜像 SQL 批次
-/// feature_journey_talent_v4_branches_20261106）：v4 分支树制——每系
+/// 五行天赋分支种子（4 角色 × 5 系 × 3 分支 = 60 行）：分支树制——每系
 /// core 本源枝 8 层（核心属性）/ growth 生息枝 5 层（第二属性）/
 /// sig 化形枝 3 层（标志强化），点亮双消耗（1 天赋点 + cost_base×
 /// 层号 功德），相生 1:1 循环锁 + 相克制衡在 App 端判定。
@@ -357,8 +354,7 @@ List<Map<String, dynamic>> buildJourneyTalentBranchSeed() =>
             },
     ];
 
-/// 武器维度槽定义兜底（远端 journey_weapon_slots 优先；镜像 SQL 批次
-/// feature_journey_slots_lv9_clone_20261106：8 槽上限 9 级 + 新增 clone 槽）。
+/// 武器维度槽定义兜底（远端 journey_weapon_slots 优先；8 槽上限 9 级 + clone 槽）。
 /// 6 主动槽=维度槽：初始武器占 1 特效槽（角色映射见引擎），空槽由
 /// 三选一「习得」卡填入；每级效果/上限为运营配置，此处仅兜底。
 const List<Map<String, dynamic>> kJourneySlotDefSeed =
@@ -372,8 +368,7 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'magnet', 'name': '磁吸', 'kind': 'effect', 'effect_per_level': '拾取范围 +40', 'max_level': 9},
   {'code': 'burn', 'name': '灼烧', 'kind': 'effect', 'effect_per_level': '命中点燃：8/秒 持续 2 秒', 'max_level': 9},
   {'code': 'clone', 'name': '分身', 'kind': 'attribute', 'effect_per_level': '环绕法宝 +1 条扇叶', 'max_level': 3},
-  // 暴击体系补全（暴击/暴伤/护甲局内成长路径；镜像 SQL 批次
-  // feature_journey_crit_slots_20261106；暴击率钳 60%、暴伤钳 200%）
+  // 暴击体系补全（暴击/暴伤/护甲局内成长路径；暴击率钳 60%、暴伤钳 200%）
   {'code': 'crit_rate', 'name': '暴击', 'kind': 'attribute', 'effect_per_level': '暴击率 +2.5%', 'max_level': 9},
   {'code': 'crit_damage', 'name': '暴伤', 'kind': 'attribute', 'effect_per_level': '暴击伤害 +6%', 'max_level': 9},
   {'code': 'armor', 'name': '护甲', 'kind': 'attribute', 'effect_per_level': '护甲 +1.5', 'max_level': 9},

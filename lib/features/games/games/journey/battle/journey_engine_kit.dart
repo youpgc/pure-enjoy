@@ -16,7 +16,9 @@ extension JourneyKit on JourneyFlameGame {
   /// 初始特效全部读 journey_weapons 后台配置；行未配置（或字段为 0/空）
   /// 时回落内置差异兜底，保证离线种子同样成立。
   void _buildStarterArm() {
-    var speed = 2.6;
+    // 基础转速在原始节奏上提速约四分之一：扇叶扫掠更连贯，单怪受击
+    // 冷却会吸收大部分频率增益，整体 DPS 不随转速等比例放大。
+    var speed = 3.3;
     var inner = 26.0;
     var outer = 104.0;
     var damage = 14.0;
@@ -24,14 +26,14 @@ extension JourneyKit on JourneyFlameGame {
     var starterEffect = 'pierce';
     switch (character.weaponCode) {
       case 'jingubang': // 金箍棒：快转窄扇叶 + 穿刺
-        speed = 3.2;
+        speed = 4.0;
         outer = 96;
         damage = 13;
         width = 22;
         starterEffect = 'pierce';
         break;
       case 'jiuchi_paba': // 九齿钉耙：慢转宽扇叶长杆 + 击退
-        speed = 1.9;
+        speed = 2.4;
         inner = 22;
         outer = 126;
         damage = 11;
@@ -39,13 +41,13 @@ extension JourneyKit on JourneyFlameGame {
         starterEffect = 'knockback';
         break;
       case 'jiangyao_bangzhang': // 降妖宝杖：慢转重击 + 灼烧
-        speed = 1.6;
+        speed = 2.0;
         outer = 92;
         damage = 21;
         width = 26;
         starterEffect = 'burn';
         break;
-      case 'staff_buddha_light': // 禅杖·佛光：均衡 + 吸血（佛光续航意象）
+      case 'staff_buddha_light': // 九环锡杖·佛光：均衡 + 吸血（佛光续航意象）
         starterEffect = 'lifesteal';
         break;
       default:
@@ -122,7 +124,7 @@ extension JourneyKit on JourneyFlameGame {
         spinAmp += weaponParam('bishui_pearl', 'spin', 0.15);
         break;
       case 'dingfeng_pearl': {
-        // 定风珠：臂长+（params.radius；与臂展槽同用 2.2×基准上限，
+        // 定风丹：臂长+（params.radius；与臂展槽同用 2.2×基准上限，
         // 且直径不超屏幕宽-40）——口径统一保证纯增益不反向缩短
         final arm = weaponArm;
         if (arm != null) {

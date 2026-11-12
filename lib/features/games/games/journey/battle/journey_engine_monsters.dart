@@ -76,7 +76,7 @@ class JourneyMonsterComponent extends PositionComponent {
   double burnRemaining = 0;
   double burnDps = 0;
 
-  /// 定身剩余时间（捆仙索命中）：>0 时跳过移动，仍可受击/灼烧。
+  /// 定身剩余时间（幌金绳命中）：>0 时跳过移动，仍可受击/灼烧。
   double rootTimer = 0;
 
   /// 虚弱剩余时间（金刚琢命中）：>0 时接触伤害减半。
@@ -153,7 +153,7 @@ class JourneyMonsterComponent extends PositionComponent {
     final toPlayer = player.position - position;
     final dist = toPlayer.length;
 
-    // 定身（捆仙索）：递减计时；期间只跳过移动，受击/灼烧照常
+    // 定身（幌金绳）：递减计时；期间只跳过移动，受击/灼烧照常
     final rooted = rootTimer > 0;
     if (rooted) {
       rootTimer -= dt;
@@ -240,7 +240,7 @@ class JourneyMonsterComponent extends PositionComponent {
         }
         break;
       case 2:
-        // 突进：方向锁定，速度 ×3.2；定身期间位移跳过（捆仙索对妖王
+        // 突进：方向锁定，速度 ×3.2；定身期间位移跳过（幌金绳对妖王
         // 突进同样生效），突进时长照常消耗（root 中即原地停摆）
         _chargeTimer -= dt;
         if (!rooted) {

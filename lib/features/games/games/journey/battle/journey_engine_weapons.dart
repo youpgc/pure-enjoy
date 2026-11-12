@@ -20,7 +20,7 @@ class JourneyWeaponArm {
   double damage; // 单次受击基准伤害（法宝分级随角色等级刷新）
   final double bladeWidth; // 扇叶判定宽度 px
 
-  double outerRadius; // 当前外环半径（臂展槽/定风珠成长）
+  double outerRadius; // 当前外环半径（臂展槽/定风丹成长）
 
   double angle = 0; // 旋转相位（渲染与判定的单一真源）
 
@@ -184,7 +184,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     _sweepMapObjects(game, arm, dt);
   }
 
-  /// 命中结算：暴击判定 → 穿刺乘成 → 触发型法宝（捆仙索定身/暴击雷引
+  /// 命中结算：暴击判定 → 穿刺乘成 → 触发型法宝（幌金绳定身/暴击雷引
   /// 闪电链）→ 吸血回复 → 击退 → 灼烧点燃。
   /// 暴击/特效只弹关键浮动文字（普通命中不弹字，防刷屏）。
   void _hitMonster(
@@ -243,7 +243,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         );
       }
     }
-    // 捆仙索：命中 chance 概率定身 root 秒（params.chance/params.root）
+    // 幌金绳：命中 chance 概率定身 root 秒（params.chance/params.root）
     if (!m.isDead &&
         game.effectWeapons.contains('kunxian_rope') &&
         game.rng.nextDouble() <

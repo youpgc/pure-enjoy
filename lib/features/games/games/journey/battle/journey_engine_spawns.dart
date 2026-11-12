@@ -43,13 +43,16 @@ mixin JourneySpawnMixin {
     // loop=true 循环层永不判完成（持续补怪至怪量上限）——含循环层的关卡
     // 不会回落兜底节奏，循环层全权承担时间轴播完后的遭遇密度。
     if (game.runtime.waves.isNotEmpty && !_updateWaves(game, dt)) return;
-    // 兜底：0.8s 起刷随局内时间渐密；批量 1~3 只（3 分钟后拉满）
+    // 兜底：随局内时间渐密；每日游历按图里程提高密度档，让 300 秒
+    // 单局的经验池足以支撑该图目标等级，批量上限随档位递增。
     _spawnTimer += dt;
     final minute = game._elapsed / 60.0;
-    final interval = (0.8 - minute * 0.2).clamp(0.3, 0.8);
+    final tier = _isDaily(game) ? _dailyDensityTier(game) : 0;
+    final interval = (0.8 - 0.10 * tier - minute * 0.12).clamp(0.28, 0.8);
     if (_spawnTimer < interval) return;
     _spawnTimer = 0;
-    final batch = 1 + (minute ~/ 3).clamp(0, 2);
+    final batchCap = 1 + tier;
+    final batch = 1 + (minute ~/ 1.5).clamp(0, batchCap - 1);
     for (var i = 0; i < batch; i++) {
       if (game.monsters.length >= game.monsterCap) return;
       final pick = _pickMonster(game);
@@ -91,8 +94,11 @@ mixin JourneySpawnMixin {
         final protectSec =
             (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
                 .toDouble();
+        // 保护期内精英、妖王与高血「伪普通」怪都回落低阶小妖，
+        // 保证开局先拿到经验池再面对强度压力
+        final early = game._elapsed < protectSec;
         final spawnModel =
-            (game._elapsed < protectSec && (model.isElite || model.isBoss))
+            (early && (model.isElite || model.isBoss || model.baseHp > 200))
                 ? (_pickMonster(game, allowElite: false) ?? model)
                 : model;
         spawnMonsterAt(
@@ -178,9 +184,16 @@ mixin JourneySpawnMixin {
       final elites = pool.where((m) => m.isElite).toList();
       if (elites.isNotEmpty) return elites[game.rng.nextInt(elites.length)];
     }
-    // 普通怪单独取样：未命中精英率时也不把精英混进随机结果
-    final commons = pool.where((m) => !m.isElite).toList();
-    final candidates = commons.isNotEmpty ? commons : pool;
+    // 普通怪单独取样：保护期内排除高血「伪普通」怪，未命中精英率时
+    // 也不把精英混进随机结果
+    final commons = pool
+        .where((m) =>
+            !m.isElite && (elapsed >= protectSec || m.baseHp <= 200))
+        .toList();
+    final fallback = pool.where((m) => !m.isElite).toList();
+    final candidates = commons.isNotEmpty
+        ? commons
+        : (fallback.isNotEmpty ? fallback : pool);
     return candidates[game.rng.nextInt(candidates.length)];
   }
 
@@ -307,11 +320,11 @@ mixin JourneySpawnMixin {
   // ---- 无尽妖潮 / 每日游历（虚拟关 level_no=0，纯 App 端模式）----
 
   /// 无尽妖潮波次生成器（除尽推进制）：当前波怪全灭才进下一波；
-  /// 波次配置 journey_endless_waves（上限 99）优先——monster_code 命中
-  /// 妖王即妖王波（一次性 1 只），否则按 count 分批刷怪，buff_mult 覆盖
-  /// 增强曲线；未配置波回落内置公式 count=10+3n、interval=max(0.2,
-  /// 0.9-0.018n)、buff=1+n*0.10（逐波更强）；怪池=普通怪（n≥10 混精英，
-  /// n≥60 精英概率 0.4）。末波（99）刷完清空→「妖潮无尽·功成」可结算。
+  /// 波次配置 journey_endless_waves 优先——monster_code 命中妖王=妖王波
+  /// （首只妖王 + 小怪护卫），count 为本波总量、elite_count 为末尾精英数；
+  /// 未配置或新列未部署时按经验池公式推演（50~120 只、每波 2~14 精英、
+  /// buff=1+0.03n）；波内先低阶小妖供发育、末尾分阶精英施压，整波约 18
+  /// 秒铺完。末波（99）刷完清空→「妖潮无尽·功成」可结算。
   void _updateEndless(JourneyFlameGame game, double dt) {
     final hud = game.controller.hud;
     if (hud.endlessWave.value != game._endlessWave) {
@@ -323,11 +336,16 @@ mixin JourneySpawnMixin {
     }
     final n = game._endlessWave;
     final waveConf = game.config?.endlessWaveOf(n);
-    final count = waveConf?.count ?? 10 + 3 * n;
-    final buff = waveConf?.buffMult ?? 1 + n * 0.10;
-    // 波次怪种（后台逐波自由配置，不限定波次）：选妖王=该波刷妖王
-    // （数量按波次配置，不强制 1 只）；普通/精英怪=该波只刷该怪；
-    // NULL/空=内置曲线随机刷怪（_pickEndlessMonster）
+    final count = waveConf?.count ?? endlessWaveCount(n);
+    final buff = waveConf?.buffMult ?? endlessWaveBuff(n);
+    // 本波精英只数：后台配置优先，0（含新列未部署）=按波号公式兜底；
+    // 精英恒留至少 1 个普通怪位，保证先发育后施压
+    final eliteCount = waveConf != null && waveConf.eliteCount > 0
+        ? waveConf.eliteCount
+        : endlessEliteCount(n);
+    final elite = math.min(eliteCount, math.max(0, count - 1));
+    // 波次怪种：普通/精英怪=该波普通段只刷该怪；选妖王=妖王波
+    // （首只妖王 + 小怪护卫，其余数量按 count 配置）
     final configuredCode = waveConf?.monsterCode ?? '';
     final isBossWave = configuredCode.isNotEmpty &&
         _monsterSource(game).any((m) => m.code == configuredCode && m.isBoss);
@@ -356,19 +374,23 @@ mixin JourneySpawnMixin {
       return;
     }
     game._endlessTimer += dt;
-    final interval = (0.9 - 0.018 * n).clamp(0.2, 0.9);
+    // 每波约 18 秒铺完（50 只→0.35s、120 只→0.15s），保持割草节奏
+    final interval = (18.0 / count).clamp(0.12, 0.35);
     if (game._endlessTimer < interval) return;
     if (game.monsters.length >= game.monsterCap) return;
-    final model = isBossWave
+    final spawned = game._endlessSpawned;
+    final isElite = elite > 0 && spawned >= count - elite;
+    final model = (isBossWave && spawned == 0)
         ? _bossModelOf(game, configuredCode)
-        : _pickEndlessMonster(game, n, configuredCode);
+        : _pickEndlessMonster(game, n, isElite ? '' : configuredCode,
+            elite: isElite);
     if (model == null) return;
     game._endlessTimer = 0;
     spawnMonsterAt(game, model, buffMult: buff, position: null);
     game.monsters.last.endlessWave = n;
     game._endlessSpawned++;
     // 妖王波首只现身：走 onBossSpawn 统一播报「妖王降临 · X」（HUD 状态同步）
-    if (isBossWave && game._endlessSpawned == 1) {
+    if (isBossWave && spawned == 0) {
       game.controller.onBossSpawn(model.name);
     }
   }
@@ -381,24 +403,21 @@ mixin JourneySpawnMixin {
     return null;
   }
 
-  /// 无尽怪池挑选：波次配置怪种时只刷该怪（配置断裂回落随机）；
-  /// 未配置走 n<10 全普通、10≤n<60 普通+精英混池、n≥60 精英概率 0.4。
+  /// 无尽怪池挑选：普通段尊重后台配置的怪种（配置断裂回落分阶随机池），
+  /// 精英段强制走分阶精英池，保证每波末尾都有精英施压。
   JourneyMonsterModel? _pickEndlessMonster(
-      JourneyFlameGame game, int n, String configuredCode) {
-    if (configuredCode.isNotEmpty) {
+    JourneyFlameGame game,
+    int waveNo,
+    String configuredCode, {
+    required bool elite,
+  }) {
+    if (!elite && configuredCode.isNotEmpty) {
       final hit = game.pool
           .where((m) => m.code == configuredCode)
           .toList(growable: false);
       if (hit.isNotEmpty) return hit[game.rng.nextInt(hit.length)];
-      // 配置怪种不在池（断裂行/已删怪）：回落随机池防死局
     }
-    final normal = game.pool.where((m) => !m.isBoss && !m.isElite).toList();
-    final elite = game.pool.where((m) => m.isElite).toList();
-    final rollElite = elite.isNotEmpty &&
-        (n >= 60
-            ? game.rng.nextDouble() < 0.4
-            : n >= 10 && game.rng.nextDouble() < elite.length / (normal.length + elite.length));
-    final pool = rollElite ? elite : (normal.isEmpty ? elite : normal);
+    final pool = endlessTierPool(game, waveNo: waveNo, elite: elite);
     if (pool.isEmpty) return null;
     return pool[game.rng.nextInt(pool.length)];
   }
@@ -432,6 +451,22 @@ mixin JourneySpawnMixin {
 /// 虚拟关模式判定（kind 约定见 JourneyLevelModel；level_no=0 不落主线）。
 bool _isEndless(JourneyFlameGame game) => game.level.kind == 'endless';
 bool _isDaily(JourneyFlameGame game) => game.level.kind == 'daily';
+
+/// 每日游历密度档：按后台地图序列的里程碑里数分 0~4 档，档位越高刷怪
+/// 越密，让 300 秒单局的经验池足以支撑该图目标等级。图序列缺失时按
+/// 里程线性分档兜底，保证离线可玩。
+int _dailyDensityTier(JourneyFlameGame game) {
+  final li =
+      game.config?.dailyMapOf(game.level.regionCode)?.milestoneLi ?? 800;
+  final maps = game.config?.dailyMapList();
+  if (maps == null || maps.isEmpty) {
+    return ((li - 800) / 450).floor().clamp(0, 4).toInt();
+  }
+  final milestones = <int>{for (final m in maps) m.milestoneLi}.toList()
+    ..sort();
+  final idx = milestones.indexWhere((v) => v >= li);
+  return (idx < 0 ? milestones.length - 1 : idx).clamp(0, 4).toInt();
+}
 
 /// 妖王降临倒计时推进：归零即召唤并写「妖王降临」横幅；剩余时间进入
 /// 后台提醒窗口（journey_globals.boss_warn_sec，默认 10s）后写入 HUD，
