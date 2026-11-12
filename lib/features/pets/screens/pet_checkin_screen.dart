@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import '../models/pet_rpc_models.dart';
 import '../services/pet_rpc.dart';
 import '../services/pet_service.dart';
+import '../utils/pet_checkin_window.dart';
 import '../utils/pet_errors.dart';
 import '../widgets/pet_checkin_cells.dart';
 import '../widgets/pet_checkin_style.dart';
@@ -13,10 +14,10 @@ import 'pet_shop_screen.dart';
 /// 主页「签到」入口弹窗（宠物模块独享签到体系）。
 ///
 /// 展示口径（参考主流签到页样式一比一还原）：**4 列 flex 等分网格**铺排
-/// 当月全部日签格（收起显示前 8 天，可展开全部），列宽恒定相等；
-/// 已签格加深并盖绿色对勾，今日待签格橙底红点高亮，漏签格可点补签
-/// （每自然月 4 次，服务端校验）。奖励锚点 = 累计签到次数（含补签）
-/// 当月第 N 次签到获得模板第 N 天奖励，与日历日期无关。
+/// 奖励槽（每 4 格一组，总数按当月天数钳制），收起显示待签槽所在组及其后一组，可展开全部；
+/// 列宽恒定相等；已签格加深并盖绿色对勾，待签格橙底红点高亮，漏签补签
+/// 走统计条按日历日选择（每自然月 4 次，服务端校验）。奖励锚点 = 累计
+/// 签到次数（含补签），当月第 N 次签到获得模板第 N 槽奖励，与日历日期无关。
 Future<void> showPetCheckinSheet(BuildContext context) {
   return showModalBottomSheet<void>(
     context: context,
@@ -70,7 +71,7 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
   bool _signing = false;
 
 
-  /// 奖励网格展开态（收起 = 前 8 天两行，展开 = 当月全部）
+  /// 奖励网格展开态（收起 = 待签槽所在组 + 后一组，展开 = 模板全槽）
   bool _expanded = false;
   String? _error;
 
@@ -81,7 +82,9 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
   static DateTime _beijingToday() =>
       DateTime.now().toUtc().add(const Duration(hours: 8));
 
-  static int _lastDayOf(DateTime d) => DateTime(d.year, d.month + 1, 0).day;
+  /// 当月天数（北京时间口径下的公历月末）
+  static int _daysInMonth(DateTime d) =>
+      DateTime(d.year, d.month + 1, 0).day;
 
   static bool _sameDay(DateTime a, DateTime b) =>
       a.year == b.year && a.month == b.month && a.day == b.day;
@@ -350,7 +353,8 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
   }
 
   /// 加载态骨架模型：空奖励表（格内问号占位）+ 全勤 signedDates
-  /// （漏签 0 天最平静视觉）。行数只随日期走，与数据无关 → 高度严格同构
+  /// （漏签 0 天最平静视觉）。累计 0 次 → 收起窗口 1-8 两行，
+  /// 与成功态收起版式严格一致 → 高度零跳变
   PetCheckinStatusModel _skeletonStatus(DateTime today) {
     String key(int day) =>
         '${today.year.toString().padLeft(4, '0')}-${today.month.toString().padLeft(2, '0')}-${day.toString().padLeft(2, '0')}';
@@ -373,28 +377,40 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
   /// [gridOverlay] 非空时以 Stack 浮层盖住网格区（骨架高度不变）
   Widget _buildStatusBody(PetCheckinStatusModel st, DateTime today,
       {Widget? gridOverlay}) {
-    final lastDay = _lastDayOf(today);
     final missed = _missedDays(st, today);
-    final visibleDays = _expanded ? lastDay : (lastDay < 8 ? lastDay : 8);
+    final totalSlots =
+        petCheckinTotalSlots(st, _daysInMonth(today));
+    // 签到后 totalSigned 递增，窗口随下一个待签槽主动前移
+    final next = st.totalSigned + 1 > totalSlots
+        ? totalSlots
+        : st.totalSigned + 1;
+    final (winStart, winEnd) =
+        petCheckinCollapsedWindow(next, totalSlots);
+    final slots = _expanded
+        ? [for (var s = 1; s <= totalSlots; s++) s]
+        : [for (var s = winStart; s <= winEnd; s++) s];
     final gridRows = <Widget>[
         // 4 列 flex 等分网格：列宽恒定相等、占满整行（行尾空槽留白）
-        for (var row = 0; row < (visibleDays + 3) ~/ 4; row++) ...[
+        for (var row = 0;
+            row <
+                (slots.length + kPetCheckinGroupSize - 1) ~/
+                    kPetCheckinGroupSize;
+            row++) ...[
           if (row > 0) const SizedBox(height: 6),
           IntrinsicHeight(
             child: Row(
               children: [
-                for (var col = 0; col < 4; col++) ...[
+                for (var col = 0; col < kPetCheckinGroupSize; col++) ...[
                   if (col > 0) const SizedBox(width: 6),
                   Expanded(
-                    child: row * 4 + col + 1 <= visibleDays
+                    child: row * kPetCheckinGroupSize + col < slots.length
                         ? PetCheckinDayCell(
                             st: st,
                             today: today,
-                            day: row * 4 + col + 1,
+                            day: slots[row * kPetCheckinGroupSize + col],
                             itemIcons: _itemIcons,
                             signing: _signing,
-                            onSign: _sign,
-                            onMakeup: _confirmMakeup)
+                            onSign: _sign)
                         : const SizedBox(),
                   ),
                 ],
@@ -422,8 +438,9 @@ class _PetCheckinPanelState extends State<PetCheckinPanel> {
         const SizedBox(height: 10),
         gridBlock,
         const SizedBox(height: 6),
-        // 展开/收起（当月超 8 天时出现）
-        if (lastDay > 8)
+        // 展开/收起（模板超出收起窗口时出现）
+        if (totalSlots >
+            kPetCheckinCollapsedGroups * kPetCheckinGroupSize)
           TextButton(
             onPressed: () => setState(() => _expanded = !_expanded),
             child: Row(

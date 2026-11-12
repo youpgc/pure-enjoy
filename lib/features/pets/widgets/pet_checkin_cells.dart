@@ -92,8 +92,9 @@ class PetCheckinStatsBar extends StatelessWidget {
   }
 }
 
-/// 日签格（4 列等分竖卡）：圆形奖励图 + ×数量 + 第 N 天名牌；
-/// 已签浅底盖半透明绿勾；今日待签金框高亮；漏签格可点补签
+/// 签到格（4 列等分竖卡，4 格一组）：圆形奖励图 + ×数量 + 第 N 次名牌；
+/// 序号是当月累计签到第 N 次（与日历日期无关），前 totalSigned 格已签、
+/// 下一格待签金框高亮；补签不落在格子上，走统计条按日期的入口
 class PetCheckinDayCell extends StatelessWidget {
   const PetCheckinDayCell({
     super.key,
@@ -103,11 +104,13 @@ class PetCheckinDayCell extends StatelessWidget {
     required this.itemIcons,
     required this.signing,
     required this.onSign,
-    required this.onMakeup,
   });
 
   final PetCheckinStatusModel st;
   final DateTime today;
+
+  /// 累计签到槽位（当月第 N 次签到），不是日历日：奖励取 days[day]、
+  /// 前 totalSigned 个槽已签、第 totalSigned+1 个槽待签
   final int day;
 
   /// 道具图标键映射（pet_items.icon 原始值，icon/ 前缀在组件内剥离）
@@ -116,10 +119,6 @@ class PetCheckinDayCell extends StatelessWidget {
   /// 签到/补签请求进行中（防重复提交，禁用整格点击）
   final bool signing;
   final void Function(DateTime date) onSign;
-  final void Function(DateTime date, PetCheckinStatusModel st) onMakeup;
-
-  static bool _sameDay(DateTime a, DateTime b) =>
-      a.year == b.year && a.month == b.month && a.day == b.day;
 
   /// 图标资源键（pet_items.icon 形如 icon/<key>，剥前缀取 key；其余原样）
   String _iconOf(String code) {
@@ -158,11 +157,11 @@ class PetCheckinDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final date = DateTime(today.year, today.month, day);
-    final signed = st.isSigned(date);
-    final isToday = _sameDay(date, today);
+    // 奖励锚点 = 累计签到次数：前 totalSigned 个槽已签，下一个槽待签
+    // （今日已签则不高亮，避免已完成后仍挂着待签橙底）
+    final signed = day <= st.totalSigned;
     final reward = st.days[day];
-    final isNext = isToday && !signed;
+    final isNext = day == st.totalSigned + 1 && !st.isSigned(today);
 
     final Color cardBg;
     final Color borderColor;
@@ -207,14 +206,8 @@ class PetCheckinDayCell extends StatelessWidget {
       ),
       clipBehavior: Clip.antiAlias,
       child: InkWell(
-        // 今日待签 → 签到；漏签 → 补签确认；已签/未来不可点
-        onTap: signing
-            ? null
-            : isToday && !signed
-                ? () => onSign(date)
-                : (!signed && date.isBefore(today))
-                    ? () => onMakeup(date, st)
-                    : null,
+        // 仅下一个待签槽可点签到；补签按日历日走统计条「漏签 N 天」入口
+        onTap: signing || !isNext ? null : () => onSign(today),
         child: Column(
           children: [
             Padding(
