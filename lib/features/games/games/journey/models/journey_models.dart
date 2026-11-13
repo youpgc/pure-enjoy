@@ -271,7 +271,6 @@ class JourneyDailyMapModel {
   final String name;
   final String themeColor; // hex（#RRGGBB），驱动地图渲染
   final int milestoneLi; // 里程碑里数（进关播报）
-  final int durationTargetSec; // 通关锚点时长（0=用虚拟关缺省 300）
   final String desc;
 
   /// 按图怪物池（journey_daily_maps.monster_pool，逗号分隔怪 code；
@@ -283,7 +282,6 @@ class JourneyDailyMapModel {
     required this.name,
     this.themeColor = '#E8C470',
     this.milestoneLi = 800,
-    this.durationTargetSec = 0,
     this.desc = '',
     this.monsterPool = const <String>[],
   });
@@ -294,8 +292,6 @@ class JourneyDailyMapModel {
       name: json['name'] as String? ?? '',
       themeColor: json['theme_color'] as String? ?? '#E8C470',
       milestoneLi: (json['milestone_li'] as num?)?.toInt() ?? 800,
-      durationTargetSec:
-          (json['duration_target_sec'] as num?)?.toInt() ?? 0,
       desc: json['description'] as String? ?? '',
       monsterPool: ((json['monster_pool'] as String?) ?? '')
           .split(',')

@@ -496,9 +496,9 @@ const List<Map<String, dynamic>> kJourneyPickupConfigSeed =
 /// 游历地图兜底种子（code/名称/主题色/里程碑里数/功成时长）；
 /// 主题色驱动地图渲染，里数为进关里程碑播报口径。
 const List<Map<String, dynamic>> kJourneyDailyMapSeed = <Map<String, dynamic>>[
-  {'code': 'huaguoshan', 'name': '花果山', 'theme_color': '#6FBF9A', 'milestone_li': 800, 'duration_target_sec': 300, 'description': '猴王故里，沿途铜钱雨不断', 'sort': 1},
-  {'code': 'gaolaozhuang', 'name': '高老庄', 'theme_color': '#B08968', 'milestone_li': 1200, 'duration_target_sec': 300, 'description': '田园庄院，庄稼间妖气隐现', 'sort': 2},
-  {'code': 'huangfengling', 'name': '黄风岭', 'theme_color': '#D4A73F', 'milestone_li': 1600, 'duration_target_sec': 300, 'description': '黄沙漫岭，妖风裹挟而行', 'sort': 3},
-  {'code': 'liushahe', 'name': '流沙河', 'theme_color': '#5B9BD5', 'milestone_li': 2000, 'duration_target_sec': 300, 'description': '八百里流沙，鹅毛难浮', 'sort': 4},
-  {'code': 'huoyanshan', 'name': '火焰山', 'theme_color': '#D4593F', 'milestone_li': 2600, 'duration_target_sec': 300, 'description': '八百里火焰，寸草不生', 'sort': 5},
+  {'code': 'huaguoshan', 'name': '花果山', 'theme_color': '#6FBF9A', 'milestone_li': 800, 'description': '猴王故里，沿途铜钱雨不断', 'sort': 1},
+  {'code': 'gaolaozhuang', 'name': '高老庄', 'theme_color': '#B08968', 'milestone_li': 1200, 'description': '田园庄院，庄稼间妖气隐现', 'sort': 2},
+  {'code': 'huangfengling', 'name': '黄风岭', 'theme_color': '#D4A73F', 'milestone_li': 1600, 'description': '黄沙漫岭，妖风裹挟而行', 'sort': 3},
+  {'code': 'liushahe', 'name': '流沙河', 'theme_color': '#5B9BD5', 'milestone_li': 2000, 'description': '八百里流沙，鹅毛难浮', 'sort': 4},
+  {'code': 'huoyanshan', 'name': '火焰山', 'theme_color': '#D4593F', 'milestone_li': 2600, 'description': '八百里火焰，寸草不生', 'sort': 5},
 ];
