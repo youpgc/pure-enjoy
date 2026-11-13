@@ -299,7 +299,8 @@ class _HudPanel extends StatelessWidget {
 }
 
 /// 妖王罗盘：箭头指向妖王据点 + 距离接近度文案；无有效引导信息时整块隐藏。
-/// 无妖章回（hasBoss=false）：每日游历=剩余时长倒计时；无妖主线章回=西行里程。
+/// 无妖章回（hasBoss=false）：每日游历不展示通关条件/提示（进图即亮「功成」、
+/// 随时可结算）；无妖主线章回=西行里程。
 class _Compass extends StatelessWidget {
   const _Compass({required this.controller});
 
@@ -441,9 +442,9 @@ class _Compass extends StatelessWidget {
   Widget _bossSpawnCountdownView(int left) =>
       _radarBadge(Icons.hourglass_top, '妖王降临 · ${left}s');
 
-  /// 无妖章回收口展示：每日游历=剩余时长倒计时（建议时长，归零不自动结算）；
-  /// 无妖主线章回=西行里程（剩余里数，按玩家实际位移累计，挂机不可达成）。
-  /// 归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
+  /// 无妖章回收口展示：每日游历不展示任何通关条件/提示（进图即亮「功成」、
+  /// 随时可结算，整块隐藏）；无妖主线章回=西行里程（剩余里数，按玩家实际
+  /// 位移累计，挂机不可达成）；无尽妖潮（endlessWave>0）：同位展示当前波数。
   Widget _surviveCountdown(JourneyBattleController controller) {
     final hud = controller.hud;
     return ValueListenableBuilder<int>(
@@ -459,12 +460,7 @@ class _Compass extends StatelessWidget {
                           ? const SizedBox.shrink()
                           : _radarBadge(Icons.directions_walk, '西行 · 余 $left 里'),
                     )
-                  : ValueListenableBuilder<int>(
-                      valueListenable: hud.surviveLeft,
-                      builder: (context, left, _) => left <= 0
-                          ? const SizedBox.shrink()
-                          : _radarBadge(Icons.hourglass_bottom, '游历 · 剩余 ${left}s'),
-                    ),
+                  : const SizedBox.shrink(),
             ),
     );
   }

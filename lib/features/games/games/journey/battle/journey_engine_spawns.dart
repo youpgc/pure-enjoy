@@ -43,8 +43,8 @@ mixin JourneySpawnMixin {
     // loop=true 循环层永不判完成（持续补怪至怪量上限）——含循环层的关卡
     // 不会回落兜底节奏，循环层全权承担时间轴播完后的遭遇密度。
     if (game.runtime.waves.isNotEmpty && !_updateWaves(game, dt)) return;
-    // 兜底：随局内时间渐密；每日游历按图里程提高密度档，让 300 秒
-    // 单局的经验池足以支撑该图目标等级，批量上限随档位递增。
+    // 兜底：随局内时间渐密；每日游历按图里程提高密度档，使单局经验池
+    // 足以支撑该图目标等级，批量上限随档位递增。
     _spawnTimer += dt;
     final minute = game._elapsed / 60.0;
     final tier = _isDaily(game) ? _dailyDensityTier(game) : 0;

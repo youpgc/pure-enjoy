@@ -125,14 +125,13 @@ class JourneyBattleHud {
   final ValueNotifier<double> bearing = ValueNotifier<double>(0);
   final ValueNotifier<double> progress = ValueNotifier<double>(0);
 
-  /// 无妖章回罗盘位口径：每日游历=剩余时长倒计时（surviveLeft=剩余秒，
-  /// 建议时长，归零不自动结算）；无妖主线章回=西行里程（travelBased=true 时用
-  /// travelLeft=剩余里数，按玩家实际位移累计，挂机不可达成）。
+  /// 无妖章回罗盘位口径：每日游历不展示通关条件/提示（进图即亮「功成」、
+  /// 随时可结算）；无妖主线章回=西行里程（travelBased=true 时用 travelLeft=
+  /// 剩余里数，按玩家实际位移累计，挂机不可达成）。
   final ValueNotifier<bool> hasBoss = ValueNotifier<bool>(true);
-  final ValueNotifier<int> surviveLeft = ValueNotifier<int>(0);
 
   /// 西行里程口径（无妖主线章回）：travelBased=true 时罗盘位改展示
-  /// travelLeft（剩余里数），时长倒计时仅保留给每日游历。
+  /// travelLeft（剩余里数）。
   final ValueNotifier<bool> travelBased = ValueNotifier<bool>(false);
   final ValueNotifier<int> travelLeft = ValueNotifier<int>(0);
 

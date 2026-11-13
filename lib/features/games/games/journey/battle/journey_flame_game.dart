@@ -405,16 +405,12 @@ class JourneyFlameGame extends FlameGame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
-      // 无妖章回（原著无妖）：罗盘位口径分派——每日游历=剩余时长倒计时
-      // （建议时长，归零不自动结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
+      // 无妖章回（原著无妖）：罗盘位口径分派——每日游历不展示通关条件/提示
+      // （进图即亮「功成」、随时可结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
       controller.hud.hasBoss.value = bossModel != null;
-      if (bossModel == null) {
-        if (_isDaily(this)) {
-          controller.hud.surviveLeft.value = surviveTargetSec;
-        } else if (!_isEndless(this)) {
-          controller.hud.travelBased.value = true;
-          controller.hud.travelLeft.value = travelTargetLi;
-        }
+      if (bossModel == null && !_isDaily(this) && !_isEndless(this)) {
+        controller.hud.travelBased.value = true;
+        controller.hud.travelLeft.value = travelTargetLi;
       }
       controller.hud.bossStartDist.value = bossStartDist;
     });
@@ -448,24 +444,16 @@ class JourneyFlameGame extends FlameGame
 
     // 无妖章回收口：满足通关条件后罗盘位归零隐藏，结算按钮亮起，
     // 游玩照常（不主动结算，由玩家决定）
-    if (bossModel == null && !_isEndless(this)) {
-      if (_isDaily(this)) {
-        // 每日游历：仅展示建议时长倒计时；归零不自动结算，由玩家点「功成」主动结算
-        final left =
-            (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
-        if (left != controller.hud.surviveLeft.value) {
-          controller.hud.surviveLeft.value = left;
-        }
-      } else {
-        // 无妖主线章回：西行里程达标即亮结算按钮（挂机/定身无里程不可达成）
-        final target = travelTargetLi;
-        final left = (target - traveledUnits / 25).ceil().clamp(0, target);
-        if (left != controller.hud.travelLeft.value) {
-          controller.hud.travelLeft.value = left;
-        }
-        if (traveledUnits >= target * 25 && !_bossDefeated) {
-          _markClearedAvailable('西行功成');
-        }
+    // 每日游历不做通关条件限制/提示（进图即亮「功成」、随时可结算），
+    // 不进入里程口径；仅无妖主线章回按西行里程亮结算按钮（挂机/定身无里程不可达成）
+    if (bossModel == null && !_isEndless(this) && !_isDaily(this)) {
+      final target = travelTargetLi;
+      final left = (target - traveledUnits / 25).ceil().clamp(0, target);
+      if (left != controller.hud.travelLeft.value) {
+        controller.hud.travelLeft.value = left;
+      }
+      if (traveledUnits >= target * 25 && !_bossDefeated) {
+        _markClearedAvailable('西行功成');
       }
     }
 

@@ -199,8 +199,6 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
               regionCode: map.code,
               kind: 'daily',
               bossFights: 0,
-              durationTargetSec:
-                  map.durationTargetSec > 0 ? map.durationTargetSec : 300,
             ),
           ),
         ),
