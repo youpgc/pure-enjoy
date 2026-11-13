@@ -367,7 +367,7 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'speed', 'name': '转速', 'kind': 'attribute', 'effect_per_level': '环绕转速 +10%', 'max_level': 9},
   {'code': 'damage', 'name': '伤害', 'kind': 'attribute', 'effect_per_level': '武器伤害 +20%', 'max_level': 9},
   {'code': 'knockback', 'name': '击退', 'kind': 'effect', 'effect_per_level': '命中击退距离 +16', 'max_level': 9},
-  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '每级命中固定回复 +2 点生命（每秒合计≤最大生命 10%）', 'max_level': 9},
+  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '命中回复武器伤害的 3%（每级 +1.5%，9 级 15%，上限 20%），单次保底 2 点；每秒合计≤最大生命 10%', 'max_level': 9},
   {'code': 'pierce', 'name': '穿刺', 'kind': 'effect', 'effect_per_level': '武器伤害 +15%', 'max_level': 9},
   {'code': 'magnet', 'name': '磁吸', 'kind': 'effect', 'effect_per_level': '拾取范围 +40', 'max_level': 9},
   {'code': 'burn', 'name': '灼烧', 'kind': 'effect', 'effect_per_level': '命中点燃：8/秒 持续 2 秒', 'max_level': 9},

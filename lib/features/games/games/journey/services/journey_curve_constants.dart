@@ -24,9 +24,21 @@ const double kJourneyMonsterSpeedCap = 200.0;
 /// 玩家等级提升不稀释妖王压力比值。
 const double kJourneyBossDamageLvK = 0.15;
 
-/// 吸血每级固定回复点数：回复与伤害乘区（攻击卡/等级/暴击）解耦，
-/// 数值可预算不随伤害膨胀。
-const double kJourneyLifestealHealPerLv = 2.0;
+/// 吸血回复比例（占最终命中伤害）：1 级基准，每级按
+/// journey_weapon_slots.lifesteal.value_per_level（缺省 +1.5%）递增，
+/// 比例钳 ≤ 上限。回复随伤害量级缩放，低伤命中另设保底点数。
+const double kJourneyLifestealBaseRatio = 0.03;
+
+/// 吸血比例的每级增量（journey_weapon_slots.lifesteal.value_per_level
+/// 可覆盖）：9 级 = 3% + 1.5%×8 = 15%。
+const double kJourneyLifestealRatioPerLv = 0.015;
+
+/// 吸血比例上限：无论等级与远端配置，单次回复比例不突破此值。
+const double kJourneyLifestealRatioCap = 0.20;
+
+/// 吸血单次保底回复点数：伤害×比例不足 2 点时按 2 点回复，
+/// 保证开局低伤阶段吸血维度仍然有效。
+const double kJourneyLifestealHealFloor = 2.0;
 
 /// 吸血每秒回复上限（占最大生命比例）：多目标高频命中的合计钳制，
 /// 防止扇叶扫掠多目标时回复叠乘失控。

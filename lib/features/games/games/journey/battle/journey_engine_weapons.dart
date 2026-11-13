@@ -259,9 +259,15 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       }
     }
     if (lifestealLv > 0) {
-      // 吸血：与伤害乘区解耦的固定点数回复（每级 +2 点），秒窗合计
-      // 钳到最大生命 10%（防多目标高频命中叠乘；禁疗由 heal 内部拦截）
-      game.addLifestealHeal(kJourneyLifestealHealPerLv * lifestealLv);
+      // 吸血：按最终命中伤害（含暴击/伏魔/火眼加伤）比例回复——1 级 3%、
+      // 每级 +1.5%（远端 value_per_level 可覆盖斜率），比例钳 ≤20%；
+      // 低伤命中保底 2 点。秒窗合计钳到最大生命 10%（防多目标高频
+      // 命中叠乘；禁疗由 heal 内部拦截）
+      final ratio = (kJourneyLifestealBaseRatio +
+              game.slotValue('lifesteal', kJourneyLifestealRatioPerLv) *
+                  (lifestealLv - 1))
+          .clamp(0.0, kJourneyLifestealRatioCap);
+      game.addLifestealHeal(math.max(dmg * ratio, kJourneyLifestealHealFloor));
     }
     if (knockLv > 0) {
       var kb = game.slotValue('knockback', 16) * knockLv;
