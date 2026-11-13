@@ -15,6 +15,9 @@ class JourneySprites {
   static String monster(String code) => 'assets/games/journey/monster_$code.svg';
   static String pickup(String kind) => 'assets/games/journey/pickup_$kind.svg';
   static String weapon(String code) => 'assets/games/journey/weapon_$code.svg';
+  /// 武器维度槽图标（HUD 槽位与局内三选一卡共用，保证同源同形）
+  static String slotIcon(String code) =>
+      'assets/games/journey/icon_slot_$code.svg';
   static String character(String code) => 'assets/games/journey/char_$code.svg';
   /// 场景道具（参照物/里程碑装饰；name=gongtai/shikuai/shibei/yiting）
   static String prop(String name) => 'assets/games/journey/prop_$name.svg';

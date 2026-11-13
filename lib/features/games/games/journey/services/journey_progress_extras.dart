@@ -5,13 +5,14 @@ part of 'journey_progress_service.dart';
 extension JourneyProgressExtras on JourneyProgressService {
   // ---- 局外玩法（M3 节点 5/10/13）：还魂复活 / 图鉴解锁 / 成就判定 ----
 
-  /// 还魂复活扣功德（节点 5）：消耗 = 基准价 × 关卡号（缺省 20×关卡号），
+  /// 还魂复活扣功德：消耗 = 基准价 × 关卡号并封顶，与局内确认价同源；
   /// 单局次数由局内状态控制。功德不足返回 false；成功落流水
   /// （source_type='revive_spend'）并触发还魂成就单查。
   Future<bool> spendRevive(int levelNo) async {
     await ensureLoaded();
     final snapshot = JourneyConfigService.instance.cached;
-    final cost = snapshot?.reviveCostFor(levelNo) ?? 20 * levelNo;
+    final cost = snapshot?.reviveCostFor(levelNo) ??
+        (kJourneyReviveMeritBase * levelNo).clamp(0, kJourneyReviveMeritCap);
     if (_state.meritBalance < cost) return false;
     final newBalance = _state.meritBalance - cost;
     final record = JourneyMeritRecordModel(

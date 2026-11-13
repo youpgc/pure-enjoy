@@ -95,7 +95,8 @@ class JourneyConfigService {
         regionRows.map(JourneyRegionModel.fromJson).toList();
     // 关卡行（game_levels）：name=难名；西行专属属性在 config jsonb
     // （region_code/level_kind/boss_fights/first_clear_merit/
-    // duration_target_sec=无妖难坚持时长）；未开放难不进列表。
+    // duration_target_sec=无妖难通关锚点时长（无妖主线换算西行里程目标、
+    // 每日游历满时长强制结算）；未开放难不进列表。
     final levels = (results[1] ?? const <Map<String, dynamic>>[])
         .where((row) => row['enabled'] != false)
         .map((row) {
@@ -132,7 +133,7 @@ class JourneyConfigService {
     final monsterCap =
         (globalsRow?['monster_cap'] as num?)?.toInt() ?? 120;
     // 还魂复活功德基准价（journey_globals 全列拉取，直接取行键）
-    final reviveMeritBase = (globalsRow?['revive_merit_base'] as num?)?.toInt() ?? 60;
+    final reviveMeritBase = (globalsRow?['revive_merit_base'] as num?)?.toInt() ?? 30;
     // 开局铺场只数（journey_globals.initial_pack_size，0=关闭；缺省 24）
     final initialPackSize = (globalsRow?['initial_pack_size'] as num?)?.toInt() ?? 24;
     final spawnDenRatio = (globalsRow?['spawn_den_ratio'] as num?)?.toDouble() ?? 0.70;
@@ -140,6 +141,8 @@ class JourneyConfigService {
     final talentDropRate = (globalsRow?['talent_drop_rate'] as num?)?.toDouble() ?? 0.10;
     // 角色等级上限（缺省回落 99）
     final charLevelCap = (globalsRow?['char_level_cap'] as num?)?.toInt() ?? 99;
+    // 每日游历局内功德增长上限（journey_globals.merit_cap，缺省 9999；后台可配）
+    final meritCap = (globalsRow?['merit_cap'] as num?)?.toInt() ?? 9999;
     // 怪物池远端配置（关卡刷怪/妖王归属的数据源）；空→引擎回落内置种子池
     final monsters = (results[6] ?? const <Map<String, dynamic>>[])
         .map(JourneyMonsterModel.fromJson)
@@ -270,6 +273,7 @@ class JourneyConfigService {
         spawnDenRatio: spawnDenRatio,
         talentDropRate: talentDropRate,
         charLevelCap: charLevelCap,
+        meritCap: meritCap,
         fromSeed: false,
       );
       return _memory!;
@@ -307,6 +311,7 @@ class JourneyConfigService {
       spawnDenRatio: kJourneySpawnDenRatio,
       talentDropRate: kJourneyTalentDropRate,
       charLevelCap: kJourneyCharLevelCap,
+      meritCap: 9999,
       fromSeed: true,
     );
   }

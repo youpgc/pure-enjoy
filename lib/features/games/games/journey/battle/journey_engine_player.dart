@@ -31,7 +31,9 @@ class JourneyPlayerComponent extends PositionComponent {
   double healBlockTimer = 0;
 
   static const double _radius = 20;
-  static const double _baseSpeed = 240;
+
+  /// 基础移速（世界单位/秒）：无妖主线章回西行里程目标的换算基准。
+  static const double baseSpeed = 240;
 
   Vector2 facing = Vector2(0, -1);
 
@@ -40,6 +42,9 @@ class JourneyPlayerComponent extends PositionComponent {
     super.update(dt);
     if (game._ended) return;
 
+    // 西行里程基准点：本帧位移/推离全部落定前记录位置，帧尾取净位移
+    final prevPos = position.clone();
+
     // 摇杆驱动（屏幕向量直接映射世界向量，全向自由移动）；
     // 金光缚身定身期间跳过移动
     if (rootTimer > 0) {
@@ -47,7 +52,7 @@ class JourneyPlayerComponent extends PositionComponent {
     } else {
       final v = game.controller.input.vector;
       if (v.distanceSquared > 0.001) {
-        position += Vector2(v.dx, v.dy) * _baseSpeed * game.moveSpeedAmp * dt;
+        position += Vector2(v.dx, v.dy) * baseSpeed * game.moveSpeedAmp * dt;
         facing = Vector2(v.dx, v.dy)..normalize();
       }
     }
@@ -58,6 +63,10 @@ class JourneyPlayerComponent extends PositionComponent {
 
     // 参照物圆碰撞推离（unbreakable + 未破坏 breakable）
     _pushOutOfMapObjects();
+
+    // 西行里程：按本帧净位移累计（挂机/定身/撞墙推离不产生里程）；
+    // 无妖主线章回以此替代纯时长作为通关口径（1 里=25 世界单位）
+    game.traveledUnits += (position - prevPos).length;
 
     // 木系自动回复（倒马毒桩禁疗期间失效）
     if (regen > 0 && healBlockTimer <= 0) {

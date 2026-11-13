@@ -3,7 +3,8 @@ part of 'journey_flame_game.dart';
 /// 怪物实体：驻守→追击→归位三态；精灵渲染 + 体型缩放。
 /// 血量/速度/接触伤害走钳制后的生效乘区；妖王血量可传入独立的时间乘区，
 /// 使其不随关卡难度放大，速度/接触伤害口径不变。
-class JourneyMonsterComponent extends PositionComponent {
+class JourneyMonsterComponent extends PositionComponent
+    with JourneyKnockbackMixin, JourneyBurnMixin, JourneyBossAbilityMixin {
   JourneyMonsterComponent({
     required this.game,
     required this.model,
@@ -26,7 +27,9 @@ class JourneyMonsterComponent extends PositionComponent {
                 : 0);
   }
 
+  @override
   final JourneyFlameGame game;
+  @override
   final JourneyMonsterModel model;
   final double buffMult;
 
@@ -38,8 +41,17 @@ class JourneyMonsterComponent extends PositionComponent {
   /// 妖王能力附加护甲（unmovable/iron_horn），受击按 armor/(armor+50) 减免。
   double bonusArmor = 0;
 
-  double get _contactDamage =>
-      _contactDamageVal * (_bloodFrenzy ? frenzyMult : 1.0);
+  double get _contactDamage {
+    final base = _contactDamageVal * (_bloodFrenzy ? frenzyMult : 1.0);
+    if (!model.isBoss) return base;
+    // 妖王压力对齐玩家成长：接触伤害随局内等级线性增长，实时取值使
+    // 已刷出的妖王也随升级同步放大，等级提升不稀释压力比值。
+    return base * (1.0 + (game._charLv - 1) * game.bossDamageLvK);
+  }
+
+  /// 妖王周期能力读取的生效接触伤害。
+  @override
+  double get contactDamage => _contactDamage;
 
   /// 血怒狂暴（九头虫）：血量 <frenzy_hp 比例时移速/接触伤害 frenzy_mult
   /// （journey_monster_params.frenzy_hp/frenzy_mult）。
@@ -63,6 +75,7 @@ class JourneyMonsterComponent extends PositionComponent {
     return mult;
   }
 
+  @override
   bool isDead = false;
   bool _aggro = false;
 
@@ -71,10 +84,6 @@ class JourneyMonsterComponent extends PositionComponent {
 
   /// 血条显示剩余时间：受击刷新，超时渐隐（妖王血条常显不受此控）。
   double _hpBarTimer = 0;
-
-  /// 灼烧状态（武器灼烧维度命中点燃）：剩余秒数与每秒伤害。
-  double burnRemaining = 0;
-  double burnDps = 0;
 
   /// 定身剩余时间（幌金绳命中）：>0 时跳过移动，仍可受击/灼烧。
   double rootTimer = 0;
@@ -94,13 +103,6 @@ class JourneyMonsterComponent extends PositionComponent {
   double _chargeTimer = 0;
   Vector2 _chargeDir = Vector2.zero();
   double _chargeCd = 0;
-
-  /// 点燃：刷新灼烧状态（重复命中刷新持续时间）。
-  void ignite({required double burnDps, required double seconds}) {
-    if (isDead) return;
-    this.burnDps = burnDps;
-    burnRemaining = seconds;
-  }
 
   static const double _baseRadius = 18;
   double get radius => _baseRadius * model.sizeScale;
@@ -130,6 +132,10 @@ class JourneyMonsterComponent extends PositionComponent {
     }
     if (isDead) return;
 
+    // 击退动画先推进：离屏冻结只跳过索敌/回血，不能冻结未走完的位移
+    _tickKnockback(dt);
+    final knockFactor = knockChaseFactor;
+
     // 离屏完全冻结（节点12 性能）：与玩家距离 >1400 时跳过索敌/移动/
     // 回血/灼烧结算，仅推进展示类计时（血条渐隐/命中冷却/定身）；
     // 灼烧离屏暂停（burnRemaining 不倒计时，回屏后继续结算伤害）。
@@ -143,10 +149,10 @@ class JourneyMonsterComponent extends PositionComponent {
       return;
     }
 
-    // 灼烧掉血（武器灼烧维度）：持续期间每帧按 dps 扣血，计时归零熄灭
-    if (burnRemaining > 0) {
-      burnRemaining -= dt;
-      takeDamage(burnDps * dt);
+    // 灼烧掉血：各来源叠加后按帧结算，来源计时归零自动移除
+    final burnDamage = tickBurn(dt);
+    if (burnDamage > 0) {
+      takeDamage(burnDamage);
       if (isDead) return;
     }
     final player = game.player;
@@ -186,24 +192,33 @@ class JourneyMonsterComponent extends PositionComponent {
       _updateCharge(dt, dist, toPlayer, rooted: rooted);
       // 妖王周期能力（追击态才走，定身中不放）
       if (_aggro && !rooted && model.abilityKey.isNotEmpty) {
-        _tickBossAbility(dt, dist);
+        tickBossAbility(dt, dist);
       }
     }
 
     if (_aggro) {
       if (_chargePhase == 0 && !rooted && dist > 1) {
         // 追击：直线朝玩家（分离力在 game 层统一做）
-        position += toPlayer.normalized() * cappedMonsterSpeed(this) * dt;
+        position += toPlayer.normalized() *
+            cappedMonsterSpeed(this) *
+            dt *
+            knockFactor;
       } else if (_chargePhase == 3 && !rooted && dist > 1) {
         // 收招：缓速归位追击
-        position += toPlayer.normalized() * cappedMonsterSlowSpeed(this) * dt;
+        position += toPlayer.normalized() *
+            cappedMonsterSlowSpeed(this) *
+            dt *
+            knockFactor;
       }
       // 蓄力（1）原地预警；突进（2）位移由冲撞状态机锁定方向推进
     } else {
       // 驻守：向驻守点缓慢归位 + 小幅游荡
       final toHome = home - position;
       if (!rooted && toHome.length > 4) {
-        position += toHome.normalized() * cappedMonsterSlowSpeed(this) * dt;
+        position += toHome.normalized() *
+            cappedMonsterSlowSpeed(this) *
+            dt *
+            knockFactor;
       }
       // 脱战快速回血：未追击玩家即回，上限 maxHp（进入追击态即停）
       if (hp < maxHp) {
@@ -216,7 +231,8 @@ class JourneyMonsterComponent extends PositionComponent {
   }
 
   /// 妖王冲撞状态机：追击近距触发→蓄力 0.7s 预警→锁定方向突进 0.55s
-  /// （速度 ×3.2，撞墙由世界边界钳制）→收招 1.0s 缓速→冷却 4.0s。
+  /// （速度 ×4.5，与玩家移速同档，走位需预判；撞墙由世界边界钳制）
+  /// →收招 1.0s 缓速→冷却 4.0s。
   void _updateCharge(double dt, double dist, Vector2 toPlayer,
       {required bool rooted}) {
     if (_chargeCd > 0) {
@@ -240,11 +256,11 @@ class JourneyMonsterComponent extends PositionComponent {
         }
         break;
       case 2:
-        // 突进：方向锁定，速度 ×3.2；定身期间位移跳过（幌金绳对妖王
-        // 突进同样生效），突进时长照常消耗（root 中即原地停摆）
+        // 突进：方向锁定，速度 ×4.5（与玩家移速同档）；定身期间位移跳过
+        //（幌金绳对妖王突进同样生效），突进时长照常消耗（root 中即原地停摆）
         _chargeTimer -= dt;
         if (!rooted) {
-          position += _chargeDir * cappedMonsterSpeed(this) * 3.2 * dt;
+          position += _chargeDir * cappedMonsterSpeed(this) * 4.5 * dt;
         }
         if (_chargeTimer <= 0) {
           _chargePhase = 3;
@@ -419,80 +435,5 @@ class JourneyMonsterComponent extends PositionComponent {
       '分魂化形！',
       const Color(0xFFB07CD4),
     );
-  }
-
-  /// 妖王周期能力（swift_wind 阵风 / samadhi_fire 火圈 / gourd_pull 摄魂）：
-  /// 各自独立计时，进战（追击态）才走，暂停时随引擎冻结。
-  double _abilityTimer = 0;
-
-  void _tickBossAbility(double dt, double dist) {
-    _abilityTimer += dt;
-    final code = model.abilityKey;
-    final period = switch (code) {
-      'swift_wind' => game.monsterParam(model.code, 'wind_period', 8.0),
-      'samadhi_fire' => game.monsterParam(model.code, 'fire_period', 6.0),
-      'gourd_pull' => game.monsterParam(model.code, 'pull_period', 10.0),
-      _ => 0.0,
-    };
-    if (period <= 0 || _abilityTimer < period) return;
-    final player = game.player;
-    switch (code) {
-      case 'swift_wind':
-        // 三昧神风：阵风把玩家吹离 200px（世界边界钳制）
-        final dir = (player.position - position);
-        final len = dir.length;
-        if (len > 1) {
-          player.position += dir.normalized() *
-              game.monsterParam(model.code, 'wind_push', 200);
-          player.position.x =
-              player.position.x.clamp(28.0, game.worldSize - 28);
-          player.position.y =
-              player.position.y.clamp(28.0, game.worldSize - 28);
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '三昧神风！',
-            const Color(0xFFD4A73F),
-          );
-        }
-        _abilityTimer = 0;
-        break;
-      case 'samadhi_fire':
-        // 三昧真火：火圈 AOE——玩家在射程内受接触伤害比例（过护甲）
-        final fireRange = game.monsterParam(model.code, 'fire_range', 250.0);
-        final fireRatio = game.monsterParam(model.code, 'fire_ratio', 0.8);
-        if (dist <= fireRange) {
-          final raw = _contactDamage * fireRatio;
-          player.takeDamage(
-            raw * (1 - JourneyDamageTickMixin.armorReductionRatio(player.armor)),
-          );
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '三昧真火',
-            const Color(0xFFD4593F),
-          );
-        }
-        game.fxLayer.spawnRing(position, fireRange);
-        _abilityTimer = 0;
-        break;
-      case 'gourd_pull':
-        // 紫金摄魂：把玩家拉向自身（距离可配，世界边界钳制）
-        final dir = position - player.position;
-        final len = dir.length;
-        if (len > 1) {
-          player.position += dir.normalized() *
-              game.monsterParam(model.code, 'pull_dist', 180);
-          player.position.x =
-              player.position.x.clamp(28.0, game.worldSize - 28);
-          player.position.y =
-              player.position.y.clamp(28.0, game.worldSize - 28);
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '紫金摄魂',
-            const Color(0xFFB07CD4),
-          );
-        }
-        _abilityTimer = 0;
-        break;
-    }
   }
 }

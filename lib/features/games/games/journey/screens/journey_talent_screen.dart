@@ -217,12 +217,17 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
   Widget _buildElementTab(JourneyConfigSnapshot config, String element) {
     final color = JourneyTheme.elementColors[element] ?? JourneyTheme.gold;
     final spent = _progress.talentSpentLayers(_char);
-    final pool = _progress.talentPoolOf(_char);
+    final pool = _progress.talentPool;
+    // 系内分支卡固定按类型序排（本源 core 8 层 → 生息 growth 5 层 →
+    // 化形 sig 3 层）：seq 语义是角色五行主辅侧重（元素级 1~5），不承载
+    // 系内分支序，按它排会导致各系三分支层级位次错乱不一。
     final branches = config
         .branchesOf(_char)
         .where((b) => b.element == element)
         .toList()
-      ..sort((a, b) => a.seq.compareTo(b.seq));
+      ..sort((a, b) => kJourneyTalentBranchTypes
+          .indexOf(a.branchType)
+          .compareTo(kJourneyTalentBranchTypes.indexOf(b.branchType)));
     return ListView(
       padding: const EdgeInsets.all(16),
       children: <Widget>[
@@ -402,6 +407,40 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
           .showSnackBar(SnackBar(content: Text(reason)));
       return;
     }
+    // 二次确认：天赋点亮双消耗（1 天赋点 + 功德，价随层数递增），误触代价大
+    final cost = service.talentMeritCost(_char, element, branch);
+    final balance = service.state.meritBalance;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: JourneyTheme.panel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+          side: const BorderSide(color: JourneyTheme.panelStroke),
+        ),
+        title: const Text('点亮天赋？', style: JourneyTheme.title),
+        content: Text(
+          '将消耗 1 天赋点 + $cost 功德点亮该层。\n'
+          '当前功德余额 $balance，确认后即时扣除。',
+          style: JourneyTheme.body,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('再想想', style: JourneyTheme.body),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              '确认点亮',
+              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
     final ok = await JourneyBusy.run(
       context,
       () async {

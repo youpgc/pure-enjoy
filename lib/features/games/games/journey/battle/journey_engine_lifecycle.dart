@@ -30,6 +30,8 @@ mixin JourneyResumeGateMixin on FlameGame {
 extension JourneyLifecycle on JourneyFlameGame {
   // ---- 伤害/击杀（damage part 调用）----
   void onMonsterKilled(JourneyMonsterComponent m) {
+    // 结算快照取走后不再改写局内计数与掉落
+    if (_ended) return;
     _kills++;
     controller.hud.kills.value = _kills;
     // 分类型击杀累计（击杀图鉴数据源；妖怪/妖王共用 model.code）
@@ -59,6 +61,21 @@ extension JourneyLifecycle on JourneyFlameGame {
       }
     }
 
+    // 紫金宝葫（jinjiao 特殊能力）：精英/妖王被杀收入宝葫炼化，
+    // 回复 15% 最大生命且本局攻击 +3%/层（钳 20 层即上限 +60%）
+    if (hasAbility('jinjiao') && (m.model.isElite || m.model.isBoss)) {
+      final lit = _jinjiaoStacks < JourneyFlameGame._jinjiaoMaxStacks;
+      if (lit) _jinjiaoStacks++;
+      player.heal(player.maxHp * 0.15);
+      spawnFloatText(
+        player.position + Vector2(0, -36),
+        lit
+            ? '紫金宝葫 · 攻击 +${_jinjiaoStacks * 3}%'
+            : '紫金宝葫 · 已满层',
+        const Color(0xFFE8C470),
+      );
+    }
+
     spawnLoot(this, m);
 
     // 多场妖王战（如「三打白骨精」）：打完一场增强再战，末场进伏诛抉择
@@ -77,9 +94,25 @@ extension JourneyLifecycle on JourneyFlameGame {
         _onBossFinalKill();
       }
     }
+    // 无尽妖潮妖王波：击杀妖王也按 talent_drop_rate 概率掉落天赋点。
+    // 无尽模式无据点妖王、game.boss 恒 null，故不触发上面末场伏诛钩子；
+    // 此处独立判定（避免与主线妖王伏诛重复发放），命中仅飘字、不改结算态。
+    if (_isEndless(this) && m.model.isBoss && !_ended) {
+      final rate = config?.talentDropRate ?? kJourneyTalentDropRate;
+      if (rng.nextDouble() < rate) {
+        dart_async.unawaited(
+          JourneyProgressService.instance.grantTalentDrop().then((granted) {
+            if (granted) {
+              spawnFloatText(
+                m.position, '天赋点掉落 +1', const Color(0xFFE8C470));
+            }
+          }),
+        );
+      }
+    }
   }
 
-  /// 满足通关条件（末场妖王伏诛/坚持功成/无尽末波）：**不主动结算**——
+  /// 满足通关条件（末场妖王伏诛/西行功成/无尽末波）：**不主动结算**——
   /// 置标记亮出「结算」按钮，游玩照常；是否结算由玩家决定。
   void _markClearedAvailable(String bannerText) {
     _bossDefeated = true;
@@ -88,8 +121,8 @@ extension JourneyLifecycle on JourneyFlameGame {
   }
 
   /// 末场妖王伏诛：按 journey_globals.talent_drop_rate 概率掉落天赋点
-  /// （全部角色点池各 +1，入账异步不阻塞横幅）；横幅按实际入账结果
-  /// 定稿（点池全满未入账时不虚报掉落）。
+  /// （全账号共享天赋点池 +1，入账异步不阻塞横幅）；横幅按实际入账结果
+  /// 定稿（未入账时不虚报掉落）。
   void _onBossFinalKill() {
     final rate = config?.talentDropRate ?? kJourneyTalentDropRate;
     if (rng.nextDouble() >= rate) {
@@ -194,7 +227,7 @@ extension JourneyLifecycle on JourneyFlameGame {
       return;
     }
     if (revivesLeft <= 0) {
-      // 已达成通关条件（妖王伏诛/坚持功成/无尽末波）后死亡 → 按通关结算
+      // 已达成通关条件（妖王伏诛/西行功成/无尽末波）后死亡 → 按通关结算
       _finish(cleared: _bossDefeated);
       return;
     }
@@ -215,9 +248,11 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
   }
 
-  /// 还魂功德价（§3）：口径=进度服务（基准价×关卡号，缺省 20×关卡号）。
-  int get reviveCost =>
-      config?.reviveCostFor(level.levelNo) ?? 20 * level.levelNo;
+  /// 还魂功德价（§3）：与进度服务同源（基准价×关卡号并封顶），
+  /// 配置快照未就绪时回落内置基准与封顶。
+  int get reviveCost => config?.reviveCostFor(level.levelNo) ??
+      (kJourneyReviveMeritBase * level.levelNo)
+          .clamp(0, kJourneyReviveMeritCap);
 
   /// 浮动文字（暴击会心/功德/还魂/炼化等关键事件），渲染见 fx part。
   void spawnFloatText(Vector2 pos, String text, Color color) {
@@ -225,8 +260,41 @@ extension JourneyLifecycle on JourneyFlameGame {
   }
 
   void addMeritCoins(int coins) {
-    _meritCoins += coins;
+    // 每日游历局内功德上限：达 meritCap 后停止增长（仍可继续割草），
+    // 与局内角色等级 99 满级停涨同源；其余模式按实际获取累计。
+    if (level.kind == 'daily') {
+      final cap = config?.meritCap ?? 9999;
+      final next = _meritCoins + coins;
+      _meritCoins = next > cap ? cap : next;
+    } else {
+      _meritCoins += coins;
+    }
     controller.hud.meritCoins.value = _meritCoins;
+  }
+
+  /// 吸血入账：按最近 1s 滑动窗口把合计回复钳到最大生命 10%，
+  /// 禁疗/满血时不占用窗口额度，避免额度被无效回复消耗。
+  void addLifestealHeal(double amount) {
+    if (amount <= 0) return;
+    if (player.healBlockTimer > 0 || player.hp >= player.maxHp) return;
+    final cutoff = _elapsed - 1.0;
+    while (_lifestealHeals.isNotEmpty &&
+        _lifestealHeals.first.$1 <= cutoff) {
+      _lifestealHeals.removeAt(0);
+    }
+    var used = 0.0;
+    for (final entry in _lifestealHeals) {
+      used += entry.$2;
+    }
+    final cap = player.maxHp * kJourneyLifestealSecCapRatio;
+    final room = math.max(player.maxHp - player.hp, 0.0);
+    final granted = math.min(
+      amount,
+      math.min(math.max(cap - used, 0.0), room),
+    );
+    if (granted <= 0) return;
+    _lifestealHeals.add((_elapsed, granted));
+    player.heal(granted);
   }
 
   void _finish({required bool cleared}) {
@@ -235,9 +303,20 @@ extension JourneyLifecycle on JourneyFlameGame {
     _resumeOnJoystick = false;
     controller.hud.awaitingJoystick.value = false;
     pauseEngine();
-    // 首通奖励仅首次通关该难发放（首通判定基准=进关时最远记录）。
+    // 首通判定基准=进关时最远记录
     final firstClear = level.levelNo > controller.farthestAtStart;
-    final clearBonus = cleared && firstClear ? level.firstClearMerit : 0;
+    // 通关奖励：首通发 firstClearMerit；重复通关也发——
+    // boss 关(firstClearMerit>0)给首通 30%，普通关(firstClearMerit=0)给固定 10；
+    // 无尽/游历(levelNo<=0)不重复发（首通本就不计）。
+    final clearBonus = !cleared
+        ? 0
+        : firstClear
+            ? level.firstClearMerit
+            : (level.levelNo <= 0
+                ? 0
+                : (level.firstClearMerit > 0
+                    ? (level.firstClearMerit * 0.3).round()
+                    : 10));
     controller.onFinished(
       cleared: cleared,
       kills: _kills,

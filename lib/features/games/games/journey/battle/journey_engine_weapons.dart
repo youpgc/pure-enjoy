@@ -259,10 +259,9 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       }
     }
     if (lifestealLv > 0) {
-      // 吸血：每级回复武器伤害 value_per_level 比例，钳 ≤100%
-      game.player.heal(
-        damage * (game.slotValue('lifesteal', 0.12) * lifestealLv).clamp(0.0, 1.0),
-      );
+      // 吸血：与伤害乘区解耦的固定点数回复（每级 +2 点），秒窗合计
+      // 钳到最大生命 10%（防多目标高频命中叠乘；禁疗由 heal 内部拦截）
+      game.addLifestealHeal(kJourneyLifestealHealPerLv * lifestealLv);
     }
     if (knockLv > 0) {
       var kb = game.slotValue('knockback', 16) * knockLv;
@@ -275,11 +274,27 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
             'knock_resist',
             m.model.abilityKey == 'unmovable' ? 0.8 : 0,
           );
-      m.position += toM.normalized() * kb;
+      m.applyKnockback(toM, kb);
     }
     if (burnLv > 0) {
-      // 灼烧：每秒 value_per_level 点，持续 2 秒（时长为引擎机制常量）
-      m.ignite(burnDps: game.slotValue('burn', 8.0) * burnLv, seconds: 2);
+      // 灼烧：每秒 value_per_level 点，持续 2 秒；三昧真火（honghaier
+      // 特殊能力）：伤害翻倍、持续延至 4 秒
+      m.ignite(
+        source: 'weapon_burn',
+        burnDps: game.slotValue('burn', 8.0) *
+            burnLv *
+            (game.hasAbility('honghaier') ? 2.0 : 1.0),
+        seconds: game.hasAbility('honghaier') ? 4 : 2,
+      );
+    }
+    // 兜率炉火（laojun 特殊能力）：炉火加持窗口内命中附加一路独立灼烧
+    // （每秒 40% 武器伤害，2 秒），与武器灼烧/其他法宝同时生效不互相覆盖
+    if (game._laojunWindow > 0 && !m.isDead) {
+      m.ignite(
+        source: 'laojun_fire',
+        burnDps: game.hitDamageBase * game.damageMult * 0.4,
+        seconds: 2,
+      );
     }
   }
 

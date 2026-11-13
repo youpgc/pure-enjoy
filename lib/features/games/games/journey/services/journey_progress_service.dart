@@ -26,10 +26,6 @@ class JourneyProgressService extends ChangeNotifier {
 
   static const String _storeKey = 'journey_progress_v1';
 
-  /// 天赋点树内总层数参考口径（5 系×16 + 加强点 1；点池本身不设上限，
-  /// 首通/妖王掉点可自由累积）。
-  static const int talentPoolTotal = 81;
-
   /// 本地流水/对局记录保留条数（新的在前）。
   static const int _recordLimit = 50;
 
@@ -78,7 +74,7 @@ class JourneyProgressService extends ChangeNotifier {
         meritBalance: (raw['merit_balance'] as num?)?.toInt() ?? 0,
         farthestLevelNo: (raw['farthest_level_no'] as num?)?.toInt() ?? 0,
         totalKills: (raw['total_kills'] as num?)?.toInt() ?? 0,
-        talentPools: _parseTalentPools(raw['talent_pools']),
+        talentPool: _parseTalentPool(raw) ?? 0,
         talentLevels: _parseTalentLevels(raw['talent_levels']),
         meritRecords: _parseRecords(
             raw['merit_records'], JourneyMeritRecordModel.fromJson),
@@ -123,7 +119,7 @@ class JourneyProgressService extends ChangeNotifier {
       meritBalance: (row['merit_balance'] as num?)?.toInt(),
       farthestLevelNo: (row['farthest_level_no'] as num?)?.toInt(),
       totalKills: (row['total_kills'] as num?)?.toInt(),
-      talentPools: _parseTalentPools(row['talent_pools']),
+      talentPool: _parseTalentPool(row),
       talentLevels: _parseTalentLevels(row['talent_levels']),
       unlockedCharacters:
           ((row['unlocked_characters'] as List<dynamic>?) ?? const <dynamic>[])
@@ -183,13 +179,22 @@ class JourneyProgressService extends ChangeNotifier {
     return parsed;
   }
 
-  /// 角色天赋点池解析（talent_pools jsonb：{charCode: 点数}；缺省空表）。
-  static Map<String, int> _parseTalentPools(dynamic raw) {
-    if (raw is! Map<String, dynamic>) return const <String, int>{};
-    return <String, int>{
-      for (final e in raw.entries)
-        if (e.value is num) e.key: (e.value as num).toInt(),
-    };
+  /// 全账号共享天赋点池解析：优先读全局列 talent_pool(int)；旧 per-char
+  /// talent_pools(jsonb) 存在时求和作兼容迁移；两列都缺返回 null，
+  /// 由调用侧回落本地已有点数，避免空列覆盖存档。
+  static int? _parseTalentPool(dynamic raw) {
+    if (raw is! Map<String, dynamic>) return null;
+    final direct = raw['talent_pool'];
+    if (direct is num) return direct.toInt();
+    final old = raw['talent_pools'];
+    if (old is Map) {
+      var sum = 0;
+      for (final v in old.values) {
+        if (v is num) sum += v.toInt();
+      }
+      return sum;
+    }
+    return null;
   }
 
   /// 本地记录解析：截断为 [_recordLimit] 条（旧脏数据自动丢弃）。
@@ -207,7 +212,7 @@ class JourneyProgressService extends ChangeNotifier {
     int? meritBalance,
     int? farthestLevelNo,
     int? totalKills,
-    Map<String, int>? talentPools,
+    int? talentPool,
     Map<String, Map<String, int>>? talentLevels,
     List<JourneyMeritRecordModel>? meritRecords,
     List<JourneyRunRecordModel>? runRecords,
@@ -219,7 +224,7 @@ class JourneyProgressService extends ChangeNotifier {
         meritBalance: meritBalance ?? _state.meritBalance,
         farthestLevelNo: farthestLevelNo ?? _state.farthestLevelNo,
         totalKills: totalKills ?? _state.totalKills,
-        talentPools: talentPools ?? _state.talentPools,
+        talentPool: talentPool ?? _state.talentPool,
         talentLevels: talentLevels ?? _state.talentLevels,
         meritRecords: meritRecords ?? _state.meritRecords,
         runRecords: runRecords ?? _state.runRecords,
@@ -242,7 +247,7 @@ class JourneyProgressService extends ChangeNotifier {
       };
 
   /// 结算入账：[merit] 全额计入余额；首通（[cleared] 且 [levelNo] 超越最远
-  /// 记录）全部角色天赋点池各 +1；同时落对局记录与功德流水并远端同步。
+  /// 记录）全账号共享天赋点池 +1；同时落对局记录与功德流水并远端同步。
   /// 返回 (实际入账功德, 是否首通)。
   Future<(int, bool)> settleRun({
     required int merit,
@@ -257,15 +262,15 @@ class JourneyProgressService extends ChangeNotifier {
     // 首通判定：仅主线（level_no≥1）可推进；level_no≤0 的无尽/游历模式
     // 即使 cleared 也不推 farthest/不发天赋点（kills/功德流水照记）
     final firstClear = cleared && levelNo > 0 && levelNo > _state.farthestLevelNo;
-    // 首通发点（角色专属树）：全部角色独立点池各 +1（点池不设上限）
+    // 首通发点（全账号共享点池）：全局 +1
     final poolGain = firstClear;
-    Map<String, int>? nextPools;
+    int? nextPool;
     if (poolGain) {
-      nextPools = Map<String, int>.of(_state.talentPools);
-      for (final char in kJourneyTalentChars) {
-        nextPools[char] = (nextPools[char] ?? 0) + 1;
-      }
+      nextPool = _state.talentPool + 1;
     }
+    // 功德按实际获取全额入账；每日游历的获取上限由局内 addMeritCoins
+    // 在游戏进行中实时钳制（与局内等级 99 满级停涨同源），此处不再做结算期钳制，
+    // 以免误伤主线通关 / 无尽妖潮等需击杀、单局难达上限的正常获取模式。
     final newBalance = _state.meritBalance + merit;
     final meritRecord = JourneyMeritRecordModel(
       id: const Uuid().v4(),
@@ -293,7 +298,7 @@ class JourneyProgressService extends ChangeNotifier {
       meritBalance: newBalance,
       farthestLevelNo: firstClear ? levelNo : _state.farthestLevelNo,
       totalKills: _state.totalKills + kills,
-      talentPools: nextPools,
+      talentPool: nextPool,
       meritRecords: <JourneyMeritRecordModel>[
         meritRecord,
         ..._state.meritRecords,
@@ -310,15 +315,11 @@ class JourneyProgressService extends ChangeNotifier {
     return (merit, firstClear);
   }
 
-  /// 妖王天赋点掉落入账：末场伏诛概率判定命中后调用，全部角色独立
-  /// 点池各 +1（点池不设上限）。返回恒 true（横幅据实提示掉落）。
+  /// 妖王天赋点掉落入账：末场伏诛概率判定命中后调用，全账号共享点池
+  /// 全局 +1（点池不设上限，总量受首通/妖王掉点约束）。返回恒 true。
   Future<bool> grantTalentDrop() async {
     await ensureLoaded();
-    final pools = Map<String, int>.of(_state.talentPools);
-    for (final char in kJourneyTalentChars) {
-      pools[char] = (pools[char] ?? 0) + 1;
-    }
-    _state = _copyState(talentPools: pools);
+    _state = _copyState(talentPool: _state.talentPool + 1);
     await _persist();
     return true;
   }
@@ -411,7 +412,7 @@ class JourneyProgressService extends ChangeNotifier {
       'merit_balance': _state.meritBalance,
       'farthest_level_no': _state.farthestLevelNo,
       'total_kills': _state.totalKills,
-      'talent_pools': _state.talentPools,
+      'talent_pool': _state.talentPool,
       'talent_levels': _state.talentLevels,
       'merit_records': _state.meritRecords.map((r) => r.toJson()).toList(),
       'run_records': _state.runRecords.map((r) => r.toJson()).toList(),
@@ -431,9 +432,8 @@ class JourneyProgressService extends ChangeNotifier {
       'merit_balance': _state.meritBalance,
       'farthest_level_no': _state.farthestLevelNo,
       'total_kills': _state.totalKills,
-      // 旧全局点池列（改版后仅作兼容镜像，App 消费 talent_pools）
-      'talent_pool': _state.talentPoolOf(selectedCharacterCode),
-      'talent_pools': _state.talentPools,
+      // 共享天赋点池列：App 与云端同名读写 talent_pool
+      'talent_pool': _state.talentPool,
       'talent_levels': _state.talentLevels,
       'unlocked_characters': _state.unlockedCharacters.toList(),
       'unlocked_weapons': _state.unlockedWeapons.toList(),

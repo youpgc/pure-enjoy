@@ -13,6 +13,8 @@ import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import '../widgets/journey_busy.dart';
 
+import 'journey_compendium_widgets.dart';
+
 /// 图鉴页（节点9 解锁链路 + 妖怪击杀图鉴）：法宝=功德+达成条件混合解锁
 /// 口径的展示层；妖怪=分类型击杀累计（击杀≥1 解锁，展示累计击杀数）。
 ///
@@ -78,6 +80,40 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
   /// → unlockWeaponWithMerit → 刷新进度；未达成/功德不足均提示。
   Future<void> _unlock(JourneyWeaponModel w) async {
     if (_unlocking) return;
+    // 二次确认：功德消耗解锁前核对价与余额，避免误触（与角色解锁口径一致）
+    final cost = _config?.relicOf(w.code)?.meritCost ?? 0;
+    final balance = JourneyProgressService.instance.state.meritBalance;
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (ctx) => AlertDialog(
+        backgroundColor: JourneyTheme.panel,
+        shape: RoundedRectangleBorder(
+          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+          side: const BorderSide(color: JourneyTheme.panelStroke),
+        ),
+        title: const Text('解锁法宝？', style: JourneyTheme.title),
+        content: Text(
+          '将消耗 $cost 功德解锁「${w.name}」。\n'
+          '当前功德余额 $balance，确认后即时扣除。',
+          style: JourneyTheme.body,
+        ),
+        actions: <Widget>[
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(false),
+            child: const Text('再想想', style: JourneyTheme.body),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(ctx).pop(true),
+            child: Text(
+              '确认解锁',
+              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+            ),
+          ),
+        ],
+      ),
+    );
+    if (confirmed != true) return;
+    if (!mounted) return;
     _unlocking = true;
     try {
       await JourneyBusy.run(context, () => _unlockFlow(w), label: '解锁中…');
@@ -126,12 +162,14 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
       );
     }
     final tabs = <String, String>{
-      'monster': '妖怪',
       'active': '主动法宝',
       'passive': '被动加持',
       'effect': '特效触发',
+      'monster': '妖怪',
     };
-    final list = config.weapons.where((w) => w.category == _tab).toList();
+    final list = config.weapons.where((w) => w.category == _tab).toList()
+      ..sort((a, b) =>
+          (_isWeaponUnlocked(b) ? 1 : 0) - (_isWeaponUnlocked(a) ? 1 : 0));
     return JourneyPageScaffold(
       title: '图鉴',
       body: Column(
@@ -139,8 +177,13 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
           Padding(
             padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
             child: Row(
-              children:
-                  tabs.entries.map((e) => _tabChip(e.key, e.value)).toList(),
+              children: tabs.entries
+                  .map((e) => JourneyCompendiumTabChip(
+                        label: e.value,
+                        selected: _tab == e.key,
+                        onTap: () => setState(() => _tab = e.key),
+                      ))
+                  .toList(),
             ),
           ),
           Expanded(
@@ -165,11 +208,16 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     final monsters = (config != null && config.monsters.isNotEmpty)
         ? config.monsters
         : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
+    // 已解锁（累计击杀≥1）优先排在前面，未解锁次之（原配置序为次级序）
+    final sorted = List<JourneyMonsterModel>.from(monsters)
+      ..sort((a, b) =>
+          ((_killStats[b.code] ?? 0) > 0 ? 1 : 0) -
+          ((_killStats[a.code] ?? 0) > 0 ? 1 : 0));
     return ListView.separated(
       padding: const EdgeInsets.all(16),
-      itemCount: monsters.length,
+      itemCount: sorted.length,
       separatorBuilder: (_, __) => const SizedBox(height: 8),
-      itemBuilder: (ctx, i) => _buildMonsterCard(monsters[i]),
+      itemBuilder: (ctx, i) => _buildMonsterCard(sorted[i]),
     );
   }
 
@@ -282,40 +330,6 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     );
   }
 
-  Widget _tabChip(String key, String label) {
-    final selected = _tab == key;
-    return Expanded(
-      child: Padding(
-        padding: const EdgeInsets.symmetric(horizontal: 4),
-        child: GestureDetector(
-          onTap: () => setState(() => _tab = key),
-          child: Container(
-            height: 34,
-            alignment: Alignment.center,
-            decoration: BoxDecoration(
-              color: selected
-                  ? JourneyTheme.gold.withValues(alpha: 0.18)
-                  : JourneyTheme.panel,
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(
-                color: selected ? JourneyTheme.gold : JourneyTheme.panelStroke,
-              ),
-            ),
-            child: Text(
-              label,
-              style: TextStyle(
-                fontSize: 12,
-                color: selected
-                    ? JourneyTheme.goldSoft
-                    : JourneyTheme.textSecondary,
-              ),
-            ),
-          ),
-        ),
-      ),
-    );
-  }
-
   Widget _buildWeaponCard(JourneyWeaponModel w) {
     final qualityIdx = w.isActive ? 3 : (w.isPassive ? 2 : 1);
     final quality = JourneyTheme.qualityColors[qualityIdx.clamp(0, 3)];
@@ -330,8 +344,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
             .characterUnlocked(boundChar);
     final relic = _config?.relicOf(w.code);
     final noAchievement = relic != null && relic.achievementCode.isEmpty;
-    final unlocked =
-        !charLocked && (relic == null || _unlockedWeapons.contains(w.code));
+    final unlocked = _isWeaponUnlocked(w);
     final done = relic == null ||
         noAchievement ||
         _achievementDone(relic.achievementCode);
@@ -349,7 +362,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
               border: Border.all(color: quality, width: 1.2),
             ),
             child: SvgPicture.asset(
-              'assets/games/journey/weapon_${w.code}.svg',
+              JourneySprites.weapon(w.code),
               width: 36,
               height: 36,
               errorBuilder: (_, __, ___) => Icon(
@@ -373,7 +386,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
                     Flexible(child: Text(w.name, style: JourneyTheme.title)),
                     if (unlocked) ...<Widget>[
                       const SizedBox(width: 6),
-                      _poolBadge(),
+                      const JourneyPoolBadge(),
                     ],
                   ],
                 ),
@@ -440,26 +453,21 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     );
   }
 
+  /// 法宝是否已入池（解锁口径同 _buildWeaponCard：角色绑定未解锁→锁定，
+  /// 有 relic 配置看进度，无配置默认已解锁）。用于列表"已解锁优先"排序。
+  bool _isWeaponUnlocked(JourneyWeaponModel w) {
+    final boundChar = w.characterCode;
+    final charLocked = boundChar.isNotEmpty &&
+        !JourneyProgressService.instance.state.characterUnlocked(boundChar);
+    final relic = _config?.relicOf(w.code);
+    return !charLocked && (relic == null || _unlockedWeapons.contains(w.code));
+  }
+
   /// 角色名（绑定归属展示用；未配置时回落编码）。
   String _charName(String code) {
     for (final c in _config?.characters ?? const <JourneyCharacterModel>[]) {
       if (c.code == code) return c.name;
     }
     return code;
-  }
-
-  /// 已入池角标（已解锁/无 relic 配置法宝）。
-  Widget _poolBadge() {
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 1),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: JourneyTheme.gold, width: 1),
-      ),
-      child: const Text(
-        '已入池',
-        style: TextStyle(fontSize: 10, color: JourneyTheme.goldSoft),
-      ),
-    );
   }
 }

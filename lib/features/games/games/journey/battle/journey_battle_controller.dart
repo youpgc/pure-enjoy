@@ -125,10 +125,16 @@ class JourneyBattleHud {
   final ValueNotifier<double> bearing = ValueNotifier<double>(0);
   final ValueNotifier<double> progress = ValueNotifier<double>(0);
 
-  /// 无妖章回（原著无妖，区域 boss_code=NULL）：hasBoss=false 时罗盘位
-  /// 切换为坚持通关倒计时（surviveLeft=剩余秒）。
+  /// 无妖章回罗盘位口径：每日游历=剩余时长倒计时（surviveLeft=剩余秒，
+  /// 满时长强制结算）；无妖主线章回=西行里程（travelBased=true 时用
+  /// travelLeft=剩余里数，按玩家实际位移累计，挂机不可达成）。
   final ValueNotifier<bool> hasBoss = ValueNotifier<bool>(true);
   final ValueNotifier<int> surviveLeft = ValueNotifier<int>(0);
+
+  /// 西行里程口径（无妖主线章回）：travelBased=true 时罗盘位改展示
+  /// travelLeft（剩余里数），时长倒计时仅保留给每日游历。
+  final ValueNotifier<bool> travelBased = ValueNotifier<bool>(false);
+  final ValueNotifier<int> travelLeft = ValueNotifier<int>(0);
 
   /// 法宝槽位变更计数：入槽/升级后 +1，槽栏监听重建（读 controller 槽表）。
   final ValueNotifier<int> slotsRevision = ValueNotifier<int>(0);
@@ -218,7 +224,9 @@ enum JourneyUpgradeKind {
 
 class JourneyUpgradeChoice {
   final JourneyUpgradeKind kind;
-  final String code; // 法宝载荷（passiveGrant 用，其余空串）
+  /// 维度槽/法宝编码：按 kind 携带 code，用于复用同源图标与应用加成；
+  /// 通用成长项（攻击/移速/生命等）为空串。
+  final String code;
   final String title;
   final String desc;
 

@@ -288,7 +288,7 @@ class _HudPanel extends StatelessWidget {
 }
 
 /// 妖王罗盘：箭头指向妖王据点 + 距离接近度文案；无有效引导信息时整块隐藏。
-/// 无妖章回（hasBoss=false）：切换为坚持通关倒计时。
+/// 无妖章回（hasBoss=false）：每日游历=剩余时长倒计时；无妖主线章回=西行里程。
 class _Compass extends StatelessWidget {
   const _Compass({required this.controller});
 
@@ -305,7 +305,7 @@ class _Compass extends StatelessWidget {
               valueListenable: controller.hud.bossPresent,
               builder: (context, present, _) => present
                   ? ValueListenableBuilder<bool>(
-                      // 清剿结束（末场伏诛/坚持功成）：移除妖王距离导航；
+                      // 清剿结束（末场伏诛/西行功成）：移除妖王距离导航；
                       // 多场战（三打白骨精等）重生期间 bossDefeated 未置位，
                       // 导航保持指向，全部击败才消失。
                       valueListenable: controller.hud.bossDefeated,
@@ -388,8 +388,8 @@ class _Compass extends StatelessWidget {
     );
   }
 
-  /// 罗盘位通用「圆盘 + 徽标文案」视图：妖王降临倒计时/无妖坚持/
-  /// 无尽波数三处同构展示的唯一实现。
+  /// 罗盘位通用「圆盘 + 徽标文案」视图：妖王降临倒计时/游历倒计时/
+  /// 西行里程/无尽波数多处同构展示的唯一实现。
   Widget _radarBadge(IconData icon, String text) {
     return Column(
       children: <Widget>[
@@ -430,19 +430,30 @@ class _Compass extends StatelessWidget {
   Widget _bossSpawnCountdownView(int left) =>
       _radarBadge(Icons.hourglass_top, '妖王将至 · ${left}s');
 
-  /// 无妖章回：坚持满时长即功成（倒计时圆盘 + 剩余秒文案）；
-  /// 倒计时归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
+  /// 无妖章回收口展示：每日游历=剩余时长倒计时（满时长强制结算）；
+  /// 无妖主线章回=西行里程（剩余里数，按玩家实际位移累计，挂机不可达成）。
+  /// 归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
   Widget _surviveCountdown(JourneyBattleController controller) {
     final hud = controller.hud;
     return ValueListenableBuilder<int>(
       valueListenable: hud.endlessWave,
       builder: (context, wave, _) => wave > 0
           ? _radarBadge(Icons.waves, '妖潮 · 第 $wave 波')
-          : ValueListenableBuilder<int>(
-              valueListenable: hud.surviveLeft,
-              builder: (context, left, _) => left <= 0
-                  ? const SizedBox.shrink()
-                  : _radarBadge(Icons.hourglass_bottom, '此难无妖 · 坚持 ${left}s'),
+          : ValueListenableBuilder<bool>(
+              valueListenable: hud.travelBased,
+              builder: (context, travel, _) => travel
+                  ? ValueListenableBuilder<int>(
+                      valueListenable: hud.travelLeft,
+                      builder: (context, left, _) => left <= 0
+                          ? const SizedBox.shrink()
+                          : _radarBadge(Icons.directions_walk, '西行 · 余 $left 里'),
+                    )
+                  : ValueListenableBuilder<int>(
+                      valueListenable: hud.surviveLeft,
+                      builder: (context, left, _) => left <= 0
+                          ? const SizedBox.shrink()
+                          : _radarBadge(Icons.hourglass_bottom, '游历 · 剩余 ${left}s'),
+                    ),
             ),
     );
   }

@@ -271,7 +271,7 @@ class JourneyDailyMapModel {
   final String name;
   final String themeColor; // hex（#RRGGBB），驱动地图渲染
   final int milestoneLi; // 里程碑里数（进关播报）
-  final int durationTargetSec; // 功成坚持时长（0=用虚拟关缺省 300）
+  final int durationTargetSec; // 通关锚点时长（0=用虚拟关缺省 300）
   final String desc;
 
   /// 按图怪物池（journey_daily_maps.monster_pool，逗号分隔怪 code；
@@ -398,9 +398,9 @@ class JourneyProgressModel {
   final int farthestLevelNo;
   final int totalKills;
 
-  /// 每角色独立天赋点池（charCode → 剩余点数，各 ≤81；
-  /// 首通每难全部角色池各 +1）。
-  final Map<String, int> talentPools;
+  /// 全账号共享天赋点池（单 int：任意角色点亮消耗同一池，点完即所有
+  /// 角色均无点可点；总量受首通/妖王掉点约束，点池本身不设上限）。
+  final int talentPool;
 
   /// 天赋分支等级（charCode → branchCode → 0..maxLv；角色专属树改版：
   /// 每角色一棵五行树，分支编码约定 '{char}_{element}_' 前缀）。
@@ -422,7 +422,7 @@ class JourneyProgressModel {
     this.meritBalance = 0,
     this.farthestLevelNo = 0,
     this.totalKills = 0,
-    this.talentPools = const <String, int>{},
+    this.talentPool = 0,
     this.talentLevels = const <String, Map<String, int>>{},
     this.meritRecords = const <JourneyMeritRecordModel>[],
     this.runRecords = const <JourneyRunRecordModel>[],
@@ -452,9 +452,6 @@ class JourneyProgressModel {
   /// 加强点是否已点亮（五系修满 80 层后消耗第 81 点）。
   bool talentEnhanceLit(String char) =>
       (talentLevels[char]?[kJourneyTalentEnhanceKey] ?? 0) > 0;
-
-  /// 角色天赋点池剩余点数（未初始化 0）。
-  int talentPoolOf(String char) => talentPools[char] ?? 0;
 
   /// 角色本树已修总层数（全系层数和）。
   int talentSpentLayers(String char) {

@@ -37,8 +37,7 @@ class JourneyBossHpBar extends StatelessWidget {
           return const SizedBox.shrink();
         }
         final ratio = hud.bossHpRatio.value;
-        final label =
-            hud.bossName.value.isEmpty ? '妖王' : hud.bossName.value;
+        final label = hud.bossName.value.isEmpty ? '妖王' : hud.bossName.value;
         final hpText = hud.bossMaxHp.value > 0
             ? '${hud.bossHp.value}/${hud.bossMaxHp.value}'
             : '';
@@ -50,83 +49,95 @@ class JourneyBossHpBar extends StatelessWidget {
             borderRadius: BorderRadius.circular(999),
             border: Border.all(color: JourneyTheme.gold, width: 1.4),
           ),
-          child: Row(
-            children: <Widget>[
-              Flexible(
-                child: Text(
-                  label,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: JourneyTheme.faint.copyWith(
-                    color: JourneyTheme.goldSoft,
+          child: LayoutBuilder(
+            builder: (context, constraints) {
+              // 名字按容器可用宽度定上限：超长妖王名才会走 ellipsis，
+              // 血条才能拿到剩余全部空间；不设上限时 Row 的非弹性子项
+              // 拿到无限宽，长名会挤空血条并溢出横幅。
+              final nameMaxWidth = constraints.maxWidth.isFinite
+                  ? constraints.maxWidth * 0.32
+                  : double.infinity;
+              return Row(
+                children: <Widget>[
+                  ConstrainedBox(
+                    constraints: BoxConstraints(maxWidth: nameMaxWidth),
+                    child: Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: JourneyTheme.faint.copyWith(
+                        color: JourneyTheme.goldSoft,
+                      ),
+                    ),
                   ),
-                ),
-              ),
-              const SizedBox(width: 10),
-              Expanded(
-                child: SizedBox(
-                  height: 16,
-                  child: Stack(
-                    children: <Widget>[
-                      Positioned.fill(
-                        child: TweenAnimationBuilder<double>(
-                          tween: Tween<double>(end: ratio.clamp(0.0, 1.0)),
-                          duration: const Duration(milliseconds: 300),
-                          curve: Curves.easeOut,
-                          builder: (context, v, _) => ClipRRect(
-                            borderRadius: BorderRadius.circular(999),
-                            child: Stack(
-                              children: <Widget>[
-                                Container(
-                                  height: 16,
-                                  color:
-                                      Colors.black.withValues(alpha: 0.45),
-                                ),
-                                Align(
-                                  alignment: Alignment.centerLeft,
-                                  child: FractionallySizedBox(
-                                    widthFactor: v.clamp(0.0, 1.0),
-                                    child: Container(
+                  const SizedBox(width: 10),
+                  Expanded(
+                    child: SizedBox(
+                      height: 16,
+                      child: Stack(
+                        children: <Widget>[
+                          Positioned.fill(
+                            child: TweenAnimationBuilder<double>(
+                              tween: Tween<double>(end: ratio.clamp(0.0, 1.0)),
+                              duration: const Duration(milliseconds: 300),
+                              curve: Curves.easeOut,
+                              builder: (context, v, _) => ClipRRect(
+                                borderRadius: BorderRadius.circular(999),
+                                child: Stack(
+                                  children: <Widget>[
+                                    Container(
                                       height: 16,
-                                      decoration: const BoxDecoration(
-                                        gradient: LinearGradient(
-                                          colors: <Color>[
-                                            Color(0xFFB93A4A),
-                                            Color(0xFFE8C470),
-                                          ],
+                                      color:
+                                          Colors.black.withValues(alpha: 0.45),
+                                    ),
+                                    Align(
+                                      alignment: Alignment.centerLeft,
+                                      child: FractionallySizedBox(
+                                        widthFactor: v.clamp(0.0, 1.0),
+                                        child: Container(
+                                          height: 16,
+                                          decoration: const BoxDecoration(
+                                            gradient: LinearGradient(
+                                              colors: <Color>[
+                                                Color(0xFFB93A4A),
+                                                Color(0xFFE8C470),
+                                              ],
+                                            ),
+                                          ),
                                         ),
                                       ),
                                     ),
-                                  ),
+                                  ],
                                 ),
-                              ],
-                            ),
-                          ),
-                        ),
-                      ),
-                      if (hpText.isNotEmpty)
-                        Align(
-                          alignment: Alignment.centerRight,
-                          child: Padding(
-                            padding: const EdgeInsets.only(right: 8),
-                            child: Text(
-                              hpText,
-                              style: const TextStyle(
-                                fontSize: 10,
-                                fontWeight: FontWeight.w700,
-                                color: Colors.white,
-                                shadows: <Shadow>[
-                                  Shadow(color: Colors.black, blurRadius: 3),
-                                ],
                               ),
                             ),
                           ),
-                        ),
-                    ],
+                          if (hpText.isNotEmpty)
+                            Align(
+                              alignment: Alignment.centerRight,
+                              child: Padding(
+                                padding: const EdgeInsets.only(right: 8),
+                                child: Text(
+                                  hpText,
+                                  style: const TextStyle(
+                                    fontSize: 10,
+                                    fontWeight: FontWeight.w700,
+                                    color: Colors.white,
+                                    shadows: <Shadow>[
+                                      Shadow(
+                                          color: Colors.black, blurRadius: 3),
+                                    ],
+                                  ),
+                                ),
+                              ),
+                            ),
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         );
       },

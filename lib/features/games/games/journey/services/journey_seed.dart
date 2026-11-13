@@ -66,7 +66,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '击杀概率触发连击/短暂攻速提升',
     'weapon_code': 'jingubang',
     'unlock_level_no': 8,
-    'unlock_merit_cost': 3000,
+    'unlock_merit_cost': 5000,
   },
   {
     'code': 'bajie',
@@ -76,7 +76,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '拾取范围+经验获取加成',
     'weapon_code': 'jiuchi_paba',
     'unlock_level_no': 12,
-    'unlock_merit_cost': 4000,
+    'unlock_merit_cost': 5000,
   },
   {
     'code': 'shaseng',
@@ -86,7 +86,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '受击减伤/周期护盾',
     'weapon_code': 'jiangyao_bangzhang',
     'unlock_level_no': 16,
-    'unlock_merit_cost': 6000,
+    'unlock_merit_cost': 5000,
   },
   // ---- 非取经扩展角色（5；解锁难号按西游记原著出场章节锚定 81 难关名）----
   {
@@ -97,7 +97,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '摄魂厚血的抗压前排',
     'weapon_code': 'zijin_gourd',
     'unlock_level_no': 25, // 莲花洞高悬（紫金葫芦被收）
-    'unlock_merit_cost': 2200,
+    'unlock_merit_cost': 12000,
   },
   {
     'code': 'honghaier',
@@ -107,7 +107,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '武器伤害 +8%，烈焰淬炼',
     'weapon_code': 'huojian_spear',
     'unlock_level_no': 31, // 请圣降妖（观音收为善财童子）
-    'unlock_merit_cost': 2400,
+    'unlock_merit_cost': 12000,
   },
   {
     'code': 'nezha',
@@ -117,7 +117,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '击杀加速成长的锋锐之姿',
     'weapon_code': 'qiankun_circle',
     'unlock_level_no': 40, // 普天神难伏（金兜山助战）
-    'unlock_merit_cost': 2800,
+    'unlock_merit_cost': 25000,
   },
   {
     'code': 'laojun',
@@ -127,7 +127,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '炼器炉火淬炼的重击',
     'weapon_code': 'sanmei_fire',
     'unlock_level_no': 41, // 问佛根源（老君收服独角兕）
-    'unlock_merit_cost': 3000,
+    'unlock_merit_cost': 25000,
   },
   {
     'code': 'tieshan',
@@ -137,7 +137,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'aura_desc': '移动速度 +8%，罡风随身',
     'weapon_code': 'bajiao_fan',
     'unlock_level_no': 49, // 收缚魔王（火焰山三调芭蕉扇）
-    'unlock_merit_cost': 3200,
+    'unlock_merit_cost': 50000,
   },
 ];
 
@@ -310,7 +310,11 @@ const Map<String, String> _kJourneyBranchNames = <String, String>{
 };
 
 /// 基础功德价（第 n 层消耗 = 此值 × n；与 SQL cost_base 默认一致）。
-const int _kJourneyTrackCostBase = 50;
+const int _kJourneyTrackCostBase = 30;
+
+/// 加强点（五系修满 80 层后第 81 点）固定功德价（里程碑式封顶，
+/// 不随层数平方膨胀；与 cost_base 解耦，后台可按需调 journey_globals）。
+const int kJourneyTalentEnhanceCost = 1500;
 
 const Map<String, String> _kJourneyTalentCharNames = <String, String>{
   'tang': '唐僧',
@@ -363,11 +367,11 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'speed', 'name': '转速', 'kind': 'attribute', 'effect_per_level': '环绕转速 +10%', 'max_level': 9},
   {'code': 'damage', 'name': '伤害', 'kind': 'attribute', 'effect_per_level': '武器伤害 +20%', 'max_level': 9},
   {'code': 'knockback', 'name': '击退', 'kind': 'effect', 'effect_per_level': '命中击退距离 +16', 'max_level': 9},
-  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '命中回复武器伤害的 12%', 'max_level': 9},
+  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '每级命中固定回复 +2 点生命（每秒合计≤最大生命 10%）', 'max_level': 9},
   {'code': 'pierce', 'name': '穿刺', 'kind': 'effect', 'effect_per_level': '武器伤害 +15%', 'max_level': 9},
   {'code': 'magnet', 'name': '磁吸', 'kind': 'effect', 'effect_per_level': '拾取范围 +40', 'max_level': 9},
   {'code': 'burn', 'name': '灼烧', 'kind': 'effect', 'effect_per_level': '命中点燃：8/秒 持续 2 秒', 'max_level': 9},
-  {'code': 'clone', 'name': '分身', 'kind': 'attribute', 'effect_per_level': '环绕法宝 +1 条扇叶', 'max_level': 3},
+  {'code': 'clone', 'name': '分身', 'kind': 'attribute', 'effect_per_level': '幻化 +1 尊武器分身', 'max_level': 3},
   // 暴击体系补全（暴击/暴伤/护甲局内成长路径；暴击率钳 60%、暴伤钳 200%）
   {'code': 'crit_rate', 'name': '暴击', 'kind': 'attribute', 'effect_per_level': '暴击率 +2.5%', 'max_level': 9},
   {'code': 'crit_damage', 'name': '暴伤', 'kind': 'attribute', 'effect_per_level': '暴击伤害 +6%', 'max_level': 9},
@@ -377,8 +381,11 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
 // ---- 局外玩法种子（M3；镜像 SQL 种子 feature_journey_m3_20261105）----
 
 /// 还魂复活功德基准价（journey_globals.revive_merit_base）；
-/// 实际消耗 = 基准 × 关卡号，单局 1 次（局内控制）。
-const int kJourneyReviveMeritBase = 60;
+/// 实际消耗 = 基准 × 关卡号，但封顶 [kJourneyReviveMeritCap]，单局 1 次（局内控制）。
+const int kJourneyReviveMeritBase = 30;
+
+/// 还魂复活功德封顶：基准价随关号增长后钳在此值，避免高关号天价。
+const int kJourneyReviveMeritCap = 1500;
 
 /// 角色等级上限（journey_globals.char_level_cap 镜像；满级经验条恒满）。
 const int kJourneyCharLevelCap = 99;
@@ -391,7 +398,7 @@ const int kJourneyInitialPackSize = 24;
 const double kJourneySpawnDenRatio = 0.70;
 
 /// 妖王天赋点掉率（journey_globals.talent_drop_rate 镜像，0~1；
-/// 末场伏诛判定命中后全部角色点池各 +1；点池不设上限）。
+/// 末场伏诛判定命中后全账号共享天赋点池 +1；点池不设上限）。
 const double kJourneyTalentDropRate = 0.10;
 
 /// 妖王首次降临延迟（秒；journey_globals.boss_spawn_delay_sec 可覆盖）。

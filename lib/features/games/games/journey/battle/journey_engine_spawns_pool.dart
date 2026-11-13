@@ -30,7 +30,7 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
 /// 本关妖王编码：
 /// - 无尽/游历（虚拟关 kind=endless/daily）：无妖王模式，恒 null；
 /// - 远端区域行存在：boss_code 即定稿口径（NULL=原著无妖章回，无妖王战，
-///   引擎走「坚持通关」口径）；
+///   引擎走「西行里程」口径）；
 /// - 区域行缺失/内置兜底快照：回落关卡号区间映射（保可玩，每关有妖王）。
 String? resolveBossCode(JourneyFlameGame game) {
   if (_isEndless(game) || _isDaily(game)) return null;
@@ -43,7 +43,7 @@ String? resolveBossCode(JourneyFlameGame game) {
 }
 
 /// 兜底映射：区域配置未就绪时按关卡区间取妖王（近似原著章回；
-/// 无妖章回返回 null，走坚持通关口径，与远端 boss_code=NULL 语义一致）。
+/// 无妖章回返回 null，走西行里程口径，与远端 boss_code=NULL 语义一致）。
 String? _fallbackBossCode(int levelNo) {
   if (levelNo <= 4) return null; // 序章·长安
   if (levelNo <= 7) return 'yin_jiangjun'; // 双叉岭·寅将军

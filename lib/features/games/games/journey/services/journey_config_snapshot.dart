@@ -76,11 +76,16 @@ class JourneyConfigSnapshot {
   final double spawnDenRatio;
 
   /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；末场伏诛
-  /// 判定命中后全部角色点池各 +1）。
+  /// 判定命中后全账号共享天赋点池 +1）。
   final double talentDropRate;
 
   /// 角色等级上限（journey_globals.char_level_cap；满级经验条恒满）。
   final int charLevelCap;
+
+  /// 每日游历局内功德增长上限（journey_globals.merit_cap，缺省 9999）；
+  /// 局内累计功德达上限后不再增长，仍可继续游玩；不限制结算余额，
+  /// 也不限制其他关卡模式。
+  final int meritCap;
 
   /// true = 全部来自内置兜底（journey_* 表未部署或拉取失败）。
   final bool fromSeed;
@@ -134,6 +139,12 @@ class JourneyConfigSnapshot {
       _globalNum(globalsRaw, 'monster_speed_cap') ??
       kJourneyMonsterSpeedCap;
 
+  /// 妖王接触伤害的玩家等级成长系数（journey_globals.boss_damage_lv_k）；
+  /// 列缺失或未配值回落内置兜底。
+  double get bossDamageLvK =>
+      _globalNum(globalsRaw, 'boss_damage_lv_k') ??
+      kJourneyBossDamageLvK;
+
   const JourneyConfigSnapshot({
     required this.regions,
     required this.levels,
@@ -152,7 +163,7 @@ class JourneyConfigSnapshot {
     this.weaponParams = const <String, Map<String, double>>{},
     this.monsterParams = const <String, Map<String, double>>{},
     this.globalsRaw,
-    this.reviveMeritBase = 20,
+    this.reviveMeritBase = 30,
     this.gameId = '',
     this.scoreDimIds = const <String, String>{},
     this.monsterCap = 120,
@@ -160,6 +171,7 @@ class JourneyConfigSnapshot {
     this.spawnDenRatio = 0.70,
     this.talentDropRate = 0.10,
     this.charLevelCap = 99,
+    this.meritCap = 9999,
     required this.fromSeed,
   });
 
@@ -329,6 +341,6 @@ class JourneyConfigSnapshot {
         attrKey: branchType);
   }
 
-  /// 还魂复活功德价 = 基准价 × 关卡号。
-  int reviveCostFor(int levelNo) => reviveMeritBase * levelNo;
+  /// 还魂复活功德价 = 基准价 × 关卡号，封顶 [kJourneyReviveMeritCap]。
+  int reviveCostFor(int levelNo) => (reviveMeritBase * levelNo).clamp(0, kJourneyReviveMeritCap);
 }

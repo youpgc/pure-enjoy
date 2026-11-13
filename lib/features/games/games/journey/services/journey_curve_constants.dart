@@ -18,3 +18,16 @@ const double kJourneyBuffMultCap = 6.0;
 /// 怪物最终移速上限（journey_globals.monster_speed_cap 可覆盖，px/s）：
 /// 低于玩家基准移速，长时对局怪群不会反超玩家。
 const double kJourneyMonsterSpeedCap = 200.0;
+
+/// 妖王接触伤害的玩家等级成长系数（journey_globals.boss_damage_lv_k 可覆盖）：
+/// 接触伤害 ×(1+(玩家等级−1)×K)。K 与玩家生命成长斜率（15/100 每级）同频，
+/// 玩家等级提升不稀释妖王压力比值。
+const double kJourneyBossDamageLvK = 0.15;
+
+/// 吸血每级固定回复点数：回复与伤害乘区（攻击卡/等级/暴击）解耦，
+/// 数值可预算不随伤害膨胀。
+const double kJourneyLifestealHealPerLv = 2.0;
+
+/// 吸血每秒回复上限（占最大生命比例）：多目标高频命中的合计钳制，
+/// 防止扇叶扫掠多目标时回复叠乘失控。
+const double kJourneyLifestealSecCapRatio = 0.10;

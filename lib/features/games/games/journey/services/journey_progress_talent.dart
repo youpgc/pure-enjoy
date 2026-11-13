@@ -39,16 +39,11 @@ extension JourneyProgressTalent on JourneyProgressService {
   }
 
   /// 点亮功德价：第 n 层 = cost_base × n（n=该分支已亮层数+1，分支内
-  /// 线性递增）；加强点按第 17 层价，基准取五系 cost_base 最大值
-  /// （后台差异化调价时随动）。cost_base 远端缺失回落 50。
+  /// 线性递增）；加强点取固定封顶价。cost_base 远端缺失回落 30。
   int talentMeritCost(String char, String element, String branch) {
     if (branch == kJourneyTalentEnhanceKey) {
-      final base = _branchesOf(char)
-          .map((b) => b.costBase)
-          .fold(0, (a, b) => b > a ? b : a);
-      final totalLv =
-          kJourneyBranchMaxLv.values.fold(0, (a, b) => a + b) + 1;
-      return (base == 0 ? 50 : base) * totalLv;
+      // 加强点为里程碑式封顶价，与分支层数解耦
+      return kJourneyTalentEnhanceCost;
     }
     final b = _branchOf(char, element, branch);
     final n = _state.talentLevelOf(char, b.branchCode) + 1;
@@ -98,7 +93,7 @@ extension JourneyProgressTalent on JourneyProgressService {
 
   /// 点数池与功德余额校验（共用尾巴）。
   String? _poolOrMeritBlock(String char, int cost) {
-    if (_state.talentPoolOf(char) <= 0) {
+    if (_state.talentPool <= 0) {
       return '天赋点不足（关卡首通/击败妖王获取）';
     }
     if (_state.meritBalance < cost) return '功德不足（需 $cost 功德）';
@@ -133,8 +128,7 @@ extension JourneyProgressTalent on JourneyProgressService {
       tree[code] = ((tree[code] ?? 0) + 1).clamp(0, maxLv);
     }
     levels[char] = tree;
-    final pools = Map<String, int>.of(_state.talentPools);
-    pools[char] = _state.talentPoolOf(char) - 1;
+    final pool = _state.talentPool - 1;
     final b = _branchOf(char, element, branch);
     final record = JourneyMeritRecordModel(
       id: const Uuid().v4(),
@@ -152,7 +146,7 @@ extension JourneyProgressTalent on JourneyProgressService {
     );
     _state = _copyState(
       meritBalance: newBalance,
-      talentPools: pools,
+      talentPool: pool,
       talentLevels: levels,
       meritRecords: <JourneyMeritRecordModel>[
         record,

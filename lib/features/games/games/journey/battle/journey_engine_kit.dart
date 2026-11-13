@@ -5,12 +5,19 @@ part of 'journey_flame_game.dart';
 /// - 法宝分级（journey_weapon_levels 品阶伤害结算）；
 /// - 被动加持入槽生效映射；
 /// - 角色光环与天赋层增量注入；
-/// - 无妖章回坚持通关时长。
+/// - 无妖章回通关锚点（时长→西行里程换算基准）。
 extension JourneyKit on JourneyFlameGame {
-  /// 无妖章回（原著无妖，区域 boss_code=NULL）通关口径：坚持满时长即功成。
-  /// 时长取关卡 duration_target_sec 配置（game_levels.config jsonb，后台可调）。
+  /// 无妖章回（原著无妖，区域 boss_code=NULL）通关时长锚点：取关卡
+  /// duration_target_sec 配置（game_levels.config jsonb，后台可调）。
+  /// 每日游历满锚点时长强制结算；无妖主线章回以锚点换算西行里程目标。
   int get surviveTargetSec =>
       level.durationTargetSec > 0 ? level.durationTargetSec : 300;
+
+  /// 无妖主线章回西行里程目标（里）：基础移速 × 锚点时长 ÷ 25
+  /// （1 里=25 世界单位，与妖王罗盘同约定）。恒速基础移速恰好在锚点
+  /// 时长内走完；移速投入可提前达成，挂机/定身不累计里程、无法达成。
+  int get travelTargetLi =>
+      (JourneyPlayerComponent.baseSpeed * surviveTargetSec / 25).round();
 
   /// 建立角色初始环绕（特性法宝 1 件）：转速/内缘/臂长/臂宽/基础伤害/
   /// 初始特效全部读 journey_weapons 后台配置；行未配置（或字段为 0/空）

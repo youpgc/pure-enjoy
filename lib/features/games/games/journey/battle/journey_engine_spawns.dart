@@ -428,9 +428,10 @@ mixin JourneySpawnMixin {
     game._dailyCoinTimer += dt;
     if (game._dailyCoinTimer < 4) return;
     game._dailyCoinTimer = 0;
-    final unit = (game.config?.pickupConfigOf('gongde_tongqian')?.value ?? 3) * 10;
+    // 每日铜钱单价固定 8，与普通铜钱(3)保持同一量级，压低每日总产出
+    const unit = 8;
     final size = game.worldSize;
-    for (var i = 0; i < 5; i++) {
+    for (var i = 0; i < 4; i++) {
       final angle = game.rng.nextDouble() * math.pi * 2;
       final dist = 420.0 + game.rng.nextDouble() * 780.0;
       game._spawnPickup(

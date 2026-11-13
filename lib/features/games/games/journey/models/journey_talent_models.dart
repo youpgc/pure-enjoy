@@ -43,7 +43,7 @@ class JourneyTalentBranchModel {
     required this.attrKey,
     this.valuePerLevel = 1,
     this.maxLv = 8,
-    this.costBase = 50,
+    this.costBase = 30,
     this.effectDesc = '',
   });
 
@@ -59,7 +59,7 @@ class JourneyTalentBranchModel {
       attrKey: json['attr_key'] as String? ?? '',
       valuePerLevel: json['value_per_level'] as num? ?? 1,
       maxLv: (json['max_lv'] as num?)?.toInt() ?? 8,
-      costBase: (json['cost_base'] as num?)?.toInt() ?? 50,
+      costBase: (json['cost_base'] as num?)?.toInt() ?? 30,
       effectDesc: json['effect_desc'] as String? ?? '',
     );
   }
@@ -162,7 +162,7 @@ const Map<String, (String, String)> kJourneyCharAbilities =
   ),
   'wukong': (
     '身外身法',
-    '每击杀 30 只触发 10 秒：临时 +1 分身扇叶且环绕转速 +30%',
+    '每击杀 30 只触发 10 秒：临时幻化 +1 尊武器分身且环绕转速 +30%',
   ),
   'bajie': (
     '铜皮铁骨',
@@ -171,6 +171,28 @@ const Map<String, (String, String)> kJourneyCharAbilities =
   'shaseng': (
     '伏魔重击',
     '每 20 秒蓄力，下一次命中造成 3 倍伤害并定身 260px 内怪物 1 秒',
+  ),
+  // 扩展角色（西游背景定制）：
+  'nezha': (
+    '三头六臂',
+    '每 30 秒现出三头六臂，持续 6 秒：武器伤害 +40% 且环绕转速 +40%',
+  ),
+  'honghaier': (
+    '三昧真火',
+    '命中点燃的灼烧伤害翻倍，持续时间由 2 秒延至 4 秒',
+  ),
+  'tieshan': (
+    '芭蕉罡风',
+    '每 30 秒扇出罡风：全屏妖物击退 240 单位并定身 1 秒',
+  ),
+  'laojun': (
+    '兜率炉火',
+    '每 30 秒炉火加持 6 秒：命中附加灼烧（每秒 40% 武器伤害，2 秒）',
+  ),
+  'jinjiao': (
+    '紫金宝葫',
+    '击杀精英或妖王收入宝葫：回复 15% 最大生命，且本局攻击 +3%'
+        '（可叠加，上限 +60%）',
   ),
 };
 

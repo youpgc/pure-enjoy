@@ -18,8 +18,11 @@ import 'journey_battle_controller.dart';
 import 'journey_sprites.dart';
 
 part 'journey_engine_world.dart';
+part 'journey_engine_setup.dart';
 part 'journey_engine_player.dart';
+part 'journey_engine_monster_effects.dart';
 part 'journey_engine_monsters.dart';
+part 'journey_engine_abilities.dart';
 part 'journey_engine_weapons.dart';
 part 'journey_weapon_render.dart';
 part 'journey_engine_choices.dart';
@@ -117,6 +120,16 @@ class JourneyFlameGame extends FlameGame
   double _bossSpawnCountdown = 0;
   int _charLv = 1, _kills = 0, _meritCoins = 0;
 
+  /// 西行里程累计（世界单位，1 里=25 单位）：玩家本局实际净位移之和。
+  /// 无妖主线章回（非每日游历）以「里程达标」为通关口径，
+  /// 挂机/定身/撞墙不累计，替代旧的纯时长坚持口径。
+  double traveledUnits = 0;
+
+  /// 吸血滑动窗口：记录最近 1s 内每次实际回复的（时刻, 数值），合计钳到
+  /// 最大生命 10%，防多目标高频命中的叠乘失控；时刻与 _elapsed 同源，
+  /// 暂停期同步冻结。
+  final List<(double, double)> _lifestealHeals = <(double, double)>[];
+
   /// 分类型击杀累计（monster_code → 本局次数；击杀图鉴上报源）。
   final Map<String, int> killsByCode = <String, int>{};
   bool _ended = false;
@@ -171,6 +184,24 @@ class JourneyFlameGame extends FlameGame
   double _fumoTimer = 0;
   bool _fumoCharged = false;
 
+  /// 西游扩展批·特殊能力（扩展角色加强点点亮后生效）：
+  /// 三头六臂（nezha）触发计时与增益窗口 / 兜率炉火（laojun）触发
+  /// 计时与加持窗口 / 芭蕉罡风（tieshan）触发计时 / 紫金宝葫
+  /// （jinjiao）本局攻击叠层（每层 +3%，击杀精英/妖王 +1，钳 20 层
+  /// 即上限 +60%）。
+  static const double _nezhaPeriodSec = 30;
+  static const double _nezhaWindowSec = 6;
+  static const double _laojunPeriodSec = 30;
+  static const double _laojunWindowSec = 6;
+  static const double _tieshanPeriodSec = 30;
+  static const int _jinjiaoMaxStacks = 20;
+  double _nezhaTimer = 0;
+  double _nezhaWindow = 0;
+  double _laojunTimer = 0;
+  double _laojunWindow = 0;
+  double _tieshanTimer = 0;
+  int _jinjiaoStacks = 0;
+
   /// 西游扩展批（被动/特效法宝）：
   /// 三根毫毛免死已用标记（单局一次）/ 金刚琢与阴阳二气瓶计时。
   bool _maoUsed = false;
@@ -198,8 +229,11 @@ class JourneyFlameGame extends FlameGame
   @override
   double critDamage = 1.5;
 
-  /// 实际伤害乘区：伤害加成钳 ≤+200%（damageAmp 1.0 基准，超过不再增长）。
-  double get damageMult => 1.0 + (damageAmp - 1.0).clamp(0.0, 2.0);
+  /// 实际伤害乘区：伤害加成钳 ≤+200%（damageAmp 1.0 基准，超过不再增长）；
+  /// 三头六臂（nezha 特殊能力）增益窗口内额外 ×1.4。
+  double get damageMult =>
+      (1.0 + (damageAmp - 1.0).clamp(0.0, 2.0)) *
+      (_nezhaWindow > 0 ? 1.4 : 1.0);
 
   /// 法宝数值参数（journey_weapon_params 后台配置；行缺失回落 fallback）。
   double weaponParam(String code, String key, double fallback) =>
@@ -340,54 +374,7 @@ class JourneyFlameGame extends FlameGame
     bossModel = _bossOfRegion(this);
     initWaveProgress(this);
 
-    // 妖王据点：确定性随机方位，距出生点（地图中心）0.32~0.45 倍边长
-    final size = worldSize;
-    final angle = rng.nextDouble() * math.pi * 2;
-    final dist = size * (0.32 + rng.nextDouble() * 0.13);
-    bossPos = Vector2(
-      (size / 2 + math.cos(angle) * dist).clamp(320.0, size - 320),
-      (size / 2 + math.sin(angle) * dist).clamp(320.0, size - 320),
-    );
-
-    // 使用 FlameGame 自带的 world/camera（自建会与 game.world/game.camera
-    // 错位成两套坐标系：实体进默认世界、相机查错相机 → 实体全部不可见）。
-    camera.viewfinder.anchor = Anchor.center;
-    // 相机边界钳制交由 Flame 内置 BoundedPositionBehavior：整个视口不出
-    // 世界矩形（防黑边）。该行为 priority 1000，每帧在 follow 修正之后
-    // 生效，手写在组件 update 里覆盖 viewfinder.position 会被 follow 拉回。
-    camera.setBounds(
-      Rectangle.fromLTWH(0, 0, size, size),
-      considerViewport: true,
-    );
-
-    // 参照物运行时状态：破坏标记 + 可击破血量表（hp<=0 行视为一击破坏）
-    _mapObjDead = List<bool>.filled(runtime.mapObjects.length, false);
-    for (var i = 0; i < runtime.mapObjects.length; i++) {
-      final o = runtime.mapObjects[i];
-      if (o.kind == 'breakable' && o.hp > 0) {
-        _mapObjHp[i] = o.hp.toDouble();
-      }
-    }
-
-    final bg = JourneyWorldBackground(
-      worldSize: size,
-      themeColor: controller.themeColor,
-      seed: level.levelNo,
-      bossPos: bossPos,
-      mapObjects: runtime.mapObjects,
-      isObjDestroyed: (i) => _mapObjDead[i],
-    );
-    world.add(bg);
-
-    player = JourneyPlayerComponent(
-      game: this,
-      position: Vector2(size / 2, size / 2),
-      maxHp: character.baseHp.toDouble(),
-    );
-    world.add(player);
-    world.add(JourneyOrbitWeapons(game: this));
-    world.add(fxLayer);
-    camera.follow(player);
+    setupWorld();
 
     // 妖王首次降临延迟：留出发育窗口；每日游历/无尽妖潮无据点妖王，
     // 不进入计时。到点在 update 内生成守卫群并播「妖王降临」横幅。
@@ -415,18 +402,19 @@ class JourneyFlameGame extends FlameGame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
-      // 无妖章回（原著无妖）：HUD 罗盘位切换为坚持通关倒计时
+      // 无妖章回（原著无妖）：罗盘位口径分派——每日游历=剩余时长倒计时
+      // （满时长强制结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
       controller.hud.hasBoss.value = bossModel != null;
       if (bossModel == null) {
-        controller.hud.surviveLeft.value = surviveTargetSec;
+        if (_isDaily(this)) {
+          controller.hud.surviveLeft.value = surviveTargetSec;
+        } else if (!_isEndless(this)) {
+          controller.hud.travelBased.value = true;
+          controller.hud.travelLeft.value = travelTargetLi;
+        }
       }
       controller.hud.bossStartDist.value = bossStartDist;
     });
-    bossStartDist = (bossPos - player.position).length;
-    // 罗盘「里」换算基准（距妖王 = 接近度 × 基准距离 ÷25，1 里=25 单位）
-    debugPrint('罗盘基准: lv=${level.levelNo} boss=${bossModel?.code} '
-        'startDist=${bossStartDist.toStringAsFixed(0)} '
-        'bossPos=$bossPos player=${player.position} worldSize=$size');
   }
 
   @override
@@ -453,25 +441,34 @@ class JourneyFlameGame extends FlameGame
     if (_ended || _pendingLevelUps > 0) return;
     _elapsed += dt;
 
-    // 伏魔重击（shaseng）：每 20s 蓄力一次，就绪后停表待下一次命中消耗
-    if (hasAbility('shaseng') && !_fumoCharged) {
-      _fumoTimer += dt;
-      if (_fumoTimer >= _fumoChargeSec) {
-        _fumoCharged = true;
-        _fumoTimer = 0;
-      }
-    }
+    tickAbilities(dt);
 
-    // 无妖章回：坚持满时长即满足通关条件（不主动结算，由玩家决定）；
-    // 满足后罗盘倒计时停 0，结算按钮亮起，游玩照常
+    // 无妖章回收口：满足通关条件后罗盘位归零隐藏，结算按钮亮起，
+    // 游玩照常（不主动结算，由玩家决定）
     if (bossModel == null && !_isEndless(this)) {
-      final left =
-          (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
-      if (left != controller.hud.surviveLeft.value) {
-        controller.hud.surviveLeft.value = left;
-      }
-      if (_elapsed >= surviveTargetSec && !_bossDefeated) {
-        _markClearedAvailable('坚持功成');
+      if (_isDaily(this)) {
+        // 每日游历：满时长即强制结算（修复超时无限刷功德）
+        final left =
+            (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
+        if (left != controller.hud.surviveLeft.value) {
+          controller.hud.surviveLeft.value = left;
+        }
+        if (_elapsed >= surviveTargetSec && !_bossDefeated) {
+          _finish(cleared: true);
+          // 强制结算后同帧不再推进武器/伤害/HUD，避免结算快照取走后
+          // 局内计数仍被改写。
+          return;
+        }
+      } else {
+        // 无妖主线章回：西行里程达标即亮结算按钮（挂机/定身无里程不可达成）
+        final target = travelTargetLi;
+        final left = (target - traveledUnits / 25).ceil().clamp(0, target);
+        if (left != controller.hud.travelLeft.value) {
+          controller.hud.travelLeft.value = left;
+        }
+        if (traveledUnits >= target * 25 && !_bossDefeated) {
+          _markClearedAvailable('西行功成');
+        }
       }
     }
 

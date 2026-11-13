@@ -448,7 +448,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
               // 同款圆形底板，位置随摇杆区顶边上移
               if (_controller != null)
                 JourneyPauseButton(onTap: _togglePause, bottom: pauseBottom),
-              // 「功成」按钮（暂停键正上方）：满足通关条件（妖王伏诛/坚持
+              // 「功成」按钮（暂停键正上方）：满足通关条件（妖王伏诛/西行
               // 功成/无尽末波）后亮出，点击即主动结算；未满足时隐藏
               if (_controller != null)
                 ValueListenableBuilder<bool>(

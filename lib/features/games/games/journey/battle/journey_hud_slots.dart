@@ -4,6 +4,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 import '../widgets/journey_theme.dart';
 import '../services/journey_config_service.dart';
 import 'journey_battle_controller.dart';
+import 'journey_sprites.dart';
 
 /// 法宝槽栏（HUD 覆盖层子组件，独立文件避免主文件超行限）：
 /// 上排=武器维度槽 6（金框：维度图标 + 等级角标——初始武器特效槽 +
@@ -68,7 +69,7 @@ class JourneyHudSlotBar extends StatelessWidget {
         children: <Widget>[
           Center(
             child: SvgPicture.asset(
-              'assets/games/journey/icon_slot_${slot.code}.svg',
+              JourneySprites.slotIcon(slot.code),
               width: 16,
               height: 16,
               // 图标缺失回落两字简称，槽位语义不丢
@@ -155,7 +156,7 @@ class JourneyHudSlotBar extends StatelessWidget {
         border: Border.all(color: stroke, width: 1.6),
       ),
       child: SvgPicture.asset(
-        'assets/games/journey/weapon_$code.svg',
+        JourneySprites.weapon(code),
         width: 22,
         height: 22,
         errorBuilder: (_, __, ___) => Icon(
@@ -179,6 +180,9 @@ class JourneyHudSlotBar extends StatelessWidget {
       'magnet': '磁吸',
       'burn': '灼烧',
       'clone': '分身',
+      'crit_rate': '暴击',
+      'crit_damage': '暴伤',
+      'armor': '护甲',
     };
     final name = names[code] ?? code;
     return name.length > 2 ? name.substring(0, 2) : name;

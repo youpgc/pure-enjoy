@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_svg/flutter_svg.dart';
 
 import '../widgets/journey_theme.dart';
 import 'journey_battle_controller.dart';
+import 'journey_sprites.dart';
 
 /// 局内升级三选一弹窗（全宽竖排卡牌，金色品质光效）。
 ///
@@ -88,8 +90,9 @@ class _ChoiceCard extends StatelessWidget {
 
   const _ChoiceCard({required this.choice, required this.onPick});
 
-  /// 类型 → 图标：习得/顿悟 ✦、被动 盾、触发 ⚡、攻击 火、移速 风、
+  /// 通用成长项 → Material 图标：被动 盾、触发 ⚡、攻击 火、移速 风、
   /// 生命 心、回复 十、磁引 罗盘；一眼区分成长类别。
+  /// 带 code 的维度/法宝卡不用本表，改用与 HUD 槽位同源的 SVG。
   static IconData _iconOf(JourneyUpgradeKind kind) => switch (kind) {
         JourneyUpgradeKind.slotLearn ||
         JourneyUpgradeKind.slotUpgrade =>
@@ -102,6 +105,29 @@ class _ChoiceCard extends StatelessWidget {
         JourneyUpgradeKind.regen => Icons.healing,
         JourneyUpgradeKind.pickupRange => Icons.explore,
       };
+
+  /// 卡面图标：维度卡取 HUD 武器维度槽的 icon_slot SVG，被动/特效法宝卡
+  /// 取 HUD 被动槽与图鉴同源的 weapon SVG，保证选卡图标与入槽后显示一致；
+  /// 无载荷的通用成长项仍用 Material 图标，素材缺失时回落同表图标。
+  Widget _icon() {
+    final fallback =
+        Icon(_iconOf(choice.kind), color: JourneyTheme.gold, size: 21);
+    if (choice.code.isEmpty) return fallback;
+    final isSlot = choice.kind == JourneyUpgradeKind.slotLearn ||
+        choice.kind == JourneyUpgradeKind.slotUpgrade;
+    final isWeapon = choice.kind == JourneyUpgradeKind.passiveGrant ||
+        choice.kind == JourneyUpgradeKind.effectGrant;
+    if (!isSlot && !isWeapon) return fallback;
+    final size = isSlot ? 22.0 : 24.0;
+    return SvgPicture.asset(
+      isSlot
+          ? JourneySprites.slotIcon(choice.code)
+          : JourneySprites.weapon(choice.code),
+      width: size,
+      height: size,
+      errorBuilder: (_, __, ___) => fallback,
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -136,8 +162,7 @@ class _ChoiceCard extends StatelessWidget {
                       color: JourneyTheme.gold.withValues(alpha: 0.85),
                       width: 1.2),
                 ),
-                child: Icon(_iconOf(choice.kind),
-                    color: JourneyTheme.gold, size: 21),
+                child: _icon(),
               ),
               const SizedBox(width: 12),
               Expanded(

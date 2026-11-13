@@ -32,6 +32,9 @@ extension JourneyCurve on JourneyFlameGame {
 
   /// 妖王血量时间项系数（后台列，缺省走内置兜底）。
   double get bossHpTimeK => config?.bossHpTimeK ?? kJourneyBossHpTimeK;
+
+  /// 妖王接触伤害的玩家等级成长系数（后台列，缺省走内置兜底）。
+  double get bossDamageLvK => config?.bossDamageLvK ?? kJourneyBossDamageLvK;
 }
 
 /// 怪物生成时统一钳制生效乘区：波次倍率、妖王阶段倍率等叠加源都不得

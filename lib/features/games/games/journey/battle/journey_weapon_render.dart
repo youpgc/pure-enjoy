@@ -20,6 +20,8 @@ class JourneyOrbitWeapons extends Component {
     if (game._wukongBuffTimer > 0) speed += 0.3;
     // 身外身法（wukong 特殊能力）：增益期间转速额外 +30%
     if (game._shenfenTimer > 0) speed += 0.3;
+    // 三头六臂（nezha 特殊能力）：增益期间转速额外 +40%
+    if (game._nezhaWindow > 0) speed += 0.4;
     // 最终角速度统一钳 5 圈/秒（10π rad/s）：speedBase×乘区超过不再增加；
     // 方向由局外设置注入（spinDirection：1=顺时针，-1=逆时针）
     arm.angle += game.spinDirection *
@@ -166,6 +168,7 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
           _pingTimer = 0;
           target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
           target.ignite(
+            source: 'yinyang_ping',
             burnDps: hitDamageBase *
                 damageMult *
                 weaponParam('yinyang_ping', 'burn', 0.4),
