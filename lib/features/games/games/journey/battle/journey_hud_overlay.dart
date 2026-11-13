@@ -28,8 +28,13 @@ class JourneyHudOverlay extends StatelessWidget {
   /// 顶部状态面板点按回调（对局页弹属性详情面板）。
   final VoidCallback? onTopPanelTap;
 
-  // 槽栏几何常量：血条定位引用，槽栏行高调整只改这里防错位
-  static const double _kSlotBarTop = 132;
+  // HUD 顶部几何：面板与小地图同高同顶边，槽栏、罗盘、面板右缘都由
+  // 小地图边长推导，调整边长时不会漏改某个相对位置。
+  static const double _kTopInset = 8;
+  static const double _kMinimapRight = 12;
+  static const double _kPanelGap = 20;
+  static const double _kCompassGap = 10;
+  static const double _kSlotBarTop = _kTopInset + JourneyMinimapWindow.size;
   static const double _kSlotBarHeight = 64; // 两行 30px 槽 + 4px 行距
   static const double _kBossBarGap = 40; // 血条与槽栏间距
 
@@ -40,10 +45,10 @@ class JourneyHudOverlay extends StatelessWidget {
     return Stack(
       children: <Widget>[
         Positioned(
-          top: safeTop + 8,
+          top: safeTop + _kTopInset,
           left: 10,
-          // 信息栏自适应宽度：右缘与右侧小地图列（132+12）保持 20px 间距
-          right: 164,
+          // 信息栏自适应宽度：右缘与小地图列保持固定间距
+          right: _kMinimapRight + JourneyMinimapWindow.size + _kPanelGap,
           child: GestureDetector(
             onTap: onTopPanelTap,
             child: _HudPanel(
@@ -66,16 +71,19 @@ class JourneyHudOverlay extends StatelessWidget {
         ),
         // 小地图点阵窗：右上角（原罗盘位）；罗盘移至其正下方
         Positioned(
-          top: safeTop + 8,
-          right: 12,
+          top: safeTop + _kTopInset,
+          right: _kMinimapRight,
           child: JourneyMinimapWindow(controller: controller),
         ),
         // 对局横幅（节点11）：开场难名/妖王降临/里程碑共用位
         JourneyBattleBanner(controller: controller),
         Positioned(
-          // 罗盘在小地图（132 高 + 上下间距）正下方
-          top: safeTop + 150,
-          right: 12,
+          // 罗盘紧贴小地图下沿，间距由顶部几何常量推导
+          top: safeTop +
+              _kTopInset +
+              JourneyMinimapWindow.size +
+              _kCompassGap,
+          right: _kMinimapRight,
           child: _Compass(controller: controller),
         ),
         // 等待接管摇杆：世界仍时停，半透明蒙层聚焦注意力 + 引导文案，
@@ -145,7 +153,10 @@ class _HudPanel extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final hud = controller.hud;
+    // 高度与小地图点阵窗一致：两块板顶部位移相同，上下边自然齐平。
+    // 宽度沿用覆盖层右缘约束，保持原自适应宽度。
     return Container(
+      height: JourneyMinimapWindow.size,
       padding: const EdgeInsets.fromLTRB(8, 8, 10, 7),
       decoration: BoxDecoration(
         color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
@@ -160,6 +171,7 @@ class _HudPanel extends StatelessWidget {
           const SizedBox(width: 6),
           Expanded(
             child: Column(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
               crossAxisAlignment: CrossAxisAlignment.start,
               children: <Widget>[
                 // 血条
@@ -174,10 +186,10 @@ class _HudPanel extends StatelessWidget {
                     ),
                   ),
                 ),
-                const SizedBox(height: 5),
                 // 经验条（两段式动画：升级先充满再归零，见引擎 exp part；
                 // expReset 变化时按新 key 重建 TweenAnimationBuilder——
-                // 重建即落位，避免「从满倒退」的反向 tween）
+                // 重建即落位，避免「从满倒退」的反向 tween）；
+                // 条下补一行当前经验/本级所需，样式与血条数值行同源
                 ValueListenableBuilder<int>(
                   valueListenable: hud.expReset,
                   builder: (context, reset, _) =>
@@ -189,14 +201,13 @@ class _HudPanel extends StatelessWidget {
                       builder: (context, need, _) => _bar(
                         exp / need,
                         const Color(0xFFA37FE0),
-                        '',
+                        '经验 ${exp.round()}/${need.round()}',
                         animKey: ValueKey<int>(reset),
                       ),
                     ),
                   ),
                 ),
-                const SizedBox(height: 5),
-                // 状态行（面板收窄至 132 后文案等比缩放防溢出）
+                // 状态行（宽度自适应，FittedBox 等比缩放防溢出）
                 ValueListenableBuilder<int>(
                   valueListenable: hud.kills,
                   builder: (context, kills, _) => ValueListenableBuilder<int>(

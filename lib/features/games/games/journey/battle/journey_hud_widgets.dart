@@ -151,6 +151,9 @@ class JourneyBossHpBar extends StatelessWidget {
 class JourneyMinimapWindow extends StatelessWidget {
   const JourneyMinimapWindow({super.key, required this.controller});
 
+  /// 点阵窗边长：左上状态面板高度与之共用，保证两块 HUD 板等高。
+  static const double size = 132;
+
   final JourneyBattleController controller;
 
   @override
@@ -158,8 +161,8 @@ class JourneyMinimapWindow extends StatelessWidget {
     return ValueListenableBuilder<JourneyMinimapData?>(
       valueListenable: controller.hud.minimap,
       builder: (context, data, _) => SizedBox(
-        width: 132,
-        height: 132,
+        width: size,
+        height: size,
         child: Stack(
           children: [
             Positioned.fill(

@@ -6,6 +6,7 @@ import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_busy.dart';
@@ -13,7 +14,7 @@ import '../widgets/journey_busy.dart';
 /// S5 五行天赋页（角色专属树 · v3 线性层制）。
 ///
 /// 每角色一棵五行树（5 系 × 16 层，按序点亮）+ 第 81 点加强点：点亮
-/// 纯消耗 1 天赋点（角色独立 81 点池，关卡首通各 +1 / 击败妖王概率
+/// 纯消耗 1 天赋点（全账号共享点池，关卡首通 +1 / 击败妖王概率
 /// 掉落），每层点亮即得该系属性加强；五系修满后点亮加强点，额外
 /// 解锁角色特殊能力（引擎侧永久生效）。两级切换：顶部角色 pill
 /// （未解锁置灰+「解锁后可修」角标，树可浏览不可点亮）→ 五行 Tab
@@ -37,6 +38,9 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
   JourneyConfigSnapshot? _config;
   JourneyProgressModel _progress = const JourneyProgressModel();
 
+  /// 点亮进行中：连点只弹一次确认窗、只扣一次天赋点与功德。
+  bool _spending = false;
+
   /// 当前浏览的角色树（默认唐僧）。
   String _char = 'tang';
 
@@ -52,24 +56,37 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
     super.dispose();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    final progress = JourneyProgressService.instance;
-    await Future.wait<void>(<Future<void>>[
-      JourneyConfigService.instance.fetch(),
-      progress.ensureLoaded(),
-    ]);
-    if (!mounted) return;
-    final chars =
-        JourneyConfigService.instance.cached?.characters ??
-            const <JourneyCharacterModel>[];
-    setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _progress = progress.state;
-      // 角色清单不含当前浏览角色（异常配置）→ 回落首角色
-      if (chars.isNotEmpty && !chars.any((c) => c.code == _char)) {
-        _char = chars.first.code;
-      }
-    });
+    try {
+      final progress = JourneyProgressService.instance;
+      await Future.wait<void>(<Future<void>>[
+        JourneyConfigService.instance.ensure(JourneyConfigScope.talent),
+        progress.ensureLoaded(),
+      ]);
+      if (!mounted) return;
+      final chars = JourneyConfigService.instance.cached?.characters ??
+          const <JourneyCharacterModel>[];
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _progress = progress.state;
+        _loadFailed = false;
+        // 角色清单不含当前浏览角色（异常配置）→ 回落首角色
+        if (chars.isNotEmpty && !chars.any((c) => c.code == _char)) {
+          _char = chars.first.code;
+        }
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    }
+  }
+
+  void _retry() {
+    setState(() => _loadFailed = false);
+    _load();
   }
 
   List<JourneyCharacterModel> get _chars =>
@@ -79,6 +96,12 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '五行天赋',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     final config = _config;
     if (config == null) {
       return const JourneyPageScaffold(
@@ -407,52 +430,58 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
           .showSnackBar(SnackBar(content: Text(reason)));
       return;
     }
-    // 二次确认：天赋点亮双消耗（1 天赋点 + 功德，价随层数递增），误触代价大
-    final cost = service.talentMeritCost(_char, element, branch);
-    final balance = service.state.meritBalance;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: JourneyTheme.panel,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
-          side: const BorderSide(color: JourneyTheme.panelStroke),
-        ),
-        title: const Text('点亮天赋？', style: JourneyTheme.title),
-        content: Text(
-          '将消耗 1 天赋点 + $cost 功德点亮该层。\n'
-          '当前功德余额 $balance，确认后即时扣除。',
-          style: JourneyTheme.body,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('再想想', style: JourneyTheme.body),
+    if (_spending) return;
+    _spending = true;
+    try {
+      // 二次确认：天赋点亮双消耗（1 天赋点 + 功德，价随层数递增），误触代价大
+      final cost = service.talentMeritCost(_char, element, branch);
+      final balance = service.state.meritBalance;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: JourneyTheme.panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+            side: const BorderSide(color: JourneyTheme.panelStroke),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              '确认点亮',
-              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+          title: const Text('点亮天赋？', style: JourneyTheme.title),
+          content: Text(
+            '将消耗 1 天赋点 + $cost 功德点亮该层。\n'
+            '当前功德余额 $balance，确认后即时扣除。',
+            style: JourneyTheme.body,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('再想想', style: JourneyTheme.body),
             ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
-    final ok = await JourneyBusy.run(
-      context,
-      () async {
-        final lit = await service.spendTalent(_char, element, branch);
-        if (lit) await _load();
-        return lit;
-      },
-      label: '点亮中…',
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text(ok ? '已点亮' : '点亮未成功')),
-    );
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                '确认点亮',
+                style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      if (!mounted) return;
+      final ok = await JourneyBusy.run(
+        context,
+        () async {
+          final lit = await service.spendTalent(_char, element, branch);
+          if (lit) await _load();
+          return lit;
+        },
+        label: '点亮中…',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(ok ? '已点亮' : '点亮未成功')),
+      );
+    } finally {
+      _spending = false;
+    }
   }
 }

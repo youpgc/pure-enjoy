@@ -6,6 +6,7 @@ import '../services/journey_progress_service.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import 'journey_battle_screen.dart';
 
 /// S3 关卡选择页（八十一难，主线西行专用）。
@@ -27,6 +28,9 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
   JourneyConfigSnapshot? _config;
   JourneyProgressModel _progress = const JourneyProgressModel();
 
+  /// 挑战页入栈中：连点只打开一个对局。
+  bool _navigating = false;
+
   /// 已展开的区域编码集合（折叠面板状态）。
   final Set<String> _expanded = <String>{};
 
@@ -39,18 +43,32 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    final progress = JourneyProgressService.instance;
-    await Future.wait<void>(<Future<void>>[
-      JourneyConfigService.instance.fetch(),
-      progress.ensureLoaded(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _progress = progress.state;
-    });
-    _prepareExpansion();
+    try {
+      final progress = JourneyProgressService.instance;
+      await Future.wait<void>(<Future<void>>[
+        JourneyConfigService.instance.ensure(JourneyConfigScope.levelSelect),
+        progress.ensureLoaded(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _progress = progress.state;
+        _loadFailed = false;
+      });
+      _prepareExpansion();
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    }
+  }
+
+  void _retry() {
+    setState(() => _loadFailed = false);
+    _load();
   }
 
   /// 初始展开：当前进行中关卡（最远+1）所在区域，其余折叠；
@@ -87,6 +105,12 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '八十一难',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     final config = _config;
     if (config == null) {
       return const JourneyPageScaffold(
@@ -276,11 +300,17 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
     );
   }
 
-  void _challenge(JourneyLevelModel level) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => JourneyBattleScreen(level: level),
-      ),
-    );
+  Future<void> _challenge(JourneyLevelModel level) async {
+    if (_navigating || !mounted) return;
+    _navigating = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => JourneyBattleScreen(level: level),
+        ),
+      );
+    } finally {
+      _navigating = false;
+    }
   }
 }

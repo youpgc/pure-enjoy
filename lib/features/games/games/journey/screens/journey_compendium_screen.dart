@@ -11,6 +11,7 @@ import '../services/journey_seed.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import '../widgets/journey_busy.dart';
 
 import 'journey_compendium_widgets.dart';
@@ -46,23 +47,37 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    await JourneyConfigService.instance.fetch();
-    final progress = JourneyProgressService.instance;
-    await progress.ensureLoaded();
-    // 成就判定刷新（best-effort）+ 定义行拉取（解锁条件名/描述展示用）
-    await progress.evaluateAchievements();
-    final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
-    final defs = await JourneyProgressSync.fetchAchievements(gameId);
-    // 击杀图鉴数据（失败/未登录回落空表=全未解锁）
-    final kills = await JourneyKillStatsService.fetchKills();
-    _refreshProgress();
-    if (!mounted) return;
-    setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _achievements = defs;
-      _killStats = kills;
-    });
+    try {
+      await JourneyConfigService.instance.ensure(JourneyConfigScope.compendium);
+      final progress = JourneyProgressService.instance;
+      await progress.ensureLoaded();
+      // 成就判定刷新（best-effort）+ 定义行拉取（解锁条件名/描述展示用）
+      await progress.evaluateAchievements();
+      final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
+      final defs = await JourneyProgressSync.fetchAchievements(gameId);
+      // 击杀图鉴数据（失败/未登录回落空表=全未解锁）
+      final kills = await JourneyKillStatsService.fetchKills();
+      _refreshProgress();
+      if (!mounted) return;
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _achievements = defs;
+        _killStats = kills;
+        _loadFailed = false;
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    }
+  }
+
+  void _retry() {
+    setState(() => _loadFailed = false);
+    _load();
   }
 
   void _refreshProgress() {
@@ -80,42 +95,42 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
   /// → unlockWeaponWithMerit → 刷新进度；未达成/功德不足均提示。
   Future<void> _unlock(JourneyWeaponModel w) async {
     if (_unlocking) return;
-    // 二次确认：功德消耗解锁前核对价与余额，避免误触（与角色解锁口径一致）
-    final cost = _config?.relicOf(w.code)?.meritCost ?? 0;
-    final balance = JourneyProgressService.instance.state.meritBalance;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: JourneyTheme.panel,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
-          side: const BorderSide(color: JourneyTheme.panelStroke),
-        ),
-        title: const Text('解锁法宝？', style: JourneyTheme.title),
-        content: Text(
-          '将消耗 $cost 功德解锁「${w.name}」。\n'
-          '当前功德余额 $balance，确认后即时扣除。',
-          style: JourneyTheme.body,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('再想想', style: JourneyTheme.body),
-          ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              '确认解锁',
-              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
-            ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    if (!mounted) return;
     _unlocking = true;
     try {
+      // 二次确认：功德消耗解锁前核对价与余额，避免误触（与角色解锁口径一致）
+      final cost = _config?.relicOf(w.code)?.meritCost ?? 0;
+      final balance = JourneyProgressService.instance.state.meritBalance;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: JourneyTheme.panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+            side: const BorderSide(color: JourneyTheme.panelStroke),
+          ),
+          title: const Text('解锁法宝？', style: JourneyTheme.title),
+          content: Text(
+            '将消耗 $cost 功德解锁「${w.name}」。\n'
+            '当前功德余额 $balance，确认后即时扣除。',
+            style: JourneyTheme.body,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('再想想', style: JourneyTheme.body),
+            ),
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                '确认解锁',
+                style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      if (!mounted) return;
       await JourneyBusy.run(context, () => _unlockFlow(w), label: '解锁中…');
     } finally {
       _unlocking = false;
@@ -152,6 +167,12 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '法宝图鉴',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     final config = _config;
     if (config == null) {
       return const JourneyPageScaffold(

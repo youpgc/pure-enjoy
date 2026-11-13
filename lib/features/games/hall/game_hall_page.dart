@@ -29,6 +29,10 @@ class _GameHallPageState extends State<GameHallPage> {
   List<GameBestScore> _best = <GameBestScore>[];
   bool _loading = true;
 
+  /// 导航进行中：入口卡与成绩看板共用同一把锁，连点只执行一次，
+  /// 直到目标页出栈并刷新完成才释放。
+  bool _opening = false;
+
   @override
   void initState() {
     super.initState();
@@ -98,25 +102,44 @@ class _GameHallPageState extends State<GameHallPage> {
   /// 点击游戏入口：西行（journey）入口条件单独判断，满足则**直达其主界面**
   /// （无中间页）；其余游戏统一进入通用 [GameHomeScreen]。
   /// 返回后刷新（对局可能产生新成绩 → 最佳记录需更新）。
+  /// 导航期间加锁：连点/重复点击只执行一次，不重复 push、不重复拉配置。
   Future<void> _openGame(GameModel game) async {
-    if (!mounted) return;
-    if (game.code == 'journey') {
-      if (!await JourneyAccess.canEnter(game)) return;
-      if (!mounted) return;
+    if (_opening || !mounted) return;
+    _opening = true;
+    try {
+      if (game.code == 'journey') {
+        if (!JourneyAccess.canEnter(game)) return;
+        if (!mounted) return;
+        await Navigator.of(context).push(
+          MaterialPageRoute(
+            // 命名路由：对局内「放弃本难/结算退出」popUntil 直达主页
+            settings: const RouteSettings(name: 'journey_hub'),
+            builder: (_) => JourneyHubScreen(game: game),
+          ),
+        );
+        if (mounted) await _load();
+        return;
+      }
       await Navigator.of(context).push(
-        MaterialPageRoute(
-          // 命名路由：对局内「放弃本难/结算退出」popUntil 直达主页
-          settings: const RouteSettings(name: 'journey_hub'),
-          builder: (_) => JourneyHubScreen(game: game),
-        ),
+        MaterialPageRoute(builder: (_) => GameHomeScreen(game: game)),
       );
       if (mounted) await _load();
-      return;
+    } finally {
+      _opening = false;
     }
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => GameHomeScreen(game: game)),
-    );
-    if (mounted) await _load();
+  }
+
+  /// 成绩看板入口：与游戏入口共用导航锁，防连点重复入栈。
+  Future<void> _openDashboard() async {
+    if (_opening || !mounted) return;
+    _opening = true;
+    try {
+      await Navigator.of(context).push(
+        MaterialPageRoute(builder: (_) => const GameTotalDashboard()),
+      );
+    } finally {
+      _opening = false;
+    }
   }
 
   @override
@@ -130,11 +153,7 @@ class _GameHallPageState extends State<GameHallPage> {
           IconButton(
             icon: const Icon(Icons.leaderboard),
             tooltip: '全部最佳成绩',
-            onPressed: () => Navigator.of(context).push(
-              MaterialPageRoute(
-                builder: (_) => const GameTotalDashboard(),
-              ),
-            ),
+            onPressed: _openDashboard,
           ),
         ],
       ),

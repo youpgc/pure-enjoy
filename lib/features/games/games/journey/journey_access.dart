@@ -1,22 +1,14 @@
 import '../../models/game_model.dart';
-import 'services/journey_config_service.dart';
 
 /// 西行·游戏入口准入（独立判断，不依赖其他游戏的开放/解锁逻辑）。
 ///
-/// 口径：游戏行启用 + 环境可见（test_only 未发布游戏由大厅统一过滤，
-/// 仅 debug 包展示）+ 配置可获取（远端或兜底）。判定逻辑收敛于此文件，
-/// 大厅与其他模块只调用，不自行复制条件。
+/// 口径：游戏行启用 + code 为 journey（test_only 未发布游戏由大厅统一过滤）。
+/// 配置不在此预拉：进入主界面后由页面按需加载并展示加载态，避免点击后
+/// 同步等待全量配置表造成无响应。
 class JourneyAccess {
   JourneyAccess._();
 
-  /// 入口条件是否满足（满足才允许进入主界面）。
-  static Future<bool> canEnter(GameModel game) async {
-    if (!game.enabled || game.code != 'journey') return false;
-    try {
-      await JourneyConfigService.instance.fetch();
-      return true;
-    } catch (_) {
-      return false;
-    }
-  }
+  /// 入口条件是否满足（同步本地判断，不发起网络请求）。
+  static bool canEnter(GameModel game) =>
+      game.enabled && game.code == 'journey';
 }

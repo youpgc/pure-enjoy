@@ -53,9 +53,41 @@ class JourneyConfigSnapshot {
   /// 列缺失/seed 快照为 null 时消费侧回落内置兜底）。
   final Map<String, dynamic>? globalsRaw;
 
+  /// 全局参数数值统一从原始行惰性读取：分组加载时 globals 表可能尚未
+  /// 到齐，构造期固化会把后台后到的配置永久锁在内置基线上。
+  /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；
+  /// 妖王伏诛判定命中后全账号共享天赋点池 +1）。
+  double get talentDropRate =>
+      _globalNum(globalsRaw, 'talent_drop_rate') ?? kJourneyTalentDropRate;
+
   /// 还魂复活功德基准价（journey_globals.revive_merit_base）；
   /// 实际消耗=基准 × 关卡号。
-  final int reviveMeritBase;
+  int get reviveMeritBase =>
+      _globalNum(globalsRaw, 'revive_merit_base')?.toInt() ??
+      kJourneyReviveMeritBase;
+
+  /// 同屏怪物实体上限（journey_globals.monster_cap，运营可在后台调整）。
+  int get monsterCap => _globalNum(globalsRaw, 'monster_cap')?.toInt() ?? 120;
+
+  /// 开局铺场只数（journey_globals.initial_pack_size，0=关闭）；
+  /// 波次关恢复铺场（修「接配置后开局空场走远看不到怪」）。
+  int get initialPackSize =>
+      _globalNum(globalsRaw, 'initial_pack_size')?.toInt() ??
+      kJourneyInitialPackSize;
+
+  /// 妖穴集中概率（journey_globals.spawn_den_ratio，0~1；调低=沿途遭遇
+  /// 更均匀）。刷怪点落入 demon_den 热区的比例。
+  double get spawnDenRatio =>
+      _globalNum(globalsRaw, 'spawn_den_ratio') ?? kJourneySpawnDenRatio;
+
+  /// 角色等级上限（journey_globals.char_level_cap；满级经验条恒满）。
+  int get charLevelCap =>
+      _globalNum(globalsRaw, 'char_level_cap')?.toInt() ?? kJourneyCharLevelCap;
+
+  /// 每日游历局内功德增长上限（journey_globals.merit_cap，缺省 9999）；
+  /// 局内累计功德达上限后不再增长，仍可继续游玩；不限制结算余额，
+  /// 也不限制其他关卡模式。
+  int get meritCap => _globalNum(globalsRaw, 'merit_cap')?.toInt() ?? 9999;
 
   /// 西行游戏 id（games.code='journey'；成绩上报用，空=未就绪不上报）。
   final String gameId;
@@ -63,29 +95,6 @@ class JourneyConfigSnapshot {
   /// 成绩维度 id（game_dimensions，code→id：farthest_level/run_kills/
   /// run_merit）；成绩上报 values 键，空=未配置不上报。
   final Map<String, String> scoreDimIds;
-
-  /// 同屏怪物实体上限（journey_globals.monster_cap，运营可在后台调整）。
-  final int monsterCap;
-
-  /// 开局铺场只数（journey_globals.initial_pack_size，0=关闭）；
-  /// 波次关恢复铺场（修「接配置后开局空场走远看不到怪」）。
-  final int initialPackSize;
-
-  /// 妖穴集中概率（journey_globals.spawn_den_ratio，0~1；调低=沿途遭遇
-  /// 更均匀）。刷怪点落入 demon_den 热区的比例。
-  final double spawnDenRatio;
-
-  /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；末场伏诛
-  /// 判定命中后全账号共享天赋点池 +1）。
-  final double talentDropRate;
-
-  /// 角色等级上限（journey_globals.char_level_cap；满级经验条恒满）。
-  final int charLevelCap;
-
-  /// 每日游历局内功德增长上限（journey_globals.merit_cap，缺省 9999）；
-  /// 局内累计功德达上限后不再增长，仍可继续游玩；不限制结算余额，
-  /// 也不限制其他关卡模式。
-  final int meritCap;
 
   /// true = 全部来自内置兜底（journey_* 表未部署或拉取失败）。
   final bool fromSeed;
@@ -106,8 +115,7 @@ class JourneyConfigSnapshot {
   /// 妖王降临倒计时提醒窗口（秒）；剩余 ≤ 该值时罗盘位展示倒计时，
   /// 0=关闭提醒。列缺失或未配值时回落内置兜底。
   int get bossWarnSec =>
-      _globalNum(globalsRaw, 'boss_warn_sec')?.toInt() ??
-      kJourneyBossWarnSec;
+      _globalNum(globalsRaw, 'boss_warn_sec')?.toInt() ?? kJourneyBossWarnSec;
 
   /// 前期发育保护期（秒）；期间不产生精英怪。
   int get earlyGameProtectSec =>
@@ -116,34 +124,28 @@ class JourneyConfigSnapshot {
 
   /// 保护期结束后精英率每分钟增量。
   double get eliteRatePerMin =>
-      _globalNum(globalsRaw, 'elite_rate_per_min') ??
-      kJourneyEliteRatePerMin;
+      _globalNum(globalsRaw, 'elite_rate_per_min') ?? kJourneyEliteRatePerMin;
 
   /// 局内强度每分钟增长斜率；列缺失或未配值回落内置兜底。
   double get buffTimeSlope =>
-      _globalNum(globalsRaw, 'buff_time_slope') ??
-      kJourneyBuffTimeSlope;
+      _globalNum(globalsRaw, 'buff_time_slope') ?? kJourneyBuffTimeSlope;
 
   /// 每点关卡难度的强度乘区增量。
   double get buffLevelMult =>
-      _globalNum(globalsRaw, 'buff_level_mult') ??
-      kJourneyBuffLevelMult;
+      _globalNum(globalsRaw, 'buff_level_mult') ?? kJourneyBuffLevelMult;
 
   /// 生效强度乘区上限。
   double get buffMultCap =>
-      _globalNum(globalsRaw, 'buff_mult_cap') ??
-      kJourneyBuffMultCap;
+      _globalNum(globalsRaw, 'buff_mult_cap') ?? kJourneyBuffMultCap;
 
   /// 怪物最终移速上限（px/s）。
   double get monsterSpeedCap =>
-      _globalNum(globalsRaw, 'monster_speed_cap') ??
-      kJourneyMonsterSpeedCap;
+      _globalNum(globalsRaw, 'monster_speed_cap') ?? kJourneyMonsterSpeedCap;
 
   /// 妖王接触伤害的玩家等级成长系数（journey_globals.boss_damage_lv_k）；
   /// 列缺失或未配值回落内置兜底。
   double get bossDamageLvK =>
-      _globalNum(globalsRaw, 'boss_damage_lv_k') ??
-      kJourneyBossDamageLvK;
+      _globalNum(globalsRaw, 'boss_damage_lv_k') ?? kJourneyBossDamageLvK;
 
   const JourneyConfigSnapshot({
     required this.regions,
@@ -163,15 +165,8 @@ class JourneyConfigSnapshot {
     this.weaponParams = const <String, Map<String, double>>{},
     this.monsterParams = const <String, Map<String, double>>{},
     this.globalsRaw,
-    this.reviveMeritBase = 30,
     this.gameId = '',
     this.scoreDimIds = const <String, String>{},
-    this.monsterCap = 120,
-    this.initialPackSize = 24,
-    this.spawnDenRatio = 0.70,
-    this.talentDropRate = 0.10,
-    this.charLevelCap = 99,
-    this.meritCap = 9999,
     required this.fromSeed,
   });
 
@@ -213,12 +208,9 @@ class JourneyConfigSnapshot {
     return null;
   }
 
-  /// 每日游历地图列表：远端就绪时如实返回后台配置（空列表=后台全部
-  /// 禁用，App 显示「今日暂无游历」）；仅内置兜底快照回落种子保离线可玩。
-  List<JourneyDailyMapModel> dailyMapList() {
-    if (!fromSeed) return dailyMaps;
-    return kJourneyDailyMapSeed.map(JourneyDailyMapModel.fromJson).toList();
-  }
+  /// 每日游历地图列表：组装侧已保证未加载的表回落内置种子，已加载的
+  /// 空列表代表后台全部禁用（App 显示「今日暂无游历」）。
+  List<JourneyDailyMapModel> dailyMapList() => dailyMaps;
 
   /// 法宝数值参数（weaponCode+参数 code 读取；行缺失回落 fallback）。
   double weaponParam(String weaponCode, String code, double fallback) {
@@ -310,18 +302,18 @@ class JourneyConfigSnapshot {
   /// 某角色的五行天赋分支（element/seq 升序）；该角色无远端行 → 内置
   /// 60 行种子按同角色过滤兜底，消费侧不死局。
   List<JourneyTalentBranchModel> branchesOf(String char) {
-    final own =
-        talentBranches.where((b) => b.characterCode == char).toList();
+    final own = talentBranches.where((b) => b.characterCode == char).toList();
     if (own.isEmpty) {
       return buildJourneyTalentBranchSeed()
           .where((row) => row['character_code'] == char)
           .map(JourneyTalentBranchModel.fromJson)
           .toList();
     }
-    return own..sort((a, b) {
-      final byElement = a.element.compareTo(b.element);
-      return byElement != 0 ? byElement : a.seq.compareTo(b.seq);
-    });
+    return own
+      ..sort((a, b) {
+        final byElement = a.element.compareTo(b.element);
+        return byElement != 0 ? byElement : a.seq.compareTo(b.seq);
+      });
   }
 
   /// 某角色某系某分支（远端行缺失回落内置种子行）。
@@ -342,5 +334,6 @@ class JourneyConfigSnapshot {
   }
 
   /// 还魂复活功德价 = 基准价 × 关卡号，封顶 [kJourneyReviveMeritCap]。
-  int reviveCostFor(int levelNo) => (reviveMeritBase * levelNo).clamp(0, kJourneyReviveMeritCap);
+  int reviveCostFor(int levelNo) =>
+      (reviveMeritBase * levelNo).clamp(0, kJourneyReviveMeritCap);
 }

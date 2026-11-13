@@ -7,6 +7,7 @@ import '../services/journey_time.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import 'journey_battle_screen.dart';
 import '../widgets/journey_busy.dart';
 
@@ -28,20 +29,37 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
   /// 每日游历 gate：今日（北京日期）已进图则整页置为已游历态。
   bool _dailyPlayed = false;
 
+  /// 启程进行中：连点只写一次当日 gate、只入栈一个对局页。
+  bool _starting = false;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    await JourneyConfigService.instance.fetch();
-    final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
-    if (!mounted) return;
-    setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _dailyPlayed = gate?['date'] == journeyBjDateKey();
-    });
+    try {
+      await JourneyConfigService.instance.ensure(JourneyConfigScope.daily);
+      final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
+      if (!mounted) return;
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _dailyPlayed = gate?['date'] == journeyBjDateKey();
+        _loadFailed = false;
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    }
+  }
+
+  void _retry() {
+    setState(() => _loadFailed = false);
+    _load();
   }
 
   Color _mapColor(JourneyDailyMapModel m) {
@@ -52,6 +70,12 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '西行游历',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     final config = _config;
     if (config == null) {
       return const JourneyPageScaffold(
@@ -154,30 +178,35 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
   }
 
   Future<void> _startDaily(JourneyDailyMapModel map) async {
-    if (_dailyPlayed) return;
-    // 进入即计次：先写当日 gate 再进对局（主动放弃同样占次）
-    await JourneyBusy.run(
-      context,
-      () => CacheHelper.instance.saveMap('journey_daily_v1',
-          <String, dynamic>{'date': journeyBjDateKey()}),
-      label: '准备游历…',
-    );
-    if (!mounted) return;
-    setState(() => _dailyPlayed = true);
-    await Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (_) => JourneyBattleScreen(
-          level: JourneyLevelModel(
-            levelNo: 0,
-            title: '游历·${map.name}',
-            regionCode: map.code,
-            kind: 'daily',
-            bossFights: 0,
-            durationTargetSec:
-                map.durationTargetSec > 0 ? map.durationTargetSec : 300,
+    if (_dailyPlayed || _starting || !mounted) return;
+    _starting = true;
+    try {
+      // 进入即计次：先写当日 gate 再进对局（主动放弃同样占次）
+      await JourneyBusy.run(
+        context,
+        () => CacheHelper.instance.saveMap('journey_daily_v1',
+            <String, dynamic>{'date': journeyBjDateKey()}),
+        label: '准备游历…',
+      );
+      if (!mounted) return;
+      setState(() => _dailyPlayed = true);
+      await Navigator.of(context).push(
+        MaterialPageRoute(
+          builder: (_) => JourneyBattleScreen(
+            level: JourneyLevelModel(
+              levelNo: 0,
+              title: '游历·${map.name}',
+              regionCode: map.code,
+              kind: 'daily',
+              bossFights: 0,
+              durationTargetSec:
+                  map.durationTargetSec > 0 ? map.durationTargetSec : 300,
+            ),
           ),
         ),
-      ),
-    );
+      );
+    } finally {
+      _starting = false;
+    }
   }
 }

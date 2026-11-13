@@ -6,6 +6,7 @@ import '../../../../../utils/cache_helper.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import 'journey_battle_screen.dart';
 import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
@@ -46,26 +47,48 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
   /// 每日游历 gate：今日（北京日期）已功成则按钮置灰（口径同关卡选择页）。
   bool _dailyPlayed = false;
 
+  /// 导航进行中：页内所有入口共用一把锁，连点只入栈一个页面，
+  /// 直到目标页出栈并完成进度刷新才释放。
+  bool _navigating = false;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    final progress = JourneyProgressService.instance;
-    await Future.wait<void>(<Future<void>>[
-      JourneyConfigService.instance.fetch(),
-      progress.ensureLoaded(),
-    ]);
-    final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
-    if (!mounted) return;
+    try {
+      final progress = JourneyProgressService.instance;
+      await Future.wait<void>(<Future<void>>[
+        JourneyConfigService.instance.ensure(JourneyConfigScope.hub),
+        progress.ensureLoaded(),
+      ]);
+      final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
+      if (!mounted) return;
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _progress = progress.state;
+        _dailyPlayed = gate?['date'] == journeyBjDateKey();
+        _loadFailed = false;
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      if (mounted && _loading) setState(() => _loading = false);
+    }
+  }
+
+  void _retry() {
     setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _progress = progress.state;
-      _dailyPlayed = gate?['date'] == journeyBjDateKey();
-      _loading = false;
+      _loadFailed = false;
+      _loading = true;
     });
+    _load();
   }
 
   List<JourneyCharacterModel> get _characters =>
@@ -123,7 +146,9 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
               'assets/games/journey/bg_hub.svg',
               fit: BoxFit.cover,
             ),
-            if (_loading)
+            if (_loadFailed)
+              Center(child: JourneyLoadError(onRetry: _retry))
+            else if (_loading)
               const Center(child: JourneyLoading(label: '西行中…'))
             else
               SafeArea(
@@ -251,10 +276,12 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
             child: JourneyEntryCard(
               icon: Icons.leaderboard,
               label: '西行排行',
-              onTap: () => openJourneyLeaderboard(context,
-                  snapshotGameId: _config?.gameId ?? '',
-                  fallbackGameId: widget.game.id,
-                  gameCode: widget.game.code),
+              onTap: () => _runLocked(() => openJourneyLeaderboard(
+                    context,
+                    snapshotGameId: _config?.gameId ?? '',
+                    fallbackGameId: widget.game.id,
+                    gameCode: widget.game.code,
+                  )),
             ),
           ),
           SizedBox(
@@ -262,7 +289,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
             child: JourneyEntryCard(
               icon: Icons.settings,
               label: '设置',
-              onTap: () => openJourneySettings(context),
+              onTap: () => _runLocked(() => openJourneySettings(context)),
             ),
           ),
         ],
@@ -432,16 +459,26 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
     );
   }
 
-  Future<void> _push(Widget page) async {
-    await Navigator.of(context).push(MaterialPageRoute(builder: (_) => page));
-    if (mounted) await _load();
+  /// 页内所有导航/抽屉共用一把锁：连点只入栈一个页面，直到目标页
+  /// 出栈并完成进度刷新才释放。
+  Future<void> _runLocked(Future<void> Function() action) async {
+    if (_navigating || !mounted) return;
+    _navigating = true;
+    try {
+      await action();
+      if (mounted) await _load();
+    } finally {
+      _navigating = false;
+    }
   }
 
-  Future<void> _openLevelSelect() async {
-    await Navigator.of(context).push(
-      MaterialPageRoute(builder: (_) => const JourneyLevelSelectScreen()),
-    );
-    if (mounted) await _load();
+  Future<void> _push(Widget page) => _runLocked(() async {
+        await Navigator.of(context)
+            .push(MaterialPageRoute(builder: (_) => page));
+      });
+
+  void _openLevelSelect() {
+    _push(const JourneyLevelSelectScreen());
   }
 
   // ---- 模式直入（hub 快捷入口；口径与关卡选择页一致）----

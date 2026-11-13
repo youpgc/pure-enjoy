@@ -59,9 +59,21 @@ class JourneyProgressService extends ChangeNotifier {
 
   bool _loaded = false;
 
-  Future<void> ensureLoaded() async {
-    if (_loaded) return;
-    _loaded = true;
+  /// 在途读档：并发进入多个页面时共享同一次加载，失败后可重试。
+  Future<void>? _loadInFlight;
+
+  Future<void> ensureLoaded() {
+    if (_loaded) return Future<void>.value();
+    final running = _loadInFlight;
+    if (running != null) return running;
+    final future = _loadProgress();
+    _loadInFlight = future;
+    return future.whenComplete(() {
+      _loadInFlight = null;
+    });
+  }
+
+  Future<void> _loadProgress() async {
     final raw = await CacheHelper.instance.loadMap(_storeKey);
     if (raw != null) {
       selectedCharacterCode =
@@ -80,10 +92,10 @@ class JourneyProgressService extends ChangeNotifier {
             raw['merit_records'], JourneyMeritRecordModel.fromJson),
         runRecords:
             _parseRecords(raw['run_records'], JourneyRunRecordModel.fromJson),
-        unlockedCharacters:
-            ((raw['unlocked_characters'] as List<dynamic>?) ?? const <dynamic>[])
-                .cast<String>()
-                .toSet(),
+        unlockedCharacters: ((raw['unlocked_characters'] as List<dynamic>?) ??
+                const <dynamic>[])
+            .cast<String>()
+            .toSet(),
         unlockedWeapons:
             ((raw['unlocked_weapons'] as List<dynamic>?) ?? const <dynamic>[])
                 .cast<String>()
@@ -97,6 +109,7 @@ class JourneyProgressService extends ChangeNotifier {
       _updatedAt = DateTime.tryParse(raw['updated_at'] as String? ?? '');
     }
     await _pullRemoteProgress();
+    _loaded = true;
   }
 
   /// 节点 13·进度服务端化：登录态下拉取远端进度行，远端 updated_at 比
@@ -170,9 +183,8 @@ class JourneyProgressService extends ChangeNotifier {
       legacyTotals.forEach((e, total) {
         final code = journeyBranchCode(char, e, 'core');
         final carried = total > 8 ? 8 : total;
-        out[code] = carried > (out[code] ?? 0)
-            ? carried
-            : (out[code] ?? carried);
+        out[code] =
+            carried > (out[code] ?? 0) ? carried : (out[code] ?? carried);
       });
       parsed[char] = out;
     });
@@ -203,7 +215,11 @@ class JourneyProgressService extends ChangeNotifier {
     T Function(Map<String, dynamic>) fromJson,
   ) {
     if (raw is! List<dynamic>) return <T>[];
-    return raw.whereType<Map<String, dynamic>>().map(fromJson).take(_recordLimit).toList();
+    return raw
+        .whereType<Map<String, dynamic>>()
+        .map(fromJson)
+        .take(_recordLimit)
+        .toList();
   }
 
   /// 全字段状态拷贝（未覆盖项沿用当前 [_state]；新增字段统一在此透传，
@@ -230,14 +246,14 @@ class JourneyProgressService extends ChangeNotifier {
         runRecords: runRecords ?? _state.runRecords,
         unlockedCharacters: unlockedCharacters ?? _state.unlockedCharacters,
         unlockedWeapons: unlockedWeapons ?? _state.unlockedWeapons,
-        unlockedAchievements: unlockedAchievements ?? _state.unlockedAchievements,
+        unlockedAchievements:
+            unlockedAchievements ?? _state.unlockedAchievements,
       );
 
   /// 分支升级功德消耗：cost_base × (已修等级+1)，线性递增。
   /// 实现拆分见 journey_progress_talent.dart（part 同 library）。
 
-  static String restrainerOfName(String element) =>
-      switch (element) {
+  static String restrainerOfName(String element) => switch (element) {
         'metal' => '金',
         'wood' => '木',
         'water' => '水',
@@ -261,7 +277,8 @@ class JourneyProgressService extends ChangeNotifier {
     await ensureLoaded();
     // 首通判定：仅主线（level_no≥1）可推进；level_no≤0 的无尽/游历模式
     // 即使 cleared 也不推 farthest/不发天赋点（kills/功德流水照记）
-    final firstClear = cleared && levelNo > 0 && levelNo > _state.farthestLevelNo;
+    final firstClear =
+        cleared && levelNo > 0 && levelNo > _state.farthestLevelNo;
     // 首通发点（全账号共享点池）：全局 +1
     final poolGain = firstClear;
     int? nextPool;
@@ -364,8 +381,8 @@ class JourneyProgressService extends ChangeNotifier {
   /// 归属 [characterCode] 且尚未解锁的法宝集合（角色解锁联动入池；
   /// 无绑定法宝时返回 null 不动原集合）。
   Set<String>? _boundWeaponsOf(String characterCode) {
-    final weapons =
-        JourneyConfigService.instance.cached?.weapons ?? const <JourneyWeaponModel>[];
+    final weapons = JourneyConfigService.instance.cached?.weapons ??
+        const <JourneyWeaponModel>[];
     final bound = weapons
         .where((w) => w.characterCode == characterCode)
         .map((w) => w.code)

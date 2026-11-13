@@ -7,6 +7,7 @@ import '../services/journey_progress_sync.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 
 /// 西行履历（三页拆分，hub 独立入口）：功德流水 / 对局记录 / 成就
 /// （本地流水，新的在前，上限 50）。共享格式化与来源标签。
@@ -61,6 +62,8 @@ class JourneyMeritRecordsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: JourneyProgressService.instance,
       builder: (context, _) {
+        // 直达记录页时补一次读档：进度服务有加载守卫，完成后通知刷新
+        JourneyProgressService.instance.ensureLoaded();
         final records =
             JourneyProgressService.instance.state.meritRecords;
         return JourneyPageScaffold(
@@ -151,6 +154,8 @@ class JourneyRunRecordsScreen extends StatelessWidget {
     return ListenableBuilder(
       listenable: JourneyProgressService.instance,
       builder: (context, _) {
+        // 直达记录页时补一次读档：进度服务有加载守卫，完成后通知刷新
+        JourneyProgressService.instance.ensureLoaded();
         final records = JourneyProgressService.instance.state.runRecords;
         return JourneyPageScaffold(
           title: '对局记录',
@@ -232,21 +237,46 @@ class _JourneyAchievementsScreenState extends State<JourneyAchievementsScreen> {
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    await JourneyProgressService.instance.ensureLoaded();
-    // 成就定义（节点10）：gameId 未配置/拉取失败展示空态
-    await JourneyConfigService.instance.fetch();
-    final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
-    final defs = await JourneyProgressSync.fetchAchievements(gameId);
-    if (!mounted) return;
+    try {
+      await JourneyProgressService.instance.ensureLoaded();
+      // 成就定义（节点10）：gameId 未配置/拉取失败展示空态
+      await JourneyConfigService.instance
+          .ensure(JourneyConfigScope.achievements);
+      final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
+      final defs = await JourneyProgressSync.fetchAchievements(gameId);
+      if (!mounted) return;
+      setState(() {
+        _achievements = defs;
+        _loadFailed = false;
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    } finally {
+      if (mounted && _loading) setState(() => _loading = false);
+    }
+  }
+
+  void _retry() {
     setState(() {
-      _achievements = defs;
-      _loading = false;
+      _loadFailed = false;
+      _loading = true;
     });
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '成就',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     if (_loading) {
       return const JourneyPageScaffold(
         title: '成就',

@@ -9,6 +9,7 @@ import '../services/journey_progress_service.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
+import '../widgets/journey_load_error.dart';
 import '../widgets/journey_busy.dart';
 
 /// S4 取经队伍（角色选择/图鉴）。
@@ -25,27 +26,50 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
   JourneyConfigSnapshot? _config;
   JourneyProgressModel _progress = const JourneyProgressModel();
 
+  /// 请人进行中：连点只弹一次确认窗、只扣一次功德。
+  bool _unlocking = false;
+
   @override
   void initState() {
     super.initState();
     _load();
   }
 
+  /// 加载失败标记：异常时由错误态接管，避免永久停在 loading。
+  bool _loadFailed = false;
+
   Future<void> _load() async {
-    final progress = JourneyProgressService.instance;
-    await Future.wait<void>(<Future<void>>[
-      JourneyConfigService.instance.fetch(),
-      progress.ensureLoaded(),
-    ]);
-    if (!mounted) return;
-    setState(() {
-      _config = JourneyConfigService.instance.cached;
-      _progress = progress.state;
-    });
+    try {
+      final progress = JourneyProgressService.instance;
+      await Future.wait<void>(<Future<void>>[
+        JourneyConfigService.instance.ensure(JourneyConfigScope.character),
+        progress.ensureLoaded(),
+      ]);
+      if (!mounted) return;
+      setState(() {
+        _config = JourneyConfigService.instance.cached;
+        _progress = progress.state;
+        _loadFailed = false;
+      });
+    } catch (e, st) {
+      reportJourneyLoadError(e, st);
+      if (mounted) setState(() => _loadFailed = true);
+    }
+  }
+
+  void _retry() {
+    setState(() => _loadFailed = false);
+    _load();
   }
 
   @override
   Widget build(BuildContext context) {
+    if (_loadFailed) {
+      return JourneyPageScaffold(
+        title: '取经队伍',
+        body: JourneyLoadError(onRetry: _retry),
+      );
+    }
     final config = _config;
     if (config == null) {
       return const JourneyPageScaffold(
@@ -232,56 +256,62 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
   }
 
   Future<void> _unlock(JourneyCharacterModel c) async {
-    // 二次确认：高价功德消耗（3000+）误触代价大，弹窗核对余额再扣
-    final balance = JourneyProgressService.instance.state.meritBalance;
-    final confirmed = await showDialog<bool>(
-      context: context,
-      builder: (ctx) => AlertDialog(
-        backgroundColor: JourneyTheme.panel,
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
-          side: const BorderSide(color: JourneyTheme.panelStroke),
-        ),
-        title: Text('请 ${c.name} 上路？', style: JourneyTheme.title),
-        content: Text(
-          '将消耗 ${c.unlockMeritCost} 功德解锁「${c.name}」。\n'
-          '当前功德余额 $balance，确认后即时扣除。',
-          style: JourneyTheme.body,
-        ),
-        actions: <Widget>[
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(false),
-            child: const Text('再想想', style: JourneyTheme.body),
+    if (_unlocking) return;
+    _unlocking = true;
+    try {
+      // 二次确认：高价功德消耗误触代价大，弹窗核对余额再扣
+      final balance = JourneyProgressService.instance.state.meritBalance;
+      final confirmed = await showDialog<bool>(
+        context: context,
+        builder: (ctx) => AlertDialog(
+          backgroundColor: JourneyTheme.panel,
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(JourneyTheme.radiusCard),
+            side: const BorderSide(color: JourneyTheme.panelStroke),
           ),
-          TextButton(
-            onPressed: () => Navigator.of(ctx).pop(true),
-            child: Text(
-              '确认解锁',
-              style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+          title: Text('请 ${c.name} 上路？', style: JourneyTheme.title),
+          content: Text(
+            '将消耗 ${c.unlockMeritCost} 功德解锁「${c.name}」。\n'
+            '当前功德余额 $balance，确认后即时扣除。',
+            style: JourneyTheme.body,
+          ),
+          actions: <Widget>[
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(false),
+              child: const Text('再想想', style: JourneyTheme.body),
             ),
-          ),
-        ],
-      ),
-    );
-    if (confirmed != true) return;
-    final progress = JourneyProgressService.instance;
-    if (!mounted) return;
-    final ok = await JourneyBusy.run(
-      context,
-      () async {
-        final unlocked = await progress.unlockCharacter(c.code,
-            meritCost: c.unlockMeritCost);
-        await _load();
-        return unlocked;
-      },
-      label: '请人中…',
-    );
-    if (!mounted) return;
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Text(ok ? '${c.name} 已加入取经队伍' : '功德不足，无法请 ${c.name} 上路'),
-        backgroundColor: ok ? null : JourneyTheme.danger,
-      ),
-    );
+            TextButton(
+              onPressed: () => Navigator.of(ctx).pop(true),
+              child: Text(
+                '确认解锁',
+                style: JourneyTheme.body.copyWith(color: JourneyTheme.gold),
+              ),
+            ),
+          ],
+        ),
+      );
+      if (confirmed != true) return;
+      final progress = JourneyProgressService.instance;
+      if (!mounted) return;
+      final ok = await JourneyBusy.run(
+        context,
+        () async {
+          final unlocked = await progress.unlockCharacter(c.code,
+              meritCost: c.unlockMeritCost);
+          await _load();
+          return unlocked;
+        },
+        label: '请人中…',
+      );
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(ok ? '${c.name} 已加入取经队伍' : '功德不足，无法请 ${c.name} 上路'),
+          backgroundColor: ok ? null : JourneyTheme.danger,
+        ),
+      );
+    } finally {
+      _unlocking = false;
+    }
   }
 }
