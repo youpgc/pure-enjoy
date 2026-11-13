@@ -436,10 +436,10 @@ class _Compass extends StatelessWidget {
     );
   }
 
-  /// 妖王降临倒计时提醒（进入 boss_warn_sec 窗口后展示），
-  /// 降临后由引擎归零自然隐藏。
+  /// 妖王降临倒计时（首次降临与多场战复活共用）：完整倒计时常显，
+  /// 归零复活后由引擎置 0 自然隐藏。
   Widget _bossSpawnCountdownView(int left) =>
-      _radarBadge(Icons.hourglass_top, '妖王将至 · ${left}s');
+      _radarBadge(Icons.hourglass_top, '妖王降临 · ${left}s');
 
   /// 无妖章回收口展示：每日游历=剩余时长倒计时（满时长强制结算）；
   /// 无妖主线章回=西行里程（剩余里数，按玩家实际位移累计，挂机不可达成）。

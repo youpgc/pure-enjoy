@@ -118,6 +118,9 @@ class JourneyFlameGame extends FlameGame
 
   /// 妖王首次降临倒计时（秒）：0 = 本关无据点妖王或妖王已降临。
   double _bossSpawnCountdown = 0;
+
+  /// 妖王阵亡后到复活/新妖王降临的冷却倒计时（秒）：0 = 无冷却/非多场战。
+  double _bossRespawnCountdown = 0;
   int _charLv = 1, _kills = 0, _meritCoins = 0;
 
   /// 西行里程累计（世界单位，1 里=25 单位）：玩家本局实际净位移之和。
@@ -473,6 +476,8 @@ class JourneyFlameGame extends FlameGame
     }
 
     tickBossSpawnCountdown(this, dt);
+    // 妖王阵亡冷却（多场战）：归零后据点重生并播「妖王降临」横幅
+    tickBossRespawnCountdown(this, dt);
 
     updateSpawns(this, dt);
     // 空间哈希（节点12）：刷怪后每帧重建，供武器/接触伤害查询附近候选

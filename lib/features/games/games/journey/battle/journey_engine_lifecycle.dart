@@ -89,7 +89,14 @@ extension JourneyLifecycle on JourneyFlameGame {
       final totalFights = level.bossFights > 1 ? level.bossFights : 1;
       if (_bossStage < totalFights - 1) {
         _bossStage++;
-        respawnBoss(this);
+        // 妖王阵亡→复活/新妖王降临冷却：罗盘位展示倒计时常显，归零由
+        // tickBossRespawnCountdown 触发据点重生（如「三打白骨精」击败一场
+        // 后冷却再刷新，避免瞬间满血重现打断节奏）
+        _bossRespawnCountdown =
+            (config?.bossRespawnCdSec ?? kJourneyBossRespawnCdSec).toDouble();
+        final secs = _bossRespawnCountdown.round();
+        controller.hud.bossSpawnIn.value = secs;
+        controller.hud.banner.value = '妖王兵解 · $secs 秒后重现';
       } else {
         _onBossFinalKill();
       }

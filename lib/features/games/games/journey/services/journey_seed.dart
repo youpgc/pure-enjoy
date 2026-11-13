@@ -408,6 +408,11 @@ const int kJourneyBossSpawnDelaySec = 300;
 /// 剩余时间 ≤ 该值时罗盘位展示倒计时，0=关闭提醒。
 const int kJourneyBossWarnSec = 10;
 
+/// 妖王阵亡（多场战）到复活/新妖王降临的冷却（秒；
+/// journey_globals.boss_respawn_cd_sec 可覆盖）：冷却期间罗盘位展示倒计时，
+/// 归零后据点重生（如「三打白骨精」击败一场后等冷却再刷新）。
+const int kJourneyBossRespawnCdSec = 10;
+
 /// 前期发育保护期（秒；journey_globals.early_game_protect_sec 可覆盖）：
 /// 期间只刷普通怪，留出发育窗口。
 const int kJourneyEarlyGameProtectSec = 60;

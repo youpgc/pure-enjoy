@@ -346,8 +346,10 @@ class JourneyMonsterComponent extends PositionComponent
         );
       }
     }
-    // 血条口径：妖王常显；普通怪受击显示、2.5s 无新受击后 0.6s 渐隐
-    if (hp < maxHp && (isBoss || _hpBarTimer > 0)) {
+    // 血条口径：妖王常显；普通怪受击显示、2.5s 无新受击后 0.6s 渐隐。
+    // 死亡瞬间（含秒杀）整体隐藏：归零后若仍绘制会闪现满宽暗底血条，
+    // 比正常受击的残血条视觉上宽很多，故以 hp>0 收口。
+    if (hp > 0 && hp < maxHp && (isBoss || _hpBarTimer > 0)) {
       final alpha = isBoss
           ? 1.0
           : (_hpBarTimer / 0.6).clamp(0.0, 1.0);

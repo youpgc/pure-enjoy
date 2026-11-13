@@ -469,10 +469,9 @@ int _dailyDensityTier(JourneyFlameGame game) {
   return (idx < 0 ? milestones.length - 1 : idx).clamp(0, 4).toInt();
 }
 
-/// 妖王降临倒计时推进：归零即召唤并写「妖王降临」横幅；剩余时间进入
-/// 后台提醒窗口（journey_globals.boss_warn_sec，默认 10s）后写入 HUD，
-/// 罗盘位展示「妖王将至 · Xs」（ValueNotifier 等值不重复通知，每秒至多
-/// 一次），0=关闭提醒。
+/// 妖王降临完整倒计时推进：从首次降临延迟起持续写入剩余秒数，罗盘位
+/// 展示「妖王降临 · Xs」（不再仅在末 10s 提醒窗口才显示）；归零即召唤
+/// 并写「妖王降临」横幅；ValueNotifier 等值不重复通知，每秒至多一次。
 void tickBossSpawnCountdown(JourneyFlameGame game, double dt) {
   if (game._bossSpawnCountdown <= 0) return;
   game._bossSpawnCountdown -= dt;
@@ -483,7 +482,24 @@ void tickBossSpawnCountdown(JourneyFlameGame game, double dt) {
     return;
   }
   final left = game._bossSpawnCountdown.ceil();
-  if (left <= (game.config?.bossWarnSec ?? kJourneyBossWarnSec)) {
+  if (game.controller.hud.bossSpawnIn.value != left) {
+    game.controller.hud.bossSpawnIn.value = left;
+  }
+}
+
+/// 妖王阵亡（多场战）到复活/新妖王降临的冷却倒计时推进：归零后据点重生
+/// 并播「妖王降临」横幅；冷却期间罗盘位展示「妖王降临 · Xs」完整倒计时。
+/// 与 [tickBossSpawnCountdown] 互不重叠（仅一者 >0），共用同一 HUD 倒计时位。
+void tickBossRespawnCountdown(JourneyFlameGame game, double dt) {
+  if (game._bossRespawnCountdown <= 0) return;
+  game._bossRespawnCountdown -= dt;
+  if (game._bossRespawnCountdown <= 0) {
+    game.controller.hud.bossSpawnIn.value = 0;
+    game.respawnBoss(game);
+    return;
+  }
+  final left = game._bossRespawnCountdown.ceil();
+  if (game.controller.hud.bossSpawnIn.value != left) {
     game.controller.hud.bossSpawnIn.value = left;
   }
 }

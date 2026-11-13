@@ -117,6 +117,11 @@ class JourneyConfigSnapshot {
   int get bossWarnSec =>
       _globalNum(globalsRaw, 'boss_warn_sec')?.toInt() ?? kJourneyBossWarnSec;
 
+  /// 妖王阵亡到复活/新妖王降临的冷却（秒）；列缺失或未配值时回落内置兜底。
+  int get bossRespawnCdSec =>
+      _globalNum(globalsRaw, 'boss_respawn_cd_sec')?.toInt() ??
+      kJourneyBossRespawnCdSec;
+
   /// 前期发育保护期（秒）；期间不产生精英怪。
   int get earlyGameProtectSec =>
       _globalNum(globalsRaw, 'early_game_protect_sec')?.toInt() ??
