@@ -44,7 +44,7 @@ JourneyLoadout buildJourneyLoadout(JourneyProgressModel p, String charCode) {
   if (woodSig >= 3) regenGain += 1; // 回春 3 层：回复 +1/秒
 
   return JourneyLoadout(
-    damageAmp: metalCore * bv('metal', 'core') +
+    attackAmp: metalCore * bv('metal', 'core') +
         fireCore * bv('fire', 'core') +
         (metalSig + fireSig) * 0.05,
     spinAmp: waterCore * bv('water', 'core') + waterSig * 0.05,

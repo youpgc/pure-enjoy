@@ -66,10 +66,12 @@ class JourneyBattleController {
 
 /// 局外预注入（对局页组装）：五行天赋树线性增量 + 加强点能力标记。
 ///
-/// v3 线性层制数值口径：金/火层数→伤害、木层数→生命上限、水层数→
-/// 环绕转速、土层数→护甲（每层数值取天赋轨迹配置）。
+/// 数值口径（伤害公式固定）：基础值 → 加百分比，百分比加法合流后
+/// 单次乘算，不做乘法叠乘。天赋金/火层数走攻击力%（attackAmp），
+/// 与武器增伤%（damageAmp，舍利子等）分桶展示。
 class JourneyLoadout {
-  final double damageAmp;
+  final double attackAmp; // 攻击力%合计（天赋锐金/离火，加法合流）
+  final double damageAmp; // 武器增伤%合计（1.0 基准，局内舍利子等续加）
   final double spinAmp; // 环绕转速加成注入
   final double armorFlat;
   final double bonusMaxHp;
@@ -88,6 +90,7 @@ class JourneyLoadout {
   final Set<String> abilities;
 
   const JourneyLoadout({
+    this.attackAmp = 0,
     this.damageAmp = 0,
     this.spinAmp = 0,
     this.armorFlat = 0,

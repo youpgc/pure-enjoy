@@ -43,7 +43,7 @@ class JourneyScoreReporter {
   }
 
   /// 组装对局详情快照（game_scores.run_detail）：使用角色 + 局内属性，
-  /// 取数口径与局内属性详情面板同源（hitDamageBase×damageMult / hud 血量
+  /// 取数口径与局内属性详情面板同源（hitDamageBase 含增伤Σ% / hud 血量
   /// / 维度槽 / 被动加持）；[game] 为 null（配置异常兜底局）时返回 null。
   static Map<String, Object?>? buildRunDetail(
     JourneyFlameGame? game, {
@@ -56,7 +56,7 @@ class JourneyScoreReporter {
       'char_level': hud.level.value,
       'hp': hud.hp.value.round(),
       'max_hp': hud.maxHp.value.round(),
-      'hit_damage': (game.hitDamageBase * game.damageMult).toStringAsFixed(1),
+      'hit_damage': game.hitDamageBase.toStringAsFixed(1),
       'move_speed_amp': game.moveSpeedAmp,
       'crit_rate': game.critRate,
       'crit_damage': game.critDamage,

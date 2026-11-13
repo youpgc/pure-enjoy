@@ -36,13 +36,32 @@ abstract final class JourneyAttributesSheet {
     final defs = _slotDefs();
 
     final rows = <Widget>[];
+    // 破甲：当前穿刺维度等级与对应无视护甲比例（公式与引擎命中结算同源）
+    final pierceLv = game.slotLevel('pierce');
+    final piercePct = pierceLv > 0
+        ? (kJourneyPierceBaseRatio +
+                game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
+                    (pierceLv - 1))
+            .clamp(0.0, kJourneyPierceRatioCap) *
+            100
+        : 0.0;
+
     rows.addAll(<Widget>[
       const Text('基础属性', style: JourneyTheme.title),
       const SizedBox(height: 6),
-      // 面板口径与实际伤害/角速度同源：hitDamageBase（法宝品阶+基础攻击）、
-      // damageMult（≤3.0 钳）与 displayAngularSpeed（2 圈/秒钳）
-      _attrRow('单次伤害',
-          '${(game.hitDamageBase * game.damageMult).toStringAsFixed(1)}/击'),
+      // 伤害公式固定：基础值 →(1+Σ%) 单次乘算；面板各行与引擎结算同源
+      // （damageBaseValue / damageAmpTotal / hitDamageBase）
+      _attrRow(
+        '基础攻击力',
+        '${(game.character.baseAttack + game.levelAttackTotal + game.cardAttackTotal).toStringAsFixed(0)}'
+        '（角色 ${game.character.baseAttack.toStringAsFixed(0)} · '
+        '等级 ${game.levelAttackTotal.toStringAsFixed(0)} · '
+        '卡 ${game.cardAttackTotal.toStringAsFixed(0)}）',
+      ),
+      _attrRow('法宝品阶伤害', game.weaponArm?.damage.toStringAsFixed(0) ?? game.weaponBaseDamage.toStringAsFixed(0)),
+      _attrRow('攻击力加成', '+${(game.attackAmp * 100).toStringAsFixed(1)}%'),
+      _attrRow('武器增伤', '+${((game.damageAmp - 1).clamp(0.0, 2.0) * 100).toStringAsFixed(1)}%'),
+      _attrRow('单次伤害', '${game.hitDamageBase.toStringAsFixed(1)}/击'),
       _attrRow(
         '环绕转速',
         '${game.displayAngularSpeed.toStringAsFixed(1)}/秒 · '
@@ -59,7 +78,14 @@ abstract final class JourneyAttributesSheet {
           '${controller.hud.hp.value.round()} / ${controller.hud.maxHp.value.round()}'),
       _attrRow('自动回复', '${game.player.regen.toStringAsFixed(1)}/秒'),
       _attrRow('护甲', '${game.player.armor.toStringAsFixed(1)}（减伤 '
-          '${(JourneyDamageTickMixin.armorReductionRatio(game.player.armor) * 100).toStringAsFixed(0)}%）'),
+          '${(JourneyDamageTickMixin.armorReductionRatio(game.player.armor,
+                  curveK: game.armorCurveK) * 100).toStringAsFixed(0)}%）'),
+      _attrRow(
+        '破甲',
+        pierceLv > 0
+            ? 'Lv$pierceLv · 无视护甲 ${piercePct.toStringAsFixed(1)}%'
+            : '未习得',
+      ),
       _attrRow('移动速度', '×${game.moveSpeedAmp.toStringAsFixed(2)}'),
       _attrRow('拾取范围', '${game.player.pickupRange.round()}'),
       _attrRow('经验获取', '×${game.expAmp.toStringAsFixed(2)}'),

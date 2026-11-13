@@ -16,8 +16,11 @@ class JourneyOrbitWeapons extends Component {
     final arm = game.weaponArm;
     if (arm == null) return;
     var speed = game.spinAmp; // 全局转速乘区（转速槽/天赋/避水珠）
-    // 悟空「大圣威压」增益期间转速额外 +30%
-    if (game._wukongBuffTimer > 0) speed += 0.3;
+    // 悟空「大圣威压」增益期间转速额外提升（光环参数 aura_params.spin_amp，
+    // 后台可配；身外身法/三头六臂为特殊能力窗口，增量固定）
+    if (game._wukongBuffTimer > 0) {
+      speed += game.character.auraNum('spin_amp', 0.3);
+    }
     // 身外身法（wukong 特殊能力）：增益期间转速额外 +30%
     if (game._shenfenTimer > 0) speed += 0.3;
     // 三头六臂（nezha 特殊能力）：增益期间转速额外 +40%
@@ -144,7 +147,6 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
           _zhuoTimer = 0;
           target.takeDamage(
             hitDamageBase *
-                damageMult *
                 weaponParam('jinggang_zhuo', 'damage', 2.5),
           );
           target.weakenTimer = weaponParam('jinggang_zhuo', 'weak', 5);
@@ -170,7 +172,6 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
           target.ignite(
             source: 'yinyang_ping',
             burnDps: hitDamageBase *
-                damageMult *
                 weaponParam('yinyang_ping', 'burn', 0.4),
             seconds: weaponParam('yinyang_ping', 'root', 2.5),
           );

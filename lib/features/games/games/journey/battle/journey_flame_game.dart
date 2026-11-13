@@ -232,11 +232,18 @@ class JourneyFlameGame extends FlameGame
   @override
   double critDamage = 1.5;
 
-  /// 实际伤害乘区：伤害加成钳 ≤+200%（damageAmp 1.0 基准，超过不再增长）；
-  /// 三头六臂（nezha 特殊能力）增益窗口内额外 ×1.4。
-  double get damageMult =>
-      (1.0 + (damageAmp - 1.0).clamp(0.0, 2.0)) *
-      (_nezhaWindow > 0 ? 1.4 : 1.0);
+  /// 增伤百分比合计（伤害公式固定：基础值 →(1+Σ%) 单次乘算，各百分比
+  /// 来源加法合流，不做乘法叠乘）：
+  /// - attackAmp：攻击力%（天赋锐金/离火本源+化形，局外注入）；
+  /// - damageAmp：武器增伤%（1.0 基准，舍利子 +15%/级、红孩儿光环 +8%，
+  ///   钳 ≤+200%）；
+  /// - 紫金宝葫叠层 3%/层（jinjiao 特殊能力，击杀精英/妖王 +1 层）；
+  /// - 三头六臂（nezha 特殊能力）增益窗口 +40%。
+  double get damageAmpTotal =>
+      attackAmp +
+      (damageAmp - 1.0).clamp(0.0, 2.0) +
+      0.03 * _jinjiaoStacks +
+      (_nezhaWindow > 0 ? 0.4 : 0);
 
   /// 法宝数值参数（journey_weapon_params 后台配置；行缺失回落 fallback）。
   double weaponParam(String code, String key, double fallback) =>
@@ -245,6 +252,15 @@ class JourneyFlameGame extends FlameGame
   /// 妖王能力参数（journey_monster_params 后台配置；行缺失回落 fallback）。
   double monsterParam(String monsterCode, String key, double fallback) =>
       config?.monsterParam(monsterCode, key, fallback) ?? fallback;
+
+  /// 护甲减伤曲线分母 K（journey_globals.armor_curve_k；缺省 80）。
+  double get armorCurveK =>
+      config?.armorCurveK ?? kJourneyArmorCurveK;
+
+  /// 怪物侧护甲减伤上限（journey_globals.monster_armor_reduction_cap；
+  /// 缺省 72%，高于玩家 60%，保 150~200 甲档位区分度）。
+  double get monsterArmorCap =>
+      config?.monsterArmorCap ?? kJourneyMonsterArmorCap;
 
   /// 维度槽定义缓存（slotDefMap 惰性构建一次；对局内配置不变）。
   Map<String, JourneySlotDefModel>? _slotDefCache;
@@ -338,6 +354,9 @@ class JourneyFlameGame extends FlameGame
   // ---- 局内成长（三选一应用的加成）----
   @override
   double damageAmp = 1.0;
+
+  /// 攻击力%合计（伤害公式固定：与武器增伤%加法合流进 damageAmpTotal）。
+  double attackAmp = 0;
   double moveSpeedAmp = 1.0;
 
   /// 等级成长累计的基础攻击力（每级叠加，独立于法宝品阶）。

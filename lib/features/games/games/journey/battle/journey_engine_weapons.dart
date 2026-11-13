@@ -56,8 +56,8 @@ abstract interface class JourneyWeaponHost {
 /// - 判定=扇形扫掠：怪与玩家连线角落在扇叶角 ± atan(半宽/距离) 内，
 ///   且怪距落在 [内环-怪半径, 外环+怪半径] → 扇叶扫到哪里哪里受击；
 /// - 单怪 0.3s 冷却防反复叠伤；环带内缘贴脸怪按 8 折兜底扫击；
-/// - 命中结算维度特效：穿刺（伤害乘成）/击退（推开）/吸血（回复）/
-///   灼烧（持续掉血）；
+/// - 命中结算维度特效：穿刺（破甲：按比例无视目标护甲）/击退（推开）/
+///   吸血（回复）/灼烧（持续掉血）；
 /// - 维度槽操作（习得/升级/每级效果结算）。
 mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   /// 某维度槽当前等级（未习得=0）。
@@ -92,7 +92,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   }
 
   /// 维度每级效果结算：属性维度即时应用到战斗字段；
-  /// 特效维度（击退/吸血/穿刺/灼烧）在命中时读 slotLevel 结算。
+  /// 特效维度（击退/吸血/穿刺破甲/灼烧）在命中时读 slotLevel 结算。
   void applySlotEffect(String code, int delta) {
     switch (code) {
       case 'radius': // 臂展：每级 +（value_per_level 后台可配）
@@ -122,7 +122,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
             .clamp(1.0, 2.0);
         break;
       case 'armor': // 护甲：每级 +（value_per_level；减伤曲线钳制在伤害侧）
-        player.armor += slotValue('armor', 1.5) * delta;
+        player.armor += slotValue('armor', 3.0) * delta;
         break;
       case 'knockback':
       case 'lifesteal':
@@ -137,6 +137,13 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     if (arm == null) return;
     final center = game.player.position;
     final pierceLv = game.slotLevel('pierce');
+    // 穿刺破甲比例：1 级基准 + 每级增量（value_per_level 可配），钳 ≤ 上限
+    final pierceIgnore = pierceLv > 0
+        ? (kJourneyPierceBaseRatio +
+                game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
+                    (pierceLv - 1))
+            .clamp(0.0, kJourneyPierceRatioCap)
+        : 0.0;
     final knockLv = game.slotLevel('knockback');
     final lifestealLv = game.slotLevel('lifesteal');
     final burnLv = game.slotLevel('burn');
@@ -171,8 +178,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         }
       }
       if (!hit) continue;
-      _hitMonster(game, m, game.hitDamageBase * game.damageMult,
-          pierceLv: pierceLv,
+      _hitMonster(game, m, game.hitDamageBase,
+          pierceIgnore: pierceIgnore,
           knockLv: knockLv,
           lifestealLv: lifestealLv,
           burnLv: burnLv,
@@ -184,14 +191,15 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     _sweepMapObjects(game, arm, dt);
   }
 
-  /// 命中结算：暴击判定 → 穿刺乘成 → 触发型法宝（幌金绳定身/暴击雷引
-  /// 闪电链）→ 吸血回复 → 击退 → 灼烧点燃。
+  /// 命中结算：暴击判定 → 穿刺破甲（按比例无视护甲，在 takeDamage 内
+  /// 生效）→ 触发型法宝（幌金绳定身/暴击雷引闪电链）→ 吸血回复 →
+  /// 击退 → 灼烧点燃。
   /// 暴击/特效只弹关键浮动文字（普通命中不弹字，防刷屏）。
   void _hitMonster(
     JourneyFlameGame game,
     JourneyMonsterComponent m,
     double damage, {
-    required int pierceLv,
+    required double pierceIgnore,
     required int knockLv,
     required int lifestealLv,
     required int burnLv,
@@ -216,18 +224,21 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         const Color(0xFFD4593F),
       );
     }
-    if (pierceLv > 0) dmg *= 1.0 + 0.15 * pierceLv;
-    // 火眼金睛（扩展被动）：精英与妖王受伤 +（params.elite）
+    // 火眼金睛（扩展被动）：对精英/妖王条件增伤——按基础值加法叠加
+    // （伤害=基础值×(1+Σ通用%+条件%) 单次乘算，与通用增伤合流不连乘）
     if ((m.model.isBoss || m.model.isElite) &&
         game.passiveSlotCodes.contains('huoyan_jingjing')) {
-      dmg *= game.weaponParam('huoyan_jingjing', 'elite', 1.2);
+      dmg += game.damageBaseValue *
+          game.weaponParam('huoyan_jingjing', 'elite', 0.2);
     }
     // 暴击判定（§8）：率与倍率见主类字段
     final isCrit = game.critRate > 0 && game.rng.nextDouble() < game.critRate;
     if (isCrit) {
       dmg *= game.critDamage;
     }
-    m.takeDamage(dmg);
+    // 穿刺破甲：比例在 takeDamage 内按目标护甲生效（灼烧/法宝等衍生
+    // 伤害不传 armorIgnore，不受益破甲，口径与吸血一致）
+    m.takeDamage(dmg, armorIgnore: pierceIgnore);
     if (isCrit) {
       game.spawnFloatText(
         m.position + Vector2(0, -m.radius - 14),
@@ -283,14 +294,15 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       m.applyKnockback(toM, kb);
     }
     if (burnLv > 0) {
-      // 灼烧：每秒 value_per_level 点，持续 2 秒；三昧真火（honghaier
-      // 特殊能力）：伤害翻倍、持续延至 4 秒
+      // 灼烧槽：每秒 value_per_level 点（固定值型=真实伤害绕甲），持续 2 秒；
+      // 三昧真火（honghaier 特殊能力）：伤害翻倍、持续延至 4 秒
       m.ignite(
         source: 'weapon_burn',
         burnDps: game.slotValue('burn', 8.0) *
             burnLv *
             (game.hasAbility('honghaier') ? 2.0 : 1.0),
         seconds: game.hasAbility('honghaier') ? 4 : 2,
+        trueDamage: true,
       );
     }
     // 兜率炉火（laojun 特殊能力）：炉火加持窗口内命中附加一路独立灼烧
@@ -298,7 +310,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     if (game._laojunWindow > 0 && !m.isDead) {
       m.ignite(
         source: 'laojun_fire',
-        burnDps: game.hitDamageBase * game.damageMult * 0.4,
+        burnDps: game.hitDamageBase * 0.4,
         seconds: 2,
       );
     }
@@ -336,7 +348,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     final arm = game.weaponArm;
     if (arm == null) return;
     final damage = game.hitDamageBase *
-        game.damageMult * game.weaponParam('zijin_ling', 'damage', 0.6);
+        game.weaponParam('zijin_ling', 'damage', 0.6);
     final range = game.weaponParam('zijin_ling', 'range', 120);
     for (final other in game.monsters) {
       if (other.isDead || identical(other, m)) continue;
@@ -400,7 +412,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         }
       }
       if (!hit) continue;
-      game.damageMapObject(i, game.hitDamageBase * game.damageMult);
+      game.damageMapObject(i, game.hitDamageBase);
       game._mapObjHitCd[i] = 0.3;
     }
   }
