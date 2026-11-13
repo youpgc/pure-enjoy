@@ -31,12 +31,29 @@ PetBendGeo? petBendGeo(String speciesCode, int stage) =>
 String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
-/// 主舞台展示用几何：优先当前阶；当前阶未登记（进化阶资源未随包产出）则
-/// 回落基础阶（stage 0），避免骨架占位——基础阶对已在架种属必存在。
-/// 回退链：当前阶 → 基础阶 → null（种属完全未登记时仍走占位兜底，铁律 8）。
-/// 弹窗/列表缩略走 [petBaseArt] 占位路径，不在此列。
-PetBendGeo? petStageArtGeo(String speciesCode, int stage) =>
-    petBendGeo(speciesCode, stage) ?? petBendGeo(speciesCode, 0);
+/// 主舞台展示用几何：优先当前 code 的当前阶；该 code 未登记此阶（进化阶资源
+/// 未随包产出）则回落该 code 的基础阶；两者皆缺再回落同系基础 code——逐段
+/// 去掉末段变体后缀取首个在 `kPetBendGeo` 登记的 code（如 `cat_n2_s1` →
+/// `cat_n2`，变体皮肤复用基础形态几何），最后才 null（种属完全未登记时走占位
+/// 兜底，铁律 8）。弹窗/列表缩略走 [petBaseArt] 占位路径，不在此列。
+PetBendGeo? petStageArtGeo(String speciesCode, int stage) {
+  final direct = petBendGeo(speciesCode, stage) ?? petBendGeo(speciesCode, 0);
+  if (direct != null) return direct;
+  final base = _petBaseSpecies(speciesCode);
+  if (base != null) return petBendGeo(base, stage) ?? petBendGeo(base, 0);
+  return null;
+}
+
+/// 取同系基础 code：逐段去掉 speciesCode 末段后缀，返回首个在 `kPetBendGeo`
+/// 登记的 code（如 `cat_n2_s1` → `cat_n2`）；无匹配返回 null。
+String? _petBaseSpecies(String speciesCode) {
+  var candidate = speciesCode;
+  while (candidate.contains('_')) {
+    candidate = candidate.substring(0, candidate.lastIndexOf('_'));
+    if (kPetBendGeo.containsKey(candidate)) return candidate;
+  }
+  return null;
+}
 
 /// 种属骨架占位图（assets/pets/placeholders/<系>_s<阶>.png）
 /// 系 = species_code 首段（cat/dog/rabbit/mouse）；阶 0~2 钳位；

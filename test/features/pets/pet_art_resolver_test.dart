@@ -33,5 +33,17 @@ void main() {
       expect(petStageArtGeo('no_such_pet', 1), isNull);
       expect(petStageArtGeo('no_such_pet', 0), isNull);
     });
+
+    test('变体 code 回落同系基础 code（如 cat_n2_s1 → cat_n2）', () {
+      // 进化/变体产出的 `cat_n2_s1` 未在 kPetBendGeo 登记，应逐段去后缀
+      // 回落到基础 code `cat_n2` 取基础阶几何，不返回 null、不骨架
+      final geo = petStageArtGeo('cat_n2_s1', 1);
+      expect(geo, isNotNull);
+      expect(geo?.dir, 'assets/pets/anim/cat/n/cat_n2/s0');
+      expect(geo, same(petBendGeo('cat_n2', 0)));
+      // 更深的后缀层层回落（cat_n2_s1_x → cat_n2_s1 → cat_n2）
+      expect(petStageArtGeo('cat_n2_s1_x', 1)?.dir,
+          'assets/pets/anim/cat/n/cat_n2/s0');
+    });
   });
 }
