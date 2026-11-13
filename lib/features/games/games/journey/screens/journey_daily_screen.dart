@@ -106,7 +106,7 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  '沿途铜钱雨不断，坚持一炷香（5 分钟）即功成。',
+                  '沿途铜钱雨不断，按你节奏随时点「功成」结算入账。',
                   style: JourneyTheme.body,
                 ),
                 SizedBox(height: 8),

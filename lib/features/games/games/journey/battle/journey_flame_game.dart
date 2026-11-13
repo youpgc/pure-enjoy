@@ -387,9 +387,9 @@ class JourneyFlameGame extends FlameGame
     seedInitialPack(this);
     // 面包屑铜钱：沿出生点→据点直线均匀撒 6 枚（无妖章回落随机方向）
     _seedBreadcrumbCoins();
-    // 无尽妖潮：进场即亮「结算」按钮（随时可主动结算，按当前进度入账）；
-    // HUD 通知调度到帧尾（onLoad 处于构建期，防 markNeedsBuild during build）
-    if (_isEndless(this)) {
+    // 无尽妖潮 / 每日游历：进场即亮「功成」结算钮（随时可主动结算，按当前
+    // 进度入账）；HUD 通知调度到帧尾（onLoad 处于构建期，防 markNeedsBuild）
+    if (_isEndless(this) || _isDaily(this)) {
       _bossDefeated = true;
       WidgetsBinding.instance.addPostFrameCallback((_) {
         controller.hud.bossDefeated.value = true;
@@ -406,7 +406,7 @@ class JourneyFlameGame extends FlameGame
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
       // 无妖章回（原著无妖）：罗盘位口径分派——每日游历=剩余时长倒计时
-      // （满时长强制结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
+      // （建议时长，归零不自动结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
       controller.hud.hasBoss.value = bossModel != null;
       if (bossModel == null) {
         if (_isDaily(this)) {
@@ -450,17 +450,11 @@ class JourneyFlameGame extends FlameGame
     // 游玩照常（不主动结算，由玩家决定）
     if (bossModel == null && !_isEndless(this)) {
       if (_isDaily(this)) {
-        // 每日游历：满时长即强制结算（修复超时无限刷功德）
+        // 每日游历：仅展示建议时长倒计时；归零不自动结算，由玩家点「功成」主动结算
         final left =
             (surviveTargetSec - _elapsed).ceil().clamp(0, surviveTargetSec);
         if (left != controller.hud.surviveLeft.value) {
           controller.hud.surviveLeft.value = left;
-        }
-        if (_elapsed >= surviveTargetSec && !_bossDefeated) {
-          _finish(cleared: true);
-          // 强制结算后同帧不再推进武器/伤害/HUD，避免结算快照取走后
-          // 局内计数仍被改写。
-          return;
         }
       } else {
         // 无妖主线章回：西行里程达标即亮结算按钮（挂机/定身无里程不可达成）

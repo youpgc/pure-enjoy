@@ -441,7 +441,7 @@ class _Compass extends StatelessWidget {
   Widget _bossSpawnCountdownView(int left) =>
       _radarBadge(Icons.hourglass_top, '妖王降临 · ${left}s');
 
-  /// 无妖章回收口展示：每日游历=剩余时长倒计时（满时长强制结算）；
+  /// 无妖章回收口展示：每日游历=剩余时长倒计时（建议时长，归零不自动结算）；
   /// 无妖主线章回=西行里程（剩余里数，按玩家实际位移累计，挂机不可达成）。
   /// 归零后整块隐藏；无尽妖潮（endlessWave>0）：同位展示当前波数。
   Widget _surviveCountdown(JourneyBattleController controller) {

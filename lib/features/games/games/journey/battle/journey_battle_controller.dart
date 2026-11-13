@@ -126,7 +126,7 @@ class JourneyBattleHud {
   final ValueNotifier<double> progress = ValueNotifier<double>(0);
 
   /// 无妖章回罗盘位口径：每日游历=剩余时长倒计时（surviveLeft=剩余秒，
-  /// 满时长强制结算）；无妖主线章回=西行里程（travelBased=true 时用
+  /// 建议时长，归零不自动结算）；无妖主线章回=西行里程（travelBased=true 时用
   /// travelLeft=剩余里数，按玩家实际位移累计，挂机不可达成）。
   final ValueNotifier<bool> hasBoss = ValueNotifier<bool>(true);
   final ValueNotifier<int> surviveLeft = ValueNotifier<int>(0);
