@@ -18,13 +18,17 @@ class JourneyMonsterComponent extends PositionComponent
             (0.9 + clampJourneyBuff(game, buffMult) * 0.12),
         _contactDamageVal = model.contactDamage *
             (0.85 + clampJourneyBuff(game, buffMult) * 0.2) {
-    // 妖王附加护甲（journey_monster_params.armor；缺省按能力兜底）
-    bonusArmor = game.monsterParam(model.code, 'armor',
-        model.abilityKey == 'unmovable'
-            ? 30
-            : model.abilityKey == 'iron_horn'
-                ? 20
-                : 0);
+    // 护甲：journey_monster_params.armor 逐怪覆盖优先；缺省按 AI 档兜底
+    // （普通 25 / 精英 40 / 妖王按西游背景定档表），同 armor/(armor+K) 曲线
+    bonusArmor = game.monsterParam(
+        model.code,
+        'armor',
+        model.isBoss
+            ? (kJourneyBossArmorDefaults[model.code] ??
+                kJourneyBossArmorFallback)
+            : (model.isElite
+                ? kJourneyEliteBaseArmor
+                : kJourneyNormalBaseArmor));
   }
 
   @override
@@ -38,7 +42,8 @@ class JourneyMonsterComponent extends PositionComponent
   final double _speed;
   double _contactDamageVal;
 
-  /// 妖王能力附加护甲（unmovable/iron_horn），受击按 armor/(armor+50) 减免。
+  /// 怪物护甲（普通 25 / 精英 40 / 妖王按背景定档或 params 逐怪配置），
+  /// 受击按 armor/(armor+K) 减免（怪物侧上限 72%），穿刺可按比例无视。
   double bonusArmor = 0;
 
   double get _contactDamage {
@@ -149,10 +154,15 @@ class JourneyMonsterComponent extends PositionComponent
       return;
     }
 
-    // 灼烧掉血：各来源叠加后按帧结算，来源计时归零自动移除
-    final burnDamage = tickBurn(dt);
-    if (burnDamage > 0) {
-      takeDamage(burnDamage);
+    // 灼烧掉血：各来源叠加后按帧结算，来源计时归零自动移除；
+    // 固定值型来源（灼烧槽）为真实伤害绕甲，百分比型来源仍经护甲减免
+    final (burnAmpDamage, burnTrueDamage) = tickBurn(dt);
+    if (burnAmpDamage > 0) {
+      takeDamage(burnAmpDamage);
+      if (isDead) return;
+    }
+    if (burnTrueDamage > 0) {
+      takeDamage(burnTrueDamage, armorIgnore: 1);
       if (isDead) return;
     }
     final player = game.player;
@@ -377,11 +387,15 @@ class JourneyMonsterComponent extends PositionComponent
     _contactDamageVal = _contactDamageVal * (1.0 + stage * 0.25);
   }
 
-  void takeDamage(double amount) {
+  void takeDamage(double amount, {double armorIgnore = 0}) {
     if (isDead) return;
-    // 妖王附加护甲（不动如山/金刚琢护体）：与玩家护甲同曲线减免
+    // 护甲减免（与玩家同曲线 armor/(armor+K)，怪物侧上限 72% 高于玩家
+    // 60%，保 150~200 甲档位区分度）；穿刺命中按 armorIgnore 比例无视
+    // 护甲（其余衍生伤害不受益）
     if (bonusArmor > 0) {
-      amount *= 1 - JourneyDamageTickMixin.armorReductionRatio(bonusArmor);
+      final effArmor = bonusArmor * (1 - armorIgnore.clamp(0.0, 1.0));
+      amount *= 1 - JourneyDamageTickMixin.armorReductionRatio(
+          effArmor, curveK: game.armorCurveK, cap: game.monsterArmorCap);
     }
     hp -= amount;
     _hpBarTimer = 2.5;

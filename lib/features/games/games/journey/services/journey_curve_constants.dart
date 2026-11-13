@@ -43,3 +43,84 @@ const double kJourneyLifestealHealFloor = 2.0;
 /// 吸血每秒回复上限（占最大生命比例）：多目标高频命中的合计钳制，
 /// 防止扇叶扫掠多目标时回复叠乘失控。
 const double kJourneyLifestealSecCapRatio = 0.10;
+
+/// 穿刺破甲比例（无视目标护甲比例）：1 级基准，每级按
+/// journey_weapon_slots.pierce.value_per_level（缺省 +2.5%）递增，钳 ≤ 上限。
+const double kJourneyPierceBaseRatio = 0.10;
+
+/// 穿刺破甲的每级增量（journey_weapon_slots.pierce.value_per_level 可覆盖）：
+/// 9 级 = 10% + 2.5%×8 = 30%。
+const double kJourneyPierceIgnorePerLv = 0.025;
+
+/// 穿刺破甲比例上限：无论等级与远端配置，无视护甲比例不突破此值。
+const double kJourneyPierceRatioCap = 0.30;
+
+/// 护甲减伤曲线分母 K：armor/(armor+K)。K 越大同护甲减伤越低，
+/// 用于拉开 50~200 护甲档位的区分度（journey_globals.armor_curve_k 可覆盖）。
+/// 参考减伤：25 甲≈23.8%、50≈38.5%、100≈55.6%、150≈65.2%、200≈71.4%。
+const double kJourneyArmorCurveK = 80.0;
+
+/// 玩家侧护甲减伤上限：单次接触伤害至少保留原值的 40%。
+const double kJourneyPlayerArmorCap = 0.60;
+
+/// 怪物侧护甲减伤上限：高于玩家侧，使 150~200 甲档位仍可区分
+/// （journey_globals.monster_armor_reduction_cap 可覆盖）。
+const double kJourneyMonsterArmorCap = 0.72;
+
+/// 普通怪兜底护甲：journey_monster_params.armor 逐怪覆盖优先。
+/// （25 甲 ≈ 23.8% 减伤）
+const double kJourneyNormalBaseArmor = 25;
+
+/// 精英怪兜底护甲：妖将定位厚血抗压档。（40 甲 ≈ 33.3% 减伤）
+const double kJourneyEliteBaseArmor = 40;
+
+/// 妖王兜底护甲：表内未配 armor 行的妖王回落此值。
+const double kJourneyBossArmorFallback = 80;
+
+/// 妖王兜底护甲表（按西游背景定档，50~200 随章节递进；
+/// journey_monster_params.armor 逐怪覆盖优先）。
+/// 减伤参考（armor/(armor+80)）：50≈38.5%、80≈50%、120≈60%、
+/// 160≈66.7%、200≈71.4%（怪物侧钳 ≤72%）。
+const Map<String, double> kJourneyBossArmorDefaults = {
+  // 五行山~白虎岭（早期妖王 50~65）：寅将军虎皮初甲、黑熊精黑甲皮糙、
+  // 黄风怪风怨身轻、白骨精枯骨无肉
+  'yin_jiangjun': 55,
+  'heixiong_jing': 65,
+  'huangfeng_jing': 58,
+  'baigu_jing': 50,
+  // 宝象国~车迟国（前中期 70~95）：黄袍怪奎木狼天将披甲、金角天庭童子
+  // 携法宝、狮猁青狮坐骑、红孩儿幼童妖王、鼍龙龙种鳞甲、虎力道袍虎精
+  'huangpao_guai': 75,
+  'jinjiao_dawang': 80,
+  'shili_guai': 85,
+  'honghaier': 70,
+  'tuolong': 95,
+  'huli_daxian': 78,
+  // 通天河~毒敌山（中期 90~110）：灵感金鱼精鳞甲、独角兕金刚琢护体、
+  // 蝎子毒尾轻甲、六耳与悟空同源灵巧
+  'linggan_dawang': 92,
+  'dujiao_si': 110,
+  'xiezi_jing': 96,
+  'liuer_mihou': 88,
+  // 积雷山~小西天（中后期 105~135）：牛魔王不动如山妖王顶档之一、
+  // 九头虫硬壳、十八公古树主干、黄眉弥勒童子肉身、红鳞巨蟒厚鳞
+  'niu_mowang': 180,
+  'jiutou_chong': 130,
+  'shibagong': 120,
+  'huangmei_dawang': 105,
+  'honglin_mang': 135,
+  // 麒麟山~狮驼岭（后期 90~130）：赛太岁金毛犼、百眼蜈蚣甲壳、
+  // 大鹏翎羽轻甲极速
+  'sai_taishui': 125,
+  'baiyan_mojun': 128,
+  'dapeng': 90,
+  // 比丘国~隐雾山（终盘前 70~100）：白鹿仙鹿轻捷、鼠精灵巧、南山豹子精
+  'bailu_jing': 80,
+  'laoshu_jing': 72,
+  'nanshan_dawang': 100,
+  // 竹节山~天竺国（终盘 140~200）：辟寒犀牛精寒甲厚重、九灵元圣九头狮祖
+  // 妖王护甲之最、玉兔月宫仙兔
+  'pihan_dawang': 140,
+  'jiuling_yuansheng': 200,
+  'yutu_jing': 76,
+};

@@ -6,15 +6,20 @@ mixin JourneyDamageTickMixin {
   double _hurtTimer = 0;
   static const double hurtInterval = 0.5;
 
-  /// 护甲减伤上限（百分比口径钳死值）：无论护甲多高，单次接触伤害
-  /// 至少保留原值的 40%。
-  static const double armorReductionCap = 0.60;
+  /// 玩家侧护甲减伤上限（百分比口径钳死值）：无论护甲多高，单次接触伤害
+  /// 至少保留原值的 40%。怪物侧另用 [kJourneyMonsterArmorCap]（72%）。
+  static const double armorReductionCap = kJourneyPlayerArmorCap;
 
-  /// 护甲值 → 减伤比例：递减曲线 armor/(armor+50)（50 甲=50%），
-  /// 再钳到 [armorReductionCap] 以内。
-  static double armorReductionRatio(double armor) {
+  /// 护甲值 → 减伤比例：递减曲线 armor/(armor+K)（K 缺省 80，后台
+  /// armor_curve_k 可调；100 甲=55.6%），再钳到 [cap] 以内。玩家/怪物
+  /// 双轨：玩家上限 60%、怪物上限 72%，使 50~200 甲档位仍可区分。
+  static double armorReductionRatio(
+    double armor, {
+    double curveK = kJourneyArmorCurveK,
+    double cap = kJourneyPlayerArmorCap,
+  }) {
     if (armor <= 0) return 0;
-    return (armor / (armor + 50)).clamp(0.0, armorReductionCap);
+    return (armor / (armor + curveK)).clamp(0.0, cap);
   }
 
   void updateDamageTick(JourneyFlameGame game, double dt) {
@@ -45,7 +50,10 @@ mixin JourneyDamageTickMixin {
         strongest *= 0.5;
       }
       var afterArmor =
-          (strongest * (1 - armorReductionRatio(player.armor)))
+          (strongest *
+                  (1 -
+                      armorReductionRatio(player.armor,
+                          curveK: game.armorCurveK)))
               .clamp(1.0, double.maxFinite);
       // 铜皮铁骨（bajie 特殊能力）：受击后窗口内额外减伤 30%
       if (game._bajieGuard > 0) {

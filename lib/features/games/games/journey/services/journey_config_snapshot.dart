@@ -61,10 +61,15 @@ class JourneyConfigSnapshot {
       _globalNum(globalsRaw, 'talent_drop_rate') ?? kJourneyTalentDropRate;
 
   /// 还魂复活功德基准价（journey_globals.revive_merit_base）；
-  /// 实际消耗=基准 × 关卡号。
+  /// 实际消耗=基准 × 当前角色等级。
   int get reviveMeritBase =>
       _globalNum(globalsRaw, 'revive_merit_base')?.toInt() ??
       kJourneyReviveMeritBase;
+
+  /// 还魂复活功德封顶（journey_globals.revive_merit_cap，后台可配）。
+  int get reviveMeritCap =>
+      _globalNum(globalsRaw, 'revive_merit_cap')?.toInt() ??
+      kJourneyReviveMeritCap;
 
   /// 同屏怪物实体上限（journey_globals.monster_cap，运营可在后台调整）。
   int get monsterCap => _globalNum(globalsRaw, 'monster_cap')?.toInt() ?? 120;
@@ -130,6 +135,10 @@ class JourneyConfigSnapshot {
   /// 保护期结束后精英率每分钟增量。
   double get eliteRatePerMin =>
       _globalNum(globalsRaw, 'elite_rate_per_min') ?? kJourneyEliteRatePerMin;
+
+  /// 精英率上限：后期仍保留普通怪比例（journey_globals.elite_rate_cap）。
+  double get eliteRateCap =>
+      _globalNum(globalsRaw, 'elite_rate_cap') ?? kJourneyEliteRateCap;
 
   /// 局内强度每分钟增长斜率；列缺失或未配值回落内置兜底。
   double get buffTimeSlope =>
@@ -267,6 +276,17 @@ class JourneyConfigSnapshot {
   double get bossHpTimeK =>
       _globalNum(globalsRaw, 'boss_hp_time_k') ?? kJourneyBossHpTimeK;
 
+  /// 护甲减伤曲线分母 K（armor_curve_k）：armor/(armor+K)，K 越大
+  /// 同护甲减伤越低；列缺失/未配值回落内置兜底。
+  double get armorCurveK =>
+      _globalNum(globalsRaw, 'armor_curve_k') ?? kJourneyArmorCurveK;
+
+  /// 怪物侧护甲减伤上限（monster_armor_reduction_cap）：高于玩家侧 60%，
+  /// 使 150~200 甲档位仍可区分；列缺失/未配值回落内置兜底。
+  double get monsterArmorCap =>
+      _globalNum(globalsRaw, 'monster_armor_reduction_cap') ??
+      kJourneyMonsterArmorCap;
+
   double _globalDouble(String key, double fallback) {
     // globals 原始行直读（列缺失/seed 快照 null 时回落内置兜底）
     return (globalsRaw?[key] as num?)?.toDouble() ?? fallback;
@@ -338,7 +358,7 @@ class JourneyConfigSnapshot {
         attrKey: branchType);
   }
 
-  /// 还魂复活功德价 = 基准价 × 关卡号，封顶 [kJourneyReviveMeritCap]。
-  int reviveCostFor(int levelNo) =>
-      (reviveMeritBase * levelNo).clamp(0, kJourneyReviveMeritCap);
+  /// 还魂复活功德价 = 基准价 × 当前角色等级，封顶 reviveMeritCap。
+  int reviveCostFor(int charLevel) =>
+      (reviveMeritBase * charLevel).clamp(0, reviveMeritCap);
 }

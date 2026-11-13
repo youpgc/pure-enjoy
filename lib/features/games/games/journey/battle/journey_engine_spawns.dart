@@ -179,7 +179,7 @@ mixin JourneySpawnMixin {
         ? 0.0
         : (((elapsed - protectSec) / 60.0) *
                 (game.config?.eliteRatePerMin ?? kJourneyEliteRatePerMin))
-            .clamp(0.0, kJourneyEliteRateCap);
+            .clamp(0.0, game.config?.eliteRateCap ?? kJourneyEliteRateCap);
     if (eliteRate > 0 && game.rng.nextDouble() < eliteRate) {
       final elites = pool.where((m) => m.isElite).toList();
       if (elites.isNotEmpty) return elites[game.rng.nextInt(elites.length)];

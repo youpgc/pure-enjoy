@@ -44,11 +44,13 @@ mixin JourneyKnockbackMixin on PositionComponent {
 
 /// 灼烧按来源独立计时：武器灼烧、兜率炉火、阴阳二气瓶互不覆盖，
 /// 每秒伤害叠加结算，使「附加灼烧」不会重置已有点燃。
+/// 固定值型来源（trueDamage=true，如灼烧槽 8/秒×等级）为真实伤害
+/// 绕过护甲减免；百分比型来源（按基础伤害比例点燃）仍经护甲。
 mixin JourneyBurnMixin on PositionComponent {
   bool get isDead;
 
-  final Map<String, (double, double)> _burnSources =
-      <String, (double, double)>{};
+  final Map<String, (double, double, bool)> _burnSources =
+      <String, (double, double, bool)>{};
 
   double get burnRemaining {
     var longest = 0.0;
@@ -64,29 +66,36 @@ mixin JourneyBurnMixin on PositionComponent {
     required String source,
     required double burnDps,
     required double seconds,
+    bool trueDamage = false,
   }) {
     if (isDead) return;
-    _burnSources[source] = (burnDps, seconds);
+    _burnSources[source] = (burnDps, seconds, trueDamage);
   }
 
-  /// 推进各来源计时，返回本帧应扣的灼烧伤害。
-  double tickBurn(double dt) {
-    if (_burnSources.isEmpty) return 0;
-    var dps = 0.0;
+  /// 推进各来源计时，返回本帧应扣灼烧伤害：
+  /// $1=经护甲减免部分（百分比型来源），$2=真实伤害部分（固定值型来源）。
+  (double, double) tickBurn(double dt) {
+    if (_burnSources.isEmpty) return (0, 0);
+    var ampDps = 0.0;
+    var trueDps = 0.0;
     final expired = <String>[];
     for (final entry in _burnSources.entries.toList()) {
       final left = entry.value.$2 - dt;
       if (left <= 0) {
         expired.add(entry.key);
       } else {
-        dps += entry.value.$1;
-        _burnSources[entry.key] = (entry.value.$1, left);
+        if (entry.value.$3) {
+          trueDps += entry.value.$1;
+        } else {
+          ampDps += entry.value.$1;
+        }
+        _burnSources[entry.key] = (entry.value.$1, left, entry.value.$3);
       }
     }
     for (final key in expired) {
       _burnSources.remove(key);
     }
-    return dps * dt;
+    return (ampDps * dt, trueDps * dt);
   }
 }
 
@@ -138,7 +147,9 @@ mixin JourneyBossAbilityMixin on PositionComponent {
           final raw = contactDamage * fireRatio;
           player.takeDamage(
             raw *
-                (1 - JourneyDamageTickMixin.armorReductionRatio(player.armor)),
+                (1 -
+                    JourneyDamageTickMixin.armorReductionRatio(player.armor,
+                        curveK: game.armorCurveK)),
           );
           game.spawnFloatText(
             player.position + Vector2(0, -36),

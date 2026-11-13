@@ -162,6 +162,7 @@ extension JourneyKit on JourneyFlameGame {
     final lo = loadout;
     // 特殊能力标记（'ability_<char>'）：加强点点亮 → 引擎钩子生效
     abilities.addAll(lo.abilities);
+    attackAmp += lo.attackAmp;
     damageAmp += lo.damageAmp;
     spinAmp += lo.spinAmp;
     player.armor += lo.armorFlat;
@@ -190,35 +191,41 @@ extension JourneyKit on JourneyFlameGame {
   }
 
   /// 角色光环（取经 4 人 + 非取经扩展 5 人差异化）。
+  /// 入口先注入角色初始属性（journey_characters.armor 初始护甲，
+  /// 与天赋/光环/局内护甲槽累加），再叠加光环差异化效果。
   void _applyCharacterKit() {
+    player.armor += character.armor;
+    // 数值取角色光环参数（journey_characters.aura_params jsonb，后台可配），
+    // 键缺失回落内置兜底；键语义见 journey_models.JourneyCharacterModel 注释。
     switch (character.code) {
-      case 'tang': // 佛光：周期回血（≈0.8/秒）
-        player.regen += 0.8;
+      case 'tang': // 佛光：周期回血
+        player.regen += character.auraNum('regen', 0.8);
         break;
       case 'wukong': // 大圣威压：击杀概率触发短暂转速提升（见 onMonsterKilled）
         break;
       case 'bajie': // 贪食：拾取范围 + 经验获取加成
-        player.pickupRange += 40;
-        expAmp *= 1.15;
+        player.pickupRange += character.auraNum('pickup', 40);
+        expAmp *= 1 + character.auraNum('exp_amp', 0.15);
         break;
-      case 'shaseng': // 坚韧：受击减伤（接触伤害固定减免）
-        player.armor += 6;
+      case 'shaseng': // 坚韧：护甲加成
+        player.armor += character.auraNum('armor', 6);
         break;
       // ---- 非取经扩展角色（feature_journey_ext_chars_20261106）----
       case 'nezha': // 莲花化身：经验获取加成（击杀加速成长）
-        expAmp *= 1.15;
+        expAmp *= 1 + character.auraNum('exp_amp', 0.15);
         break;
-      case 'honghaier': // 三昧真火：武器伤害加成（烈焰增伤）
-        damageAmp *= 1.08;
+      case 'honghaier': // 三昧真火：武器伤害加成（烈焰增伤，加法合流）
+        damageAmp += character.auraNum('damage_amp', 0.08);
         break;
       case 'tieshan': // 罡风偃月：移速加成（控场走位）
-        moveSpeedAmp *= 1.08;
+        moveSpeedAmp *= 1 + character.auraNum('move_amp', 0.08);
         break;
       case 'laojun': // 兜率炉火：暴击伤害加成（炉火淬炼）
-        critDamage = (critDamage + 0.2).clamp(1.0, 2.0);
+        critDamage =
+            (critDamage + character.auraNum('crit_damage', 0.2)).clamp(1.0, 2.0);
         break;
       case 'jinjiao': // 移山劲：护甲加成（厚血抗压前排）
-        player.armor += 4;
+        player.armor += character.auraNum('armor', 4);
         break;
     }
   }

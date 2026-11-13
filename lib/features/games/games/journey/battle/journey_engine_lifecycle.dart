@@ -42,17 +42,21 @@ extension JourneyLifecycle on JourneyFlameGame {
       addMeritCoins(m.model.meritDrop);
     }
 
-    // 悟空「大圣威压」：击杀 20% 概率触发 3 秒攻速增益
-    if (character.code == 'wukong' && rng.nextDouble() < 0.20) {
-      _wukongBuffTimer = 3.0;
+    // 悟空「大圣威压」：击杀按光环参数概率触发短暂转速增益
+    // （proc_rate 触发概率 / buff_sec 增益时长，aura_params 后台可配）
+    if (character.code == 'wukong' &&
+        rng.nextDouble() < character.auraNum('proc_rate', 0.20)) {
+      _wukongBuffTimer = character.auraNum('buff_sec', 3.0);
     }
 
-    // 身外身法（wukong 特殊能力）：每击杀 30 只触发 10s 临时分身+转速
+    // 身外身法（wukong 特殊能力）：每击杀 N 只触发 M 秒临时分身+转速
+    // （N/M 取角色光环参数 aura_params.kill_count/duration，后台可配）
     if (hasAbility('wukong')) {
       _shenfenKills++;
-      if (_shenfenKills >= 30) {
+      if (_shenfenKills >=
+          character.auraNum('kill_count', 30).round()) {
         _shenfenKills = 0;
-        _shenfenTimer = 10;
+        _shenfenTimer = character.auraNum('duration', 10);
         spawnFloatText(
           player.position + Vector2(0, -36),
           '身外身法',
@@ -255,11 +259,10 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
   }
 
-  /// 还魂功德价（§3）：与进度服务同源（基准价×关卡号并封顶），
+  /// 还魂功德价（§3）：与进度服务同源（基准价×当前角色等级并封顶），
   /// 配置快照未就绪时回落内置基准与封顶。
-  int get reviveCost => config?.reviveCostFor(level.levelNo) ??
-      (kJourneyReviveMeritBase * level.levelNo)
-          .clamp(0, kJourneyReviveMeritCap);
+  int get reviveCost => config?.reviveCostFor(_charLv) ??
+      (kJourneyReviveMeritBase * _charLv).clamp(0, kJourneyReviveMeritCap);
 
   /// 浮动文字（暴击会心/功德/还魂/炼化等关键事件），渲染见 fx part。
   void spawnFloatText(Vector2 pos, String text, Color color) {
