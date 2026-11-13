@@ -380,11 +380,22 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
   Future<bool> _onRevivePrompt(int cost) async {
     if (!mounted) return false;
     final balance = JourneyProgressService.instance.state.meritBalance;
-    return JourneyPromptSheets.showRevive(
+    final confirmed = await JourneyPromptSheets.showRevive(
       context,
       cost: cost,
       meritBalance: balance,
     );
+    if (!confirmed) return false;
+    // 确认即扣功德（与局内确认价同源：基准价×当前角色等级并封顶）；
+    // 扣费失败（结算期间余额变动不足）按拒绝处理走结算路径。
+    final ok = await JourneyProgressService.instance
+        .spendRevive(_controller?.hud.level.value ?? 1);
+    if (!ok && mounted) {
+      ScaffoldMessenger.maybeOf(context)?.showSnackBar(
+        const SnackBar(content: Text('功德不足，还魂失败')),
+      );
+    }
+    return ok;
   }
 
   Future<bool> _onAlchemyPrompt(String resultName) async {
