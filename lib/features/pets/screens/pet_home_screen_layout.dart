@@ -39,8 +39,9 @@ extension _PetHomeLayout on _PetHomeScreenState {
                       onDoubleTap: _onStageDoubleTap,
                       onLongPress: _openAttributes,
                       child: PetLivingArt(
-                        // 分层弯曲：已登记几何的形态走逐行弯曲，其余画骨架占位
-                        bendGeo: petBendGeo(pet.speciesCode, pet.stage),
+                        // 分层弯曲：当前阶几何存在则用之；进化阶资源未产出时
+                        // 回落基础阶（petStageArtGeo），不画骨架占位
+                        bendGeo: petStageArtGeo(pet.speciesCode, pet.stage),
                         bendRevealDir: petBendRevealDir(pet.speciesCode, pet.stage),
                         action: _machine.current,
                         onActionEnd: _onActionEnd,

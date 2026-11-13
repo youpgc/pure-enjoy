@@ -31,6 +31,13 @@ PetBendGeo? petBendGeo(String speciesCode, int stage) =>
 String? petBendRevealDir(String speciesCode, int stage) =>
     kPetBendGeo[speciesCode]?[stage + 1]?.dir;
 
+/// 主舞台展示用几何：优先当前阶；当前阶未登记（进化阶资源未随包产出）则
+/// 回落基础阶（stage 0），避免骨架占位——基础阶对已在架种属必存在。
+/// 回退链：当前阶 → 基础阶 → null（种属完全未登记时仍走占位兜底，铁律 8）。
+/// 弹窗/列表缩略走 [petBaseArt] 占位路径，不在此列。
+PetBendGeo? petStageArtGeo(String speciesCode, int stage) =>
+    petBendGeo(speciesCode, stage) ?? petBendGeo(speciesCode, 0);
+
 /// 种属骨架占位图（assets/pets/placeholders/<系>_s<阶>.png）
 /// 系 = species_code 首段（cat/dog/rabbit/mouse）；阶 0~2 钳位；
 /// 资源缺失由调用方 errorBuilder 回退图标。
