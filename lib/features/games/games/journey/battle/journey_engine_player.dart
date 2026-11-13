@@ -190,6 +190,11 @@ class JourneyPlayerComponent extends PositionComponent {
     if ((near - hud.progress.value).abs() > 0.005) {
       hud.progress.value = near;
     }
+    // 罗盘里数直接用实际距离（绕路时可能大于出生基准；接近度在
+    // 超基准时钳 0，反推距离会恒等于基准值不再更新）
+    if ((to.length - hud.bossDistWorld.value).abs() > 2) {
+      hud.bossDistWorld.value = to.length;
+    }
   }
 
   @override

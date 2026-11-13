@@ -341,61 +341,57 @@ class _Compass extends StatelessWidget {
     return ValueListenableBuilder<double>(
       valueListenable: hud.bearing,
       builder: (context, bearing, _) => ValueListenableBuilder<double>(
-        valueListenable: hud.progress,
-        builder: (context, near, _) => ValueListenableBuilder<double>(
-          valueListenable: hud.bossStartDist,
-          builder: (context, startDist, _) {
-            // 距妖王（里）= 接近度缺口 × 出生点基准距离 ÷ 25
-            // （1 里=25 世界单位；同屏内数值收敛到个位十里，消除
-            // 「同屏却显示 200 里」的观感失真）
-            final dist = ((1 - near) * startDist).clamp(0.0, double.infinity);
-            final li = dist / 25.0;
-            return Column(
-              children: <Widget>[
-                Container(
-                  width: 58,
-                  height: 58,
-                  alignment: Alignment.center,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-                    border: Border.all(
-                        color: JourneyTheme.gold.withValues(alpha: 0.85),
-                        width: 1.6),
-                  ),
-                  child: Transform.rotate(
-                    // navigation 图标默认朝上（-y），世界角 atan2 以 +x 为 0
-                    angle: bearing + math.pi / 2,
-                    child: const Icon(Icons.navigation,
-                        color: JourneyTheme.gold, size: 28),
+        valueListenable: hud.bossDistWorld,
+        builder: (context, distWorld, _) {
+          // 距妖王（里）= 实际距离 ÷ 25（1 里=25 世界单位）。
+          // 不经接近度反推：玩家绕路时离妖王可能比出生基准更远，
+          // 接近度钳 0 会把文案钉死在基准里数不再更新。
+          final li = distWorld / 25.0;
+          return Column(
+            children: <Widget>[
+              Container(
+                width: 58,
+                height: 58,
+                alignment: Alignment.center,
+                decoration: BoxDecoration(
+                  shape: BoxShape.circle,
+                  color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+                  border: Border.all(
+                      color: JourneyTheme.gold.withValues(alpha: 0.85),
+                      width: 1.6),
+                ),
+                child: Transform.rotate(
+                  // navigation 图标默认朝上（-y），世界角 atan2 以 +x 为 0
+                  angle: bearing + math.pi / 2,
+                  child: const Icon(Icons.navigation,
+                      color: JourneyTheme.gold, size: 28),
+                ),
+              ),
+              const SizedBox(height: 3),
+              Container(
+                padding:
+                    const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                decoration: BoxDecoration(
+                  color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
+                  borderRadius: BorderRadius.circular(6),
+                ),
+                child: Text(
+                  // 距离分层：同屏内（<420 单位≈17 里）只提示临近，不显里数
+                  li <= 0.05
+                      ? '已抵据点'
+                      : distWorld < 420
+                          ? '妖王就在附近'
+                          : '距妖王 ${li.toStringAsFixed(li < 10 ? 1 : 0)} 里',
+                  style: const TextStyle(
+                    fontSize: 11,
+                    color: JourneyTheme.textPrimary,
+                    fontWeight: FontWeight.w600,
                   ),
                 ),
-                const SizedBox(height: 3),
-                Container(
-                  padding:
-                      const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                  decoration: BoxDecoration(
-                    color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Text(
-                    // 距离分层：同屏内（<420 单位≈17 里）只提示临近，不显里数
-                    li <= 0.05
-                        ? '已抵据点'
-                        : dist < 420
-                            ? '妖王就在附近'
-                            : '距妖王 ${li.toStringAsFixed(li < 10 ? 1 : 0)} 里',
-                    style: const TextStyle(
-                      fontSize: 11,
-                      color: JourneyTheme.textPrimary,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                ),
-              ],
-            );
-          },
-        ),
+              ),
+            ],
+          );
+        },
       ),
     );
   }

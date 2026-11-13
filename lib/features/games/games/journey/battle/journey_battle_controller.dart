@@ -173,8 +173,14 @@ class JourneyBattleHud {
   final ValueNotifier<int> bossSpawnIn = ValueNotifier<int>(0);
 
   /// 妖王罗盘·据点基准距离（出生点到据点，进关时引擎写入一次）：
-  /// 罗盘距离文案=接近度 × 基准距离换算「里」（1 里=25 世界单位）。
+  /// 接近度口径的换算基准（progress=1-实际距离/基准）；罗盘里数展示
+  /// 已改用 bossDistWorld 实际距离，不再经基准反推。
   final ValueNotifier<double> bossStartDist = ValueNotifier<double>(1);
+
+  /// 妖王罗盘·距妖王实际距离（世界单位）：引擎每帧上报（带去重阈值）。
+  /// 玩家绕路时实际距离可能大于出生基准，罗盘里数=此值÷25 直接换算，
+  /// 不受接近度钳制影响（1 里=25 世界单位）。
+  final ValueNotifier<double> bossDistWorld = ValueNotifier<double>(0);
 
   /// 无尽妖潮当前波数（1 起；0=非无尽模式，罗盘位回退坚持倒计时口径）。
   final ValueNotifier<int> endlessWave = ValueNotifier<int>(0);
