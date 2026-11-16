@@ -150,10 +150,11 @@ extension JourneyLifecycle on JourneyFlameGame {
 
   /// 满足通关条件（末场妖王伏诛/西行功成/无尽末波）：**不主动结算**——
   /// 置标记亮出「结算」按钮，游玩照常；是否结算由玩家决定。
-  void _markClearedAvailable(String bannerText) {
+  void _markClearedAvailable(String bannerText, {bool showSettleHint = true}) {
     _bossDefeated = true;
     controller.hud.bossDefeated.value = true;
-    controller.hud.banner.value = '$bannerText · 可随时结算';
+    controller.hud.banner.value =
+        showSettleHint ? '$bannerText · 可随时结算' : bannerText;
   }
 
   /// 末场妖王伏诛：按 journey_globals.talent_drop_rate 概率掉落天赋点
@@ -167,7 +168,11 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
     dart_async.unawaited(
         JourneyProgressService.instance.grantTalentDrop().then((granted) {
-      _markClearedAvailable(granted ? '妖王已伏诛 · 天赋点掉落 +1' : '妖王已伏诛');
+      if (granted) {
+        _markClearedAvailable('妖王已伏诛 · 天赋点 +1', showSettleHint: false);
+      } else {
+        _markClearedAvailable('妖王已伏诛');
+      }
     }));
     _markClearedAvailable('妖王已伏诛');
   }
