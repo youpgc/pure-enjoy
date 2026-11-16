@@ -12,8 +12,20 @@ class JourneyMonsterComponent extends PositionComponent
     double? hpBuffMult,
     required super.position,
   })  : buffMult = clampJourneyBuff(game, buffMult),
-        hp = model.baseHp * clampJourneyBuff(game, hpBuffMult ?? buffMult),
-        maxHp = model.baseHp * clampJourneyBuff(game, hpBuffMult ?? buffMult),
+        hp = model.baseHp *
+            journeyMonsterHpMult(
+              game,
+              model,
+              buffMult: buffMult,
+              hpBuffMult: hpBuffMult,
+            ),
+        maxHp = model.baseHp *
+            journeyMonsterHpMult(
+              game,
+              model,
+              buffMult: buffMult,
+              hpBuffMult: hpBuffMult,
+            ),
         _speed = model.baseSpeed *
             (0.9 + clampJourneyBuff(game, buffMult) * 0.12),
         _contactDamageVal = model.contactDamage *

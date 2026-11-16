@@ -49,6 +49,35 @@ double cappedMonsterSpeed(JourneyMonsterComponent monster) => math.min(
       monster.game.monsterSpeedCap,
     );
 
+/// 怪物血量等级成长乘区（生成时一次结算）：
+/// - 妖王：时间项乘区 ×(1+(等级−1)×boss_hp_lv_k)，保持唯一操作挑战；
+///   bossLvHpTerm=false 时不叠等级项（妖潮妖王走波次项 hpBuffMult
+///   对标玩家 DPS 成长——等级项与波次项双叠会把终盘妖王血量推到
+///   基础值 150 倍以上，与「可操作击杀」目标相悖）；
+/// - 精英：只走乘区，完全不跟玩家等级——能力上升后精英始终可被
+///   一套连招秒杀，秒杀爽感锚点；
+/// - 普通怪：乘区 ×(1+(等级−1)×monster_lv_k)，避免后期普怪血量停滞
+///   （普怪退场前的过渡期仍有成长感）。
+/// 等级项系数为 0 时完全还原旧口径（灰度回滚位）。
+double journeyMonsterHpMult(
+  JourneyFlameGame game,
+  JourneyMonsterModel model, {
+  required double buffMult,
+  double? hpBuffMult,
+  bool bossLvHpTerm = true,
+}) {
+  final base = clampJourneyBuff(game, hpBuffMult ?? buffMult);
+  final lv = game._charLv;
+  if (model.isBoss) {
+    if (!bossLvHpTerm) return base;
+    final k = game.config?.bossHpLvK ?? kJourneyBossHpLvK;
+    return base * (1 + (lv - 1) * k);
+  }
+  if (model.isElite) return base;
+  final k = game.config?.monsterLvK ?? kJourneyMonsterLvK;
+  return base * (1 + (lv - 1) * k);
+}
+
 /// 钳制后的缓速移速（收招/归位）：保持原有 0.4 倍关系，仅加上限。
 double cappedMonsterSlowSpeed(JourneyMonsterComponent monster) => math.min(
       monster._speed * 0.4,

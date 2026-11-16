@@ -123,6 +123,9 @@ class JourneyFlameGame extends FlameGame
   double _bossRespawnCountdown = 0;
   int _charLv = 1, _kills = 0, _meritCoins = 0;
 
+  /// 已达成境界档位（进局从 0 档起，突破只结增量；结算在 exp part）。
+  int _realmReached = 0;
+
   /// 西行里程累计（世界单位，1 里=25 单位）：玩家本局实际净位移之和。
   /// 无妖主线章回（非每日游历）以「里程达标」为通关口径，
   /// 挂机/定身/撞墙不累计，替代旧的纯时长坚持口径。

@@ -12,6 +12,34 @@ extension JourneyExp on JourneyFlameGame {
   /// 角色等级上限（配置快照优先，兜底 99）。
   int get _charLevelCap => config?.charLevelCap ?? kJourneyCharLevelCap;
 
+  /// 境界档位（0 起，钳 9 档）：(等级−1)~/步长。步长可后台调（realm_step）。
+  int get _realmIndex =>
+      ((_charLv - 1) ~/ (config?.realmStep ?? kJourneyRealmStep)).clamp(0, 8);
+
+  /// 当前境界名号（西游化 9 档，属性面板「境界」行展示）。取号链：
+  /// 远端 realm_titles 专属 → 内置按角色名号表 → 通用名号池。
+  String get realmTitle {
+    final i = _realmIndex;
+    return character.realmTitleAt(i) ??
+        kJourneyRealmTitlesByChar[character.code]?[i] ??
+        kJourneyRealmTitles[i.clamp(0, kJourneyRealmTitles.length - 1)];
+  }
+
+  /// 境界突破结算：档位边界（每 realm_step 级）触发一次——
+  /// 增伤走Σ%加法合流（伤害定序口径），生命上限复利并同步 HUD。
+  /// （_realmReached 宿主字段，见 journey_flame_game.dart）
+  void _checkRealmBreakthrough() {
+    final realm = _realmIndex;
+    if (realm <= _realmReached) return;
+    _realmReached = realm;
+    damageAmp += config?.realmAmpPer ?? kJourneyRealmAmpPer;
+    final hpUp = player.maxHp * (config?.realmHpPer ?? kJourneyRealmHpPer);
+    player.maxHp += hpUp;
+    player.hp += hpUp;
+    controller.hud.maxHp.value = player.maxHp;
+    controller.hud.hp.value = player.hp;
+  }
+
   /// 经验入账与升级结算（loot part 拾取香火调用）。
   void gainExp(double amount) {
     if (_charLv >= _charLevelCap) return; // 满级：经验停止累计
@@ -26,6 +54,7 @@ extension JourneyExp on JourneyFlameGame {
       player.hp += hpUp;
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
+      _checkRealmBreakthrough(); // 境界突破：档位边界增伤/生命增幅
       // 经验曲线（journey_globals.exp_base/exp_per_lv 后台可调，缺省 12/7）
       _expNeed =
           (config?.expBase ?? 12) + _charLv * (config?.expPerLv ?? 7);

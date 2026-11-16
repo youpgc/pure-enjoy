@@ -87,18 +87,24 @@ extension JourneyKit on JourneyFlameGame {
     learnSlot(starterEffect);
   }
 
-  /// 法宝分级（journey_weapon_levels）：当前品阶伤害=分级表
-  /// [min(角色等级, 8)] 级；分级表未配置该法宝或缺当前级时回落
-  /// base_damage（后台「基础伤害」，保证单源可调不失效）。
+  /// 法宝分级（journey_weapon_levels）：L1~L8 查分级表；L9 起分级表未定义，
+  /// 以 L8 品阶伤害为锚按每级增幅复利延展 ×(1+增幅)^(等级−8)
+  /// （journey_globals.weapon_grade_per_lv 可覆盖，缺省 1.5%）。
+  /// 分级表未配置该法宝或缺当前级时回落 base_damage（后台「基础伤害」，
+  /// 保证单源可调不失效），L9+ 同样按锚点复利。
   double _gradeDamage({required double fallback}) {
+    final per = config?.weaponGradePerLv ?? kJourneyWeaponGradePerLv;
     final levels = config?.weaponLevels[character.weaponCode];
-    if (levels != null && levels.isNotEmpty) {
-      final grade = _charLv.clamp(1, 8);
-      for (final l in levels) {
-        if (l.lv == grade && l.damage > 0) return l.damage.toDouble();
+    double? gradeOf(int lv) {
+      for (final l in levels ?? const <JourneyWeaponLevelModel>[]) {
+        if (l.lv == lv && l.damage > 0) return l.damage.toDouble();
       }
+      return null;
     }
-    return fallback;
+
+    final anchor = gradeOf(math.min(_charLv, 8)) ?? fallback;
+    if (_charLv <= 8) return anchor;
+    return anchor * math.pow(1 + per, _charLv - 8).toDouble();
   }
 
   /// 升级后按法宝分级刷新当前品阶伤害（环绕形态消费 damage 列）；

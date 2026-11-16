@@ -161,6 +161,46 @@ class JourneyConfigSnapshot {
   double get bossDamageLvK =>
       _globalNum(globalsRaw, 'boss_damage_lv_k') ?? kJourneyBossDamageLvK;
 
+  // ---- 平衡曲线（经验幂次 / 怪物等级项 / 境界 / 品阶 / 精英宝箱）----
+
+  /// 经验曲线幂次（exp_curve_pow）：升级所需 = exp_base + exp_per_lv ×
+  /// lv^pow；1=旧线性曲线。
+  double get expCurvePow =>
+      _globalNum(globalsRaw, 'exp_curve_pow') ?? kJourneyExpCurvePow;
+
+  /// 怪物经验随强度乘区缩放系数（exp_mult_k）：经验 ×(1+乘区×K)；0=旧口径。
+  double get expMultK =>
+      _globalNum(globalsRaw, 'exp_mult_k') ?? kJourneyExpMultK;
+
+  /// 普通怪血量玩家等级成长系数（monster_lv_k）；精英不跟等级，0=旧口径。
+  double get monsterLvK =>
+      _globalNum(globalsRaw, 'monster_lv_k') ?? kJourneyMonsterLvK;
+
+  /// 妖王血量玩家等级成长系数（boss_hp_lv_k），与时间项叠乘；0=旧口径。
+  double get bossHpLvK =>
+      _globalNum(globalsRaw, 'boss_hp_lv_k') ?? kJourneyBossHpLvK;
+
+  /// 精英宝箱掉落概率（elite_chest_rate）：宝箱为惊喜彩蛋，妖王仅首杀必掉。
+  double get eliteChestRate =>
+      _globalNum(globalsRaw, 'elite_chest_rate') ?? kJourneyEliteChestRate;
+
+  /// 每次境界突破的增伤增量（realm_amp_per）：增伤Σ%加法合流。
+  double get realmAmpPer =>
+      _globalNum(globalsRaw, 'realm_amp_per') ?? kJourneyRealmAmpPer;
+
+  /// 每次境界突破的生命上限增幅（realm_hp_per）：maxHp 复利。
+  double get realmHpPer =>
+      _globalNum(globalsRaw, 'realm_hp_per') ?? kJourneyRealmHpPer;
+
+  /// 境界步长（realm_step）：每 N 级一档境界，99 级共 9 档。
+  int get realmStep =>
+      _globalNum(globalsRaw, 'realm_step')?.toInt() ?? kJourneyRealmStep;
+
+  /// 法宝品阶 L9+ 每级增幅（weapon_grade_per_lv）：L8 锚点复利延展。
+  double get weaponGradePerLv =>
+      _globalNum(globalsRaw, 'weapon_grade_per_lv') ??
+      kJourneyWeaponGradePerLv;
+
   const JourneyConfigSnapshot({
     required this.regions,
     required this.levels,

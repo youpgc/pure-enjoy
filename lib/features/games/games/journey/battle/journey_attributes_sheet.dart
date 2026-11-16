@@ -58,6 +58,8 @@ abstract final class JourneyAttributesSheet {
         '等级 ${game.levelAttackTotal.toStringAsFixed(0)} · '
         '卡 ${game.cardAttackTotal.toStringAsFixed(0)}）',
       ),
+      // 境界：每 realm_step 级突破一档（增伤Σ%/生命复利），名称走内置 9 档
+      _attrRow('境界', game.realmTitle),
       _attrRow('法宝品阶伤害', game.weaponArm?.damage.toStringAsFixed(0) ?? game.weaponBaseDamage.toStringAsFixed(0)),
       _attrRow('攻击力加成', '+${(game.attackAmp * 100).toStringAsFixed(1)}%'),
       _attrRow('武器增伤', '+${((game.damageAmp - 1).clamp(0.0, 2.0) * 100).toStringAsFixed(1)}%'),

@@ -86,7 +86,9 @@ int endlessEliteCount(int waveNo) => math.min(14, 2 + waveNo ~/ 8);
 double endlessWaveBuff(int waveNo) => (100 + 3 * waveNo) / 100;
 
 /// 分阶怪池：普通段前期只出低血小妖，避免高血「伪普通」怪打断发育；
-/// 精英段按波号取对应经验档，强度随波次递进且不会前期撞上顶阶精英。
+/// 精英段按波号取对应经验档（与精英经验重标定的分档渐变对齐：
+/// 小型 22~28 / 中型 55~68 / 大型 140~170），强度随波次递进且
+/// 不会前期撞上顶阶精英。
 List<JourneyMonsterModel> endlessTierPool(
   JourneyFlameGame game, {
   required int waveNo,
@@ -94,12 +96,8 @@ List<JourneyMonsterModel> endlessTierPool(
 }) {
   final all = game.pool.where((m) => !m.isBoss).toList(growable: false);
   if (elite) {
-    final lo = waveNo <= 10
-        ? 0
-        : (waveNo <= 30 ? 70 : (waveNo <= 60 ? 115 : 155));
-    final hi = waveNo <= 10
-        ? 30
-        : (waveNo <= 30 ? 115 : (waveNo <= 60 ? 155 : 200));
+    final lo = waveNo <= 10 ? 0 : (waveNo <= 60 ? 40 : 120);
+    final hi = waveNo <= 10 ? 35 : (waveNo <= 60 ? 120 : 200);
     final band = all
         .where((m) => m.isElite && m.expDrop >= lo && m.expDrop <= hi)
         .toList(growable: false);
@@ -112,5 +110,77 @@ List<JourneyMonsterModel> endlessTierPool(
     if (low.isNotEmpty) return low;
   }
   return commons.isNotEmpty ? commons : all;
+}
+
+/// 兜底刷怪选怪（波次缺失时的遭遇战来源）：
+/// - 生态轮换（角色等级分带线 10/16/26，分档血量阈值 600/2800）——
+///   精英登场分阶：10 级前只小型精英、26 级前不见大型精英、之后全量，
+///   低级不撞顶阶精英、高级不刷低阶小精英；
+/// - 普怪退场曲线：16 级起出现概率线性衰减、26 级绝迹（只刷精英）。
+///   能力上升后小怪不再刷，遭遇战换成可秒杀的精英——爽感锚点迁移；
+///   铺场（allowElite=false）与保护期不受轮换影响；
+/// - 保护期内不产生精英；保护期过后按局内时间线性增长并钳上限
+///   （分带轮换之外的既有精英率口径）。
+JourneyMonsterModel? _pickMonster(
+  JourneyFlameGame game, {
+  bool allowElite = true,
+}) {
+  final pool = game.pool.where((m) => !m.isBoss).toList();
+  if (pool.isEmpty) return null;
+  final protectSec =
+      (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
+          .toDouble();
+  final elapsed = game._elapsed;
+  final charLv = game._charLv;
+  final elites = _ecologyElitePool(pool, charLv);
+
+  final pCommon = (allowElite &&
+          elapsed >= protectSec &&
+          charLv > kJourneyEcoCommonFadeLv)
+      ? (1.0 -
+              (charLv - kJourneyEcoCommonFadeLv) /
+                  (kJourneyEcoCommonOutLv - kJourneyEcoCommonFadeLv))
+          .clamp(0.0, 1.0)
+      : 1.0;
+  if (pCommon < 1.0 &&
+      elites.isNotEmpty &&
+      game.rng.nextDouble() >= pCommon) {
+    return elites[game.rng.nextInt(elites.length)];
+  }
+
+  final eliteRate = (elapsed < protectSec || !allowElite)
+      ? 0.0
+      : (((elapsed - protectSec) / 60.0) *
+              (game.config?.eliteRatePerMin ?? kJourneyEliteRatePerMin))
+          .clamp(0.0, game.config?.eliteRateCap ?? kJourneyEliteRateCap);
+  if (eliteRate > 0 && elites.isNotEmpty && game.rng.nextDouble() < eliteRate) {
+    return elites[game.rng.nextInt(elites.length)];
+  }
+  // 普通怪单独取样：保护期内排除高血「伪普通」怪，未命中精英率时
+  // 也不把精英混进随机结果
+  final commons = pool
+      .where((m) => !m.isElite && (elapsed >= protectSec || m.baseHp <= 200))
+      .toList();
+  final fallback = pool.where((m) => !m.isElite).toList();
+  final candidates = commons.isNotEmpty
+      ? commons
+      : (fallback.isNotEmpty ? fallback : pool);
+  return candidates[game.rng.nextInt(candidates.length)];
+}
+
+/// 生态轮换精英分阶池：按角色等级限定登场档位（小型 ≤600 / 中型
+/// ≤2800 / 大型 >2800 血量档）；分档后为空时回落全量精英池防死局。
+List<JourneyMonsterModel> _ecologyElitePool(
+  List<JourneyMonsterModel> pool,
+  int charLv,
+) {
+  final elites = pool.where((m) => m.isElite).toList();
+  if (elites.isEmpty) return elites;
+  final band = charLv < kJourneyEcoEliteInLv
+      ? elites.where((m) => m.baseHp <= kJourneyEcoEliteMidHp).toList()
+      : charLv < kJourneyEcoCommonOutLv
+          ? elites.where((m) => m.baseHp <= kJourneyEcoEliteLargeHp).toList()
+          : elites;
+  return band.isNotEmpty ? band : elites;
 }
 

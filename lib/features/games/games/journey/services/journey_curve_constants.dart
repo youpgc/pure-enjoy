@@ -6,14 +6,29 @@ library;
 
 /// 局内强度每分钟增长斜率（journey_globals.buff_time_slope 可覆盖）。
 /// 时间项与关卡项分离，难号不在时间斜率中重复计入。
-const double kJourneyBuffTimeSlope = 0.30;
+/// 0.40 配合上限 12：13 分钟左右触顶，99 级长局强度仍有爬升空间。
+const double kJourneyBuffTimeSlope = 0.40;
 
 /// 每点关卡难度的强度乘区增量（journey_globals.buff_level_mult 可覆盖）。
 const double kJourneyBuffLevelMult = 0.04;
 
 /// 生效强度乘区上限（journey_globals.buff_mult_cap 可覆盖）：
 /// 波次倍率、妖王阶段倍率等叠加源在怪物生成时统一钳到此值。
-const double kJourneyBuffMultCap = 6.0;
+/// 6→12：旧上限 13~16 分钟即触顶，长局后半段强度恒定是 20 级后
+/// 无可玩性的根因之一；放宽后经验/怪物成长同步延展。
+const double kJourneyBuffMultCap = 12.0;
+
+/// 生态轮换分带线（按局内角色等级）：10 级精英登场、16 级普通怪渐退、
+/// 26 级普通怪绝迹（只刷精英）。角色能力上升后小怪不再刷，取而代之
+/// 的是持续遭遇可秒杀的精英——爽感锚点由「一刀切小怪」换成「大怪秒杀」。
+const int kJourneyEcoEliteInLv = 10;
+const int kJourneyEcoCommonFadeLv = 16;
+const int kJourneyEcoCommonOutLv = 26;
+
+/// 生态轮换精英分阶血量阈值：小型 ≤600 / 中型 ≤2800 / 大型 >2800。
+/// 按角色等级限定登场精英档位（低级不见顶阶精英，高级不刷低阶小精英）。
+const double kJourneyEcoEliteMidHp = 600;
+const double kJourneyEcoEliteLargeHp = 2800;
 
 /// 怪物最终移速上限（journey_globals.monster_speed_cap 可覆盖，px/s）：
 /// 低于玩家基准移速，长时对局怪群不会反超玩家。

@@ -164,39 +164,6 @@ mixin JourneySpawnMixin {
     return pos;
   }
 
-  JourneyMonsterModel? _pickMonster(
-    JourneyFlameGame game, {
-    bool allowElite = true,
-  }) {
-    final pool = game.pool.where((m) => !m.isBoss).toList();
-    if (pool.isEmpty) return null;
-    final protectSec =
-        (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
-            .toDouble();
-    final elapsed = game._elapsed;
-    // 保护期内不产生精英；保护期过后按局内时间线性增长并钳上限
-    final eliteRate = (elapsed < protectSec || !allowElite)
-        ? 0.0
-        : (((elapsed - protectSec) / 60.0) *
-                (game.config?.eliteRatePerMin ?? kJourneyEliteRatePerMin))
-            .clamp(0.0, game.config?.eliteRateCap ?? kJourneyEliteRateCap);
-    if (eliteRate > 0 && game.rng.nextDouble() < eliteRate) {
-      final elites = pool.where((m) => m.isElite).toList();
-      if (elites.isNotEmpty) return elites[game.rng.nextInt(elites.length)];
-    }
-    // 普通怪单独取样：保护期内排除高血「伪普通」怪，未命中精英率时
-    // 也不把精英混进随机结果
-    final commons = pool
-        .where((m) =>
-            !m.isElite && (elapsed >= protectSec || m.baseHp <= 200))
-        .toList();
-    final fallback = pool.where((m) => !m.isElite).toList();
-    final candidates = commons.isNotEmpty
-        ? commons
-        : (fallback.isNotEmpty ? fallback : pool);
-    return candidates[game.rng.nextInt(candidates.length)];
-  }
-
   void spawnMonster(JourneyFlameGame game, JourneyMonsterModel model) {
     spawnMonsterAt(game, model, buffMult: game.buffMult, position: null);
   }
