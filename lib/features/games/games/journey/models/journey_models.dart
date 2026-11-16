@@ -374,7 +374,7 @@ class JourneyProgressModel {
   /// 功德流水（新的在前，上限 50）。
   final List<JourneyMeritRecordModel> meritRecords;
 
-  /// 对局记录（新的在前，上限 50）。
+  /// 西行记录（新的在前，上限 50）。
   final List<JourneyRunRecordModel> runRecords;
 
   final Set<String> unlockedCharacters;

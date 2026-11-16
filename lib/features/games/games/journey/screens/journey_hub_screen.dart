@@ -211,7 +211,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
     );
   }
 
-  // ---- 入口行：顶栏正下方（功德流水/对局记录/成就独立入口） ----
+  // ---- 入口行：顶栏正下方（功德流水/西行记录/成就独立入口） ----
 
   Widget _entryRow() {
     // Wrap 换行排布：窄机型自动折行，卡片定宽防文案换行/间距过窄
@@ -259,7 +259,7 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
             width: 68,
             child: JourneyEntryCard(
               icon: Icons.sports_esports,
-              label: '对局记录',
+              label: '西行记录',
               onTap: () => _push(const JourneyRunRecordsScreen()),
             ),
           ),

@@ -1,133 +1,26 @@
 import 'package:flutter/material.dart';
 
-import '../models/journey_models.dart';
-import '../models/journey_talent_models.dart';
-import '../services/journey_config_service.dart';
-import '../services/journey_seed.dart';
+import 'journey_attributes_data.dart';
 import 'journey_flame_game.dart';
 import '../widgets/journey_theme.dart';
 
 /// 属性详情面板：由对局页先进入暂停态再展示，面板不改变引擎运行状态。
-/// 基础战斗属性 + 武器维度槽（等级/上限/当前实际贡献值）+ 被动加持。
+/// 取值与历史对局详情共用 [JourneyAttributesData]，避免两处格式化漂移。
 abstract final class JourneyAttributesSheet {
-  /// 维度槽简称（HUD/面板空间有限，取两字简称；全名见维度定义表）。
-  static const Map<String, String> slotNames = <String, String>{
-    'radius': '臂展',
-    'speed': '转速',
-    'damage': '伤害',
-    'knockback': '击退',
-    'lifesteal': '吸血',
-    'pierce': '穿刺',
-    'magnet': '磁吸',
-    'burn': '灼烧',
-    'clone': '分身',
-    'crit_rate': '暴击',
-    'crit_damage': '暴伤',
-    'armor': '护甲',
-  };
-
   static Future<void> show(
     BuildContext context, {
     required JourneyFlameGame game,
   }) async {
-    final arm = game.weaponArm;
-    if (arm == null) return;
-    final controller = game.controller;
-    final defs = _slotDefs();
-
-    final rows = <Widget>[];
-    // 破甲：当前穿刺维度等级与对应无视护甲比例（公式与引擎命中结算同源）
-    final pierceLv = game.slotLevel('pierce');
-    final piercePct = pierceLv > 0
-        ? (kJourneyPierceBaseRatio +
-                game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
-                    (pierceLv - 1))
-            .clamp(0.0, kJourneyPierceRatioCap) *
-            100
-        : 0.0;
-
-    rows.addAll(<Widget>[
-      const Text('基础属性', style: JourneyTheme.title),
-      const SizedBox(height: 6),
-      // 基础攻击力只展示最终总值，分项来源不对外呈现
-      _attrRow(
-        '基础攻击力',
-        (game.character.baseAttack + game.levelAttackTotal + game.cardAttackTotal)
-            .toStringAsFixed(0),
-      ),
-      // 境界：每 realm_step 级突破一档（增伤Σ%/生命复利），名称走内置 9 档
-      _attrRow('境界', game.realmTitle),
-      _attrRow('法宝品阶伤害', game.weaponArm?.damage.toStringAsFixed(0) ?? game.weaponBaseDamage.toStringAsFixed(0)),
-      _attrRow('攻击力加成', '+${(game.attackAmp * 100).toStringAsFixed(1)}%'),
-      _attrRow('武器增伤', '+${((game.damageAmp - 1).clamp(0.0, 2.0) * 100).toStringAsFixed(1)}%'),
-      _attrRow('单次伤害', '${game.hitDamageBase.toStringAsFixed(1)}/击'),
-      _attrRow(
-        '环绕转速',
-        '${game.displayAngularSpeed.toStringAsFixed(1)}/秒 · '
-        '${game.spinDirection < 0 ? '逆时针' : '顺时针'}',
-      ),
-      // 臂展做百分比展示（基准=屏幕最大宽-40，即左右各留 20px 空余）；
-      // 内部 px 数值保留在括号里便于运营核对
-      _attrRow(
-        '武器臂展',
-        '${game.maxArmDiameter > 0 ? ((arm.outerRadius * 2 / game.maxArmDiameter * 100).round()) : 0}%'
-        '（直径 ${(arm.outerRadius * 2).round()} · 内圈 ${arm.innerRadius.round()}）',
-      ),
-      _attrRow('生命',
-          '${controller.hud.hp.value.round()} / ${controller.hud.maxHp.value.round()}'),
-      _attrRow('自动回复', '${game.player.regen.toStringAsFixed(1)}/秒'),
-      _attrRow('护甲', '${game.player.armor.toStringAsFixed(1)}（减伤 '
-          '${(JourneyDamageTickMixin.armorReductionRatio(game.player.armor,
-                  curveK: game.armorCurveK) * 100).toStringAsFixed(0)}%）'),
-      _attrRow(
-        '破甲',
-        pierceLv > 0
-            ? 'Lv$pierceLv · 无视护甲 ${piercePct.toStringAsFixed(1)}%'
-            : '未习得',
-      ),
-      _attrRow('移动速度', '×${game.moveSpeedAmp.toStringAsFixed(2)}'),
-      _attrRow('拾取范围', '${game.player.pickupRange.round()}'),
-      _attrRow('经验获取', '×${game.expAmp.toStringAsFixed(2)}'),
-      // 暴击与炼化（节点11/4）：暴击率/暴击伤害/炼化状态/特效法宝
-      _attrRow('暴击率', '${(game.critRate * 100).toStringAsFixed(1)}%'),
-      _attrRow('暴击伤害', '${(game.critDamage * 100).round()}%'),
-      _attrRow('炼化状态', game.evolved ? '已炼化' : '未炼化'),
-      _attrRow('特效法宝', _effectWeaponsText(game)),
-      _attrRow('特殊能力', _abilitiesText(game)),
-    ]);
-    rows.add(const SizedBox(height: 12));
-
-    rows.addAll(<Widget>[
-      const Text('武器维度槽', style: JourneyTheme.title),
-      const SizedBox(height: 6),
-      for (final slot in game.weaponSlots)
-        _attrRow(
-          '${slotNames[slot.code] ?? slot.code} · Lv${slot.level}'
-          '/${defs[slot.code]?.maxLevel ?? 3}',
-          _slotCurrentValue(slot.code, slot.level, defs),
-        ),
-      if (game.weaponSlots.length < 6)
-        Padding(
-          padding: const EdgeInsets.only(top: 4),
-          child: Text(
-            '空槽 ${6 - game.weaponSlots.length} 格 · 三选一可习得新维度',
-            style: JourneyTheme.faint,
-          ),
-        ),
-    ]);
-    rows.add(const SizedBox(height: 12));
-
-    if (game.passiveSlotCodes.isNotEmpty) {
-      rows.addAll(<Widget>[
-        const Text('被动加持', style: JourneyTheme.title),
+    final groups = JourneyAttributesData.collect(game);
+    final rows = <Widget>[
+      for (final group in groups) ...<Widget>[
+        Text(group.title, style: JourneyTheme.title),
         const SizedBox(height: 6),
-        for (final code in game.passiveSlotCodes)
-          _attrRow(
-            kJourneyPassiveEffects[code]?.$1 ?? code,
-            kJourneyPassiveEffects[code]?.$2 ?? '',
-          ),
-      ]);
-    }
+        for (final row in group.rows) _attrRow(row.$1, row.$2),
+        const SizedBox(height: 12),
+      ],
+    ];
+    if (rows.isNotEmpty) rows.removeLast();
 
     await showModalBottomSheet<void>(
       context: context,
@@ -169,47 +62,6 @@ abstract final class JourneyAttributesSheet {
         ),
       ),
     );
-  }
-
-  /// 维度槽当前实际贡献值：按当前等级从引擎同源公式结算，与选卡对比口径
-  /// 共用 journeySlotValueText；未知维度回落配置的每级介绍文案。
-  static String _slotCurrentValue(
-    String code,
-    int level,
-    Map<String, JourneySlotDefModel> defs,
-  ) {
-    final def = defs[code];
-    final text = journeySlotValueText(code, level, def?.valuePerLevel ?? 0);
-    return text.isNotEmpty ? text : (def?.effectPerLevel ?? '');
-  }
-
-  static Map<String, JourneySlotDefModel> _slotDefs() {
-    final remote =
-        JourneyConfigService.instance.cached?.slotDefMap();
-    if (remote != null && remote.isNotEmpty) return remote;
-    return <String, JourneySlotDefModel>{
-      for (final d in kJourneySlotDefSeed.map(JourneySlotDefModel.fromJson))
-        d.code: d,
-    };
-  }
-
-  /// 特效法宝名单：配置表名字优先，缺省回落编码；空显示'未习得'。
-  static String _effectWeaponsText(JourneyFlameGame game) {
-    if (game.effectWeapons.isEmpty) return '未习得';
-    final config = JourneyConfigService.instance.cached;
-    return game.effectWeapons
-        .map((c) => config?.weaponOf(c)?.name ?? c)
-        .join('、');
-  }
-
-  /// 已解锁角色特殊能力名单（'ability_<char>' 标记 → 能力名）；
-  /// 未解锁显示'未解锁'。
-  static String _abilitiesText(JourneyFlameGame game) {
-    if (game.abilities.isEmpty) return '未解锁';
-    return game.abilities.map((code) {
-      final char = code.startsWith('ability_') ? code.substring(8) : '';
-      return kJourneyCharAbilities[char]?.$1 ?? code;
-    }).join('、');
   }
 
   static Widget _attrRow(String label, String value) {

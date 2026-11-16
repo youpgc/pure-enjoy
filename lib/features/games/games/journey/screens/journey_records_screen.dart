@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 
+import 'journey_run_detail_screen.dart';
 import '../models/journey_talent_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
@@ -9,7 +10,7 @@ import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
 import '../widgets/journey_load_error.dart';
 
-/// 西行履历（三页拆分，hub 独立入口）：功德流水 / 对局记录 / 成就
+/// 西行履历（三页拆分，hub 独立入口）：功德流水 / 西行记录 / 成就
 /// （本地流水，新的在前，上限 50）。共享格式化与来源标签。
 
 /// 功德来源中文标签（未知类型回落「其他」）。
@@ -126,13 +127,14 @@ class JourneyMeritRecordsScreen extends StatelessWidget {
   }
 }
 
-// ---- 对局记录页 ----
+// ---- 西行记录页 ----
 
-/// 对局记录页：一场对局一条（难别/模式 + 击杀/时长 + 功德入账）。
+/// 西行记录页：一场对局一条（难别/模式 + 击杀/时长 + 功德入账），
+/// 点击卡片进入详情查看当局属性快照。
 class JourneyRunRecordsScreen extends StatelessWidget {
   const JourneyRunRecordsScreen({super.key});
 
-  /// 对局记录标题：优先 levelTitle（「第 N 难 · 关卡名称」，battle 结算
+  /// 西行记录标题：优先 levelTitle（「第 N 难 · 关卡名称」，battle 结算
   /// 入参拼接）；旧记录为空按 levelNo 兜底；非主线按 kind 映射模式名
   /// （endless=无尽妖潮 / daily=西行游历）。
   String _runTitle(JourneyRunRecordModel r) {
@@ -150,7 +152,7 @@ class JourneyRunRecordsScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    // 订阅进度服务：页面停留期间新对局记录实时刷新
+    // 订阅进度服务：页面停留期间新西行记录实时刷新
     return ListenableBuilder(
       listenable: JourneyProgressService.instance,
       builder: (context, _) {
@@ -158,53 +160,62 @@ class JourneyRunRecordsScreen extends StatelessWidget {
         JourneyProgressService.instance.ensureLoaded();
         final records = JourneyProgressService.instance.state.runRecords;
         return JourneyPageScaffold(
-          title: '对局记录',
+          title: '西行记录',
           body: records.isEmpty
               ? const Center(
-                  child: Text('暂无对局记录', style: JourneyTheme.faint))
+                  child: Text('暂无西行记录', style: JourneyTheme.faint))
               : ListView.separated(
                   padding: const EdgeInsets.fromLTRB(16, 10, 16, 16),
                   itemCount: records.length,
                   separatorBuilder: (_, __) => const SizedBox(height: 10),
                   itemBuilder: (_, int index) {
                     final r = records[index];
-                    return JourneyCard(
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
-                        children: <Widget>[
-                          Row(
-                            children: <Widget>[
-                              Text(_runTitle(r), style: JourneyTheme.body),
-                              const SizedBox(width: 8),
-                              Text(
-                                r.cleared ? '通关 ✓' : '未竟',
-                                style: JourneyTheme.caption.copyWith(
-                                  color: r.cleared
-                                      ? JourneyTheme.gold
-                                      : JourneyTheme.textFaint,
+                    return InkWell(
+                      onTap: () => Navigator.of(context).push(
+                        MaterialPageRoute<void>(
+                          builder: (_) => JourneyRunDetailScreen(record: r),
+                        ),
+                      ),
+                      borderRadius: BorderRadius.circular(12),
+                      child: JourneyCard(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: <Widget>[
+                            Row(
+                              children: <Widget>[
+                                Text(_runTitle(r), style: JourneyTheme.body),
+                                const SizedBox(width: 8),
+                                Text(
+                                  r.cleared ? '通关 ✓' : '未竟',
+                                  style: JourneyTheme.caption.copyWith(
+                                    color: r.cleared
+                                        ? JourneyTheme.gold
+                                        : JourneyTheme.textFaint,
+                                  ),
                                 ),
-                              ),
-                              const Spacer(),
-                              Text(
-                                '+${r.meritGained}',
-                                style: JourneyTheme.title
-                                    .copyWith(color: JourneyTheme.gold),
-                              ),
-                            ],
-                          ),
-                          const SizedBox(height: 4),
-                          Row(
-                            children: <Widget>[
-                              Text(
-                                '击杀 ${r.kills} · ${_fmtDuration(r.durationMs)}',
-                                style: JourneyTheme.caption,
-                              ),
-                              const Spacer(),
-                              Text(_fmtDate(r.createdAt),
-                                  style: JourneyTheme.faint),
-                            ],
-                          ),
-                        ],
+                                const Spacer(),
+                                Text(
+                                  '+${r.meritGained}',
+                                  style: JourneyTheme.title
+                                      .copyWith(color: JourneyTheme.gold),
+                                ),
+                              ],
+                            ),
+                            const SizedBox(height: 4),
+                            Row(
+                              children: <Widget>[
+                                Expanded(
+                                  child: Text(
+                                    '击杀 ${r.kills} · ${_fmtDuration(r.durationMs)}',
+                                    style: JourneyTheme.caption,
+                                  ),
+                                ),
+                                Text(_fmtDate(r.createdAt),
+                                    style: JourneyTheme.faint),
+                              ],
+                            ),
+                          ],
+                        ),
                       ),
                     );
                   },

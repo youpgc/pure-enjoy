@@ -41,7 +41,7 @@ class JourneyProgressSync {
     }
   }
 
-  /// 对局记录上报（journey_runs；未登录跳过）。
+  /// 西行记录上报（journey_runs；未登录跳过）。
   static Future<void> syncRunRecord(JourneyRunRecordModel r) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
@@ -56,15 +56,16 @@ class JourneyProgressSync {
           'merit_gained': r.meritGained,
           'duration_ms': r.durationMs,
           'cleared': r.cleared,
+          if (r.runDetail != null) 'run_detail': r.runDetail,
         },
         returnRepresentation: false,
         note: 'journey:run_record',
       );
       if (!result.isSuccess && kDebugMode) {
-        debugPrint('journey 对局记录同步失败: ${result.errorMessage}');
+        debugPrint('journey 西行记录同步失败: ${result.errorMessage}');
       }
     } catch (e) {
-      if (kDebugMode) debugPrint('journey 对局记录同步异常: $e');
+      if (kDebugMode) debugPrint('journey 西行记录同步异常: $e');
     }
   }
 

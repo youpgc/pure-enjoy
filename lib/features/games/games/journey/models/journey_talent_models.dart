@@ -245,7 +245,7 @@ class JourneyMeritRecordModel {
       };
 }
 
-/// 对局记录（journey_runs 行/本地镜像）。
+/// 西行记录（journey_runs 行/本地镜像）。
 /// kind=对局模式：mainline=主线难 / endless=无尽妖潮 / daily=西行游历
 /// （远端 journey_runs 无 kind 列，仅本地镜像区分展示）。
 class JourneyRunRecordModel {
@@ -262,6 +262,10 @@ class JourneyRunRecordModel {
   /// 旧记录为空时展示层按 levelNo/kind 兜底）。
   final String levelTitle;
 
+  /// 对局属性快照（结算时按属性面板全量口径采集，供历史详情页展示）；
+  /// 旧记录为空时详情页展示空态。
+  final Map<String, dynamic>? runDetail;
+
   const JourneyRunRecordModel({
     required this.id,
     required this.levelNo,
@@ -272,6 +276,7 @@ class JourneyRunRecordModel {
     this.createdAt,
     this.kind = 'mainline',
     this.levelTitle = '',
+    this.runDetail,
   });
 
   factory JourneyRunRecordModel.fromJson(Map<String, dynamic> json) {
@@ -285,6 +290,9 @@ class JourneyRunRecordModel {
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
       kind: json['kind'] as String? ?? 'mainline',
       levelTitle: json['level_title'] as String? ?? '',
+      runDetail: json['run_detail'] is Map
+          ? Map<String, dynamic>.from(json['run_detail'] as Map)
+          : null,
     );
   }
 
@@ -298,5 +306,6 @@ class JourneyRunRecordModel {
         'created_at': createdAt?.toIso8601String(),
         'kind': kind,
         'level_title': levelTitle,
+        if (runDetail != null) 'run_detail': runDetail,
       };
 }

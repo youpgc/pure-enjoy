@@ -15,7 +15,7 @@ part 'journey_progress_talent.dart';
 /// 西行·用户进度服务（本地持久化优先，登录态双写远端）。
 ///
 /// 功德余额/天赋分支等级/流水/解锁记录先落本地（CacheHelper），保证
-/// 离线可玩；登录态下进度行（journey_progress）与流水/对局记录
+/// 离线可玩；登录态下进度行（journey_progress）与流水/西行记录
 /// best-effort 同步远端，双写以 updated_at 新者胜，失败静默不阻塞本地。
 part 'journey_progress_extras.dart';
 
@@ -26,7 +26,7 @@ class JourneyProgressService extends ChangeNotifier {
 
   static const String _storeKey = 'journey_progress_v1';
 
-  /// 本地流水/对局记录保留条数（新的在前）。
+  /// 本地流水/西行记录保留条数（新的在前）。
   static const int _recordLimit = 50;
 
   /// 相生链：生我者（分支升第 2 级起需先修其生源系）。
@@ -113,7 +113,7 @@ class JourneyProgressService extends ChangeNotifier {
   }
 
   /// 节点 13·进度服务端化：登录态下拉取远端进度行，远端 updated_at 比
-  /// 本地新时覆盖本地（双写新者胜；流水/对局记录仅本地缓存不参与覆盖）。
+  /// 本地新时覆盖本地（双写新者胜；流水/西行记录仅本地缓存不参与覆盖）。
   Future<void> _pullRemoteProgress() async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
@@ -263,7 +263,7 @@ class JourneyProgressService extends ChangeNotifier {
       };
 
   /// 结算入账：[merit] 全额计入余额；首通（[cleared] 且 [levelNo] 超越最远
-  /// 记录）全账号共享天赋点池 +1；同时落对局记录与功德流水并远端同步。
+  /// 记录）全账号共享天赋点池 +1；同时落西行记录与功德流水并远端同步。
   /// 返回 (实际入账功德, 是否首通)。
   Future<(int, bool)> settleRun({
     required int merit,
@@ -273,6 +273,7 @@ class JourneyProgressService extends ChangeNotifier {
     bool cleared = false,
     String kind = 'mainline',
     String levelTitle = '',
+    Map<String, dynamic>? runDetail,
   }) async {
     await ensureLoaded();
     // 首通判定：仅主线（level_no≥1）可推进；level_no≤0 的无尽/游历模式
@@ -309,6 +310,7 @@ class JourneyProgressService extends ChangeNotifier {
       cleared: cleared,
       kind: kind,
       levelTitle: levelTitle,
+      runDetail: runDetail,
       createdAt: journeyBjNow(),
     );
     _state = _copyState(

@@ -1,4 +1,5 @@
 import '../../../services/game_score_service.dart';
+import '../battle/journey_attributes_data.dart';
 import '../battle/journey_battle_controller.dart';
 import '../battle/journey_flame_game.dart';
 import 'journey_config_service.dart';
@@ -14,8 +15,8 @@ class JourneyScoreReporter {
   /// farthest_level 维度取值（未通关传 0，max 聚合不受污染）。
   /// [runDetail] 为对局详情快照（角色/属性等，落 game_scores.run_detail，
   /// 供游戏记录/排障/后续排行榜与成就使用；终局无论胜败均随上报落库）。
-  /// 非主线模式（level_no≤0 的无尽/游历）不上报：farthest_level 维度
-  /// 无意义，避免 0 值污染成绩看板/排行榜。
+  /// 全部模式（主线/无尽/游历）均上报对局与属性快照；farthest_level
+  /// 维度只有主线写值，虚拟关 level_no=0 不参与最远关卡聚合。
   static void report({
     required JourneyRunResult result,
     required bool cleared,
@@ -23,7 +24,6 @@ class JourneyScoreReporter {
     JourneyConfigSnapshot? snapshot,
     Map<String, Object?>? runDetail,
   }) {
-    if (result.levelNo <= 0) return;
     final dims = snapshot?.scoreDimIds ?? const <String, String>{};
     final gameId = snapshot?.gameId ?? '';
     if (gameId.isEmpty || dims.isEmpty) return;
@@ -33,7 +33,7 @@ class JourneyScoreReporter {
       cleared: cleared,
       durationMs: result.durationSec * 1000,
       values: <String, num>{
-        if (dims['farthest_level'] != null)
+        if (dims['farthest_level'] != null && result.levelNo > 0)
           dims['farthest_level']!: cleared ? result.levelNo : 0,
         if (dims['run_kills'] != null) dims['run_kills']!: result.kills,
         if (dims['run_merit'] != null) dims['run_merit']!: result.meritTotal,
@@ -42,17 +42,21 @@ class JourneyScoreReporter {
     );
   }
 
-  /// 组装对局详情快照（game_scores.run_detail）：使用角色 + 局内属性，
-  /// 取数口径与局内属性详情面板同源（hitDamageBase 含增伤Σ% / hud 血量
-  /// / 维度槽 / 被动加持）；[game] 为 null（配置异常兜底局）时返回 null。
+  /// 组装对局详情快照（game_scores.run_detail + journey_runs.run_detail）：
+  /// 扁平字段供后台成绩看板摘要，attr_groups 为属性面板全量分组行
+  /// （与局内面板共用 [JourneyAttributesData] 口径），供历史详情页展示；
+  /// [modeCode] 为所属模式码（main/endless/daily），供成绩看板在无 level_id
+  /// 时回退展示模式名；[game] 为 null（配置异常兜底局）时返回 null。
   static Map<String, Object?>? buildRunDetail(
     JourneyFlameGame? game, {
     required String characterCode,
+    required String modeCode,
   }) {
     if (game == null) return null;
     final hud = game.controller.hud;
     return <String, Object?>{
       'character_code': characterCode,
+      'mode': modeCode,
       'char_level': hud.level.value,
       'hp': hud.hp.value.round(),
       'max_hp': hud.maxHp.value.round(),
@@ -68,6 +72,9 @@ class JourneyScoreReporter {
       },
       'passives': game.passiveSlotCodes,
       'evolved': game.evolved,
+      'attr_groups': <Map<String, dynamic>>[
+        for (final g in JourneyAttributesData.collect(game)) g.toJson(),
+      ],
     };
   }
 }
