@@ -55,7 +55,7 @@ enum _SlotUnit { percent, intValue, perSecond, count }
 }
 
 /// 按引擎口径算某维度在 [level] 级的展示数值：基准类（穿刺/吸血）1 级
-/// 即基准值、此后每级加增量；其余按等级×每级值；暴伤另加 100% 基准。
+/// 即基准值、此后每级加增量；其余按等级×每级值；暴伤仅展示槽位增量。
 double _slotDisplayValue(
   String code,
   int level,
@@ -85,6 +85,17 @@ String _formatSlotValue(double value, _SlotUnit unit) {
     case _SlotUnit.count:
       return '${value.round()}';
   }
+}
+
+/// 维度槽当前等级的实际贡献值文案（属性详情面板与选卡对比共用同一口径）。
+/// 无匹配规则时返回空串，由调用方回落原介绍文案。
+String journeySlotValueText(String code, int level, double perLevel) {
+  final rule = _slotDisplayRule(code);
+  if (rule.brief.isEmpty) return '';
+  return '${rule.brief} ${_formatSlotValue(
+    _slotDisplayValue(code, level, perLevel, rule),
+    rule.unit,
+  )}';
 }
 
 /// 顿悟卡描述：简介 + 当前值→下一级值；无匹配规则时回落原介绍文案。

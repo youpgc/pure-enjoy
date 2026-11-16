@@ -8,7 +8,7 @@ import 'journey_flame_game.dart';
 import '../widgets/journey_theme.dart';
 
 /// 属性详情面板：由对局页先进入暂停态再展示，面板不改变引擎运行状态。
-/// 基础战斗属性 + 武器维度槽（等级/上限/每级效果）+ 被动加持。
+/// 基础战斗属性 + 武器维度槽（等级/上限/当前实际贡献值）+ 被动加持。
 abstract final class JourneyAttributesSheet {
   /// 维度槽简称（HUD/面板空间有限，取两字简称；全名见维度定义表）。
   static const Map<String, String> slotNames = <String, String>{
@@ -49,14 +49,11 @@ abstract final class JourneyAttributesSheet {
     rows.addAll(<Widget>[
       const Text('基础属性', style: JourneyTheme.title),
       const SizedBox(height: 6),
-      // 伤害公式固定：基础值 →(1+Σ%) 单次乘算；面板各行与引擎结算同源
-      // （damageBaseValue / damageAmpTotal / hitDamageBase）
+      // 基础攻击力只展示最终总值，分项来源不对外呈现
       _attrRow(
         '基础攻击力',
-        '${(game.character.baseAttack + game.levelAttackTotal + game.cardAttackTotal).toStringAsFixed(0)}'
-        '（角色 ${game.character.baseAttack.toStringAsFixed(0)} · '
-        '等级 ${game.levelAttackTotal.toStringAsFixed(0)} · '
-        '卡 ${game.cardAttackTotal.toStringAsFixed(0)}）',
+        (game.character.baseAttack + game.levelAttackTotal + game.cardAttackTotal)
+            .toStringAsFixed(0),
       ),
       // 境界：每 realm_step 级突破一档（增伤Σ%/生命复利），名称走内置 9 档
       _attrRow('境界', game.realmTitle),
@@ -107,7 +104,7 @@ abstract final class JourneyAttributesSheet {
         _attrRow(
           '${slotNames[slot.code] ?? slot.code} · Lv${slot.level}'
           '/${defs[slot.code]?.maxLevel ?? 3}',
-          defs[slot.code]?.effectPerLevel ?? '',
+          _slotCurrentValue(slot.code, slot.level, defs),
         ),
       if (game.weaponSlots.length < 6)
         Padding(
@@ -172,6 +169,18 @@ abstract final class JourneyAttributesSheet {
         ),
       ),
     );
+  }
+
+  /// 维度槽当前实际贡献值：按当前等级从引擎同源公式结算，与选卡对比口径
+  /// 共用 journeySlotValueText；未知维度回落配置的每级介绍文案。
+  static String _slotCurrentValue(
+    String code,
+    int level,
+    Map<String, JourneySlotDefModel> defs,
+  ) {
+    final def = defs[code];
+    final text = journeySlotValueText(code, level, def?.valuePerLevel ?? 0);
+    return text.isNotEmpty ? text : (def?.effectPerLevel ?? '');
   }
 
   static Map<String, JourneySlotDefModel> _slotDefs() {
