@@ -40,6 +40,27 @@ extension JourneyExp on JourneyFlameGame {
     controller.hud.hp.value = player.hp;
   }
 
+  /// 经验需求曲线（journey_globals.exp_base/exp_per_lv/exp_curve_pow 可调）：
+  /// exp_base + exp_per_lv × lv^pow。幂次 1.5 拉开高级段需求撑起 99 级
+  /// 长线成长；pow=1 还原旧线性口径。
+  double _expNeedFor(int lv) {
+    // 无尽妖潮专属需求曲线：need = endless_exp_base + per_lv × lv^pow
+    // （默认 12+30×lv^2.0）。妖王经验按表值×强度缩放不压缩，产出随波
+    // ~n² 增长，需求取同构二次式：满级落在第 90 波上下，末段波次
+    // 预留纯挑战（满级后经验不再累计）。
+    if (level.kind == 'endless') {
+      return ((config?.endlessExpBase ?? kJourneyEndlessExpBase) +
+              (config?.endlessExpPerLv ?? kJourneyEndlessExpPerLv) *
+                  math.pow(
+                      lv, config?.endlessExpPow ?? kJourneyEndlessExpPow))
+          .round()
+          .toDouble();
+    }
+    // 主线/每日：exp_base + exp_per_lv × lv^pow（缺省 12+7×lv^1.5）。
+    final pow = config?.expCurvePow ?? kJourneyExpCurvePow;
+    return (config?.expBase ?? 12) + (config?.expPerLv ?? 7) * math.pow(lv, pow);
+  }
+
   /// 经验入账与升级结算（loot part 拾取香火调用）。
   void gainExp(double amount) {
     if (_charLv >= _charLevelCap) return; // 满级：经验停止累计
@@ -55,9 +76,7 @@ extension JourneyExp on JourneyFlameGame {
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
       _checkRealmBreakthrough(); // 境界突破：档位边界增伤/生命增幅
-      // 经验曲线（journey_globals.exp_base/exp_per_lv 后台可调，缺省 12/7）
-      _expNeed =
-          (config?.expBase ?? 12) + _charLv * (config?.expPerLv ?? 7);
+      _expNeed = _expNeedFor(_charLv);
       _pendingLevelUps++;
       // 升到上限的一级不排「充满→归零」段：满级后经验条直接落满格恒满
       if (_charLv < _charLevelCap) _expFillPending++;

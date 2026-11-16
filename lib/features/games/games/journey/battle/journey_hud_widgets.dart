@@ -216,14 +216,14 @@ class _MinimapPainter extends CustomPainter {
       canvas.drawCircle(p, 2.5, monsterPaint);
     }
 
-    final bp = d.bossPos;
-    if (bp != null) {
+    // 妖王大红点（全部存活妖王，含妖王潮多妖王）：双环样式突出位置
+    final bossPaint = Paint()..color = const Color(0xFF8E2F3C);
+    final bossRing = Paint()
+      ..color = Colors.white.withValues(alpha: 0.9)
+      ..style = PaintingStyle.stroke
+      ..strokeWidth = 1.4;
+    for (final bp in d.bossPositions) {
       final p = _clampInside(center, center + Offset(bp.x, bp.y) * k, r - 6);
-      final bossPaint = Paint()..color = const Color(0xFF8E2F3C);
-      final bossRing = Paint()
-        ..color = Colors.white.withValues(alpha: 0.9)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 1.4;
       canvas.drawCircle(p, 5, bossPaint);
       canvas.drawCircle(p, 5, bossRing);
     }

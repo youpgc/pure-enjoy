@@ -66,18 +66,27 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
 
     // 紫金宝葫（jinjiao 特殊能力）：精英/妖王被杀收入宝葫炼化，
-    // 回复 15% 最大生命且本局攻击 +3%/层（钳 20 层即上限 +60%）
+    // 回复 15% 最大生命且本局攻击 +3%/层（钳 20 层即上限 +60%）。
+    // 无尽妖潮按波限流：每波炼化上限 endless_boss_refine_per_wave
+    // （回血+叠层共用配额，超出不触发），防止海量妖王下无限回血秒满层。
     if (hasAbility('jinjiao') && (m.model.isElite || m.model.isBoss)) {
-      final lit = _jinjiaoStacks < JourneyFlameGame._jinjiaoMaxStacks;
-      if (lit) _jinjiaoStacks++;
-      player.heal(player.maxHp * 0.15);
-      spawnFloatText(
-        player.position + Vector2(0, -36),
-        lit
-            ? '紫金宝葫 · 攻击 +${_jinjiaoStacks * 3}%'
-            : '紫金宝葫 · 已满层',
-        const Color(0xFFE8C470),
-      );
+      final refineAllowed = !_isEndless(this) ||
+          _jinjiaoWaveRefines <
+              (config?.endlessBossRefinePerWave ??
+                  kJourneyEndlessBossRefinePerWave);
+      if (refineAllowed) {
+        if (_isEndless(this)) _jinjiaoWaveRefines++;
+        final lit = _jinjiaoStacks < JourneyFlameGame._jinjiaoMaxStacks;
+        if (lit) _jinjiaoStacks++;
+        player.heal(player.maxHp * 0.15);
+        spawnFloatText(
+          player.position + Vector2(0, -36),
+          lit
+              ? '紫金宝葫 · 攻击 +${_jinjiaoStacks * 3}%'
+              : '紫金宝葫 · 已满层',
+          const Color(0xFFE8C470),
+        );
+      }
     }
 
     spawnLoot(this, m);
@@ -105,20 +114,36 @@ extension JourneyLifecycle on JourneyFlameGame {
         _onBossFinalKill();
       }
     }
-    // 无尽妖潮妖王波：击杀妖王也按 talent_drop_rate 概率掉落天赋点。
-    // 无尽模式无据点妖王、game.boss 恒 null，故不触发上面末场伏诛钩子；
-    // 此处独立判定（避免与主线妖王伏诛重复发放），命中仅飘字、不改结算态。
+    // 接战妖王阵亡：熄灭其大血条横幅（主线据点妖王由下方 m==boss 分支
+    // 清理，此处兜住无据点的妖王潮妖王——接战中击杀不熄会恒显 0 血横幅）；
+    // 仍有其他接战妖王时保持大血条给下一只（多妖王同场语义）。
+    if (m.model.isBoss && m._aggro) {
+      m._aggro = false;
+      final otherEngaged = monsters.any((o) =>
+          !identical(o, m) && !o.isDead && o.model.isBoss && o._aggro);
+      if (!otherEngaged) {
+        controller.hud.bossHpRatio.value = 0;
+        controller.hud.bossEngaged.value = false;
+        controller.hud.bossHp.value = 0;
+      }
+    }
+    // 无尽妖潮：天赋点按**波内首杀妖王**掷 1 次（talent_drop_rate 可配），
+    // 后续妖王击杀不再重复掷——配额制下单波妖王可达数十只，逐只掷率
+    // 会使天赋点期望随配额线性膨胀。首杀判定=宝葫/掉落结算后波内击杀
+    // 计数恰为 1（spawnLoot 先于本段递增 _endlessBossKilled）。
     if (_isEndless(this) && m.model.isBoss && !_ended) {
-      final rate = config?.talentDropRate ?? kJourneyTalentDropRate;
-      if (rng.nextDouble() < rate) {
-        dart_async.unawaited(
-          JourneyProgressService.instance.grantTalentDrop().then((granted) {
-            if (granted) {
-              spawnFloatText(
-                m.position, '天赋点掉落 +1', const Color(0xFFE8C470));
-            }
-          }),
-        );
+      if (_endlessBossKilled == 1) {
+        final rate = config?.talentDropRate ?? kJourneyTalentDropRate;
+        if (rng.nextDouble() < rate) {
+          dart_async.unawaited(
+            JourneyProgressService.instance.grantTalentDrop().then((granted) {
+              if (granted) {
+                spawnFloatText(
+                  m.position, '天赋点掉落 +1', const Color(0xFFE8C470));
+              }
+            }),
+          );
+        }
       }
     }
   }

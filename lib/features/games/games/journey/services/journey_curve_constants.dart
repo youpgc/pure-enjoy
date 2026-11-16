@@ -70,6 +70,75 @@ const double kJourneyPierceIgnorePerLv = 0.025;
 /// 穿刺破甲比例上限：无论等级与远端配置，无视护甲比例不突破此值。
 const double kJourneyPierceRatioCap = 0.30;
 
+/// ---- 无尽妖潮·妖王潮（journey_globals 十列可覆盖，App 内置兜底）----
+/// 妖潮语义：波次表配置妖王配额的波起小怪淡出（精英为主）、妖王波改
+/// 配额制——同场并发钳制、击杀后按降临倒计时依次补位（不同时刷新），
+/// 妖王领地锚点散布（最小间距）+ 软领地 leash 杜绝群殴；妖潮起点以
+/// 后台实际配置为准（首个 boss_count>0 的波）。
+
+/// 妖潮期每波妖王配额兜底公式的起点（波次表首个 boss_count>0 的波
+/// 优先于本值）：前 9 波发育期（小怪+精英），第 10 波起妖王按线性
+/// 端点式递增至终波满额。
+const int kJourneyEndlessBossTideStartWave = 10;
+
+/// 同波妖王配额上限（可配置，默认 99）：单波刷新量级，与同屏并发
+/// （endless_boss_concurrent，默认 10）为两个独立维度——配额限总量、
+/// 并发限在场，配额内超出并发的部分按降临倒计时排队补位。
+const int kJourneyEndlessBossCountCap = 99;
+
+/// 同场并发妖王数上限（可配置，默认 10）：配额内妖王按降临倒计时依次
+/// 登场，同屏在场数不突破此值；击杀腾位后补位降临。
+const int kJourneyEndlessBossConcurrent = 10;
+
+/// 妖王补位降临倒计时（秒）：缺口出现后按此间隔依次降临（后台可配）。
+const double kJourneyEndlessBossArriveCd = 10.0;
+
+/// 妖王能力每波额外增幅：妖王 buffMult = 波次 buff ×(1+(波号−分界)×K)，
+/// 与全局波次 buff 叠乘；0=只吃波次 buff。
+const double kJourneyEndlessBossAmpPerWave = 0.04;
+
+/// 妖王领地半径（px）：软领地侦测圈=该值；null/未配回落 isBoss 默认口径。
+const double kJourneyEndlessBossTerritoryRadius = 300.0;
+
+/// 软领地 leash 倍率：追出领地半径×1.3 即脱战归位锚点（快速回血照旧）。
+const double kJourneyEndlessBossLeashGain = 1.3;
+
+/// 多妖王锚点最小间距（px）：降临点散布约束，领地不重叠防群殴。
+const double kJourneyEndlessBossSpreadMinDist = 700.0;
+
+/// 妖潮期护卫/普通段精英占比：精英为主+少量小怪（0.8=两成小怪保留
+/// 割草节奏）；1=全精英。发育期不受此值影响。
+const double kJourneyEndlessBossGuardEliteRatio = 0.8;
+
+/// 无尽妖王宝箱掉落概率：妖王潮配额制下妖王数量大，宝箱改为
+/// **波内首杀**才掷概率的惊喜（全程期望约 9 箱）；主线据点妖王
+/// 保持首杀必掉不受影响。
+const double kJourneyEndlessBossChestRate = 0.10;
+
+/// 宝葫（jinjiao）妖潮期每波炼化上限：精英/妖王击杀触发的回血+叠层
+/// 共用本配额（超出不触发），防止海量妖王下无限回血/秒满层；
+/// 主线与每日不受限。
+const int kJourneyEndlessBossRefinePerWave = 2;
+
+/// 无尽模式专属升级需求曲线参数（主线/每日保持 12+7×lv^1.5 不变）：
+/// need(lv) = base + per_lv × lv^pow。妖王经验走表值（50~1630）×强度
+/// 缩放（含波次增幅、钳 12）不压缩，产出随波 ~n² 增长，需求曲线取
+/// 同构二次式（pow=2.0），标定=产出至第 90 波累计恰好覆盖 99 级总需求
+/// ——满级落在第 90 波上下，预留末段波次纯挑战（满级后经验不再累计）。
+const double kJourneyEndlessExpBase = 12;
+const double kJourneyEndlessExpPerLv = 30;
+const double kJourneyEndlessExpPow = 2.0;
+
+/// 妖潮妖王血量每波额外增幅（journey_globals.endless_boss_hp_amp 可覆盖）：
+/// 妖潮妖王血量乘区与经验/速度/接触伤害共用乘区解耦，独立走
+/// hpBuffMult = 波次 buff ×(1+(波号−起点)×K)，且不吃玩家等级项——
+/// 等级项 ×(1+(等级−1)×boss_hp_lv_k) 是主线妖王终盘血量的主力，
+/// 叠加进妖潮会把 99 级妖王血量推到基础值 150 倍以上（打不动）；
+/// 波次项对标玩家 DPS 成长，终盘妖王单挑 30~70 秒量级，最后几波
+/// 满级也需操作。结果仍受 buff_mult_cap 钳制（12）。0=还原共用乘区。
+const double kJourneyEndlessBossHpAmp = 0.02;
+
+
 /// 护甲减伤曲线分母 K：armor/(armor+K)。K 越大同护甲减伤越低，
 /// 用于拉开 50~200 护甲档位的区分度（journey_globals.armor_curve_k 可覆盖）。
 /// 参考减伤：25 甲≈23.8%、50≈38.5%、100≈55.6%、150≈65.2%、200≈71.4%。

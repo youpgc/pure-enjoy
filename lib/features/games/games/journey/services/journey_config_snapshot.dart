@@ -201,6 +201,77 @@ class JourneyConfigSnapshot {
       _globalNum(globalsRaw, 'weapon_grade_per_lv') ??
       kJourneyWeaponGradePerLv;
 
+  // ---- 无尽妖潮·妖王潮（起点/配额/降临/领地/护卫/限流/经验曲线）----
+
+  /// 妖潮起点波号兜底（endless_boss_tide_start_wave）：波次表首个
+  /// boss_count>0 的波优先于本值。
+  int get endlessBossTideStartWave =>
+      _globalNum(globalsRaw, 'endless_boss_tide_start_wave')?.toInt() ??
+      kJourneyEndlessBossTideStartWave;
+
+  /// 同波妖王配额上限（endless_boss_count_cap，默认 99=波次刷新总量，
+  /// 与同屏并发为两个独立维度）。
+  int get endlessBossCountCap =>
+      _globalNum(globalsRaw, 'endless_boss_count_cap')?.toInt() ??
+      kJourneyEndlessBossCountCap;
+
+  /// 无尽妖王宝箱波内首杀掉落概率（endless_boss_chest_rate）。
+  double get endlessBossChestRate =>
+      _globalNum(globalsRaw, 'endless_boss_chest_rate') ??
+      kJourneyEndlessBossChestRate;
+
+  /// 宝葫妖潮期每波炼化上限（endless_boss_refine_per_wave）。
+  int get endlessBossRefinePerWave =>
+      _globalNum(globalsRaw, 'endless_boss_refine_per_wave')?.toInt() ??
+      kJourneyEndlessBossRefinePerWave;
+
+  /// 无尽模式专属升级需求曲线：need(lv) = base + per_lv × lv^pow
+  /// （endless_exp_base / endless_exp_per_lv / endless_exp_pow）。
+  double get endlessExpBase =>
+      _globalNum(globalsRaw, 'endless_exp_base') ?? kJourneyEndlessExpBase;
+
+  double get endlessExpPerLv =>
+      _globalNum(globalsRaw, 'endless_exp_per_lv') ?? kJourneyEndlessExpPerLv;
+
+  double get endlessExpPow =>
+      _globalNum(globalsRaw, 'endless_exp_pow') ?? kJourneyEndlessExpPow;
+
+  /// 同场并发妖王数上限（endless_boss_concurrent）。
+  int get endlessBossConcurrent =>
+      _globalNum(globalsRaw, 'endless_boss_concurrent')?.toInt() ??
+      kJourneyEndlessBossConcurrent;
+
+  /// 妖王补位降临倒计时秒（endless_boss_arrive_cd）。
+  double get endlessBossArriveCd =>
+      _globalNum(globalsRaw, 'endless_boss_arrive_cd') ??
+      kJourneyEndlessBossArriveCd;
+
+  /// 妖王能力每波额外增幅（endless_boss_amp_per_wave）。
+  double get endlessBossAmpPerWave =>
+      _globalNum(globalsRaw, 'endless_boss_amp_per_wave') ??
+      kJourneyEndlessBossAmpPerWave;
+
+  /// 妖潮妖王血量每波额外增幅（endless_boss_hp_amp）：血量乘区独立于
+  /// 经验/速度/接触伤害共用乘区，不吃玩家等级项。
+  double get endlessBossHpAmp =>
+      _globalNum(globalsRaw, 'endless_boss_hp_amp') ??
+      kJourneyEndlessBossHpAmp;
+
+  /// 妖王领地半径 px（endless_boss_territory_radius）。
+  double get endlessBossTerritoryRadius =>
+      _globalNum(globalsRaw, 'endless_boss_territory_radius') ??
+      kJourneyEndlessBossTerritoryRadius;
+
+  /// 多妖王锚点最小间距 px（endless_boss_spread_min_dist）。
+  double get endlessBossSpreadMinDist =>
+      _globalNum(globalsRaw, 'endless_boss_spread_min_dist') ??
+      kJourneyEndlessBossSpreadMinDist;
+
+  /// 妖潮期护卫精英占比（endless_boss_guard_elite_ratio）。
+  double get endlessBossGuardEliteRatio =>
+      _globalNum(globalsRaw, 'endless_boss_guard_elite_ratio') ??
+      kJourneyEndlessBossGuardEliteRatio;
+
   const JourneyConfigSnapshot({
     required this.regions,
     required this.levels,

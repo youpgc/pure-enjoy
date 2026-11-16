@@ -195,13 +195,14 @@ class JourneyBattleHud {
 }
 
 /// 小地图采样快照（节点11）：怪点=相对玩家的世界偏移（≤span，上限 60）；
-/// bossPos=相对玩家的偏移（超范围时按 bearing 方向贴窗缘）。
+/// bossPositions=全部存活妖王相对玩家的偏移（超范围贴窗缘示方向）——
+/// 主线据点妖王与妖王潮多妖王同源采样，大红点逐妖王绘制。
 class JourneyMinimapData {
   /// 玩家世界坐标（备用参考位；渲染以偏移为准）。
   final Vector2 playerPos;
 
-  /// 妖王相对玩家的偏移（null = 未降临或已清剿）。
-  final Vector2? bossPos;
+  /// 存活妖王相对玩家的偏移集合（空 = 无妖王在场/已清剿）。
+  final List<Vector2> bossPositions;
 
   /// 相对玩家的怪物偏移（上限 60，均在 span 内）。
   final List<Vector2> monsterOffsets;
@@ -212,7 +213,7 @@ class JourneyMinimapData {
   const JourneyMinimapData({
     required this.playerPos,
     required this.monsterOffsets,
-    this.bossPos,
+    this.bossPositions = const <Vector2>[],
     this.span = 1000,
   });
 }

@@ -33,6 +33,7 @@ part 'journey_engine_loot.dart';
 part 'journey_engine_damage.dart';
 part 'journey_engine_spawns.dart';
 part 'journey_engine_spawns_pool.dart';
+part 'journey_engine_endless.dart';
 part 'journey_engine_interact.dart';
 part 'journey_engine_grid.dart';
 part 'journey_engine_exp.dart';

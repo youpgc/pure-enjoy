@@ -268,6 +268,7 @@ class JourneyDailyMapModel {
 /// 无尽妖潮波次（journey_endless_waves 行，上限 99）：后台可配的独立
 /// 波次表——monster_code 命中妖王即妖王波，否则按 count 分批刷怪；
 /// elite_count 指定本波末尾的精英只数（0=引擎按波号公式兜底）；
+/// boss_count 指定妖潮期本波妖王配额（0=引擎按全局公式兜底）；
 /// buff_mult 覆盖内置增强曲线；未配置的波回落内置公式。
 class JourneyEndlessWaveModel {
   final int waveNo;
@@ -277,6 +278,7 @@ class JourneyEndlessWaveModel {
   final int eliteCount;
 
   /// 本波妖王配额（妖潮期生效；0=按全局基数+递增公式兜底，≤10）。
+  final int bossCount;
 
   const JourneyEndlessWaveModel({
     required this.waveNo,
@@ -284,6 +286,7 @@ class JourneyEndlessWaveModel {
     this.count = 10,
     this.buffMult = 1,
     this.eliteCount = 0,
+    this.bossCount = 0,
   });
 
   factory JourneyEndlessWaveModel.fromJson(Map<String, dynamic> json) {
@@ -293,6 +296,7 @@ class JourneyEndlessWaveModel {
       count: (json['count'] as num?)?.toInt() ?? 10,
       buffMult: (json['buff_mult'] as num?)?.toDouble() ?? 1,
       eliteCount: (json['elite_count'] as num?)?.toInt() ?? 0,
+      bossCount: (json['boss_count'] as num?)?.toInt() ?? 0,
     );
   }
 }

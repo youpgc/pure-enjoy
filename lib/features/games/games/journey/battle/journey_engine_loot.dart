@@ -163,8 +163,20 @@ mixin JourneyLootMixin {
 
   /// 击杀掉落（journey_drops 表驱动）：boss/精英/普通分表加权随机；
   /// 空表回落内置硬编码概率口径（香火必掉/铜钱 35%/蟠桃 4%）。
-  /// 精英/妖王宝箱固定掉落由 monster_elite/monster_boss 表承接。
+  ///
+  /// - 经验单源=怪物行 exp_drop，按生成时强度乘区缩放
+  ///   ×(1+乘区×exp_mult_k)，drops 表 xianghuo 行的 qty 不再参与经验
+  ///   结算（journey_monsters.exp_drop 为唯一经验入口）；
+  /// - 精英掉落以经验为主，宝箱为惊喜彩蛋（elite_chest_rate 缺省 10%）：
+  ///   drops 表的精英固定 baoxiang 行在此屏蔽（兜住种子/旧配置）；
+  /// - 妖王宝箱：主线据点首杀必掉；无尽妖潮改波内首杀掷概率
+  ///   （endless_boss_chest_rate 缺省 10%，后场妖王不掷）。
   void spawnLoot(JourneyFlameGame game, JourneyMonsterComponent m) {
+    // 经验值：怪物行 exp_drop × 强度缩放（乘区=生成时钳制值，非当前值）
+    final expK = game.config?.expMultK ?? kJourneyExpMultK;
+    final expValue =
+        (m.model.expDrop * (1 + m.buffMult * expK)).round();
+
     // 掉落分档：21+ 难切换 late 表（高价值拾取物权重上调）；
     // late 表缺行回落基础表（老配置不炸）。
     final base = m.model.isBoss
@@ -177,10 +189,23 @@ mixin JourneyLootMixin {
         const <JourneyDropModel>[];
     final effective =
         table.isNotEmpty ? table : game.config?.dropTableOf(base) ?? const <JourneyDropModel>[];
-    if (effective.isNotEmpty) {
-      _rollDropTable(game, effective, m.position.clone());
-      return;
-    }
+    // 宝箱口径迁移：精英行恒屏蔽（彩蛋化）；妖王行主线保持首杀必掉，
+    // 无尽妖潮改**波内首杀掷概率**（endless_boss_chest_rate，全程期望
+    // 约 9 箱）——波内击杀计数在本次结算内完成「判首杀→掷→递增」。
+    final isEndless = game.level.kind == 'endless';
+    final tideBossFirst =
+        isEndless && m.model.isBoss && game._endlessBossKilled == 0;
+    if (isEndless && m.model.isBoss) game._endlessBossKilled++;
+    final tideChestHit = tideBossFirst &&
+        game.rng.nextDouble() <
+            (game.config?.endlessBossChestRate ??
+                kJourneyEndlessBossChestRate);
+    final bossFirstKill = m.model.isBoss && !isEndless && game._bossStage == 0;
+    final keepBossChest = m.model.isBoss &&
+        (isEndless ? tideChestHit : bossFirstKill);
+    final rollTable = effective
+        .where((d) => d.pickupCode != 'baoxiang' || keepBossChest)
+        .toList();
 
     // 兜底口径（掉落表未就绪时保持可玩）
     void drop(JourneyPickupKind kind, int value) {
@@ -196,15 +221,24 @@ mixin JourneyLootMixin {
       );
     }
 
-    drop(JourneyPickupKind.exp, m.model.expDrop);
-    if (game.rng.nextDouble() < 0.35) {
-      drop(JourneyPickupKind.meritCoin, 3 + game.level.levelNo ~/ 2);
+    if (rollTable.isNotEmpty) {
+      _rollDropTable(game, rollTable, m.position.clone(), expValue: expValue);
+    } else {
+      drop(JourneyPickupKind.exp, expValue);
+      if (game.rng.nextDouble() < 0.35) {
+        drop(JourneyPickupKind.meritCoin, 3 + game.level.levelNo ~/ 2);
+      }
+      if (game.rng.nextDouble() < 0.04) {
+        drop(JourneyPickupKind.peach, 25);
+      }
+      if (keepBossChest) {
+        drop(JourneyPickupKind.chest, 15);
+      }
     }
-    if (game.rng.nextDouble() < 0.04) {
-      drop(JourneyPickupKind.peach, 25);
-    }
-    // 兜底口径对齐远端掉落表：精英/妖王固定掉宝箱（monster_elite/boss 表行）
-    if (m.model.isElite || m.model.isBoss) {
+    // 精英惊喜彩蛋：宝箱概率掉落（缺省 10%，journey_globals.elite_chest_rate）
+    if (m.model.isElite &&
+        game.rng.nextDouble() <
+            (game.config?.eliteChestRate ?? kJourneyEliteChestRate)) {
       drop(JourneyPickupKind.chest, 15);
     }
   }
@@ -212,11 +246,13 @@ mixin JourneyLootMixin {
 
 /// 掉落表加权随机：weight=0 行跳过；pickup_code 空=什么都不掉；
 /// 命中后按 pickup 编码映射生成拾取物（值=单价×随机数量）。
+/// [expValue] 非空时覆盖 xianghuo 行的经验值（exp_drop 单源 × 强度缩放）。
 void _rollDropTable(
   JourneyFlameGame game,
   List<JourneyDropModel> table,
-  Vector2 pos,
-) {
+  Vector2 pos, {
+  int? expValue,
+}) {
   var total = 0;
   for (final d in table) {
     if (d.weight > 0) total += d.weight;
@@ -238,6 +274,11 @@ void _rollDropTable(
   final qtyMax = hit.qtyMax < qtyMin ? qtyMin : hit.qtyMax;
   final qty = qtyMin + game.rng.nextInt(qtyMax - qtyMin + 1);
   if (qty <= 0) return; // 误配 0/0 行：不生成 0 价值拾取物
+  // 香火经验走 expValue 单源（exp_drop × 强度缩放），表内 qty 不参与
+  if (code == 'xianghuo' && expValue != null) {
+    _spawnPickupByCode(game, code, pos, expValue);
+    return;
+  }
   _spawnPickupByCode(game, code, pos, qty);
 }
 

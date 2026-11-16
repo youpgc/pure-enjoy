@@ -10,6 +10,7 @@ class JourneyMonsterComponent extends PositionComponent
     required this.model,
     required double buffMult,
     double? hpBuffMult,
+    bool bossLvHpTerm = true,
     required super.position,
   })  : buffMult = clampJourneyBuff(game, buffMult),
         hp = model.baseHp *
@@ -18,6 +19,7 @@ class JourneyMonsterComponent extends PositionComponent
               model,
               buffMult: buffMult,
               hpBuffMult: hpBuffMult,
+              bossLvHpTerm: bossLvHpTerm,
             ),
         maxHp = model.baseHp *
             journeyMonsterHpMult(
@@ -25,6 +27,7 @@ class JourneyMonsterComponent extends PositionComponent
               model,
               buffMult: buffMult,
               hpBuffMult: hpBuffMult,
+              bossLvHpTerm: bossLvHpTerm,
             ),
         _speed = model.baseSpeed *
             (0.9 + clampJourneyBuff(game, buffMult) * 0.12),
@@ -127,11 +130,22 @@ class JourneyMonsterComponent extends PositionComponent
   // 驻守坐标（脱战后归位）
   late final Vector2 home = position.clone();
 
-  /// 侦测半径：普通怪≈屏高 0.4 口径；妖王据点用更大触发圈。
-  double get aggroRange => model.isBoss ? 420 : 260;
+  /// 领地半径（endless 妖王潮降临赋值；null=按 isBoss 默认两半径口径）：
+  /// 软领地——侦测圈=领地半径（玩家进圈才接战），追出领地 ×leash 倍率
+  /// 即脱战归位锚点（快速回血照旧）；配合降临锚点最小间距，多妖王
+  /// 各守一方、不同时接战。
+  double? territoryRadius;
 
-  /// 脱战半径 = 侦测 × 1.5。
-  double get leashRange => aggroRange * 1.5;
+  /// 侦测半径：妖王潮领地半径优先；普通怪≈屏高 0.4 口径；妖王据点
+  /// 用更大触发圈。
+  double get aggroRange =>
+      territoryRadius ?? (model.isBoss ? 420 : 260);
+
+  /// 脱战半径：领地口径=领地 ×leash 倍率（软领地追出 30% 即归位）；
+  /// 默认口径=侦测 × 1.5。
+  double get leashRange => territoryRadius != null
+      ? territoryRadius! * kJourneyEndlessBossLeashGain
+      : aggroRange * 1.5;
 
   /// 脱战快速回血速率：每秒恢复 maxHp 的 40%（2.5 秒回满）。
   /// 口径：脱战（驻守/归位态）快速回满，再入战（追击态）立即停止；
@@ -199,14 +213,20 @@ class JourneyMonsterComponent extends PositionComponent
       _aggro = false;
     }
     // 妖王领地显隐（节点横幅）：进入侦测圈才亮大血条，脱战熄灭（变更才写）；
-    // 进战瞬间按当前血量刷新比例（spawn/respawn 不再预写常显）
+    // 进战瞬间按当前血量刷新比例（spawn/respawn 不再预写常显）。
+    // 多妖王同场（妖王潮）：脱战仅在无其他接战妖王时熄灭，大血条
+    // 跟随最近交战的那只——单只脱战不熄灭他妖王的血条。
     if (model.isBoss && wasAggro != _aggro) {
       final hud = game.controller.hud;
-      hud.bossEngaged.value = _aggro;
       if (_aggro) {
+        hud.bossEngaged.value = true;
         hud.bossHpRatio.value = (hp / maxHp).clamp(0.0, 1.0);
         hud.bossMaxHp.value = maxHp.round();
         hud.bossHp.value = hp.clamp(0.0, maxHp).round();
+      } else {
+        final otherEngaged = game.monsters.any((m) =>
+            !identical(m, this) && !m.isDead && m.model.isBoss && m._aggro);
+        if (!otherEngaged) hud.bossEngaged.value = false;
       }
     }
 

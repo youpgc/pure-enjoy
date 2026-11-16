@@ -14,6 +14,10 @@ mixin JourneySpawnMixin {
   int _endlessSpawned = 0; // 本波已刷只数
   double _endlessTimer = 0; // 波内刷怪间隔计时
   double _endlessRest = 0; // 波间休整倒计时（>0 休整中）
+  int _endlessBossSummoned = 0; // 妖潮期本波已降临妖王数（配额消耗）
+  double _endlessBossCd = 0; // 妖王补位降临倒计时（>0 计时中）
+  int _endlessBossKilled = 0; // 妖潮期本波已被击杀妖王数（宝箱/天赋点首杀判定）
+  int _jinjiaoWaveRefines = 0; // 宝葫本波已炼化次数（妖潮期按波限流）
 
   // ---- 每日游历（虚拟关 kind=daily）铜钱雨状态 ----
   double _dailyCoinTimer = 0;
@@ -173,6 +177,8 @@ mixin JourneySpawnMixin {
     JourneyFlameGame game,
     JourneyMonsterModel model, {
     required double buffMult,
+    double? hpBuffMult,
+    bool bossLvHpTerm = true,
     Vector2? position,
   }) {
     final size = game.worldSize;
@@ -191,6 +197,8 @@ mixin JourneySpawnMixin {
       game: game,
       model: model,
       buffMult: buffMult,
+      hpBuffMult: hpBuffMult,
+      bossLvHpTerm: bossLvHpTerm,
       position: pos,
     );
     game.monsters.add(comp);
@@ -286,108 +294,10 @@ mixin JourneySpawnMixin {
 
   // ---- 无尽妖潮 / 每日游历（虚拟关 level_no=0，纯 App 端模式）----
 
-  /// 无尽妖潮波次生成器（除尽推进制）：当前波怪全灭才进下一波；
-  /// 波次配置 journey_endless_waves 优先——monster_code 命中妖王=妖王波
-  /// （首只妖王 + 小怪护卫），count 为本波总量、elite_count 为末尾精英数；
-  /// 未配置或新列未部署时按经验池公式推演（50~120 只、每波 2~14 精英、
-  /// buff=1+0.03n）；波内先低阶小妖供发育、末尾分阶精英施压，整波约 18
-  /// 秒铺完。末波（99）刷完清空→「妖潮无尽·功成」可结算。
-  void _updateEndless(JourneyFlameGame game, double dt) {
-    final hud = game.controller.hud;
-    if (hud.endlessWave.value != game._endlessWave) {
-      hud.endlessWave.value = game._endlessWave;
-    }
-    if (game._endlessRest > 0) {
-      game._endlessRest -= dt;
-      return;
-    }
-    final n = game._endlessWave;
-    final waveConf = game.config?.endlessWaveOf(n);
-    final count = waveConf?.count ?? endlessWaveCount(n);
-    final buff = waveConf?.buffMult ?? endlessWaveBuff(n);
-    // 本波精英只数：后台配置优先，0（含新列未部署）=按波号公式兜底；
-    // 精英恒留至少 1 个普通怪位，保证先发育后施压
-    final eliteCount = waveConf != null && waveConf.eliteCount > 0
-        ? waveConf.eliteCount
-        : endlessEliteCount(n);
-    final elite = math.min(eliteCount, math.max(0, count - 1));
-    // 波次怪种：普通/精英怪=该波普通段只刷该怪；选妖王=妖王波
-    // （首只妖王 + 小怪护卫，其余数量按 count 配置）
-    final configuredCode = waveConf?.monsterCode ?? '';
-    final isBossWave = configuredCode.isNotEmpty &&
-        _monsterSource(game).any((m) => m.code == configuredCode && m.isBoss);
-
-    if (game._endlessSpawned >= count) {
-      // 除尽推进：本波怪（含妖王）全灭才进下一波
-      final alive =
-          game.monsters.any((m) => !m.isDead && m.endlessWave == n);
-      if (alive) return;
-      if (n >= 99) {
-        // 末波（第 99 波）清空 → 终局：挂功成横幅（endless 预置
-        // _bossDefeated=true，不走门控直接标记），2.4s 播报完整后自动
-        // 结算（期间玩家也可点常亮的结算按钮提前结算）
-        if (!game._endlessSettleScheduled) {
-          game._endlessSettleScheduled = true;
-          game._markClearedAvailable('妖潮无尽·功成');
-          dart_async.Timer(const Duration(milliseconds: 2400), () {
-            if (!game.isEnded) game.settleNow();
-          });
-        }
-        return;
-      }
-      game._endlessWave = n + 1;
-      game._endlessSpawned = 0;
-      game._endlessRest = 1.2;
-      return;
-    }
-    game._endlessTimer += dt;
-    // 每波约 18 秒铺完（50 只→0.35s、120 只→0.15s），保持割草节奏
-    final interval = (18.0 / count).clamp(0.12, 0.35);
-    if (game._endlessTimer < interval) return;
-    if (game.monsters.length >= game.monsterCap) return;
-    final spawned = game._endlessSpawned;
-    final isElite = elite > 0 && spawned >= count - elite;
-    final model = (isBossWave && spawned == 0)
-        ? _bossModelOf(game, configuredCode)
-        : _pickEndlessMonster(game, n, isElite ? '' : configuredCode,
-            elite: isElite);
-    if (model == null) return;
-    game._endlessTimer = 0;
-    spawnMonsterAt(game, model, buffMult: buff, position: null);
-    game.monsters.last.endlessWave = n;
-    game._endlessSpawned++;
-    // 妖王波首只现身：走 onBossSpawn 统一播报「妖王降临 · X」（HUD 状态同步）
-    if (isBossWave && spawned == 0) {
-      game.controller.onBossSpawn(model.name);
-    }
-  }
-
-  /// 妖王波取怪：怪物全源按 code 取妖王（endless 刷怪池不含妖王）。
-  JourneyMonsterModel? _bossModelOf(JourneyFlameGame game, String code) {
-    for (final m in _monsterSource(game)) {
-      if (m.code == code && m.isBoss) return m;
-    }
-    return null;
-  }
-
-  /// 无尽怪池挑选：普通段尊重后台配置的怪种（配置断裂回落分阶随机池），
-  /// 精英段强制走分阶精英池，保证每波末尾都有精英施压。
-  JourneyMonsterModel? _pickEndlessMonster(
-    JourneyFlameGame game,
-    int waveNo,
-    String configuredCode, {
-    required bool elite,
-  }) {
-    if (!elite && configuredCode.isNotEmpty) {
-      final hit = game.pool
-          .where((m) => m.code == configuredCode)
-          .toList(growable: false);
-      if (hit.isNotEmpty) return hit[game.rng.nextInt(hit.length)];
-    }
-    final pool = endlessTierPool(game, waveNo: waveNo, elite: elite);
-    if (pool.isEmpty) return null;
-    return pool[game.rng.nextInt(pool.length)];
-  }
+  /// 无尽妖潮波次生成器入口（本体在 journey_engine_endless.dart，
+  /// 同库 top-level 函数：发育期/妖潮期分段 + 妖王潮配额降临）。
+  void _updateEndless(JourneyFlameGame game, double dt) =>
+      journeyEndlessTick(game, dt);
 
   /// 每日游历·铜钱雨：每 4s 在玩家环带 spawn 5 枚功德铜钱，
   /// 每枚价值=pickupConfigOf('gongde_tongqian').value×10（缺省 30）。
