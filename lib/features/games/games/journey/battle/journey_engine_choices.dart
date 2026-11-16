@@ -1,5 +1,103 @@
 part of 'journey_flame_game.dart';
 
+/// 维度卡升级对比的数值口径：把「等级 → 展示数值」按引擎结算规则还原，
+/// 供顿悟卡展示「当前→下一级」。[brief] 为简介，[value] 取后台每级数值
+/// （缺失时回落引擎内置），[unit] 决定展示格式。
+///
+/// 倍率类（speed/damage）引擎以小数累加（+0.10=+10%），展示乘 100；
+/// 暴伤按槽位增量展示（玩家已有 150% 基础暴伤且受角色/法宝加成，槽位
+/// 不决定最终倍率）；穿刺/吸血有起始基准且从 2 级起按增量累加（见引擎
+/// updateWeapons / _hitMonster），其余为整数或每秒数值直接按等级线性。
+enum _SlotUnit { percent, intValue, perSecond, count }
+
+({String brief, _SlotUnit unit, double base, double fallback, double cap})
+    _slotDisplayRule(String code) {
+  switch (code) {
+    case 'radius':
+      return (brief: '武器臂长', unit: _SlotUnit.intValue, base: 0, fallback: 14, cap: double.infinity);
+    case 'speed':
+      return (brief: '环绕转速', unit: _SlotUnit.percent, base: 0, fallback: 0.10, cap: double.infinity);
+    case 'damage':
+      return (brief: '武器伤害', unit: _SlotUnit.percent, base: 0, fallback: 0.20, cap: double.infinity);
+    case 'knockback':
+      return (brief: '击退距离', unit: _SlotUnit.intValue, base: 0, fallback: 16, cap: double.infinity);
+    case 'magnet':
+      return (brief: '拾取范围', unit: _SlotUnit.intValue, base: 0, fallback: 40, cap: double.infinity);
+    case 'armor':
+      return (brief: '护甲', unit: _SlotUnit.intValue, base: 0, fallback: 3, cap: double.infinity);
+    case 'burn':
+      return (brief: '灼烧伤害', unit: _SlotUnit.perSecond, base: 0, fallback: 8, cap: double.infinity);
+    case 'clone':
+      return (brief: '武器分身', unit: _SlotUnit.count, base: 0, fallback: 1, cap: double.infinity);
+    case 'crit_rate':
+      return (brief: '暴击率', unit: _SlotUnit.percent, base: 0, fallback: 0.025, cap: 0.60);
+    case 'crit_damage':
+      return (brief: '暴击伤害', unit: _SlotUnit.percent, base: 0, fallback: 0.06, cap: double.infinity);
+    case 'pierce':
+      return (
+        brief: '无视护甲',
+        unit: _SlotUnit.percent,
+        base: kJourneyPierceBaseRatio,
+        fallback: kJourneyPierceIgnorePerLv,
+        cap: kJourneyPierceRatioCap,
+      );
+    case 'lifesteal':
+      return (
+        brief: '命中回血',
+        unit: _SlotUnit.percent,
+        base: kJourneyLifestealBaseRatio,
+        fallback: kJourneyLifestealRatioPerLv,
+        cap: kJourneyLifestealRatioCap,
+      );
+    default:
+      return (brief: '', unit: _SlotUnit.intValue, base: 0, fallback: 0, cap: double.infinity);
+  }
+}
+
+/// 按引擎口径算某维度在 [level] 级的展示数值：基准类（穿刺/吸血）1 级
+/// 即基准值、此后每级加增量；其余按等级×每级值；暴伤另加 100% 基准。
+double _slotDisplayValue(
+  String code,
+  int level,
+  double perLevel, ({
+  String brief,
+  _SlotUnit unit,
+  double base,
+  double fallback,
+  double cap,
+}) rule,
+) {
+  final step = perLevel > 0 ? perLevel : rule.fallback;
+  final raw = (code == 'pierce' || code == 'lifesteal')
+      ? rule.base + step * (level - 1)
+      : rule.base + step * level;
+  return raw.clamp(0.0, rule.cap);
+}
+
+/// 数值转文案：倍率类乘 100 取整，整数/分身取整，每秒数值保留 1 位小数。
+String _formatSlotValue(double value, _SlotUnit unit) {
+  switch (unit) {
+    case _SlotUnit.percent:
+      return '${(value * 100).round()}%';
+    case _SlotUnit.perSecond:
+      return '${value.toStringAsFixed(value == value.roundToDouble() ? 0 : 1)}/秒';
+    case _SlotUnit.intValue:
+    case _SlotUnit.count:
+      return '${value.round()}';
+  }
+}
+
+/// 顿悟卡描述：简介 + 当前值→下一级值；无匹配规则时回落原介绍文案。
+String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
+  final rule = _slotDisplayRule(def.code);
+  if (rule.brief.isEmpty) return def.effectPerLevel;
+  final before = _formatSlotValue(
+      _slotDisplayValue(def.code, currentLevel, def.valuePerLevel, rule), rule.unit);
+  final after = _formatSlotValue(
+      _slotDisplayValue(def.code, currentLevel + 1, def.valuePerLevel, rule), rule.unit);
+  return '${rule.brief} $before → $after';
+}
+
 /// 三选一候选池（维度槽口径）：
 /// - 空槽且维度未入槽 → 「习得·X」（占 1 槽，Lv1）；
 /// - 已入槽且未达上限 → 「X · 顿悟」（等级 +1，展示下一级效果）；
@@ -29,7 +127,7 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
         JourneyUpgradeKind.slotUpgrade,
         code: def.code,
         title: '${def.name} · 顿悟',
-        desc: def.effectPerLevel,
+        desc: _upgradeDesc(def, held.first.level),
       ));
     }
   }
@@ -68,24 +166,24 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
     pool.add(JourneyUpgradeChoice(
       JourneyUpgradeKind.attack,
       title: '伏魔真力',
-      desc: '基础攻击 +${(game.config?.upgradeAttack ?? kJourneyUpgradeAttack).round()}',
+      desc: '攻击 +${(game.config?.upgradeAttack ?? kJourneyUpgradeAttack).round()}',
     ));
   }
   pool
     ..add(JourneyUpgradeChoice(
       JourneyUpgradeKind.moveSpeed,
       title: '筋斗云气',
-      desc: '移动速度 +${((game.config?.upgradeMove ?? 0.09) * 100).round()}%',
+      desc: '移速 +${((game.config?.upgradeMove ?? 0.09) * 100).round()}%',
     ))
     ..add(JourneyUpgradeChoice(
       JourneyUpgradeKind.maxHp,
       title: '蟠桃益气',
-      desc: '生命上限 +${(game.config?.upgradeHp ?? 20).round()} 并回满同量',
+      desc: '生命 +${(game.config?.upgradeHp ?? 20).round()}',
     ))
     ..add(JourneyUpgradeChoice(
       JourneyUpgradeKind.regen,
       title: '木灵回春',
-      desc: '自动回复 +${(game.config?.upgradeRegen ?? 1.0).toStringAsFixed(1)}/秒',
+      desc: '回复 +${(game.config?.upgradeRegen ?? 1.0).toStringAsFixed(1)}/秒',
     ))
     ..add(JourneyUpgradeChoice(
       JourneyUpgradeKind.pickupRange,
@@ -109,16 +207,16 @@ Map<String, JourneySlotDefModel> _fallbackSlotDefs() {
 /// 描述一句话说清当前效果，不写括号补充/实现细节。
 const Map<String, (String, String)> kJourneyPassiveEffects =
     <String, (String, String)>{
-  'jindou_cloud': ('筋斗云', '移动速度 +12%'),
+  'jindou_cloud': ('筋斗云', '移速 +12%'),
   'pantao': ('蟠桃', '生命上限 +25，回复 +0.5/秒'),
-  'renshen_guo': ('人参果', '经验获取 +25%'),
-  'bishui_pearl': ('避水珠', '环绕转速 +15%'),
-  'dingfeng_pearl': ('定风丹', '武器臂长 +18'),
-  'shelizi': ('舍利子', '武器伤害 +15%'),
+  'renshen_guo': ('人参果', '经验 +25%'),
+  'bishui_pearl': ('避水珠', '转速 +15%'),
+  'dingfeng_pearl': ('定风丹', '臂长 +18'),
+  'shelizi': ('舍利子', '伤害 +15%'),
   // 西游扩展批（功德解锁，图鉴直购）
-  'sanheng_mao': ('三根毫毛', '致命伤免死一次，回 30% 生命'),
-  'yujing_ping': ('玉净瓶甘露', '每 20 秒回复 20% 生命'),
-  'huoyan_jingjing': ('火眼金睛', '精英与妖王受伤 +20%'),
+  'sanheng_mao': ('三根毫毛', '免死一次，回 30% 生命'),
+  'yujing_ping': ('玉净瓶', '每 20 秒回 20% 生命'),
+  'huoyan_jingjing': ('火眼金睛', '精英/妖王受伤 +20%'),
 };
 
 JourneyUpgradeChoice _passiveGrantChoice(
@@ -138,13 +236,13 @@ JourneyUpgradeChoice _passiveGrantChoice(
 /// updateDamageTick；激活即入 game.effectWeapons。
 const Map<String, (String, String)> kJourneyEffectWeapons =
     <String, (String, String)>{
-  'kunxian_rope': ('幌金绳', '命中 12% 概率定身 1.5 秒'),
+  'kunxian_rope': ('幌金绳', '12% 概率定身 1.5 秒'),
   'fanshang_thorns': ('反伤荆棘', '受击反弹 30% 伤害'),
-  'baoji_thunder': ('暴击雷引', '暴击引发闪电链，波及最多 2 个妖物'),
+  'baoji_thunder': ('暴击雷引', '暴击引闪电链，波及 2 妖'),
   // 西游扩展批（功德解锁，图鉴直购）
-  'zijin_ling': ('紫金铃', '同一目标命中 3 次引发妖火爆裂'),
-  'jinggang_zhuo': ('金刚琢', '每 12 秒套取最近妖物并使其虚弱'),
-  'yinyang_ping': ('阴阳二气瓶', '每 18 秒吸纳最近妖物定身灼烧'),
+  'zijin_ling': ('紫金铃', '同目标命中 3 次引爆'),
+  'jinggang_zhuo': ('金刚琢', '每 12 秒套取并虚弱最近妖物'),
+  'yinyang_ping': ('阴阳二气瓶', '每 18 秒定身灼烧最近妖物'),
 };
 
 /// 功德解锁的扩展被动（图鉴直购；未解锁不进三选一免费池）。

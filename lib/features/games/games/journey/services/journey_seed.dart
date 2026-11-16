@@ -399,15 +399,15 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'radius', 'name': '臂展', 'kind': 'attribute', 'effect_per_level': '武器臂长 +14', 'max_level': 9},
   {'code': 'speed', 'name': '转速', 'kind': 'attribute', 'effect_per_level': '环绕转速 +10%', 'max_level': 9},
   {'code': 'damage', 'name': '伤害', 'kind': 'attribute', 'effect_per_level': '武器伤害 +20%', 'max_level': 9},
-  {'code': 'knockback', 'name': '击退', 'kind': 'effect', 'effect_per_level': '命中击退距离 +16', 'max_level': 9},
-  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '命中回复武器伤害的 3%（每级 +1.5%，9 级 15%，上限 20%），单次保底 2 点；每秒合计≤最大生命 10%', 'max_level': 9},
-  {'code': 'pierce', 'name': '穿刺', 'kind': 'effect', 'effect_per_level': '命中无视目标护甲 10%（每级 +2.5%，9 级 30%）', 'max_level': 9},
+  {'code': 'knockback', 'name': '击退', 'kind': 'effect', 'effect_per_level': '击退 +16', 'max_level': 9},
+  {'code': 'lifesteal', 'name': '吸血', 'kind': 'effect', 'effect_per_level': '命中回血 3%', 'max_level': 9},
+  {'code': 'pierce', 'name': '穿刺', 'kind': 'effect', 'effect_per_level': '无视护甲 10%', 'max_level': 9},
   {'code': 'magnet', 'name': '磁吸', 'kind': 'effect', 'effect_per_level': '拾取范围 +40', 'max_level': 9},
-  {'code': 'burn', 'name': '灼烧', 'kind': 'effect', 'effect_per_level': '命中点燃：8/秒 持续 2 秒', 'max_level': 9},
+  {'code': 'burn', 'name': '灼烧', 'kind': 'effect', 'effect_per_level': '点燃 8/秒·2秒', 'max_level': 9},
   // 分身上限 5（总扇叶 = 本尊 1 + 分身 5 = 6，引擎钳 ≤6；与远端 max_level=5 对齐）
-  {'code': 'clone', 'name': '分身', 'kind': 'attribute', 'effect_per_level': '幻化 +1 尊武器分身', 'max_level': 5},
+  {'code': 'clone', 'name': '分身', 'kind': 'attribute', 'effect_per_level': '+1 尊武器分身', 'max_level': 5},
   // 暴击体系补全（暴击/暴伤/护甲局内成长路径；暴击率钳 60%、暴伤钳 200%）
-  {'code': 'crit_rate', 'name': '暴击', 'kind': 'attribute', 'effect_per_level': '暴击率 +5%', 'max_level': 9},
+  {'code': 'crit_rate', 'name': '暴击', 'kind': 'attribute', 'effect_per_level': '暴击率 +2.5%', 'max_level': 9},
   {'code': 'crit_damage', 'name': '暴伤', 'kind': 'attribute', 'effect_per_level': '暴击伤害 +6%', 'max_level': 9},
   {'code': 'armor', 'name': '护甲', 'kind': 'attribute', 'effect_per_level': '护甲 +3', 'max_level': 9},
 ];
