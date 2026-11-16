@@ -6,11 +6,13 @@ import 'package:flutter/scheduler.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import 'journey_battle_controller.dart';
+import 'journey_hp_bar_fx.dart';
 
 /// 妖王大血条：6+6 槽栏正下方居中，铺满横幅宽度、金框暗底、
-/// 左侧妖王名 + 红金渐变填充 + 进度条内右端绝对血量，300ms 宽度动画。
-/// 显示条件：妖王已降临且进入侦测圈且 ratio>0；未降临、脱战、
-/// 妖王倒下或无妖章回均隐藏。
+/// 左侧妖王名 + 红金渐变填充 + 进度条内右端绝对血量；条体复用
+/// [JourneyHpBarFx] 的受击/回血双向动画。
+/// 显示条件：妖王已降临、ratio>0，且（交战中 或 脱战回血未满）；
+/// 脱战回血期间保持可见以展示增长动画，回满/倒下/无妖章回才隐藏。
 class JourneyBossHpBar extends StatelessWidget {
   const JourneyBossHpBar({super.key, required this.controller});
 
@@ -30,13 +32,16 @@ class JourneyBossHpBar extends StatelessWidget {
         hud.bossMaxHp,
       ]),
       builder: (context, _) {
+        final ratio = hud.bossHpRatio.value;
+        // 脱战回血未满（0<ratio<1）保持显示以播放增长动画；交战中常显；
+        // 回满、倒下（ratio<=0）、未降临、无妖章回隐藏。
+        final regening = !hud.bossEngaged.value && ratio > 0 && ratio < 1;
         if (!hud.hasBoss.value ||
             !hud.bossPresent.value ||
-            !hud.bossEngaged.value ||
-            hud.bossHpRatio.value <= 0) {
+            (!hud.bossEngaged.value && !regening) ||
+            ratio <= 0) {
           return const SizedBox.shrink();
         }
-        final ratio = hud.bossHpRatio.value;
         final label = hud.bossName.value.isEmpty ? '妖王' : hud.bossName.value;
         final hpText = hud.bossMaxHp.value > 0
             ? '${hud.bossHp.value}/${hud.bossMaxHp.value}'
@@ -77,39 +82,17 @@ class JourneyBossHpBar extends StatelessWidget {
                       child: Stack(
                         children: <Widget>[
                           Positioned.fill(
-                            child: TweenAnimationBuilder<double>(
-                              tween: Tween<double>(end: ratio.clamp(0.0, 1.0)),
-                              duration: const Duration(milliseconds: 300),
-                              curve: Curves.easeOut,
-                              builder: (context, v, _) => ClipRRect(
-                                borderRadius: BorderRadius.circular(999),
-                                child: Stack(
-                                  children: <Widget>[
-                                    Container(
-                                      height: 16,
-                                      color:
-                                          Colors.black.withValues(alpha: 0.45),
-                                    ),
-                                    Align(
-                                      alignment: Alignment.centerLeft,
-                                      child: FractionallySizedBox(
-                                        widthFactor: v.clamp(0.0, 1.0),
-                                        child: Container(
-                                          height: 16,
-                                          decoration: const BoxDecoration(
-                                            gradient: LinearGradient(
-                                              colors: <Color>[
-                                                Color(0xFFB93A4A),
-                                                Color(0xFFE8C470),
-                                              ],
-                                            ),
-                                          ),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
+                            child: JourneyHpBarFx(
+                              value: ratio,
+                              height: 16,
+                              radius: 999,
+                              foregroundGradient: const LinearGradient(
+                                colors: <Color>[
+                                  Color(0xFFB93A4A),
+                                  Color(0xFFE8C470),
+                                ],
                               ),
+                              lagColor: const Color(0xFFFFD08A),
                             ),
                           ),
                           if (hpText.isNotEmpty)

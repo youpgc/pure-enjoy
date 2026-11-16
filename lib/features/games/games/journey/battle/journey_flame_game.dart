@@ -428,6 +428,7 @@ class JourneyFlameGame extends FlameGame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
+      controller.hud.realmTitle.value = realmTitle;
       // 无妖章回（原著无妖）：罗盘位口径分派——每日游历不展示通关条件/提示
       // （进图即亮「功成」、随时可结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）
       controller.hud.hasBoss.value = bossModel != null;

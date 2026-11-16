@@ -113,6 +113,9 @@ class JourneyBattleHud {
   final ValueNotifier<double> expNeed = ValueNotifier<double>(12);
   final ValueNotifier<int> level = ValueNotifier<int>(1);
 
+  /// 当前境界名号（随境界突破切换，引擎同步；顶部状态面板首行展示）。
+  final ValueNotifier<String> realmTitle = ValueNotifier<String>('');
+
   /// 经验条两段式动画的归零计数：每次「充满→归零」+1，进度条监听后按
   /// 新 key 重建 TweenAnimationBuilder（重建即落位，无从满倒退的反向
   /// tween）。写入口径见引擎 exp part。

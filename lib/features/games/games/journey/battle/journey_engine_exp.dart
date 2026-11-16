@@ -94,6 +94,7 @@ extension JourneyExp on JourneyFlameGame {
       }
     } else {
       controller.hud.level.value = _charLv;
+      controller.hud.realmTitle.value = realmTitle;
       controller.hud.expNeed.value = _expNeed;
       controller.hud.exp.value = _exp;
     }
@@ -120,6 +121,7 @@ extension JourneyExp on JourneyFlameGame {
       return;
     }
     controller.hud.level.value = _charLv;
+    controller.hud.realmTitle.value = realmTitle;
     controller.hud.expNeed.value = _expNeed;
     controller.hud.exp.value = _exp;
   }

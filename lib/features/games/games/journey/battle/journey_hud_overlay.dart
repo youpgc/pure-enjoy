@@ -1,9 +1,9 @@
 import 'dart:math' as math;
 
 import 'package:flutter/material.dart';
-import 'package:flutter_svg/flutter_svg.dart';
 
 import 'journey_battle_controller.dart';
+import 'journey_hud_panel.dart';
 import 'journey_hud_slots.dart';
 import 'journey_hud_widgets.dart';
 import '../widgets/journey_theme.dart';
@@ -34,7 +34,9 @@ class JourneyHudOverlay extends StatelessWidget {
   static const double _kMinimapRight = 12;
   static const double _kPanelGap = 20;
   static const double _kCompassGap = 10;
-  static const double _kSlotBarTop = _kTopInset + JourneyMinimapWindow.size;
+  static const double _kSlotBarPanelGap = 10; // 槽栏与面板上下间距
+  static const double _kSlotBarTop =
+      _kTopInset + JourneyMinimapWindow.size + _kSlotBarPanelGap;
   static const double _kSlotBarHeight = 64; // 两行 30px 槽 + 4px 行距
   static const double _kBossBarGap = 40; // 血条与槽栏间距
 
@@ -51,7 +53,7 @@ class JourneyHudOverlay extends StatelessWidget {
           right: _kMinimapRight + JourneyMinimapWindow.size + _kPanelGap,
           child: GestureDetector(
             onTap: onTopPanelTap,
-            child: _HudPanel(
+            child: JourneyHudPanel(
               controller: controller,
               characterCode: characterCode,
             ),
@@ -138,161 +140,6 @@ class JourneyHudOverlay extends StatelessWidget {
                 )
               : const SizedBox.shrink(),
         ),
-      ],
-    );
-  }
-}
-
-/// 左上状态面板：角色头像（圆形裁剪）+ 血条/经验条/状态行。
-class _HudPanel extends StatelessWidget {
-  const _HudPanel({required this.controller, required this.characterCode});
-
-  final JourneyBattleController controller;
-  final String characterCode;
-
-  @override
-  Widget build(BuildContext context) {
-    final hud = controller.hud;
-    // 高度与小地图点阵窗一致：两块板顶部位移相同，上下边自然齐平。
-    // 宽度沿用覆盖层右缘约束，保持原自适应宽度。
-    return Container(
-      height: JourneyMinimapWindow.size,
-      padding: const EdgeInsets.fromLTRB(8, 8, 10, 7),
-      decoration: BoxDecoration(
-        color: JourneyTheme.bgDeep.withValues(alpha: 0.62),
-        borderRadius: BorderRadius.circular(10),
-        border:
-            Border.all(color: JourneyTheme.panelStroke.withValues(alpha: 0.6)),
-      ),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.center,
-        children: <Widget>[
-          _avatar(),
-          const SizedBox(width: 6),
-          Expanded(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: <Widget>[
-                // 血条
-                ValueListenableBuilder<double>(
-                  valueListenable: hud.hp,
-                  builder: (context, hp, _) => ValueListenableBuilder<double>(
-                    valueListenable: hud.maxHp,
-                    builder: (context, maxHp, _) => _bar(
-                      hp / maxHp,
-                      const Color(0xFFE0604C),
-                      '❤ ${hp.round()}/${maxHp.round()}',
-                    ),
-                  ),
-                ),
-                // 经验条（两段式动画：升级先充满再归零，见引擎 exp part；
-                // expReset 变化时按新 key 重建 TweenAnimationBuilder——
-                // 重建即落位，避免「从满倒退」的反向 tween）；
-                // 条下补一行当前经验/本级所需，样式与血条数值行同源
-                ValueListenableBuilder<int>(
-                  valueListenable: hud.expReset,
-                  builder: (context, reset, _) =>
-                      ValueListenableBuilder<double>(
-                    valueListenable: hud.exp,
-                    builder: (context, exp, _) =>
-                        ValueListenableBuilder<double>(
-                      valueListenable: hud.expNeed,
-                      builder: (context, need, _) => _bar(
-                        exp / need,
-                        const Color(0xFFA37FE0),
-                        '经验 ${exp.round()}/${need.round()}',
-                        animKey: ValueKey<int>(reset),
-                      ),
-                    ),
-                  ),
-                ),
-                // 状态行（宽度自适应，FittedBox 等比缩放防溢出）
-                ValueListenableBuilder<int>(
-                  valueListenable: hud.kills,
-                  builder: (context, kills, _) => ValueListenableBuilder<int>(
-                    valueListenable: hud.meritCoins,
-                    builder: (context, coins, _) => ValueListenableBuilder<int>(
-                      valueListenable: hud.level,
-                      builder: (context, lv, _) => FittedBox(
-                        fit: BoxFit.scaleDown,
-                        alignment: Alignment.centerLeft,
-                        child: Text(
-                          'Lv$lv · 击杀 $kills · 功德 $coins',
-                          style: const TextStyle(
-                            fontSize: 13,
-                            color: JourneyTheme.textPrimary,
-                            fontWeight: FontWeight.w600,
-                          ),
-                        ),
-                      ),
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  /// 出战角色头像：char_<code>.svg 圆形裁剪；缺失回落人形占位图标。
-  Widget _avatar() {
-    return ClipOval(
-      child: Container(
-        width: 30,
-        height: 30,
-        color: Colors.black.withValues(alpha: 0.35),
-        child: SvgPicture.asset(
-          'assets/games/journey/char_$characterCode.svg',
-          width: 30,
-          height: 30,
-          fit: BoxFit.cover,
-          errorBuilder: (_, __, ___) => const Icon(
-            Icons.person,
-            size: 20,
-            color: JourneyTheme.gold,
-          ),
-        ),
-      ),
-    );
-  }
-
-  /// 进度条：TweenAnimationBuilder 300ms 缓动到目标值，
-  /// 升级/拾取经验与受击掉血均平滑过渡不跳变；
-  /// [animKey] 变化时重建（新 State 直接落位到 end 值，无反向动画）。
-  Widget _bar(double value, Color color, String label, {Key? animKey}) {
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: <Widget>[
-        ClipRRect(
-          borderRadius: BorderRadius.circular(4),
-          child: TweenAnimationBuilder<double>(
-            key: animKey,
-            tween: Tween<double>(end: value.clamp(0.0, 1.0)),
-            duration: const Duration(milliseconds: 300),
-            curve: Curves.easeOut,
-            builder: (context, v, _) => LinearProgressIndicator(
-              value: v,
-              minHeight: 9,
-              backgroundColor: Colors.black.withValues(alpha: 0.4),
-              color: color,
-            ),
-          ),
-        ),
-        if (label.isNotEmpty)
-          Padding(
-            padding: const EdgeInsets.only(top: 2),
-            child: Text(
-              label,
-              style: const TextStyle(
-                fontSize: 12,
-                color: JourneyTheme.textPrimary,
-                fontWeight: FontWeight.w600,
-              ),
-            ),
-          ),
       ],
     );
   }
