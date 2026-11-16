@@ -123,9 +123,14 @@ class JourneyMonsterComponent extends PositionComponent
   double _chargeTimer = 0;
   Vector2 _chargeDir = Vector2.zero();
   double _chargeCd = 0;
+  bool _chargeHit = false;
 
   static const double _baseRadius = 18;
   double get radius => _baseRadius * model.sizeScale;
+
+  /// 突进相位且未被定身：只有真正产生突进位移时才是冲撞态。定身期间
+  /// 位移跳过，恢复普通占位与接触伤害，不得判定撞开角色。
+  bool get isCharging => _chargePhase == 2 && rootTimer <= 0;
 
   // 驻守坐标（脱战后归位）
   late final Vector2 home = position.clone();
@@ -267,8 +272,13 @@ class JourneyMonsterComponent extends PositionComponent
         hp = math.min(hp + maxHp * _regenPerSec * dt, maxHp);
       }
     }
-    // 禁止进入角色内圈：停在接触边界，随后统一钳回世界边界
-    clampMonsterOutOfInnerCircle(this, player.position);
+    // 普通状态停在接触边界；突进中不被角色挡住，命中后撞开角色并结算
+    // 一次冲撞伤害（单次去重），随后统一钳回世界边界
+    if (isCharging) {
+      if (!_chargeHit && game.resolveBossChargeHit(this)) _chargeHit = true;
+    } else {
+      clampMonsterOutOfInnerCircle(this, player.position);
+    }
     clampMonsterToWorld(this, game.worldSize);
   }
 
@@ -295,6 +305,7 @@ class JourneyMonsterComponent extends PositionComponent
           _chargeDir = dist > 1 ? toPlayer.normalized() : Vector2(1, 0);
           _chargePhase = 2;
           _chargeTimer = 0.55;
+          _chargeHit = false;
         }
         break;
       case 2:

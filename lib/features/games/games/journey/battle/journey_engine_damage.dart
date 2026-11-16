@@ -36,7 +36,7 @@ mixin JourneyDamageTickMixin {
     final candidates = game.spatialGrid
         .queryRange(player.position, JourneySpatialGrid.cellSize);
     for (final m in candidates) {
-      if (m.isDead) continue;
+      if (m.isDead || m.isCharging) continue;
       final overlap = (m.position - player.position).length <=
           m.radius + JourneyPlayerComponent._radius;
       if (overlap && m._contactDamage > strongest) {
@@ -102,5 +102,45 @@ mixin JourneyDamageTickMixin {
         }
       }
     }
+  }
+}
+
+/// 妖王冲撞结算：突进命中角色时沿锁定方向撞开角色，并结算一次伤害。
+/// 伤害倍率/击退距离走 journey_monster_params（逐怪可配，缺省 2.0/160），
+/// 与 0.5s 接触节拍互斥，避免同一突进重复扣血。
+extension JourneyBossCharge on JourneyFlameGame {
+  bool resolveBossChargeHit(JourneyMonsterComponent boss) {
+    final player = this.player;
+    if (player.invulnTimer > 0) return false;
+    final d = player.position - boss.position;
+    if (d.length > boss.radius + JourneyPlayerComponent._radius) return false;
+
+    var raw = boss._contactDamage *
+        monsterParam(boss.model.code, 'charge_ratio', 2.0);
+    // 虚弱（金刚琢）：与接触节拍同口径，护甲折算前减半
+    if (boss.weakenTimer > 0) raw *= 0.5;
+    var afterArmor = (raw *
+            (1 -
+                JourneyDamageTickMixin.armorReductionRatio(
+                    player.armor, curveK: armorCurveK)))
+        .clamp(1.0, double.maxFinite);
+    if (_bajieGuard > 0) afterArmor *= 0.70;
+    player.takeDamage(afterArmor);
+    // 反伤荆棘：冲撞同属接触伤害，照常对撞人妖王反弹
+    if (effectWeapons.contains('fanshang_thorns')) {
+      boss.takeDamage(
+        afterArmor * weaponParam('fanshang_thorns', 'thorns', 0.30),
+      );
+    }
+    player.applyChargeKnock(
+      boss._chargeDir,
+      monsterParam(boss.model.code, 'charge_knockback', 160),
+    );
+    spawnFloatText(
+      player.position + Vector2(0, -36),
+      '妖王冲撞！',
+      const Color(0xFFD4593F),
+    );
+    return true;
   }
 }

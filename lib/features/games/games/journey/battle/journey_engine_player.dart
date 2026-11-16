@@ -32,6 +32,13 @@ class JourneyPlayerComponent extends PositionComponent {
 
   static const double _radius = 20;
 
+  /// 妖王冲撞击退：命中登记方向与剩余距离，逐帧推进；期间摇杆仍可操作，
+  /// 击退位移不计入西行里程。
+  static const double _chargeKnockDuration = 0.25;
+  Vector2 _chargeKnockDir = Vector2.zero();
+  double _chargeKnockLeft = 0;
+  double _chargeKnockSpeed = 0;
+
   /// 基础移速（世界单位/秒）：无妖主线章回西行里程目标的换算基准。
   static const double baseSpeed = 240;
 
@@ -56,17 +63,28 @@ class JourneyPlayerComponent extends PositionComponent {
         facing = Vector2(v.dx, v.dy)..normalize();
       }
     }
+    // 妖王冲撞位移：撞开角色（与摇杆可同帧叠加），随后与其他推离一起钳界
+    var knockStep = 0.0;
+    if (_chargeKnockLeft > 0) {
+      knockStep = math.min(_chargeKnockLeft, _chargeKnockSpeed * dt);
+      position += _chargeKnockDir * knockStep;
+      _chargeKnockLeft -= knockStep;
+    }
     position.x = position.x
         .clamp(_radius + 8, game.worldSize - _radius - 8);
     position.y = position.y
         .clamp(_radius + 8, game.worldSize - _radius - 8);
 
+    // 怪物占位：玩家不可穿过/挤开怪物；冲撞中的妖王例外（由击退处理）
+    _blockByMonsters();
+
     // 参照物圆碰撞推离（unbreakable + 未破坏 breakable）
     _pushOutOfMapObjects();
 
-    // 西行里程：按本帧净位移累计（挂机/定身/撞墙推离不产生里程）；
+    // 西行里程：按本帧净位移累计（挂机/定身/撞墙推离/冲撞击退不算）；
     // 无妖主线章回以此替代纯时长作为通关口径（1 里=25 世界单位）
-    game.traveledUnits += (position - prevPos).length;
+    game.traveledUnits +=
+        ((position - prevPos) - _chargeKnockDir * knockStep).length;
 
     // 木系自动回复（倒马毒桩禁疗期间失效）
     if (regen > 0 && healBlockTimer <= 0) {
@@ -127,6 +145,28 @@ class JourneyPlayerComponent extends PositionComponent {
     }
 
     _reportCompass();
+  }
+
+  /// 怪物占位：玩家进入怪物接触圈时只推回自身，不挤开怪物（接触边界
+  /// 保留重叠量供节拍伤害结算）。多怪叠压时两轮解算，沿法线自然滑动；
+  /// 冲撞突进中的妖王不在此阻挡，由冲撞击退统一处理。
+  void _blockByMonsters() {
+    for (var pass = 0; pass < 2; pass++) {
+      for (final m in game.monsters) {
+        if (m.isDead || m.isCharging) continue;
+        final d = position - m.position;
+        final minDist = m.radius + _radius - kJourneyContactOverlap;
+        final len = d.length;
+        if (len >= minDist) continue;
+        position = len > 0.01
+            ? m.position + d * (minDist / len)
+            : m.position + Vector2(minDist, 0);
+      }
+    }
+    position.x = position.x
+        .clamp(_radius + 8, game.worldSize - _radius - 8);
+    position.y = position.y
+        .clamp(_radius + 8, game.worldSize - _radius - 8);
   }
 
   /// 参照物圆碰撞推离：玩家与实体参照物重叠时被推出
@@ -247,6 +287,15 @@ class JourneyPlayerComponent extends PositionComponent {
       4,
       Paint()..color = const Color(0xFFD4593F),
     );
+  }
+
+  /// 妖王冲撞命中：沿冲撞方向把角色撞开，距离逐帧推进（不瞬移）。
+  /// 无敌帧期间免疫冲撞击退，与免疫伤害口径一致。
+  void applyChargeKnock(Vector2 dir, double distance) {
+    if (invulnTimer > 0 || distance <= 0 || dir.length < 0.001) return;
+    _chargeKnockDir = dir.normalized();
+    _chargeKnockSpeed = distance / _chargeKnockDuration;
+    _chargeKnockLeft = distance;
   }
 
   void takeDamage(double amount) {
