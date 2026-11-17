@@ -173,11 +173,16 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
       cost: cost,
       meritBalance: balance,
     );
-    if (!confirmed) return false;
+    if (!confirmed || !mounted) return false;
     // 确认即扣功德（与局内确认价同源：基准价×当前角色等级并封顶）；
-    // 扣费失败（结算期间余额变动不足）按拒绝处理走结算路径。
-    final ok = await JourneyProgressService.instance
-        .spendRevive(_controller?.hud.level.value ?? 1);
+    // 扣费失败（结算期间余额变动不足）按拒绝处理走结算路径。弹窗关闭后
+    // 引擎仍暂停，这段持久化往返用遮罩 loading 覆盖，避免静止画面像卡顿。
+    final ok = await JourneyBusy.run(
+      context,
+      () => JourneyProgressService.instance
+          .spendRevive(_controller?.hud.level.value ?? 1),
+      label: '还魂中…',
+    );
     if (!ok && mounted) {
       ScaffoldMessenger.maybeOf(context)?.showSnackBar(
         const SnackBar(content: Text('功德不足，还魂失败')),
