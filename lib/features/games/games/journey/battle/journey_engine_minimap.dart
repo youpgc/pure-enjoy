@@ -4,7 +4,7 @@ part of 'journey_flame_game.dart';
 /// （主线据点妖王 + 妖王潮多妖王同源采样），无妖王时不画。
 extension JourneyMinimapSampling on JourneyFlameGame {
   /// 0.25s 采样一次：怪取相对玩家偏移 ≤1000 的前 60 只；妖王逐只采样
-  /// （范围内带实际偏移，超范围按 bearing 方向贴窗缘示方向）；主线据点
+  /// （范围内带实际偏移，超范围按妖王自身方位贴窗缘示方向）；主线据点
   /// 妖王清剿后不画；无变化不写 notifier（HUD 直读零 setState）。
   void _sampleMinimap(double dt) {
     _minimapTimer -= dt;
@@ -20,13 +20,13 @@ extension JourneyMinimapSampling on JourneyFlameGame {
       final d = m.position - center;
       final inRange = d.length2 <= span * span;
       if (m.model.isBoss) {
-        // 妖王大红点：存活即画；超范围按各自 bearing 贴窗缘示方向
+        // 妖王大红点：存活即画；超范围按妖王自身相对玩家的方位贴窗缘
+        // 示方向。不用罗盘 bearing——无尽模式无据点妖王，bearing 恒为 0，
+        // 会把所有超距妖王钉在窗右缘；多妖王也需各自方位而非同一方向。
         bossOffsets.add(
           inRange
               ? d.clone()
-              : Vector2(math.cos(hud.bearing.value),
-                      math.sin(hud.bearing.value)) *
-              span,
+              : d.normalized() * span,
         );
         continue;
       }

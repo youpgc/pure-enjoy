@@ -167,15 +167,28 @@ mixin JourneyLootMixin {
   /// - 经验单源=怪物行 exp_drop，按生成时强度乘区缩放
   ///   ×(1+乘区×exp_mult_k)，drops 表 xianghuo 行的 qty 不再参与经验
   ///   结算（journey_monsters.exp_drop 为唯一经验入口）；
-  /// - 精英掉落以经验为主，宝箱为惊喜彩蛋（elite_chest_rate 缺省 10%）：
+  /// - 精英掉落以经验为主，宝箱为低概率惊喜彩蛋
+  ///   （elite_chest_rate 缺省 1%）：
   ///   drops 表的精英固定 baoxiang 行在此屏蔽（兜住种子/旧配置）；
   /// - 妖王宝箱：主线据点首杀必掉；无尽妖潮改波内首杀掷概率
   ///   （endless_boss_chest_rate 缺省 10%，后场妖王不掷）。
   void spawnLoot(JourneyFlameGame game, JourneyMonsterComponent m) {
     // 经验值：怪物行 exp_drop × 强度缩放（乘区=生成时钳制值，非当前值）
+    // 发育期（妖潮起点前的无尽波次）再乘集中配置的经验倍率，撑起角色
+    // 经验池，让妖王波前即可获得足够强化；妖潮期不加成。
     final expK = game.config?.expMultK ?? kJourneyExpMultK;
-    final expValue =
-        (m.model.expDrop * (1 + m.buffMult * expK)).round();
+    final tideStart = _endlessTideStartWave(game);
+    final developExp =
+        game.level.kind == 'endless' &&
+                tideStart != null &&
+                m.endlessWave > 0 &&
+                m.endlessWave < tideStart
+            ? math.max(0.0, game.battleNum('endless', 'develop_exp_mult', 1.0))
+            : 1.0;
+    final expValue = (m.model.expDrop *
+            (1 + m.buffMult * expK) *
+            developExp)
+        .round();
 
     // 掉落分档：21+ 难切换 late 表（高价值拾取物权重上调）；
     // late 表缺行回落基础表（老配置不炸）。
@@ -237,10 +250,12 @@ mixin JourneyLootMixin {
         drop(JourneyPickupKind.chest, 15);
       }
     }
-    // 精英惊喜彩蛋：宝箱概率掉落（缺省 10%，journey_globals.elite_chest_rate）
+    // 精英惊喜彩蛋：宝箱低概率掉落
+    // （journey_battle_params.economy.elite_chest_rate，缺省 1%）
     if (m.model.isElite &&
         game.rng.nextDouble() <
-            (game.config?.eliteChestRate ?? kJourneyEliteChestRate)) {
+            game.battleNum(
+                'economy', 'elite_chest_rate', kJourneyEliteChestRate)) {
       drop(JourneyPickupKind.chest, 15);
     }
   }

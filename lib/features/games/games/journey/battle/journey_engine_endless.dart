@@ -24,12 +24,20 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
   }
   final n = game._endlessWave;
   final waveConf = game.config?.endlessWaveOf(n);
-  final count = waveConf?.count ?? endlessWaveCount(n);
+  final baseCount = waveConf?.count ?? endlessWaveCount(n);
   final buff = waveConf?.buffMult ?? endlessWaveBuff(n);
   // 妖潮期判定以后台波次表实际配置为准：首个 boss_count>0 的波即妖潮起点；
   // 波次表无配额配置时回落全局 tide_start_wave（默认第 10 波）。
   final tideStart = _endlessTideStartWave(game);
   final tide = tideStart != null && n >= tideStart;
+  // 发育期（妖潮起点前）每波追加怪数：后台集中配置，为角色经验池兜底，
+  // 让玩家在妖王波前获得足够强化；妖潮期不加成，避免同屏压力叠加。
+  final count = math.max(
+      1,
+      !tide
+          ? baseCount +
+              game.battleNum('endless', 'develop_extra_count', 0).round()
+          : baseCount);
   // 本波精英只数：后台配置优先，0（含新列未部署）=按波号公式兜底；
   // 精英恒留至少 1 个普通怪位，保证先发育后施压
   final eliteCount = waveConf != null && waveConf.eliteCount > 0
@@ -254,13 +262,26 @@ JourneyMonsterModel? _bossModelOf(JourneyFlameGame game, String code) {
   return null;
 }
 
-/// 妖潮期降临取怪：从怪物全源的全部妖王里随机取一只，使同波配额内
-/// 可出现多种妖王。候选池为空（远端怪物表缺失且种子无妖王）时按配置
-/// code 回落兜底。
+/// 妖潮期降临取怪：按玩家等级限定候选妖王的血量上限，低等级只在低血档
+/// 随机，同波配额内仍可出现多种妖王。上限 = 基数 + 每级血量档 × 玩家等级，
+/// 由通用战斗参数 endless 分组配置；无妖王落在档内时取全池最低血妖王，
+/// 保证妖王波有怪可降。候选池为空（远端怪物表缺失且种子无妖王）时按
+/// 配置 code 回落兜底。
 JourneyMonsterModel? _randomTideBoss(JourneyFlameGame game, String code) {
   final bosses = _monsterSource(game).where((m) => m.isBoss).toList();
   if (bosses.isEmpty) return _bossModelOf(game, code);
-  return bosses[game.rng.nextInt(bosses.length)];
+  final hpBase = game.battleNum('endless', 'boss_pool_hp_base', 0);
+  final hpPerLv = game.battleNum('endless', 'boss_pool_hp_per_lv', 3000);
+  final cap = hpBase + hpPerLv * game._charLv;
+  final eligible = bosses.where((m) => m.baseHp <= cap).toList();
+  if (eligible.isNotEmpty) {
+    return eligible[game.rng.nextInt(eligible.length)];
+  }
+  var weakest = bosses.first;
+  for (final m in bosses) {
+    if (m.baseHp < weakest.baseHp) weakest = m;
+  }
+  return weakest;
 }
 
 /// 无尽怪池挑选：精英段强制走分阶精英池；普通段尊重后台配置的怪种

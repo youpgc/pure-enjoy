@@ -159,8 +159,6 @@ class _Compass extends StatelessWidget {
       valueListenable: controller.hud.hasBoss,
       builder: (context, hasBoss, _) => hasBoss
           ? ValueListenableBuilder<bool>(
-              // 妖王未降临时没有可导航的目标：进入提醒窗口（boss_spawn_in
-              // >0）展示降临倒计时，窗口外整块隐藏
               valueListenable: controller.hud.bossPresent,
               builder: (context, present, _) => present
                   ? ValueListenableBuilder<bool>(
@@ -179,7 +177,14 @@ class _Compass extends StatelessWidget {
                           : const SizedBox.shrink(),
                     ),
             )
-          : _surviveCountdown(controller),
+          // 无尽妖潮 hasBoss=false：妖王补位倒计时与波数共用罗盘位，
+          // 倒计时优先，避免降临提示被波数分支吞掉。
+          : ValueListenableBuilder<int>(
+              valueListenable: controller.hud.bossSpawnIn,
+              builder: (context, left, _) => left > 0
+                  ? _bossSpawnCountdownView(left)
+                  : _surviveCountdown(controller),
+            ),
     );
   }
 

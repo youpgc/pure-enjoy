@@ -52,9 +52,9 @@ const double kJourneyMonsterLvK = 0.08;
 /// 维持妖王作为唯一操作挑战的定位。K=0 还原旧口径。
 const double kJourneyBossHpLvK = 0.12;
 
-/// 精英宝箱掉落概率（journey_globals.elite_chest_rate 可覆盖）：
-/// 精英以经验掉落为主，宝箱降格为惊喜彩蛋（10%）；妖王保留必掉但仅首杀。
-const double kJourneyEliteChestRate = 0.10;
+/// 精英宝箱掉落概率（journey_battle_params.economy.elite_chest_rate 可覆盖）：
+/// 精英以经验掉落为主，宝箱降格为低概率惊喜彩蛋（1%）；妖王保留必掉但仅首杀。
+const double kJourneyEliteChestRate = 0.01;
 
 /// 每次境界突破的增伤增量（journey_globals.realm_amp_per 可覆盖）：
 /// 增伤Σ%加法合流（伤害定序口径），每档境界 +8%。

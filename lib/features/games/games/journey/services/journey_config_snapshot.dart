@@ -198,10 +198,6 @@ class JourneyConfigSnapshot {
   double get bossHpLvK =>
       _globalNum(globalsRaw, 'boss_hp_lv_k') ?? kJourneyBossHpLvK;
 
-  /// 精英宝箱掉落概率（elite_chest_rate）：宝箱为惊喜彩蛋，妖王仅首杀必掉。
-  double get eliteChestRate =>
-      _globalNum(globalsRaw, 'elite_chest_rate') ?? kJourneyEliteChestRate;
-
   /// 每次境界突破的增伤增量（realm_amp_per）：增伤Σ%加法合流。
   double get realmAmpPer =>
       _globalNum(globalsRaw, 'realm_amp_per') ?? kJourneyRealmAmpPer;
