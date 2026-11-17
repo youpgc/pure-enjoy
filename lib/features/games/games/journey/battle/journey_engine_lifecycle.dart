@@ -100,11 +100,8 @@ extension JourneyLifecycle on JourneyFlameGame {
 
     // 多场妖王战（如「三打白骨精」）：打完一场增强再战，末场进伏诛抉择
     if (m == boss && !_ended) {
-      // 妖王大血条：死亡清零并熄灭领地显隐（多场战重进侦测圈再亮）
-      controller.hud.bossHpRatio.value = 0;
-      controller.hud.bossEngaged.value = false;
-      controller.hud.bossHp.value = 0;
-      // 末场伏诛后罗盘与妖王点一并熄灭；多场战重生时再置回 true
+      // 大血条由每帧 syncBossHud 按存活妖王收起；末场伏诛后罗盘与妖王点
+      // 一并熄灭，多场战重生时再置回 true。
       controller.hud.bossPresent.value = false;
       final totalFights = level.bossFights > 1 ? level.bossFights : 1;
       if (_bossStage < totalFights - 1) {
@@ -121,18 +118,10 @@ extension JourneyLifecycle on JourneyFlameGame {
         _onBossFinalKill();
       }
     }
-    // 接战妖王阵亡：熄灭其大血条横幅（主线据点妖王由下方 m==boss 分支
-    // 清理，此处兜住无据点的妖王潮妖王——接战中击杀不熄会恒显 0 血横幅）；
-    // 仍有其他接战妖王时保持大血条给下一只（多妖王同场语义）。
+    // 接战妖王阵亡即退出交战态；其横幅由每帧 syncBossHud 收起，
+    // 队列中其余妖王顺位上移（多妖王同场语义）。
     if (m.model.isBoss && m._aggro) {
       m._aggro = false;
-      final otherEngaged = monsters.any((o) =>
-          !identical(o, m) && !o.isDead && o.model.isBoss && o._aggro);
-      if (!otherEngaged) {
-        controller.hud.bossHpRatio.value = 0;
-        controller.hud.bossEngaged.value = false;
-        controller.hud.bossHp.value = 0;
-      }
     }
     // 无尽妖潮：天赋点按**波内首杀妖王**掷 1 次（talent_drop_rate 可配），
     // 后续妖王击杀不再重复掷——配额制下单波妖王可达数十只，逐只掷率

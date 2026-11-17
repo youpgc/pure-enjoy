@@ -121,6 +121,9 @@ class JourneyMonsterComponent extends PositionComponent
   /// 无尽妖潮所属波次（除尽推进制：该波怪全灭才刷下一波）。
   int endlessWave = 0;
 
+  /// 最近一次进入交战态的序号（大血条选取「最新交战」目标的依据）。
+  int lastEngageSeq = 0;
+
   // ---- 妖王冲撞状态机（仅 model.isBoss，§7 MVP）----
   /// 冲撞相位：0 待机 / 1 蓄力 / 2 突进 / 3 收招。
   int _chargePhase = 0;
@@ -226,22 +229,10 @@ class JourneyMonsterComponent extends PositionComponent
     } else if (_aggro && dist > leashRange) {
       _aggro = false;
     }
-    // 妖王领地显隐（节点横幅）：进入侦测圈才亮大血条，脱战熄灭（变更才写）；
-    // 进战瞬间按当前血量刷新比例（spawn/respawn 不再预写常显）。
-    // 多妖王同场（妖王潮）：脱战仅在无其他接战妖王时熄灭，大血条
-    // 跟随最近交战的那只——单只脱战不熄灭他妖王的血条。
-    if (model.isBoss && wasAggro != _aggro) {
-      final hud = game.controller.hud;
-      if (_aggro) {
-        hud.bossEngaged.value = true;
-        hud.bossHpRatio.value = (hp / maxHp).clamp(0.0, 1.0);
-        hud.bossMaxHp.value = maxHp.round();
-        hud.bossHp.value = hp.clamp(0.0, maxHp).round();
-      } else {
-        final otherEngaged = game.monsters.any((m) =>
-            !identical(m, this) && !m.isDead && m.model.isBoss && m._aggro);
-        if (!otherEngaged) hud.bossEngaged.value = false;
-      }
+    // 进入交战态时登记序号，供大血条按「最新交战」选取展示目标；
+    // 血条数值与显隐统一由宿主每帧 syncBossHud 维护（多妖王不串台）。
+    if (model.isBoss && !wasAggro && _aggro) {
+      lastEngageSeq = ++game.bossEngageSeq;
     }
 
     if (model.isBoss) {
@@ -277,14 +268,7 @@ class JourneyMonsterComponent extends PositionComponent
             knockFactor;
       }
       // 脱战快速回血：未追击玩家即回，上限 maxHp（进入追击态即停）
-      if (hp < maxHp) {
-        hp = math.min(
-            hp +
-                maxHp *
-                    game.battleNum('monster', 'regen_per_sec', _regenPerSec) *
-                    dt,
-            maxHp);
-      }
+      regenWhenDisengaged(dt);
     }
     // 普通状态停在接触边界；突进中不被角色挡住，命中后撞开角色并结算
     // 一次冲撞伤害（单次去重），随后统一钳回世界边界
@@ -472,16 +456,6 @@ class JourneyMonsterComponent extends PositionComponent
         hp < maxHp * game.battleNum('monster', 'split_hp_ratio', 0.5)) {
       _splitDone = true;
       _spawnBoneSplinters();
-    }
-    // 妖王大血条（节点11）：差值 >0.005 才写，防高频刷 notifier
-    if (model.isBoss) {
-      final ratio = (hp / maxHp).clamp(0.0, 1.0);
-      final hud = game.controller.hud;
-      if ((hud.bossHpRatio.value - ratio).abs() > 0.005) {
-        hud.bossHpRatio.value = ratio;
-      }
-      final hpNow = hp.clamp(0.0, maxHp).round();
-      if (hud.bossHp.value != hpNow) hud.bossHp.value = hpNow;
     }
     if (hp <= 0) {
       isDead = true;

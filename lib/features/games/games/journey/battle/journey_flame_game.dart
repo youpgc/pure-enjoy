@@ -22,6 +22,8 @@ part 'journey_engine_setup.dart';
 part 'journey_engine_player.dart';
 part 'journey_engine_monster_effects.dart';
 part 'journey_engine_monsters.dart';
+part 'journey_engine_boss_hud.dart';
+part 'journey_engine_config_access.dart';
 part 'journey_engine_abilities.dart';
 part 'journey_engine_weapons.dart';
 part 'journey_weapon_render.dart';
@@ -111,6 +113,14 @@ class JourneyFlameGame extends FlameGame
   late List<JourneyMonsterModel> pool;
   JourneyMonsterModel? bossModel;
   JourneyMonsterComponent? boss;
+
+  /// 大血条当前展示的妖王队列（最多三条，顺序稳定）：一只一条横幅；
+  /// 在列妖王不因走位重排，新进按优先级插入，退出后其余顺位上移。
+  final List<JourneyMonsterComponent> hudTrackedBosses =
+      <JourneyMonsterComponent>[];
+
+  /// 妖王接战序号：每次进入交战态递增，作为「最新交战」的选取依据。
+  int bossEngageSeq = 0;
 
   late final math.Random rng = math.Random(level.levelNo);
 
@@ -246,14 +256,6 @@ class JourneyFlameGame extends FlameGame
           ? battleNum('ability', 'nezha_amp', 0.4)
           : 0);
 
-  /// 法宝数值参数（journey_weapon_params 后台配置；行缺失回落 fallback）。
-  double weaponParam(String code, String key, double fallback) =>
-      config?.weaponParam(code, key, fallback) ?? fallback;
-
-  /// 妖王能力参数（journey_monster_params 后台配置；行缺失回落 fallback）。
-  double monsterParam(String monsterCode, String key, double fallback) =>
-      config?.monsterParam(monsterCode, key, fallback) ?? fallback;
-
   /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 fallback）。
   /// [group] 为参数分组（damage/spawn/monster/boss/ability/economy/…），
   /// [key] 为组内语义键；原内置常量作为 [fallback] 保证未配置行为不变。
@@ -261,31 +263,8 @@ class JourneyFlameGame extends FlameGame
   double battleNum(String group, String key, double fallback) =>
       config?.battleNum(group, key, fallback) ?? fallback;
 
-  /// 玩家基础移速（player.base_speed；缺省用内置值）。
-  double get baseSpeed =>
-      battleNum('player', 'base_speed', JourneyPlayerComponent.baseSpeed);
-
-  /// 通用战斗参数·文本（枚举型，未配置回落 fallback）。
-  String battleText(String group, String key, String fallback) =>
-      config?.battleText(group, key, fallback) ?? fallback;
-
-  /// 护甲减伤曲线分母 K（journey_globals.armor_curve_k；缺省 80）。
-  double get armorCurveK =>
-      config?.armorCurveK ?? kJourneyArmorCurveK;
-
-  /// 怪物侧护甲减伤上限（journey_globals.monster_armor_reduction_cap；
-  /// 缺省 72%，高于玩家 60%，保 150~200 甲档位区分度）。
-  double get monsterArmorCap =>
-      config?.monsterArmorCap ?? kJourneyMonsterArmorCap;
-
   /// 维度槽定义缓存（slotDefMap 惰性构建一次；对局内配置不变）。
   Map<String, JourneySlotDefModel>? _slotDefCache;
-
-  /// 维度槽定义（code 匹配；含远端空表回落内置种子）。
-  JourneySlotDefModel? slotDefOf(String code) {
-    final map = _slotDefCache ??= config?.slotDefMap() ?? const {};
-    return map[code];
-  }
 
   /// 维度槽每级数值（value_per_level 后台配置；0/缺失回落内置兜底）。
   @override
@@ -504,6 +483,8 @@ class JourneyFlameGame extends FlameGame
     spatialGrid.rebuild(monsters);
     updateWeapons(this, dt);
     updateDamageTick(this, dt);
+    // 大血条统一同步：全部实体与伤害结算后选取展示目标，避免多妖王串台
+    syncBossHud(this);
     checkMilestones();
     _sampleMinimap(dt);
 

@@ -8,122 +8,127 @@ import '../widgets/journey_widgets.dart';
 import 'journey_battle_controller.dart';
 import 'journey_hp_bar_fx.dart';
 
-/// 妖王大血条：6+6 槽栏正下方居中，铺满横幅宽度、金框暗底、
-/// 左侧妖王名 + 红金渐变填充 + 进度条内右端绝对血量；条体复用
-/// [JourneyHpBarFx] 的受击/回血双向动画。
-/// 显示条件：妖王已降临、ratio>0，且（交战中 或 脱战回血未满）；
-/// 脱战回血期间保持可见以展示增长动画，回满/倒下/无妖章回才隐藏。
+/// 妖王大血条组：6+6 槽栏正下方居中，自上而下叠加当前交战妖王，
+/// 一妖一条、最多三条、条间 10px。顺序由引擎维护稳定序，横幅以妖王实体
+/// 为 ValueKey，保证顺位变化时受击/回血动画不串台。
 class JourneyBossHpBar extends StatelessWidget {
   const JourneyBossHpBar({super.key, required this.controller});
+
+  /// 相邻横幅上下间距。
+  static const double gap = 10;
 
   final JourneyBattleController controller;
 
   @override
   Widget build(BuildContext context) {
-    final hud = controller.hud;
-    return AnimatedBuilder(
-      animation: Listenable.merge(<Listenable>[
-        hud.hasBoss,
-        hud.bossPresent,
-        hud.bossEngaged,
-        hud.bossHpRatio,
-        hud.bossName,
-        hud.bossHp,
-        hud.bossMaxHp,
-      ]),
-      builder: (context, _) {
-        final ratio = hud.bossHpRatio.value;
-        // 脱战回血未满（0<ratio<1）保持显示以播放增长动画；交战中常显；
-        // 回满、倒下（ratio<=0）、未降临、无妖章回隐藏。
-        final regening = !hud.bossEngaged.value && ratio > 0 && ratio < 1;
-        if (!hud.hasBoss.value ||
-            !hud.bossPresent.value ||
-            (!hud.bossEngaged.value && !regening) ||
-            ratio <= 0) {
-          return const SizedBox.shrink();
-        }
-        final label = hud.bossName.value.isEmpty ? '妖王' : hud.bossName.value;
-        final hpText = hud.bossMaxHp.value > 0
-            ? '${hud.bossHp.value}/${hud.bossMaxHp.value}'
-            : '';
-        return Container(
-          width: MediaQuery.of(context).size.width * 0.81,
-          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
-          decoration: BoxDecoration(
-            color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
-            borderRadius: BorderRadius.circular(999),
-            border: Border.all(color: JourneyTheme.gold, width: 1.4),
-          ),
-          child: LayoutBuilder(
-            builder: (context, constraints) {
-              // 名字按容器可用宽度定上限：超长妖王名才会走 ellipsis，
-              // 血条才能拿到剩余全部空间；不设上限时 Row 的非弹性子项
-              // 拿到无限宽，长名会挤空血条并溢出横幅。
-              final nameMaxWidth = constraints.maxWidth.isFinite
-                  ? constraints.maxWidth * 0.32
-                  : double.infinity;
-              return Row(
-                children: <Widget>[
-                  ConstrainedBox(
-                    constraints: BoxConstraints(maxWidth: nameMaxWidth),
-                    child: Text(
-                      label,
-                      maxLines: 1,
-                      overflow: TextOverflow.ellipsis,
-                      style: JourneyTheme.faint.copyWith(
-                        color: JourneyTheme.goldSoft,
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 10),
-                  Expanded(
-                    child: SizedBox(
-                      height: 16,
-                      child: Stack(
-                        children: <Widget>[
-                          Positioned.fill(
-                            child: JourneyHpBarFx(
-                              value: ratio,
-                              height: 16,
-                              radius: 999,
-                              foregroundGradient: const LinearGradient(
-                                colors: <Color>[
-                                  Color(0xFFB93A4A),
-                                  Color(0xFFE8C470),
-                                ],
-                              ),
-                              lagColor: const Color(0xFFFFD08A),
-                            ),
-                          ),
-                          if (hpText.isNotEmpty)
-                            Align(
-                              alignment: Alignment.centerRight,
-                              child: Padding(
-                                padding: const EdgeInsets.only(right: 8),
-                                child: Text(
-                                  hpText,
-                                  style: const TextStyle(
-                                    fontSize: 10,
-                                    fontWeight: FontWeight.w700,
-                                    color: Colors.white,
-                                    shadows: <Shadow>[
-                                      Shadow(
-                                          color: Colors.black, blurRadius: 3),
-                                    ],
-                                  ),
-                                ),
-                              ),
-                            ),
-                        ],
-                      ),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
+    return ValueListenableBuilder<List<JourneyBossHudBar>>(
+      valueListenable: controller.hud.bossBars,
+      builder: (context, bars, _) {
+        if (bars.isEmpty) return const SizedBox.shrink();
+        return Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (var i = 0; i < bars.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(height: gap),
+              JourneyBossHpBarItem(
+                key: ValueKey<Object>(bars[i].key),
+                bar: bars[i],
+              ),
+            ],
+          ],
         );
       },
+    );
+  }
+}
+
+/// 单条妖王血条：金框暗底、左侧妖王名 + 红金渐变填充 + 条内右端绝对血量；
+/// 条体复用 [JourneyHpBarFx] 的受击/回血双向动画。
+class JourneyBossHpBarItem extends StatelessWidget {
+  const JourneyBossHpBarItem({super.key, required this.bar});
+
+  final JourneyBossHudBar bar;
+
+  @override
+  Widget build(BuildContext context) {
+    final ratio = bar.ratio;
+    final label = bar.name.isEmpty ? '妖王' : bar.name;
+    final hpText = bar.maxHp > 0 ? '${bar.hp}/${bar.maxHp}' : '';
+    return Container(
+      width: MediaQuery.of(context).size.width * 0.81,
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 5),
+      decoration: BoxDecoration(
+        color: JourneyTheme.bgDeep.withValues(alpha: 0.72),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: JourneyTheme.gold, width: 1.4),
+      ),
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          // 名字按容器可用宽度定上限：超长妖王名才会走 ellipsis，
+          // 血条才能拿到剩余全部空间；不设上限时 Row 的非弹性子项
+          // 拿到无限宽，长名会挤空血条并溢出横幅。
+          final nameMaxWidth = constraints.maxWidth.isFinite
+              ? constraints.maxWidth * 0.32
+              : double.infinity;
+          return Row(
+            children: <Widget>[
+              ConstrainedBox(
+                constraints: BoxConstraints(maxWidth: nameMaxWidth),
+                child: Text(
+                  label,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: JourneyTheme.faint.copyWith(
+                    color: JourneyTheme.goldSoft,
+                  ),
+                ),
+              ),
+              const SizedBox(width: 10),
+              Expanded(
+                child: SizedBox(
+                  height: 16,
+                  child: Stack(
+                    children: <Widget>[
+                      Positioned.fill(
+                        child: JourneyHpBarFx(
+                          value: ratio,
+                          height: 16,
+                          radius: 999,
+                          foregroundGradient: const LinearGradient(
+                            colors: <Color>[
+                              Color(0xFFB93A4A),
+                              Color(0xFFE8C470),
+                            ],
+                          ),
+                          lagColor: const Color(0xFFFFD08A),
+                        ),
+                      ),
+                      if (hpText.isNotEmpty)
+                        Align(
+                          alignment: Alignment.centerRight,
+                          child: Padding(
+                            padding: const EdgeInsets.only(right: 8),
+                            child: Text(
+                              hpText,
+                              style: const TextStyle(
+                                fontSize: 10,
+                                fontWeight: FontWeight.w700,
+                                color: Colors.white,
+                                shadows: <Shadow>[
+                                  Shadow(color: Colors.black, blurRadius: 3),
+                                ],
+                              ),
+                            ),
+                          ),
+                        ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
+          );
+        },
+      ),
     );
   }
 }

@@ -155,22 +155,18 @@ class JourneyBattleHud {
   /// null=无横幅，覆盖层监听展示 2.4s 后自行隐去。
   final ValueNotifier<String?> banner = ValueNotifier<String?>(null);
 
-  /// 妖王大血条（节点11）：ratio=妖王血量比例 0~1（0=已倒下不显示），
-  /// name=妖王名（无妖章回恒空串）；
-  /// bossEngaged=玩家进入妖王侦测圈（横幅血条仅交战时可见，脱战/死亡熄灭）。
-  final ValueNotifier<double> bossHpRatio = ValueNotifier<double>(0);
-  final ValueNotifier<String> bossName = ValueNotifier<String>('');
-  final ValueNotifier<bool> bossEngaged = ValueNotifier<bool>(false);
+  /// 妖王大血条组（节点11）：一条=一只妖王，最多三条，自上而下叠加。
+  /// 引擎维护稳定序：新进一律从队尾入列，在列妖王不因走位重排，退出后
+  /// 下方顺位上移；优先级仅用于满额淘汰最弱者与同批入场的先后。
+  /// 空列表=当前无妖王横幅。
+  final ValueNotifier<List<JourneyBossHudBar>> bossBars =
+      ValueNotifier<List<JourneyBossHudBar>>(const <JourneyBossHudBar>[]);
 
   /// 受击脉冲计数：玩家每次有效受击 +1，屏幕边框呼吸灯据此重启动画。
   final ValueNotifier<int> hitPulse = ValueNotifier<int>(0);
 
-  /// 妖王绝对血量（当前/上限）：大血条内右侧的数值展示；
-  /// 未降临或已倒下时当前值为 0。
-  final ValueNotifier<int> bossHp = ValueNotifier<int>(0);
-  final ValueNotifier<int> bossMaxHp = ValueNotifier<int>(0);
-
-  /// 妖王已降临且未伏诛：罗盘导航与小地图标记的共同显隐依据。
+  /// 主线章回妖王已降临且未伏诛：罗盘导航的显隐依据，由 spawns 置位、
+  /// lifecycle 伏诛时复位；小地图标记与小地图快照解耦，不读本字段。
   final ValueNotifier<bool> bossPresent = ValueNotifier<bool>(false);
 
   /// 妖王降临倒计时（秒）：首次降临与多场战复活冷却共用此位，由引擎
@@ -195,6 +191,24 @@ class JourneyBattleHud {
   /// null=尚未采样（覆盖层画空窗）。
   final ValueNotifier<JourneyMinimapData?> minimap =
       ValueNotifier<JourneyMinimapData?>(null);
+}
+
+/// 单条妖王大血条的展示快照。[key] 为对应妖王实体的引用，横幅以它作
+/// ValueKey，保证同一妖王在顺位变化时动画状态不串给别的妖王。
+class JourneyBossHudBar {
+  const JourneyBossHudBar({
+    required this.key,
+    required this.name,
+    required this.ratio,
+    required this.hp,
+    required this.maxHp,
+  });
+
+  final Object key;
+  final String name;
+  final double ratio;
+  final int hp;
+  final int maxHp;
 }
 
 /// 小地图采样快照（节点11）：怪点=相对玩家的世界偏移（≤span，上限 60）；

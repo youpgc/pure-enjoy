@@ -184,3 +184,19 @@ mixin JourneyBossAbilityMixin on PositionComponent {
     }
   }
 }
+
+/// 脱战快速回血：只增长实体血量，大血条数值由每帧 syncBossHud 统一刷新。
+/// 对所有怪物通用（含妖王），归在怪物效果 part 而非妖王血条 part。
+extension JourneyMonsterRegen on JourneyMonsterComponent {
+  void regenWhenDisengaged(double dt) {
+    if (hp >= maxHp) return;
+    hp = math.min(
+      hp +
+          maxHp *
+              game.battleNum(
+                  'monster', 'regen_per_sec', JourneyMonsterComponent._regenPerSec) *
+          dt,
+      maxHp,
+    );
+  }
+}

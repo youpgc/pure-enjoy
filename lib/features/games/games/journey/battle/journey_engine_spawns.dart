@@ -243,15 +243,10 @@ mixin JourneySpawnMixin {
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
-    // 妖王名照写；血条比例由首次进侦测圈（bossEngaged）时按当前血量写入，
-    // 开局不再预写常显（领地显隐口径见 monsters part）。
-    // onLoad 挂载期 HUD 通知调度帧尾（防 markNeedsBuild during build）。
+    // 罗盘/小地图的妖王显隐开关；大血条由每帧 syncBossHud 按交战与血量
+    // 自行出入列。onLoad 挂载期 HUD 通知调度帧尾（防 markNeedsBuild during build）。
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      final hud = game.controller.hud;
-      hud.bossName.value = model.name;
-      hud.bossPresent.value = true;
-      hud.bossMaxHp.value = comp.maxHp.round();
-      hud.bossHp.value = comp.hp.round();
+      game.controller.hud.bossPresent.value = true;
     });
 
     // 据点守卫：妖王周边环状精英/普通怪，只数与环带可配
@@ -294,13 +289,8 @@ mixin JourneySpawnMixin {
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
-    // 妖王名与绝对血量照写；比例由再次进侦测圈时按当前血量写入
-    // （下场增强再战，新体满血；respawn 后仍未 engaged）
-    final hud = game.controller.hud;
-    hud.bossName.value = model.name;
-    hud.bossPresent.value = true;
-    hud.bossMaxHp.value = comp.maxHp.round();
-    hud.bossHp.value = comp.hp.round();
+    // 罗盘/小地图显隐复位；大血条由每帧 syncBossHud 按新体交战状态入列。
+    game.controller.hud.bossPresent.value = true;
     game.controller.onBossSpawn('${game._bossStage + 1} 打 · ${model.name}');
   }
 
