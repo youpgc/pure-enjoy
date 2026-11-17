@@ -2,15 +2,15 @@ part of 'journey_progress_service.dart';
 
 /// 西行·角色专属天赋树逻辑拆分（part 同 library：访问宿主私有状态）。
 ///
-/// v4 分支树制：点亮的前置校验与双消耗扣费入账。每角色一棵五行树
+/// 分支树制：点亮的前置校验与双消耗扣费入账。每角色一棵五行树
 /// （5 系 × 16 层 = core 8/growth 5/sig 3 三分支 + 第 81 点加强点）。
-/// 前置规则（生态循环）：
+/// 前置规则（分组解锁）：
 /// · 分支内按层序点亮；
-/// · 枝间顺序：growth 开亮需本系 core≥3；sig 开亮需本系 core 修满 8；
-/// · 相生阶梯锁：每系自第 2 层起，需「生我者」系总层数 ≥ 本系
-///   点亮后总层数 − 1（即任一系最多比其生源系深 1 层；金→水→木→火→土→金，
-///   借此打破五系闭环、避免循环死锁，仍保留按相生顺序节制的设计意图）；
-/// · 相克制衡：sig 点亮需「克我者」系 ≥4 层；
+/// · 本源枝 core 全系随时可修，不受其他系进度牵制；
+/// · 下一组解锁看前一组是否修满：growth 需本系 core 修满且生我者系
+///   core 修满；sig 需本系 growth 修满且生我者系 growth 修满；
+/// · 因本源枝 8 层全自由，五系可先各自修满本源再逐级解锁下一组，
+///   相生闭环不构成死锁；
 /// · 加强点：五系修满 80 层后消耗第 81 点，解锁角色特殊能力。
 extension JourneyProgressTalent on JourneyProgressService {
   /// 某角色全部分支行（配置快照优先，种子兜底）。
@@ -65,27 +65,24 @@ extension JourneyProgressTalent on JourneyProgressService {
     final lv = _state.talentLevelOf(char, b.branchCode);
     if (lv >= b.maxLv) return '该分支已修满';
 
-    // 枝间顺序：growth 需本系 core≥3；sig 需本系 core 修满 8
-    final coreLv = _state.talentLevelOf(
-        char, journeyBranchCode(char, element, 'core'));
-    if (branch == 'growth' && coreLv < 3) return '需本源枝点亮 3 层';
-    if (branch == 'sig' && coreLv < kJourneyBranchMaxLv['core']!) {
-      return '需本源枝修满 8 层';
-    }
-    // 相克制衡：sig 需「克我者」系 ≥4 层
-    if (branch == 'sig') {
-      final restrainer = JourneyProgressService.restrainerOf[element]!;
-      final rLv = _state.talentElementLv(char, restrainer);
-      if (rLv < 4) return '需「${_elementName(restrainer)}」系 ≥4 层';
-    }
-    // 相生阶梯锁：自第 2 层起需「生我者」系总层数 ≥ 点亮后本系总层数 − 1
-    // （任一系最多比其生源系深 1 层；原 1:1 等深约束在五系闭环上会循环死锁）
-    final myTotalNew = _state.talentElementLv(char, element) + 1;
-    if (myTotalNew >= 2) {
+    // 分组解锁：本源枝按层序自由修，无前置；下一组（growth/sig）需
+    // 前一组在本系与生我者系都修满。前一组取 core→growth 的前一支；
+    // 满级阈值统一取分支配置的 max_lv（快照优先、种子兜底），与本系
+    // 修满判定、写入 clamp、UI 显示同源，后台调整层数上限不会口径分裂。
+    if (branch != 'core') {
+      final prevBranch = branch == 'growth' ? 'core' : 'growth';
+      final prevCode = journeyBranchCode(char, element, prevBranch);
+      if (_state.talentLevelOf(char, prevCode) <
+          _branchOf(char, element, prevBranch).maxLv) {
+        return '需本系${prevBranch == 'core' ? '本源枝' : '生息枝'}修满';
+      }
+      // 生我者系同组也要修满，确保相生关系成立后才开放下一组。
       final generator = JourneyProgressService.generatorOf[element]!;
-      final gLv = _state.talentElementLv(char, generator);
-      if (gLv < myTotalNew - 1) {
-        return '需「${_elementName(generator)}」系 ≥${myTotalNew - 1} 层';
+      final genPrevCode = journeyBranchCode(char, generator, prevBranch);
+      if (_state.talentLevelOf(char, genPrevCode) <
+          _branchOf(char, generator, prevBranch).maxLv) {
+        return '需「${_elementName(generator)}」系'
+            '${prevBranch == 'core' ? '本源枝' : '生息枝'}修满';
       }
     }
     return _poolOrMeritBlock(char, cost);
@@ -124,7 +121,7 @@ extension JourneyProgressTalent on JourneyProgressService {
       tree[branch] = 1;
     } else {
       final code = journeyBranchCode(char, element, branch);
-      final maxLv = kJourneyBranchMaxLv[branch] ?? 8;
+      final maxLv = _branchOf(char, element, branch).maxLv;
       tree[code] = ((tree[code] ?? 0) + 1).clamp(0, maxLv);
     }
     levels[char] = tree;

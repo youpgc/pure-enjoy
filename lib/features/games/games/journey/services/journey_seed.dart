@@ -283,7 +283,8 @@ const List<Map<String, dynamic>> kJourneyMonsterSeed = <Map<String, dynamic>>[
 /// 五行天赋分支种子（4 角色 × 5 系 × 3 分支 = 60 行）：分支树制——每系
 /// core 本源枝 8 层（核心属性）/ growth 生息枝 5 层（第二属性）/
 /// sig 化形枝 3 层（标志强化），点亮双消耗（1 天赋点 + cost_base×
-/// 层号 功德），相生 1:1 循环锁 + 相克制衡在 App 端判定。
+/// 层号 功德），本源枝自由修、下一组需本系与生我者系前一组均修满的
+/// 分组解锁在 App 端判定。
 
 /// 系 → (core, growth, sig) 每层数值（与 SQL 种子一致）。
 const Map<String, List<num>> _kJourneyBranchValue =

@@ -29,7 +29,7 @@ class JourneyProgressService extends ChangeNotifier {
   /// 本地流水/西行记录保留条数（新的在前）。
   static const int _recordLimit = 50;
 
-  /// 相生链：生我者（分支升第 2 级起需先修其生源系）。
+  /// 相生链：生我者（下一组解锁需本系前一组与生我者系前一组均修满）。
   static const Map<String, String> generatorOf = <String, String>{
     'metal': 'earth', // 土生金
     'water': 'metal', // 金生水
@@ -38,7 +38,7 @@ class JourneyProgressService extends ChangeNotifier {
     'earth': 'fire', // 火生土
   };
 
-  /// 相克链：克我者（标志分支需修克我者≥4 层作制衡代价）。
+  /// 相克链：克我者。当前天赋解锁已不设相克制衡，留存供展示/后续复用。
   static const Map<String, String> restrainerOf = <String, String>{
     'metal': 'fire', // 火克金
     'wood': 'metal', // 金克木
@@ -253,6 +253,7 @@ class JourneyProgressService extends ChangeNotifier {
   /// 分支升级功德消耗：cost_base × (已修等级+1)，线性递增。
   /// 实现拆分见 journey_progress_talent.dart（part 同 library）。
 
+  /// 克我者中文名：相克制衡已停用，留存供展示/后续复用。
   static String restrainerOfName(String element) => switch (element) {
         'metal' => '金',
         'wood' => '木',

@@ -269,7 +269,7 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
                     const SizedBox(height: 6),
                     Text(
                       _charUnlocked
-                          ? '点亮消耗 1 天赋点 + 功德 · 相生循环节制点亮顺序'
+                          ? '点亮消耗 1 天赋点 + 功德 · 本源自由修，下一组需本系与相生系前组修满'
                           : '解锁该角色后可修行其专属天赋树（当前可浏览）',
                       style: JourneyTheme.faint,
                     ),
