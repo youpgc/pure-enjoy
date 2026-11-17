@@ -65,8 +65,8 @@ JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) {
   return null;
 }
 
-/// 怪物全源（远端优先，种子兜底）：妖王波判定/指定怪种刷怪共用——
-/// 无尽妖潮刷怪池不含妖王，波次配置的怪种语义需在全源上判定。
+/// 怪物全源（远端优先，种子兜底）：主线按 code 取关卡妖王、妖潮期
+/// 从全池随机取妖王共用；无尽刷怪池不含妖王，妖王取怪须走全源。
 List<JourneyMonsterModel> _monsterSource(JourneyFlameGame game) {
   final remote = game.config?.monsters ?? const <JourneyMonsterModel>[];
   return remote.isNotEmpty

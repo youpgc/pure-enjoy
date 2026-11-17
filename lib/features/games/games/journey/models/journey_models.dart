@@ -266,7 +266,8 @@ class JourneyDailyMapModel {
 }
 
 /// 无尽妖潮波次（journey_endless_waves 行，上限 99）：后台可配的独立
-/// 波次表——monster_code 命中妖王即妖王波，否则按 count 分批刷怪；
+/// 波次表——boss_count>0 即妖王波（妖王种类引擎随机），普通怪按 count
+/// 分批刷怪、monster_code 指定普通段/护卫怪种（留空=分阶随机池）；
 /// elite_count 指定本波末尾的精英只数（0=引擎按波号公式兜底）；
 /// boss_count 指定妖潮期本波妖王配额（0=引擎按全局公式兜底）；
 /// buff_mult 覆盖内置增强曲线；未配置的波回落内置公式。

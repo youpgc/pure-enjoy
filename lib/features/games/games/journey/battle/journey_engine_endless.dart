@@ -1,16 +1,16 @@
 part of 'journey_flame_game.dart';
 
 /// 无尽妖潮波次生成器（自 journey_engine_spawns.dart 迁出）：
-/// - **发育期**（妖潮起点前）：小怪普通段+末尾精英，妖王波保持
-///   单只妖王+小怪护卫的教学式单挑（现状口径）；
+/// - **发育期**（妖潮起点前）：小怪普通段+末尾精英，不降临妖王（妖王
+///   波统一并入妖潮期）；
 /// - **妖潮期**（妖潮起点起）：小怪淡出为「精英为主+少量小怪」
-///   （guard_elite_ratio）；妖王波改**妖王潮配额制**——同波配额只
+///   （guard_elite_ratio）；妖王波为**妖王潮配额制**——同波配额只
 ///   依次降临（同场并发钳制 + 缺口出现按降临倒计时补位，不在同一
-///   时间刷新），每只降临播报并赋软领地（锚点散布+leash 杜绝群殴）；
-///   妖潮起点=波次表首个 boss_count>0 的波（以后台实际配置为准）；
-/// - 波次配置 journey_endless_waves 优先：monster_code 命中妖王=妖王
-///   波，count 为本波护卫总量、elite_count 末尾精英数、boss_count
-///   本波妖王配额（0=全局公式兜底）；未配置按经验池公式推演；
+///   时间刷新），种类从全妖王池随机，每只降临播报并赋软领地（锚点
+///   散布+leash 杜绝群殴）；妖潮起点=波次表首个 boss_count>0 的波；
+/// - 波次配置 journey_endless_waves 优先：boss_count>0 即妖王波，怪种
+///   仅决定普通段/护卫怪种；count 为本波护卫总量、elite_count 末尾精英数、
+///   boss_count 本波妖王配额（0=全局公式兜底）；未配置按经验池公式推演；
 /// - 除尽推进不变：本波怪全灭且妖王配额耗尽才进下一波；末波（99）
 ///   清空→「妖潮无尽·功成」可结算。
 void journeyEndlessTick(JourneyFlameGame game, double dt) {
@@ -26,8 +26,8 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
   final waveConf = game.config?.endlessWaveOf(n);
   final count = waveConf?.count ?? endlessWaveCount(n);
   final buff = waveConf?.buffMult ?? endlessWaveBuff(n);
-  // 妖潮期判定以后台波次表实际配置为准：首个配置妖王配额的波即妖潮起点，
-  // 无任何配额配置=全程发育期（妖王波单挑）
+  // 妖潮期判定以后台波次表实际配置为准：首个 boss_count>0 的波即妖潮起点；
+  // 波次表无配额配置时回落全局 tide_start_wave（默认第 10 波）。
   final tideStart = _endlessTideStartWave(game);
   final tide = tideStart != null && n >= tideStart;
   // 本波精英只数：后台配置优先，0（含新列未部署）=按波号公式兜底；
@@ -36,12 +36,11 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
       ? waveConf.eliteCount
       : endlessEliteCount(n);
   final elite = math.min(eliteCount, math.max(0, count - 1));
-  // 波次怪种：普通/精英怪=该波普通段只刷该怪；选妖王=妖王波
+  // 波次怪种只决定普通段/护卫怪种；妖王波由 boss_count>0 判定，与怪种解耦。
   final configuredCode = waveConf?.monsterCode ?? '';
-  final isBossWave = configuredCode.isNotEmpty &&
-      _monsterSource(game).any((m) => m.code == configuredCode && m.isBoss);
-  // 妖潮期妖王波配额：波行 boss_count 优先，0=全局基数+递增公式兜底
-  final bossQuota = !tide || !isBossWave
+  // 妖潮期妖王波配额：波行 boss_count>0 即妖王波，0=全局基数+递增公式兜底；
+  // 发育期（妖潮起点前）恒无妖王。
+  final bossQuota = !tide
       ? 0
       : (waveConf != null && waveConf.bossCount > 0
           ? waveConf.bossCount
@@ -89,22 +88,14 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
   if (game.monsters.length >= game.monsterCap) return;
   final spawned = game._endlessSpawned;
   final isElite = elite > 0 && spawned >= count - elite;
-  // 妖王出场：发育期妖王波=首只位置刷单只妖王（护卫小怪，教学式单挑）；
-  // 妖潮期妖王波妖王全部走补位降临 tick，count 配额全部为护卫
-  final spawnBossInline = isBossWave && !tide && spawned == 0;
-  final model = spawnBossInline
-      ? _bossModelOf(game, configuredCode)
-      : _pickEndlessMonster(game, n, configuredCode,
-          elite: isElite, tideGuard: tide);
+  // 妖王全部走妖潮补位降临 tick；本段只铺普通段/护卫小怪。
+  final model = _pickEndlessMonster(game, n, configuredCode,
+      elite: isElite, tideGuard: tide);
   if (model == null) return;
   game._endlessTimer = 0;
   game.spawnMonsterAt(game, model, buffMult: buff, position: null);
   game.monsters.last.endlessWave = n;
   game._endlessSpawned++;
-  // 妖王波首只现身：走 onBossSpawn 统一播报「妖王降临 · X」（HUD 状态同步）
-  if (spawnBossInline) {
-    game.controller.onBossSpawn(model.name);
-  }
 }
 
 /// 妖潮起点波号：波次表中首个配置妖王配额（boss_count>0）的波——
@@ -189,7 +180,7 @@ void _summonEndlessBoss(
   double buff,
   int? tideStart,
 ) {
-  final model = _bossModelOf(game, configuredCode);
+  final model = _randomTideBoss(game, configuredCode);
   if (model == null) return;
   final amp =
       game.config?.endlessBossAmpPerWave ?? kJourneyEndlessBossAmpPerWave;
@@ -258,6 +249,15 @@ JourneyMonsterModel? _bossModelOf(JourneyFlameGame game, String code) {
     if (m.code == code && m.isBoss) return m;
   }
   return null;
+}
+
+/// 妖潮期降临取怪：从怪物全源的全部妖王里随机取一只，使同波配额内
+/// 可出现多种妖王。候选池为空（远端怪物表缺失且种子无妖王）时按配置
+/// code 回落兜底。
+JourneyMonsterModel? _randomTideBoss(JourneyFlameGame game, String code) {
+  final bosses = _monsterSource(game).where((m) => m.isBoss).toList();
+  if (bosses.isEmpty) return _bossModelOf(game, code);
+  return bosses[game.rng.nextInt(bosses.length)];
 }
 
 /// 无尽怪池挑选：精英段强制走分阶精英池；普通段尊重后台配置的怪种
