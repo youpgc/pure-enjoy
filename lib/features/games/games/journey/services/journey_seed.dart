@@ -494,7 +494,7 @@ const List<Map<String, dynamic>> kJourneyDropSeed =
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'jinding', 'weight': 30, 'qty_min': 1, 'qty_max': 2},
 ];
 
-/// 炼化配方种子（journey_evo_recipes；4 条镜像 SQL 种子，
+/// 炼化配方种子（journey_evo_recipes；9 条镜像 SQL 种子，
 /// 表顺序 seq = 宝箱同时满足多配方时的判定优先级）。
 const List<Map<String, dynamic>> kJourneyEvoRecipeSeed =
     <Map<String, dynamic>>[
@@ -502,6 +502,11 @@ const List<Map<String, dynamic>> kJourneyEvoRecipeSeed =
   {'seq': 2, 'weapon_code': 'jiuchi_paba', 'required_passive_code': 'pantao', 'required_passive_lv': 1, 'result_code': 'tianpeng_armor', 'result_name': '天蓬战甲'},
   {'seq': 3, 'weapon_code': 'jiangyao_bangzhang', 'required_passive_code': 'bishui_pearl', 'required_passive_lv': 1, 'result_code': 'fumo_staff', 'result_name': '伏魔宝杖'},
   {'seq': 4, 'weapon_code': 'staff_buddha_light', 'required_passive_code': 'dingfeng_pearl', 'required_passive_lv': 1, 'result_code': 'jinshen_light', 'result_name': '金身佛光'},
+  {'seq': 5, 'weapon_code': 'qiankun_circle', 'required_passive_code': 'bishui_pearl', 'required_passive_lv': 1, 'result_code': 'nezha_triform', 'result_name': '三头六臂'},
+  {'seq': 6, 'weapon_code': 'huojian_spear', 'required_passive_code': 'shelizi', 'required_passive_lv': 1, 'result_code': 'sheng_ying_fire', 'result_name': '圣婴真火'},
+  {'seq': 7, 'weapon_code': 'zijin_gourd', 'required_passive_code': 'pantao', 'required_passive_lv': 1, 'result_code': 'zijin_hulu', 'result_name': '紫金红葫芦·装天'},
+  {'seq': 8, 'weapon_code': 'sanmei_fire', 'required_passive_code': 'renshen_guo', 'required_passive_lv': 1, 'result_code': 'bagua_furnace', 'result_name': '八卦炉·九转金丹'},
+  {'seq': 9, 'weapon_code': 'bajiao_fan', 'required_passive_code': 'dingfeng_pearl', 'required_passive_lv': 1, 'result_code': 'luocha_fan', 'result_name': '罗刹芭蕉扇'},
 ];
 
 /// 图鉴解锁种子（journey_relic_unlocks；4 件强法宝，
