@@ -207,14 +207,19 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   }) {
     var dmg = damage;
     // 伏魔重击（shaseng 特殊能力）：充能就绪的下一次命中 3 倍伤害，
-    // 并定身该怪 260px 内所有怪 1s（浮动字提示）
+    // 并定身该怪波及范围内所有怪 1s（浮动字提示）
     if (game.hasAbility('shaseng') && game._fumoCharged) {
       game._fumoCharged = false;
       game._fumoTimer = 0;
       dmg *= 3;
+      // 定身波及半径钳制在武器臂长内（以受击怪为圆心）。
+      final reach = math.min(
+        260.0,
+        game.weaponArm?.outerRadius ?? double.maxFinite,
+      );
       for (final other in game.monsters) {
         if (!other.isDead &&
-            (other.position - m.position).length <= 260) {
+            (other.position - m.position).length <= reach) {
           other.rootTimer = 1;
         }
       }
@@ -324,7 +329,12 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     JourneyMonsterComponent from,
     double damage,
   ) {
-    final range = game.weaponParam('baoji_thunder', 'range', 260);
+    // 连锁半径钳制在武器臂长内：以受击怪为圆心，但波及目标不得超出
+    // 玩家可见屏（臂长受 maxArmDiameter/2 约束，天然在屏内）。
+    final range = math.min(
+      game.weaponParam('baoji_thunder', 'range', 260),
+      game.weaponArm?.outerRadius ?? double.maxFinite,
+    );
     final targets = game.weaponParam('baoji_thunder', 'targets', 2).round();
     final candidates = <JourneyMonsterComponent>[];
     for (final m in game.monsters) {
@@ -349,7 +359,11 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     if (arm == null) return;
     final damage = game.hitDamageBase *
         game.weaponParam('zijin_ling', 'damage', 0.6);
-    final range = game.weaponParam('zijin_ling', 'range', 120);
+    // 爆炸半径钳制在武器臂长内（以目标怪为圆心，不波及屏外目标）。
+    final range = math.min(
+      game.weaponParam('zijin_ling', 'range', 120),
+      arm.outerRadius,
+    );
     for (final other in game.monsters) {
       if (other.isDead || identical(other, m)) continue;
       if ((other.position - m.position).length <= range) {

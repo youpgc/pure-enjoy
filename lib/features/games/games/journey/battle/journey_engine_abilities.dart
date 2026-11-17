@@ -43,20 +43,23 @@ extension JourneyAbilityTick on JourneyFlameGame {
       }
     }
 
-    // 芭蕉罡风（tieshan）：每 30s 扇出罡风，全屏妖物击退 240 并定身 1s
+    // 芭蕉罡风（tieshan）：每 30s 扇出罡风，武器臂长内妖物击退 240 并定身 1s
     if (hasAbility('tieshan')) {
       _tieshanTimer += dt;
       if (_tieshanTimer >= JourneyFlameGame._tieshanPeriodSec) {
         _tieshanTimer = 0;
+        final arm = weaponArm;
+        final reach = arm?.outerRadius ?? 0.0;
         for (final m in monsters) {
           if (m.isDead) continue;
           final away = m.position - player.position;
+          if (away.length > reach) continue;
           if (away.length > 1) {
             m.applyKnockback(away, 240);
           }
           m.rootTimer = 1;
         }
-        fxLayer.spawnRing(player.position, 240);
+        fxLayer.spawnRing(player.position, reach);
         spawnFloatText(
           player.position + Vector2(0, -36),
           '芭蕉罡风',

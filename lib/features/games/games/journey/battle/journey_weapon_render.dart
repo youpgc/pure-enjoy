@@ -114,8 +114,9 @@ class JourneyOrbitWeapons extends Component {
   }
 }
 
-/// 西游扩展特效触发（金刚琢/阴阳二气瓶）：周期结算，目标取玩家 900 内
-/// 最近存活怪；对局暂停时随引擎冻结（挂在伤害节拍前每帧推进）。
+/// 西游扩展特效触发（金刚琢/阴阳二气瓶）：周期结算，目标取玩家武器
+/// 臂长内最近存活怪（臂长受可见屏约束，不索敌屏外目标）；对局暂停时
+/// 随引擎冻结（挂在伤害节拍前每帧推进）。
 extension JourneyTriggerWeapons on JourneyFlameGame {
   /// 金刚琢：每 12s 套取最近怪，受 250% 武器伤害且接触伤害减半 5s；
   /// 阴阳二气瓶：每 18s 吸纳最近怪，定身 2.5s 并每秒受 40% 武器伤害。
@@ -129,7 +130,9 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
     if (!hasZhuo && !hasPing) return;
 
     JourneyMonsterComponent? nearest;
-    var best = 900.0;
+    // 索敌范围钳制在武器臂长内：臂长已被 maxArmDiameter/2 限在可见屏内，
+    // 触发目标不会落在玩家看不到的屏外区域。
+    var best = arm.outerRadius;
     for (final m in monsters) {
       if (m.isDead) continue;
       final d = (m.position - player.position).length;
