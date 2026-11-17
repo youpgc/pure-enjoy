@@ -49,6 +49,7 @@ abstract interface class JourneyWeaponHost {
   set critDamage(double value);
   double get maxArmDiameter;
   double slotValue(String code, double fallback);
+  double battleNum(String group, String key, double fallback);
   JourneyPlayerComponent get player;
 }
 
@@ -113,13 +114,15 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       case 'magnet': // 磁吸：每级拾取范围 +（value_per_level）
         player.pickupRange += slotValue('magnet', 40) * delta;
         break;
-      case 'crit_rate': // 暴击率：每级 +（value_per_level；引擎钳 ≤60%）
+      case 'crit_rate': // 暴击率：每级 +（value_per_level；引擎钳上限可配）
         critRate = (critRate + slotValue('crit_rate', 0.025) * delta)
-            .clamp(0.0, 0.60);
+            .clamp(0.0, battleNum('damage', 'crit_rate_cap', 0.60));
         break;
-      case 'crit_damage': // 暴击伤害：每级 +（value_per_level；钳 ≤+100%）
+      case 'crit_damage': // 暴击伤害：每级 +（value_per_level；上下限可配）
+        final cMin = battleNum('damage', 'crit_dmg_min', 1.0);
+        final cMax = battleNum('damage', 'crit_dmg_cap', 2.0);
         critDamage = (critDamage + slotValue('crit_damage', 0.06) * delta)
-            .clamp(1.0, 2.0);
+            .clamp(math.min(cMin, cMax), math.max(cMin, cMax));
         break;
       case 'armor': // 护甲：每级 +（value_per_level；减伤曲线钳制在伤害侧）
         player.armor += slotValue('armor', 3.0) * delta;
@@ -139,10 +142,14 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     final pierceLv = game.slotLevel('pierce');
     // 穿刺破甲比例：1 级基准 + 每级增量（value_per_level 可配），钳 ≤ 上限
     final pierceIgnore = pierceLv > 0
-        ? (kJourneyPierceBaseRatio +
+        ? (game.battleNum('weapon', 'pierce_base',
+                    kJourneyPierceBaseRatio) +
                 game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
                     (pierceLv - 1))
-            .clamp(0.0, kJourneyPierceRatioCap)
+            .clamp(
+                0.0,
+                game.battleNum(
+                    'weapon', 'pierce_cap', kJourneyPierceRatioCap))
         : 0.0;
     final knockLv = game.slotLevel('knockback');
     final lifestealLv = game.slotLevel('lifesteal');
@@ -184,7 +191,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           lifestealLv: lifestealLv,
           burnLv: burnLv,
           toM: toM);
-      m.orbHitCd = 0.3;
+      m.orbHitCd = game.battleNum('weapon', 'hit_cd', 0.3);
     }
 
     // 参照物扫掠：可击破参照物被扇叶命中扣血（无暴击，0.3s/个冷却）
@@ -279,16 +286,25 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       // 每级 +1.5%（远端 value_per_level 可覆盖斜率），比例钳 ≤20%；
       // 低伤命中保底 2 点。秒窗合计钳到最大生命 10%（防多目标高频
       // 命中叠乘；禁疗由 heal 内部拦截）
-      final ratio = (kJourneyLifestealBaseRatio +
+      final ratio = (game.battleNum('weapon', 'lifesteal_base',
+                    kJourneyLifestealBaseRatio) +
               game.slotValue('lifesteal', kJourneyLifestealRatioPerLv) *
                   (lifestealLv - 1))
-          .clamp(0.0, kJourneyLifestealRatioCap);
-      game.addLifestealHeal(math.max(dmg * ratio, kJourneyLifestealHealFloor));
+          .clamp(
+              0.0,
+              game.battleNum('weapon', 'lifesteal_cap',
+                  kJourneyLifestealRatioCap));
+      game.addLifestealHeal(math.max(
+          dmg * ratio,
+          game.battleNum('weapon', 'lifesteal_floor',
+              kJourneyLifestealHealFloor)));
     }
     if (knockLv > 0) {
       var kb = game.slotValue('knockback', 16) * knockLv;
-      // 铜皮铁骨（bajie 特殊能力）：受击窗口内击退强度 +50%
-      if (game._bajieGuard > 0) kb *= 1.5;
+      // 铜皮铁骨（bajie 特殊能力）：受击窗口内击退强度放大
+      if (game._bajieGuard > 0) {
+        kb *= game.battleNum('ability', 'bajie_knock_mult', 1.5);
+      }
       // 不动如山（牛魔王）：抗击退（journey_monster_params.knock_resist）
       kb *= 1 -
           game.monsterParam(
@@ -305,18 +321,23 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         source: 'weapon_burn',
         burnDps: game.slotValue('burn', 8.0) *
             burnLv *
-            (game.hasAbility('honghaier') ? 2.0 : 1.0),
-        seconds: game.hasAbility('honghaier') ? 4 : 2,
+            (game.hasAbility('honghaier')
+                ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
+                : 1.0),
+        seconds: game.hasAbility('honghaier')
+            ? game.battleNum('ability', 'honghaier_burn_sec', 4)
+            : 2,
         trueDamage: true,
       );
     }
     // 兜率炉火（laojun 特殊能力）：炉火加持窗口内命中附加一路独立灼烧
-    // （每秒 40% 武器伤害，2 秒），与武器灼烧/其他法宝同时生效不互相覆盖
+    // （每秒按武器伤害比例，持续可配），与武器灼烧/其他法宝同时生效不互相覆盖
     if (game._laojunWindow > 0 && !m.isDead) {
       m.ignite(
         source: 'laojun_fire',
-        burnDps: game.hitDamageBase * 0.4,
-        seconds: 2,
+        burnDps: game.hitDamageBase *
+            game.battleNum('ability', 'laojun_burn_ratio', 0.4),
+        seconds: game.battleNum('ability', 'laojun_burn_sec', 2),
       );
     }
   }
@@ -427,7 +448,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       }
       if (!hit) continue;
       game.damageMapObject(i, game.hitDamageBase);
-      game._mapObjHitCd[i] = 0.3;
+      game._mapObjHitCd[i] = game.battleNum('weapon', 'hit_cd', 0.3);
     }
   }
 }

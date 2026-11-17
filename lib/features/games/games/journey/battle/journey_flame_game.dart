@@ -186,22 +186,16 @@ class JourneyFlameGame extends FlameGame
   /// 铜皮铁骨（bajie）：受击后减伤窗口剩余时间（3s）。
   double _bajieGuard = 0;
 
-  /// 伏魔重击（shaseng）：蓄力计时 / 充能就绪标记（每 20s 一次）。
-  static const double _fumoChargeSec = 20;
+  /// 伏魔重击（shaseng）：蓄力计时 / 充能就绪标记。
+  /// 周期走 ability 组参数，缺省 20s。
   double _fumoTimer = 0;
   bool _fumoCharged = false;
 
   /// 西游扩展批·特殊能力（扩展角色加强点点亮后生效）：
   /// 三头六臂（nezha）触发计时与增益窗口 / 兜率炉火（laojun）触发
   /// 计时与加持窗口 / 芭蕉罡风（tieshan）触发计时 / 紫金宝葫
-  /// （jinjiao）本局攻击叠层（每层 +3%，击杀精英/妖王 +1，钳 20 层
-  /// 即上限 +60%）。
-  static const double _nezhaPeriodSec = 30;
-  static const double _nezhaWindowSec = 6;
-  static const double _laojunPeriodSec = 30;
-  static const double _laojunWindowSec = 6;
-  static const double _tieshanPeriodSec = 30;
-  static const int _jinjiaoMaxStacks = 20;
+  /// （jinjiao）本局攻击叠层（击杀精英/妖王 +1）。
+  /// 各周期、窗口、层数上限与叠层增幅走 ability 组参数。
   double _nezhaTimer = 0;
   double _nezhaWindow = 0;
   double _laojunTimer = 0;
@@ -245,9 +239,12 @@ class JourneyFlameGame extends FlameGame
   /// - 三头六臂（nezha 特殊能力）增益窗口 +40%。
   double get damageAmpTotal =>
       attackAmp +
-      (damageAmp - 1.0).clamp(0.0, 2.0) +
-      0.03 * _jinjiaoStacks +
-      (_nezhaWindow > 0 ? 0.4 : 0);
+      (damageAmp - 1.0)
+          .clamp(0.0, battleNum('damage', 'amp_cap', 2.0)) +
+      battleNum('ability', 'jinjiao_per_stack', 0.03) * _jinjiaoStacks +
+      (_nezhaWindow > 0
+          ? battleNum('ability', 'nezha_amp', 0.4)
+          : 0);
 
   /// 法宝数值参数（journey_weapon_params 后台配置；行缺失回落 fallback）。
   double weaponParam(String code, String key, double fallback) =>
@@ -256,6 +253,21 @@ class JourneyFlameGame extends FlameGame
   /// 妖王能力参数（journey_monster_params 后台配置；行缺失回落 fallback）。
   double monsterParam(String monsterCode, String key, double fallback) =>
       config?.monsterParam(monsterCode, key, fallback) ?? fallback;
+
+  /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 fallback）。
+  /// [group] 为参数分组（damage/spawn/monster/boss/ability/economy/…），
+  /// [key] 为组内语义键；原内置常量作为 [fallback] 保证未配置行为不变。
+  @override
+  double battleNum(String group, String key, double fallback) =>
+      config?.battleNum(group, key, fallback) ?? fallback;
+
+  /// 玩家基础移速（player.base_speed；缺省用内置值）。
+  double get baseSpeed =>
+      battleNum('player', 'base_speed', JourneyPlayerComponent.baseSpeed);
+
+  /// 通用战斗参数·文本（枚举型，未配置回落 fallback）。
+  String battleText(String group, String key, String fallback) =>
+      config?.battleText(group, key, fallback) ?? fallback;
 
   /// 护甲减伤曲线分母 K（journey_globals.armor_curve_k；缺省 80）。
   double get armorCurveK =>
@@ -472,11 +484,13 @@ class JourneyFlameGame extends FlameGame
     // 不进入里程口径；仅无妖主线章回按西行里程亮结算按钮（挂机/定身无里程不可达成）
     if (bossModel == null && !_isEndless(this) && !_isDaily(this)) {
       final target = travelTargetLi;
-      final left = (target - traveledUnits / 25).ceil().clamp(0, target);
+      final unitsPerLi = battleNum('player', 'units_per_li', 25);
+      final left =
+          (target - traveledUnits / unitsPerLi).ceil().clamp(0, target);
       if (left != controller.hud.travelLeft.value) {
         controller.hud.travelLeft.value = left;
       }
-      if (traveledUnits >= target * 25 && !_bossDefeated) {
+      if (traveledUnits >= target * unitsPerLi && !_bossDefeated) {
         _markClearedAvailable('西行功成');
       }
     }

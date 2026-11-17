@@ -1,10 +1,9 @@
 part of 'journey_flame_game.dart';
 
-/// 全局节拍伤害：0.5s 一结算，取接触中伤害最高怪；贴脸怪群不叠乘。
-/// （口径详见概念文档 §7；节拍间隔后台可调，客户端先取常量。）
+/// 全局节拍伤害：默认 0.5s 一结算，取接触中伤害最高怪；贴脸怪群不叠乘。
+/// 节拍间隔可由 journey_battle_params.damage.hurt_interval 调整。
 mixin JourneyDamageTickMixin {
   double _hurtTimer = 0;
-  static const double hurtInterval = 0.5;
 
   /// 玩家侧护甲减伤上限（百分比口径钳死值）：无论护甲多高，单次接触伤害
   /// 至少保留原值的 40%。怪物侧另用 [kJourneyMonsterArmorCap]（72%）。
@@ -26,7 +25,7 @@ mixin JourneyDamageTickMixin {
     // 扩展特效计时（金刚琢/阴阳二气瓶）：每帧推进，暂停时随引擎冻结
     game.updateTriggerWeapons(dt);
     _hurtTimer += dt;
-    if (_hurtTimer < hurtInterval) return;
+    if (_hurtTimer < game.battleNum('damage', 'hurt_interval', 0.5)) return;
     _hurtTimer = 0;
 
     final player = game.player;
@@ -45,19 +44,21 @@ mixin JourneyDamageTickMixin {
       }
     }
     if (strongestM != null) {
-      // 虚弱（金刚琢）：虚弱期接触伤害减半（在护甲折算前生效）
+      // 虚弱（金刚琢）：虚弱期接触伤害按系数削减（护甲折算前生效）
       if (strongestM.weakenTimer > 0) {
-        strongest *= 0.5;
+        strongest *= game.battleNum('damage', 'weaken_mult', 0.5);
       }
       var afterArmor =
           (strongest *
                   (1 -
                       armorReductionRatio(player.armor,
-                          curveK: game.armorCurveK)))
+                          curveK: game.armorCurveK,
+                          cap: game.battleNum('damage', 'player_armor_cap',
+                              kJourneyPlayerArmorCap))))
               .clamp(1.0, double.maxFinite);
-      // 铜皮铁骨（bajie 特殊能力）：受击后窗口内额外减伤 30%
+      // 铜皮铁骨（bajie 特殊能力）：受击后窗口内按系数减伤
       if (game._bajieGuard > 0) {
-        afterArmor *= 0.70;
+        afterArmor *= game.battleNum('ability', 'bajie_guard_mult', 0.70);
       }
       player.takeDamage(afterArmor);
       // 反伤荆棘（§6 特效法宝）：对造成伤害的怪反弹 thorns 比例护甲后
@@ -117,14 +118,21 @@ extension JourneyBossCharge on JourneyFlameGame {
 
     var raw = boss._contactDamage *
         monsterParam(boss.model.code, 'charge_ratio', 2.0);
-    // 虚弱（金刚琢）：与接触节拍同口径，护甲折算前减半
-    if (boss.weakenTimer > 0) raw *= 0.5;
+    // 虚弱（金刚琢）：与接触节拍同口径，护甲折算前按系数削减
+    if (boss.weakenTimer > 0) {
+      raw *= battleNum('damage', 'weaken_mult', 0.5);
+    }
     var afterArmor = (raw *
             (1 -
                 JourneyDamageTickMixin.armorReductionRatio(
-                    player.armor, curveK: armorCurveK)))
+                    player.armor,
+                    curveK: armorCurveK,
+                    cap: battleNum('damage', 'player_armor_cap',
+                        kJourneyPlayerArmorCap))))
         .clamp(1.0, double.maxFinite);
-    if (_bajieGuard > 0) afterArmor *= 0.70;
+    if (_bajieGuard > 0) {
+      afterArmor *= battleNum('ability', 'bajie_guard_mult', 0.70);
+    }
     player.takeDamage(afterArmor);
     // 反伤荆棘：冲撞同属接触伤害，照常对撞人妖王反弹
     if (effectWeapons.contains('fanshang_thorns')) {

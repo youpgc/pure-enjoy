@@ -63,18 +63,21 @@ extension JourneyInteract on JourneyFlameGame {
     }
   }
 
-  /// 还魂复活（§3）：回 60% 血量、300px 内怪物向外推至 420px、弹「还魂！」。
+  /// 还魂复活（§3）：按参数回血、推开近身怪、弹「还魂！」。
   void doRevive() {
     revivesLeft--;
-    player.hp = player.maxHp * 0.6;
+    player.hp = player.maxHp *
+        battleNum('economy', 'revive_hp_ratio', 0.6);
+    final pushFrom = battleNum('economy', 'revive_push_from', 300);
+    final pushTo = battleNum('economy', 'revive_push_to', 420);
     for (final m in monsters) {
       if (m.isDead) continue;
       final d = m.position - player.position;
       final len = d.length;
-      if (len < 300) {
+      if (len < pushFrom) {
         m.position = len < 1
-            ? player.position + Vector2(420, 0)
-            : player.position + d.normalized() * 420;
+            ? player.position + Vector2(pushTo, 0)
+            : player.position + d.normalized() * pushTo;
       }
     }
     spawnFloatText(
@@ -122,7 +125,9 @@ extension JourneyInteract on JourneyFlameGame {
       }
       return;
     }
-    if (_charLv < _charLevelCap && rng.nextDouble() < 0.8) {
+    if (_charLv < _charLevelCap &&
+        rng.nextDouble() <
+            battleNum('economy', 'chest_choice_rate', 0.8)) {
       // 额外三选一（不涨经验，复用升级选卡暂停/恢复路径）
       triggerBonusChoice();
     } else {
@@ -130,9 +135,13 @@ extension JourneyInteract on JourneyFlameGame {
     }
   }
 
-  /// 宝箱功德兜底：15 枚，50% 概率翻倍成 30（暴击翻倍口径）。
+  /// 宝箱功德兜底：基准枚数，按概率翻倍（暴击翻倍口径）。
   void _chestMeritFallback() {
-    final coins = rng.nextDouble() < 0.5 ? 30 : 15;
+    final doubleRate =
+        battleNum('economy', 'chest_merit_double_rate', 0.5);
+    final coins = rng.nextDouble() < doubleRate
+        ? battleNum('economy', 'chest_merit_double', 30).round()
+        : battleNum('economy', 'chest_merit_base', 15).round();
     addMeritCoins(coins);
     spawnFloatText(
       player.position + Vector2(0, -36),

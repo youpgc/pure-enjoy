@@ -213,6 +213,29 @@ Map<String, Map<String, double>> _monsterParams(
           ? globalsRows.first
           : null;
 
+  // 通用战斗参数：按 group.param 平铺为数值/文本两张表；停用行不写入，
+  // 由消费侧回落内置常量。numeric 字段兼容数字与字符串两种返回。
+  final battleParamsNum = <String, double>{};
+  final battleParamsText = <String, String>{};
+  for (final row in view.of(JourneyConfigTable.battleParams)) {
+    if (row['enabled'] == false) continue;
+    final group = row['group_code'] as String?;
+    final code = row['param_code'] as String?;
+    if (group == null || group.isEmpty || code == null || code.isEmpty) {
+      continue;
+    }
+    final key = JourneyConfigSnapshot.battleKey(group, code);
+    final numValue = row['value_num'];
+    if (numValue is num) {
+      battleParamsNum[key] = numValue.toDouble();
+    } else if (numValue is String) {
+      final parsed = double.tryParse(numValue);
+      if (parsed != null) battleParamsNum[key] = parsed;
+    }
+    final text = row['value_text'];
+    if (text is String && text.isNotEmpty) battleParamsText[key] = text;
+  }
+
   return (
     snapshot: JourneyConfigSnapshot(
       regions: regions,
@@ -252,6 +275,8 @@ Map<String, Map<String, double>> _monsterParams(
           .toList(),
       weaponParams: relations.weaponParams,
       monsterParams: _monsterParams(view, monsterIdToCode),
+      battleParamsNum: battleParamsNum,
+      battleParamsText: battleParamsText,
       globalsRaw: globalsRaw,
       gameId: gameId,
       scoreDimIds: <String, String>{

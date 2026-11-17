@@ -52,11 +52,18 @@ mixin JourneySpawnMixin {
     _spawnTimer += dt;
     final minute = game._elapsed / 60.0;
     final tier = _isDaily(game) ? _dailyDensityTier(game) : 0;
-    final interval = (0.8 - 0.10 * tier - minute * 0.12).clamp(0.28, 0.8);
+    final spawnMin = game.battleNum('spawn', 'interval_min', 0.28);
+    final spawnMax = game.battleNum('spawn', 'interval_base', 0.8);
+    final interval = (game.battleNum('spawn', 'interval_base', 0.8) -
+            game.battleNum('spawn', 'interval_tier', 0.10) * tier -
+            minute * game.battleNum('spawn', 'interval_minute', 0.12))
+        .clamp(math.min(spawnMin, spawnMax), math.max(spawnMin, spawnMax));
     if (_spawnTimer < interval) return;
     _spawnTimer = 0;
     final batchCap = 1 + tier;
-    final batch = 1 + (minute ~/ 1.5).clamp(0, batchCap - 1);
+    final batchMinutes = game.battleNum('spawn', 'batch_minutes', 1.5);
+    final batch = 1 +
+        (minute ~/ batchMinutes).clamp(0, batchCap - 1);
     for (var i = 0; i < batch; i++) {
       if (game.monsters.length >= game.monsterCap) return;
       final pick = _pickMonster(game);
@@ -247,11 +254,14 @@ mixin JourneySpawnMixin {
       hud.bossHp.value = comp.hp.round();
     });
 
-    // 据点守卫：妖王周边环状 10 只精英/普通怪
+    // 据点守卫：妖王周边环状精英/普通怪，只数与环带可配
     final guards = game.pool.where((m) => !m.isBoss).toList();
-    for (var i = 0; i < 10 && guards.isNotEmpty; i++) {
+    final guardCount = game.battleNum('spawn', 'boss_guard_count', 10).round();
+    final ringMin = game.battleNum('spawn', 'boss_guard_ring_min', 120);
+    final ringSpan = game.battleNum('spawn', 'boss_guard_ring_span', 140);
+    for (var i = 0; i < guardCount && guards.isNotEmpty; i++) {
       final gAngle = (i / 6) * math.pi * 2 + game.rng.nextDouble() * 0.6;
-      final gDist = 120.0 + game.rng.nextDouble() * 140.0;
+      final gDist = ringMin + game.rng.nextDouble() * ringSpan;
       spawnMonsterAt(
         game,
         guards[game.rng.nextInt(guards.length)],
@@ -266,16 +276,18 @@ mixin JourneySpawnMixin {
     }
   }
 
-  /// 下一场妖王：同体增强（血量 +55%/场、伤害 +25%/场），据点重生。
+  /// 下一场妖王：同体增强（血量/伤害按场递增），据点重生。
   void respawnBoss(JourneyFlameGame game) {
     final model = game.bossModel;
     if (model == null) return;
+    final hpGain =
+        game.battleNum('boss', 'stage_hp_gain', 0.55);
     final comp = JourneyMonsterComponent(
       game: game,
       model: model,
-      buffMult: game.buffMult * (1.0 + game._bossStage * 0.55),
+      buffMult: game.buffMult * (1.0 + game._bossStage * hpGain),
       hpBuffMult: game.bossHpBuffMult *
-          (1.0 + game._bossStage * 0.55),
+          (1.0 + game._bossStage * hpGain),
       position: game.bossPos.clone(),
     );
     comp.scaleStageDamage(game._bossStage);
@@ -299,16 +311,18 @@ mixin JourneySpawnMixin {
   void _updateEndless(JourneyFlameGame game, double dt) =>
       journeyEndlessTick(game, dt);
 
-  /// 每日游历·铜钱雨：每 4s 在玩家环带 spawn 5 枚功德铜钱，
-  /// 每枚价值=pickupConfigOf('gongde_tongqian').value×10（缺省 30）。
+  /// 每日游历·铜钱雨：按参数周期在玩家环带撒功德铜钱，每枚价值可配。
   void _updateDailyCoinRain(JourneyFlameGame game, double dt) {
     game._dailyCoinTimer += dt;
-    if (game._dailyCoinTimer < 4) return;
+    if (game._dailyCoinTimer <
+        game.battleNum('economy', 'daily_coin_period_sec', 4)) {
+      return;
+    }
     game._dailyCoinTimer = 0;
-    // 每日铜钱单价固定 8，与普通铜钱(3)保持同一量级，压低每日总产出
-    const unit = 8;
+    final unit = game.battleNum('economy', 'daily_coin_unit', 8).round();
+    final count = game.battleNum('economy', 'daily_coin_count', 4).round();
     final size = game.worldSize;
-    for (var i = 0; i < 4; i++) {
+    for (var i = 0; i < count; i++) {
       final angle = game.rng.nextDouble() * math.pi * 2;
       final dist = 420.0 + game.rng.nextDouble() * 780.0;
       game._spawnPickup(

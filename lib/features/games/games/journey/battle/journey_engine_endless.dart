@@ -66,7 +66,8 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
     }
     game._endlessWave = n + 1;
     game._endlessSpawned = 0;
-    game._endlessRest = 1.2;
+    game._endlessRest =
+        game.battleNum('endless', 'wave_rest_sec', 1.2);
     game._endlessBossSummoned = 0;
     game._endlessBossKilled = 0;
     game._jinjiaoWaveRefines = 0;
@@ -82,8 +83,9 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
   }
 
   game._endlessTimer += dt;
-  // 每波约 18 秒铺完（50 只→0.35s、120 只→0.15s），保持割草节奏
-  final interval = (18.0 / count).clamp(0.12, 0.35);
+  // 每波铺怪总时长可配（50 只→0.35s、120 只→0.15s），保持割草节奏
+  final spreadSec = game.battleNum('endless', 'wave_spread_sec', 18.0);
+  final interval = (spreadSec / count).clamp(0.12, 0.35);
   if (game._endlessTimer < interval) return;
   if (game.monsters.length >= game.monsterCap) return;
   final spawned = game._endlessSpawned;
@@ -114,13 +116,14 @@ int? _endlessTideStartWave(JourneyFlameGame game) {
 }
 
 /// 妖潮期每波妖王配额兜底公式：自妖潮起点线性递增至终波满额——
-/// quota = (n − 起点 + 1) × 11 ~/ 10（整数算式），起点 10 时
+/// quota = (n − 起点 + 1) × 配额系数（向下取整），起点 10 时
 /// 波10=1、波20=12、波50=45、波99=99；波行 boss_count 优先于本公式。
 /// 同波配额限刷新总量（默认上限 99），同屏在场数由并发上限独立钳制。
 int _endlessBossQuota(JourneyFlameGame game, int n, int? tideStart) {
   final cap = game.config?.endlessBossCountCap ?? kJourneyEndlessBossCountCap;
   if (tideStart == null) return 0;
-  return (((n - tideStart + 1) * 11) ~/ 10).clamp(1, cap);
+  final gain = game.battleNum('endless', 'boss_quota_gain', 1.1);
+  return ((n - tideStart + 1) * gain).floor().clamp(1, cap);
 }
 
 /// 妖王潮降临节拍：同场并发钳制；配额内首只立即降临，此后缺口出现

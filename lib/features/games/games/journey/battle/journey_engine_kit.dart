@@ -18,7 +18,8 @@ extension JourneyKit on JourneyFlameGame {
   /// （1 里=25 世界单位，与妖王罗盘同约定）。恒速基础移速恰好在锚点
   /// 时长内走完；移速投入可提前达成，挂机/定身不累计里程、无法达成。
   int get travelTargetLi =>
-      (JourneyPlayerComponent.baseSpeed * surviveTargetSec / 25).round();
+      (baseSpeed * surviveTargetSec / battleNum('player', 'units_per_li', 25))
+          .round();
 
   /// 建立角色初始环绕（特性法宝 1 件）：转速/内缘/臂长/臂宽/基础伤害/
   /// 初始特效全部读 journey_weapons 后台配置；行未配置（或字段为 0/空）

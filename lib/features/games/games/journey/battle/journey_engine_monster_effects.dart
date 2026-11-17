@@ -149,7 +149,9 @@ mixin JourneyBossAbilityMixin on PositionComponent {
             raw *
                 (1 -
                     JourneyDamageTickMixin.armorReductionRatio(player.armor,
-                        curveK: game.armorCurveK)),
+                        curveK: game.armorCurveK,
+                        cap: game.battleNum('damage', 'player_armor_cap',
+                            kJourneyPlayerArmorCap))),
           );
           game.spawnFloatText(
             player.position + Vector2(0, -36),

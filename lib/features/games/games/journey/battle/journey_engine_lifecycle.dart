@@ -76,13 +76,20 @@ extension JourneyLifecycle on JourneyFlameGame {
                   kJourneyEndlessBossRefinePerWave);
       if (refineAllowed) {
         if (_isEndless(this)) _jinjiaoWaveRefines++;
-        final lit = _jinjiaoStacks < JourneyFlameGame._jinjiaoMaxStacks;
+        final maxStacks =
+            battleNum('ability', 'jinjiao_max_stacks', 20).round();
+        final lit = _jinjiaoStacks < maxStacks;
         if (lit) _jinjiaoStacks++;
-        player.heal(player.maxHp * 0.15);
+        player.heal(player.maxHp *
+            battleNum('ability', 'jinjiao_heal_per_stack', 0.15));
+        final stackPct = (_jinjiaoStacks *
+                battleNum('ability', 'jinjiao_per_stack', 0.03) *
+                100)
+            .round();
         spawnFloatText(
           player.position + Vector2(0, -36),
           lit
-              ? '紫金宝葫 · 攻击 +${_jinjiaoStacks * 3}%'
+              ? '紫金宝葫 · 攻击 +$stackPct%'
               : '紫金宝葫 · 已满层',
           const Color(0xFFE8C470),
         );
@@ -244,7 +251,8 @@ extension JourneyLifecycle on JourneyFlameGame {
     // 金身佛光·免死：回 30% 生命并跳过还魂/结算（仅一次，与还魂互斥）
     if (hasAbility('tang') && !_jinshenFatalUsed) {
       _jinshenFatalUsed = true;
-      player.hp = player.maxHp * 0.3;
+      player.hp = player.maxHp *
+          battleNum('ability', 'tang_fatal_heal_ratio', 0.3);
       controller.hud.hp.value = player.hp;
       spawnFloatText(
         player.position + Vector2(0, -36),
@@ -326,7 +334,8 @@ extension JourneyLifecycle on JourneyFlameGame {
     for (final entry in _lifestealHeals) {
       used += entry.$2;
     }
-    final cap = player.maxHp * kJourneyLifestealSecCapRatio;
+    final cap = player.maxHp *
+        battleNum('weapon', 'lifesteal_sec_cap', kJourneyLifestealSecCapRatio);
     final room = math.max(player.maxHp - player.hp, 0.0);
     final granted = math.min(
       amount,
@@ -355,8 +364,11 @@ extension JourneyLifecycle on JourneyFlameGame {
             : (level.levelNo <= 0
                 ? 0
                 : (level.firstClearMerit > 0
-                    ? (level.firstClearMerit * 0.3).round()
-                    : 10));
+                    ? (level.firstClearMerit *
+                            battleNum('economy', 'repeat_clear_ratio', 0.3))
+                        .round()
+                    : battleNum('economy', 'repeat_clear_flat', 10)
+                        .round()));
     controller.onFinished(
       cleared: cleared,
       kills: _kills,

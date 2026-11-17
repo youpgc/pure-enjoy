@@ -225,10 +225,12 @@ mixin JourneyLootMixin {
       _rollDropTable(game, rollTable, m.position.clone(), expValue: expValue);
     } else {
       drop(JourneyPickupKind.exp, expValue);
-      if (game.rng.nextDouble() < 0.35) {
+      if (game.rng.nextDouble() <
+          game.battleNum('economy', 'drop_coin_fallback', 0.35)) {
         drop(JourneyPickupKind.meritCoin, 3 + game.level.levelNo ~/ 2);
       }
-      if (game.rng.nextDouble() < 0.04) {
+      if (game.rng.nextDouble() <
+          game.battleNum('economy', 'drop_peach_fallback', 0.04)) {
         drop(JourneyPickupKind.peach, 25);
       }
       if (keepBossChest) {

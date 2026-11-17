@@ -53,6 +53,12 @@ class JourneyConfigSnapshot {
   /// 列缺失/seed 快照为 null 时消费侧回落内置兜底）。
   final Map<String, dynamic>? globalsRaw;
 
+  /// 通用战斗参数（journey_battle_params，key = 'group_code.param_code'）：
+  /// 数值型与文本型分表存储，引擎按分组+语义键读取；未配置或停用的参数
+  /// 不写入，消费侧经 [battleNum]/[battleText] 回落内置常量。
+  final Map<String, double> battleParamsNum;
+  final Map<String, String> battleParamsText;
+
   /// 全局参数数值统一从原始行惰性读取：分组加载时 globals 表可能尚未
   /// 到齐，构造期固化会把后台后到的配置永久锁在内置基线上。
   /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；
@@ -111,6 +117,18 @@ class JourneyConfigSnapshot {
     if (v is String) return double.tryParse(v);
     return null;
   }
+
+  /// 通用战斗参数键：分组码与语义键拼成唯一键。
+  static String battleKey(String group, String code) => '$group.$code';
+
+  /// 数值型战斗参数：未配置走 [fallback]。引擎逐项传入原内置常量，
+  /// 保证参数表未部署/未配置时行为与改造前一致。
+  double battleNum(String group, String code, double fallback) =>
+      battleParamsNum[battleKey(group, code)] ?? fallback;
+
+  /// 枚举/文本型战斗参数：未配置走 [fallback]。
+  String battleText(String group, String code, String fallback) =>
+      battleParamsText[battleKey(group, code)] ?? fallback;
 
   /// 妖王首次降临延迟（秒）；列缺失或未配值时回落内置兜底。
   int get bossSpawnDelaySec =>
@@ -289,6 +307,8 @@ class JourneyConfigSnapshot {
     this.endlessWaves = const <JourneyEndlessWaveModel>[],
     this.weaponParams = const <String, Map<String, double>>{},
     this.monsterParams = const <String, Map<String, double>>{},
+    this.battleParamsNum = const <String, double>{},
+    this.battleParamsText = const <String, String>{},
     this.globalsRaw,
     this.gameId = '',
     this.scoreDimIds = const <String, String>{},

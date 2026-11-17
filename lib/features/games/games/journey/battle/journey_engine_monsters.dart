@@ -30,9 +30,13 @@ class JourneyMonsterComponent extends PositionComponent
               bossLvHpTerm: bossLvHpTerm,
             ),
         _speed = model.baseSpeed *
-            (0.9 + clampJourneyBuff(game, buffMult) * 0.12),
+            (game.battleNum('monster', 'speed_base', 0.9) +
+                clampJourneyBuff(game, buffMult) *
+                    game.battleNum('monster', 'speed_per_buff', 0.12)),
         _contactDamageVal = model.contactDamage *
-            (0.85 + clampJourneyBuff(game, buffMult) * 0.2) {
+            (game.battleNum('monster', 'contact_base', 0.85) +
+                clampJourneyBuff(game, buffMult) *
+                    game.battleNum('monster', 'contact_per_buff', 0.2)) {
     // 护甲：journey_monster_params.armor 逐怪覆盖优先；缺省按 AI 档兜底
     // （普通 25 / 精英 40 / 妖王按西游背景定档表），同 armor/(armor+K) 曲线
     bonusArmor = game.monsterParam(
@@ -143,16 +147,20 @@ class JourneyMonsterComponent extends PositionComponent
 
   /// 侦测半径：妖王潮领地半径优先；普通怪≈屏高 0.4 口径；妖王据点
   /// 用更大触发圈。
-  double get aggroRange =>
-      territoryRadius ?? (model.isBoss ? 420 : 260);
+  double get aggroRange => territoryRadius ??
+      (model.isBoss
+          ? game.battleNum('monster', 'aggro_boss', 420)
+          : game.battleNum('monster', 'aggro_normal', 260));
 
   /// 脱战半径：领地口径=领地 ×leash 倍率（软领地追出 30% 即归位）；
-  /// 默认口径=侦测 × 1.5。
+  /// 默认口径=侦测 × 脱战倍率。
   double get leashRange => territoryRadius != null
-      ? territoryRadius! * kJourneyEndlessBossLeashGain
-      : aggroRange * 1.5;
+      ? territoryRadius! *
+          game.battleNum('endless', 'boss_leash_gain',
+              kJourneyEndlessBossLeashGain)
+      : aggroRange * game.battleNum('monster', 'leash_mult', 1.5);
 
-  /// 脱战快速回血速率：每秒恢复 maxHp 的 40%（2.5 秒回满）。
+  /// 脱战快速回血速率：每秒恢复 maxHp 的比例（默认 40%，2.5 秒回满）。
   /// 口径：脱战（驻守/归位态）快速回满，再入战（追击态）立即停止；
   /// 妖王同规则——拉开距离即回满，惩罚拉脱打法。不触发死亡/掉落。
   static const double _regenPerSec = 0.4;
@@ -175,7 +183,8 @@ class JourneyMonsterComponent extends PositionComponent
     // 离屏完全冻结（节点12 性能）：与玩家距离 >1400 时跳过索敌/移动/
     // 回血/灼烧结算，仅推进展示类计时（血条渐隐/命中冷却/定身）；
     // 灼烧离屏暂停（burnRemaining 不倒计时，回屏后继续结算伤害）。
-    if ((game.player.position - position).length > 1400) {
+    if ((game.player.position - position).length >
+        game.battleNum('monster', 'freeze_dist', 1400)) {
       if (rootTimer > 0) {
         rootTimer -= dt;
       }
@@ -269,7 +278,12 @@ class JourneyMonsterComponent extends PositionComponent
       }
       // 脱战快速回血：未追击玩家即回，上限 maxHp（进入追击态即停）
       if (hp < maxHp) {
-        hp = math.min(hp + maxHp * _regenPerSec * dt, maxHp);
+        hp = math.min(
+            hp +
+                maxHp *
+                    game.battleNum('monster', 'regen_per_sec', _regenPerSec) *
+                    dt,
+            maxHp);
       }
     }
     // 普通状态停在接触边界；突进中不被角色挡住，命中后撞开角色并结算
@@ -282,9 +296,9 @@ class JourneyMonsterComponent extends PositionComponent
     clampMonsterToWorld(this, game.worldSize);
   }
 
-  /// 妖王冲撞状态机：追击近距触发→蓄力 0.7s 预警→锁定方向突进 0.55s
-  /// （速度 ×4.5，与玩家移速同档，走位需预判；撞墙由世界边界钳制）
-  /// →收招 1.0s 缓速→冷却 4.0s。
+  /// 妖王冲撞状态机：追击近距触发→蓄力预警→锁定方向突进
+  /// （速度乘区与玩家移速同档，走位需预判；撞墙由世界边界钳制）
+  /// →收招缓速→冷却。各时序与距离走 boss 组参数，缺省沿用内置口径。
   void _updateCharge(double dt, double dist, Vector2 toPlayer,
       {required bool rooted}) {
     if (_chargeCd > 0) {
@@ -293,9 +307,12 @@ class JourneyMonsterComponent extends PositionComponent
     switch (_chargePhase) {
       case 0:
         // 追击态近距触发（定身中不触发）
-        if (_aggro && !rooted && _chargeCd <= 0 && dist < 340) {
+        if (_aggro &&
+            !rooted &&
+            _chargeCd <= 0 &&
+            dist < game.battleNum('boss', 'charge_trigger_dist', 340)) {
           _chargePhase = 1;
-          _chargeTimer = 0.7;
+          _chargeTimer = game.battleNum('boss', 'charge_windup_sec', 0.7);
         }
         break;
       case 1:
@@ -304,20 +321,24 @@ class JourneyMonsterComponent extends PositionComponent
         if (_chargeTimer <= 0) {
           _chargeDir = dist > 1 ? toPlayer.normalized() : Vector2(1, 0);
           _chargePhase = 2;
-          _chargeTimer = 0.55;
+          _chargeTimer = game.battleNum('boss', 'charge_dash_sec', 0.55);
           _chargeHit = false;
         }
         break;
       case 2:
-        // 突进：方向锁定，速度 ×4.5（与玩家移速同档）；定身期间位移跳过
+        // 突进：方向锁定，速度乘区与玩家移速同档；定身期间位移跳过
         //（幌金绳对妖王突进同样生效），突进时长照常消耗（root 中即原地停摆）
         _chargeTimer -= dt;
         if (!rooted) {
-          position += _chargeDir * cappedMonsterSpeed(this) * 4.5 * dt;
+          position +=
+              _chargeDir *
+              cappedMonsterSpeed(this) *
+              game.battleNum('boss', 'charge_speed_mult', 4.5) *
+              dt;
         }
         if (_chargeTimer <= 0) {
           _chargePhase = 3;
-          _chargeTimer = 1.0;
+          _chargeTimer = game.battleNum('boss', 'charge_recover_sec', 1.0);
         }
         break;
       case 3:
@@ -424,10 +445,12 @@ class JourneyMonsterComponent extends PositionComponent
     }
   }
 
-  /// 多场妖王战的逐场伤害增强（+25%/场，血量由 buffMult 承担）。
+  /// 多场妖王战的逐场伤害增强（缺省 +25%/场，血量由 buffMult 承担）。
   void scaleStageDamage(int stage) {
     if (stage <= 0) return;
-    _contactDamageVal = _contactDamageVal * (1.0 + stage * 0.25);
+    _contactDamageVal = _contactDamageVal *
+        (1.0 +
+            stage * game.battleNum('boss', 'stage_damage_gain', 0.25));
   }
 
   void takeDamage(double amount, {double armorIgnore = 0}) {
@@ -442,11 +465,11 @@ class JourneyMonsterComponent extends PositionComponent
     }
     hp -= amount;
     _hpBarTimer = 2.5;
-    // 分魂化形（白骨精）：血量首次跌破 50% 分裂 2 只妖卫（每场一次）
+    // 分魂化形（白骨精）：血量首次跌破阈值分裂 2 只妖卫（每场一次）
     if (model.abilityKey == 'bone_split' &&
         !_splitDone &&
         hp > 0 &&
-        hp < maxHp * 0.5) {
+        hp < maxHp * game.battleNum('monster', 'split_hp_ratio', 0.5)) {
       _splitDone = true;
       _spawnBoneSplinters();
     }
@@ -480,7 +503,8 @@ class JourneyMonsterComponent extends PositionComponent
       final comp = JourneyMonsterComponent(
         game: game,
         model: model,
-        buffMult: buffMult * 0.4,
+        buffMult: buffMult *
+            game.battleNum('monster', 'split_hp_mult', 0.4),
         position: position +
             Vector2(i == 0 ? -46 : 46, 0),
       );

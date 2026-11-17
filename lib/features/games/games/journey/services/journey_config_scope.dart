@@ -25,7 +25,8 @@ enum JourneyConfigTable {
   dailyMaps('journey_daily_maps', 'sort.asc'),
   endlessWaves('journey_endless_waves', 'wave_no.asc'),
   weaponParams('journey_weapon_params', 'weapon_id.asc'),
-  monsterParams('journey_monster_params', 'monster_id.asc');
+  monsterParams('journey_monster_params', 'monster_id.asc'),
+  battleParams('journey_battle_params', 'group_code.asc');
 
   const JourneyConfigTable(this.tableName, this.order, [this.select]);
 

@@ -59,7 +59,8 @@ class JourneyPlayerComponent extends PositionComponent {
     } else {
       final v = game.controller.input.vector;
       if (v.distanceSquared > 0.001) {
-        position += Vector2(v.dx, v.dy) * baseSpeed * game.moveSpeedAmp * dt;
+        position +=
+            Vector2(v.dx, v.dy) * game.baseSpeed * game.moveSpeedAmp * dt;
         facing = Vector2(v.dx, v.dy)..normalize();
       }
     }
@@ -101,13 +102,15 @@ class JourneyPlayerComponent extends PositionComponent {
       healBlockTimer -= dt;
     }
 
-    // 金身佛光（tang 特殊能力）：每 10s 回复 8% 最大生命（禁疗期间失效）
+    // 金身佛光（tang 特殊能力）：按参数周期回复最大生命比例（禁疗期间失效）
     if (game.hasAbility('tang') && healBlockTimer <= 0) {
       game._jinshenTimer += dt;
-      if (game._jinshenTimer >= 10) {
+      if (game._jinshenTimer >=
+          game.battleNum('ability', 'tang_heal_period_sec', 10)) {
         game._jinshenTimer = 0;
         if (hp < maxHp) {
-          final amount = maxHp * 0.08;
+          final amount = maxHp *
+              game.battleNum('ability', 'tang_heal_ratio', 0.08);
           hp = (hp + amount).clamp(0.0, maxHp);
           game.onPlayerHpChanged();
           game.spawnFloatText(

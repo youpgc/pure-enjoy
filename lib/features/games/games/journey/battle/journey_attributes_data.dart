@@ -108,7 +108,9 @@ abstract final class JourneyAttributesData {
         '护甲',
         '${game.player.armor.toStringAsFixed(1)}（减伤 '
             '${(JourneyDamageTickMixin.armorReductionRatio(game.player.armor,
-                    curveK: game.armorCurveK) *
+                    curveK: game.armorCurveK,
+                    cap: game.battleNum('damage', 'player_armor_cap',
+                        kJourneyPlayerArmorCap)) *
                 100)
                 .toStringAsFixed(0)}%）'
       ),
