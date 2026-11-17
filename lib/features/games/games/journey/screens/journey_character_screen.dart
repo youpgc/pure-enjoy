@@ -202,7 +202,7 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
               ],
             ),
           ),
-          _buildTail(c, unlocked, progressMet, meritMet),
+          _buildTail(c, unlocked, progressMet, meritMet, canUnlock),
         ],
       ),
     );
@@ -213,6 +213,7 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     bool unlocked,
     bool progressMet,
     bool meritMet,
+    bool canUnlock,
   ) {
     if (unlocked) {
       return const SizedBox.shrink();
@@ -224,7 +225,12 @@ class _JourneyCharacterScreenState extends State<JourneyCharacterScreen> {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.end,
       children: <Widget>[
-        const Icon(Icons.lock, color: JourneyTheme.locked, size: 16),
+        // 达成关卡且功德足够（此刻可请上路）时锁图标点金，未达条件保持默认
+        Icon(
+          Icons.lock,
+          color: canUnlock ? JourneyTheme.gold : JourneyTheme.locked,
+          size: 16,
+        ),
         const SizedBox(height: 4),
         Text(
           progressMet
