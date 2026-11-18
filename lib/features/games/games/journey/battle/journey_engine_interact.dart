@@ -66,6 +66,8 @@ extension JourneyInteract on JourneyFlameGame {
   /// 还魂复活（§3）：按参数回血、推开近身怪、弹「还魂！」。
   void doRevive() {
     revivesLeft--;
+    // 清掉死亡瞬间被暂停冻结的强制位移，避免复活后继续推进的「幽灵位移」
+    player.clearForcedDisplacement();
     player.hp = player.maxHp *
         battleNum('economy', 'revive_hp_ratio', 0.6);
     final pushFrom = battleNum('economy', 'revive_push_from', 300);

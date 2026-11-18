@@ -39,6 +39,18 @@ class JourneyPlayerComponent extends PositionComponent {
   double _chargeKnockLeft = 0;
   double _chargeKnockSpeed = 0;
 
+  /// 妖王技能牵引（紫金摄魂拉近/三昧神风推离）：命中登记方向与总距离，
+  /// 逐帧推进给出可见位移过程；速度钳在玩家移速之下，持续反向摇杆可净
+  /// 挣脱（避免被拉到贴脸连刀）。期间摇杆仍可操作，牵引位移不计入里程；
+  /// 与冲撞队列各自独立，同帧并存不互相覆盖。
+  Vector2 _skillShiftDir = Vector2.zero();
+  double _skillShiftLeft = 0;
+  double _skillShiftSpeed = 0;
+
+  /// 牵引速度上限占玩家自身移速的比例：必须小于 1，反向摇杆才有净速度
+  /// 挣脱；留余量使多妖王混战下仍有可反应的脱离窗口。
+  static const double _skillShiftSpeedRatio = 0.8;
+
   /// 基础移速（世界单位/秒）：无妖主线章回西行里程目标的换算基准。
   static const double baseSpeed = 240;
 
@@ -71,6 +83,14 @@ class JourneyPlayerComponent extends PositionComponent {
       position += _chargeKnockDir * knockStep;
       _chargeKnockLeft -= knockStep;
     }
+    // 妖王技能牵引位移：摄魂拉近/神风推离逐帧推进（与摇杆、冲撞同帧叠加），
+    // 使位移动画可见、玩家有时间反向挣脱，而非单帧闪现。
+    var skillShiftStep = 0.0;
+    if (_skillShiftLeft > 0) {
+      skillShiftStep = math.min(_skillShiftLeft, _skillShiftSpeed * dt);
+      position += _skillShiftDir * skillShiftStep;
+      _skillShiftLeft -= skillShiftStep;
+    }
     position.x = position.x
         .clamp(_radius + 8, game.worldSize - _radius - 8);
     position.y = position.y
@@ -82,10 +102,12 @@ class JourneyPlayerComponent extends PositionComponent {
     // 参照物圆碰撞推离（unbreakable + 未破坏 breakable）
     _pushOutOfMapObjects();
 
-    // 西行里程：按本帧净位移累计（挂机/定身/撞墙推离/冲撞击退不算）；
+    // 西行里程：按本帧净位移累计（挂机/定身/撞墙推离/冲撞击退/技能牵引不算）；
     // 无妖主线章回以此替代纯时长作为通关口径（1 里=25 世界单位）
-    game.traveledUnits +=
-        ((position - prevPos) - _chargeKnockDir * knockStep).length;
+    game.traveledUnits += ((position - prevPos) -
+            _chargeKnockDir * knockStep -
+            _skillShiftDir * skillShiftStep)
+        .length;
 
     // 木系自动回复（倒马毒桩禁疗期间失效）
     if (regen > 0 && healBlockTimer <= 0) {
@@ -299,6 +321,36 @@ class JourneyPlayerComponent extends PositionComponent {
     _chargeKnockDir = dir.normalized();
     _chargeKnockSpeed = distance / _chargeKnockDuration;
     _chargeKnockLeft = distance;
+  }
+
+  /// 妖王技能牵引命中：沿 [dir] 把角色渐进推移 [distance]（摄魂拉向妖王、
+  /// 神风推离妖王）。[duration] 仅为期望时长，实际速度钳到玩家移速的
+  /// [_skillShiftSpeedRatio]，保证反向摇杆可挣脱；连续命中重置为单次距离、
+  /// 方向取最新来源，控制时长有界，多妖王混战不会叠加成长期锁定。无敌帧免疫。
+  void applySkillShift(Vector2 dir, double distance, double duration) {
+    if (invulnTimer > 0 ||
+        distance <= 0 ||
+        dir.length < 0.001 ||
+        duration <= 0) {
+      return;
+    }
+    // 速度上限取玩家当前移速的一定比例：玩家移速随升级/筋斗云增长，
+    // 牵引上限同步水涨船高，但始终低于玩家，反向摇杆始终能净挣脱。
+    final escapeSpeed =
+        game.baseSpeed * game.moveSpeedAmp * _skillShiftSpeedRatio;
+    _skillShiftSpeed = math.min(distance / duration, escapeSpeed);
+    _skillShiftDir = dir.normalized();
+    // 连续命中重置为单次距离（方向取最新）而非累加，使控制时长有界：
+    // 多妖王混战下不会叠加成长期锁定，玩家总能在单段位移后挣脱。
+    _skillShiftLeft = distance;
+  }
+
+  /// 清除未走完的强制位移（还魂复活时调用）：死亡瞬间正在进行的牵引/
+  /// 冲撞被暂停冻结，复活后若继续推进会出现「幽灵位移」把刚复活的角色
+  /// 拉走。复活后重新受击会再次登记，无需保留本局残留。
+  void clearForcedDisplacement() {
+    _chargeKnockLeft = 0;
+    _skillShiftLeft = 0;
   }
 
   void takeDamage(double amount) {

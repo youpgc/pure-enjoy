@@ -121,16 +121,15 @@ mixin JourneyBossAbilityMixin on PositionComponent {
     final player = game.player;
     switch (code) {
       case 'swift_wind':
-        // 三昧神风：阵风把玩家吹离 200px（世界边界钳制）
+        // 三昧神风：阵风把玩家吹离（渐进位移，时长/距离可配）
         final dir = (player.position - position);
         final len = dir.length;
         if (len > 1) {
-          player.position += dir.normalized() *
-              game.monsterParam(model.code, 'wind_push', 200);
-          player.position.x =
-              player.position.x.clamp(28.0, game.worldSize - 28);
-          player.position.y =
-              player.position.y.clamp(28.0, game.worldSize - 28);
+          player.applySkillShift(
+            dir,
+            game.monsterParam(model.code, 'wind_push', 200),
+            game.monsterParam(model.code, 'wind_shift_sec', 0.6),
+          );
           game.spawnFloatText(
             player.position + Vector2(0, -36),
             '三昧神风！',
@@ -163,16 +162,15 @@ mixin JourneyBossAbilityMixin on PositionComponent {
         _abilityTimer = 0;
         break;
       case 'gourd_pull':
-        // 紫金摄魂：把玩家拉向自身（距离可配，世界边界钳制）
+        // 紫金摄魂：把玩家拉向自身（渐进位移，时长/距离可配）
         final dir = position - player.position;
         final len = dir.length;
         if (len > 1) {
-          player.position += dir.normalized() *
-              game.monsterParam(model.code, 'pull_dist', 180);
-          player.position.x =
-              player.position.x.clamp(28.0, game.worldSize - 28);
-          player.position.y =
-              player.position.y.clamp(28.0, game.worldSize - 28);
+          player.applySkillShift(
+            dir,
+            game.monsterParam(model.code, 'pull_dist', 180),
+            game.monsterParam(model.code, 'pull_shift_sec', 0.6),
+          );
           game.spawnFloatText(
             player.position + Vector2(0, -36),
             '紫金摄魂',
