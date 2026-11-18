@@ -261,6 +261,12 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         game.passiveSlotCodes.contains('huoyan_jingjing')) {
       dmg += game.damageBaseValue *
           game.weaponParam('huoyan_jingjing', 'elite', 0.2);
+      game.fxLayer.spawnRing(
+        m.position,
+        m.radius + 6,
+        color: const Color(0xFFFFB27A),
+      );
+      // GameAudio.instance.journeyTrigger();
     }
     // 暴击判定（§8）：率与倍率见主类字段
     final isCrit = game.critRate > 0 && game.rng.nextDouble() < game.critRate;
@@ -291,6 +297,12 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         game.rng.nextDouble() <
             game.weaponParam('kunxian_rope', 'chance', 0.12)) {
       m.rootTimer = game.weaponParam('kunxian_rope', 'root', 1.5);
+      game.fxLayer.spawnRing(
+        m.position,
+        m.radius + 8,
+        color: const Color(0xFFFFE9A8),
+      );
+      // GameAudio.instance.journeyTrigger();
     }
     // 紫金铃（扩展特效）：同一目标累计命中 hits 次引发妖火爆炸
     if (!m.isDead && game.effectWeapons.contains('zijin_ling')) {

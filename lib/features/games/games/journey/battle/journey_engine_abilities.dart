@@ -9,6 +9,7 @@ extension JourneyAbilityTick on JourneyFlameGame {
       if (_fumoTimer >= battleNum('ability', 'fumo_charge_sec', 20)) {
         _fumoCharged = true;
         _fumoTimer = 0;
+        // GameAudio.instance.journeyAura();
       }
     }
 
@@ -25,6 +26,7 @@ extension JourneyAbilityTick on JourneyFlameGame {
           '三头六臂',
           const Color(0xFFE8C470),
         );
+        // GameAudio.instance.journeyAura();
       }
     }
 
@@ -40,6 +42,7 @@ extension JourneyAbilityTick on JourneyFlameGame {
           '兜率炉火',
           const Color(0xFFD4593F),
         );
+        // GameAudio.instance.journeyAura();
       }
     }
 

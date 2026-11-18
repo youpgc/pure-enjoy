@@ -40,15 +40,21 @@ class JourneyOrbitWeapons extends Component {
     final inner = arm.innerRadius;
     final outer = arm.outerRadius;
     final midR = (inner + outer) / 2;
+    // 光效态：能力/被动激活时环带与扇叶按统一取色提亮；无激活态保持原色
+    final aura = journeyWeaponAura(game);
+    final auraColor = aura?.$1 ?? const Color(0xFFE8C470);
+    final bandAlpha = aura == null ? 0.09 : 0.22 * aura.$2;
+    final edgeAlpha = aura == null ? 0.24 : 0.55 * aura.$2;
+    final bladeAlpha = aura == null ? 0.18 : 0.42 * aura.$2;
 
     // 受击环带填充（淡金）+ 内外边界细线
     final bandPaint = Paint()
-      ..color = const Color(0x16E8C470)
+      ..color = auraColor.withValues(alpha: bandAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = arm.bandWidth;
     canvas.drawCircle(center, midR, bandPaint);
     final edgePaint = Paint()
-      ..color = const Color(0x3DE8C470)
+      ..color = auraColor.withValues(alpha: edgeAlpha)
       ..style = PaintingStyle.stroke
       ..strokeWidth = 1.4;
     canvas.drawCircle(center, inner, edgePaint);
@@ -69,12 +75,14 @@ class JourneyOrbitWeapons extends Component {
       // 径向光带（扇叶从容器延伸到外环）
       canvas.drawRect(
         Rect.fromLTWH(inner, -visHalf, outer - inner, visHalf * 2),
-        Paint()..color = const Color(0x2FE8C470),
+        Paint()..color = auraColor.withValues(alpha: bladeAlpha),
       );
       // 扇叶外端提亮（锋线）
       canvas.drawRect(
         Rect.fromLTWH(outer - 10, -visHalf, 10, visHalf * 2),
-        Paint()..color = const Color(0x55F6E3B4),
+        Paint()..color = aura == null
+            ? const Color(0x55F6E3B4)
+            : auraColor.withValues(alpha: 0.72 * aura.$2),
       );
 
       if (pic != null) {

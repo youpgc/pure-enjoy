@@ -47,6 +47,7 @@ extension JourneyLifecycle on JourneyFlameGame {
     if (character.code == 'wukong' &&
         rng.nextDouble() < character.auraNum('proc_rate', 0.20)) {
       _wukongBuffTimer = character.auraNum('buff_sec', 3.0);
+      // GameAudio.instance.journeyAura();
     }
 
     // 身外身法（wukong 特殊能力）：每击杀 N 只触发 M 秒临时分身+转速
@@ -62,6 +63,7 @@ extension JourneyLifecycle on JourneyFlameGame {
           '身外身法',
           const Color(0xFFE8C470),
         );
+        // GameAudio.instance.journeyAura();
       }
     }
 
@@ -248,6 +250,7 @@ extension JourneyLifecycle on JourneyFlameGame {
         '金身佛光·免死',
         const Color(0xFFF6E3B4),
       );
+      // GameAudio.instance.journeyAura();
       return;
     }
     // 三根毫毛（扩展被动）：致命伤免死一次，回 heal 比例生命 + invuln 秒
@@ -262,6 +265,7 @@ extension JourneyLifecycle on JourneyFlameGame {
         '毫毛护身！',
         const Color(0xFFF6E3B4),
       );
+      // GameAudio.instance.journeyAura();
       return;
     }
     if (revivesLeft <= 0) {

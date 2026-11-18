@@ -166,6 +166,7 @@ class JourneyPlayerComponent extends PositionComponent {
             '金身佛光 +${amount.round()}',
             const Color(0xFFF6E3B4),
           );
+          // GameAudio.instance.journeyAura();
         }
       }
     }
@@ -292,6 +293,11 @@ class JourneyPlayerComponent extends PositionComponent {
   void render(Canvas canvas) {
     // 注意：PositionComponent 的 render 画布已平移到本组件局部坐标，
     // 绘制必须围绕原点，禁止再叠加 position（双重偏移会画出屏外）。
+    // 角色光效（金身/护盾）：背光先于本体绘制，立绘与几何两条路径共用。
+    final aura = journeyPlayerAura(game);
+    if (aura != null) {
+      _drawAura(canvas, aura.$1, aura.$2);
+    }
     // 角色立绘优先（char_<code>.svg）；失败回落几何
     final pic = JourneySprites.get(JourneySprites.character(game.character.code));
     if (pic != null) {
@@ -337,6 +343,30 @@ class JourneyPlayerComponent extends PositionComponent {
       (facing * _radius * 0.62).toOffset(),
       4,
       Paint()..color = const Color(0xFFD4593F),
+    );
+  }
+
+  /// 角色本体光效：无敌金身画三层同心柔光 + 描边，护盾画两层外扩柔环，
+  /// 描边均落在立绘轮廓之外，立绘与几何两条路径都能看到。
+  /// 金色由 [journeyPlayerAura] 按状态给出，强度随呼吸系数变化。
+  void _drawAura(Canvas canvas, Color color, double strength) {
+    final invuln = invulnTimer > 0;
+    final rings = invuln ? 3 : 2;
+    const center = Offset.zero;
+    for (var i = rings; i >= 1; i--) {
+      canvas.drawCircle(
+        center,
+        _radius + 6.0 * i,
+        Paint()..color = color.withValues(alpha: 0.10 * strength),
+      );
+    }
+    canvas.drawCircle(
+      center,
+      _radius + rings * 6.0,
+      Paint()
+        ..color = color.withValues(alpha: 0.85 * strength)
+        ..style = PaintingStyle.stroke
+        ..strokeWidth = 2.2,
     );
   }
 
@@ -392,6 +422,7 @@ class JourneyPlayerComponent extends PositionComponent {
     // 铜皮铁骨（bajie 特殊能力）：受击后 3s 内进入减伤/击退强化窗口
     if (game.hasAbility('bajie')) {
       game._bajieGuard = 3;
+      // GameAudio.instance.journeyAura();
     }
     game.onPlayerHpChanged();
   }

@@ -81,6 +81,16 @@ class GameAudio {
   /// 俄罗斯方块：升级（marathon/blitz 等级跃迁；缺资源回退 merge）
   void levelUp() => _play('tetris_levelup.wav');
 
+  /// 西行：光环/特性激活（金身、武器金光、护盾等）音效触发位。
+  void journeyAura() {
+    // _play('journey_aura.wav');
+  }
+
+  /// 西行：瞬发法宝命中（反伤、定身、火眼金睛等）音效触发位。
+  void journeyTrigger() {
+    // _play('journey_trigger.wav');
+  }
+
   /// 触感反馈（静音时同样抑制）
   void haptic(GameHaptic type) {
     if (_muted) return;

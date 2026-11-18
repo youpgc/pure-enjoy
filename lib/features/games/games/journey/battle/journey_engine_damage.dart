@@ -62,11 +62,17 @@ mixin JourneyDamageTickMixin {
       }
       player.takeDamage(afterArmor);
       // 反伤荆棘（§6 特效法宝）：对造成伤害的怪反弹 thorns 比例护甲后
-      // 伤害（params.thorns，直接 takeDamage，不计暴击）
+      // 伤害（params.thorns，直接 takeDamage，不计暴击）；荆棘绿环提示
       if (game.effectWeapons.contains('fanshang_thorns')) {
         strongestM.takeDamage(
           afterArmor * game.weaponParam('fanshang_thorns', 'thorns', 0.30),
         );
+        game.fxLayer.spawnRing(
+          strongestM.position,
+          strongestM.radius + 6,
+          color: const Color(0xFF9AD5C3),
+        );
+        // GameAudio.instance.journeyTrigger();
       }
       // 妖王接触附带控制/毒（西游记扩展）：
       // 金光缚身（百眼魔君）定身；倒马毒桩（蝎子精）禁疗（时长可配）
@@ -139,6 +145,12 @@ extension JourneyBossCharge on JourneyFlameGame {
       boss.takeDamage(
         afterArmor * weaponParam('fanshang_thorns', 'thorns', 0.30),
       );
+      fxLayer.spawnRing(
+        boss.position,
+        boss.radius + 6,
+        color: const Color(0xFF9AD5C3),
+      );
+      // GameAudio.instance.journeyTrigger();
     }
     player.applyChargeKnock(
       boss._chargeDir,
