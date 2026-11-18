@@ -69,6 +69,20 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     return 0;
   }
 
+  /// 法宝/被动槽变更通知 HUD：槽栏由 ValueListenableBuilder 监听
+  /// slotsRevision。onLoad 建立初始环绕时处于 GameWidget 构建期，同步写
+  /// ValueNotifier 会令监听 widget 在 build 中被标脏（markNeedsBuild during
+  /// build）；构建期统一推迟到帧尾，其余时刻即时写。
+  void bumpSlotsRevision() {
+    void apply() => controller.hud.slotsRevision.value++;
+    if (SchedulerBinding.instance.schedulerPhase ==
+        SchedulerPhase.persistentCallbacks) {
+      WidgetsBinding.instance.addPostFrameCallback((_) => apply());
+    } else {
+      apply();
+    }
+  }
+
   /// 习得维度（占 1 空槽，Lv1）并应用每级效果。
   void learnSlot(String code) {
     if (weaponSlots.length >= 6) return;
@@ -77,7 +91,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     weaponSlots.add(slot);
     controller.activeSlots.add(slot);
     applySlotEffect(code, 1);
-    controller.hud.slotsRevision.value++;
+    bumpSlotsRevision();
   }
 
   /// 维度升级（+delta 级）并应用每级效果（上限由配置驱动，调用方判定）。
@@ -86,7 +100,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       if (s.code == code) {
         s.level += delta;
         applySlotEffect(code, delta);
-        controller.hud.slotsRevision.value++;
+        bumpSlotsRevision();
         return;
       }
     }

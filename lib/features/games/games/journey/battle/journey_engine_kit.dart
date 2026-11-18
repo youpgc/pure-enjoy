@@ -161,7 +161,7 @@ extension JourneyKit on JourneyFlameGame {
     }
     passiveSlotCodes.add(code);
     controller.passiveSlots.add(code);
-    controller.hud.slotsRevision.value++;
+    bumpSlotsRevision();
   }
 
   /// 局外预注入：出战角色五行天赋树线性增量 + 加强点特殊能力标记。
