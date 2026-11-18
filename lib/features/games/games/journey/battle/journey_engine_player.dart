@@ -40,9 +40,10 @@ class JourneyPlayerComponent extends PositionComponent {
   double _chargeKnockSpeed = 0;
 
   /// 妖王技能牵引（紫金摄魂拉近/三昧神风推离）：命中登记方向与总距离，
-  /// 逐帧推进给出可见位移过程；速度钳在玩家移速之下，持续反向摇杆可净
-  /// 挣脱（避免被拉到贴脸连刀）。期间摇杆仍可操作，牵引位移不计入里程；
-  /// 与冲撞队列各自独立，同帧并存不互相覆盖。
+  /// 逐帧推进给出可见位移过程；速度钳在玩家移速之下，且与摇杆同向时按
+  /// 差额封顶不叠加（避免异常加速冲向妖王），反向摇杆仍可净挣脱（避免
+  /// 被拉到贴脸连刀）。期间摇杆仍可操作，牵引位移不计入里程；与冲撞
+  /// 队列各自独立，同帧并存不互相覆盖。
   Vector2 _skillShiftDir = Vector2.zero();
   double _skillShiftLeft = 0;
   double _skillShiftSpeed = 0;
@@ -66,28 +67,48 @@ class JourneyPlayerComponent extends PositionComponent {
 
     // 摇杆驱动（屏幕向量直接映射世界向量，全向自由移动）；
     // 金光缚身定身期间跳过移动
+    final stick = game.controller.input.vector;
     if (rootTimer > 0) {
       rootTimer -= dt;
-    } else {
-      final v = game.controller.input.vector;
-      if (v.distanceSquared > 0.001) {
-        position +=
-            Vector2(v.dx, v.dy) * game.baseSpeed * game.moveSpeedAmp * dt;
-        facing = Vector2(v.dx, v.dy)..normalize();
-      }
+    } else if (stick.distanceSquared > 0.001) {
+      position += Vector2(stick.dx, stick.dy) *
+          game.baseSpeed *
+          game.moveSpeedAmp *
+          dt;
+      facing = Vector2(stick.dx, stick.dy)..normalize();
     }
-    // 妖王冲撞位移：撞开角色（与摇杆可同帧叠加），随后与其他推离一起钳界
+    // 妖王冲撞位移：撞开角色，随后与其他推离一起钳界；与摇杆同向时按
+    // 差额封顶（净速度不超过击退速度），避免同向叠加把角色额外加速撞飞
     var knockStep = 0.0;
     if (_chargeKnockLeft > 0) {
-      knockStep = math.min(_chargeKnockLeft, _chargeKnockSpeed * dt);
+      final activeAlong = rootTimer > 0
+          ? 0.0
+          : (stick.dx * _chargeKnockDir.x + stick.dy * _chargeKnockDir.y) *
+              game.baseSpeed *
+              game.moveSpeedAmp;
+      final desired = activeAlong > 0
+          ? math.max(0.0, _chargeKnockSpeed - activeAlong)
+          : _chargeKnockSpeed;
+      knockStep = math.min(_chargeKnockLeft, desired * dt);
       position += _chargeKnockDir * knockStep;
       _chargeKnockLeft -= knockStep;
     }
-    // 妖王技能牵引位移：摄魂拉近/神风推离逐帧推进（与摇杆、冲撞同帧叠加），
-    // 使位移动画可见、玩家有时间反向挣脱，而非单帧闪现。
+    // 妖王技能牵引位移：摄魂拉近/神风推离逐帧推进，使位移动画可见、
+    // 玩家有时间反向挣脱，而非单帧闪现。牵引不与摇杆无条件叠加：同向时
+    // 按差额补足到牵引速度（消除加速且斜向输入不削弱拉近），静止/反向
+    // 用固定牵引额（不放大，保留挣脱窗口）。
     var skillShiftStep = 0.0;
     if (_skillShiftLeft > 0) {
-      skillShiftStep = math.min(_skillShiftLeft, _skillShiftSpeed * dt);
+      // 本帧玩家沿牵引方向的主动速度；定身期无摇杆按 0 处理
+      final activeAlong = rootTimer > 0
+          ? 0.0
+          : (stick.dx * _skillShiftDir.x + stick.dy * _skillShiftDir.y) *
+              game.baseSpeed *
+              game.moveSpeedAmp;
+      final desired = activeAlong > 0
+          ? math.max(0.0, _skillShiftSpeed - activeAlong)
+          : _skillShiftSpeed;
+      skillShiftStep = math.min(_skillShiftLeft, desired * dt);
       position += _skillShiftDir * skillShiftStep;
       _skillShiftLeft -= skillShiftStep;
     }
@@ -314,8 +335,9 @@ class JourneyPlayerComponent extends PositionComponent {
     );
   }
 
-  /// 妖王冲撞命中：沿冲撞方向把角色撞开，距离逐帧推进（不瞬移）。
-  /// 无敌帧期间免疫冲撞击退，与免疫伤害口径一致。
+  /// 妖王冲撞命中：沿冲撞方向把角色撞开，距离逐帧推进（不瞬移）；
+  /// 与摇杆同向时按差额封顶，避免叠加加速。无敌帧期间免疫冲撞击退，
+  /// 与免疫伤害口径一致。
   void applyChargeKnock(Vector2 dir, double distance) {
     if (invulnTimer > 0 || distance <= 0 || dir.length < 0.001) return;
     _chargeKnockDir = dir.normalized();
@@ -325,8 +347,10 @@ class JourneyPlayerComponent extends PositionComponent {
 
   /// 妖王技能牵引命中：沿 [dir] 把角色渐进推移 [distance]（摄魂拉向妖王、
   /// 神风推离妖王）。[duration] 仅为期望时长，实际速度钳到玩家移速的
-  /// [_skillShiftSpeedRatio]，保证反向摇杆可挣脱；连续命中重置为单次距离、
-  /// 方向取最新来源，控制时长有界，多妖王混战不会叠加成长期锁定。无敌帧免疫。
+  /// [_skillShiftSpeedRatio]，且玩家主动同向移动时按差额封顶（不叠加
+  /// 加速），反向摇杆可净挣脱；连续命中重置为单次距离、方向取最新来源，
+  /// 控制时长有界，多妖王混战不会叠加成长期锁定。无敌帧只挡新命中，
+  /// 不中断已登记的位移。
   void applySkillShift(Vector2 dir, double distance, double duration) {
     if (invulnTimer > 0 ||
         distance <= 0 ||
