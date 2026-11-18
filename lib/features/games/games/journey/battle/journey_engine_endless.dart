@@ -53,6 +53,8 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
       : (waveConf != null && waveConf.bossCount > 0
           ? waveConf.bossCount
           : _endlessBossQuota(game, n, tideStart));
+  // 本波计划刷怪数（全图追猎据此判定「波已铺完」，防波初存活少误触发）
+  game._endlessWavePlanned = count;
 
   if (game._endlessSpawned >= count) {
     // 除尽推进：本波怪全灭且妖王配额已耗尽才进下一波
@@ -74,6 +76,7 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
     }
     game._endlessWave = n + 1;
     game._endlessSpawned = 0;
+    game._endlessWavePlanned = 0;
     game._endlessRest =
         game.battleNum('endless', 'wave_rest_sec', 1.2);
     game._endlessBossSummoned = 0;

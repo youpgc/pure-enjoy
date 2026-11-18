@@ -18,6 +18,7 @@ mixin JourneySpawnMixin {
   double _endlessBossCd = 0; // 妖王补位降临倒计时（>0 计时中）
   int _endlessBossKilled = 0; // 妖潮期本波已被击杀妖王数（宝箱/天赋点首杀判定）
   int _jinjiaoWaveRefines = 0; // 宝葫本波已炼化次数（妖潮期按波限流）
+  int _endlessWavePlanned = 0; // 本波计划刷怪总数：刷完才允许触发全图追猎，防波初误触发
 
   // ---- 每日游历（虚拟关 kind=daily）铜钱雨状态 ----
   double _dailyCoinTimer = 0;

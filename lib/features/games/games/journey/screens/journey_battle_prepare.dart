@@ -79,6 +79,8 @@ extension _JourneyBattlePrepare on _JourneyBattleScreenState {
     if (!mounted) return;
     // 局外设置：环绕旋转方向（hub 设置面板可切换，默认顺时针）
     final spinRaw = await CacheHelper.instance.loadMap('journey_spin_dir');
+    // 局外设置：全图追猎（仅无尽妖潮生效，默认关闭）
+    final autoHuntRaw = await CacheHelper.instance.loadMap('journey_auto_hunt');
     if (!mounted) return;
     final newGame = JourneyFlameGame(
       level: widget.level,
@@ -91,6 +93,7 @@ extension _JourneyBattlePrepare on _JourneyBattleScreenState {
     );
     newGame.spinDirection =
         (spinRaw?['dir'] as String? ?? 'cw') == 'ccw' ? -1.0 : 1.0;
+    newGame.autoHuntSetting = autoHuntRaw?['enabled'] as bool? ?? false;
     _rebuild(() {
       _controller = controller;
       _game = newGame;

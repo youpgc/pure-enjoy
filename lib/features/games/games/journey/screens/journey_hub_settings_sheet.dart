@@ -21,9 +21,14 @@ class _JourneySettingsSheetState extends State<JourneySettingsSheet> {
   /// 对局页进局时读取注入引擎（见 journey_battle_screen._setup）。
   static const String _spinKey = 'journey_spin_dir';
 
+  /// 全图追猎（仅无尽妖潮，局内生效）：独立键存 bool，默认关闭；
+  /// 对局页进局时读取注入引擎。
+  static const String _autoHuntKey = 'journey_auto_hunt';
+
   bool _music = true;
   bool _sfx = true;
   bool _clockwise = true;
+  bool _autoHunt = false;
   bool _loaded = false;
 
   @override
@@ -35,11 +40,13 @@ class _JourneySettingsSheetState extends State<JourneySettingsSheet> {
   Future<void> _load() async {
     final raw = await CacheHelper.instance.loadMap(_storeKey);
     final spin = await CacheHelper.instance.loadMap(_spinKey);
+    final autoHunt = await CacheHelper.instance.loadMap(_autoHuntKey);
     if (!mounted) return;
     setState(() {
       _music = raw?['music'] as bool? ?? true;
       _sfx = raw?['sfx'] as bool? ?? true;
       _clockwise = (spin?['dir'] as String? ?? 'cw') != 'ccw';
+      _autoHunt = autoHunt?['enabled'] as bool? ?? false;
       _loaded = true;
     });
   }
@@ -61,6 +68,17 @@ class _JourneySettingsSheetState extends State<JourneySettingsSheet> {
       context,
       () => CacheHelper.instance.saveMap(_spinKey, <String, dynamic>{
         'dir': clockwise ? 'cw' : 'ccw',
+      }),
+      label: '保存中…',
+    );
+  }
+
+  /// 全图追猎即时写缓存（下一次进局生效）。
+  Future<void> _saveAutoHunt(bool enabled) async {
+    await JourneyBusy.run(
+      context,
+      () => CacheHelper.instance.saveMap(_autoHuntKey, <String, dynamic>{
+        'enabled': enabled,
       }),
       label: '保存中…',
     );
@@ -110,6 +128,21 @@ class _JourneySettingsSheetState extends State<JourneySettingsSheet> {
                   ? Switch(value: _clockwise, onChanged: (v) {
                       setState(() => _clockwise = v);
                       _saveSpinDir(v);
+                    })
+                  : null,
+            ),
+            // 全图追猎：仅无尽妖潮生效，开=达成条件后剩余怪自动寻玩家（默认关）
+            ListTile(
+              leading: const Icon(Icons.travel_explore, color: JourneyTheme.gold),
+              title: const Text('全图追猎', style: JourneyTheme.body),
+              subtitle: const Text(
+                '无尽妖潮：残怪稀少且血量过半时自动聚怪（妖王除外）',
+                style: JourneyTheme.faint,
+              ),
+              trailing: _loaded
+                  ? Switch(value: _autoHunt, onChanged: (v) {
+                      setState(() => _autoHunt = v);
+                      _saveAutoHunt(v);
                     })
                   : null,
             ),

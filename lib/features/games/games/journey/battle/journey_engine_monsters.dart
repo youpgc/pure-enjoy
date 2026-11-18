@@ -182,12 +182,14 @@ class JourneyMonsterComponent extends PositionComponent
     // 击退动画先推进：离屏冻结只跳过索敌/回血，不能冻结未走完的位移
     _tickKnockback(dt);
     final knockFactor = knockChaseFactor;
+    final hunting = autoHuntApplies(game, this); // 冻结/追击共用，妖王恒 false
 
     // 离屏完全冻结（节点12 性能）：与玩家距离 >1400 时跳过索敌/移动/
     // 回血/灼烧结算，仅推进展示类计时（血条渐隐/命中冷却/定身）；
     // 灼烧离屏暂停（burnRemaining 不倒计时，回屏后继续结算伤害）。
-    if ((game.player.position - position).length >
-        game.battleNum('monster', 'freeze_dist', 1400)) {
+    if (!hunting && // 全图追猎普怪豁免冻结（妖王不豁免），否则远处怪永不靠近
+        (game.player.position - position).length >
+            game.battleNum('monster', 'freeze_dist', 1400)) {
       if (rootTimer > 0) {
         rootTimer -= dt;
       }
@@ -222,9 +224,10 @@ class JourneyMonsterComponent extends PositionComponent
       weakenTimer -= dt;
     }
 
-    // 三态两半径（妖王同规则：驻点待机→侦测追击→脱战归位据点）
+    // 三态两半径（妖王同规则：驻点待机→侦测追击→脱战归位据点）；
+    // 全图追猎的普怪强制常驻追击态，忽略两半径，直追到击杀（妖王不受影响）。
     final wasAggro = _aggro;
-    if (!_aggro && dist < aggroRange) {
+    if (hunting || (!_aggro && dist < aggroRange)) {
       _aggro = true;
     } else if (_aggro && dist > leashRange) {
       _aggro = false;

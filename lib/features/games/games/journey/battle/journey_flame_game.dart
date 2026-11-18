@@ -43,6 +43,7 @@ part 'journey_engine_minimap.dart';
 part 'journey_engine_bounds.dart';
 part 'journey_engine_curve.dart';
 part 'journey_engine_growth.dart';
+part 'journey_engine_autohunt.dart';
 
 /// 西行·Flame 对局主类。
 ///
@@ -161,6 +162,9 @@ class JourneyFlameGame extends FlameGame
   /// 引擎当前是否因升级选卡而暂停（暂停键恢复时需据此跳过 resume，
   /// 否则选卡期间世界会被误恢复运行）。
   bool get isPausedForLevelUp => _pausedByLevelUp;
+
+  // 全图追猎（仅无尽，局外开关达成条件后本局锁定；详见 autohunt part）
+  bool autoHuntSetting = false, _autoHuntActive = false;
 
   /// 当前妖王战场次（0-based；bossFights>1 时打完一场增强再战）。
   int _bossStage = 0;
@@ -479,6 +483,7 @@ class JourneyFlameGame extends FlameGame
     tickBossRespawnCountdown(this, dt);
 
     updateSpawns(this, dt);
+    tickAutoHunt(this); // 全图追猎：锁定后普怪自动追寻，妖王不受影响
     // 空间哈希（节点12）：刷怪后每帧重建，供武器/接触伤害查询附近候选
     spatialGrid.rebuild(monsters);
     updateWeapons(this, dt);
