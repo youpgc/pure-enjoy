@@ -106,7 +106,13 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
       elite: isElite, tideGuard: tide);
   if (model == null) return;
   game._endlessTimer = 0;
-  game.spawnMonsterAt(game, model, buffMult: buff, position: null);
+  game.spawnMonsterAt(
+    game,
+    model,
+    buffMult: buff,
+    position: null,
+    spreadAllMap: true,
+  );
   game.monsters.last.endlessWave = n;
   game._endlessSpawned++;
 }
@@ -185,8 +191,8 @@ void _tickEndlessBossTide(
 /// 降临一只妖王：经验/速度/接触伤害走共用乘区（波次 buff ×(1+步进×
 /// amp_per_wave)，钳 buff_mult_cap）；血量走独立波次乘区（hp_amp 每
 /// 波额外增幅）且不吃玩家等级项——波次项对标玩家 DPS 成长，终盘
-/// 妖王单挑 30~70 秒量级，最后几波满级也需操作；位置按玩家环带
-/// 锚点散布（与在场妖王锚点保持最小间距），赋软领地半径并播报。
+/// 妖王单挑 30~70 秒量级，最后几波满级也需操作；位置在全图留白区
+/// 均匀取样（与在场妖王锚点保持最小间距），赋软领地半径并播报。
 void _summonEndlessBoss(
   JourneyFlameGame game,
   int n,
@@ -218,8 +224,8 @@ void _summonEndlessBoss(
   game.controller.onBossSpawn(model.name);
 }
 
-/// 妖王降临点：玩家活动环带随机取样，与在场存活妖王的锚点（home）
-/// 保持最小间距——领地不重叠；取样未命中时取间距最大候选兜底。
+/// 妖王降临点：全图均匀取样，与在场存活妖王的锚点（home）保持最小间距——
+/// 领地不重叠；取样未命中时取间距最大候选兜底。
 Vector2 _endlessBossSpawnPos(JourneyFlameGame game) {
   final minDist =
       game.config?.endlessBossSpreadMinDist ?? kJourneyEndlessBossSpreadMinDist;
@@ -227,18 +233,10 @@ Vector2 _endlessBossSpawnPos(JourneyFlameGame game) {
     for (final m in game.monsters)
       if (!m.isDead && m.model.isBoss) m.home,
   ];
-  final size = game.worldSize;
   Vector2? best;
   var bestScore = -1.0;
   for (var i = 0; i < 12; i++) {
-    final angle = game.rng.nextDouble() * math.pi * 2;
-    final dist = 420.0 + game.rng.nextDouble() * 780.0;
-    final p = Vector2(
-      (game.player.position.x + math.cos(angle) * dist)
-          .clamp(80.0, size - 80),
-      (game.player.position.y + math.sin(angle) * dist)
-          .clamp(80.0, size - 80),
-    );
+    final p = randomMapPosition(game);
     var nearest = double.infinity;
     for (final a in anchors) {
       final d = (p - a).length;
@@ -250,11 +248,9 @@ Vector2 _endlessBossSpawnPos(JourneyFlameGame game) {
       best = p;
     }
   }
-  return best ??
-      Vector2(
-        (game.player.position.x + minDist).clamp(80.0, size - 80),
-        game.player.position.y,
-      );
+  // anchors 为空时首轮即 return；非空时首轮 nearest≥0 > bestScore(-1)
+  // 必赋值 best，故循环走完 best 恒非空
+  return best!;
 }
 
 /// 妖王波取怪：怪物全源按 code 取妖王（endless 刷怪池不含妖王）。

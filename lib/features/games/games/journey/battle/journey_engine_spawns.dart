@@ -180,7 +180,9 @@ mixin JourneySpawnMixin {
     spawnMonsterAt(game, model, buffMult: game.buffMult, position: null);
   }
 
-  /// 统一落怪入口：[position] 为 null 时按玩家活动环带随机（全向散布）。
+  /// 统一落怪入口：[position] 为 null 时按 [spreadAllMap] 选落点——
+  /// true=全图均匀取样（无尽铺怪，避免环带 clamp 堆积边缘）；
+  /// false=玩家活动环带（开局铺场/兜底刷怪）。
   void spawnMonsterAt(
     JourneyFlameGame game,
     JourneyMonsterModel model, {
@@ -188,19 +190,12 @@ mixin JourneySpawnMixin {
     double? hpBuffMult,
     bool bossLvHpTerm = true,
     Vector2? position,
+    bool spreadAllMap = false,
   }) {
-    final size = game.worldSize;
     var pos = position;
-    if (pos == null) {
-      final angle = game.rng.nextDouble() * math.pi * 2;
-      final dist = 420.0 + game.rng.nextDouble() * 780.0;
-      pos = Vector2(
-        (game.player.position.x + math.cos(angle) * dist)
-            .clamp(80.0, size - 80),
-        (game.player.position.y + math.sin(angle) * dist)
-            .clamp(80.0, size - 80),
-      );
-    }
+    pos ??= spreadAllMap
+        ? randomMapPosition(game)
+        : _aroundPlayerPosition(game);
     final comp = JourneyMonsterComponent(
       game: game,
       model: model,
@@ -329,6 +324,32 @@ mixin JourneySpawnMixin {
       );
     }
   }
+}
+
+/// 全图均匀落点：在四边留白内的方形区域均匀取样，与玩家位置无关。
+/// 留白走 journey_battle_params.endless.spawn_edge_margin（缺省 80）；
+/// 消除「玩家环带 + 越界 clamp」把怪压到地图边缘的堆积。
+Vector2 randomMapPosition(JourneyFlameGame game) {
+  final size = game.worldSize;
+  final margin =
+      game.battleNum('endless', 'spawn_edge_margin', 80).clamp(0.0, size / 2 - 1);
+  final span = size - 2 * margin;
+  return Vector2(
+    margin + game.rng.nextDouble() * span,
+    margin + game.rng.nextDouble() * span,
+  );
+}
+
+/// 玩家活动环带落点：半径 420~1200 随机方位，越界钳制到图内。
+/// 供开局铺场与兜底刷怪使用（刻意围绕玩家，不走全图均匀）。
+Vector2 _aroundPlayerPosition(JourneyFlameGame game) {
+  final size = game.worldSize;
+  final angle = game.rng.nextDouble() * math.pi * 2;
+  final dist = 420.0 + game.rng.nextDouble() * 780.0;
+  return Vector2(
+    (game.player.position.x + math.cos(angle) * dist).clamp(80.0, size - 80),
+    (game.player.position.y + math.sin(angle) * dist).clamp(80.0, size - 80),
+  );
 }
 
 /// 虚拟关模式判定（kind 约定见 JourneyLevelModel；level_no=0 不落主线）。
