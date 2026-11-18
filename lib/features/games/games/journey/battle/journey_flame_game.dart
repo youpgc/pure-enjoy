@@ -163,7 +163,7 @@ class JourneyFlameGame extends FlameGame
   /// 否则选卡期间世界会被误恢复运行）。
   bool get isPausedForLevelUp => _pausedByLevelUp;
 
-  // 全图追猎（仅无尽，局外开关达成条件后本局锁定；详见 autohunt part）
+  // 全图追猎（仅无尽，局外开关 + 本波剩余数/血量条件达成时开启，波末自动关闭；详见 autohunt part）
   bool autoHuntSetting = false, _autoHuntActive = false;
 
   /// 当前妖王战场次（0-based；bossFights>1 时打完一场增强再战）。
@@ -456,6 +456,7 @@ class JourneyFlameGame extends FlameGame
     // 特殊能力计时递减：身外身法增益窗口 / 铜皮铁骨减伤窗口
     if (_shenfenTimer > 0) _shenfenTimer -= dt;
     if (_bajieGuard > 0) _bajieGuard -= dt;
+    tickAutoHunt(this); // 全图追猎：逐帧判定，波末/选卡期关闭
     if (_ended || _pendingLevelUps > 0) return;
     _elapsed += dt;
 
@@ -483,7 +484,6 @@ class JourneyFlameGame extends FlameGame
     tickBossRespawnCountdown(this, dt);
 
     updateSpawns(this, dt);
-    tickAutoHunt(this); // 全图追猎：锁定后普怪自动追寻，妖王不受影响
     // 空间哈希（节点12）：刷怪后每帧重建，供武器/接触伤害查询附近候选
     spatialGrid.rebuild(monsters);
     updateWeapons(this, dt);
