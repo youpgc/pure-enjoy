@@ -83,7 +83,6 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
     game._endlessBossKilled = 0;
     game._jinjiaoWaveRefines = 0;
     game._endlessBossCd = 0;
-    hud.bossSpawnIn.value = 0;
     return;
   }
 
@@ -145,7 +144,7 @@ int _endlessBossQuota(JourneyFlameGame game, int n, int? tideStart) {
 
 /// 妖王潮降临节拍：同场并发钳制；配额内首只立即降临，此后缺口出现
 /// （击杀腾位）按降临倒计时依次补位——任意两次降临间隔 ≥ 倒计时，
-/// 不在同一时间刷新；倒计时同步罗盘位「妖王降临 · Xs」。
+/// 不在同一时间刷新。倒计时仅控制补位节奏，不驱动罗盘位展示。
 void _tickEndlessBossTide(
   JourneyFlameGame game,
   int n,
@@ -165,10 +164,9 @@ void _tickEndlessBossTide(
   if (game._endlessBossSummoned >= quota) return;
   if (aliveBosses >= concurrent) {
     game._endlessBossCd = 0;
-    game.controller.hud.bossSpawnIn.value = 0;
     return;
   }
-  // 首只立即降临；后续缺口按降临倒计时补位
+  // 首只立即降临；后续缺口按降临倒计时补位（仅控制补位节奏，不驱动 HUD）
   if (game._endlessBossSummoned > 0 && game._endlessBossCd <= 0) {
     game._endlessBossCd =
         game.config?.endlessBossArriveCd ?? kJourneyEndlessBossArriveCd;
@@ -176,14 +174,7 @@ void _tickEndlessBossTide(
   }
   if (game._endlessBossCd > 0) {
     game._endlessBossCd -= dt;
-    final left = game._endlessBossCd.ceil();
-    if (game._endlessBossCd > 0) {
-      if (game.controller.hud.bossSpawnIn.value != left) {
-        game.controller.hud.bossSpawnIn.value = left;
-      }
-      return;
-    }
-    game.controller.hud.bossSpawnIn.value = 0;
+    if (game._endlessBossCd > 0) return;
   }
   _summonEndlessBoss(game, n, configuredCode, buff, tideStart);
 }

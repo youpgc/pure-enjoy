@@ -169,9 +169,9 @@ class JourneyBattleHud {
   /// lifecycle 伏诛时复位；小地图标记与小地图快照解耦，不读本字段。
   final ValueNotifier<bool> bossPresent = ValueNotifier<bool>(false);
 
-  /// 妖王降临倒计时（秒）：首次降临与多场战复活冷却共用此位，由引擎
+  /// 妖王降临倒计时（秒）：主线首次降临与多场战复活冷却共用此位，由引擎
   /// 从计时起点持续写入剩余秒数（罗盘位展示「妖王降临 · Xs」），
-  /// 归零复活/降临后引擎置 0 自然隐藏；无妖章回恒为 0。
+  /// 归零复活/降临后引擎置 0 自然隐藏；无妖章回与无尽妖潮恒为 0。
   final ValueNotifier<int> bossSpawnIn = ValueNotifier<int>(0);
 
   /// 妖王罗盘·据点基准距离（出生点到据点，进关时引擎写入一次）：

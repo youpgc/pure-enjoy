@@ -177,14 +177,9 @@ class _Compass extends StatelessWidget {
                           : const SizedBox.shrink(),
                     ),
             )
-          // 无尽妖潮 hasBoss=false：妖王补位倒计时与波数共用罗盘位，
-          // 倒计时优先，避免降临提示被波数分支吞掉。
-          : ValueListenableBuilder<int>(
-              valueListenable: controller.hud.bossSpawnIn,
-              builder: (context, left, _) => left > 0
-                  ? _bossSpawnCountdownView(left)
-                  : _surviveCountdown(controller),
-            ),
+          // 无尽妖潮 hasBoss=false：罗盘位只展示当前波数；妖王补位倒计时
+          // 仅控制降临节奏，不驱动 HUD。
+          : _surviveCountdown(controller),
     );
   }
 
