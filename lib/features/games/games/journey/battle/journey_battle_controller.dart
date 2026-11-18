@@ -151,8 +151,8 @@ class JourneyBattleHud {
   /// null=无播报，对局页监听展示后可清回 null）。
   final ValueNotifier<String?> milestoneText = ValueNotifier<String?>(null);
 
-  /// 横幅位（节点11）：开场难名/妖王降临/里程碑共用展示槽；
-  /// null=无横幅，覆盖层监听展示 2.4s 后自行隐去。
+  /// 横幅源（节点11）：开场难名/妖王降临/伏诛写入；
+  /// 覆盖层监听后每次写入各成一条、独立计时，不与其他横幅互相覆盖。
   final ValueNotifier<String?> banner = ValueNotifier<String?>(null);
 
   /// 妖王大血条组（节点11）：一条=一只妖王，最多三条，自上而下叠加。

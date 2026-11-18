@@ -77,7 +77,7 @@ class JourneyHudOverlay extends StatelessWidget {
           right: _kMinimapRight,
           child: JourneyMinimapWindow(controller: controller),
         ),
-        // 对局横幅（节点11）：开场难名/妖王降临/里程碑共用位
+        // 对局横幅（节点11）：开场难名/妖王降临/伏诛/里程碑各自成条、互不覆盖
         JourneyBattleBanner(controller: controller),
         Positioned(
           // 罗盘紧贴小地图下沿，间距由顶部几何常量推导

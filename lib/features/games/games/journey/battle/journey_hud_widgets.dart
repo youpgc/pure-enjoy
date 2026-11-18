@@ -1,7 +1,6 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import 'package:flutter/scheduler.dart';
 
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
@@ -229,10 +228,24 @@ class _MinimapPainter extends CustomPainter {
   bool shouldRepaint(covariant _MinimapPainter old) => old.data != data;
 }
 
-/// 对局横幅（节点11）：开场难名/妖王降临/里程碑共用位；屏幕上 1/3 居中
-/// 大字金描边横幅，出现 2.4s 后自动隐去；短间隔先后触发后者覆盖重启计时。
+/// 对局横幅（节点11）：开场难名/妖王降临/伏诛/里程碑各自成条、互不覆盖，
+/// 屏幕上 1/3 居中自上而下堆叠，条间 [gap]，最多 [maxEntries] 条，
+/// 每条展示 [showDuration]（末段 [fadeDuration] 淡出）后移除；
+/// 条身份用递增序号，顺位变化时已有横幅不重建。
 class JourneyBattleBanner extends StatefulWidget {
   const JourneyBattleBanner({super.key, required this.controller});
+
+  /// 相邻横幅上下间距。
+  static const double gap = 8;
+
+  /// 同屏条数上限，超出淘汰最旧条，避免堆叠遮挡战斗区。
+  static const int maxEntries = 4;
+
+  /// 单条横幅总展示时长。
+  static const Duration showDuration = Duration(milliseconds: 2400);
+
+  /// 到期淡出时长，计入 [showDuration]。
+  static const Duration fadeDuration = Duration(milliseconds: 240);
 
   final JourneyBattleController controller;
 
@@ -240,62 +253,106 @@ class JourneyBattleBanner extends StatefulWidget {
   State<JourneyBattleBanner> createState() => _JourneyBattleBannerState();
 }
 
-class _JourneyBattleBannerState extends State<JourneyBattleBanner> {
-  Timer? _timer;
-  String? _text;
+/// 一条横幅：序号作稳定身份；到期先标记淡出、淡完才移除，
+/// 到期计时器与淡出计时器各自只作用于本条。
+class _BannerEntry {
+  _BannerEntry(this.id, this.text);
 
-  static const Duration _showDuration = Duration(milliseconds: 2400);
+  final int id;
+  final String text;
+  bool fading = true; // 新条目首帧透明，帧尾翻起触发淡入；到期另置 expiring 淡出
+  bool expiring = false;
+  Timer? timer;
+  Timer? fadeTimer;
+}
+
+class _JourneyBattleBannerState extends State<JourneyBattleBanner> {
+  final List<_BannerEntry> _entries = <_BannerEntry>[];
+  int _nextId = 0;
+  bool _rebuildScheduled = false;
 
   @override
   void initState() {
     super.initState();
     widget.controller.hud.banner.addListener(_onBanner);
     widget.controller.hud.milestoneText.addListener(_onMilestone);
-    // 挂载前已写入的横幅（_setup 尾部先赋值后建图）补播一次
+    // 挂载前已写入的开场横幅补播一次，并清回槽位供后续同文事件触发
+    _consumeBanner();
+  }
+
+  void _onBanner() => _consumeBanner();
+
+  /// 读横幅槽位入列并清回 null——槽位留空，下次写入相同文本才会再触发通知
+  void _consumeBanner() {
+    final text = widget.controller.hud.banner.value;
+    if (text == null || text.isEmpty) return;
+    _add(text);
+    // 清槽调度到帧尾——引擎可能在构建期写入（防 markNeedsBuild during build）
     WidgetsBinding.instance.addPostFrameCallback((_) {
-      if (mounted) {
-        _show(widget.controller.hud.banner.value);
-      }
+      if (!mounted) return;
+      widget.controller.hud.banner.value = null;
     });
   }
 
-  void _onBanner() => _show(widget.controller.hud.banner.value);
-
   void _onMilestone() {
-    // 里程碑只播一次：展示后清回 null（口径见 hud.milestoneText 注释）；
-    // 清写调度到帧尾——引擎可能在构建期写入（防 markNeedsBuild during build）
-    _show(widget.controller.hud.milestoneText.value);
+    final text = widget.controller.hud.milestoneText.value;
+    if (text == null || text.isEmpty) return;
+    _add(text);
+    // 里程碑只播一次：清回 null 调度到帧尾——引擎可能在构建期写入
     WidgetsBinding.instance.addPostFrameCallback((_) {
+      if (!mounted) return;
       widget.controller.hud.milestoneText.value = null;
     });
   }
 
-  void _show(String? text) {
-    if (text == null || text.isEmpty) return;
-    _timer?.cancel();
-    // 构建期内引擎写入横幅（GameWidget 首帧 tick 同步于布局阶段）时，
-    // setState 调度到帧尾执行，防 markNeedsBuild during build 异常
-    void apply() {
-      if (!mounted) return;
-      setState(() => _text = text);
+  void _add(String text) {
+    while (_entries.length >= JourneyBattleBanner.maxEntries) {
+      _drop(_entries.first);
     }
+    final entry = _BannerEntry(_nextId++, text);
+    _entries.add(entry);
+    entry.timer = Timer(
+      JourneyBattleBanner.showDuration - JourneyBattleBanner.fadeDuration,
+      () {
+        entry.expiring = true;
+        _scheduleRebuild();
+        entry.fadeTimer = Timer(JourneyBattleBanner.fadeDuration, () {
+          _drop(entry);
+          _scheduleRebuild();
+        });
+      },
+    );
+    _scheduleRebuild();
+  }
 
-    if (SchedulerBinding.instance.schedulerPhase ==
-        SchedulerPhase.persistentCallbacks) {
-      WidgetsBinding.instance.addPostFrameCallback((_) => apply());
-    } else {
-      apply();
-    }
-    _timer = Timer(_showDuration, () {
-      if (mounted) {
-        setState(() => _text = null);
-      }
+  void _drop(_BannerEntry entry) {
+    entry.timer?.cancel();
+    entry.fadeTimer?.cancel();
+    _entries.removeWhere((item) => item.id == entry.id);
+  }
+
+  /// 帧尾统一重建——引擎在 tick / build 期均可能写入 notifier；
+  /// 顺带翻起新入列条目的淡入标记（首帧透明、下一帧起渐变到不透明）
+  void _scheduleRebuild() {
+    if (_rebuildScheduled) return;
+    _rebuildScheduled = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      _rebuildScheduled = false;
+      if (!mounted) return;
+      setState(() {
+        for (final entry in _entries) {
+          if (!entry.expiring) entry.fading = false;
+        }
+      });
     });
   }
 
   @override
   void dispose() {
-    _timer?.cancel();
+    for (final entry in _entries) {
+      entry.timer?.cancel();
+      entry.fadeTimer?.cancel();
+    }
     widget.controller.hud.banner.removeListener(_onBanner);
     widget.controller.hud.milestoneText.removeListener(_onMilestone);
     super.dispose();
@@ -307,12 +364,23 @@ class _JourneyBattleBannerState extends State<JourneyBattleBanner> {
     return Align(
       alignment: const Alignment(0, -0.38),
       child: IgnorePointer(
-        child: AnimatedOpacity(
-          opacity: _text == null ? 0 : 1,
-          duration: const Duration(milliseconds: 240),
-          child: _text == null
-              ? const SizedBox.shrink()
-              : JourneyBanner(title: _text!, color: JourneyTheme.gold),
+        child: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: <Widget>[
+            for (var i = 0; i < _entries.length; i++) ...<Widget>[
+              if (i > 0) const SizedBox(height: JourneyBattleBanner.gap),
+              AnimatedOpacity(
+                key: ValueKey<int>(_entries[i].id),
+                opacity:
+                    _entries[i].fading || _entries[i].expiring ? 0 : 1,
+                duration: JourneyBattleBanner.fadeDuration,
+                child: JourneyBanner(
+                  title: _entries[i].text,
+                  color: JourneyTheme.gold,
+                ),
+              ),
+            ],
+          ],
         ),
       ),
     );
