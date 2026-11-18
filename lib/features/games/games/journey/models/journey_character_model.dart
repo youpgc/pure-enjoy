@@ -1,7 +1,8 @@
 /// 西行·角色数据模型（对应 journey_characters 表行）。
 ///
-/// 自 journey_models.dart 拆出：角色模型含 aura_params/realm_titles
-/// 两个 jsonb 解析器，独立成文件控制单文件规模。
+/// 自 journey_models.dart 拆出：光环参数与境界名号由 journey_character_aura_params
+/// /journey_realm_titles 子表按角色注入，解析器独立成文件控制单文件规模；
+/// 保留对内置种子 jsonb 形态的兼容。
 library;
 
 import 'dart:convert';
@@ -28,10 +29,15 @@ class JourneyCharacterModel {
   /// 键缺失时回落内置兜底值，空对象=全部走兜底。
   final Map<String, double> auraParams;
 
-  /// 角色境界名称（journey_characters.realm_titles jsonb，后台可配）：
-  /// 9 档修行路径逐角色独立（索引=境界档位 0~8），第 9 档为原著正果
-  /// 名号；行缺失/档位缺项回落引擎内置按角色表，再回落通用 9 档。
+  /// 角色境界名称：由 journey_realm_titles 子表按 tier 聚合注入
+  /// （一行一档，缺档不错位）；未注入时兼容内置种子的 realm_titles 列表。
+  /// 9 档修行路径逐角色独立（档位 0~8），第 9 档为原著正果名号；
+  /// 档位缺项回落引擎内置按角色表，再回落通用 9 档。
   final List<String> realmTitles;
+
+  /// 境界名号按档位的精确映射（journey_realm_titles 子表注入源）；
+  /// 非空时 realmTitleAt 优先按档位取号，避免稀疏档位错位。
+  final Map<int, String> realmTitleByTier;
   final String weaponCode;
   final int unlockLevelNo;
   final int unlockMeritCost;
@@ -50,6 +56,7 @@ class JourneyCharacterModel {
     required this.auraDesc,
     this.auraParams = const <String, double>{},
     this.realmTitles = const <String>[],
+    this.realmTitleByTier = const <int, String>{},
     required this.weaponCode,
     this.unlockLevelNo = 0,
     this.unlockMeritCost = 0,
@@ -67,6 +74,7 @@ class JourneyCharacterModel {
       auraDesc: json['aura_desc'] as String? ?? '',
       auraParams: _auraParamsOf(json['aura_params']),
       realmTitles: _realmTitlesOf(json['realm_titles']),
+      realmTitleByTier: _realmByTierOf(json['realm_title_by_tier']),
       weaponCode: json['weapon_code'] as String? ?? '',
       unlockLevelNo: (json['unlock_level_no'] as num?)?.toInt() ?? 0,
       unlockMeritCost: (json['unlock_merit_cost'] as num?)?.toInt() ?? 0,
@@ -100,10 +108,36 @@ class JourneyCharacterModel {
   double auraNum(String key, double fallback) =>
       auraParams[key] ?? fallback;
 
-  /// 境界名号读取：[tier]（0 起）有专属配置用专属，未配回落 null
-  /// （消费侧再按角色内置名号表/通用名号表逐级兜底）。
-  String? realmTitleAt(int tier) =>
-      tier >= 0 && tier < realmTitles.length ? realmTitles[tier] : null;
+  /// 境界名号读取：[tier]（0 起）优先取子表按档位映射，未注入时取
+  /// 内置/远端列表同索引；缺档回落 null（消费侧再逐级兜底）。
+  String? realmTitleAt(int tier) {
+    if (tier < 0 || tier > 8) return null;
+    final byTier = realmTitleByTier[tier];
+    if (byTier != null && byTier.isNotEmpty) return byTier;
+    return tier < realmTitles.length ? realmTitles[tier] : null;
+  }
+
+  /// 子表档位映射解析：注入源为 Map<int, String>；兼容字符串键的 Map
+  /// （PostgREST/dynamic 透传），键非 0~8 整数或空文案的行丢弃。
+  static Map<int, String> _realmByTierOf(Object? raw) {
+    if (raw == null) return const <int, String>{};
+    if (raw is! Map) return const <int, String>{};
+    final result = <int, String>{};
+    for (final entry in raw.entries) {
+      final key = entry.key;
+      final tier = key is int
+          ? key
+          : key is String
+              ? int.tryParse(key)
+              : null;
+      final value = entry.value;
+      if (tier != null && tier >= 0 && tier <= 8 &&
+          value is String && value.isNotEmpty) {
+        result[tier] = value;
+      }
+    }
+    return result;
+  }
 
   /// 境界名号解析：jsonb 列远端返回 List；兜底种子/文本入参兼容
   /// JSON 字符串；解析失败回落空列表（引擎走内置按角色名号表）。

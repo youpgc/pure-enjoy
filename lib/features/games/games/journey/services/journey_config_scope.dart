@@ -3,6 +3,7 @@
 /// 表名即 PostgREST 资源名；请求参数集中在此，避免服务层散落硬编码。
 /// 依赖 gameId 的表（game_levels / game_dimensions / journey_weapon_levels）
 /// 必须先取 games.code='journey' 的行，否则全表会混入其他游戏数据。
+/// journey_levels 按 level_id 与 game_levels 关联，无独立 gameId 过滤。
 library;
 
 enum JourneyConfigTable {
@@ -26,7 +27,10 @@ enum JourneyConfigTable {
   endlessWaves('journey_endless_waves', 'wave_no.asc'),
   weaponParams('journey_weapon_params', 'weapon_id.asc'),
   monsterParams('journey_monster_params', 'monster_id.asc'),
-  battleParams('journey_battle_params', 'group_code.asc');
+  battleParams('journey_battle_params', 'group_code.asc'),
+  characterAuraParams('journey_character_aura_params', 'character_code.asc'),
+  realmTitles('journey_realm_titles', 'character_code.asc,tier.asc'),
+  journeyLevels('journey_levels', 'level_id.asc');
 
   const JourneyConfigTable(this.tableName, this.order, [this.select]);
 
@@ -125,6 +129,27 @@ Set<JourneyConfigTable> expandConfigDependencies(
   }
   if (tables.contains(JourneyConfigTable.monsterParams)) {
     result.add(JourneyConfigTable.monsters);
+  }
+  // 角色附带数据：aura 参数与境界名号按 character_code 关联，缺源表时
+  // 角色会退回内置兜底，故凡需角色的页面自动带上这两张表。
+  const needsCharacters = <JourneyConfigTable>{
+    JourneyConfigTable.characterAuraParams,
+    JourneyConfigTable.realmTitles,
+  };
+  if (tables.contains(JourneyConfigTable.characters) ||
+      tables.any(needsCharacters.contains)) {
+    result
+      ..add(JourneyConfigTable.characters)
+      ..add(JourneyConfigTable.characterAuraParams)
+      ..add(JourneyConfigTable.realmTitles);
+  }
+  // 关卡的西行专属属性已拆到 journey_levels（level_id=game_levels.id），
+  // 选关页需同时拿到两者；缺任一表则该关退回内置兜底。
+  if (tables.contains(JourneyConfigTable.levels) ||
+      tables.contains(JourneyConfigTable.journeyLevels)) {
+    result
+      ..add(JourneyConfigTable.levels)
+      ..add(JourneyConfigTable.journeyLevels);
   }
   return result;
 }

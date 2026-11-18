@@ -8,7 +8,7 @@ part of 'journey_flame_game.dart';
 /// - 无妖章回通关锚点（时长→西行里程换算基准）。
 extension JourneyKit on JourneyFlameGame {
   /// 无妖章回（原著无妖，区域 boss_code=NULL）通关时长锚点：取关卡
-  /// duration_target_sec 配置（game_levels.config jsonb，后台可调）。
+  /// duration_target_sec 配置（journey_levels 子表，后台可调）。
   /// 无妖主线章回以锚点时长换算西行里程目标；每日游历不消费时长锚点
   /// （进图即亮「功成」、随时结算，无通关条件限制/提示）。
   int get surviveTargetSec =>

@@ -35,33 +35,93 @@ Map<String, String> _idCodeMap(List<Map<String, dynamic>> rows) =>
           row['id'] as String: row['code'] as String,
     };
 
-/// 关卡行：name=难名；西行专属属性在 config jsonb。
-JourneyLevelModel _levelFromRow(Map<String, dynamic> row) {
-  final config =
-      (row['config'] as Map<String, dynamic>?) ?? const <String, dynamic>{};
+/// 关卡行：name=难名；西行专属属性在 journey_levels（level_id=关卡 id）。
+/// 子表行缺失/表未加载时字段回落空，JourneyLevelModel 按缺省值兜底。
+JourneyLevelModel _levelFromRow(
+  Map<String, dynamic> row,
+  Map<String, Map<String, dynamic>> levelAttrs,
+) {
+  final attr = levelAttrs[row['id'] as String?] ?? const <String, dynamic>{};
   return JourneyLevelModel.fromJson(<String, dynamic>{
     'id': row['id'],
     'level_no': row['level_no'],
     'title': row['name'],
-    'region_code': config['region_code'],
-    'level_kind': config['level_kind'],
-    'boss_fights': config['boss_fights'],
-    'first_clear_merit': config['first_clear_merit'],
-    'duration_target_sec': config['duration_target_sec'],
+    'region_code': attr['region_code'],
+    'level_kind': attr['level_kind'],
+    'boss_fights': attr['boss_fights'],
+    'first_clear_merit': attr['first_clear_merit'],
+    'duration_target_sec': attr['duration_target_sec'],
     'difficulty': row['difficulty'],
   });
 }
 
+/// journey_levels 行按 level_id 建索引（一关一行）。
+Map<String, Map<String, dynamic>> _levelAttrsOf(_RowsView view) =>
+    <String, Map<String, dynamic>>{
+      for (final row in view.of(JourneyConfigTable.journeyLevels))
+        if (row['level_id'] is String) row['level_id'] as String: row,
+    };
+
+/// 角色 aura 参数：journey_character_aura_params 按 character_code 聚合为
+/// {code→{param_key→值}}，注入角色行供模型解析（一行一键，值兼容数字/文本）。
+Map<String, Map<String, double>> _characterAuraOf(_RowsView view) {
+  final result = <String, Map<String, double>>{};
+  for (final row in view.of(JourneyConfigTable.characterAuraParams)) {
+    final charCode = row['character_code'] as String?;
+    final paramCode = row['code'] as String?;
+    if (charCode == null || charCode.isEmpty || paramCode == null) continue;
+    final raw = row['value_num'];
+    final value = raw is num
+        ? raw.toDouble()
+        : raw is String
+            ? double.tryParse(raw)
+            : null;
+    if (value == null) continue;
+    (result[charCode] ??= <String, double>{})[paramCode] = value;
+  }
+  return result;
+}
+
+/// 角色境界名号：journey_realm_titles 按 character_code 聚合成 tier→名号
+/// 映射（一行一档，缺档不错位），注入角色行供模型按档位精确取号。
+Map<String, Map<int, String>> _characterRealmTitlesOf(_RowsView view) {
+  final grouped = <String, Map<int, String>>{};
+  for (final row in view.of(JourneyConfigTable.realmTitles)) {
+    final charCode = row['character_code'] as String?;
+    final tier = (row['tier'] as num?)?.toInt();
+    final title = row['title'] as String?;
+    if (charCode == null || charCode.isEmpty || tier == null ||
+        title == null || title.isEmpty) {
+      continue;
+    }
+    (grouped[charCode] ??= <int, String>{})[tier] = title;
+  }
+  return grouped;
+}
+
 /// 角色：客户端过滤禁用行（enabled 列后台开关；列未部署时解析缺省
-/// true 不丢行）。空表回落种子，避免「无可用角色」死局。
+/// true 不丢行）。光环参数与境界名号由子表按 character_code 注入，
+/// 子表无该角色行时保留行内既有配置，由消费侧回落内置兜底。空表回落种子，
+/// 避免「无可用角色」死局。
 List<JourneyCharacterModel> _charactersOf(_RowsView view) {
   const table = JourneyConfigTable.characters;
   if (!view.loaded(table)) {
     return kJourneyCharacterSeed.map(JourneyCharacterModel.fromJson).toList();
   }
+  final auraByChar = _characterAuraOf(view);
+  final realmByChar = _characterRealmTitlesOf(view);
   final rows = view
       .of(table)
-      .map(JourneyCharacterModel.fromJson)
+      .map((row) {
+        final code = row['code'] as String? ?? '';
+        final aura = auraByChar[code];
+        final realm = realmByChar[code];
+        return JourneyCharacterModel.fromJson(<String, dynamic>{
+          ...row,
+          if (aura != null) 'aura_params': aura,
+          if (realm != null) 'realm_title_by_tier': realm,
+        });
+      })
       .where((c) => c.enabled)
       .toList();
   return rows.isEmpty
@@ -178,11 +238,12 @@ Map<String, Map<String, double>> _monsterParams(
       .of(JourneyConfigTable.regions)
       .map(JourneyRegionModel.fromJson)
       .toList();
+  final levelAttrs = _levelAttrsOf(view);
   final levels = view.loaded(JourneyConfigTable.levels)
       ? view
           .of(JourneyConfigTable.levels)
           .where((row) => row['enabled'] != false)
-          .map(_levelFromRow)
+          .map((row) => _levelFromRow(row, levelAttrs))
           .toList()
       : kJourneyLevelSeed.map(JourneyLevelModel.fromJson).toList();
   // 关卡表已部署但一行未开：沿用内置八十一难，保证选关页不空白。

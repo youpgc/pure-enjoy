@@ -40,7 +40,7 @@ class JourneyRegionModel {
   }
 }
 
-/// 关卡（一关=一难；远端行=game_levels，西行属性在 config jsonb）
+/// 关卡（一关=一难；远端行=game_levels，西行属性在 journey_levels 子表）
 class JourneyLevelModel {
   /// 远端行 id（game_levels.id）：按需拉取该关的波次/热区/参照物配置；
   /// 内置兜底关卡无 id（空串→引擎走兜底刷怪）。

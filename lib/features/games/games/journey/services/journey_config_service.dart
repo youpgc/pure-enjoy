@@ -17,7 +17,7 @@ export 'journey_config_snapshot.dart';
 /// 缓存远端行，重复进入不重复请求，跨页面累积成同一份配置快照。基础组
 /// （games + regions）为局外页面共用，战斗页在进入时补齐剩余全部表。
 /// 关卡走既有 game_levels 链（games.code='journey' → game_levels，西行
-/// 属性在 config jsonb）；其余为 journey_* 只读配置表。
+/// 属性在 journey_levels 子表按 level_id 关联）；其余为 journey_* 只读配置表。
 class JourneyConfigService {
   JourneyConfigService._();
 
