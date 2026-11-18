@@ -202,7 +202,7 @@ extension JourneyLifecycle on JourneyFlameGame {
         moveSpeedAmp += config?.upgradeMove ?? 0.09;
         break;
       case JourneyUpgradeKind.maxHp:
-        final hpUp = config?.upgradeHp ?? 20;
+        final hpUp = (config?.upgradeHp ?? 20) * (1 + player.pantaoHpRatio);
         player.maxHp += hpUp;
         player.hp += hpUp;
         controller.hud.maxHp.value = player.maxHp;

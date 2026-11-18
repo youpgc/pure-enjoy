@@ -219,7 +219,7 @@ Map<String, JourneySlotDefModel> _fallbackSlotDefs() {
 const Map<String, (String, String)> kJourneyPassiveEffects =
     <String, (String, String)>{
   'jindou_cloud': ('筋斗云', '移速 +12%'),
-  'pantao': ('蟠桃', '生命上限 +25，回复 +0.5/秒'),
+  'pantao': ('蟠桃', '生命上限 +20%，回复 +0.5/秒'),
   'renshen_guo': ('人参果', '经验 +25%'),
   'bishui_pearl': ('避水珠', '转速 +15%'),
   'dingfeng_pearl': ('定风丹', '臂长 +18'),

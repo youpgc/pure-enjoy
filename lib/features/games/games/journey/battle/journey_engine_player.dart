@@ -13,6 +13,11 @@ class JourneyPlayerComponent extends PositionComponent {
   double maxHp;
   double hp;
   double regen = 0;
+
+  /// 蟠桃生命上限加成比例，未获得时为 0。局内固定额生命成长按
+  /// (1 + 此比例) 放大，使蟠桃加成随角色生命成长同步提升；百分比成长
+  /// 直接按当前上限结算，已含蟠桃部分，不重复放大。
+  double pantaoHpRatio = 0;
   double armor = 0;
   double pickupRange = 80;
   double _regenTimer = 0;

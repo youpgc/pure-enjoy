@@ -124,8 +124,12 @@ extension JourneyKit on JourneyFlameGame {
       case 'jindou_cloud': // 筋斗云：移速（params.move）
         moveSpeedAmp += weaponParam('jindou_cloud', 'move', 0.12);
         break;
-      case 'pantao': // 蟠桃：生命上限+回复（params.hp/regen）
-        final hpUp = weaponParam('pantao', 'hp', 25);
+      case 'pantao': // 蟠桃：生命上限+回复（params.hp_ratio/regen）
+        // 登记加成比例，不在此结算固定上限：后续固定额生命成长同步放大，
+        // 使蟠桃加成随角色成长持续提升；hp_ratio 缺行回落 0.2。
+        final hpRatio = weaponParam('pantao', 'hp_ratio', 0.2);
+        player.pantaoHpRatio = hpRatio;
+        final hpUp = player.maxHp * hpRatio;
         player.maxHp += hpUp;
         player.hp = (player.hp + hpUp).clamp(0.0, player.maxHp);
         controller.hud.maxHp.value = player.maxHp;
