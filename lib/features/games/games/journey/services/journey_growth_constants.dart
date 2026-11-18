@@ -94,12 +94,12 @@ const List<String> kJourneyRealmTitles = <String>[
 /// 档位缺项回落本表，再回落通用名号池。
 const Map<String, List<String>> kJourneyRealmTitlesByChar =
     <String, List<String>>{
-  // 石猴→美猴王→悟空（祖师赐名）→弼马温→齐天大圣→孙行者→正果
+  // 石猴→美猴王→悟空（祖师赐名）→灵明石猴→齐天大圣→孙行者→正果
   'wukong': <String>[
     '石猴',
     '美猴王',
     '悟空',
-    '弼马温',
+    '灵明石猴',
     '齐天大圣',
     '孙行者',
     '神通大成',
@@ -118,11 +118,11 @@ const Map<String, List<String>> kJourneyRealmTitlesByChar =
     '功圆行满',
     '旃檀功德佛',
   ],
-  // 天蓬元帅→猪刚鬣→云栈洞主→悟能（观音赐名）→八戒（唐僧赐名）→正果
+  // 天蓬元帅→天蓬真君→云栈真人→悟能（观音赐名）→八戒（唐僧赐名）→正果
   'bajie': <String>[
     '天蓬元帅',
-    '猪刚鬣',
-    '云栈洞主',
+    '天蓬真君',
+    '云栈真人',
     '悟能',
     '八戒',
     '法力通玄',
@@ -130,10 +130,10 @@ const Map<String, List<String>> kJourneyRealmTitlesByChar =
     '功圆行满',
     '净坛使者',
   ],
-  // 卷帘大将→流沙河主→悟净→沙和尚→正果
+  // 卷帘大将→流沙真人→悟净→沙和尚→正果
   'shaseng': <String>[
     '卷帘大将',
-    '流沙河主',
+    '流沙真人',
     '悟净',
     '沙和尚',
     '法力通玄',
@@ -154,11 +154,11 @@ const Map<String, List<String>> kJourneyRealmTitlesByChar =
     '功圆行满',
     '三坛海会大神',
   ],
-  // 红孩儿→火云洞主→圣婴大王→（被收伏后修行）→正果
+  // 红孩儿→火云真人→三昧真童→（被收伏后修行）→正果
   'honghaier': <String>[
     '红孩儿',
-    '火云洞主',
-    '圣婴大王',
+    '火云真人',
+    '三昧真童',
     '法力通玄',
     '神游三界',
     '半步金仙',
@@ -166,9 +166,9 @@ const Map<String, List<String>> kJourneyRealmTitlesByChar =
     '功圆行满',
     '善财童子',
   ],
-  // 罗刹女→铁扇仙（民间称呼）→铁扇公主→正果（原著「经藏中万古流名」）
+  // 翠云仙子→铁扇仙（民间称呼）→铁扇公主→正果（原著「经藏中万古流名」）
   'tieshan': <String>[
-    '罗刹女',
+    '翠云仙子',
     '铁扇仙',
     '铁扇公主',
     '法力通玄',
@@ -190,10 +190,10 @@ const Map<String, List<String>> kJourneyRealmTitlesByChar =
     '太上老君',
     '道德天尊',
   ],
-  // 兜率童子→金角大王→（回归本职）→金炉正果
+  // 兜率童子→金炉真人→（回归本职）→金炉正果
   'jinjiao': <String>[
     '兜率童子',
-    '金角大王',
+    '金炉真人',
     '法力初成',
     '法力通玄',
     '神游三界',
