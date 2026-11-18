@@ -253,10 +253,15 @@ extension JourneyLifecycle on JourneyFlameGame {
       // GameAudio.instance.journeyAura();
       return;
     }
-    // 三根毫毛（扩展被动）：致命伤免死一次，回 heal 比例生命 + invuln 秒
-    // 无敌帧（params.heal/params.invuln，单局一次）
-    if (passiveSlotCodes.contains('sanheng_mao') && !_maoUsed) {
-      _maoUsed = true;
+    // 三根毫毛（扩展被动）：就绪时致命伤免死，回 heal 比例生命 +
+    // invuln 秒无敌帧；冷却配 0 时置 -1（本局不再免死，HUD 不显示冷却），
+    // 否则进入 cooldown 秒冷却（params.heal/invuln/cooldown）
+    if (passiveSlotCodes.contains('sanheng_mao') && _maoCd == 0) {
+      final maoCooldown = weaponParam('sanheng_mao', 'cooldown', 300);
+      _maoCd = maoCooldown > 0 ? maoCooldown : -1;
+      if (_maoCd > 0) {
+        controller.hud.maoCd.value = _maoCd.ceil();
+      }
       player.hp = player.maxHp * weaponParam('sanheng_mao', 'heal', 0.3);
       player.invulnTimer = weaponParam('sanheng_mao', 'invuln', 1.5);
       controller.hud.hp.value = player.hp;

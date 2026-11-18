@@ -144,6 +144,10 @@ class JourneyBattleHud {
   /// 法宝槽位变更计数：入槽/升级后 +1，槽栏监听重建（读 controller 槽表）。
   final ValueNotifier<int> slotsRevision = ValueNotifier<int>(0);
 
+  /// 三根毫毛免死冷却剩余秒数：0=就绪，>0=冷却中。
+  /// 被动槽图标据此灰化并显示右下角秒数，由引擎逐帧去重写入。
+  final ValueNotifier<int> maoCd = ValueNotifier<int>(0);
+
   /// 等待玩家接管摇杆：点继续/选卡后世界仍时停，按下摇杆才恢复。
   final ValueNotifier<bool> awaitingJoystick = ValueNotifier<bool>(false);
 

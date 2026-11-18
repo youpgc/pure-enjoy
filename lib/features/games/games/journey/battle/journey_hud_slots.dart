@@ -25,7 +25,11 @@ class JourneyHudSlotBar extends StatelessWidget {
           children: <Widget>[
             _dimensionRow(controller.activeSlots),
             const SizedBox(height: 4),
-            _slotRow(controller.passiveSlots, const Color(0xFF7FA8E0)),
+            ValueListenableBuilder<int>(
+              valueListenable: controller.hud.maoCd,
+              builder: (context, maoCd, _) =>
+                  _slotRow(controller.passiveSlots, const Color(0xFF7FA8E0), maoCd),
+            ),
           ],
         );
       },
@@ -118,7 +122,7 @@ class JourneyHudSlotBar extends StatelessWidget {
     );
   }
 
-  Widget _slotRow(List<String> codes, Color stroke) {
+  Widget _slotRow(List<String> codes, Color stroke, int maoCd) {
     return Row(
       mainAxisSize: MainAxisSize.min,
       children: <Widget>[
@@ -126,7 +130,7 @@ class JourneyHudSlotBar extends StatelessWidget {
           Padding(
             padding: const EdgeInsets.only(right: 4),
             child: i < codes.length
-                ? _filledSlot(codes[i], stroke)
+                ? _filledSlot(codes[i], stroke, maoCd)
                 : _emptySlot(stroke),
           ),
       ],
@@ -145,7 +149,19 @@ class JourneyHudSlotBar extends StatelessWidget {
     );
   }
 
-  Widget _filledSlot(String code, Color stroke) {
+  Widget _filledSlot(String code, Color stroke, int maoCd) {
+    // 三根毫毛冷却中：图标去饱和灰化，右下角显示剩余秒数
+    final cooling = code == 'sanheng_mao' && maoCd > 0;
+    final icon = SvgPicture.asset(
+      JourneySprites.weapon(code),
+      width: 22,
+      height: 22,
+      errorBuilder: (_, __, ___) => Icon(
+        Icons.auto_awesome,
+        color: stroke,
+        size: 16,
+      ),
+    );
     return Container(
       width: 30,
       height: 30,
@@ -153,17 +169,39 @@ class JourneyHudSlotBar extends StatelessWidget {
       decoration: BoxDecoration(
         color: JourneyTheme.bgDeep.withValues(alpha: 0.7),
         borderRadius: BorderRadius.circular(7),
-        border: Border.all(color: stroke, width: 1.6),
-      ),
-      child: SvgPicture.asset(
-        JourneySprites.weapon(code),
-        width: 22,
-        height: 22,
-        errorBuilder: (_, __, ___) => Icon(
-          Icons.auto_awesome,
-          color: stroke,
-          size: 16,
+        border: Border.all(
+          color: cooling ? stroke.withValues(alpha: 0.4) : stroke,
+          width: 1.6,
         ),
+      ),
+      child: Stack(
+        children: <Widget>[
+          Center(
+            child: cooling
+                ? ColorFiltered(
+                    colorFilter: const ColorFilter.mode(
+                      Colors.grey,
+                      BlendMode.saturation,
+                    ),
+                    child: icon,
+                  )
+                : icon,
+          ),
+          if (cooling)
+            Positioned(
+              right: 0,
+              bottom: -1,
+              child: Text(
+                '$maoCd',
+                style: const TextStyle(
+                  fontSize: 9,
+                  height: 1.0,
+                  color: Color(0xFFFF9B7A),
+                  fontWeight: FontWeight.w800,
+                ),
+              ),
+            ),
+        ],
       ),
     );
   }

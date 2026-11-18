@@ -3,6 +3,16 @@ part of 'journey_flame_game.dart';
 /// 角色特殊能力的周期计时与触发：由主循环每帧调用，暂停/结算时随引擎冻结。
 extension JourneyAbilityTick on JourneyFlameGame {
   void tickAbilities(double dt) {
+    // 三根毫毛（sanheng_mao）：免死冷却递减；HUD 按整秒去重写入，
+    // 驱动被动槽图标灰化与右下角秒数。冷却长度走法宝参数 cooldown。
+    if (_maoCd > 0) {
+      _maoCd = math.max(0, _maoCd - dt);
+      final secs = _maoCd.ceil();
+      if (controller.hud.maoCd.value != secs) {
+        controller.hud.maoCd.value = secs;
+      }
+    }
+
     // 伏魔重击（shaseng）：蓄力周期可配，就绪后停表待下一次命中消耗
     if (hasAbility('shaseng') && !_fumoCharged) {
       _fumoTimer += dt;

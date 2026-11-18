@@ -218,8 +218,8 @@ class JourneyFlameGame extends FlameGame
   int _jinjiaoStacks = 0;
 
   /// 西游扩展批（被动/特效法宝）：
-  /// 三根毫毛免死已用标记（单局一次）/ 金刚琢与阴阳二气瓶计时。
-  bool _maoUsed = false;
+  /// 三根毫毛免死状态（0=就绪 / >0=冷却剩余 / -1=冷却配 0 时本局用尽）/ 金刚琢与阴阳二气瓶计时。
+  double _maoCd = 0;
   double _zhuoTimer = 0;
   double _pingTimer = 0;
 

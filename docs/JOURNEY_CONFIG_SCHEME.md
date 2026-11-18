@@ -196,7 +196,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 避水珠 bishui_pearl | spin | +15%/份 | 环绕转速 |
 | 定风丹 dingfeng_pearl | radius | +18/份 | 全环半径 |
 | 舍利子 shelizi | damage | +15%/份 | 武器增伤 |
-| 三根毫毛 sanheng_mao | heal / invuln | 30% / 1.5 秒 | 致命伤免死一次 |
+| 三根毫毛 sanheng_mao | heal / invuln / cooldown | 30% / 1.5 秒 / 300 秒 | 冷却就绪时致命伤免死并进入冷却；冷却期间不再免死、被动槽图标灰化并显示剩余秒数。cooldown 配 0 时不进入冷却、本局仅触发一次（缺行回落 300 秒） |
 | 玉净瓶甘露 yujing_ping | period / heal | 20 秒 / 20% | 周期回血 |
 | 火眼金睛 huoyan_jingjing | elite | ⏳远端 1.2（乘法脏值）→ 0.2（加法） | 精英/妖王受伤 +基础值×20% |
 
