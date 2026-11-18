@@ -58,7 +58,8 @@ abstract interface class JourneyWeaponHost {
 ///   且怪距落在 [内环-怪半径, 外环+怪半径] → 扇叶扫到哪里哪里受击；
 /// - 单怪 0.3s 冷却防反复叠伤；环带内缘贴脸怪按 8 折兜底扫击；
 /// - 命中结算维度特效：穿刺（破甲：按比例无视目标护甲）/击退（推开）/
-///   吸血（回复）/灼烧（持续掉血）；
+///   吸血（回复）；
+/// - 灼烧不走命中：三路来源统一由臂展圆内驻留满阈值点燃（见 tickBurnAura）；
 /// - 维度槽操作（习得/升级/每级效果结算）。
 mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   /// 某维度槽当前等级（未习得=0）。
@@ -107,7 +108,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   }
 
   /// 维度每级效果结算：属性维度即时应用到战斗字段；
-  /// 特效维度（击退/吸血/穿刺破甲/灼烧）在命中时读 slotLevel 结算。
+  /// 特效维度击退/吸血/穿刺破甲在命中时读 slotLevel 结算，灼烧由驻留判定读取。
   void applySlotEffect(String code, int delta) {
     switch (code) {
       case 'radius': // 臂展：每级 +（value_per_level 后台可配）
@@ -144,12 +145,19 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       case 'knockback':
       case 'lifesteal':
       case 'pierce':
+        break; // 命中结算特效（见 _hitMonster）
       case 'burn':
-        break; // 特效维度：命中结算（见 _hitMonster）
+        break; // 灼烧驻留特效（见 JourneyBurnMixin.tickBurnAura）
     }
   }
 
   void updateWeapons(JourneyFlameGame game, double dt) {
+    // 臂展驻留灼烧：三路灼烧由整臂展圆内驻留满阈值点燃，不随命中附加。
+    // 对全部怪判定（含离屏怪以清零驻留），灼烧伤害仍由怪物自身 tickBurn 结算。
+    final dwellSec = game.battleNum('weapon', 'burn_dwell_sec', 1.0);
+    for (final m in game.monsters) {
+      m.tickBurnAura(game, dt, dwellSec: dwellSec, monsterRadius: m.radius);
+    }
     final arm = game.weaponArm;
     if (arm == null) return;
     final center = game.player.position;
@@ -167,7 +175,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         : 0.0;
     final knockLv = game.slotLevel('knockback');
     final lifestealLv = game.slotLevel('lifesteal');
-    final burnLv = game.slotLevel('burn');
 
     // 空间哈希（节点12）：先取玩家附近候选（外环 + 最大怪半径 + 余量）
     // 再扇形判定，避免 monsterCap 全量遍历
@@ -203,7 +210,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           pierceIgnore: pierceIgnore,
           knockLv: knockLv,
           lifestealLv: lifestealLv,
-          burnLv: burnLv,
           toM: toM);
       m.orbHitCd = game.battleNum('weapon', 'hit_cd', 0.3);
     }
@@ -213,8 +219,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   }
 
   /// 命中结算：暴击判定 → 穿刺破甲（按比例无视护甲，在 takeDamage 内
-  /// 生效）→ 触发型法宝（幌金绳定身/暴击雷引闪电链）→ 吸血回复 →
-  /// 击退 → 灼烧点燃。
+  /// 生效）→ 触发型法宝（幌金绳定身/暴击雷引闪电链）→ 吸血回复 → 击退。
+  /// 灼烧不随命中点燃，统一由臂展驻留判定驱动。
   /// 暴击/特效只弹关键浮动文字（普通命中不弹字，防刷屏）。
   void _hitMonster(
     JourneyFlameGame game,
@@ -223,7 +229,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     required double pierceIgnore,
     required int knockLv,
     required int lifestealLv,
-    required int burnLv,
     required Vector2 toM,
   }) {
     var dmg = damage;
@@ -327,32 +332,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
             m.model.abilityKey == 'unmovable' ? 0.8 : 0,
           );
       m.applyKnockback(toM, kb);
-    }
-    if (burnLv > 0) {
-      // 灼烧槽：每秒 value_per_level 点（固定值型=真实伤害绕甲），持续 2 秒；
-      // 三昧真火（honghaier 特殊能力）：伤害翻倍、持续延至 4 秒
-      m.ignite(
-        source: 'weapon_burn',
-        burnDps: game.slotValue('burn', 8.0) *
-            burnLv *
-            (game.hasAbility('honghaier')
-                ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
-                : 1.0),
-        seconds: game.hasAbility('honghaier')
-            ? game.battleNum('ability', 'honghaier_burn_sec', 4)
-            : 2,
-        trueDamage: true,
-      );
-    }
-    // 兜率炉火（laojun 特殊能力）：炉火加持窗口内命中附加一路独立灼烧
-    // （每秒按武器伤害比例，持续可配），与武器灼烧/其他法宝同时生效不互相覆盖
-    if (game._laojunWindow > 0 && !m.isDead) {
-      m.ignite(
-        source: 'laojun_fire',
-        burnDps: game.hitDamageBase *
-            game.battleNum('ability', 'laojun_burn_ratio', 0.4),
-        seconds: game.battleNum('ability', 'laojun_burn_sec', 2),
-      );
     }
   }
 

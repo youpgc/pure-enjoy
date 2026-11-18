@@ -119,7 +119,7 @@ class JourneyOrbitWeapons extends Component {
 /// 随引擎冻结（挂在伤害节拍前每帧推进）。
 extension JourneyTriggerWeapons on JourneyFlameGame {
   /// 金刚琢：每 12s 套取最近怪，受 250% 武器伤害且接触伤害减半 5s；
-  /// 阴阳二气瓶：每 18s 吸纳最近怪，定身 2.5s 并每秒受 40% 武器伤害。
+  /// 阴阳二气瓶：每 18s 吸纳最近怪定身 2.5s，灼烧由臂展驻留判定点燃。
   /// 无目标时约 1s 后重试（计时回退到阈值前 1s，不白等一整轮）。
   void updateTriggerWeapons(double dt) {
     if (_ended) return;
@@ -172,12 +172,6 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
         if (target != null && !target.isDead) {
           _pingTimer = 0;
           target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
-          target.ignite(
-            source: 'yinyang_ping',
-            burnDps: hitDamageBase *
-                weaponParam('yinyang_ping', 'burn', 0.4),
-            seconds: weaponParam('yinyang_ping', 'root', 2.5),
-          );
           fxLayer.spawnRing(target.position, 30);
           spawnFloatText(
             target.position + Vector2(0, -target.radius - 14),

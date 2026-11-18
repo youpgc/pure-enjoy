@@ -49,6 +49,10 @@ mixin JourneyKnockbackMixin on PositionComponent {
 mixin JourneyBurnMixin on PositionComponent {
   bool get isDead;
 
+  /// 处于武器臂展圆内的连续驻留时长：驱动所有灼烧来源的点燃，离开范围清零。
+  /// 每满驻留阈值续烧一次，已点燃的来源按各自时长独立烧完。
+  double burnDwell = 0;
+
   final Map<String, (double, double, bool)> _burnSources =
       <String, (double, double, bool)>{};
 
@@ -70,6 +74,68 @@ mixin JourneyBurnMixin on PositionComponent {
   }) {
     if (isDead) return;
     _burnSources[source] = (burnDps, seconds, trueDamage);
+  }
+
+  /// 臂展驻留灼烧：处于武器外环圆内（整圆判定，不看扇叶角度与命中冷却）
+  /// 累计驻留时长，每满 [dwellSec] 秒续燃全部生效来源；离开范围清零计时。
+  /// 三路来源沿用各自伤害口径，已点燃者按独立时长继续烧完不被覆盖中断。
+  void tickBurnAura(
+    JourneyFlameGame game,
+    double dt, {
+    required double dwellSec,
+    required double monsterRadius,
+  }) {
+    final arm = game.weaponArm;
+    if (isDead || arm == null) {
+      burnDwell = 0;
+      return;
+    }
+    final safeDwell = dwellSec.clamp(0.1, 30.0);
+    final dist = (game.player.position - position).length;
+    if (dist - monsterRadius > arm.outerRadius) {
+      // 离开臂展圆即清零驻留，重新进入需再次驻留满阈值
+      burnDwell = 0;
+      return;
+    }
+    burnDwell += dt;
+    if (burnDwell < safeDwell) return;
+    // 每满一个阈值续燃一次；用取模而非清零，保留超出部分继续累计
+    burnDwell %= safeDwell;
+    // 武器灼烧槽：槽值×等级×三昧倍率，固定值型绕甲
+    final burnLv = game.slotLevel('burn');
+    if (burnLv > 0) {
+      final honghaier = game.hasAbility('honghaier');
+      ignite(
+        source: 'weapon_burn',
+        burnDps: game.slotValue('burn', 8.0) *
+            burnLv *
+            (honghaier
+                ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
+                : 1.0),
+        seconds: honghaier
+            ? game.battleNum('ability', 'honghaier_burn_sec', 4)
+            : 2,
+        trueDamage: true,
+      );
+    }
+    // 兜率炉火（老君）：炉火加持窗口内按武器伤害比例点燃，经甲
+    if (game._laojunWindow > 0) {
+      ignite(
+        source: 'laojun_fire',
+        burnDps:
+            game.hitDamageBase * game.battleNum('ability', 'laojun_burn_ratio', 0.4),
+        seconds: game.battleNum('ability', 'laojun_burn_sec', 2),
+      );
+    }
+    // 阴阳二气瓶：装备该法宝即按周期口径的伤害比例点燃，经甲
+    if (game.effectWeapons.contains('yinyang_ping')) {
+      ignite(
+        source: 'yinyang_ping',
+        burnDps:
+            game.hitDamageBase * game.weaponParam('yinyang_ping', 'burn', 0.4),
+        seconds: game.weaponParam('yinyang_ping', 'root', 2.5),
+      );
+    }
   }
 
   /// 推进各来源计时，返回本帧应扣灼烧伤害：
