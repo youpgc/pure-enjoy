@@ -40,6 +40,7 @@ class JourneyHudPanel extends StatelessWidget {
             builder: (context, lv, _) => ValueListenableBuilder<String>(
               valueListenable: hud.realmTitle,
               builder: (context, title, _) => Row(
+                crossAxisAlignment: CrossAxisAlignment.center,
                 children: <Widget>[
                   _avatar(),
                   const SizedBox(width: 6),

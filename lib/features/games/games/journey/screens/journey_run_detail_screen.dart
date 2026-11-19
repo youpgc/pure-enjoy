@@ -25,6 +25,23 @@ class JourneyRunDetailScreen extends StatelessWidget {
     }
   }
 
+  /// 角色摘要：优先读快照内的角色名/等级/波次；旧记录仅有 character_code
+  /// 时回退 code、等级或波次缺失时不展示该段，避免拼出半截文案。
+  String _characterLine() {
+    final detail = record.runDetail;
+    if (detail == null) return '';
+    final name = detail['character_name'] as String? ?? '';
+    final code = detail['character_code'] as String? ?? '';
+    final level = detail['char_level'];
+    final wave = detail['wave'];
+    final parts = <String>[
+      if (name.isNotEmpty) name else if (code.isNotEmpty) code,
+      if (level is num && level > 0) 'Lv${level.round()}',
+      if (wave is num && wave > 0) '第 ${wave.round()} 波',
+    ];
+    return parts.join(' · ');
+  }
+
   List<JourneyAttrGroup> _groups() {
     final raw = record.runDetail?['attr_groups'];
     if (raw is! List) return const <JourneyAttrGroup>[];
@@ -40,6 +57,7 @@ class JourneyRunDetailScreen extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final groups = _groups();
+    final characterLine = _characterLine();
     return JourneyPageScaffold(
       title: '西行记录详情',
       body: ListView(
@@ -51,6 +69,10 @@ class JourneyRunDetailScreen extends StatelessWidget {
               children: <Widget>[
                 Text(_title, style: JourneyTheme.title),
                 const SizedBox(height: 6),
+                if (characterLine.isNotEmpty) ...<Widget>[
+                  Text(characterLine, style: JourneyTheme.body),
+                  const SizedBox(height: 6),
+                ],
                 Text(
                   '${record.cleared ? '通关 ✓' : '未竟'} · '
                   '击杀 ${record.kills} · 功德 +${record.meritGained}',

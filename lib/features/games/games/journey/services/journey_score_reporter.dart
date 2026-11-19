@@ -56,8 +56,10 @@ class JourneyScoreReporter {
     final hud = game.controller.hud;
     return <String, Object?>{
       'character_code': characterCode,
+      'character_name': game.character.name,
       'mode': modeCode,
       'char_level': hud.level.value,
+      'wave': hud.endlessWave.value,
       'hp': hud.hp.value.round(),
       'max_hp': hud.maxHp.value.round(),
       'hit_damage': game.hitDamageBase.toStringAsFixed(1),

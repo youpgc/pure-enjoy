@@ -55,6 +55,11 @@ abstract final class JourneyAttributesSheet {
                 ),
               ),
               const Text('属 性 详 情', style: JourneyTheme.titleLg),
+              const SizedBox(height: 6),
+              Text(
+                '${game.character.name} · Lv${game.controller.hud.level.value}',
+                style: JourneyTheme.caption,
+              ),
               const SizedBox(height: 12),
               ...rows,
             ],
