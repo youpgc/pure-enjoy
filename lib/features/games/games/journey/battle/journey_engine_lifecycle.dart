@@ -227,7 +227,7 @@ extension JourneyLifecycle on JourneyFlameGame {
     }
     _pendingLevelUps--;
     if (_pendingLevelUps > 0) {
-      controller.onLevelUp(_charLv, paused: true);
+      controller.onLevelUp(_charLv);
     } else {
       _pausedByLevelUp = false;
       armJoystickResume();

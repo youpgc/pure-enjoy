@@ -105,7 +105,7 @@ extension JourneyExp on JourneyFlameGame {
       // 真暂停：选卡期间世界完全静止（怪物不逼近、节拍不走）
       _pausedByLevelUp = true;
       pauseEngine();
-      controller.onLevelUp(_charLv, paused: true);
+      controller.onLevelUp(_charLv);
     }
   }
 

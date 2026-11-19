@@ -3,7 +3,7 @@ part of 'journey_battle_screen.dart';
 /// 局内对局页引擎回调（extension，同 library 访问宿主私有成员）：升级选卡、
 /// 终局结算上报、结算弹窗、还魂/炼化确认与提前结算。
 extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
-  void _onLevelUp(int newLevel, {required bool paused}) {
+  void _onLevelUp(int newLevel) {
     if (!mounted || _levelUpSheetOpen) return;
     final game = _game;
     if (game == null) return;
@@ -17,17 +17,30 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
     ).then((_) {
       _levelUpSheetOpen = false;
       if (!mounted) return;
-      // 弹窗被非选卡途径关闭时选卡仍未完成 → 延迟重弹（等旧浮层退场动画
-      // 结束，避免过渡期间 push 触发 Navigator 锁断言），
-      // 否则引擎停在选卡暂停态再无出口（死锁）。
-      if (game.isPausedForLevelUp) {
-        Future<void>.delayed(const Duration(milliseconds: 350), () {
-          if (!mounted) return;
-          if (game.isPausedForLevelUp) {
-            _onLevelUp(game.controller.hud.level.value, paused: true);
-          }
-        });
+      // 弹窗关闭后引擎仍处于选卡暂停态 → 还有未选完的卡，靠 here 续弹。
+      // 引擎侧 applyUpgrade 对 controller.onLevelUp 的同步调用会被上面的
+      // _levelUpSheetOpen 防重入吞掉，因此续弹必须在这里可靠接上，否则引擎
+      // 永久停在选卡暂停态（无卡、无恢复蒙层、世界静止）。
+      if (game.isPausedForLevelUp) _resumePendingLevelUp(game);
+    });
+  }
+
+  /// 续弹兜底：引擎仍在选卡暂停态就持续重试，等浮层退场动画结束后弹出
+  /// 下一张卡。仅在引擎脱离选卡暂停态时停止，避免一次性延迟因浮层仍被
+  /// 占用而 return 后无人再触发、把玩家锁死在静止世界。
+  void _resumePendingLevelUp(JourneyFlameGame game) {
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      // 屏幕销毁、引擎被重建替换（重试/退出流程会置空并重建 _game）或对局已
+      // 终局 → 停止续弹，避免操作旧引擎引用或在结算后仍弹选卡。
+      if (!mounted || !identical(_game, game) || game.isEnded) return;
+      if (!game.isPausedForLevelUp) return;
+      if (_levelUpSheetOpen) {
+        _resumePendingLevelUp(game);
+        return;
       }
+      // 等级取引擎真实值而非 hud.level：连升时 HUD 两段式动画延迟同步，
+      // 直接读 hud 会让续弹弹窗标题滞后一级。
+      _onLevelUp(game.charLevel);
     });
   }
 
@@ -102,7 +115,8 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
 
   void _showSettlement() {
     final result = _lastResult;
-    if (result == null || !mounted) return;
+    if (result == null || !mounted || _settlementSheetOpen) return;
+    _settlementSheetOpen = true;
     JourneySettlementSheet.show(
       context,
       result: result,
@@ -129,15 +143,24 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
         popToHub();
       },
     ).then((_) {
+      _settlementSheetOpen = false;
       if (!mounted) return;
       // 弹窗被非出口按钮途径关闭（对局已终局、引擎停止，不重弹会卡在
-      // 无出口的对局页）：延迟重弹，等旧浮层退场动画结束防过渡期 push 断言。
-      if (_lastResult != null) {
-        Future<void>.delayed(const Duration(milliseconds: 350), () {
-          if (!mounted || _lastResult == null) return;
-          _showSettlement();
-        });
+      // 无出口的对局页）：仍有结果就走持续重试，等旧浮层退场结束再弹，
+      // 过渡期被占用则继续下一轮，避免一次性延迟 return 后无人再触发。
+      if (_lastResult != null) _resumeSettlement();
+    });
+  }
+
+  /// 结算浮层续弹兜底：结果仍在就持续重试，出口按钮已处理结果时停止。
+  void _resumeSettlement() {
+    Future<void>.delayed(const Duration(milliseconds: 350), () {
+      if (!mounted || _lastResult == null) return;
+      if (_settlementSheetOpen) {
+        _resumeSettlement();
+        return;
       }
+      _showSettlement();
     });
   }
 

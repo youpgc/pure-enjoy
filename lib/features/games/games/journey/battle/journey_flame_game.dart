@@ -151,6 +151,10 @@ class JourneyFlameGame extends FlameGame
   bool _ended = false;
   bool get isEnded => _ended;
 
+  /// 引擎真实角色等级（连升时 hud.level 由两段式动画延迟同步，
+  /// 续弹弹窗标题取此值避免显示滞后一级）。
+  int get charLevel => _charLv;
+
   /// 待结算的升级次数（连升时不堆叠弹窗，逐个出卡）。
   int _pendingLevelUps = 0;
 

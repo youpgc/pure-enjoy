@@ -71,6 +71,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
 
   /// 升级/结算弹窗占用标记：防重弹 + 识别非选卡途径关闭（如系统返回键）。
   bool _levelUpSheetOpen = false;
+  bool _settlementSheetOpen = false;
   JourneyRunResult? _lastResult;
   int _lastGranted = 0;
   bool _lastFirstClear = false;

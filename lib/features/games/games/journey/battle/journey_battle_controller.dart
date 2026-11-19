@@ -26,7 +26,7 @@ class JourneyBattleController {
         onAlchemyPrompt = onAlchemyPrompt ?? _defaultAlchemyPrompt;
 
   final String themeColor;
-  final void Function(int newLevel, {required bool paused}) onLevelUp;
+  final void Function(int newLevel) onLevelUp;
   final void Function({
     required bool cleared,
     required int kills,

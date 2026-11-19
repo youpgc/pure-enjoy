@@ -176,7 +176,7 @@ extension JourneyInteract on JourneyFlameGame {
     if (_pausedByLevelUp) return;
     _pausedByLevelUp = true;
     pauseEngine();
-    controller.onLevelUp(_charLv, paused: true);
+    controller.onLevelUp(_charLv);
   }
 
   /// 面包屑铜钱（§2）：沿出生点→妖王据点直线均匀撒 6 枚指引西行；
