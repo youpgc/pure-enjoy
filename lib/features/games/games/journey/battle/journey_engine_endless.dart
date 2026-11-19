@@ -56,6 +56,14 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
   // 本波计划刷怪数（全图追猎据此判定「波已铺完」，防波初存活少误触发）
   game._endlessWavePlanned = count;
 
+  // 妖王补位降临：铺怪期与铺怪完成后每帧持续，直至本波配额耗尽（函数内
+  // 部按已降临数自停）。推波要求配额已耗尽，故召唤不能随铺怪完成而停止，
+  // 否则清怪快于补位节奏时配额永远补不满，卡在当前波。
+  if (bossQuota > 0) {
+    _tickEndlessBossTide(
+        game, n, configuredCode, buff, tideStart, bossQuota, dt);
+  }
+
   if (game._endlessSpawned >= count) {
     // 除尽推进：本波怪全灭且妖王配额已耗尽才进下一波
     final alive =
@@ -84,12 +92,6 @@ void journeyEndlessTick(JourneyFlameGame game, double dt) {
     game._jinjiaoWaveRefines = 0;
     game._endlessBossCd = 0;
     return;
-  }
-
-  // 妖王潮补位降临：同场并发钳制 + 依次降临（倒计时后台可配）
-  if (bossQuota > 0) {
-    _tickEndlessBossTide(
-        game, n, configuredCode, buff, tideStart, bossQuota, dt);
   }
 
   game._endlessTimer += dt;
