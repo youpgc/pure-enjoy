@@ -221,6 +221,9 @@ class JourneyFlameGame extends FlameGame
   double _zhuoTimer = 0;
   double _pingTimer = 0;
 
+  /// 计时槽冷却快照的 HUD 同步节流累加器（20fps）。
+  double _slotCdSyncTimer = 0;
+
   /// 环绕旋转方向（局外设置）：1=顺时针，-1=逆时针；对局页进局时注入。
   double spinDirection = 1.0;
 

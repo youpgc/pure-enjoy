@@ -261,9 +261,6 @@ extension JourneyLifecycle on JourneyFlameGame {
     if (passiveSlotCodes.contains('sanheng_mao') && _maoCd == 0) {
       final maoCooldown = weaponParam('sanheng_mao', 'cooldown', 300);
       _maoCd = maoCooldown > 0 ? maoCooldown : -1;
-      if (_maoCd > 0) {
-        controller.hud.maoCd.value = _maoCd.ceil();
-      }
       player.hp = player.maxHp * weaponParam('sanheng_mao', 'heal', 0.3);
       player.invulnTimer = weaponParam('sanheng_mao', 'invuln', 1.5);
       controller.hud.hp.value = player.hp;

@@ -29,6 +29,9 @@ class JourneyPlayerComponent extends PositionComponent {
   /// 玉净瓶甘露（扩展被动）：周期回血计时（每 20s 回 20% 生命）。
   double _ganluTimer = 0;
 
+  /// 甘露已累加秒数（HUD 时钟蒙层读取，剩余 = period - 此值）。
+  double get ganluElapsed => _ganluTimer;
+
   /// 定身剩余时间（百眼魔君金光缚身）：>0 时摇杆移动失效。
   double rootTimer = 0;
 

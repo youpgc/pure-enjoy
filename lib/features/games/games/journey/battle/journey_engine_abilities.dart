@@ -3,14 +3,10 @@ part of 'journey_flame_game.dart';
 /// 角色特殊能力的周期计时与触发：由主循环每帧调用，暂停/结算时随引擎冻结。
 extension JourneyAbilityTick on JourneyFlameGame {
   void tickAbilities(double dt) {
-    // 三根毫毛（sanheng_mao）：免死冷却递减；HUD 按整秒去重写入，
-    // 驱动被动槽图标灰化与右下角秒数。冷却长度走法宝参数 cooldown。
+    // 三根毫毛（sanheng_mao）：免死冷却递减；冷却快照统一在
+    // syncSlotCooldowns 中写入 HUD，驱动被动槽时钟蒙层与倒计时。
     if (_maoCd > 0) {
       _maoCd = math.max(0, _maoCd - dt);
-      final secs = _maoCd.ceil();
-      if (controller.hud.maoCd.value != secs) {
-        controller.hud.maoCd.value = secs;
-      }
     }
 
     // 伏魔重击（shaseng）：蓄力周期可配，就绪后停表待下一次命中消耗
@@ -85,7 +81,65 @@ extension JourneyAbilityTick on JourneyFlameGame {
 
     // 新维度槽（回元/护盾）的周期驱动 + 范围减速的每帧施加；聚妖幡寻猎走法宝通道
     tickNewSlots(dt);
+
+    // 计时类槽的 HUD 冷却快照统一同步（时钟蒙层 + 秒数），20fps 节流写入。
+    syncSlotCooldowns(dt);
   }
+}
+
+/// 计时类槽冷却快照同步：把每帧累加的周期/冷却计时折算为「剩余/总秒数」
+/// 写入 HUD，驱动槽位顺时针蒙层与倒计时文案。按 20fps 节流、0.05s 量化去重，
+/// 避免每帧通知 Flutter 层重建；就绪（剩余<=0）或槽位不存在则移除该项。
+/// 覆盖：回元/护体（维度槽周期）、玉净瓶（被动周期）、三根毫毛（被动冷却）。
+extension JourneySlotCooldownSync on JourneyFlameGame {
+  void syncSlotCooldowns(double dt) {
+    _slotCdSyncTimer += dt;
+    if (_slotCdSyncTimer < 0.05) return;
+    _slotCdSyncTimer = 0;
+
+    final prevMap = controller.hud.slotCooldowns.value;
+    final next = <String, JourneySlotCooldown>{};
+
+    // 量化到 0.05s：同一次节流窗内重复的快照复用旧对象，仅变化项触发重建。
+    void put(String code, double remain, double total) {
+      if (total <= 0 || remain <= 0) return;
+      final prev = prevMap[code];
+      next[code] = prev != null &&
+              _cdQuant(prev.remain) == _cdQuant(remain) &&
+              _cdQuant(prev.total) == _cdQuant(total)
+          ? prev
+          : JourneySlotCooldown(remain, total);
+    }
+
+    // 回元 / 护体：周期从 0 累加到 period，剩余 = period - tick。
+    for (final code in const ['recovery', 'shield']) {
+      final lv = slotLevel(code);
+      if (lv <= 0) continue;
+      final period =
+          slotPeriod(code, battleNum('weapon', '${code}_period', 4));
+      if (period <= 0) continue;
+      final tick = code == 'recovery' ? player.recoveryTick : player.shieldTick;
+      put(code, math.max(0.0, period - tick), period);
+    }
+    // 玉净瓶：周期回血，剩余 = period - 甘露累加计时。
+    if (passiveSlotCodes.contains('yujing_ping')) {
+      final period = weaponParam('yujing_ping', 'period', 20);
+      put('yujing_ping',
+          math.max(0.0, period - player.ganluElapsed), period);
+    }
+    // 三根毫毛：冷却从 cooldown 递减到 0，剩余 = _maoCd；-1=本局不再免死。
+    if (passiveSlotCodes.contains('sanheng_mao') && _maoCd > 0) {
+      put('sanheng_mao', _maoCd, weaponParam('sanheng_mao', 'cooldown', 300));
+    }
+
+    if (next.length != prevMap.length ||
+        next.entries.any((e) => !identical(e.value, prevMap[e.key]))) {
+      controller.hud.slotCooldowns.value = Map.unmodifiable(next);
+    }
+  }
+
+  /// 冷却量化：0.05s 一格，与节流窗一致，保证扫过平滑且不频繁重建。
+  int _cdQuant(double v) => (v * 20).round();
 }
 
 /// 周期效果：回元按缺失血量回血、护体金光周期授予护盾、聚妖幡周期吸引

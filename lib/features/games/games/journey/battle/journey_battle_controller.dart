@@ -105,6 +105,24 @@ class JourneyLoadout {
   });
 }
 
+/// 单个计时槽的冷却快照（HUD 时钟蒙层数据源）：
+/// remain=距下次触发/就绪的剩余秒数，total=周期或冷却总秒数。
+/// 周期类（玉净瓶/回元/护体）随计时推进 remain 递减，归零即触发并重置；
+/// 冷却类（三根毫毛）触发时置满，递减归零即就绪。
+class JourneySlotCooldown {
+  const JourneySlotCooldown(this.remain, this.total);
+
+  final double remain;
+  final double total;
+
+  /// 蒙层比例（0=无蒙层/就绪，1=满蒙层/刚触发）。
+  double get progress =>
+      total > 0 ? (remain / total).clamp(0.0, 1.0) : 0.0;
+
+  /// 文案倒计时取整秒（向上取整，归零前始终显示至少 1）。
+  int get secs => remain.ceil();
+}
+
 /// 局内 HUD 数值源（ValueNotifier 直读，组件化 HUD 订阅）。
 class JourneyBattleHud {
   final ValueNotifier<double> hp = ValueNotifier<double>(100);
@@ -146,9 +164,12 @@ class JourneyBattleHud {
   /// 法宝槽位变更计数：入槽/升级后 +1，槽栏监听重建（读 controller 槽表）。
   final ValueNotifier<int> slotsRevision = ValueNotifier<int>(0);
 
-  /// 三根毫毛免死冷却剩余秒数：0=就绪，>0=冷却中。
-  /// 被动槽图标据此灰化并显示右下角秒数，由引擎逐帧去重写入。
-  final ValueNotifier<int> maoCd = ValueNotifier<int>(0);
+  /// 计时槽冷却快照表：code → 剩余/总秒数。驱动槽位顺时针蒙层与秒数文案。
+  /// 收录全部带计时的槽（回元/护体/玉净瓶/三根毫毛），由引擎逐帧按秒去重
+  /// 写入；就绪或槽位消失时移除该项，蒙层随之隐藏。
+  final ValueNotifier<Map<String, JourneySlotCooldown>> slotCooldowns =
+      ValueNotifier<Map<String, JourneySlotCooldown>>(
+          const <String, JourneySlotCooldown>{});
 
   /// 等待玩家接管摇杆：点继续/选卡后世界仍时停，按下摇杆才恢复。
   final ValueNotifier<bool> awaitingJoystick = ValueNotifier<bool>(false);
