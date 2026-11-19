@@ -216,8 +216,12 @@ mixin JourneyLootMixin {
     final bossFirstKill = m.model.isBoss && !isEndless && game._bossStage == 0;
     final keepBossChest = m.model.isBoss &&
         (isEndless ? tideChestHit : bossFirstKill);
+    // 妖王表剔除香火行：经验走 expValue 单源在保底路径生成，避免
+    // _rollDropTable 命中香火行造成经验双份（exp_drop 为唯一经验入口）。
     final rollTable = effective
-        .where((d) => d.pickupCode != 'baoxiang' || keepBossChest)
+        .where((d) =>
+            (d.pickupCode != 'baoxiang' || keepBossChest) &&
+            (!m.model.isBoss || d.pickupCode != 'xianghuo'))
         .toList();
 
     // 兜底口径（掉落表未就绪时保持可玩）
@@ -236,7 +240,12 @@ mixin JourneyLootMixin {
 
     if (rollTable.isNotEmpty) {
       _rollDropTable(game, rollTable, m.position.clone(), expValue: expValue);
+      // 妖王保底经验：表内已剔除香火行，独立补一份 exp_drop 单源经验。
+      if (m.model.isBoss && expValue > 0) {
+        drop(JourneyPickupKind.exp, expValue);
+      }
     } else {
+      // 空表兜底已含 expValue 经验，妖王无需再补
       drop(JourneyPickupKind.exp, expValue);
       if (game.rng.nextDouble() <
           game.battleNum('economy', 'drop_coin_fallback', 0.35)) {
