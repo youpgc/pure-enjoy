@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 锦襕袈裟：佛门披袍，金线田相格 -->
+  <path d="M18 8 L30 8 L34 16 L42 34 L30 40 L24 32 L18 40 L6 34 L14 16 Z" fill="none" stroke="#E8C470" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M24 12 L24 30 M18 20 L30 20 M16 27 L32 27" stroke="#B98F3E" stroke-width="1.6" fill="none"/>
+  <circle cx="24" cy="9" r="2" fill="#F6E3B4"/>
+</svg>

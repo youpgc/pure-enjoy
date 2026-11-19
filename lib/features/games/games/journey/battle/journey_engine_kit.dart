@@ -157,6 +157,17 @@ extension JourneyKit on JourneyFlameGame {
       case 'shelizi': // 舍利子：伤害（params.damage）
         damageAmp += weaponParam('shelizi', 'damage', 0.15);
         break;
+      case 'jinlan_kasha': // 锦襕袈裟：护体护甲（params.armor）
+        player.armor += weaponParam('jinlan_kasha', 'armor', 5);
+        break;
+      case 'feilong_staff': // 飞龙宝杖：命中击退加成（params.knockback）
+        player.bonusKnockback += weaponParam('feilong_staff', 'knockback', 12);
+        break;
+      case 'bihuo_zhao': // 辟火罩：火系伤害减免（params.resist）
+        player.fireResist = (player.fireResist +
+                weaponParam('bihuo_zhao', 'resist', 0.15))
+            .clamp(0.0, 0.8);
+        break;
       // zijin_gourd 已改角色绑定特性法宝（紫金葫芦），被动加持槽位退役
       case 'sanheng_mao': // 三根毫毛：免死标记在血量归零链路查表生效
       case 'yujing_ping': // 玉净瓶甘露：周期回血在玩家 update 查表生效

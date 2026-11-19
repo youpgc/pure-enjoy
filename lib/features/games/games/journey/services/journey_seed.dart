@@ -213,6 +213,14 @@ const List<Map<String, dynamic>> kJourneyWeaponSeed = <Map<String, dynamic>>[
   {'code': 'zijin_ling', 'name': '紫金铃', 'category': 'effect', 'attack_kind': '', 'description': '命中 3 次引发妖火爆裂'},
   {'code': 'jinggang_zhuo', 'name': '金刚琢', 'category': 'effect', 'attack_kind': '', 'description': '周期套取最近妖物并使其虚弱'},
   {'code': 'yinyang_ping', 'name': '阴阳二气瓶', 'category': 'effect', 'attack_kind': '', 'description': '周期吸纳妖物定身灼烧'},
+  // 西游新法宝批（被动 3 + 特效 3；功德解锁，数值走 weapon_params）
+  {'code': 'jinlan_kasha', 'name': '锦襕袈裟', 'category': 'passive', 'attack_kind': '', 'description': '观音所赐，护体护甲提升', 'attr_key': 'armor'},
+  {'code': 'feilong_staff', 'name': '飞龙宝杖', 'category': 'passive', 'attack_kind': '', 'description': '灵吉菩萨宝杖，命中击退增强', 'attr_key': 'knockback'},
+  {'code': 'bihuo_zhao', 'name': '辟火罩', 'category': 'passive', 'attack_kind': '', 'description': '观音辟火罩，减免火系伤害', 'attr_key': 'fire_resist'},
+  {'code': 'huntian_ling', 'name': '混天绫', 'category': 'effect', 'attack_kind': '', 'description': '哪吒混天绫，命中拖拽妖物近身'},
+  {'code': 'fenghuo_lun', 'name': '风火轮', 'category': 'effect', 'attack_kind': '', 'description': '哪吒风火轮，点燃妖物并逐代扩散灼烧'},
+  {'code': 'qixing_jian', 'name': '七星剑', 'category': 'effect', 'attack_kind': '', 'description': '金角七星剑，暴击对精英妖王追加真伤'},
+  {'code': 'juyao_fan', 'name': '聚妖幡', 'category': 'effect', 'attack_kind': '', 'description': '招妖法幡，周期吸引范围妖物主动来攻'},
 ];
 
 const List<Map<String, dynamic>> kJourneyMonsterSeed = <Map<String, dynamic>>[
@@ -392,6 +400,18 @@ List<Map<String, dynamic>> buildJourneyTalentBranchSeed() =>
             },
     ];
 
+/// 三选一基础值成长卡兜底（远端 journey_upgrade_cards 优先）。
+/// 名称与数值入表，展示文案由引擎按 code + 数值生成；类内均匀随机抽取，
+/// enabled=false 不入池。抽卡权重只在四类之间配置。
+const List<Map<String, dynamic>> kJourneyUpgradeCardSeed =
+    <Map<String, dynamic>>[
+  {'code': 'attack', 'name': '伏魔真力', 'value': 50, 'enabled': true, 'sort_order': 1},
+  {'code': 'move_speed', 'name': '筋斗云气', 'value': 0.09, 'enabled': true, 'sort_order': 2},
+  {'code': 'max_hp', 'name': '蟠桃益气', 'value': 20, 'enabled': true, 'sort_order': 3},
+  {'code': 'regen', 'name': '木灵回春', 'value': 1.0, 'enabled': true, 'sort_order': 4},
+  {'code': 'pickup_range', 'name': '紫金磁引', 'value': 18, 'enabled': true, 'sort_order': 5},
+];
+
 /// 武器维度槽定义兜底（远端 journey_weapon_slots 优先；8 槽上限 9 级 + clone 槽）。
 /// 6 主动槽=维度槽：初始武器占 1 特效槽（角色映射见引擎），空槽由
 /// 三选一「习得」卡填入；每级效果/上限为运营配置，此处仅兜底。
@@ -411,6 +431,13 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'crit_rate', 'name': '暴击', 'kind': 'attribute', 'effect_per_level': '暴击率 +2.5%', 'max_level': 9},
   {'code': 'crit_damage', 'name': '暴伤', 'kind': 'attribute', 'effect_per_level': '暴击伤害 +6%', 'max_level': 9},
   {'code': 'armor', 'name': '护甲', 'kind': 'attribute', 'effect_per_level': '护甲 +3', 'max_level': 9},
+  // 新维度槽（扩展角色玩法）：抽取权重只在四类之间配置，类内均匀随机。
+  {'code': 'vitality', 'name': '生机', 'kind': 'attribute', 'effect_per_level': '生命上限 +5%', 'max_level': 9, 'value_per_level': 0.05},
+  {'code': 'cloud', 'name': '腾云', 'kind': 'attribute', 'effect_per_level': '移动速度 +5%', 'max_level': 9, 'value_per_level': 0.05},
+  {'code': 'ward', 'name': '金刚', 'kind': 'attribute', 'effect_per_level': '受击减伤 +4%', 'max_level': 9, 'value_per_level': 0.04},
+  {'code': 'recovery', 'name': '回元', 'kind': 'effect', 'effect_per_level': '每 4 秒按缺失生命 5% 回复', 'max_level': 9, 'value_per_level': 0.05, 'period_sec': 4},
+  {'code': 'shield', 'name': '护体', 'kind': 'effect', 'effect_per_level': '每 4 秒获护盾 20 点', 'max_level': 9, 'value_per_level': 20, 'period_sec': 4},
+  {'code': 'slow', 'name': '缚灵', 'kind': 'effect', 'effect_per_level': '臂展内妖物减速 6%', 'max_level': 9, 'value_per_level': 0.06},
 ];
 
 // ---- 局外玩法种子（M3；镜像 SQL 种子 feature_journey_m3_20261105）----

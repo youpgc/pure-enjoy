@@ -70,10 +70,10 @@ extension JourneyExp on JourneyFlameGame {
       _charLv++;
       levelAttackTotal +=
           config?.levelAttackPerLv ?? kJourneyLevelAttackPerLv;
-      // 固定额成长按蟠桃比例同步放大，保持加成随生命成长持续提升；
-      // 境界突破的百分比成长天然含蟠桃部分，不做重复放大。
+      // 固定额成长按蟠桃+生机比例同步放大，保持加成随生命成长持续提升；
+      // 境界突破的百分比成长天然含这些比例部分，不做重复放大。
       final hpUp = (config?.levelHpPerLv ?? kJourneyLevelHpPerLv) *
-          (1 + player.pantaoHpRatio);
+          (1 + player.pantaoHpRatio + player.hpBonusRatio);
       player.maxHp += hpUp;
       player.hp += hpUp;
       controller.hud.maxHp.value = player.maxHp;

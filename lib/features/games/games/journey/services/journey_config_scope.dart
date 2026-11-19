@@ -28,6 +28,7 @@ enum JourneyConfigTable {
   weaponParams('journey_weapon_params', 'weapon_id.asc'),
   monsterParams('journey_monster_params', 'monster_id.asc'),
   battleParams('journey_battle_params', 'group_code.asc'),
+  upgradeCards('journey_upgrade_cards', 'sort_order.asc'),
   characterAuraParams('journey_character_aura_params', 'character_code.asc'),
   realmTitles('journey_realm_titles', 'character_code.asc,tier.asc'),
   journeyLevels('journey_levels', 'level_id.asc');

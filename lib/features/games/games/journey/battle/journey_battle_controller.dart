@@ -109,6 +109,8 @@ class JourneyLoadout {
 class JourneyBattleHud {
   final ValueNotifier<double> hp = ValueNotifier<double>(100);
   final ValueNotifier<double> maxHp = ValueNotifier<double>(100);
+  /// 护体金光护盾值（HUD 血条下方白线按 shield/maxHp 比例展示）。
+  final ValueNotifier<double> shield = ValueNotifier<double>(0);
   final ValueNotifier<double> exp = ValueNotifier<double>(0);
   final ValueNotifier<double> expNeed = ValueNotifier<double>(12);
   final ValueNotifier<int> level = ValueNotifier<int>(1);
@@ -239,6 +241,9 @@ class JourneyMinimapData {
   });
 }
 
+/// 三选一候选类别：用于类别层权重抽卡（维度槽/法宝/触发效果/基础值）。
+enum JourneyChoiceCategory { slot, passive, effect, base }
+
 /// 局内成长三选一选项（维度槽 + 被动加持 + 通用成长）。
 enum JourneyUpgradeKind {
   slotLearn, // 习得新维度入空槽（[code] 载荷，Lv1）
@@ -260,11 +265,15 @@ class JourneyUpgradeChoice {
   final String title;
   final String desc;
 
+  /// 类别层抽取归属（权重管理的最小粒度；类内均匀随机抽取）。
+  final JourneyChoiceCategory category;
+
   const JourneyUpgradeChoice(
     this.kind, {
     this.code = '',
     required this.title,
     required this.desc,
+    this.category = JourneyChoiceCategory.base,
   });
 }
 

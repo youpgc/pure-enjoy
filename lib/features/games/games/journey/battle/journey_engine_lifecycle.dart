@@ -201,23 +201,25 @@ extension JourneyLifecycle on JourneyFlameGame {
         );
         break;
       case JourneyUpgradeKind.moveSpeed:
-        moveSpeedAmp += config?.upgradeMove ?? 0.09;
+        moveSpeedAmp += upgradeCardValue('move_speed', config?.upgradeMove ?? 0.09);
         break;
       case JourneyUpgradeKind.maxHp:
-        final hpUp = (config?.upgradeHp ?? 20) * (1 + player.pantaoHpRatio);
+        final hpUp = upgradeCardValue('max_hp', config?.upgradeHp ?? 20) *
+            (1 + player.pantaoHpRatio + player.hpBonusRatio);
         player.maxHp += hpUp;
         player.hp += hpUp;
         controller.hud.maxHp.value = player.maxHp;
         controller.hud.hp.value = player.hp;
         break;
       case JourneyUpgradeKind.regen:
-        player.regen += config?.upgradeRegen ?? 1.0;
+        player.regen += upgradeCardValue('regen', config?.upgradeRegen ?? 1.0);
         break;
       case JourneyUpgradeKind.pickupRange:
-        player.pickupRange += config?.upgradePickup ?? 18;
+        player.pickupRange +=
+            upgradeCardValue('pickup_range', config?.upgradePickup ?? 18);
         break;
       case JourneyUpgradeKind.attack:
-        final step = config?.upgradeAttack ?? kJourneyUpgradeAttack;
+        final step = upgradeCardValue('attack', config?.upgradeAttack ?? kJourneyUpgradeAttack);
         final cap = config?.attackUpgradeCap ?? kJourneyAttackUpgradeCap;
         cardAttackTotal = math.min(cardAttackTotal + step, cap);
         _refreshWeaponGrade();

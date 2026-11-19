@@ -34,4 +34,18 @@ extension JourneyConfigAccess on JourneyFlameGame {
     final map = _slotDefCache ??= config?.slotDefMap() ?? const {};
     return map[code];
   }
+
+  /// 维度槽周期秒数（period_sec 后台配置；0/缺失回落 [fallback]）。
+  /// 回元/护体等周期槽的文案与真实触发周期同源，避免两处口径脱节。
+  double slotPeriod(String code, double fallback) {
+    final v = slotDefOf(code)?.periodSec ?? 0;
+    return v > 0 ? v : fallback;
+  }
+
+  /// 基础值成长卡每级数值（journey_upgrade_cards.value）：表已配置则用表值，
+  /// 否则回落 [fallback]（由调用方传 globals 存量值，兼容表未部署）。
+  double upgradeCardValue(String code, double fallback) {
+    final v = config?.upgradeCardMap()[code]?.value ?? 0;
+    return v > 0 ? v : fallback;
+  }
 }

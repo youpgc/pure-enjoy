@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 七星剑：金角七星剑，北斗七星 -->
+  <path d="M24 5 L27 12 L26 30 L22 30 L21 12 Z" fill="none" stroke="#E8C470" stroke-width="2.8" stroke-linejoin="round"/>
+  <path d="M15 30 L33 30 M24 30 L24 40 M20 41 L28 41" stroke="#F6E3B4" stroke-width="2.6" stroke-linecap="round"/>
+  <circle cx="24" cy="9" r="1.5" fill="#D4593F"/>
+  <circle cx="19" cy="14" r="1.2" fill="#F6E3B4"/>
+  <circle cx="29" cy="14" r="1.2" fill="#F6E3B4"/>
+  <circle cx="16" cy="20" r="1.2" fill="#F6E3B4"/>
+  <circle cx="32" cy="20" r="1.2" fill="#F6E3B4"/>
+  <circle cx="19" cy="26" r="1.2" fill="#F6E3B4"/>
+  <circle cx="29" cy="26" r="1.2" fill="#F6E3B4"/>
+</svg>

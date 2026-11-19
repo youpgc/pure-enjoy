@@ -310,6 +310,13 @@ Map<String, Map<String, double>> _monsterParams(
         () => kJourneySlotDefSeed.map(JourneySlotDefModel.fromJson).toList(),
         JourneySlotDefModel.fromJson,
       ),
+      upgradeCards: view.models(
+        JourneyConfigTable.upgradeCards,
+        () => kJourneyUpgradeCardSeed
+            .map(JourneyUpgradeCardModel.fromJson)
+            .toList(),
+        JourneyUpgradeCardModel.fromJson,
+      ),
       weaponLevels: relations.weaponLevels,
       drops: view.models(
         JourneyConfigTable.drops,
@@ -371,6 +378,8 @@ JourneyConfigSnapshot buildJourneySeedSnapshot() {
         .map(JourneyPickupConfigModel.fromJson)
         .toList(),
     slotDefs: kJourneySlotDefSeed.map(JourneySlotDefModel.fromJson).toList(),
+    upgradeCards:
+        kJourneyUpgradeCardSeed.map(JourneyUpgradeCardModel.fromJson).toList(),
     dailyMaps: kJourneyDailyMapSeed.map(JourneyDailyMapModel.fromJson).toList(),
     fromSeed: true,
   );

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 回元：损失回血，循环十字 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 21 A9 9 0 1 1 20 14"/>
+    <path d="M20 9 L20 14 L15 14"/>
+    <path d="M12 8 V16 M8 12 H16"/>
+  </g>
+</svg>

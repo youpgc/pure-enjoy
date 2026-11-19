@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 辟火罩：观音辟火罩，罩体覆火 -->
+  <path d="M14 38 Q10 24 24 9 Q38 24 34 38 Z" fill="none" stroke="#E8C470" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M18 38 Q16 26 24 15 Q32 26 30 38" fill="none" stroke="#B98F3E" stroke-width="2" stroke-linecap="round"/>
+  <path d="M11 40 Q14 34 17 40 M31 40 Q34 34 37 40" fill="none" stroke="#D4593F" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="24" cy="9" r="2" fill="#F6E3B4"/>
+</svg>

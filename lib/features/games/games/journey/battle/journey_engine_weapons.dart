@@ -43,6 +43,8 @@ abstract interface class JourneyWeaponHost {
   set spinAmp(double value);
   double get damageAmp;
   set damageAmp(double value);
+  double get moveSpeedAmp;
+  set moveSpeedAmp(double value);
   double get critRate;
   set critRate(double value);
   double get critDamage;
@@ -142,10 +144,29 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       case 'armor': // 护甲：每级 +（value_per_level；减伤曲线钳制在伤害侧）
         player.armor += slotValue('armor', 3.0) * delta;
         break;
+      case 'vitality': // 生机：生命上限百分比，与蟠桃同构按当前上限放大并登记比例
+        final ratio = (slotValue('vitality', 0.05) * delta).clamp(
+          0.0,
+          battleNum('weapon', 'vitality_cap', 0.6),
+        );
+        player.hpBonusRatio += ratio;
+        final hpUp = player.maxHp * ratio;
+        player.maxHp += hpUp;
+        player.hp += hpUp;
+        controller.hud.maxHp.value = player.maxHp;
+        controller.hud.hp.value = player.hp;
+        break;
+      case 'cloud': // 腾云：移速百分比，加法区（与筋斗云/升级卡同级）
+        moveSpeedAmp += slotValue('cloud', 0.05) * delta;
+        break;
+      case 'ward': // 金刚不坏：受击最终减伤，在 takeDamage 侧按等级读取
+      case 'recovery': // 回元：周期回血，在 tickNewSlots 侧按等级读取
+      case 'shield': // 护体金光：周期护盾，在 tickNewSlots 侧按等级读取
+      case 'slow': // 缚灵：范围减速，在 tickNewSlots 侧按等级读取
       case 'knockback':
       case 'lifesteal':
       case 'pierce':
-        break; // 命中结算特效（见 _hitMonster）
+        break; // 命中/周期结算特效（见 _hitMonster / tickNewSlots）
       case 'burn':
         break; // 灼烧驻留特效（见 JourneyBurnMixin.tickBurnAura）
     }
@@ -290,19 +311,32 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           dmg * game.weaponParam('baoji_thunder', 'chain', 0.4),
         );
       }
+      // 七星剑：暴击对精英/妖王追加真伤（params.bonus；绕护甲）
+      if (game.effectWeapons.contains('qixing_jian') &&
+          (m.model.aiTier != 'normal' || m.model.isBoss)) {
+        m.takeDamage(
+          dmg * game.weaponParam('qixing_jian', 'bonus', 0.3),
+          armorIgnore: 1,
+        );
+      }
     }
-    // 幌金绳：命中 chance 概率定身 root 秒（params.chance/params.root）
+    // 幌金绳：命中按概率定身；混天绫：命中按概率把妖物拖向玩家近身
     if (!m.isDead &&
         game.effectWeapons.contains('kunxian_rope') &&
-        game.rng.nextDouble() <
-            game.weaponParam('kunxian_rope', 'chance', 0.12)) {
+        game.rng.nextDouble() < game.weaponParam('kunxian_rope', 'chance', 0.12)) {
       m.rootTimer = game.weaponParam('kunxian_rope', 'root', 1.5);
-      game.fxLayer.spawnRing(
-        m.position,
-        m.radius + 8,
-        color: const Color(0xFFFFE9A8),
-      );
-      // GameAudio.instance.journeyTrigger();
+      game.fxLayer.spawnRing(m.position, m.radius + 8,
+          color: const Color(0xFFFFE9A8));
+    }
+    if (!m.isDead &&
+        game.effectWeapons.contains('huntian_ling') &&
+        game.rng.nextDouble() < game.weaponParam('huntian_ling', 'chance', 0.12)) {
+      final toPlayer = game.player.position - m.position;
+      final drag = math.min(game.weaponParam('huntian_ling', 'drag', 90),
+          toPlayer.length - m.radius - 20);
+      if (drag > 0) m.applyDrag(toPlayer, drag);
+      game.fxLayer.spawnRing(m.position, m.radius + 8,
+          color: const Color(0xFFD98AD9));
     }
     // 紫金铃（扩展特效）：同一目标累计命中 hits 次引发妖火爆炸
     if (!m.isDead && game.effectWeapons.contains('zijin_ling')) {
@@ -330,8 +364,9 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           game.battleNum('weapon', 'lifesteal_floor',
               kJourneyLifestealHealFloor)));
     }
-    if (knockLv > 0) {
-      var kb = game.slotValue('knockback', 16) * knockLv;
+    if (knockLv > 0 || game.player.bonusKnockback > 0) {
+      var kb = game.slotValue('knockback', 16) * knockLv +
+          game.player.bonusKnockback; // 击退槽 + 飞龙宝杖被动加成
       // 铜皮铁骨（bajie 特殊能力）：受击窗口内击退强度放大
       if (game._bajieGuard > 0) {
         kb *= game.battleNum('ability', 'bajie_knock_mult', 1.5);

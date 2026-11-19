@@ -1,6 +1,4 @@
-// dart:async 以别名引入：flame/components 同名导出 Flame Timer（double 秒），
-// 经验条两段式动画的 Dart 定时器统一走 dart_async.Timer（exp part）。
-import 'dart:async' as dart_async;
+import 'dart:async' as dart_async; // 别名避开 flame 同名 Timer，经验条动画用
 import 'dart:math' as math;
 import 'dart:ui' as ui;
 import 'package:flame/components.dart';
@@ -356,6 +354,7 @@ class JourneyFlameGame extends FlameGame
 
   /// 攻击力%合计（伤害公式固定：与武器增伤%加法合流进 damageAmpTotal）。
   double attackAmp = 0;
+  @override
   double moveSpeedAmp = 1.0;
 
   /// 等级成长累计的基础攻击力（每级叠加，独立于法宝品阶）。
@@ -423,6 +422,7 @@ class JourneyFlameGame extends FlameGame
     WidgetsBinding.instance.addPostFrameCallback((_) {
       controller.hud.maxHp.value = player.maxHp;
       controller.hud.hp.value = player.hp;
+      controller.hud.shield.value = player.shield;
       controller.hud.realmTitle.value = realmTitle;
       // 无妖章回（原著无妖）：罗盘位口径分派——每日游历不展示通关条件/提示
       // （进图即亮「功成」、随时可结算）；无妖主线章回=西行里程（位移累计，挂机不可达成）

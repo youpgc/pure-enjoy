@@ -77,6 +77,37 @@ class JourneyHudPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   JourneyHpBarFx(value: maxHp > 0 ? hp / maxHp : 0),
+                  // 护体金光：血条下方白色细线，宽度按护盾/最大生命比例
+                  ValueListenableBuilder<double>(
+                    valueListenable: hud.shield,
+                    builder: (context, shield, _) => Padding(
+                      padding: const EdgeInsets.only(top: 2),
+                      child: ClipRRect(
+                        borderRadius: BorderRadius.circular(1),
+                        child: SizedBox(
+                          height: 2,
+                          child: Stack(
+                            children: <Widget>[
+                              Positioned.fill(
+                                child: Container(
+                                  color: Colors.white.withValues(alpha: 0.12),
+                                ),
+                              ),
+                              Align(
+                                alignment: Alignment.centerLeft,
+                                child: FractionallySizedBox(
+                                  widthFactor: maxHp > 0
+                                      ? (shield / maxHp).clamp(0.0, 1.0)
+                                      : 0.0,
+                                  child: Container(color: Colors.white),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ),
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
                     child: Text(

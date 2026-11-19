@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 混天绫：哪吒混天绫，绫带拖拽拉拽 -->
+  <path d="M8 14 Q20 6 30 14 Q40 22 32 30 Q24 38 16 30" fill="none" stroke="#E8C470" stroke-width="3.2" stroke-linecap="round"/>
+  <path d="M12 18 Q20 12 28 18 Q34 23 29 28" fill="none" stroke="#F6E3B4" stroke-width="2" stroke-linecap="round"/>
+  <path d="M14 34 Q24 42 34 34" fill="none" stroke="#D4593F" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M30 32 L35 35 L29 37" fill="none" stroke="#D4593F" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round"/>
+</svg>

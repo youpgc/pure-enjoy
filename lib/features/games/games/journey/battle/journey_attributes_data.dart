@@ -52,6 +52,12 @@ abstract final class JourneyAttributesData {
     'crit_rate': '暴击',
     'crit_damage': '暴伤',
     'armor': '护甲',
+    'vitality': '生机',
+    'cloud': '腾云',
+    'ward': '金刚',
+    'recovery': '回元',
+    'shield': '护体',
+    'slow': '缚灵',
   };
 
   static List<JourneyAttrGroup> collect(JourneyFlameGame game) {

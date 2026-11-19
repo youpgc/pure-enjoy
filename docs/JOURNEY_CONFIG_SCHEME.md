@@ -102,8 +102,8 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | exp_base / exp_per_lv | 12 / 7 | 升级经验 = 12 + lv×7 |
 | level_attack_per_lv | 12.00 | 每级攻击成长 |
 | level_hp_per_lv | 15.00 | 每级生命成长 |
-| upgrade_attack / attack_upgrade_cap | 50 / 500 | 攻击卡单次/累计上限 |
-| upgrade_hp / upgrade_regen / upgrade_pickup / upgrade_move | 20 / 1 / 18 / 0.09 | 三选一其余卡数值 |
+| upgrade_attack / attack_upgrade_cap | 50 / 500 | 攻击卡单次/累计上限（表未配置时兜底；正常由 journey_upgrade_cards 提供） |
+| upgrade_hp / upgrade_regen / upgrade_pickup / upgrade_move | 20 / 1 / 18 / 0.09 | 三选一其余卡数值（同上，正常由 journey_upgrade_cards 提供） |
 | talent_drop_rate | 0.10 | 妖王伏诛掉天赋点概率 |
 | revive_merit_base | ⏳60 | 还魂价 = 基准 × 当前角色等级（pending⑧ 统一为 60；旧口径 ×关卡号） |
 | revive_merit_cap | ⏳2000 | 还魂功德封顶（pending⑧ 新增列，单局 1 次不变） |
@@ -144,6 +144,8 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 移速卡 | +9%/次 | 三选一 |
 | 维度槽习得/升级卡 | 见 §5 | 三选一 |
 
+> 三选一五张基础值卡（攻击/生命/回复/拾取/移速）由 `journey_upgrade_cards` 表独立管理（后台「基础值成长卡」页签）：名称、每级数值、是否入池后台可配；展示文案由 App 按编码+数值生成，改数值即改文案。抽卡权重只在四类之间配置（economy 组 `choice_weight_*`），基础值类内均匀随机抽取。上表数值为表未配置时的内置兜底。`attack` 卡累计达 `attack_upgrade_cap` 后不再入池。
+
 ---
 
 ## 4. 法宝·主动环绕（9，journey_weapons + journey_weapon_levels）
@@ -167,7 +169,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 
 > 该阈值在后台「西行配置 → 战斗参数 → 武器与吸血穿刺 → 命中冷却与灼烧驻留」的「灼烧驻留触发(秒)」逐键可改（`journey_battle_params.weapon.burn_dwell_sec`，缺省回落 1 秒）。
 
-## 5. 武器维度槽（12，journey_weapon_slots，后台可逐项改）
+## 5. 武器维度槽（19，journey_weapon_slots，后台可逐项改）
 
 | 槽 | 类型 | 每级数值（远端现值） | 9 级合计 | 状态 |
 |---|---|---|---|---|
@@ -184,9 +186,26 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 暴伤 crit_damage | 属性 | +6% | +54%（整桶钳 ≤200%） | ✅ |
 | 护甲 armor | 属性 | 1.5 → ⏳3 | 27 | ⏳pending④ |
 
+### 扩展维度槽（6，扩展角色玩法）
+
+三选一抽卡**只在类别层配置权重**：按**类别权重**选类（维度槽/法宝/触发效果/基础值四类，配置在「战斗参数 → 经济与掉落」组 `journey_battle_params.group_code='economy'` 的 `choice_weight_slot/passive/effect/base`，缺省 1，越小该类越少出现），选中类后**类内均匀随机**抽一张；某类被抽空（槽满/全持有）时该类权重自动剔除、不占抽取机会，保证不会因槽满抽空。单项卡（维度槽、基础值卡）不设抽取权重，类内机会均等。上限/范围类参数并入后台「战斗参数 → 武器与吸血穿刺」组（`group_code='weapon'`）逐键可改；每级增量仍在维度槽表 `value_per_level`。周期槽（回元/护体）的真实触发秒数改由维度槽表 `period_sec` 直接承载，与「每级效果」文案同源，`period_sec=0` 时回落 weapon 组 `recovery_period/shield_period`。
+
+> `journey_weapon_slots.weight` 与 `journey_upgrade_cards.weight` 为历史遗留列，三选一已不再读取；后台表单与 App 均不展示、不配置单项权重。
+
+| 槽 | 类型 | 每级数值（占位） | 结算口径 | 参数键（weapon 组） |
+|---|---|---|---|---|
+| 生机 vitality | 属性 | 生命上限 +5% | 按当前上限放大并登记比例，固定额生命成长同比放大（与蟠桃同构） | vitality_cap |
+| 腾云 cloud | 属性 | 移速 +5% | 加法区（与筋斗云/升级卡同级） | — |
+| 金刚 ward | 属性 | 受击减伤 +4% | 最终减伤区，在 takeDamage 乘算于来源减伤之后 | ward_cap |
+| 回元 recovery | 效果 | 缺失生命 5% | 每 4 秒按已损失血量回血，走 heal（禁疗拦截） | period_sec（优先）/ recovery_period 兜底 / recovery_cap |
+| 护体 shield | 效果 | 护盾 +20 点/级 | 每 4 秒按「每级数值×等级」授予固定护盾点数，与最大生命无关；护盾总量上限=最大生命值，达到上限不再增长；受击先抵扣再扣血；HUD 血条下方白线按护盾/最大生命展示 | period_sec（优先）/ shield_period 兜底 |
+| 缚灵 slow | 效果 | 减速 6% | 每帧刷新臂展圆内怪物减速，离圈计时自然到期 | slow_cap / slow_hold_sec |
+
+> 周期寻猎由特效法宝「聚妖幡」提供，不再占用维度槽，见第 7 节。
+
 ---
 
-## 6. 被动法宝（9，journey_weapon_params 后台可逐键改）
+## 6. 被动法宝（12，journey_weapon_params 后台可逐键改）
 
 | 法宝 | 参数 | 数值 | 效果 |
 |---|---|---|---|
@@ -199,8 +218,11 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 三根毫毛 sanheng_mao | heal / invuln / cooldown | 30% / 1.5 秒 / 300 秒 | 冷却就绪时致命伤免死并进入冷却；冷却期间不再免死、被动槽图标灰化并显示剩余秒数。cooldown 配 0 时不进入冷却、本局仅触发一次（缺行回落 300 秒） |
 | 玉净瓶甘露 yujing_ping | period / heal | 20 秒 / 20% | 周期回血 |
 | 火眼金睛 huoyan_jingjing | elite | ⏳远端 1.2（乘法脏值）→ 0.2（加法） | 精英/妖王受伤 +基础值×20% |
+| 锦襕袈裟 jinlan_kasha | armor | +5/份 | 观音所赐，护体护甲（入槽即加 player.armor） |
+| 飞龙宝杖 feilong_staff | knockback | +12/份 | 命中击退距离加成（与击退槽独立叠加） |
+| 辟火罩 bihuo_zhao | resist | 15%/份 | 火系伤害减免（在三昧真火结算乘算，钳 80%） |
 
-## 7. 特效法宝（6）
+## 7. 特效法宝（10）
 
 | 法宝 | 参数 | 数值 | 效果 |
 |---|---|---|---|
@@ -210,6 +232,10 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 紫金铃 zijin_ling | hits / damage / range | 3 次 / 60% / 120 | 连击爆裂 |
 | 金刚琢 jinggang_zhuo | period / damage / weak | 12 秒 / ×2.5 / 5 秒 | 周期套取+虚弱 |
 | 阴阳二气瓶 yinyang_ping | period / root / burn | 18 秒 / 2.5 秒 / 40% | 周期吸纳定身灼烧 |
+| 混天绫 huntian_ling | chance / drag | 12% / 90 | 命中概率把妖物拖拽近身；拖拽距离≤自身到玩家的可拉近余量（与幌金绳定身不同机制） |
+| 风火轮 fenghuo_lun | period / burn / seconds / spread_period / spread_range / spread_ratio / spread_generations | 10 秒 / ×0.5 / 3 秒 / 2 秒 / 140 / 0.6 / 2 | 周期点燃臂展内最近妖物作火种，火种按周期向邻近未点燃妖物逐代扩散灼烧，伤害按代际衰减、到代际上限停止 |
+| 七星剑 qixing_jian | bonus | 30% | 暴击对精英/妖王追加真伤（绕护甲） |
+| 聚妖幡 juyao_fan | period / range / seconds | 15 秒 / 900 / 12 秒 | 周期吸引范围内非妖王妖物主动来攻；窗口内无视侦测/脱战半径、豁免离屏冻结；妖王不受影响 |
 
 ---
 
@@ -381,6 +407,14 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 三根毫毛 | 直购 | 3000 |
 | 玉净瓶甘露 | 直购 | 2500 |
 | 火眼金睛 | 直购 | 3000 |
+| 锦襕袈裟 | journey_robe_bestowed（通关第 7 难） | 3000 |
+| 飞龙宝杖 | journey_dragon_staff（通关第 20 难） | 3000 |
+| 辟火罩 | journey_fire_ward（击杀 1000） | 3000 |
+| 混天绫 | journey_neza_silk（击杀 5000） | 4000 |
+| 风火轮 | journey_neza_wheel（功德 2000） | 4000 |
+| 七星剑 | journey_seven_star（首次还魂） | 4000 |
+
+> 新增 6 法宝解锁成就按西游记典故命名，门槛复用现有 journey 成就的四类条件档位（通关/击杀/功德/还魂），不新增运营数值口径；功德价为占位、以管理后台编辑为准。解锁=达成成就且功德足够，未解锁不进三选一候选池。
 
 > ⏳种子兜底价 300/200/400 与远端 900/600/1200 不一致（远端生效，建议后台维持远端值，种子仅容灾）。
 
@@ -410,3 +444,5 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 14 | boss_respawn_cd_sec | 远端 globals 无列（兜底 10 秒生效） | pending⑧ 补列=10 | ⏳pending⑧ |
 | 15 | 精英率上限 | 兜底 0.60，后台无列 | pending⑧ 补列=0.60 | ⏳pending⑧ |
 | 16 | 固定值衍生伤害绕甲 | 固定值类（灼烧槽 8/秒×等级）仍经护甲减免 | 用户拍板绕甲：灼烧 DoT 拆双轨（固定值型 armorIgnore=1，百分比型仍经甲），App 已落地 | ✅已落地 |
+| 17 | 扩展角色玩法（6 维度槽 + 7 法宝） | 无 | App 三层独立实现 + weight 加权抽卡 + 新槽参数并入 weapon 参数组；配置占位行 SQL 已执行 | ✅已执行 |
+| 18 | 三选一类别权重 + 周期同源 + 基础值卡后台化 | 扁平池单项权重导致三张全维度槽；回元/护体周期藏在 weapon 组与文案脱节；基础值五卡硬编码 | 抽卡改四类权重（economy 组 choice_weight_*，槽满类剔除）；维度槽加 period_sec 让周期与文案同源；新建 journey_upgrade_cards 表+页签管理五张基础值卡 | ✅代码落地，SQL pending |

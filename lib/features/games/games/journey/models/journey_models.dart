@@ -337,6 +337,9 @@ class JourneySlotDefModel {
   /// 每级数值（value_per_level 列；0=未配置走引擎内置兜底）。
   final double valuePerLevel;
 
+  /// 周期触发秒数（period_sec 列；仅回元/护体等周期槽使用，0=回落引擎兜底）。
+  final double periodSec;
+
   const JourneySlotDefModel({
     required this.code,
     required this.name,
@@ -344,6 +347,7 @@ class JourneySlotDefModel {
     required this.effectPerLevel,
     required this.maxLevel,
     this.valuePerLevel = 0,
+    this.periodSec = 0,
   });
 
   factory JourneySlotDefModel.fromJson(Map<String, dynamic> json) {
@@ -354,6 +358,38 @@ class JourneySlotDefModel {
       effectPerLevel: json['effect_per_level'] as String? ?? '',
       maxLevel: (json['max_level'] as num?)?.toInt() ?? 3,
       valuePerLevel: (json['value_per_level'] as num?)?.toDouble() ?? 0,
+      periodSec: (json['period_sec'] as num?)?.toDouble() ?? 0,
+    );
+  }
+}
+
+/// 三选一基础值成长卡（journey_upgrade_cards）：伏魔真力/筋斗云气/
+/// 蟠桃益气/木灵回春/紫金磁引五张常驻成长项。名称、每级数值、是否入池
+/// 均后台可配；展示文案由引擎按 code + 数值生成，避免文案与数值两处脱节。
+/// 抽卡权重只在四类之间配置（economy 组 choice_weight_*），类内均匀随机。
+/// 远端表未就绪时回落内置种子。
+class JourneyUpgradeCardModel {
+  final String code;
+  final String name;
+  final double value;
+  final bool enabled;
+  final int sortOrder;
+
+  const JourneyUpgradeCardModel({
+    required this.code,
+    required this.name,
+    required this.value,
+    this.enabled = true,
+    this.sortOrder = 0,
+  });
+
+  factory JourneyUpgradeCardModel.fromJson(Map<String, dynamic> json) {
+    return JourneyUpgradeCardModel(
+      code: json['code'] as String? ?? '',
+      name: json['name'] as String? ?? '',
+      value: (json['value'] as num?)?.toDouble() ?? 0,
+      enabled: json['enabled'] as bool? ?? true,
+      sortOrder: (json['sort_order'] as num?)?.toInt() ?? 0,
     );
   }
 }

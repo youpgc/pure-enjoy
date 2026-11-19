@@ -49,6 +49,18 @@ enum _SlotUnit { percent, intValue, perSecond, count }
         fallback: kJourneyLifestealRatioPerLv,
         cap: kJourneyLifestealRatioCap,
       );
+    case 'vitality':
+      return (brief: '生命上限', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.60);
+    case 'cloud':
+      return (brief: '移动速度', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: double.infinity);
+    case 'ward':
+      return (brief: '受击减伤', unit: _SlotUnit.percent, base: 0, fallback: 0.04, cap: 0.50);
+    case 'recovery':
+      return (brief: '回元回血', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.50);
+    case 'shield':
+      return (brief: '护盾点数', unit: _SlotUnit.intValue, base: 0, fallback: 20, cap: double.infinity);
+    case 'slow':
+      return (brief: '范围减速', unit: _SlotUnit.percent, base: 0, fallback: 0.06, cap: 0.70);
     default:
       return (brief: '', unit: _SlotUnit.intValue, base: 0, fallback: 0, cap: double.infinity);
   }
@@ -131,6 +143,7 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
           code: def.code,
           title: '习得·${def.name}',
           desc: def.effectPerLevel,
+          category: JourneyChoiceCategory.slot,
         ));
       }
     } else if (held.first.level < def.maxLevel) {
@@ -139,6 +152,7 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
         code: def.code,
         title: '${def.name} · 顿悟',
         desc: _upgradeDesc(def, held.first.level),
+        category: JourneyChoiceCategory.slot,
       ));
     }
   }
@@ -167,43 +181,144 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
       code: e.key,
       title: '触发·${e.value.$1}',
       desc: e.value.$2,
+      category: JourneyChoiceCategory.effect,
     ));
   }
 
-  // 通用成长项（槽满后仍可选的基础属性增长；数值走 globals 后台配置）
+  // 基础值成长卡（journey_upgrade_cards）：名称/每级数值/入池后台可配；
+  // 文案由 code + 数值生成，避免文案与数值两处脱节；enabled=false 不入池。
+  final cardMap = game.config?.upgradeCardMap() ??
+      const <String, JourneyUpgradeCardModel>{};
+  JourneyUpgradeCardModel cardOf(String code, String name, double fallback) =>
+      cardMap[code] ??
+      JourneyUpgradeCardModel(code: code, name: name, value: fallback);
   final attackCap =
       game.config?.attackUpgradeCap ?? kJourneyAttackUpgradeCap;
-  if (game.cardAttackTotal < attackCap) {
+  void addBaseCard(
+    String code,
+    String name,
+    double fallback,
+    JourneyUpgradeKind kind,
+    String Function(double value) descOf, {
+    bool available = true,
+  }) {
+    if (!available) return;
+    final card = cardOf(code, name, fallback);
+    if (!card.enabled) return;
     pool.add(JourneyUpgradeChoice(
-      JourneyUpgradeKind.attack,
-      title: '伏魔真力',
-      desc: '攻击 +${(game.config?.upgradeAttack ?? kJourneyUpgradeAttack).round()}',
+      kind,
+      title: card.name,
+      // 文案数值与结算共用同一取值口径：表值>0 优先，否则回落兜底。
+      // 避免表内 value<=0 或行缺失时"显示 +0、实加兜底值"脱节。
+      desc: descOf(game.upgradeCardValue(code, fallback)),
+      category: JourneyChoiceCategory.base,
     ));
   }
-  pool
-    ..add(JourneyUpgradeChoice(
+
+  // 兜底值与结算侧逐项同口径（config globals 优先、内置常量兜底）：
+  // 表缺行时文案与结算回落到同一个值，不因两处 fallback 不同再度脱节。
+  addBaseCard('attack', '伏魔真力',
+      game.config?.upgradeAttack ?? kJourneyUpgradeAttack,
+      JourneyUpgradeKind.attack,
+      (v) => '攻击 +${v.round()}',
+      available: game.cardAttackTotal < attackCap);
+  addBaseCard('move_speed', '筋斗云气', game.config?.upgradeMove ?? 0.09,
       JourneyUpgradeKind.moveSpeed,
-      title: '筋斗云气',
-      desc: '移速 +${((game.config?.upgradeMove ?? 0.09) * 100).round()}%',
-    ))
-    ..add(JourneyUpgradeChoice(
+      (v) => '移速 +${(v * 100).round()}%');
+  addBaseCard('max_hp', '蟠桃益气', game.config?.upgradeHp ?? 20,
+      JourneyUpgradeKind.maxHp,
+      (v) => '生命 +${v.round()}');
+  addBaseCard('regen', '木灵回春', game.config?.upgradeRegen ?? 1.0,
+      JourneyUpgradeKind.regen,
+      (v) => '回复 +${v.toStringAsFixed(1)}/秒');
+  addBaseCard('pickup_range', '紫金磁引', game.config?.upgradePickup ?? 18,
+      JourneyUpgradeKind.pickupRange,
+      (v) => '拾取范围 +${v.round()}');
+
+  // 候选池保底：极端情况下（所有基础卡被后台关闭、维度全满级、攻击封顶、
+  // 被动/特效全持有）候选可能为空。空列表会让选卡弹窗无卡可选，而引擎仍处
+  // 升级暂停态，关闭后延迟重弹形成死循环。此处注入一张保底成长卡兜底。
+  if (pool.isEmpty) {
+    final hpStep =
+        game.upgradeCardValue('max_hp', game.config?.upgradeHp ?? 20);
+    pool.add(JourneyUpgradeChoice(
       JourneyUpgradeKind.maxHp,
       title: '蟠桃益气',
-      desc: '生命 +${(game.config?.upgradeHp ?? 20).round()}',
-    ))
-    ..add(JourneyUpgradeChoice(
-      JourneyUpgradeKind.regen,
-      title: '木灵回春',
-      desc: '回复 +${(game.config?.upgradeRegen ?? 1.0).toStringAsFixed(1)}/秒',
-    ))
-    ..add(JourneyUpgradeChoice(
-      JourneyUpgradeKind.pickupRange,
-      title: '紫金磁引',
-      desc: '拾取范围 +${(game.config?.upgradePickup ?? 18).round()}',
+      desc: '生命 +${hpStep.round()}',
+      category: JourneyChoiceCategory.base,
     ));
+  }
 
-  pool.shuffle();
-  return pool.take(3).toList();
+  // 四类权重轮盘 + 槽满剔除：先按类权重选类别，再在类内均匀随机抽卡。
+  return _drawWeightedByCategory(pool, 3, game);
+}
+
+/// 按类权重轮盘抽 [count] 张：每轮先按「有剩余候选的类」的类权重选类别，
+/// 再在该类内均匀随机抽一张。候选被抽空（含槽满后该类无新卡）的类
+/// 权重剔除，不再参与后续轮盘——即「槽满不占权重」。类权重取后台 economy
+/// 组 choice_weight_*，缺省 1；全部退化为均匀随机。
+List<JourneyUpgradeChoice> _drawWeightedByCategory(
+  List<JourneyUpgradeChoice> pool,
+  int count,
+  JourneyFlameGame game,
+) {
+  final rng = game.rng;
+  final remaining = List<JourneyUpgradeChoice>.from(pool);
+  final picked = <JourneyUpgradeChoice>[];
+
+  const categories = <JourneyChoiceCategory>[
+    JourneyChoiceCategory.slot,
+    JourneyChoiceCategory.passive,
+    JourneyChoiceCategory.effect,
+    JourneyChoiceCategory.base,
+  ];
+  double categoryWeight(JourneyChoiceCategory c) {
+    final key = switch (c) {
+      JourneyChoiceCategory.slot => 'choice_weight_slot',
+      JourneyChoiceCategory.passive => 'choice_weight_passive',
+      JourneyChoiceCategory.effect => 'choice_weight_effect',
+      JourneyChoiceCategory.base => 'choice_weight_base',
+    };
+    return game.battleNum('economy', key, 1);
+  }
+
+  while (picked.length < count && remaining.isNotEmpty) {
+    // 候选被抽空的类不参与本轮（槽满/耗尽即权重剔除）。
+    final available = categories
+        .where((c) => remaining.any((x) => x.category == c))
+        .toList();
+    if (available.isEmpty) break;
+
+    var total = 0.0;
+    for (final c in available) {
+      final w = categoryWeight(c);
+      if (w > 0) total += w;
+    }
+    JourneyChoiceCategory chosen;
+    if (total <= 0) {
+      // 类权重全部<=0：退化为在有候选的类之间均匀选类，保证仍出满。
+      chosen = available[rng.nextInt(available.length)];
+    } else {
+      var ticket = rng.nextDouble() * total;
+      chosen = available.last;
+      for (final c in available) {
+        final w = categoryWeight(c);
+        if (w <= 0) continue;
+        ticket -= w;
+        if (ticket <= 0) {
+          chosen = c;
+          break;
+        }
+      }
+    }
+
+    // 类内均匀随机抽一张（权重只在类别层配置，类内不设单项权重）。
+    final inClass = remaining.where((x) => x.category == chosen).toList();
+    final take = inClass[rng.nextInt(inClass.length)];
+    picked.add(take);
+    remaining.remove(take);
+  }
+  return picked;
 }
 
 /// 内置维度定义兜底（远端 journey_weapon_slots 未就绪时）。
@@ -228,6 +343,9 @@ const Map<String, (String, String)> kJourneyPassiveEffects =
   'sanheng_mao': ('三根毫毛', '免死一次，回 30% 生命'),
   'yujing_ping': ('玉净瓶', '每 20 秒回 20% 生命'),
   'huoyan_jingjing': ('火眼金睛', '精英/妖王受伤 +20%'),
+  'jinlan_kasha': ('锦襕袈裟', '护甲 +5'),
+  'feilong_staff': ('飞龙宝杖', '命中击退 +12'),
+  'bihuo_zhao': ('辟火罩', '火系伤害减免 15%'),
 };
 
 JourneyUpgradeChoice _passiveGrantChoice(
@@ -240,6 +358,7 @@ JourneyUpgradeChoice _passiveGrantChoice(
     code: code,
     title: '加持·$name',
     desc: desc,
+    category: JourneyChoiceCategory.passive,
   );
 }
 
@@ -254,6 +373,10 @@ const Map<String, (String, String)> kJourneyEffectWeapons =
   'zijin_ling': ('紫金铃', '同目标命中 3 次引爆'),
   'jinggang_zhuo': ('金刚琢', '每 12 秒套取并虚弱最近妖物'),
   'yinyang_ping': ('阴阳二气瓶', '每 18 秒定身灼烧最近妖物'),
+  'huntian_ling': ('混天绫', '12% 概率把妖物拖拽近身'),
+  'fenghuo_lun': ('风火轮', '点燃妖物并向周围逐代扩散灼烧'),
+  'qixing_jian': ('七星剑', '暴击对精英妖王追加真伤'),
+  'juyao_fan': ('聚妖幡', '每 15 秒招引范围妖物主动来攻'),
 };
 
 /// 功德解锁的扩展被动（图鉴直购；未解锁不进三选一免费池）。
@@ -261,4 +384,7 @@ const Set<String> kJourneyMeritPassives = <String>{
   'sanheng_mao',
   'yujing_ping',
   'huoyan_jingjing',
+  'jinlan_kasha',
+  'feilong_staff',
+  'bihuo_zhao',
 };

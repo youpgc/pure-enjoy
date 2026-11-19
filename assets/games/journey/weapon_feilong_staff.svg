@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 飞龙宝杖：灵吉菩萨宝杖，盘龙首 -->
+  <path d="M22 42 L26 14" fill="none" stroke="#E8C470" stroke-width="3.4" stroke-linecap="round"/>
+  <path d="M26 14 Q20 8 26 5 Q32 3 30 9 Q29 13 24 12" fill="none" stroke="#F6E3B4" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M30 9 Q34 6 36 10 M26 5 Q24 2 21 4" fill="none" stroke="#D4593F" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="31" cy="8" r="1.6" fill="#D4593F"/>
+  <path d="M20 24 L32 24" stroke="#B98F3E" stroke-width="2" stroke-linecap="round"/>
+</svg>

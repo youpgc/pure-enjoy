@@ -1,10 +1,9 @@
 part of 'journey_flame_game.dart';
 
-/// 怪物实体：驻守→追击→归位三态；精灵渲染 + 体型缩放。
-/// 血量/速度/接触伤害走钳制后的生效乘区；妖王血量可传入独立的时间乘区，
-/// 使其不随关卡难度放大，速度/接触伤害口径不变。
+/// 怪物实体：驻守→追击→归位三态；血量/速度/接触伤害走钳制后的生效乘区；
+/// 妖王血量可传入独立时间乘区，不随关卡难度放大，速度/接触伤害口径不变。
 class JourneyMonsterComponent extends PositionComponent
-    with JourneyKnockbackMixin, JourneyBurnMixin, JourneyBossAbilityMixin {
+    with JourneyKnockbackMixin, JourneyBurnMixin, JourneyBossAbilityMixin, JourneySlotStatusMixin {
   JourneyMonsterComponent({
     required this.game,
     required this.model,
@@ -181,13 +180,14 @@ class JourneyMonsterComponent extends PositionComponent
 
     // 击退动画先推进：离屏冻结只跳过索敌/回血，不能冻结未走完的位移
     _tickKnockback(dt);
-    final knockFactor = knockChaseFactor;
+    tickSlotStatus(dt); // 减速/寻猎计时：离屏也推进，寻猎怪不因冻结而卡态
+    final knockFactor = knockChaseFactor * slotSlowFactor;
     final hunting = autoHuntApplies(game, this); // 冻结/追击共用，妖王恒 false
 
-    // 离屏完全冻结（节点12 性能）：与玩家距离 >1400 时跳过索敌/移动/
-    // 回血/灼烧结算，仅推进展示类计时（血条渐隐/命中冷却/定身）；
+    // 离屏冻结：距离 >1400 时跳过索敌/移动/回血/灼烧，仅推进展示类计时；
     // 灼烧离屏暂停（burnRemaining 不倒计时，回屏后继续结算伤害）。
-    if (!hunting && // 全图追猎普怪豁免冻结（妖王不豁免），否则远处怪永不靠近
+    if (!hunting &&
+        lureTimer <= 0 && // 寻猎怪豁免冻结，否则被吸引的远处怪停在原地
         (game.player.position - position).length >
             game.battleNum('monster', 'freeze_dist', 1400)) {
       if (rootTimer > 0) {
@@ -225,11 +225,12 @@ class JourneyMonsterComponent extends PositionComponent
     }
 
     // 三态两半径（妖王同规则：驻点待机→侦测追击→脱战归位据点）；
-    // 全图追猎的普怪强制常驻追击态，忽略两半径，直追到击杀（妖王不受影响）。
+    // 全图追猎/寻猎的普怪强制常驻追击态，忽略两半径，直追到击杀（妖王不受寻猎影响）。
     final wasAggro = _aggro;
-    if (hunting || (!_aggro && dist < aggroRange)) {
+    final lured = lureTimer > 0;
+    if (hunting || lured || (!_aggro && dist < aggroRange)) {
       _aggro = true;
-    } else if (_aggro && dist > leashRange) {
+    } else if (_aggro && dist > leashRange && !lured) {
       _aggro = false;
     }
     // 进入交战态时登记序号，供大血条按「最新交战」选取展示目标；

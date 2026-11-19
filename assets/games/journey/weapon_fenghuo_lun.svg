@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 风火轮：哪吒风火轮，轮盘生焰向周围逐代扩散 -->
+  <circle cx="24" cy="26" r="12" fill="none" stroke="#E8C470" stroke-width="3"/>
+  <circle cx="24" cy="26" r="4" fill="none" stroke="#F6E3B4" stroke-width="2.4"/>
+  <path d="M24 14 L24 22 M24 30 L24 38 M12 26 L20 26 M28 26 L36 26 M16 18 L21 23 M27 29 L32 34 M32 18 L27 23 M21 29 L16 34" stroke="#B98F3E" stroke-width="1.8" stroke-linecap="round"/>
+  <path d="M8 10 L5 7 M40 10 L43 7 M8 40 L5 43 M40 40 L43 43" stroke="#D4593F" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M4 14 L1 14 M44 14 L47 14 M4 34 L1 34 M44 34 L47 34" stroke="#FF8A4A" stroke-width="1.8" stroke-linecap="round"/>
+</svg>

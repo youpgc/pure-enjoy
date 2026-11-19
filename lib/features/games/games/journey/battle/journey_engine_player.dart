@@ -35,6 +35,26 @@ class JourneyPlayerComponent extends PositionComponent {
   /// 禁疗剩余时间（蝎子精倒马毒桩）：>0 时治疗与回复失效。
   double healBlockTimer = 0;
 
+  /// 生机维度累计的生命上限加成比例：供固定额生命成长同步放大。
+  double hpBonusRatio = 0;
+
+  /// 护体金光当前护盾值：受击时优先抵扣，周期由维度槽授予。
+  double shield = 0;
+
+  /// 回元/护盾/聚妖幡的周期计时（秒），由 tickNewSlots 推进。
+  double recoveryTick = 0;
+  double shieldTick = 0;
+  double huntTick = 0;
+
+  /// 飞龙宝杖被动：命中击退距离的额外加成（在命中结算读取）。
+  double bonusKnockback = 0;
+
+  /// 辟火罩被动：火系伤害减免比例（0~1，在火伤结算读取）。
+  double fireResist = 0;
+
+  /// 风火轮触发计时（周期点燃火种，灼烧随后逐代扩散）。
+  double fenghuoTick = 0;
+
   static const double _radius = 20;
 
   /// 妖王冲撞击退：命中登记方向与剩余距离，逐帧推进；期间摇杆仍可操作，
@@ -416,6 +436,22 @@ class JourneyPlayerComponent extends PositionComponent {
     if (hp <= 0) return;
     // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
     if (invulnTimer > 0) return;
+    // 金刚不坏（ward 维度）：最终减伤区，乘算在来源减伤之后
+    final wardLv = game.slotLevel('ward');
+    if (wardLv > 0) {
+      final wardRed = (game.slotValue('ward', 0.04) * wardLv).clamp(
+        0.0,
+        game.battleNum('weapon', 'ward_cap', 0.5),
+      );
+      amount *= 1 - wardRed;
+    }
+    // 护体金光（shield 维度）：护盾先抵扣，余量再进扣血
+    if (shield > 0) {
+      final absorbed = math.min(shield, amount);
+      shield -= absorbed;
+      amount -= absorbed;
+      game.controller.hud.shield.value = shield;
+    }
     hp = (hp - amount).clamp(0.0, maxHp);
     // 有效受击：屏幕边框呼吸灯按脉冲重启一次泛红提示
     game.controller.hud.hitPulse.value++;

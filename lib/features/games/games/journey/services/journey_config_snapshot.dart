@@ -18,6 +18,9 @@ class JourneyConfigSnapshot {
   /// 武器维度槽定义（journey_weapon_slots；空=引擎回落内置兜底）。
   final List<JourneySlotDefModel> slotDefs;
 
+  /// 三选一基础值成长卡（journey_upgrade_cards；空=引擎回落内置兜底）。
+  final List<JourneyUpgradeCardModel> upgradeCards;
+
   /// 法宝分级（journey_weapon_levels，按法宝 code 分组，lv 升序）；
   /// 空=引擎回落内置基准数值。
   final Map<String, List<JourneyWeaponLevelModel>> weaponLevels;
@@ -294,6 +297,7 @@ class JourneyConfigSnapshot {
     required this.talentBranches,
     this.monsters = const <JourneyMonsterModel>[],
     this.slotDefs = const <JourneySlotDefModel>[],
+    this.upgradeCards = const <JourneyUpgradeCardModel>[],
     this.weaponLevels = const <String, List<JourneyWeaponLevelModel>>{},
     this.drops = const <JourneyDropModel>[],
     this.evoRecipes = const <JourneyEvoRecipeModel>[],
@@ -317,6 +321,14 @@ class JourneyConfigSnapshot {
         ? slotDefs
         : kJourneySlotDefSeed.map(JourneySlotDefModel.fromJson).toList();
     return <String, JourneySlotDefModel>{for (final d in defs) d.code: d};
+  }
+
+  /// 基础值成长卡（code → 卡）；远端空表回落内置种子。
+  Map<String, JourneyUpgradeCardModel> upgradeCardMap() {
+    final cards = upgradeCards.isNotEmpty
+        ? upgradeCards
+        : kJourneyUpgradeCardSeed.map(JourneyUpgradeCardModel.fromJson).toList();
+    return <String, JourneyUpgradeCardModel>{for (final c in cards) c.code: c};
   }
 
   JourneyRegionModel? regionOf(String code) {
