@@ -131,7 +131,7 @@ abstract final class JourneyAttributesData {
       ('经验获取', '×${game.expAmp.toStringAsFixed(2)}'),
       ('暴击率', '${(game.critRate * 100).toStringAsFixed(1)}%'),
       ('暴击伤害', '${(game.critDamage * 100).round()}%'),
-      ('炼化状态', game.evolved ? '已炼化' : '未炼化'),
+      ('炼化状态', _evolveText(game)),
       ('特效法宝', _effectWeaponsText(game)),
       ('特殊能力', _abilitiesText(game)),
     ]));
@@ -167,6 +167,18 @@ abstract final class JourneyAttributesData {
     }
 
     return groups;
+  }
+
+  /// 炼化状态：已炼化显示配方结果名，未炼化提示当前武器配方所需前置被动；
+  /// 配方/被动缺失时回落通用文案，不暴露 code 或拼出半截文案。
+  static String _evolveText(JourneyFlameGame game) {
+    final recipe = game.config?.evoRecipeOf(game.character.weaponCode);
+    final result = recipe?.resultName ?? '';
+    if (game.evolved) return result.isNotEmpty ? result : '已炼化';
+    final passiveCode = recipe?.requiredPassiveCode ?? '';
+    final passive = kJourneyPassiveEffects[passiveCode]?.$1 ?? passiveCode;
+    if (passive.isEmpty) return '未炼化';
+    return '未炼化（需被动「$passive」）';
   }
 
   static String _slotCurrentValue(
