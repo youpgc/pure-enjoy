@@ -105,6 +105,7 @@ class JourneyProgressService extends ChangeNotifier {
                     const <dynamic>[])
                 .cast<String>()
                 .toSet(),
+        lastDailyDate: raw['last_daily_date'] as String? ?? '',
       );
       _updatedAt = DateTime.tryParse(raw['updated_at'] as String? ?? '');
     }
@@ -142,6 +143,7 @@ class JourneyProgressService extends ChangeNotifier {
           ((row['unlocked_weapons'] as List<dynamic>?) ?? const <dynamic>[])
               .cast<String>()
               .toSet(),
+      lastDailyDate: row['last_daily_date'] as String?,
     );
     selectedCharacterCode =
         row['selected_character'] as String? ?? selectedCharacterCode;
@@ -235,6 +237,7 @@ class JourneyProgressService extends ChangeNotifier {
     Set<String>? unlockedCharacters,
     Set<String>? unlockedWeapons,
     Set<String>? unlockedAchievements,
+    String? lastDailyDate,
   }) =>
       JourneyProgressModel(
         meritBalance: meritBalance ?? _state.meritBalance,
@@ -248,6 +251,7 @@ class JourneyProgressService extends ChangeNotifier {
         unlockedWeapons: unlockedWeapons ?? _state.unlockedWeapons,
         unlockedAchievements:
             unlockedAchievements ?? _state.unlockedAchievements,
+        lastDailyDate: lastDailyDate ?? _state.lastDailyDate,
       );
 
   /// 分支升级功德消耗：cost_base × (已修等级+1)，线性递增。
@@ -439,6 +443,7 @@ class JourneyProgressService extends ChangeNotifier {
       'unlocked_characters': _state.unlockedCharacters.toList(),
       'unlocked_weapons': _state.unlockedWeapons.toList(),
       'unlocked_achievements': _state.unlockedAchievements.toList(),
+      'last_daily_date': _state.lastDailyDate,
       'selected_character': selectedCharacterCode,
       'updated_at': updatedAt,
     });
@@ -458,7 +463,21 @@ class JourneyProgressService extends ChangeNotifier {
       'unlocked_characters': _state.unlockedCharacters.toList(),
       'unlocked_weapons': _state.unlockedWeapons.toList(),
       'selected_character': selectedCharacterCode,
+      'last_daily_date': _state.lastDailyDate,
       'updated_at': updatedAt,
     });
   }
+
+  /// 每日游历进入即计次：写入当日北京日期键并立即双写本地与远端进度。
+  /// 远端列缺失（DDL 未执行）时 upsert 整行失败静默，但本地 gate 已落，
+  /// 不影响当次进图；DDL 就绪后清缓存即可由远端恢复。
+  Future<void> markDailyPlayed() async {
+    final today = journeyBjDateKey();
+    if (_state.lastDailyDate == today) return;
+    _state = _copyState(lastDailyDate: today);
+    await _persist();
+  }
+
+  /// 今日（北京日期）是否已进入过每日游历。
+  bool get dailyPlayedToday => _state.lastDailyDate == journeyBjDateKey();
 }

@@ -95,28 +95,44 @@ class JourneyProgressSync {
     Map<String, dynamic> row,
   ) async {
     try {
-      final patched = await ApiClient.patchByFilter(
-        'journey_progress',
-        filters: <String, String>{'user_id': 'eq.$userId'},
-        body: row,
-        note: 'journey:progress',
-      );
-      // PostgREST PATCH 零行命中仍返回 200+空数组（非 404）：以命中行数
-      // 为准，未命中才 POST 补插——否则首行永远无法创建，上行同步静默失效
-      final patchedRows = patched.data ?? const <Map<String, dynamic>>[];
-      if (patched.isSuccess && patchedRows.isNotEmpty) return;
-      final inserted = await ApiClient.post(
-        'journey_progress',
-        row,
-        returnRepresentation: false,
-        note: 'journey:progress',
-      );
-      if (!inserted.isSuccess && kDebugMode) {
-        debugPrint('journey 进度同步失败: ${inserted.errorMessage}');
+      if (await _upsertOnce(userId, row)) return;
+      // 带 last_daily_date 写入失败（多为 DDL 未执行、列不存在）：剔除
+      // 该列重试，保证功德/天赋等主进度不被每日 gate 字段拖垮。
+      if (row.containsKey('last_daily_date')) {
+        final bare = Map<String, dynamic>.from(row)
+          ..remove('last_daily_date');
+        await _upsertOnce(userId, bare);
       }
     } catch (e) {
       if (kDebugMode) debugPrint('journey 进度同步异常: $e');
     }
+  }
+
+  /// 单次进度行 upsert（PATCH 过滤更新，未命中再 POST 补插）；返回是否成功。
+  static Future<bool> _upsertOnce(
+    String userId,
+    Map<String, dynamic> row,
+  ) async {
+    final patched = await ApiClient.patchByFilter(
+      'journey_progress',
+      filters: <String, String>{'user_id': 'eq.$userId'},
+      body: row,
+      note: 'journey:progress',
+    );
+    // PostgREST PATCH 零行命中仍返回 200+空数组（非 404）：以命中行数
+    // 为准，未命中才 POST 补插——否则首行永远无法创建，上行同步静默失效
+    final patchedRows = patched.data ?? const <Map<String, dynamic>>[];
+    if (patched.isSuccess && patchedRows.isNotEmpty) return true;
+    final inserted = await ApiClient.post(
+      'journey_progress',
+      row,
+      returnRepresentation: false,
+      note: 'journey:progress',
+    );
+    if (!inserted.isSuccess && kDebugMode) {
+      debugPrint('journey 进度同步失败: ${inserted.errorMessage}');
+    }
+    return inserted.isSuccess;
   }
 
   /// 西行成就解锁判定（game_achievements，game_id 过滤 + enabled）。

@@ -1,9 +1,8 @@
 import 'package:flutter/material.dart';
 
-import '../../../../../utils/cache_helper.dart';
 import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
-import '../services/journey_time.dart';
+import '../services/journey_progress_service.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
@@ -43,12 +42,14 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
 
   Future<void> _load() async {
     try {
-      await JourneyConfigService.instance.ensure(JourneyConfigScope.daily);
-      final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
+      await Future.wait<void>(<Future<void>>[
+        JourneyConfigService.instance.ensure(JourneyConfigScope.daily),
+        JourneyProgressService.instance.ensureLoaded(),
+      ]);
       if (!mounted) return;
       setState(() {
         _config = JourneyConfigService.instance.cached;
-        _dailyPlayed = gate?['date'] == journeyBjDateKey();
+        _dailyPlayed = JourneyProgressService.instance.dailyPlayedToday;
         _loadFailed = false;
       });
     } catch (e, st) {
@@ -181,11 +182,11 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
     if (_dailyPlayed || _starting || !mounted) return;
     _starting = true;
     try {
-      // 进入即计次：先写当日 gate 再进对局（主动放弃同样占次）
+      // 进入即计次：先写当日 gate 再进对局（主动放弃同样占次）。
+      // gate 随进度双写远端，清本地缓存后由服务端恢复，无法绕过每日一次。
       await JourneyBusy.run(
         context,
-        () => CacheHelper.instance.saveMap('journey_daily_v1',
-            <String, dynamic>{'date': journeyBjDateKey()}),
+        () => JourneyProgressService.instance.markDailyPlayed(),
         label: '准备游历…',
       );
       if (!mounted) return;

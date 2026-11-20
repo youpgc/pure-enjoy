@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_svg/flutter_svg.dart';
 
 import '../../../models/game_model.dart';
-import '../../../../../utils/cache_helper.dart';
 import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 import '../widgets/journey_loading.dart';
@@ -12,7 +11,6 @@ import '../models/journey_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_progress_service.dart';
 import '../services/journey_seed.dart';
-import '../services/journey_time.dart';
 import 'journey_level_select_screen.dart';
 import 'journey_daily_screen.dart';
 import 'journey_character_screen.dart';
@@ -67,12 +65,11 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
         JourneyConfigService.instance.ensure(JourneyConfigScope.hub),
         progress.ensureLoaded(),
       ]);
-      final gate = await CacheHelper.instance.loadMap('journey_daily_v1');
       if (!mounted) return;
       setState(() {
         _config = JourneyConfigService.instance.cached;
         _progress = progress.state;
-        _dailyPlayed = gate?['date'] == journeyBjDateKey();
+        _dailyPlayed = progress.dailyPlayedToday;
         _loadFailed = false;
       });
     } catch (e, st) {

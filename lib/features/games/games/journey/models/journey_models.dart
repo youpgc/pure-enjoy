@@ -420,6 +420,11 @@ class JourneyProgressModel {
   /// 已解锁成就 code（本地缓存；远端真源 = user_game_achievements）。
   final Set<String> unlockedAchievements;
 
+  /// 每日游历 gate：最近一次进图的北京日期键（yyyyMMdd）。
+  /// 与进度双写远端 journey_progress.last_daily_date，清本地缓存后
+  /// 由远端恢复，防止绕过「每日一次」。空=从未游历。
+  final String lastDailyDate;
+
   const JourneyProgressModel({
     this.meritBalance = 0,
     this.farthestLevelNo = 0,
@@ -431,6 +436,7 @@ class JourneyProgressModel {
     this.unlockedCharacters = const <String>{},
     this.unlockedWeapons = const <String>{},
     this.unlockedAchievements = const <String>{},
+    this.lastDailyDate = '',
   });
 
   bool characterUnlocked(String code) =>
