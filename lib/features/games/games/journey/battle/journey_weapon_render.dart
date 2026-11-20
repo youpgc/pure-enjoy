@@ -9,10 +9,14 @@ class JourneyOrbitWeapons extends Component {
 
   final JourneyFlameGame game;
 
+  /// 环带光效混合器：状态切换时颜色与亮度按帧插值，避免激活/失效首帧跳色。
+  final JourneyAuraBlend _auraBlend = JourneyAuraBlend();
+
   @override
   void update(double dt) {
     // dt=0 的布局期空刷不推进相位（与主类 update 短路口径一致）
     if (dt <= 0) return;
+    _auraBlend.advance(journeyWeaponAura(game), dt);
     final arm = game.weaponArm;
     if (arm == null) return;
     var speed = game.spinAmp; // 全局转速乘区（转速槽/天赋/避水珠）
@@ -40,12 +44,17 @@ class JourneyOrbitWeapons extends Component {
     final inner = arm.innerRadius;
     final outer = arm.outerRadius;
     final midR = (inner + outer) / 2;
-    // 光效态：能力/被动激活时环带与扇叶按统一取色提亮；无激活态保持原色
-    final aura = journeyWeaponAura(game);
-    final auraColor = aura?.$1 ?? const Color(0xFFE8C470);
-    final bandAlpha = aura == null ? 0.09 : 0.22 * aura.$2;
-    final edgeAlpha = aura == null ? 0.24 : 0.55 * aura.$2;
-    final bladeAlpha = aura == null ? 0.18 : 0.42 * aura.$2;
+    // 光效态按混合权重渐变：环带颜色、亮度与三处透明度同时向目标插值，
+    // 激活/失效都不再出现整圈瞬间提亮或突然退回底色的跳变。
+    final blend = _auraBlend;
+    // 底色按混合权重回落到默认鎏金：权重归零后环带/边界/扇叶恢复原色，
+    // 不残留最后一种增益态的取色（原逻辑只衰减 weight，颜色会永久停在末态）。
+    final auraColor =
+        Color.lerp(const Color(0xFFE8C470), blend.color, blend.weight)!;
+    final weight = blend.weight;
+    final bandAlpha = 0.09 + (0.22 * blend.strength - 0.09) * weight;
+    final edgeAlpha = 0.24 + (0.55 * blend.strength - 0.24) * weight;
+    final bladeAlpha = 0.18 + (0.42 * blend.strength - 0.18) * weight;
 
     // 受击环带填充（淡金）+ 内外边界细线
     final bandPaint = Paint()
@@ -80,9 +89,9 @@ class JourneyOrbitWeapons extends Component {
       // 扇叶外端提亮（锋线）
       canvas.drawRect(
         Rect.fromLTWH(outer - 10, -visHalf, 10, visHalf * 2),
-        Paint()..color = aura == null
-            ? const Color(0x55F6E3B4)
-            : auraColor.withValues(alpha: 0.72 * aura.$2),
+        Paint()
+          ..color = const Color(0xFFF6E3B4).withValues(
+              alpha: 0.33 + (0.72 * blend.strength - 0.33) * weight),
       );
 
       if (pic != null) {

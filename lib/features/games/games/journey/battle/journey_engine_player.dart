@@ -60,6 +60,9 @@ class JourneyPlayerComponent extends PositionComponent {
 
   static const double _radius = 20;
 
+  /// 本体光效混合器：无敌/负面态/护盾切换时淡入淡出，不在首帧跳色。
+  final JourneyAuraBlend auraBlend = JourneyAuraBlend();
+
   /// 妖王冲撞击退：命中登记方向与剩余距离，逐帧推进；期间摇杆仍可操作，
   /// 击退位移不计入西行里程。
   static const double _chargeKnockDuration = 0.25;
@@ -219,6 +222,22 @@ class JourneyPlayerComponent extends PositionComponent {
       }
     }
 
+    final hud = game.controller.hud;
+    final rootRemain = rootTimer > 0 ? (rootTimer * 10).ceil() / 10 : 0.0;
+    if (hud.rootRemain.value != rootRemain) {
+      hud.rootRemain.value = rootRemain;
+    }
+    final blockRemain =
+        healBlockTimer > 0 ? (healBlockTimer * 10).ceil() / 10 : 0.0;
+    if (hud.healBlockRemain.value != blockRemain) {
+      hud.healBlockRemain.value = blockRemain;
+    }
+    auraBlend.advance(
+      journeyPlayerAura(game),
+      dt,
+      outerRing: invulnTimer > 0,
+    );
+
     _reportCompass();
   }
 
@@ -316,10 +335,16 @@ class JourneyPlayerComponent extends PositionComponent {
   void render(Canvas canvas) {
     // 注意：PositionComponent 的 render 画布已平移到本组件局部坐标，
     // 绘制必须围绕原点，禁止再叠加 position（双重偏移会画出屏外）。
-    // 角色光效（金身/护盾）：背光先于本体绘制，立绘与几何两条路径共用。
-    final aura = journeyPlayerAura(game);
-    if (aura != null) {
-      _drawAura(canvas, aura.$1, aura.$2);
+    // 角色光效（金身/负面态/护盾）：背光先于本体绘制，立绘与几何两条路径共用。
+    // 混合器权重随状态切换缓入缓出，首帧不跳色、消失不硬切。
+    final aura = auraBlend;
+    if (aura.weight > 0.01) {
+      drawAura(
+        canvas,
+        aura.color,
+        aura.strength * aura.weight,
+        aura.layer,
+      );
     }
     // 角色立绘优先（char_<code>.svg）；失败回落几何
     final pic = JourneySprites.get(JourneySprites.character(game.character.code));
@@ -366,30 +391,6 @@ class JourneyPlayerComponent extends PositionComponent {
       (facing * _radius * 0.62).toOffset(),
       4,
       Paint()..color = const Color(0xFFD4593F),
-    );
-  }
-
-  /// 角色本体光效：无敌金身画三层同心柔光 + 描边，护盾画两层外扩柔环，
-  /// 描边均落在立绘轮廓之外，立绘与几何两条路径都能看到。
-  /// 金色由 [journeyPlayerAura] 按状态给出，强度随呼吸系数变化。
-  void _drawAura(Canvas canvas, Color color, double strength) {
-    final invuln = invulnTimer > 0;
-    final rings = invuln ? 3 : 2;
-    const center = Offset.zero;
-    for (var i = rings; i >= 1; i--) {
-      canvas.drawCircle(
-        center,
-        _radius + 6.0 * i,
-        Paint()..color = color.withValues(alpha: 0.10 * strength),
-      );
-    }
-    canvas.drawCircle(
-      center,
-      _radius + rings * 6.0,
-      Paint()
-        ..color = color.withValues(alpha: 0.85 * strength)
-        ..style = PaintingStyle.stroke
-        ..strokeWidth = 2.2,
     );
   }
 

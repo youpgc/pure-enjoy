@@ -346,6 +346,9 @@ extension JourneyLifecycle on JourneyFlameGame {
   void _finish({required bool cleared}) {
     if (_ended) return;
     _ended = true;
+    // 终局停更后不再有帧同步负面状态，显式清零避免结算页背后残留角标
+    controller.hud.rootRemain.value = 0;
+    controller.hud.healBlockRemain.value = 0;
     _resumeOnJoystick = false;
     controller.hud.awaitingJoystick.value = false;
     pauseEngine();

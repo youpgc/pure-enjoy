@@ -129,6 +129,11 @@ class JourneyBattleHud {
   final ValueNotifier<double> maxHp = ValueNotifier<double>(100);
   /// 护体金光护盾值（HUD 血条下方白线按 shield/maxHp 比例展示）。
   final ValueNotifier<double> shield = ValueNotifier<double>(0);
+
+  /// 玩家负面状态剩余秒数（HUD 血条行角标）：定身=百眼魔君金光缚身，
+  /// 禁疗=蝎子精倒马毒桩。引擎按 0.1s 粒度去重写入，0=已解除。
+  final ValueNotifier<double> rootRemain = ValueNotifier<double>(0);
+  final ValueNotifier<double> healBlockRemain = ValueNotifier<double>(0);
   final ValueNotifier<double> exp = ValueNotifier<double>(0);
   final ValueNotifier<double> expNeed = ValueNotifier<double>(12);
   final ValueNotifier<int> level = ValueNotifier<int>(1);

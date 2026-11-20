@@ -99,12 +99,40 @@ class JourneyHudPanel extends StatelessWidget {
                   ),
                   Padding(
                     padding: const EdgeInsets.only(top: 4),
-                    child: Text(
-                      '❤ ${hp.round()}/${maxHp.round()}',
-                      style: const TextStyle(
-                        fontSize: 12,
-                        color: JourneyTheme.textPrimary,
-                        fontWeight: FontWeight.w600,
+                    // 负面状态角标与血量同一行，不额外占面板高度：
+                    // 禁疗（紫）/定身（青）只在生效期间出现，秒数向上取整。
+                    child: ValueListenableBuilder<double>(
+                      valueListenable: hud.healBlockRemain,
+                      builder: (context, block, _) =>
+                          ValueListenableBuilder<double>(
+                        valueListenable: hud.rootRemain,
+                        builder: (context, root, _) => Row(
+                          children: <Widget>[
+                            Expanded(
+                              child: Text(
+                                '❤ ${hp.round()}/${maxHp.round()}',
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(
+                                  fontSize: 12,
+                                  color: JourneyTheme.textPrimary,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ),
+                            if (block > 0)
+                              _statusBadge(
+                                '禁疗 ${block.ceil()}s',
+                                const Color(0xFFB07CD4),
+                              ),
+                            if (root > 0) ...<Widget>[
+                              if (block > 0) const SizedBox(width: 4),
+                              _statusBadge(
+                                '定身 ${root.ceil()}s',
+                                const Color(0xFF9AD5C8),
+                              ),
+                            ],
+                          ],
+                        ),
                       ),
                     ),
                   ),
@@ -190,6 +218,26 @@ class JourneyHudPanel extends StatelessWidget {
             size: 20,
             color: JourneyTheme.gold,
           ),
+        ),
+      ),
+    );
+  }
+
+  /// 负面状态角标：与血量同排的紧凑胶囊，颜色与角色本体负面光效同源。
+  Widget _statusBadge(String label, Color color) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 1),
+      decoration: BoxDecoration(
+        color: color.withValues(alpha: 0.16),
+        borderRadius: BorderRadius.circular(6),
+        border: Border.all(color: color.withValues(alpha: 0.7), width: 0.8),
+      ),
+      child: Text(
+        label,
+        style: TextStyle(
+          fontSize: 10,
+          color: color,
+          fontWeight: FontWeight.w700,
         ),
       ),
     );

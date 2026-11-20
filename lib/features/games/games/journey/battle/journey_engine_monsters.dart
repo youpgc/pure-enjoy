@@ -108,6 +108,16 @@ class JourneyMonsterComponent extends PositionComponent
   /// 血条显示剩余时间：受击刷新，超时渐隐（妖王血条常显不受此控）。
   double _hpBarTimer = 0;
 
+  /// 血条受击淡入进度（0.1s）：避免受击瞬间整条血条硬闪出现。
+  double _hpBarFade = 0;
+
+  /// 妖王冲撞视觉过渡：蓄力预警圈淡出 / 突进残影淡入淡出（0~1）。
+  double _warningFade = 0;
+  double _dashFade = 0;
+
+  /// 预警圈淡出期间冻结的闪烁相位：突进计时语义已变，不能继续驱动闪烁。
+  double _warningPhase = 0;
+
   /// 定身剩余时间（幌金绳命中）：>0 时跳过移动，仍可受击/灼烧。
   double rootTimer = 0;
 
@@ -172,6 +182,27 @@ class JourneyMonsterComponent extends PositionComponent
     super.update(dt);
     if (_hpBarTimer > 0) {
       _hpBarTimer -= dt;
+      _hpBarFade = math.min(1, _hpBarFade + dt / 0.1);
+    } else {
+      _hpBarFade = 0;
+    }
+    // 冲撞相位切换的视觉过渡：蓄力预警圈淡出、突进残影淡入淡出。
+    // 仅推进展示计时，不参与状态机判定，暂停时随引擎冻结。
+    if (model.isBoss) {
+      if (_chargePhase == 1) {
+        _warningFade = 1;
+        _dashFade = 0;
+        _warningPhase = 0.5 + 0.5 * math.sin(_chargeTimer * 26);
+      } else {
+        if (_warningFade > 0) {
+          _warningFade = math.max(0, _warningFade - dt / 0.18);
+        }
+        if (_chargePhase == 2) {
+          _dashFade = math.min(1, _dashFade + dt / 0.12);
+        } else if (_dashFade > 0) {
+          _dashFade = math.max(0, _dashFade - dt / 0.18);
+        }
+      }
     }
     if (orbHitCd > 0) {
       orbHitCd -= dt;
@@ -381,56 +412,11 @@ class JourneyMonsterComponent extends PositionComponent
           ..strokeWidth = isBoss ? 2.4 : 1.2,
       );
     }
-    // 冲撞渲染（仅妖王）：蓄力=红色预警圈闪烁；突进=残影拖尾 2 层
-    if (isBoss && _chargePhase == 1) {
-      final blink = 0.2 + 0.3 * (0.5 + 0.5 * math.sin(_chargeTimer * 26));
-      canvas.drawCircle(
-        Offset.zero,
-        radius + 18,
-        Paint()..color = const Color(0xFFD4593F).withValues(alpha: blink),
-      );
-      canvas.drawCircle(
-        Offset.zero,
-        radius + 18,
-        Paint()
-          ..color =
-              const Color(0xFFD4593F).withValues(alpha: (blink + 0.2).clamp(0.0, 1.0))
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 2.6,
-      );
-    }
-    if (isBoss && _chargePhase == 2) {
-      for (var i = 1; i <= 2; i++) {
-        canvas.drawCircle(
-          Offset(-_chargeDir.x * 14 * i, -_chargeDir.y * 14 * i),
-          radius * (1 - 0.18 * i),
-          Paint()..color = const Color(0x668E2F3C),
-        );
-      }
-    }
-    // 血条口径：妖王常显；普通怪受击显示、2.5s 无新受击后 0.6s 渐隐。
-    // 死亡瞬间（含秒杀）整体隐藏：归零后若仍绘制会闪现满宽暗底血条，
-    // 比正常受击的残血条视觉上宽很多，故以 hp>0 收口。
-    if (hp > 0 && hp < maxHp && (isBoss || _hpBarTimer > 0)) {
-      final alpha = isBoss
-          ? 1.0
-          : (_hpBarTimer / 0.6).clamp(0.0, 1.0);
-      final w = radius * 2.2;
-      final rect = Rect.fromCenter(
-        center: Offset(0, -radius - 9),
-        width: w,
-        height: 4,
-      );
-      canvas.drawRect(rect, Paint()..color = const Color(0x66000000));
-      canvas.drawRect(
-        Rect.fromLTWH(rect.left, rect.top, w * (hp / maxHp), 4),
-        Paint()
-          ..color = (isBoss
-                  ? const Color(0xFFE8C470)
-                  : const Color(0xFFD4593F))
-              .withValues(alpha: alpha),
-      );
-    }
+    // 持续减益在怪物身上画状态环（灼烧/定身/虚弱/减速/寻猎/血怒），
+    // 冲撞预警与残影、血条淡入统一由视觉 part 绘制，不写回战斗状态。
+    drawStatusRings(canvas);
+    drawChargeVisual(canvas);
+    drawHpBar(canvas);
   }
 
   /// 多场妖王战的逐场伤害增强（缺省 +25%/场，血量由 buffMult 承担）。
