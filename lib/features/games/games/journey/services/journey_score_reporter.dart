@@ -47,10 +47,14 @@ class JourneyScoreReporter {
   /// （与局内面板共用 [JourneyAttributesData] 口径），供历史详情页展示；
   /// [modeCode] 为所属模式码（main/endless/daily），供成绩看板在无 level_id
   /// 时回退展示模式名；[game] 为 null（配置异常兜底局）时返回 null。
+  /// [kills]/[meritGained] 随快照落库，供后台成绩详情弹窗展示击杀与功德，
+  /// 与 App 记录详情摘要口径一致。
   static Map<String, Object?>? buildRunDetail(
     JourneyFlameGame? game, {
     required String characterCode,
     required String modeCode,
+    int? kills,
+    int? meritGained,
   }) {
     if (game == null) return null;
     final hud = game.controller.hud;
@@ -60,6 +64,8 @@ class JourneyScoreReporter {
       'mode': modeCode,
       'char_level': hud.level.value,
       'wave': hud.endlessWave.value,
+      'kills': kills,
+      'merit_gained': meritGained,
       'hp': hud.hp.value.round(),
       'max_hp': hud.maxHp.value.round(),
       'hit_damage': game.hitDamageBase.toStringAsFixed(1),

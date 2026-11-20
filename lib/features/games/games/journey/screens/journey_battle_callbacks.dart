@@ -73,6 +73,8 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
       _game,
       characterCode: _characterCode,
       modeCode: widget.level.levelNo > 0 ? 'main' : widget.level.kind,
+      kills: kills,
+      meritGained: result.meritTotal,
     );
     final (granted, earnedPoint) = await JourneyBusy.run(
       context,
