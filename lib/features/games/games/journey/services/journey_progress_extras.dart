@@ -56,6 +56,33 @@ extension JourneyProgressExtras on JourneyProgressService {
     return true;
   }
 
+  /// 从远端回拉本游戏已解锁成就 code 并并入本地状态（清缓存后恢复点亮态）。
+  /// 取并集：远端已解锁的补亮；本地已有但远端暂不可达的保留（离线兼容）。
+  Future<void> syncUnlockedAchievements() async {
+    await ensureLoaded();
+    final userId = AuthService.instance.currentUserId;
+    final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
+    if (userId == null || gameId.isEmpty) return;
+    final remote = await JourneyProgressSync.fetchUnlockedAchievementCodes(
+      gameId,
+      userId,
+    );
+    if (remote.isEmpty) return;
+    final merged = Set<String>.of(_state.unlockedAchievements)..addAll(remote);
+    if (merged.length == _state.unlockedAchievements.length) return;
+    _state = _copyState(unlockedAchievements: merged);
+    await _persist();
+  }
+
+  /// 成就页/图鉴页进入时的统一成就态刷新：先回拉远端已解锁 code
+  /// （清缓存恢复），再判定新达成项并 best-effort 写远端。
+  /// 顺序固定（先 sync 后 evaluate），避免 evaluate 写库后 sync 拿旧快照
+  /// 覆盖；两页共用同一入口，口径一致。
+  Future<void> refreshAchievementState() async {
+    await syncUnlockedAchievements();
+    await evaluateAchievements();
+  }
+
   /// 成就判定（西行 6 项种子）：满足条件且未解锁则 best-effort 写
   /// user_game_achievements，返回本次新解锁 code 列表（未登录/配置未就绪/
   /// 拉取失败静默返回空）。[revivedCount] 传本局还魂次数（revived 条件用）。

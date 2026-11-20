@@ -7,9 +7,11 @@ import 'package:flutter/material.dart';
 /// 1. 在 State 类中 with PaginatedListMixin
 /// 2. 在 initState 中调用 initPagination()
 /// 3. 在 dispose 中调用 disposePagination()
-/// 4. 在数据加载方法中使用 paginationParams 获取 limit/offset
-/// 5. 在数据加载完成后调用 onPaginationDataLoaded(newDataCount)
-/// 6. 在下拉刷新时调用 resetPagination() + 重新加载
+/// 4. 首载/刷新：beginReset() 占位 → 成功 resetPagination() 归位、
+///    onPaginationDataLoaded() 记账；失败 cancelLoadMore(revertPage:false)
+/// 5. 触底加载：beginLoadMore() 占位并自增页码 → 成功 onPaginationDataLoaded()、
+///    失败 cancelLoadMore() 回退页码；用 paginationParams 取 limit/offset
+/// 6. 远端从未成功（本地兜底态）时触底直接 return，仅下拉刷新重试
 mixin PaginatedListMixin<T extends StatefulWidget> on State<T> {
   /// 每页数据量
   int get pageSize => 10;
@@ -75,6 +77,21 @@ mixin PaginatedListMixin<T extends StatefulWidget> on State<T> {
     _isLoadingMore = true;
     _currentPage++;
     return true;
+  }
+
+  /// 首载/下拉刷新：占用加载锁但不推进页码。
+  /// 成功后再调用 [resetPagination] 归位，失败用 [cancelLoadMore] 且 revertPage=false。
+  bool beginReset() {
+    if (_isLoadingMore) return false;
+    _isLoadingMore = true;
+    return true;
+  }
+
+  /// 加载失败时释放 [beginLoadMore] 的页码自增与加载锁。
+  /// [revertPage] 仅触底加载需要回退页码；首载/刷新失败保持原页码。
+  void cancelLoadMore({bool revertPage = true}) {
+    if (revertPage && _isLoadingMore && _currentPage > 1) _currentPage--;
+    _isLoadingMore = false;
   }
 
   /// 滚动监听 - 触底自动加载

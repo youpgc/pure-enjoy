@@ -57,8 +57,8 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
       await JourneyConfigService.instance.ensure(JourneyConfigScope.compendium);
       final progress = JourneyProgressService.instance;
       await progress.ensureLoaded();
-      // 成就判定刷新（best-effort）+ 定义行拉取（解锁条件名/描述展示用）
-      await progress.evaluateAchievements();
+      // 先回拉远端已解锁态（清缓存后恢复），再判定新达成项（best-effort）。
+      await progress.refreshAchievementState();
       final gameId = JourneyConfigService.instance.cached?.gameId ?? '';
       final defs = await JourneyProgressSync.fetchAchievements(gameId);
       // 击杀图鉴数据（失败/未登录回落空表=全未解锁）

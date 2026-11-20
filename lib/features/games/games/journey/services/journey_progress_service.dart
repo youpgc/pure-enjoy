@@ -106,6 +106,7 @@ class JourneyProgressService extends ChangeNotifier {
                 .cast<String>()
                 .toSet(),
         lastDailyDate: raw['last_daily_date'] as String? ?? '',
+        totalMeritEarned: (raw['total_merit_earned'] as num?)?.toInt() ?? 0,
       );
       _updatedAt = DateTime.tryParse(raw['updated_at'] as String? ?? '');
     }
@@ -144,6 +145,7 @@ class JourneyProgressService extends ChangeNotifier {
               .cast<String>()
               .toSet(),
       lastDailyDate: row['last_daily_date'] as String?,
+      totalMeritEarned: (row['total_merit_earned'] as num?)?.toInt(),
     );
     selectedCharacterCode =
         row['selected_character'] as String? ?? selectedCharacterCode;
@@ -238,6 +240,7 @@ class JourneyProgressService extends ChangeNotifier {
     Set<String>? unlockedWeapons,
     Set<String>? unlockedAchievements,
     String? lastDailyDate,
+    int? totalMeritEarned,
   }) =>
       JourneyProgressModel(
         meritBalance: meritBalance ?? _state.meritBalance,
@@ -252,6 +255,7 @@ class JourneyProgressService extends ChangeNotifier {
         unlockedAchievements:
             unlockedAchievements ?? _state.unlockedAchievements,
         lastDailyDate: lastDailyDate ?? _state.lastDailyDate,
+        totalMeritEarned: totalMeritEarned ?? _state.totalMeritEarned,
       );
 
   /// 分支升级功德消耗：cost_base × (已修等级+1)，线性递增。
@@ -322,6 +326,8 @@ class JourneyProgressService extends ChangeNotifier {
       meritBalance: newBalance,
       farthestLevelNo: firstClear ? levelNo : _state.farthestLevelNo,
       totalKills: _state.totalKills + kills,
+      // 累计获得功德仅正向入账（消耗流水不计），与远端回填口径一致。
+      totalMeritEarned: _state.totalMeritEarned + (merit > 0 ? merit : 0),
       talentPool: nextPool,
       meritRecords: <JourneyMeritRecordModel>[
         meritRecord,
@@ -444,6 +450,7 @@ class JourneyProgressService extends ChangeNotifier {
       'unlocked_weapons': _state.unlockedWeapons.toList(),
       'unlocked_achievements': _state.unlockedAchievements.toList(),
       'last_daily_date': _state.lastDailyDate,
+      'total_merit_earned': _state.totalMeritEarned,
       'selected_character': selectedCharacterCode,
       'updated_at': updatedAt,
     });
@@ -464,6 +471,7 @@ class JourneyProgressService extends ChangeNotifier {
       'unlocked_weapons': _state.unlockedWeapons.toList(),
       'selected_character': selectedCharacterCode,
       'last_daily_date': _state.lastDailyDate,
+      'total_merit_earned': _state.totalMeritEarned,
       'updated_at': updatedAt,
     });
   }

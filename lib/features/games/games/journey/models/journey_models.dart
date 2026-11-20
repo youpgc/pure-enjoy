@@ -425,6 +425,10 @@ class JourneyProgressModel {
   /// 由远端恢复，防止绕过「每日一次」。空=从未游历。
   final String lastDailyDate;
 
+  /// 累计获得功德（仅正向入账求和）：远端 journey_progress.total_merit_earned
+  /// 为真源，作为 merit_earned 成就判定口径，不依赖本地流水完整性。
+  final int totalMeritEarned;
+
   const JourneyProgressModel({
     this.meritBalance = 0,
     this.farthestLevelNo = 0,
@@ -437,6 +441,7 @@ class JourneyProgressModel {
     this.unlockedWeapons = const <String>{},
     this.unlockedAchievements = const <String>{},
     this.lastDailyDate = '',
+    this.totalMeritEarned = 0,
   });
 
   bool characterUnlocked(String code) =>

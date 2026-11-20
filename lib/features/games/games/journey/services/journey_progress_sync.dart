@@ -4,6 +4,7 @@ import '../../../../../services/api_client.dart';
 import '../../../../../services/supabase_service.dart';
 import '../models/journey_models.dart';
 import '../models/journey_talent_models.dart';
+import 'journey_progress_queries.dart';
 
 /// 西行·进度远端同步助手（全部 best-effort：失败静默/仅调试输出，不抛出）。
 ///
@@ -42,32 +43,76 @@ class JourneyProgressSync {
   }
 
   /// 西行记录上报（journey_runs；未登录跳过）。
+  /// type/name 为渐进式加列：DDL 未执行时整行写入报未知列，逐个剔除后
+  /// 重试，保证基础对局记录不被可选字段拖垮。
+  static const List<String> _optionalRunColumns = <String>['type', 'name'];
+
   static Future<void> syncRunRecord(JourneyRunRecordModel r) async {
     final userId = AuthService.instance.currentUserId;
     if (userId == null) return;
+    final body = <String, dynamic>{
+      'id': r.id,
+      'user_id': userId,
+      'level_no': r.levelNo,
+      'kills': r.kills,
+      'merit_gained': r.meritGained,
+      'duration_ms': r.durationMs,
+      'cleared': r.cleared,
+      // type 为模式真源（后续新增模式沿用该字段）；name 按 type 带名称。
+      'type': r.kind,
+      'name': r.levelTitle,
+      if (r.runDetail != null) 'run_detail': r.runDetail,
+    };
     try {
-      final result = await ApiClient.post(
-        'journey_runs',
-        <String, dynamic>{
-          'id': r.id,
-          'user_id': userId,
-          'level_no': r.levelNo,
-          'kills': r.kills,
-          'merit_gained': r.meritGained,
-          'duration_ms': r.durationMs,
-          'cleared': r.cleared,
-          if (r.runDetail != null) 'run_detail': r.runDetail,
-        },
-        returnRepresentation: false,
-        note: 'journey:run_record',
-      );
-      if (!result.isSuccess && kDebugMode) {
-        debugPrint('journey 西行记录同步失败: ${result.errorMessage}');
+      if (await _postRunOnce(body)) return;
+      final bare = Map<String, dynamic>.from(body);
+      for (final column in _optionalRunColumns) {
+        if (!bare.containsKey(column)) continue;
+        bare.remove(column);
+        if (await _postRunOnce(bare)) return;
       }
     } catch (e) {
       if (kDebugMode) debugPrint('journey 西行记录同步异常: $e');
     }
   }
+
+  /// 单次西行记录写入；返回是否成功（失败仅调试输出）。
+  static Future<bool> _postRunOnce(Map<String, dynamic> body) async {
+    final result = await ApiClient.post(
+      'journey_runs',
+      body,
+      returnRepresentation: false,
+      note: 'journey:run_record',
+    );
+    if (!result.isSuccess && kDebugMode) {
+      debugPrint('journey 西行记录同步失败: ${result.errorMessage}');
+    }
+    return result.isSuccess;
+  }
+
+  /// 分页拉取功德流水（journey_merit_records，按时间倒序）。
+  static Future<List<JourneyMeritRecordModel>?> fetchMeritRecordsPage(
+    String userId, {
+    required int limit,
+    required int offset,
+  }) =>
+      JourneyProgressQueries.fetchMeritRecordsPage(
+        userId,
+        limit: limit,
+        offset: offset,
+      );
+
+  /// 分页拉取西行记录（journey_runs，按时间倒序）。
+  static Future<List<JourneyRunRecordModel>?> fetchRunRecordsPage(
+    String userId, {
+    required int limit,
+    required int offset,
+  }) =>
+      JourneyProgressQueries.fetchRunRecordsPage(
+        userId,
+        limit: limit,
+        offset: offset,
+      );
 
   /// 拉取用户进度行（journey_progress；失败/无行返回 null）。
   static Future<Map<String, dynamic>?> fetchProgressRow(String userId) async {
@@ -90,18 +135,24 @@ class JourneyProgressSync {
   /// 进度行 upsert：ApiClient.post 不支持 upsert 头（Prefer
   /// resolution=merge-duplicates），先 PATCH 过滤更新（PostgREST 未命中
   /// 行返回 404），失败再 POST 补插；失败静默。
+  /// 渐进式加列的可选字段：DDL 未执行时整行 upsert 会报未知列，
+  /// 逐个剔除后重试，保证功德/天赋等主进度不被可选字段拖垮。
+  static const List<String> _optionalProgressColumns = <String>[
+    'last_daily_date',
+    'total_merit_earned',
+  ];
+
   static Future<void> upsertProgressRow(
     String userId,
     Map<String, dynamic> row,
   ) async {
     try {
       if (await _upsertOnce(userId, row)) return;
-      // 带 last_daily_date 写入失败（多为 DDL 未执行、列不存在）：剔除
-      // 该列重试，保证功德/天赋等主进度不被每日 gate 字段拖垮。
-      if (row.containsKey('last_daily_date')) {
-        final bare = Map<String, dynamic>.from(row)
-          ..remove('last_daily_date');
-        await _upsertOnce(userId, bare);
+      final bare = Map<String, dynamic>.from(row);
+      for (final column in _optionalProgressColumns) {
+        if (!bare.containsKey(column)) continue;
+        bare.remove(column);
+        if (await _upsertOnce(userId, bare)) return;
       }
     } catch (e) {
       if (kDebugMode) debugPrint('journey 进度同步异常: $e');
@@ -138,7 +189,7 @@ class JourneyProgressSync {
   /// 西行成就解锁判定（game_achievements，game_id 过滤 + enabled）。
   ///
   /// condition.type：level_cleared=远端 value≤最远关 / total_kills=≤累计
-  /// 击杀 / merit_earned=≤累计获得功德（本地流水正 delta 求和）/
+  /// 击杀 / merit_earned=≤累计获得功德（进度行 total_merit_earned 真源）/
   /// revived=≤本局还魂次数（[revivedCount]）。满足且未解锁则 best-effort
   /// 写 user_game_achievements，返回本次新解锁 code 列表；单次拉取失败
   /// 静默返回空。
@@ -154,7 +205,8 @@ class JourneyProgressSync {
         'game_achievements',
         filters: <String, String>{'game_id': 'eq.$gameId', 'enabled': 'eq.true'},
         select: 'id,code,condition',
-        limit: 100,
+        // 与 fetchUnlockedAchievementCodes 的成就上限同口径（200）。
+        limit: 200,
         note: 'journey:achievements',
       );
       if (!defs.isSuccess) return const <String>[];
@@ -172,7 +224,7 @@ class JourneyProgressSync {
           'achievement_id': 'in.(${ids.join(',')})',
         },
         select: 'achievement_id',
-        limit: 100,
+        limit: 200,
         note: 'journey:unlocked_achievements',
       );
       if (!unlockedRes.isSuccess) return const <String>[];
@@ -180,9 +232,8 @@ class JourneyProgressSync {
         for (final row in unlockedRes.data ?? const <Map<String, dynamic>>[])
           if (row['achievement_id'] is String) row['achievement_id'] as String,
       };
-      // 累计获得功德（流水上限 50 条，口径近似，达标值远高于上限）
-      final meritEarned = state.meritRecords.fold<int>(
-          0, (sum, r) => r.delta > 0 ? sum + r.delta : sum);
+      // 累计获得功德：进度行累计列（服务端真源，清缓存/分页不影响）
+      final meritEarned = state.totalMeritEarned;
       final newly = <String>[];
       for (final row in defRows) {
         final id = row['id'] as String? ?? '';
@@ -217,6 +268,13 @@ class JourneyProgressSync {
     }
   }
 
+  /// 拉取本游戏已解锁成就 code（远端 user_game_achievements 为真源）。
+  static Future<Set<String>> fetchUnlockedAchievementCodes(
+    String gameId,
+    String userId,
+  ) =>
+      JourneyProgressQueries.fetchUnlockedAchievementCodes(gameId, userId);
+
   /// 西行成就定义行（game_achievements 轻量视图）内存缓存：
   /// 图鉴解锁条件 / 记录页成就 Tab 共用，进程内一次拉取。
   static List<JourneyAchievementDef>? _achievementDefsCache;
@@ -234,7 +292,7 @@ class JourneyProgressSync {
         'game_achievements',
         filters: <String, String>{'game_id': 'eq.$gameId', 'enabled': 'eq.true'},
         select: 'code,name,description,condition',
-        limit: 100,
+        limit: 200,
         note: 'journey:achievement_defs',
       );
       if (!result.isSuccess) return const <JourneyAchievementDef>[];

@@ -17,6 +17,7 @@ import 'journey_character_screen.dart';
 import 'journey_talent_screen.dart';
 import 'journey_compendium_screen.dart';
 import 'journey_records_screen.dart';
+import 'journey_record_lists.dart';
 import 'journey_hub_actions.dart';
 import '../widgets/journey_entry_card.dart';
 

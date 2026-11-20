@@ -246,8 +246,9 @@ class JourneyMeritRecordModel {
 }
 
 /// 西行记录（journey_runs 行/本地镜像）。
-/// kind=对局模式：mainline=主线难 / endless=无尽妖潮 / daily=西行游历
-/// （远端 journey_runs 无 kind 列，仅本地镜像区分展示）。
+/// kind=对局模式：mainline=主线难 / endless=无尽妖潮 / daily=西行游历，
+/// 对应远端 journey_runs.type 列（后续新增模式沿用该字段）；
+/// 旧本地镜像的 kind/level_title 键读取时回落，兼容存量数据。
 class JourneyRunRecordModel {
   final String id;
   final int levelNo;
@@ -288,14 +289,21 @@ class JourneyRunRecordModel {
       durationMs: (json['duration_ms'] as num?)?.toInt() ?? 0,
       cleared: json['cleared'] as bool? ?? false,
       createdAt: DateTime.tryParse(json['created_at'] as String? ?? ''),
-      kind: json['kind'] as String? ?? 'mainline',
-      levelTitle: json['level_title'] as String? ?? '',
+      // type 为服务端权威模式列；旧本地镜像只有 kind，回落兼容。
+      kind: (json['type'] as String?) ??
+          (json['kind'] as String?) ??
+          'mainline',
+      // name 为服务端按 type 带的展示名称；旧本地镜像为 level_title。
+      levelTitle: (json['name'] as String?) ??
+          (json['level_title'] as String?) ??
+          '',
       runDetail: json['run_detail'] is Map
           ? Map<String, dynamic>.from(json['run_detail'] as Map)
           : null,
     );
   }
 
+  /// 本地镜像写旧键（kind/level_title），远端上报走 type/name（见 sync）。
   Map<String, dynamic> toJson() => <String, dynamic>{
         'id': id,
         'level_no': levelNo,
