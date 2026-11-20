@@ -56,6 +56,7 @@ class JourneyHpBarFx extends StatefulWidget {
     this.foregroundColor = const Color(0xFFE0604C),
     this.foregroundGradient,
     this.lagColor = const Color(0xFFF0A070),
+    this.backgroundColor = const Color(0x66000000),
   });
 
   /// 血量比例 0~1。
@@ -71,6 +72,9 @@ class JourneyHpBarFx extends StatefulWidget {
 
   /// 残影高亮色（玩家橙、妖王亮金）。
   final Color lagColor;
+
+  /// 条底底色（玩家/妖王血条默认半透明黑；护盾细线传半透明白）。
+  final Color backgroundColor;
 
   @override
   State<JourneyHpBarFx> createState() => _JourneyHpBarFxState();
@@ -120,7 +124,7 @@ class _JourneyHpBarFxState extends State<JourneyHpBarFx>
         ..reset()
         ..forward();
     } else if (v > prev + 0.001) {
-      // 吸血/回血：残影直接跟随，不产生冲击段
+      // 吸血/回血/护盾增长：不画残影，前景直接缓动增长
       _impacting = false;
       _lagController.reset();
       _lagFrom = _lagTo = v;
@@ -142,14 +146,17 @@ class _JourneyHpBarFxState extends State<JourneyHpBarFx>
         child: Stack(
           children: <Widget>[
             Positioned.fill(
-              child: Container(color: Colors.black.withValues(alpha: 0.4)),
+              child: Container(color: widget.backgroundColor),
             ),
             AnimatedBuilder(
               animation: _lagController,
               builder: (context, _) {
+                // 残影只在抵扣瞬间露出（从旧值延迟收缩，露出被扣段）；
+                // 增长/静止时不画残影，前景纯色独立缓动，避免残影与前景
+                // 宽度错位时透出下层颜色。
                 final lag = _impacting
                     ? _lagFrom + (_lagTo - _lagFrom) * _lagTween.value
-                    : _clamped(widget.value);
+                    : 0.0;
                 return Align(
                   alignment: Alignment.centerLeft,
                   child: FractionallySizedBox(

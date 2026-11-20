@@ -78,34 +78,22 @@ class JourneyHudPanel extends StatelessWidget {
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: <Widget>[
                   JourneyHpBarFx(value: maxHp > 0 ? hp / maxHp : 0),
-                  // 护体金光：血条下方白色细线，宽度按护盾/最大生命比例
+                  // 护体金光：血条下方白色细线，宽度按护盾/最大生命比例。
+                  // 复用血条动画组件：护盾增长平滑缓动、受击抵扣时先露出金色
+                  // 残影段（被抵扣的部分）再渐变收缩，与血条受击口径一致。
                   ValueListenableBuilder<double>(
                     valueListenable: hud.shield,
                     builder: (context, shield, _) => Padding(
                       padding: const EdgeInsets.only(top: 2),
-                      child: ClipRRect(
-                        borderRadius: BorderRadius.circular(1),
-                        child: SizedBox(
-                          height: 2,
-                          child: Stack(
-                            children: <Widget>[
-                              Positioned.fill(
-                                child: Container(
-                                  color: Colors.white.withValues(alpha: 0.12),
-                                ),
-                              ),
-                              Align(
-                                alignment: Alignment.centerLeft,
-                                child: FractionallySizedBox(
-                                  widthFactor: maxHp > 0
-                                      ? (shield / maxHp).clamp(0.0, 1.0)
-                                      : 0.0,
-                                  child: Container(color: Colors.white),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
+                      child: JourneyHpBarFx(
+                        value: maxHp > 0
+                            ? (shield / maxHp).clamp(0.0, 1.0)
+                            : 0.0,
+                        height: 2,
+                        radius: 1,
+                        foregroundColor: Colors.white,
+                        lagColor: const Color(0xFFE8C470),
+                        backgroundColor: Colors.white.withValues(alpha: 0.12),
                       ),
                     ),
                   ),
