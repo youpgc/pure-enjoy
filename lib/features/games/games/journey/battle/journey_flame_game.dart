@@ -24,6 +24,9 @@ part 'journey_engine_boss_hud.dart';
 part 'journey_engine_config_access.dart';
 part 'journey_engine_abilities.dart';
 part 'journey_engine_weapons.dart';
+part 'journey_engine_attack_units.dart';
+part 'journey_engine_attack_forms.dart';
+part 'journey_engine_attack_beam_fx.dart';
 part 'journey_weapon_render.dart';
 part 'journey_engine_choices.dart';
 part 'journey_engine_kit.dart';
@@ -293,6 +296,10 @@ class JourneyFlameGame extends FlameGame
   /// 特效渲染层（浮动文字/闪电连线/破坏残屑），world 内置顶。
   late final JourneyFxLayer fxLayer = JourneyFxLayer(this);
 
+  /// 并行攻击单位：图鉴已解锁常规法宝按 attack_kind 常驻攻击；
+  /// 组件在 setupWorld 挂载，进局装配完成后由 rebuild 填充单位。
+  JourneyAttackUnits? attackUnits;
+
   /// 空间哈希网格（节点12 性能）：每帧重建，武器/接触伤害只查附近候选。
   final JourneySpatialGrid spatialGrid = JourneySpatialGrid();
 
@@ -423,6 +430,8 @@ class JourneyFlameGame extends FlameGame
     _buildStarterArm();
     _applyCharacterKit();
     _applyLoadout();
+    // 并行攻击单位在环绕臂与局外注入完成后构建（数值依赖 _charLv 与 config）。
+    attackUnits?.rebuild();
 
     // onLoad 发生于 GameWidget 挂载（构建）期：HUD 通知一律调度到帧尾，
     // 防 ValueListenableBuilder markNeedsBuild during build 异常

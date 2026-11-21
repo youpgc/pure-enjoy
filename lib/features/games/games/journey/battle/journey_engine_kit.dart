@@ -115,6 +115,8 @@ extension JourneyKit on JourneyFlameGame {
     if (arm == null) return;
     arm.damage =
         _gradeDamage(fallback: weaponBaseDamage) * (evolved ? evoMult : 1.0);
+    // 并行攻击单位的分级数值同源刷新（各自取分级表的形态列）。
+    _refreshAttackUnits();
   }
 
   /// 被动加持入槽：入槽即生效（效果映射，重复选择不会入池）。

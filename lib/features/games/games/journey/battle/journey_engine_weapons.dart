@@ -182,18 +182,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     final arm = game.weaponArm;
     if (arm == null) return;
     final center = game.player.position;
-    final pierceLv = game.slotLevel('pierce');
-    // 穿刺破甲比例：1 级基准 + 每级增量（value_per_level 可配），钳 ≤ 上限
-    final pierceIgnore = pierceLv > 0
-        ? (game.battleNum('weapon', 'pierce_base',
-                    kJourneyPierceBaseRatio) +
-                game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
-                    (pierceLv - 1))
-            .clamp(
-                0.0,
-                game.battleNum(
-                    'weapon', 'pierce_cap', kJourneyPierceRatioCap))
-        : 0.0;
+    // 破甲比例与并行单位共用 armorIgnoreRatio 单一口径。
+    final pierceIgnore = game.armorIgnoreRatio;
     final knockLv = game.slotLevel('knockback');
     final lifestealLv = game.slotLevel('lifesteal');
 
@@ -251,11 +241,13 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     required int knockLv,
     required int lifestealLv,
     required Vector2 toM,
+    bool allowSignature = true,
+    double? conditionBase,
   }) {
     var dmg = damage;
-    // 伏魔重击（shaseng 特殊能力）：充能就绪的下一次命中 3 倍伤害，
-    // 并定身该怪波及范围内所有怪 1s（浮动字提示）
-    if (game.hasAbility('shaseng') && game._fumoCharged) {
+    // 伏魔重击（沙僧环绕专属爆发）：并行单位高频命中若也能消耗，
+    // 会在小伤害上浪费 3 倍爆发并吞掉环绕定身，故按 allowSignature 屏蔽。
+    if (allowSignature && game.hasAbility('shaseng') && game._fumoCharged) {
       game._fumoCharged = false;
       game._fumoTimer = 0;
       dmg *= 3;
@@ -280,7 +272,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     // （伤害=基础值×(1+Σ通用%+条件%) 单次乘算，与通用增伤合流不连乘）
     if ((m.model.isBoss || m.model.isElite) &&
         game.passiveSlotCodes.contains('huoyan_jingjing')) {
-      dmg += game.damageBaseValue *
+      // 并行单位传自身伤害基数，避免套用环绕基数造成口径串用。
+      dmg += (conditionBase ?? game.damageBaseValue) *
           game.weaponParam('huoyan_jingjing', 'elite', 0.2);
       game.fxLayer.spawnRing(
         m.position,

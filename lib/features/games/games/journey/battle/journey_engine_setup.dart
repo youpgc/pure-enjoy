@@ -47,7 +47,13 @@ extension JourneyWorldSetup on JourneyFlameGame {
     );
     world.add(player);
     world.add(JourneyOrbitWeapons(game: this));
-    world.add(fxLayer);
+    // 并行攻击单位：图鉴已解锁常规法宝按 attack_kind 常驻攻击。
+    final units = JourneyAttackUnits(game: this);
+    attackUnits = units;
+    world.add(units);
+    world.add(JourneyAttackUnitRenderer(units: units)..priority = 12);
+    // 飘字/闪电等瞬时反馈置顶：priority 高于并行单位渲染层(12)。
+    world.add(fxLayer..priority = 20);
     camera.follow(player);
 
     bossStartDist = (bossPos - player.position).length;

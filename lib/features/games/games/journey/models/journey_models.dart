@@ -9,6 +9,7 @@ import 'journey_talent_models.dart';
 export 'journey_character_model.dart';
 export 'journey_config_models.dart';
 export 'journey_runtime_models.dart';
+export 'journey_weapon_level_model.dart';
 
 /// 区域（关卡分组；远端 38 章段，boss_code=本段妖王驱动妖王战）
 class JourneyRegionModel {
@@ -110,6 +111,14 @@ class JourneyWeaponModel {
   final double baseDamage; // 基础伤害（分级表缺失时兜底）
   final String starterEffect; // 初始特效槽 code（pierce/knockback/burn/lifesteal）
 
+  // 非常规形态的基础参数（journey_weapons 可配；0=未配置走引擎兜底）
+  final double baseIntervalMs; // 发射/投掷/扫击周期兜底（projectile/boomerang/beam）
+  final double projectileSpeed; // 弹体飞行速度（projectile/boomerang）
+  final int pierce; // 穿透个数（projectile）
+  final double aoeRadius; // 领域/光束半径（aura/beam/magnet）
+  final double healFixed; // 命中固定回血兜底（magnet/吸血）
+  final double rangePx; // 最大射程（projectile/boomerang/beam）
+
   /// 归属角色（空=通用法宝；非空=跟随该角色解锁，角色未解锁不可解锁）
   final String characterCode;
 
@@ -128,6 +137,12 @@ class JourneyWeaponModel {
     this.bladeWidth = 0,
     this.baseDamage = 0,
     this.starterEffect = '',
+    this.baseIntervalMs = 0,
+    this.projectileSpeed = 0,
+    this.pierce = 0,
+    this.aoeRadius = 0,
+    this.healFixed = 0,
+    this.rangePx = 0,
     this.characterCode = '',
     this.ownerName = '',
   });
@@ -145,6 +160,12 @@ class JourneyWeaponModel {
       bladeWidth: (json['blade_width'] as num?)?.toDouble() ?? 0,
       baseDamage: (json['base_damage'] as num?)?.toDouble() ?? 0,
       starterEffect: json['starter_effect'] as String? ?? '',
+      baseIntervalMs: (json['base_interval_ms'] as num?)?.toDouble() ?? 0,
+      projectileSpeed: (json['projectile_speed'] as num?)?.toDouble() ?? 0,
+      pierce: (json['pierce'] as num?)?.toInt() ?? 0,
+      aoeRadius: (json['aoe_radius'] as num?)?.toDouble() ?? 0,
+      healFixed: (json['heal_fixed'] as num?)?.toDouble() ?? 0,
+      rangePx: (json['range_px'] as num?)?.toDouble() ?? 0,
       characterCode: json['character_code'] as String? ?? '',
       ownerName: json['owner_name'] as String? ?? '',
     );
@@ -298,28 +319,6 @@ class JourneyEndlessWaveModel {
       buffMult: (json['buff_mult'] as num?)?.toDouble() ?? 1,
       eliteCount: (json['elite_count'] as num?)?.toInt() ?? 0,
       bossCount: (json['boss_count'] as num?)?.toInt() ?? 0,
-    );
-  }
-}
-
-/// 法宝分级（journey_weapon_levels 行）：法宝 1~8 级数值；
-/// 环绕形态消费 damage，projectile 等形态消费 interval_ms。
-class JourneyWeaponLevelModel {
-  final int lv;
-  final int damage;
-  final int intervalMs;
-
-  const JourneyWeaponLevelModel({
-    required this.lv,
-    this.damage = 0,
-    this.intervalMs = 0,
-  });
-
-  factory JourneyWeaponLevelModel.fromJson(Map<String, dynamic> json) {
-    return JourneyWeaponLevelModel(
-      lv: (json['lv'] as num?)?.toInt() ?? 0,
-      damage: (json['damage'] as num?)?.toInt() ?? 0,
-      intervalMs: (json['interval_ms'] as num?)?.toInt() ?? 0,
     );
   }
 }

@@ -105,6 +105,11 @@ class JourneyMonsterComponent extends PositionComponent
   /// 环绕法宝命中冷却：防旋转扫过同一怪连击叠伤。
   double orbHitCd = 0;
 
+  /// 并行攻击单位命中冷却：按形态分槽，避免不同形态互相吞命中。
+  /// 槽位由 [_attackUnitSlot] 映射；同形态仍按 0.3s 去重。
+  final List<double> attackUnitCds =
+      List<double>.filled(kAttackUnitSlotCount, 0);
+
   /// 血条显示剩余时间：受击刷新，超时渐隐（妖王血条常显不受此控）。
   double _hpBarTimer = 0;
 
@@ -206,6 +211,11 @@ class JourneyMonsterComponent extends PositionComponent
     }
     if (orbHitCd > 0) {
       orbHitCd -= dt;
+    }
+    for (var i = 0; i < attackUnitCds.length; i++) {
+      if (attackUnitCds[i] > 0) {
+        attackUnitCds[i] -= dt;
+      }
     }
     if (isDead) return;
 
