@@ -12,25 +12,20 @@ extension JourneyAttackForms on JourneyFlameGame {
     return null;
   }
 
-  /// 按已解锁集构建本局的并行攻击单位。已解锁集取服务端进度快照
-  /// （与本地镜像一致），只挂载 category=active 且 attack_kind 非 orbit 的
-  /// 常规法宝；角色专属环绕法宝不重复挂载。
+  /// 按当前出战角色构建并行攻击单位。常规 5 件法宝与角色 weaponCode
+  /// 一一绑定，只有出战角色自己的那件法宝挂载为并行单位，其他角色的
+  /// 法宝一律不挂——法宝归属角色，换人出战即换一件。
   ///
-  /// 常规 5 件与角色 weaponCode 一一绑定（角色解锁即得），当前出战角色
-  /// 的那件法宝已作为环绕主武器生效，必须从并行单位排除，否则同一件
-  /// 法宝双份攻击。切换角色出战时排除项随之变化。
+  /// 该法宝同时保留环绕底盘：取经四角色的法宝是 orbit 环绕型，只走
+  /// 专属环绕参数、不产生并行单位；扩展五角色的法宝是非 orbit 形态，
+  /// 在环绕底盘之外再叠加一份对应形态的并行攻击（环绕加领域）。
   List<JourneyAttackUnit> _buildAttackUnits() {
-    final unlocked = JourneyProgressService.instance.state.unlockedWeapons;
-    final mainWeapon = weaponCode;
-    final result = <JourneyAttackUnit>[];
-    for (final code in unlocked) {
-      if (code == mainWeapon) continue;
-      final w = config?.weaponOf(code) ?? _seedWeaponOf(code);
-      if (w == null || w.category != 'active') continue;
-      if (w.attackKind.isEmpty || w.attackKind == 'orbit') continue;
-      result.add(_attackUnitOf(w));
+    final w = config?.weaponOf(weaponCode) ?? _seedWeaponOf(weaponCode);
+    if (w == null || w.category != 'active') return const <JourneyAttackUnit>[];
+    if (w.attackKind.isEmpty || w.attackKind == 'orbit') {
+      return const <JourneyAttackUnit>[];
     }
-    return result;
+    return <JourneyAttackUnit>[_attackUnitOf(w)];
   }
 
   /// 单件法宝的分级数值快照：L1~L8 查分级表，L9+ 按 weapon_grade_per_lv

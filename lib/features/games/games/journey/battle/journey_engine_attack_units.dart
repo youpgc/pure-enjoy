@@ -140,7 +140,7 @@ class JourneyAttackUnits extends Component {
     _magnetApplied = next;
   }
 
-  /// 按已解锁集重建单位列表；解锁进度来自服务端进度快照，与本地一致。
+  /// 按当前出战角色重建单位列表；只挂该角色自己的法宝形态。
   void rebuild() {
     units
       ..clear()
@@ -155,7 +155,7 @@ class JourneyAttackUnits extends Component {
 
   /// 升级后按新等级刷新单位数值（保留计时器，避免升级瞬间重置周期）。
   void refresh() {
-    // 计时器按 code 归档：解锁集顺序或构成变动时也不会错配到别的单位。
+    // 计时器按 code 归档：单位构成变动时也不会错配到别的单位。
     final timers = <String, double>{for (final u in units) u.code: u.timer};
     final fresh = game._buildAttackUnits();
     units

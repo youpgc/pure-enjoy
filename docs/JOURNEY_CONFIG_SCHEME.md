@@ -150,7 +150,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 
 ## 4. 法宝（9，journey_weapons + journey_weapon_levels）
 
-角色专属 4 件走环绕底盘（`attack_kind=orbit`）；常规 5 件解锁后按 `attack_kind` 常驻并行攻击（概念设计 §21）。`attack_kind` 决定行为，`journey_weapon_levels` 分级列按形态消费：`orbit→damage`、`projectile→interval_ms+proj_count+damage`、`boomerang→interval_ms+damage`、`aura→value_num`、`beam→interval_ms+damage`、`magnet→value_num`。分级取值 = `min(角色等级,8)` 级，缺列回落 `journey_weapons` base 列（base_interval_ms/projectile_speed/pierce），全部后台可配。紫金葫芦剥离回血后，引擎不再消费 `heal_amount`/`heal_fixed` 两列（后台列保留、仅不再生效）。领域范围取武器臂展长度，不再消费 `aoe_radius`。
+角色专属 4 件走环绕底盘（`attack_kind=orbit`）；常规 5 件按 `attack_kind` 作为并行单位，且**只挂当前出战角色自己的那件法宝**——法宝归属角色，换人出战即换一件，其他角色的法宝不再常驻并行（概念设计 §21）。出战扩展角色时法宝在环绕底盘之外叠加一份对应形态的并行攻击（环绕加领域）；出战取经四角色时法宝为 orbit 型，只有环绕、无并行单位。`attack_kind` 决定行为，`journey_weapon_levels` 分级列按形态消费：`orbit→damage`、`projectile→interval_ms+proj_count+damage`、`boomerang→interval_ms+damage`、`aura→value_num`、`beam→interval_ms+damage`、`magnet→value_num`。分级取值 = `min(角色等级,8)` 级，缺列回落 `journey_weapons` base 列（base_interval_ms/projectile_speed/pierce），全部后台可配。紫金葫芦剥离回血后，引擎不再消费 `heal_amount`/`heal_fixed` 两列（后台列保留、仅不再生效）。领域范围取武器臂展长度，不再消费 `aoe_radius`。
 
 | 法宝 | attack_kind | 角色 | 转速/内径/外径/刃宽 | base_damage | 初始特效 | 品阶 L1~L8 |
 |---|---|---|---|---|---|---|---|
