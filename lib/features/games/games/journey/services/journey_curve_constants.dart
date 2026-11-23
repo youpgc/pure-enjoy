@@ -121,13 +121,23 @@ const double kJourneyEndlessBossChestRate = 0.10;
 const int kJourneyEndlessBossRefinePerWave = 2;
 
 /// 无尽模式专属升级需求曲线参数（主线/每日保持 12+7×lv^1.5 不变）：
-/// need(lv) = base + per_lv × lv^pow。妖王经验走表值（50~1630）×强度
-/// 缩放（含波次增幅、钳 12）不压缩，产出随波 ~n² 增长，需求曲线取
-/// 同构二次式（pow=2.0），标定=产出至第 90 波累计恰好覆盖 99 级总需求
-/// ——满级落在第 90 波上下，预留末段波次纯挑战（满级后经验不再累计）。
+/// need(lv) = base + per_lv × lv^pow。产出侧三类怪（普通/精英/妖王）
+/// 的经验共享同一个波次成长乘区（exp_wave_gain），妖王经验另用独立
+/// 基准脱离限血选怪的表值锁死；需求取同阶幂次（pow=1.75），标定=
+/// 每波经验池至第 81 波累计覆盖 99 级总需求，波 17 约 17 级。
 const double kJourneyEndlessExpBase = 12;
-const double kJourneyEndlessExpPerLv = 30;
-const double kJourneyEndlessExpPow = 2.0;
+const double kJourneyEndlessExpPerLv = 28;
+const double kJourneyEndlessExpPow = 1.75;
+
+/// 无尽波次统一经验成长系数：每波经验池（普通/精英/妖王三类怪的经验
+/// 之和）乘 1+该值×(波号−1)，与降幂后的需求曲线同阶；0=还原为不随波
+/// 成长（旧口径会卡在 17 波前后）。journey_battle_params.endless 可覆盖。
+const double kJourneyExpWaveGain = 0.02;
+
+/// 无尽妖王经验基准：降临妖王的经验不再取被「限血选怪」锁死在低血档
+/// 的 exp_drop 表值，改用该独立基准×强度缩放×波次成长乘区，避免
+/// 「等级低→只能选低血妖王→经验低→升不动」的负反馈。
+const double kJourneyEndlessBossExpBase = 200;
 
 /// 妖潮妖王血量每波额外增幅（journey_globals.endless_boss_hp_amp 可覆盖）：
 /// 妖潮妖王血量乘区与经验/速度/接触伤害共用乘区解耦，独立走

@@ -135,6 +135,10 @@ class JourneyMonsterComponent extends PositionComponent
   /// 无尽妖潮所属波次（除尽推进制：该波怪全灭才刷下一波）。
   int endlessWave = 0;
 
+  /// 独立经验基准（仅无尽妖王）：>0 时替代 exp_drop 作为经验基准，
+  /// 使妖王经验随波成长，不再被限血选怪锁在低血档的经验值上。
+  double expOverride = 0;
+
   /// 最近一次进入交战态的序号（大血条选取「最新交战」目标的依据）。
   int lastEngageSeq = 0;
 

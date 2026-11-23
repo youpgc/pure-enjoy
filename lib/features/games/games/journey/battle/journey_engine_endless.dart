@@ -210,6 +210,10 @@ void _summonEndlessBoss(
   );
   final comp = game.monsters.last;
   comp.endlessWave = n;
+  // 经验脱离「限血选怪」锁死的低血档 exp_drop，改用独立基准随波成长，
+  // 避免低等级只能遇低经验妖王、升级停滞的负反馈。
+  comp.expOverride = game.battleNum(
+      'endless', 'boss_exp_base', kJourneyEndlessBossExpBase);
   comp.territoryRadius =
       game.config?.endlessBossTerritoryRadius ??
           kJourneyEndlessBossTerritoryRadius;

@@ -164,9 +164,10 @@ mixin JourneyLootMixin {
   /// 击杀掉落（journey_drops 表驱动）：boss/精英/普通分表加权随机；
   /// 空表回落内置硬编码概率口径（香火必掉/铜钱 35%/蟠桃 4%）。
   ///
-  /// - 经验单源=怪物行 exp_drop，按生成时强度乘区缩放
-  ///   ×(1+乘区×exp_mult_k)，drops 表 xianghuo 行的 qty 不再参与经验
-  ///   结算（journey_monsters.exp_drop 为唯一经验入口）；
+  /// - 经验单源=怪物经验基准，按生成时强度乘区缩放×(1+乘区×exp_mult_k)，
+  ///   再乘无尽波次成长乘区（普通/精英/妖王统一参与，让整池随波扩张）；
+  ///   妖王基准走独立值 exp_override，脱离「限血选怪」锁死的 exp_drop
+  ///   低血档，其余怪用自身 exp_drop；drops 表 xianghuo 行 qty 不参与经验；
   /// - 精英掉落以经验为主，宝箱为低概率惊喜彩蛋
   ///   （elite_chest_rate 缺省 1%）：
   ///   drops 表的精英固定 baoxiang 行在此屏蔽（兜住种子/旧配置）；
@@ -185,9 +186,16 @@ mixin JourneyLootMixin {
                 m.endlessWave < tideStart
             ? math.max(0.0, game.battleNum('endless', 'develop_exp_mult', 1.0))
             : 1.0;
-    final expValue = (m.model.expDrop *
+    // 经验基准：妖王用降临写入的独立基准（脱离限血选怪表值），其余怪
+    // 用自身 exp_drop；三类怪共用同一个无尽波次成长乘区，一起撑起经验池。
+    final expBasis = m.expOverride > 0 ? m.expOverride : m.model.expDrop;
+    final waveGain = game.level.kind == 'endless' && m.endlessWave > 0
+        ? game.battleNum('endless', 'exp_wave_gain', kJourneyExpWaveGain)
+        : 0.0;
+    final expValue = (expBasis *
             (1 + m.buffMult * expK) *
-            developExp)
+            developExp *
+            (1 + waveGain * (m.endlessWave - 1)))
         .round();
 
     // 掉落分档：21+ 难切换 late 表（高价值拾取物权重上调）；

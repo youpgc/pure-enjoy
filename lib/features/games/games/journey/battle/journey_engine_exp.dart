@@ -45,9 +45,10 @@ extension JourneyExp on JourneyFlameGame {
   /// 长线成长；pow=1 还原旧线性口径。
   double _expNeedFor(int lv) {
     // 无尽妖潮专属需求曲线：need = endless_exp_base + per_lv × lv^pow
-    // （默认 12+30×lv^2.0）。妖王经验按表值×强度缩放不压缩，产出随波
-    // ~n² 增长，需求取同构二次式：满级落在第 90 波上下，末段波次
-    // 预留纯挑战（满级后经验不再累计）。
+    // （默认 12+28×lv^1.75）。产出侧普通/精英/妖王三类怪的经验共享
+    // 波次成长乘区（exp_wave_gain）、妖王另走独立基准，整池随波扩张；
+    // 需求取同阶幂次：波 17 约 17 级、第 81 波满级，末段波次预留纯挑战
+    // （满级后经验不再累计）。
     if (level.kind == 'endless') {
       return ((config?.endlessExpBase ?? kJourneyEndlessExpBase) +
               (config?.endlessExpPerLv ?? kJourneyEndlessExpPerLv) *
