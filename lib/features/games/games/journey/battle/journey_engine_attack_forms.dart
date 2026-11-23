@@ -62,8 +62,6 @@ extension JourneyAttackForms on JourneyFlameGame {
     if (interval <= 0) interval = w.baseIntervalMs;
     var projCount = grade?.projCount ?? 0;
     if (projCount <= 0) projCount = 1;
-    var heal = grade?.healAmount.toDouble() ?? 0;
-    if (heal <= 0) heal = w.healFixed;
     var value = grade?.valueNum ?? 0;
     if (value <= 0) value = damage;
 
@@ -73,7 +71,6 @@ extension JourneyAttackForms on JourneyFlameGame {
       damage: damage,
       intervalMs: interval,
       projCount: projCount,
-      healAmount: heal,
       valueNum: value,
       pierce: w.pierce,
       speed: w.projectileSpeed,
@@ -89,17 +86,8 @@ extension JourneyAttackForms on JourneyFlameGame {
 
 /// 领域/光束/磁吸的逐帧行为（挂在调度组件上，同 library 访问宿主字段）。
 extension JourneyAttackUnitTick on JourneyAttackUnits {
-  void _tickAura(JourneyAttackUnit unit) {
-    final radius = unit.aoeRadius > 0
-        ? unit.aoeRadius
-        : (game.weaponArm?.outerRadius ?? 120);
-    final candidates = game.spatialGrid.queryRange(game.player.position, radius);
-    for (final m in candidates) {
-      if (m.isDead || (m.position - game.player.position).length > radius + m.radius) {
-        continue;
-      }
-      _hit(unit, m, multiplier: unit.valueNum / math.max(1.0, unit.damage));
-    }
+  void _tickAura(JourneyAttackUnit unit, double dt) {
+    _tickField(unit, dt);
   }
 
   void _tickBeam(JourneyAttackUnit unit, double dt) {
@@ -107,7 +95,7 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
       unit.timer -= dt;
       return;
     }
-    final period = (unit.intervalMs > 0 ? unit.intervalMs : 1200) / 1000;
+    final period = unitPeriodOf(unit);
     final range = unit.rangePx > 0
         ? unit.rangePx
         : (game.weaponArm?.outerRadius ?? 320) + 80;
@@ -124,6 +112,7 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
 
     final beamSlot = _attackUnitSlot('beam');
     final candidates = game.spatialGrid.queryRange(game.player.position, range);
+    final targets = <JourneyMonsterComponent>[];
     for (final m in candidates) {
       if (m.isDead || m.attackUnitCds[beamSlot] > 0) continue;
       final toM = m.position - game.player.position;
@@ -132,20 +121,72 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
           kBeamHalfAngle) {
         continue;
       }
+      targets.add(m);
+    }
+    targets.sort((a, b) => (a.position - game.player.position).length2
+        .compareTo((b.position - game.player.position).length2));
+    for (final m in targets.take(_attackTargetCap)) {
       _hit(unit, m);
     }
   }
 
   void _tickMagnet(JourneyAttackUnit unit, double dt) {
     // 拾取范围增益在单位构建/升级时按差值同步到 player.pickupRange；
-    // 这里只负责紫金葫芦的近身周期伤害与命中固定回血。
-    final radius = unit.aoeRadius > 0 ? unit.aoeRadius : 120.0;
-    final candidates = game.spatialGrid.queryRange(game.player.position, radius);
-    for (final m in candidates) {
-      if (m.isDead || (m.position - game.player.position).length > radius + m.radius) {
-        continue;
+    // 领域伤害与 aura 同口径（驻留按秒 + 1.5 秒脉冲），见 _tickField。
+    _tickField(unit, dt);
+  }
+
+  /// 领域轨逐帧推进：驻留按秒结算 + 周期脉冲两条独立线，范围=武器臂展。
+  ///
+  /// 驻留线：臂展内每只怪按各自连续驻留时长计伤——驻留越久倍率越高，
+  /// 每满 1 秒结算一次真实伤害，不限制目标数；离开范围清零倍率。
+  /// 脉冲线：每 [fieldPulsePeriod] 秒，以领域内每只怪为起点向外扩散
+  /// `臂长×fieldPulseRadiusRatio` 的圆，波及圆内全部怪（含臂展外）各一次
+  /// 真实伤害，同怪每次脉冲至多中一次（起点去重集）；臂展外的怪无驻留
+  /// 倍率，按基础倍率结算，范围内则叠加各自驻留倍率。
+  void _tickField(JourneyAttackUnit unit, double dt) {
+    final radius = _fieldRadius;
+    final inField = _monstersInRadius(game.player.position, radius);
+    final present = inField.toSet();
+
+    // — 驻留计时：连续驻留秒数（计倍率）+ 按秒结算节拍 —
+    final dwell = _fieldDwell.putIfAbsent(
+        unit.code, () => <JourneyMonsterComponent, double>{});
+    final tick = _fieldTick.putIfAbsent(
+        unit.code, () => <JourneyMonsterComponent, double>{});
+    // 离场或死亡的怪清除两份计时：倍率归 1、结算节拍重来。
+    dwell.removeWhere((m, _) => !present.contains(m) || m.isDead);
+    tick.removeWhere((m, _) => !present.contains(m) || m.isDead);
+    for (final m in inField) {
+      dwell[m] = (dwell[m] ?? 0) + dt;
+      final t = (tick[m] ?? 0) + dt;
+      if (t >= JourneyAttackUnits.fieldDwellSec) {
+        tick[m] = t % JourneyAttackUnits.fieldDwellSec;
+        _hitField(unit, m, mult: _fieldDwellMult(dwell[m] ?? 0));
+      } else {
+        tick[m] = t;
       }
-      _hit(unit, m, multiplier: unit.valueNum / math.max(1.0, unit.damage));
+    }
+
+    // — 周期脉冲线 —
+    if (unit.timer > 0) {
+      unit.timer -= dt;
+      return;
+    }
+    unit.timer = _fieldPulsePeriod;
+    if (inField.isEmpty) return;
+    final pulseRadius = radius * _fieldPulseRadiusRatio;
+    final hitSet = <JourneyMonsterComponent>{};
+    for (final origin in inField) {
+      for (final m in _monstersInRadius(origin.position, pulseRadius)) {
+        if (!hitSet.add(m)) continue;
+        _hitField(
+          unit,
+          m,
+          mult: _fieldDwellMult(dwell[m] ?? 0),
+          fromPulse: true,
+        );
+      }
     }
   }
 }
@@ -164,10 +205,13 @@ class JourneyAttackUnitRenderer extends Component {
 
     for (final unit in units.units) {
       if (unit.kind == 'aura' || unit.kind == 'magnet') {
-        final radius = unit.aoeRadius > 0
-            ? unit.aoeRadius
-            : (game.weaponArm?.outerRadius ?? 120);
-        final pulse = 0.5 + 0.5 * math.sin(units._auraPulse * 4);
+        // 领域范围与伤害一致，取武器臂展长度。
+        final radius = units._fieldRadius;
+        final period = units._fieldPulsePeriod;
+        // 伤害在 timer 归零时触发：越接近归零越亮，脉冲峰值与伤害同相。
+        final pulse = unit.timer > 0
+            ? (1 - unit.timer / period).clamp(0.0, 1.0)
+            : 1.0;
         canvas.drawCircle(
           center,
           radius,

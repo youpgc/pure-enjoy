@@ -116,7 +116,6 @@ class JourneyWeaponModel {
   final double projectileSpeed; // 弹体飞行速度（projectile/boomerang）
   final int pierce; // 穿透个数（projectile）
   final double aoeRadius; // 领域/光束半径（aura/beam/magnet）
-  final double healFixed; // 命中固定回血兜底（magnet/吸血）
   final double rangePx; // 最大射程（projectile/boomerang/beam）
 
   /// 归属角色（空=通用法宝；非空=跟随该角色解锁，角色未解锁不可解锁）
@@ -141,7 +140,6 @@ class JourneyWeaponModel {
     this.projectileSpeed = 0,
     this.pierce = 0,
     this.aoeRadius = 0,
-    this.healFixed = 0,
     this.rangePx = 0,
     this.characterCode = '',
     this.ownerName = '',
@@ -164,7 +162,6 @@ class JourneyWeaponModel {
       projectileSpeed: (json['projectile_speed'] as num?)?.toDouble() ?? 0,
       pierce: (json['pierce'] as num?)?.toInt() ?? 0,
       aoeRadius: (json['aoe_radius'] as num?)?.toDouble() ?? 0,
-      healFixed: (json['heal_fixed'] as num?)?.toDouble() ?? 0,
       rangePx: (json['range_px'] as num?)?.toDouble() ?? 0,
       characterCode: json['character_code'] as String? ?? '',
       ownerName: json['owner_name'] as String? ?? '',

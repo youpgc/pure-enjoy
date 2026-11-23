@@ -72,6 +72,28 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     return 0;
   }
 
+  /// 吸血比例（lv<=0 返回 0）：1 级取 lifesteal_base，每级增量取维度槽
+  /// value_per_level（远端可覆盖），钳 lifesteal_cap。环绕与并行单位共用，
+  /// 保证同名参数在两条命中链上口径一致。
+  double lifestealRatioOf(int lv) {
+    if (lv <= 0) return 0;
+    return (battleNum('weapon', 'lifesteal_base', kJourneyLifestealBaseRatio) +
+            slotValue('lifesteal', kJourneyLifestealRatioPerLv) * (lv - 1))
+        .clamp(
+          0.0,
+          battleNum('weapon', 'lifesteal_cap', kJourneyLifestealRatioCap),
+        );
+  }
+
+  /// 单次吸血回血点：命中伤害×比例，低伤命中保底 lifesteal_floor。
+  double lifestealHealOf(double dmg, int lv) {
+    if (lv <= 0 || dmg <= 0) return 0;
+    return math.max(
+      dmg * lifestealRatioOf(lv),
+      battleNum('weapon', 'lifesteal_floor', kJourneyLifestealHealFloor),
+    );
+  }
+
   /// 法宝/被动槽变更通知 HUD：槽栏由 ValueListenableBuilder 监听
   /// slotsRevision。onLoad 建立初始环绕时处于 GameWidget 构建期，同步写
   /// ValueNotifier 会令监听 widget 在 build 中被标脏（markNeedsBuild during
@@ -268,11 +290,11 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         const Color(0xFFD4593F),
       );
     }
-    // 火眼金睛（扩展被动）：对精英/妖王条件增伤——按基础值加法叠加
-    // （伤害=基础值×(1+Σ通用%+条件%) 单次乘算，与通用增伤合流不连乘）
+    // 火眼金睛（扩展被动）：对精英/妖王的条件增伤并入伤害公式的增伤合计
+    // （伤害=基础值×(1+Σ通用%+条件%)，与通用增伤加法合流、单次乘算）。
+    // 环绕传环绕基础值、弹道传自身未增伤基础值，两轨同一口径。
     if ((m.model.isBoss || m.model.isElite) &&
         game.passiveSlotCodes.contains('huoyan_jingjing')) {
-      // 并行单位传自身伤害基数，避免套用环绕基数造成口径串用。
       dmg += (conditionBase ?? game.damageBaseValue) *
           game.weaponParam('huoyan_jingjing', 'elite', 0.2);
       game.fxLayer.spawnRing(
@@ -340,22 +362,10 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       }
     }
     if (lifestealLv > 0) {
-      // 吸血：按最终命中伤害（含暴击/伏魔/火眼加伤）比例回复——1 级 3%、
-      // 每级 +1.5%（远端 value_per_level 可覆盖斜率），比例钳 ≤20%；
-      // 低伤命中保底 2 点。秒窗合计钳到最大生命 10%（防多目标高频
-      // 命中叠乘；禁疗由 heal 内部拦截）
-      final ratio = (game.battleNum('weapon', 'lifesteal_base',
-                    kJourneyLifestealBaseRatio) +
-              game.slotValue('lifesteal', kJourneyLifestealRatioPerLv) *
-                  (lifestealLv - 1))
-          .clamp(
-              0.0,
-              game.battleNum('weapon', 'lifesteal_cap',
-                  kJourneyLifestealRatioCap));
-      game.addLifestealHeal(math.max(
-          dmg * ratio,
-          game.battleNum('weapon', 'lifesteal_floor',
-              kJourneyLifestealHealFloor)));
+      // 吸血：按最终命中伤害（含暴击/伏魔/火眼加伤）比例回复，比例与保底
+      // 走共享口径（见 lifestealHealOf）；秒窗合计钳到最大生命一定比例
+      // （防多目标高频命中叠乘；禁疗由 addLifestealHeal 拦截）。
+      game.addLifestealHeal(game.lifestealHealOf(dmg, lifestealLv));
     }
     if (knockLv > 0 || game.player.bonusKnockback > 0) {
       var kb = game.slotValue('knockback', 16) * knockLv +

@@ -468,7 +468,9 @@ class JourneyFlameGame extends FlameGame
     updateSpawns(this, dt);
     // 空间哈希（节点12）：刷怪后每帧重建，供武器/接触伤害查询附近候选
     spatialGrid.rebuild(monsters);
+    // 环绕武器先结算命中，并行法宝随后补刀，保证武器命中是主要伤害来源。
     updateWeapons(this, dt);
+    attackUnits?.step(dt);
     updateDamageTick(this, dt);
     // 大血条统一同步：全部实体与伤害结算后选取展示目标，避免多妖王串台
     syncBossHud(this);

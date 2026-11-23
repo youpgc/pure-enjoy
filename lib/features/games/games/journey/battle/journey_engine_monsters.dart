@@ -240,15 +240,10 @@ class JourneyMonsterComponent extends PositionComponent
       return;
     }
 
-    // 灼烧掉血：各来源叠加后按帧结算，来源计时归零自动移除；
-    // 固定值型来源（灼烧槽）为真实伤害绕甲，百分比型来源仍经护甲减免
-    final (burnAmpDamage, burnTrueDamage) = tickBurn(dt);
-    if (burnAmpDamage > 0) {
-      takeDamage(burnAmpDamage);
-      if (isDead) return;
-    }
-    if (burnTrueDamage > 0) {
-      takeDamage(burnTrueDamage, armorIgnore: 1);
+    // 灼烧掉血：逐来源独立扣血，互不相加；来源计时归零自动移除。
+    // 固定值型来源（灼烧槽/领域灼烧）为真实伤害绕甲，百分比型来源经护甲减免。
+    for (final tick in tickBurn(dt)) {
+      takeDamage(tick.damage, armorIgnore: tick.trueDamage ? 1 : 0);
       if (isDead) return;
     }
     final player = game.player;

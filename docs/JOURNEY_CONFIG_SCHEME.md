@@ -150,7 +150,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 
 ## 4. 法宝（9，journey_weapons + journey_weapon_levels）
 
-角色专属 4 件走环绕底盘（`attack_kind=orbit`）；常规 5 件解锁后按 `attack_kind` 常驻并行攻击（概念设计 §21）。`attack_kind` 决定行为，`journey_weapon_levels` 分级列按形态消费：`orbit→damage`、`projectile→interval_ms+proj_count+damage`、`boomerang→interval_ms+damage`、`aura→value_num+damage`、`beam→interval_ms+damage`、`magnet→heal_amount+value_num`。分级取值 = `min(角色等级,8)` 级，缺列回落 `journey_weapons` base 列（base_interval_ms/projectile_speed/pierce/aoe_radius/heal_fixed），全部后台可配。
+角色专属 4 件走环绕底盘（`attack_kind=orbit`）；常规 5 件解锁后按 `attack_kind` 常驻并行攻击（概念设计 §21）。`attack_kind` 决定行为，`journey_weapon_levels` 分级列按形态消费：`orbit→damage`、`projectile→interval_ms+proj_count+damage`、`boomerang→interval_ms+damage`、`aura→value_num`、`beam→interval_ms+damage`、`magnet→value_num`。分级取值 = `min(角色等级,8)` 级，缺列回落 `journey_weapons` base 列（base_interval_ms/projectile_speed/pierce），全部后台可配。紫金葫芦剥离回血后，引擎不再消费 `heal_amount`/`heal_fixed` 两列（后台列保留、仅不再生效）。领域范围取武器臂展长度，不再消费 `aoe_radius`。
 
 | 法宝 | attack_kind | 角色 | 转速/内径/外径/刃宽 | base_damage | 初始特效 | 品阶 L1~L8 |
 |---|---|---|---|---|---|---|---|
@@ -171,7 +171,9 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 
 > 该阈值在后台「西行配置 → 战斗参数 → 武器与吸血穿刺 → 命中冷却与灼烧驻留」的「灼烧驻留触发(秒)」逐键可改（`journey_battle_params.weapon.burn_dwell_sec`，缺省回落 1 秒）。
 
-> 并行攻击单位（非常规 attack_kind 的已解锁法宝）携带法宝自身初始特效：击退/吸血按命中生效（与全局维度槽取较高等级），灼烧型法宝按命中点燃并使用独立 source key（`attack_<code>`），不覆盖也不计入环绕驻留灼烧来源；其灼烧伤害按攻击力比例结算，属百分比型经甲口径（与炉火/二气瓶同源，仅固定值型灼烧绕甲）；其命中频率低（周期 + hitSet 去重），不会反复重置驻留计时。并行单位与环绕共用 `armor_ignore` 破甲比例口径，不再按形态硬编码全额破甲。
+> 并行攻击单位（非常规 attack_kind 的已解锁法宝）分两轨：**弹道轨**（穿透弹/回旋/光束）与环绕武器走同一伤害公式乘区（基础值→(1+增伤Σ%)、暴击同源、破甲经甲），按各自攻击动作命中，携带法宝自身初始特效，击退/吸血与全局维度槽取较高等级，灼烧型按命中点燃并使用独立 source key（`attack_<code>`）；**领域轨**（八卦炉真火 aura/紫金葫芦 magnet）走独立真实伤害乘区，范围=武器臂展长度，两条结算线：①驻留伤害——范围内全部怪按驻留时间每满 1 秒结算一次 `value_num（领域每秒伤害基准）×驻留倍率` 真实伤害，不限目标数；②周期脉冲——每 1.5 秒以领域内每只怪为起点向外扩散 `臂长×0.3` 的圆，波及圆内全部怪（含臂展外）各结算一次 `value_num ×驻留倍率` 真实伤害，同怪每次脉冲至多中一次。驻留倍率 = 1 + 连续驻留秒数/达上限秒数 ×(封顶倍率−1)，离开范围清零重算——驻留越久伤害越高，满配基准 337×封顶 6 倍≈2023/秒。领域伤害不叠加角色基础攻击/等级攻击/增伤百分比，不受护甲减免，不触发暴击/雷引/紫金铃/伏魔等环绕专属效果。火眼金睛对精英/妖王的条件增伤并入增伤百分比合计（Σ%），随走伤害公式的命中生效。
+>
+> 吸血边界：吸血（吸血维度槽 + 初始特效）只在武器环绕命中与弹道命中（走 `_hitMonster`）触发；领域伤害与灼烧伤害都不触发吸血或回血，紫金葫芦领域不再回血。灼烧按来源独立结算、互不相加：武器维度槽灼烧（`weapon_burn`，固定值型真实伤害）与八卦炉法宝灼烧（`field_sanmei_fire`，按领域 `value_num` 固定基准比例的真实伤害）分属两条链路，各自按独立 source key 计时、各自扣血；两种灼烧都不随驻留递增，武器灼烧槽数值 = 槽值×槽等级×(1+(角色等级−1)×等级成长系数)，领域灼烧数值 = `value_num × attack_burn_ratio`，驻留倍率只作用于领域直伤、不影响灼烧，保证后期仍有效。领域灼烧 source key 用 `field_<code>` 前缀，与弹道灼烧 `attack_<code>` 前缀分开，切换攻击形态不覆盖旧来源口径。相关后台键：`journey_battle_params.weapon.field_pulse_period_sec`（领域脉冲周期秒，默认 1.5）、`field_pulse_radius_ratio`（脉冲扩散半径相对臂长比例，默认 0.3）、`field_dwell_cap_mult`（驻留封顶倍率，默认 6）、`field_dwell_cap_sec`（驻留达封顶秒数，默认 6）、`burn_level_growth`（灼烧等级成长，默认 0.04）、`attack_burn_ratio`（法宝灼烧伤害比例，默认 0.25，弹道=命中伤害×比例、领域=每秒伤害基准×比例）、`attack_burn_sec`（法宝灼烧持续时间秒，默认 2，各来源独立计时）、`attack_target_cap`（弹道单次目标上限，默认 3）、`attack_shot_life_sec`（弹体存在时间上限秒，默认 8，超时强制销毁兜底异常射程/速度）。
 
 ## 5. 武器维度槽（19，journey_weapon_slots，后台可逐项改）
 

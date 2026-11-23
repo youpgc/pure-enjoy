@@ -69,6 +69,10 @@ mixin JourneyKnockbackMixin on PositionComponent {
   }
 }
 
+/// 灼烧单来源的本帧结算明细：来源键、本帧伤害、是否真实伤害绕甲。
+/// 调用方按来源逐条扣血，避免把不同来源相加成一笔伤害。
+typedef JourneyBurnTick = ({String source, double damage, bool trueDamage});
+
 /// 灼烧按来源独立计时：武器灼烧、兜率炉火、阴阳二气瓶互不覆盖，
 /// 每秒伤害叠加结算，使「附加灼烧」不会重置已有点燃。
 /// 固定值型来源（trueDamage=true，如灼烧槽 8/秒×等级）为真实伤害
@@ -139,14 +143,20 @@ mixin JourneyBurnMixin on PositionComponent {
     if (burnDwell < safeDwell) return;
     // 每满一个阈值续燃一次；用取模而非清零，保留超出部分继续累计
     burnDwell %= safeDwell;
-    // 武器灼烧槽：槽值×等级×三昧倍率，固定值型绕甲
+    // 武器灼烧槽：槽值×等级×角色等级成长×三昧倍率，固定值型绕甲。
+    // 成长随局内角色等级线性提升，避免后期怪物血量上涨后固定灼烧失效；
+    // 灼烧本身不随驻留时间递增，只靠槽等级与角色等级提升数值。
     final burnLv = game.slotLevel('burn');
     if (burnLv > 0) {
       final honghaier = game.hasAbility('honghaier');
+      final lvGrowth = 1 +
+          (game.charLevel - 1) *
+              game.battleNum('weapon', 'burn_level_growth', 0.04);
       ignite(
         source: 'weapon_burn',
         burnDps: game.slotValue('burn', 8.0) *
             burnLv *
+            lvGrowth *
             (honghaier
                 ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
                 : 1.0),
@@ -176,31 +186,31 @@ mixin JourneyBurnMixin on PositionComponent {
     }
   }
 
-  /// 推进各来源计时，返回本帧应扣灼烧伤害：
-  /// $1=经护甲减免部分（百分比型来源），$2=真实伤害部分（固定值型来源）。
-  (double, double) tickBurn(double dt) {
-    if (_burnSources.isEmpty) return (0, 0);
-    var ampDps = 0.0;
-    var trueDps = 0.0;
+  /// 推进各来源计时，返回本帧各来源的灼烧伤害明细：每条带来源键、伤害值、
+  /// 是否真实伤害绕甲。调用方逐来源扣血，使各来源独立结算、互不相加。
+  List<JourneyBurnTick> tickBurn(double dt) {
+    if (_burnSources.isEmpty) return const [];
+    final ticks = <JourneyBurnTick>[];
     final expired = <String>[];
     for (final entry in _burnSources.entries.toList()) {
       final left = entry.value.$2 - dt;
       if (left <= 0) {
         expired.add(entry.key);
-      } else {
-        if (entry.value.$3) {
-          trueDps += entry.value.$1;
-        } else {
-          ampDps += entry.value.$1;
-        }
-        _burnSources[entry.key] = (entry.value.$1, left, entry.value.$3);
+        continue;
       }
+      _burnSources[entry.key] = (entry.value.$1, left, entry.value.$3);
+      if (entry.value.$1 <= 0) continue;
+      ticks.add((
+        source: entry.key,
+        damage: entry.value.$1 * dt,
+        trueDamage: entry.value.$3,
+      ));
     }
     for (final key in expired) {
       if (key == 'fenghuo_lun') fenghuoGen = -1;
       _burnSources.remove(key);
     }
-    return (ampDps * dt, trueDps * dt);
+    return ticks;
   }
 }
 
