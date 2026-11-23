@@ -89,7 +89,8 @@ extension JourneyInteract on JourneyFlameGame {
     );
     controller.hud.hp.value = player.hp;
     _revivePending = false;
-    // 选卡弹窗未清时交由 applyUpgrade 尾部恢复，避免误恢复选卡暂停态
+    // 还魂确认后直接续跑，不进摇杆等待态：此处是瞬时确认，非选卡/手动暂停
+    // 的接管切换；选卡弹窗未清时交由 applyUpgrade 尾部恢复，避免误恢复。
     if (!isPausedForLevelUp) {
       resumeEngine();
     }
@@ -121,7 +122,8 @@ extension JourneyInteract on JourneyFlameGame {
         );
       }
       _alchemyPending = false;
-      // 选卡弹窗未清时交由 applyUpgrade 尾部恢复，避免误恢复选卡暂停态
+      // 炼化确认后直接续跑，不进摇杆等待态：此处是瞬时确认，非选卡/手动暂停
+      // 的接管切换；选卡弹窗未清时交由 applyUpgrade 尾部恢复，避免误恢复。
       if (!_ended && !isPausedForLevelUp) {
         resumeEngine();
       }

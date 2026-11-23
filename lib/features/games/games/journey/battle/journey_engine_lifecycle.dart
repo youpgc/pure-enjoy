@@ -10,10 +10,12 @@ mixin JourneyResumeGateMixin on FlameGame {
   /// 引擎是否正等待摇杆接管（HUD 提示与恢复判定依据）。
   bool get resumeOnJoystick => _resumeOnJoystick;
 
-  /// 进入等待接管态：保持暂停，只亮提示。
+  /// 进入等待接管态：恢复引擎循环以维持画布重绘，世界推进由 update 的
+  /// 等待门禁冻结，避免选卡弹窗关闭后画布停止重绘露出底色。
   void armJoystickResume() {
     _resumeOnJoystick = true;
     controller.hud.awaitingJoystick.value = true;
+    resumeEngine();
   }
 
   /// 玩家按下摇杆：正式恢复对局，同一手势同时开始驱动移动。
@@ -21,7 +23,8 @@ mixin JourneyResumeGateMixin on FlameGame {
     if (!_resumeOnJoystick) return;
     _resumeOnJoystick = false;
     controller.hud.awaitingJoystick.value = false;
-    resumeEngine();
+    // 进入等待态时已恢复引擎循环；仅当等待期间被其它流程再次暂停才补恢复。
+    if (paused) resumeEngine();
   }
 }
 
