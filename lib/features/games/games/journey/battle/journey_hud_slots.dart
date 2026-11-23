@@ -156,7 +156,7 @@ class JourneyHudSlotBar extends StatelessWidget {
   }
 
   Widget _filledSlot(String code, Color stroke, JourneySlotCooldown? cd) {
-    // 计时类被动槽冷却中：图标去饱和灰化，顺时针蒙层 + 居中秒数倒计时
+    // 计时类被动槽冷却中：暗边框 + 顺时针蒙层 + 居中秒数倒计时
     final cooling = cd != null;
     final icon = SvgPicture.asset(
       JourneySprites.weapon(code),
@@ -182,17 +182,7 @@ class JourneyHudSlotBar extends StatelessWidget {
       ),
       child: Stack(
         children: <Widget>[
-          Center(
-            child: cooling
-                ? ColorFiltered(
-                    colorFilter: const ColorFilter.mode(
-                      Colors.grey,
-                      BlendMode.saturation,
-                    ),
-                    child: icon,
-                  )
-                : icon,
-          ),
+          Center(child: icon),
           if (cd != null) _cooldownOverlay(cd),
         ],
       ),
