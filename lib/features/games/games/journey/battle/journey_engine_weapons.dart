@@ -66,6 +66,8 @@ abstract interface class JourneyWeaponHost {
 mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   /// 某维度槽当前等级（未习得=0）。
   int slotLevel(String code) {
+    // 装天封印：被封槽在有效期内等级按 0 计，槽定义与 UI 均不改
+    if (player.sealedSlotCode == code && player.sealTimer > 0) return 0;
     for (final s in weaponSlots) {
       if (s.code == code) return s.level;
     }

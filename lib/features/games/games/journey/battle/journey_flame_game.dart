@@ -19,6 +19,10 @@ part 'journey_engine_world.dart';
 part 'journey_engine_setup.dart';
 part 'journey_engine_player.dart';
 part 'journey_engine_monster_effects.dart';
+part 'journey_boss_skill_layer.dart';
+part 'journey_engine_boss_skill_effects.dart';
+part 'journey_engine_boss_skills.dart';
+part 'journey_engine_boss_skills_new.dart';
 part 'journey_engine_monsters.dart';
 part 'journey_engine_boss_hud.dart';
 part 'journey_engine_config_access.dart';
@@ -263,6 +267,9 @@ class JourneyFlameGame extends FlameGame
 
   /// 特效渲染层（浮动文字/闪电连线/破坏残屑），world 内置顶。
   late final JourneyFxLayer fxLayer = JourneyFxLayer(this);
+
+  /// 妖王技能实体层（弹道/预警/领域），挂载于特效层之下。
+  late final JourneyBossSkillLayer bossSkillLayer = JourneyBossSkillLayer(this);
 
   /// 并行攻击单位：图鉴已解锁常规法宝按 attack_kind 常驻攻击；
   /// 组件在 setupWorld 挂载，进局装配完成后由 rebuild 填充单位。

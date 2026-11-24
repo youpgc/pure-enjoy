@@ -51,7 +51,7 @@ mixin JourneyDamageTickMixin {
       var afterArmor =
           (strongest *
                   (1 -
-                      armorReductionRatio(player.armor,
+                      armorReductionRatio(player.effectiveArmor,
                           curveK: game.armorCurveK,
                           cap: game.battleNum('damage', 'player_armor_cap',
                               kJourneyPlayerArmorCap))))
@@ -81,14 +81,24 @@ mixin JourneyDamageTickMixin {
           player.rootTimer = game.monsterParam(
               strongestM.model.code, 'web_root', 0.8);
           break;
-        case 'poison_mist':
+        case 'poison_mist': // 倒马毒桩：禁疗 + 接触叠毒刺，满层真伤爆发
           player.healBlockTimer = game.monsterParam(
               strongestM.model.code, 'poison_block', 3.0);
+          game.applyBossSkillEffect('sting',
+              power: game.monsterParam(
+                  strongestM.model.code, 'sting_add', 1),
+              owner: strongestM);
           game.spawnFloatText(
             player.position + Vector2(0, -36),
             '倒马毒桩·禁疗',
             const Color(0xFF8E2F3C),
           );
+          break;
+        case 'ice_seal': // 灵感大王：接触附带减速（冰封周期再补破甲）
+          game.applyBossSkillEffect('slow',
+              power: game.monsterParam(
+                  strongestM.model.code, 'seal_slow', 0.3),
+              owner: strongestM);
           break;
       }
     }
@@ -130,8 +140,8 @@ extension JourneyBossCharge on JourneyFlameGame {
     }
     var afterArmor = (raw *
             (1 -
-                JourneyDamageTickMixin.armorReductionRatio(
-                    player.armor,
+                    JourneyDamageTickMixin.armorReductionRatio(
+                    player.effectiveArmor,
                     curveK: armorCurveK,
                     cap: battleNum('damage', 'player_armor_cap',
                         kJourneyPlayerArmorCap))))
@@ -156,6 +166,19 @@ extension JourneyBossCharge on JourneyFlameGame {
       boss._chargeDir,
       monsterParam(boss.model.code, 'charge_knockback', 160),
     );
+    // 金翅迅影·风刃轨迹：冲撞命中后在身后留一段减速领域
+    if (boss.model.abilityKey == 'roc_speed') {
+      bossSkillLayer.castField(
+        boss.position - boss._chargeDir * 60,
+          radius: monsterParam(boss.model.code, 'blade_range', 120),
+          life: monsterParam(boss.model.code, 'blade_sec', 3),
+          tick: monsterParam(boss.model.code, 'blade_tick', 0.6),
+        effect: 'slow',
+        power: monsterParam(boss.model.code, 'blade_slow', 0.35),
+        color: const Color(0xFFD4A73F),
+        owner: boss,
+      );
+    }
     spawnFloatText(
       player.position + Vector2(0, -36),
       '妖王冲撞！',

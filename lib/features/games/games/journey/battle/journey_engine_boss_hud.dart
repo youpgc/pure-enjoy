@@ -26,7 +26,7 @@ void syncBossHud(JourneyFlameGame game) {
   // 新进妖王：在场、满足展示条件且尚未入列者，按优先级降序排队入场。
   final incoming = <JourneyMonsterComponent>[];
   for (final m in game.monsters) {
-    if (m.isDead || !m.model.isBoss) continue;
+    if (m.isDead || !m.model.isBoss || m.isDecoy) continue;
     if (!m._aggro && m.hp >= m.maxHp) continue;
     if (tracked.any((t) => identical(t, m))) continue;
     incoming.add(m);

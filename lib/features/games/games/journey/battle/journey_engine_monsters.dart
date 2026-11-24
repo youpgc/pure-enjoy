@@ -132,6 +132,48 @@ class JourneyMonsterComponent extends PositionComponent
   /// 紫金铃命中计数（扩展特效）：同一目标累计 3 次触发妖火爆炸。
   int lingHits = 0;
 
+  // ---- 妖王技能公共状态（仅 model.isBoss 使用）----
+  /// 技能公共冷却：任意主动技起手后写入，GCD>0 期间禁止再次起手，
+  /// 杜绝冲撞与周期能力同帧/近帧连刀。取值走 boss 组参数（缺省 3s）。
+  double _skillGcd = 0;
+
+  /// 护罩吸收量（金铙/月华）：受击时先抵扣，归零后正常走护甲与扣血。
+  double ward = 0;
+
+  /// 技能 GCD 就绪：仅妖王参与互斥，普通怪恒可释放。
+  bool get skillGcdReady => !model.isBoss || _skillGcd <= 0;
+
+  /// 任意主动技起手时写入公共冷却，逐怪 skill_gcd 优先于全局 boss 组。
+  void startSkillGcd() {
+    if (!model.isBoss) return;
+    _skillGcd = game.monsterParam(
+        model.code, 'skill_gcd', game.battleNum('boss', 'skill_gcd', 3.0));
+  }
+
+  /// 假身标记（变化术/分瓣梅花）：假身计入怪物列表承伤，但死亡不结算
+  /// 经验/功德/掉落，且到时自动消散。
+  bool isDecoy = false;
+  double decoyLife = 0;
+
+  /// 妖王技能专属的战斗中回血（劲节十八公·根须汲取）：交战态按最大
+  /// 生命比例持续回复，区别于通用脱战回血；数值走逐怪 combat_regen。
+  void regenInCombat(double dt) {
+    if (!model.isBoss || model.abilityKey != 'root_bind' || hp >= maxHp) {
+      return;
+    }
+    final rate = game.monsterParam(model.code, 'combat_regen', 0.03);
+    if (rate <= 0) return;
+    hp = math.min(maxHp, hp + maxHp * rate * dt);
+  }
+
+  /// 受击写入护罩：按接触伤害×倍数授予，总量不超 maxHp 比例。
+  void grantWard(double ratio) {
+    if (!model.isBoss || ratio <= 0) return;
+    final add = _contactDamage * ratio;
+    final cap = maxHp * game.battleNum('boss', 'ward_cap', 0.35);
+    ward = math.min(cap, ward + add);
+  }
+
   /// 无尽妖潮所属波次（除尽推进制：该波怪全灭才刷下一波）。
   int endlessWave = 0;
 
@@ -223,6 +265,11 @@ class JourneyMonsterComponent extends PositionComponent
     }
     if (isDead) return;
 
+    // 妖王技能 GCD 逐帧递减（暂停随引擎冻结，定身中也照常恢复）
+    if (model.isBoss && _skillGcd > 0) {
+      _skillGcd = math.max(0, _skillGcd - dt);
+    }
+
     // 击退动画先推进：离屏冻结只跳过索敌/回血，不能冻结未走完的位移
     _tickKnockback(dt);
     tickSlotStatus(dt); // 减速/寻猎计时：离屏也推进，寻猎怪不因冻结而卡态
@@ -275,15 +322,29 @@ class JourneyMonsterComponent extends PositionComponent
     }
     // 进入交战态时登记序号，供大血条按「最新交战」选取展示目标；
     // 血条数值与显隐统一由宿主每帧 syncBossHud 维护（多妖王不串台）。
-    if (model.isBoss && !wasAggro && _aggro) {
+    if (model.isBoss && !isDecoy && !wasAggro && _aggro) {
       lastEngageSeq = ++game.bossEngageSeq;
     }
 
-    if (model.isBoss) {
+    // 假身沿用本体模型但只是承伤分身：不施法、不冲撞、不回血，
+    // 否则变化术假身会递归召出更多假身，造成指数增殖。
+    if (model.isBoss && !isDecoy) {
       _updateCharge(dt, dist, toPlayer, rooted: rooted);
       // 妖王周期能力（追击态才走，定身中不放）
       if (_aggro && !rooted && model.abilityKey.isNotEmpty) {
         tickBossAbility(dt, dist);
+      }
+      // 交战态专属回血（根须汲取）：持续生效，定身中亦在战斗中
+      if (_aggro) regenInCombat(dt);
+    }
+
+    // 假身到时消散：不计入击杀结算，直接移除
+    if (isDecoy) {
+      decoyLife -= dt;
+      if (decoyLife <= 0) {
+        isDead = true;
+        removeFromParent();
+        return;
       }
     }
 
@@ -338,9 +399,12 @@ class JourneyMonsterComponent extends PositionComponent
         if (_aggro &&
             !rooted &&
             _chargeCd <= 0 &&
+            skillGcdReady &&
             dist < game.battleNum('boss', 'charge_trigger_dist', 340)) {
           _chargePhase = 1;
           _chargeTimer = game.battleNum('boss', 'charge_windup_sec', 0.7);
+          // 冲撞起手占公共冷却，避免紧接着又放周期能力形成连刀
+          startSkillGcd();
         }
         break;
       case 1:
@@ -438,6 +502,12 @@ class JourneyMonsterComponent extends PositionComponent
 
   void takeDamage(double amount, {double armorIgnore = 0}) {
     if (isDead) return;
+    // 护罩优先抵扣（金铙/月华护盾），破产部分再走护甲与扣血
+    if (ward > 0) {
+      final absorbed = math.min(ward, amount);
+      ward -= absorbed;
+      amount -= absorbed;
+    }
     // 护甲减免（与玩家同曲线 armor/(armor+K)，怪物侧上限 72% 高于玩家
     // 60%，保 150~200 甲档位区分度）；穿刺命中按 armorIgnore 比例无视
     // 护甲（其余衍生伤害不受益）
@@ -448,8 +518,23 @@ class JourneyMonsterComponent extends PositionComponent
     }
     hp -= amount;
     _hpBarTimer = 2.5;
+    // 法天象地（牛魔王）：血量首次跌破阈值后接触伤害永久提升（每场一次）
+    if (!isDecoy &&
+        model.abilityKey == 'unmovable' &&
+        !_giantTriggered &&
+        hp > 0 &&
+        hp < maxHp * game.monsterParam(model.code, 'giant_hp', 0.5)) {
+      _giantTriggered = true;
+      _contactDamageVal *= game.monsterParam(model.code, 'giant_damage', 1.4);
+      game.spawnFloatText(
+        position + Vector2(0, -radius - 14),
+        '法天象地！',
+        const Color(0xFFE04545),
+      );
+    }
     // 分魂化形（白骨精）：血量首次跌破阈值分裂 2 只妖卫（每场一次）
-    if (model.abilityKey == 'bone_split' &&
+    if (!isDecoy &&
+        model.abilityKey == 'bone_split' &&
         !_splitDone &&
         hp > 0 &&
         hp < maxHp * game.battleNum('monster', 'split_hp_ratio', 0.5)) {
@@ -464,6 +549,7 @@ class JourneyMonsterComponent extends PositionComponent
   }
 
   bool _splitDone = false;
+  bool _giantTriggered = false;
 
   /// 白骨妖卫 ×2：白骨精分魂（精英属性，血量 40% buff，落位本体两侧）。
   void _spawnBoneSplinters() {

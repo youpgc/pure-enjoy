@@ -35,6 +35,10 @@ extension JourneyLifecycle on JourneyFlameGame {
   void onMonsterKilled(JourneyMonsterComponent m) {
     // 结算快照取走后不再改写局内计数与掉落
     if (_ended) return;
+    // 变化术/分瓣梅花的假身不计入击杀、功德、图鉴与掉落
+    if (m.isDecoy) return;
+    // 施法者死亡后清掉它在途的弹道/预警/领域，避免死后延迟技仍命中
+    bossSkillLayer.clearByOwner(m);
     _kills++;
     controller.hud.kills.value = _kills;
     // 分类型击杀累计（击杀图鉴数据源；妖怪/妖王共用 model.code）
@@ -356,6 +360,8 @@ extension JourneyLifecycle on JourneyFlameGame {
   void _finish({required bool cleared}) {
     if (_ended) return;
     _ended = true;
+    // 终局清空在途妖王技能实体，避免结算页背后仍有弹道/领域判定残留
+    bossSkillLayer.clearAll();
     // 终局停更后不再有帧同步负面状态，显式清零避免结算页背后残留角标
     controller.hud.rootRemain.value = 0;
     controller.hud.healBlockRemain.value = 0;

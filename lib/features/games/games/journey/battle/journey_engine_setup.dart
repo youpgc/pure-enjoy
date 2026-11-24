@@ -52,6 +52,8 @@ extension JourneyWorldSetup on JourneyFlameGame {
     attackUnits = units;
     world.add(units);
     world.add(JourneyAttackUnitRenderer(units: units)..priority = 12);
+    // 妖王技能实体层（弹道/预警/领域）置于飘字层之下。
+    world.add(bossSkillLayer..priority = 18);
     // 飘字/闪电等瞬时反馈置顶：priority 高于并行单位渲染层(12)。
     world.add(fxLayer..priority = 20);
     camera.follow(player);

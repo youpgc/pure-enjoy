@@ -20,7 +20,8 @@ extension JourneyGrowth on JourneyFlameGame {
   /// 单次命中基数 = 基础值 ×(1+增伤Σ%)。环绕命中、触发法宝、参照物
   /// 扫掠与属性面板共用此口径（火眼金睛对精英/妖王的条件增伤在
   /// _hitMonster 内按基础值加法叠加）。
-  double get hitDamageBase => damageBaseValue * (1 + damageAmpTotal);
+  double get hitDamageBase =>
+      damageBaseValue * (1 + damageAmpTotal) * bossSkillDamageFactor;
 
   /// 穿刺破甲比例：1 级基准 + 每级增量（value_per_level 后台可配），钳 ≤ 上限。
   /// 环绕命中与并行单位命中共用此口径，避免穿透弹硬编码全额破甲。

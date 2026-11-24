@@ -68,6 +68,20 @@ extension JourneyInteract on JourneyFlameGame {
     revivesLeft--;
     // 清掉死亡瞬间被暂停冻结的强制位移，避免复活后继续推进的「幽灵位移」
     player.clearForcedDisplacement();
+    // 复活后清掉在途妖王技能与负面态，防止死亡期冻结的弹道继续命中
+    bossSkillLayer.clearAll();
+    player.rootTimer = 0;
+    player.blindTimer = 0;
+    player.chillTimer = 0;
+    player.healBlockTimer = 0;
+    player.armorBreakTimer = 0;
+    player.drainTimer = 0;
+    player.sealTimer = 0;
+    player.sealedSlotCode = '';
+    player.stingStacks = 0;
+    player.skillDotRemain = 0;
+    player.skillDotPerTick = 0;
+    player.resetSkillDotTimer();
     player.hp = player.maxHp *
         battleNum('economy', 'revive_hp_ratio', 0.6);
     final pushFrom = battleNum('economy', 'revive_push_from', 300);

@@ -38,6 +38,70 @@ class JourneyPlayerComponent extends PositionComponent {
   /// 禁疗剩余时间（蝎子精倒马毒桩）：>0 时治疗与回复失效。
   double healBlockTimer = 0;
 
+  // ---- 妖王技能负面态（逐帧递减，与角色能力态互不覆盖）----
+  /// 致盲剩余时间：命中精度下降，对妖武器伤害按系数削减。
+  double blindTimer = 0;
+
+  /// 减速剩余时间与倍率：>0 时移动速度乘 slowFactor（0~1）。
+  double chillTimer = 0;
+  double chillFactor = 1;
+
+  /// 破甲剩余时间与护甲削减比例：>0 时受击护甲按系数降低。
+  double armorBreakTimer = 0;
+  double armorBreakRatio = 0;
+
+  /// 增益被套取剩余时间：>0 时增伤按系数削减（独角兕金刚琢）。
+  double drainTimer = 0;
+
+  /// 封印槽位与剩余时间：封印期内该槽等级按 0 计（金角装天）。
+  String sealedSlotCode = '';
+  double sealTimer = 0;
+
+  /// 毒刺累计层数与计时（蝎子精）：层数满触发一次真伤爆发。
+  int stingStacks = 0;
+  double stingTimer = 0;
+
+  /// 单体持续伤害来源：妖王领域灼烧/毒雾按每次 tick 结算。
+  double skillDotRemain = 0;
+  double skillDotPerTick = 0;
+  double _skillDotTimer = 0;
+
+  /// 妖王技能负面态统一推进：计时到点归零并清理派生状态。
+  void tickBossDebuffs(double dt) {
+    if (blindTimer > 0) blindTimer = math.max(0, blindTimer - dt);
+    if (chillTimer > 0) chillTimer = math.max(0, chillTimer - dt);
+    if (armorBreakTimer > 0) {
+      armorBreakTimer = math.max(0, armorBreakTimer - dt);
+    }
+    if (drainTimer > 0) drainTimer = math.max(0, drainTimer - dt);
+    if (sealTimer > 0) {
+      sealTimer = math.max(0, sealTimer - dt);
+      if (sealTimer <= 0) sealedSlotCode = '';
+    }
+    if (stingTimer > 0) {
+      stingTimer = math.max(0, stingTimer - dt);
+      if (stingTimer <= 0) stingStacks = 0;
+    }
+    if (skillDotRemain > 0) {
+      skillDotRemain = math.max(0, skillDotRemain - dt);
+      if (skillDotRemain <= 0) {
+        skillDotPerTick = 0;
+        resetSkillDotTimer();
+      }
+    }
+  }
+
+  /// DOT 换源/到期时归零跳伤节拍，避免上一来源残留的计时让新来源提前跳伤。
+  void resetSkillDotTimer() => _skillDotTimer = 0;
+
+  /// 生效护甲：破甲期按系数削减，其余时段返回原值。
+  double get effectiveArmor =>
+      armorBreakTimer > 0 ? armor * (1 - armorBreakRatio.clamp(0.0, 1.0)) : armor;
+
+  /// 生效移速乘区：减速期按倍率削减，其余时段返回 1。
+  double get chillSpeedFactor =>
+      chillTimer > 0 ? chillFactor.clamp(0.0, 1.0) : 1.0;
+
   /// 生机维度累计的生命上限加成比例：供固定额生命成长同步放大。
   double hpBonusRatio = 0;
 
@@ -93,6 +157,18 @@ class JourneyPlayerComponent extends PositionComponent {
     super.update(dt);
     if (game._ended) return;
 
+    tickBossDebuffs(dt);
+    // 妖王毒雾/灼烧领域：持续伤害按后台节拍结算，禁疗不挡伤害
+    final dotTick = game.battleNum('boss', 'skill_dot_tick', 1.0)
+        .clamp(0.1, 60.0);
+    if (skillDotRemain > 0 && skillDotPerTick > 0) {
+      _skillDotTimer += dt;
+      if (_skillDotTimer >= dotTick) {
+        _skillDotTimer -= dotTick;
+        takeDamage(skillDotPerTick);
+      }
+    }
+
     // 西行里程基准点：本帧位移/推离全部落定前记录位置，帧尾取净位移
     final prevPos = position.clone();
 
@@ -105,6 +181,7 @@ class JourneyPlayerComponent extends PositionComponent {
       position += Vector2(stick.dx, stick.dy) *
           game.baseSpeed *
           game.moveSpeedAmp *
+          chillSpeedFactor *
           dt;
       facing = Vector2(stick.dx, stick.dy)..normalize();
     }
@@ -438,23 +515,25 @@ class JourneyPlayerComponent extends PositionComponent {
     _skillShiftLeft = 0;
   }
 
-  void takeDamage(double amount) {
+  void takeDamage(double amount, {bool trueDamage = false}) {
     if (hp <= 0) return;
     // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
     if (invulnTimer > 0) return;
-    // 最终减伤区（乘算在护甲减伤之后）：金刚不坏（ward 维度）与坚韧光环
-    // （沙僧）加法合流后统一钳 ward_cap，避免两路独立乘算叠加破上限。
-    final wardLv = game.slotLevel('ward');
-    final wardRed =
-        wardLv > 0 ? game.slotValue('ward', 0.04) * wardLv : 0.0;
-    final auraReduce = game.character.code == 'shaseng'
-        ? game.character.auraNum('hurt_reduce', 0.1)
-        : 0.0;
-    final totalReduce = (wardRed + auraReduce).clamp(
-      0.0,
-      game.battleNum('weapon', 'ward_cap', 0.5),
-    );
-    if (totalReduce > 0) amount *= 1 - totalReduce;
+    if (!trueDamage) {
+      // 最终减伤区（乘算在护甲减伤之后）：金刚不坏（ward 维度）与坚韧光环
+      // （沙僧）加法合流后统一钳 ward_cap，避免两路独立乘算叠加破上限。
+      final wardLv = game.slotLevel('ward');
+      final wardRed =
+          wardLv > 0 ? game.slotValue('ward', 0.04) * wardLv : 0.0;
+      final auraReduce = game.character.code == 'shaseng'
+          ? game.character.auraNum('hurt_reduce', 0.1)
+          : 0.0;
+      final totalReduce = (wardRed + auraReduce).clamp(
+        0.0,
+        game.battleNum('weapon', 'ward_cap', 0.5),
+      );
+      if (totalReduce > 0) amount *= 1 - totalReduce;
+    }
     // 护体金光（shield 维度）：护盾先抵扣，余量再进扣血
     if (shield > 0) {
       final absorbed = math.min(shield, amount);

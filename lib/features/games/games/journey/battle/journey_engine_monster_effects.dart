@@ -221,80 +221,31 @@ mixin JourneyBossAbilityMixin on PositionComponent {
   JourneyMonsterModel get model;
   double get contactDamage;
 
+  /// 周期能力计时（到周期即停住，GCD/条件未满足不空转）。
   double _abilityTimer = 0;
 
+  /// 白骨三变形态计数：交替授予护罩/致幻。
+  int _boneForm = 0;
+
+  /// 紫金铃三色轮转相位（火/烟/沙）。
+  int _bellPhase = 0;
+
+  /// 周期是否到点：计时钳在 period，就绪后由 [ackPeriodic] 清零。
+  bool periodicReady(double period) => _abilityTimer >= period;
+
+  void ackPeriodic() => _abilityTimer = 0;
+
+  /// 统一调度入口（由 monsters part 每帧在追击态调用）：
+  /// 周期读取、计时推进、GCD 检查与派发全部收敛在调度 part，
+  /// 避免计时上限与派发阈值两处口径漂移。
   void tickBossAbility(double dt, double dist) {
-    _abilityTimer += dt;
-    final code = model.abilityKey;
-    final period = switch (code) {
-      'swift_wind' => game.monsterParam(model.code, 'wind_period', 8.0),
-      'samadhi_fire' => game.monsterParam(model.code, 'fire_period', 6.0),
-      'gourd_pull' => game.monsterParam(model.code, 'pull_period', 10.0),
-      _ => 0.0,
-    };
-    if (period <= 0 || _abilityTimer < period) return;
-    final player = game.player;
-    switch (code) {
-      case 'swift_wind':
-        // 三昧神风：阵风把玩家吹离（渐进位移，时长/距离可配）
-        final dir = (player.position - position);
-        final len = dir.length;
-        if (len > 1) {
-          player.applySkillShift(
-            dir,
-            game.monsterParam(model.code, 'wind_push', 200),
-            game.monsterParam(model.code, 'wind_shift_sec', 0.6),
-          );
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '三昧神风！',
-            const Color(0xFFD4A73F),
-          );
-        }
-        _abilityTimer = 0;
-        break;
-      case 'samadhi_fire':
-        // 三昧真火：火圈 AOE——玩家在射程内受接触伤害比例（过护甲）
-        final fireRange = game.monsterParam(model.code, 'fire_range', 250.0);
-        final fireRatio = game.monsterParam(model.code, 'fire_ratio', 0.8);
-        if (dist <= fireRange) {
-          final raw = contactDamage * fireRatio;
-          player.takeDamage(
-            raw *
-                (1 - player.fireResist) * // 辟火罩：火系伤害减免
-                (1 -
-                    JourneyDamageTickMixin.armorReductionRatio(player.armor,
-                        curveK: game.armorCurveK,
-                        cap: game.battleNum('damage', 'player_armor_cap',
-                            kJourneyPlayerArmorCap))),
-          );
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '三昧真火',
-            const Color(0xFFD4593F),
-          );
-        }
-        game.fxLayer.spawnRing(position, fireRange);
-        _abilityTimer = 0;
-        break;
-      case 'gourd_pull':
-        // 紫金摄魂：把玩家拉向自身（渐进位移，时长/距离可配）
-        final dir = position - player.position;
-        final len = dir.length;
-        if (len > 1) {
-          player.applySkillShift(
-            dir,
-            game.monsterParam(model.code, 'pull_dist', 180),
-            game.monsterParam(model.code, 'pull_shift_sec', 0.6),
-          );
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '紫金摄魂',
-            const Color(0xFFB07CD4),
-          );
-        }
-        _abilityTimer = 0;
-        break;
+    game.tickBossSkill(this as JourneyMonsterComponent, dt, dist);
+  }
+
+  /// 计时钳在周期上限（到点停表，不空转）。
+  void advancePeriodic(double dt, double period) {
+    if (_abilityTimer < period) {
+      _abilityTimer = math.min(period, _abilityTimer + dt);
     }
   }
 }
