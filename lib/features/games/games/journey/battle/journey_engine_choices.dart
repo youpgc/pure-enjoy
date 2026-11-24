@@ -121,6 +121,10 @@ String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
   return '${rule.brief} $before → $after';
 }
 
+/// 三选一卡的唯一键（类别+编码）：基础属性卡 code 为空但同属 base 类，
+/// 不参与轮空；维度槽/被动/触发按各自 code 识别。
+String _choiceKey(JourneyUpgradeChoice c) => '${c.category.name}:${c.code}';
+
 /// 三选一候选池（维度槽口径）：
 /// - 空槽且维度未入槽 → 「习得·X」（占 1 槽，Lv1）；
 /// - 已入槽且未达上限 → 「X · 顿悟」（等级 +1，展示下一级效果）；
@@ -249,8 +253,27 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
     ));
   }
 
+  // 上一轮展示却没被选中的非基础卡：本轮轮空一次（基础卡不参与）。
+  // 仅剩轮空卡时放宽限制，避免候选为空导致选卡弹窗死循环。
+  if (game._lastShownUnpicked.isNotEmpty) {
+    final filtered = pool
+        .where((c) => !game._lastShownUnpicked.contains(_choiceKey(c)))
+        .toList();
+    if (filtered.isNotEmpty) {
+      pool
+        ..clear()
+        ..addAll(filtered);
+    }
+  }
+
   // 四类权重轮盘 + 槽满剔除：先按类权重选类别，再在类内均匀随机抽卡。
-  return _drawWeightedByCategory(pool, 3, game);
+  final drawn = _drawWeightedByCategory(pool, 3, game);
+  // 记录本轮展示的非基础卡；选卡后据此把未选中的转入下一轮轮空集合。
+  game._currentShownNonBase = {
+    for (final c in drawn)
+      if (c.category != JourneyChoiceCategory.base) _choiceKey(c),
+  };
+  return drawn;
 }
 
 /// 按类权重轮盘抽 [count] 张：每轮先按「有剩余候选的类」的类权重选类别，

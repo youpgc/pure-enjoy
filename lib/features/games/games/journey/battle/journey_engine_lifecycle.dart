@@ -184,6 +184,13 @@ extension JourneyLifecycle on JourneyFlameGame {
   /// 三选一选定：应用加成；仍有余级则继续弹卡，否则恢复运行。
   /// （候选池构建见 choices part 的 drawChoices，本方法只结算。）
   void applyUpgrade(JourneyUpgradeChoice choice) {
+    // 本轮展示却没被选中的非基础卡转入下一轮轮空集合：选中的卡已生效
+    // （入槽/持有/升级）不再重复入池，无需轮空；未选的跳过下一轮一次，
+    // 打断同一张卡连续反复出现；基础属性卡不参与轮空。
+    _lastShownUnpicked
+      ..clear()
+      ..addAll(_currentShownNonBase.where((k) => k != _choiceKey(choice)));
+
     switch (choice.kind) {
       case JourneyUpgradeKind.slotLearn:
         learnSlot(choice.code);

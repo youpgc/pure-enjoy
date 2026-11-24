@@ -298,6 +298,13 @@ class JourneyFlameGame extends FlameGame
   /// 炼化确认弹窗占用标记。
   bool _alchemyPending = false;
 
+  /// 上一次三选一展示但未被选中的非基础卡键（维度槽/被动/触发）。
+  /// 下次抽卡轮空一轮，避免同类卡连续出现；基础属性卡不受限。
+  final Set<String> _lastShownUnpicked = <String>{};
+
+  /// 本次三选一展示的非基础卡键；选卡时据此刷新轮空集合。
+  Set<String> _currentShownNonBase = <String>{};
+
   // ---- 周身环绕武器（电风扇模型）----
   /// 初始武器（角色特性法宝，1 件）从角色容器延伸到外环旋转收割。
   /// 6 主动槽=维度槽（属性/特效）：初始武器占 1 特效槽，空槽由三选一
