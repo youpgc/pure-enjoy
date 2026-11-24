@@ -187,13 +187,16 @@ const Map<String, double> kJourneyBossArmorDefaults = {
   'huangfeng_jing': 58,
   'baigu_jing': 50,
   // 宝象国~车迟国（前中期 70~95）：黄袍怪奎木狼天将披甲、金角天庭童子
-  // 携法宝、狮猁青狮坐骑、红孩儿幼童妖王、鼍龙龙种鳞甲、虎力道袍虎精
+  // 携法宝、狮猁青狮坐骑、红孩儿幼童妖王、鼍龙龙种鳞甲、虎力道袍虎精、
+  // 鹿力白鹿角甲、羊力羚羊精
   'huangpao_guai': 75,
   'jinjiao_dawang': 80,
   'shili_guai': 85,
   'honghaier': 70,
   'tuolong': 95,
   'huli_daxian': 78,
+  'luli_daxian': 72,
+  'yangli_daxian': 70,
   // 通天河~毒敌山（中期 90~110）：灵感金鱼精鳞甲、独角兕金刚琢护体、
   // 蝎子毒尾轻甲、六耳与悟空同源灵巧
   'linggan_dawang': 92,

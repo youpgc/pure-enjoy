@@ -48,6 +48,7 @@ JourneyLevelModel _levelFromRow(
     'title': row['name'],
     'region_code': attr['region_code'],
     'level_kind': attr['level_kind'],
+    'boss_code': attr['boss_code'],
     'boss_fights': attr['boss_fights'],
     'first_clear_merit': attr['first_clear_merit'],
     'duration_target_sec': attr['duration_target_sec'],

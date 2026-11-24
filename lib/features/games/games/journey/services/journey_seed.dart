@@ -283,8 +283,8 @@ const List<Map<String, dynamic>> kJourneyMonsterSeed = <Map<String, dynamic>>[
   // 原著精英妖将
   {'code': 'yinjiao_dawang', 'name': '银角大王', 'ai_tier': 'elite', 'base_hp': 1800, 'base_speed': 60, 'contact_damage': 24, 'size_scale': 1.8, 'exp_drop': 90},
   {'code': 'hu_xianfeng', 'name': '虎先锋', 'ai_tier': 'elite', 'base_hp': 1500, 'base_speed': 66, 'contact_damage': 20, 'size_scale': 1.7, 'exp_drop': 80},
-  {'code': 'luli_daxian', 'name': '鹿力大仙', 'ai_tier': 'elite', 'base_hp': 2200, 'base_speed': 58, 'contact_damage': 26, 'size_scale': 1.8, 'exp_drop': 100},
-  {'code': 'yangli_daxian', 'name': '羊力大仙', 'ai_tier': 'elite', 'base_hp': 2400, 'base_speed': 60, 'contact_damage': 26, 'size_scale': 1.7, 'exp_drop': 105},
+  {'code': 'luli_daxian', 'ability_key': 'deer_belly', 'name': '鹿力大仙', 'ai_tier': 'boss', 'base_hp': 68000, 'base_speed': 58, 'contact_damage': 48, 'size_scale': 2.3, 'exp_drop': 520, 'merit_drop': 110},
+  {'code': 'yangli_daxian', 'ability_key': 'ram_oil', 'name': '羊力大仙', 'ai_tier': 'boss', 'base_hp': 70000, 'base_speed': 60, 'contact_damage': 49, 'size_scale': 2.3, 'exp_drop': 540, 'merit_drop': 115},
   {'code': 'youlai_qu', 'name': '有来有去', 'ai_tier': 'elite', 'base_hp': 3200, 'base_speed': 62, 'contact_damage': 28, 'size_scale': 1.4, 'exp_drop': 125},
   {'code': 'yumian_gongzhu', 'name': '玉面公主', 'ai_tier': 'elite', 'base_hp': 2600, 'base_speed': 64, 'contact_damage': 26, 'size_scale': 1.5, 'exp_drop': 110},
   {'code': 'benboer_ba', 'name': '奔波儿灞', 'ai_tier': 'elite', 'base_hp': 3000, 'base_speed': 56, 'contact_damage': 28, 'size_scale': 1.7, 'exp_drop': 120},

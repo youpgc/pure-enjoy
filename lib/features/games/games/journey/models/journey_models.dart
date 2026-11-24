@@ -50,6 +50,11 @@ class JourneyLevelModel {
   final String title;
   final String regionCode;
   final String kind;
+
+  /// 本关妖王编码（journey_levels.boss_code；NULL/空=沿用本段区域妖王）。
+  /// 车迟国三关借此各挂虎力/鹿力/羊力，实现原著三场斗法。
+  final String? bossCode;
+
   final int bossFights;
   final int durationTargetSec;
   final int suggestPower;
@@ -65,6 +70,7 @@ class JourneyLevelModel {
     required this.title,
     required this.regionCode,
     this.kind = 'battle',
+    this.bossCode,
     this.bossFights = 1,
     this.durationTargetSec = 600,
     this.suggestPower = 0,
@@ -81,6 +87,7 @@ class JourneyLevelModel {
       title: json['title'] as String? ?? json['name'] as String? ?? '',
       regionCode: json['region_code'] as String? ?? '',
       kind: json['level_kind'] as String? ?? 'battle',
+      bossCode: json['boss_code'] as String?,
       bossFights: (json['boss_fights'] as num?)?.toInt() ?? 1,
       durationTargetSec: (json['duration_target_sec'] as num?)?.toInt() ?? 600,
       suggestPower: (json['suggest_power'] as num?)?.toInt() ?? 0,
@@ -209,8 +216,12 @@ class JourneyMonsterModel {
   final int meritDrop;
 
   /// 妖王能力（西游记背景扩展；空=无特殊能力，后台怪物页签可配）：
-  /// unmovable/swift_wind/roc_speed/samadhi_fire/bone_split/gourd_pull/
-  /// iron_horn/spider_web/blood_frenzy/poison_mist
+  /// 原有：unmovable/swift_wind/roc_speed/samadhi_fire/bone_split/gourd_pull/
+  /// iron_horn/spider_web/blood_frenzy/poison_mist；
+  /// 新增：inner_core/fake_body/water_prison/five_thunder/ice_seal/mirror/
+  /// root_bind/golden_bag/devour/three_bells/spear_thrust/earth_trap/
+  /// plum_flower/nine_seize/ice_charge/moon_guard/tiger_pounce/black_wind/
+  /// deer_belly/ram_oil
   final String abilityKey;
 
   const JourneyMonsterModel({

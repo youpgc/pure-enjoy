@@ -29,11 +29,14 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
 
 /// 本关妖王编码：
 /// - 无尽/游历（虚拟关 kind=endless/daily）：无妖王模式，恒 null；
-/// - 远端区域行存在：boss_code 即定稿口径（NULL=原著无妖章回，无妖王战，
-///   引擎走「西行里程」口径）；
-/// - 区域行缺失/内置兜底快照：回落关卡号区间映射（保可玩，每关有妖王）。
+/// - 关卡级 boss_code（journey_levels.boss_code）优先：非空即本关妖王
+///   （车迟国三关借此各挂虎力/鹿力/羊力，空串=本关显式无妖王战）；
+/// - 关卡未配：取区域 boss_code（NULL=原著无妖章回，引擎走「西行里程」口径）；
+/// - 远端未就绪/内置兜底快照：回落关卡号区间映射（保可玩）。
 String? resolveBossCode(JourneyFlameGame game) {
   if (_isEndless(game) || _isDaily(game)) return null;
+  final levelBoss = game.level.bossCode;
+  if (levelBoss != null && levelBoss.isNotEmpty) return levelBoss;
   final region = game.config?.regionOf(game.level.regionCode);
   if (game.config?.fromSeed != true && region != null) {
     final configured = region.bossCode;
