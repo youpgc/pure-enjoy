@@ -257,6 +257,8 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
 /// 再在该类内均匀随机抽一张。候选被抽空（含槽满后该类无新卡）的类
 /// 权重剔除，不再参与后续轮盘——即「槽满不占权重」。类权重取后台 economy
 /// 组 choice_weight_*，缺省 1；全部退化为均匀随机。
+/// 武器维度槽类一次最多取 2 张，避免三选一被单一类别占满；仅剩该类时
+/// 为抽满仍保留。
 List<JourneyUpgradeChoice> _drawWeightedByCategory(
   List<JourneyUpgradeChoice> pool,
   int count,
@@ -282,12 +284,26 @@ List<JourneyUpgradeChoice> _drawWeightedByCategory(
     return game.battleNum('economy', key, 1);
   }
 
+  // 武器维度槽类一次三选一最多取 2 张，避免单一类别占满选项。
+  const maxSlotPerDraw = 2;
+
   while (picked.length < count && remaining.isNotEmpty) {
     // 候选被抽空的类不参与本轮（槽满/耗尽即权重剔除）。
-    final available = categories
+    var available = categories
         .where((c) => remaining.any((x) => x.category == c))
         .toList();
     if (available.isEmpty) break;
+
+    // 维度槽已达上限且有其它类候选时剔除该类；若仅剩维度槽则保留，
+    // 保证仍能抽满（例如图鉴未解锁导致其它类无候选）。
+    final slotPicked =
+        picked.where((x) => x.category == JourneyChoiceCategory.slot).length;
+    if (slotPicked >= maxSlotPerDraw) {
+      final others = available
+          .where((c) => c != JourneyChoiceCategory.slot)
+          .toList();
+      if (others.isNotEmpty) available = others;
+    }
 
     var total = 0.0;
     for (final c in available) {
