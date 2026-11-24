@@ -18,6 +18,7 @@ class JourneyHudOverlay extends StatelessWidget {
     required this.controller,
     required this.characterCode,
     this.onTopPanelTap,
+    this.onMinimapTap,
   });
 
   final JourneyBattleController controller;
@@ -27,6 +28,9 @@ class JourneyHudOverlay extends StatelessWidget {
 
   /// 顶部状态面板点按回调（对局页弹属性详情面板）。
   final VoidCallback? onTopPanelTap;
+
+  /// 小地图点按回调（对局页弹西行舆图大地图）。
+  final VoidCallback? onMinimapTap;
 
   // HUD 顶部几何：面板与小地图同高同顶边，槽栏、罗盘、面板右缘都由
   // 小地图边长推导，调整边长时不会漏改某个相对位置。
@@ -75,7 +79,10 @@ class JourneyHudOverlay extends StatelessWidget {
         Positioned(
           top: safeTop + _kTopInset,
           right: _kMinimapRight,
-          child: JourneyMinimapWindow(controller: controller),
+          child: JourneyMinimapWindow(
+            controller: controller,
+            onTap: onMinimapTap,
+          ),
         ),
         // 对局横幅（节点11）：开场难名/妖王降临/伏诛/里程碑各自成条、互不覆盖
         JourneyBattleBanner(controller: controller),

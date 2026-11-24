@@ -17,6 +17,7 @@ import '../battle/journey_battle_controller.dart';
 import '../battle/journey_battle_exit.dart';
 import '../battle/journey_battle_overlays.dart';
 import '../battle/journey_attributes_sheet.dart';
+import '../battle/journey_world_map_sheet.dart';
 import '../battle/journey_flame_game.dart';
 import '../battle/journey_sprites.dart';
 import '../battle/journey_levelup_sheet.dart';
@@ -145,6 +146,7 @@ class _JourneyBattleScreenState extends State<JourneyBattleScreen>
                   controller: _controller!,
                   characterCode: _characterCode,
                   onTopPanelTap: _showAttributes,
+                  onMinimapTap: _showWorldMap,
                 ),
               // 虚拟摇杆（下半屏任意触点按下；手势状态由组件自管）
               if (_controller != null)

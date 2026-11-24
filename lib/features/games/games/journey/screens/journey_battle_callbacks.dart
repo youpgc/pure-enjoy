@@ -180,6 +180,23 @@ extension _JourneyBattleCallbacks on _JourneyBattleScreenState {
     JourneyAttributesSheet.show(context, game: game);
   }
 
+  /// 西行舆图（大地图查看）：与属性面板同流程——先进入暂停态（引擎暂停、
+  /// 摇杆输入清空），抓一次全图快照后展示；关闭后仍保持暂停，由浮层
+  /// 「继续战斗」统一恢复。快照只读，弹窗不改引擎状态。
+  void _showWorldMap() {
+    final game = _game;
+    if (game == null || !mounted) return;
+    if (!_paused) {
+      _rebuild(() => _paused = true);
+      game.pauseEngine();
+      _controller?.input.reset();
+    }
+    JourneyWorldMapSheet.show(
+      context,
+      snapshot: JourneyWorldMapSnapshot.collect(game),
+    );
+  }
+
   void _onBossSpawn(String bossName) {
     // 妖王降临（节点11）：改用开场横幅位展示（引擎 respawn 前调用）
     _controller?.hud.banner.value = '妖王降临 · $bossName';

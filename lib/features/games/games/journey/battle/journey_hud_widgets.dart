@@ -132,39 +132,49 @@ class JourneyBossHpBarItem extends StatelessWidget {
   }
 }
 
-/// 小地图点阵窗（节点11）：右下角（摇杆区上方、暂停键避让位），
-/// 半径 66 半透明暗底金环；CustomPaint 直读 notifier 画怪点/妖王/
-/// 玩家朝向箭头，无 setState。
+/// 小地图点阵窗（节点11）：右上角；半透明暗底金环；CustomPaint 直读
+/// notifier 画怪点/妖王/玩家朝向箭头，无 setState。点击整窗打开大地图。
 class JourneyMinimapWindow extends StatelessWidget {
-  const JourneyMinimapWindow({super.key, required this.controller});
+  const JourneyMinimapWindow({
+    super.key,
+    required this.controller,
+    this.onTap,
+  });
 
   /// 点阵窗边长：左上状态面板高度与之共用，保证两块 HUD 板等高。
   static const double size = 132;
 
   final JourneyBattleController controller;
 
+  /// 点击小地图打开西行舆图（大地图查看弹窗）。
+  final VoidCallback? onTap;
+
   @override
   Widget build(BuildContext context) {
-    return ValueListenableBuilder<JourneyMinimapData?>(
-      valueListenable: controller.hud.minimap,
-      builder: (context, data, _) => SizedBox(
-        width: size,
-        height: size,
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: CustomPaint(painter: _MinimapPainter(data)),
-            ),
-            Center(
-              // 玩家标记：恒向上白箭头（input.vector 为普通字段非 notifier，
-              // 逐帧读取需轮询，口径取规格允许的恒向上）
-              child: Icon(
-                Icons.navigation,
-                size: 18,
-                color: Colors.white.withValues(alpha: 0.92),
+    return GestureDetector(
+      onTap: onTap,
+      behavior: HitTestBehavior.opaque,
+      child: ValueListenableBuilder<JourneyMinimapData?>(
+        valueListenable: controller.hud.minimap,
+        builder: (context, data, _) => SizedBox(
+          width: size,
+          height: size,
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: CustomPaint(painter: _MinimapPainter(data)),
               ),
-            ),
-          ],
+              Center(
+                // 玩家标记：恒向上白箭头（input.vector 为普通字段非 notifier，
+                // 逐帧读取需轮询，口径取规格允许的恒向上）
+                child: Icon(
+                  Icons.navigation,
+                  size: 18,
+                  color: Colors.white.withValues(alpha: 0.92),
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
