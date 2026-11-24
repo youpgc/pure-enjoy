@@ -68,7 +68,7 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'base_attack': 10,
     'armor': 30,
     'aura_name': '大圣威压',
-    'aura_desc': '击杀概率触发连击/短暂攻速提升',
+    'aura_desc': '击杀概率触发短暂转速提升',
     'aura_params': <String, double>{
       'kill_count': 30,
       'duration': 10,
@@ -101,7 +101,16 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'armor': 42,
     'aura_name': '坚韧',
     'aura_desc': '受击减伤/周期护盾',
-    'aura_params': <String, double>{'armor': 6},
+    // 光环参数均由 journey_character_aura_params 后台可配，此处仅兜底：
+    // hurt_reduce 受击减伤比例（与 ward 合流钳上限）、shield_per_level 每级
+    // 护盾点数、shield_max 单次授予点数上限、shield_period 护盾周期秒。
+    'aura_params': <String, double>{
+      'armor': 6,
+      'hurt_reduce': 0.1,
+      'shield_per_level': 5,
+      'shield_max': 200,
+      'shield_period': 10,
+    },
     'weapon_code': 'jiangyao_bangzhang',
     'unlock_level_no': 16,
     'unlock_merit_cost': 5000,
@@ -154,7 +163,8 @@ const List<Map<String, dynamic>> kJourneyCharacterSeed =
     'armor': 24,
     'aura_name': '兜率炉火',
     'aura_desc': '炼器炉火淬炼的重击',
-    'aura_params': <String, double>{'crit_damage': 0.2},
+    // crit_rate 基础暴击率（暴伤光环的收益前提，缺省 5%）、crit_damage 暴击伤害
+    'aura_params': <String, double>{'crit_damage': 0.2, 'crit_rate': 0.05},
     'weapon_code': 'sanmei_fire',
     'unlock_level_no': 41, // 问佛根源（老君收服独角兕）
     'unlock_merit_cost': 25000,

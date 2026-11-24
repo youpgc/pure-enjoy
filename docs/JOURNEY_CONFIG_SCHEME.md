@@ -11,7 +11,7 @@
 ### 0.1 伤害公式（先基础值，后百分比，加法合流）
 
 ```
-基础值 = 角色基础攻击(base_attack) + 等级攻击(+12/级) + 攻击卡(+50/次，累计≤500)
+基础值 = 角色基础攻击(base_attack) + 等级攻击(+12/级) + 攻击卡(+30/次，累计≤1200)
        + 法宝品阶伤害(weapon_levels[min(角色等级,8)]，缺行回落 base_damage)
 
 增伤Σ% = 攻击力%(锐金本源 +3%/层，≤8 层)                      ← 攻击力%桶 attackAmp
@@ -84,7 +84,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 ### 0.7 暴击
 
 ```
-暴击率：局外天赋(离火生息 +1.5%/层≤5 层) + 局内暴击槽，引擎钳 ≤ 60%
+暴击率：老君光环 +5%(基础) + 局外天赋(离火生息 +1.5%/层≤5 层) + 局内暴击槽，引擎钳 ≤ 60%
 暴击伤害：基准 150% + 天赋(锐金生息 +5%/层≤5 层) + 老君光环 +20% + 局内暴伤槽 +6%/级，钳 ≤ 200%
 ```
 
@@ -113,7 +113,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | exp_base / exp_per_lv | 12 / 7 | 升级经验 = 12 + lv×7 |
 | level_attack_per_lv | 12.00 | 每级攻击成长 |
 | level_hp_per_lv | 15.00 | 每级生命成长 |
-| upgrade_attack / attack_upgrade_cap | 50 / 500 | 攻击卡单次/累计上限（表未配置时兜底；正常由 journey_upgrade_cards 提供） |
+| upgrade_attack / attack_upgrade_cap | 30 / 1200 | 攻击卡单次/累计上限（表未配置时兜底；正常由 journey_upgrade_cards 提供） |
 | upgrade_hp / upgrade_regen / upgrade_pickup / upgrade_move | 20 / 1 / 18 / 0.09 | 三选一其余卡数值（同上，正常由 journey_upgrade_cards 提供） |
 | talent_drop_rate | 0.10 | 妖王伏诛掉天赋点概率 |
 | revive_merit_base | ⏳60 | 还魂价 = 基准 × 当前角色等级（pending⑧ 统一为 60；旧口径 ×关卡号） |
@@ -131,16 +131,16 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 | 角色 | base_hp | base_attack | armor（⏳新列） | 光环（当前引擎硬编码） | 解锁 | 功德价 |
 |---|---|---|---|---|---|---|
 | 唐僧 tang | 100 | 4 | 20 | 佛光：自动回复 +0.8/秒 | 初始 | 0 |
-| 悟空 wukong | 110 | 10 | 30 | 大圣威压：击杀概率触发转速爆发 | 8 关 | 5000 |
+| 悟空 wukong | 110 | 10 | 30 | 大圣威压：击杀概率触发短暂转速提升 | 8 关 | 5000 |
 | 八戒 bajie | 120 | 6 | 50（顶格重甲） | 贪食：拾取 +40、经验 ×1.15 | 12 关 | 5000 |
-| 沙僧 shaseng | 120 | 8 | 42（光环 +6 → 48） | 坚韧：护甲 +6 | 16 关 | 5000 |
+| 沙僧 shaseng | 120 | 8 | 42（光环 +6 → 48） | 坚韧：护甲 +6；受击减伤（与金刚合流钳上限）；周期护盾（单次点数=每级点数×角色等级，钳点数上限；护盾池上限=最大生命值） | 16 关 | 5000 |
 | 金角大王 jinjiao | 125 | 8 | 42（光环 +4 → 46） | 移山劲：护甲 +4；紫金葫芦击杀叠层 | 25 关 | 12000 |
 | 红孩儿 honghaier | 105 | 12 | 24 | 三昧真火：武器增伤 +8% | 31 关 | 12000 |
 | 哪吒 nezha | 115 | 9 | 34 | 莲花化身：经验 ×1.15；三头六臂 +40% 窗口 | 40 关 | 25000 |
-| 太上老君 laojun | 100 | 12 | 24 | 兜率炉火：暴伤 +20%；炉火灼烧 | 41 关 | 25000 |
+| 太上老君 laojun | 100 | 12 | 24 | 兜率炉火：基础暴击 +5%、暴伤 +20%；炉火灼烧 | 41 关 | 25000 |
 | 铁扇公主 tieshan | 110 | 5 | 26 | 罡风偃月：移速 ×1.08 | 49 关 | 50000 |
 
-> 光环数值已配置化：`journey_characters.aura_params` jsonb（⏳pending⑨ 建列+9 行初始值），引擎按角色消费键值（tang regen / wukong kill_count+duration / bajie pickup+exp_amp / shaseng·jinjiao armor / honghaier damage_amp / nezha exp_amp / laojun crit_damage / tieshan move_amp），键缺失回落内置兜底；Admin「角色」tab 编辑「光环参数(JSON)」。
+> 光环数值已配置化：`journey_character_aura_params`（一行一键，按 character_code 聚合成 aura_params 注入角色行），引擎按角色消费键值（tang regen / wukong kill_count+duration / bajie pickup+exp_amp / shaseng·jinjiao armor / honghaier damage_amp / nezha exp_amp / laojun crit_rate+crit_damage / tieshan move_amp），键缺失回落内置兜底；Admin「角色配置 → 光环参数」页签逐键编辑。老君 `crit_rate`（基础暴击率，兜底 5%）为暴伤光环的收益前提，与天赋暴击率叠合后钳 ≤60%。沙僧坚韧追加四键：`hurt_reduce`（受击减伤比例，与 ward 加法合流后钳 `ward_cap`）、`shield_per_level`（每级护盾点数，×角色等级）、`shield_max`（单次授予护盾点数上限，非护盾池上限）、`shield_period`（护盾周期秒）；单次点数=每级点数×角色等级后钳此上限，护盾池上限同通用护体槽为最大生命值；兜底 0.1 / 5 / 200 / 10，以后台录入为准。
 
 ## 3. 角色局内成长路径
 
@@ -148,14 +148,14 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 |---|---|---|
 | 每级攻击 | +12 | globals.level_attack_per_lv |
 | 每级生命 | +15 | globals.level_hp_per_lv |
-| 攻击卡 | +50/次，累计 ≤500 | 三选一 |
+| 攻击卡 | +30/次，累计 ≤1200 | 三选一 |
 | 生命卡 | +20/次 | 三选一 |
 | 回复卡 | +1/秒/次 | 三选一 |
 | 拾取卡 | +18/次 | 三选一 |
 | 移速卡 | +9%/次 | 三选一 |
 | 维度槽习得/升级卡 | 见 §5 | 三选一 |
 
-> 三选一五张基础值卡（攻击/生命/回复/拾取/移速）由 `journey_upgrade_cards` 表独立管理（后台「基础值成长卡」页签）：名称、每级数值、是否入池后台可配；展示文案由 App 按编码+数值生成，改数值即改文案。抽卡权重只在四类之间配置（economy 组 `choice_weight_*`），基础值类内均匀随机抽取。上表数值为表未配置时的内置兜底。`attack` 卡累计达 `attack_upgrade_cap` 后不再入池。
+> 三选一五张基础值卡（攻击/生命/回复/拾取/移速）由 `journey_upgrade_cards` 表独立管理（后台「基础值成长卡」页签）：名称、每级数值、是否入池后台可配；展示文案由 App 按编码+数值生成，改数值即改文案。抽卡权重只在四类之间配置（economy 组 `choice_weight_*`），基础值类内均匀随机抽取。上表数值为当前远端生效值；表未配置时 App 回落内置兜底。`attack` 卡累计达 `attack_upgrade_cap` 后不再入池。
 
 ---
 
@@ -228,7 +228,7 @@ mult = 1 + 对局分钟 × 0.30(时间斜率) + 关卡难度 × 0.04，钳 ≤ 6
 |---|---|---|---|
 | 筋斗云 jindou_cloud | move | +12%/份 | 移速 |
 | 蟠桃 pantao | hp_ratio / regen | +20%/份 · 随生命成长 / +0.5/秒 每/份 | 生命上限+回复（按当前上限加成并登记比例，后续固定额成长同比放大、百分比成长自然复利，加成随角色成长持续提升；hp_ratio 缺行回落 0.2；旧 hp 固定值键已停用） |
-| 人参果 renshen_guo | exp | +25%/份 | 经验获取 |
+| 人参果 renshen_guo | exp | +50%/份 | 经验获取 |
 | 避水珠 bishui_pearl | spin | +15%/份 | 环绕转速 |
 | 定风丹 dingfeng_pearl | radius | +18/份 | 全环半径 |
 | 舍利子 shelizi | damage | +15%/份 | 武器增伤 |

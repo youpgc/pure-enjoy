@@ -24,6 +24,10 @@ mixin JourneyAbilityStateMixin {
   double _fumoTimer = 0;
   bool _fumoCharged = false;
 
+  /// 坚韧光环·周期护盾（shaseng）：与通用护体槽 shieldTick 独立计时，
+  /// 避免两路补盾互相重置；周期/每级点数/上限取角色光环参数。
+  double _shasengShieldTick = 0;
+
   /// 西游扩展批·特殊能力（扩展角色加强点点亮后生效）：
   /// 三头六臂（nezha）触发计时与增益窗口 / 兜率炉火（laojun）触发
   /// 计时与加持窗口 / 芭蕉罡风（tieshan）触发计时 / 紫金宝葫

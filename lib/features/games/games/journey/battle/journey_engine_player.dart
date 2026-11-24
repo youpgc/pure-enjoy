@@ -442,15 +442,19 @@ class JourneyPlayerComponent extends PositionComponent {
     if (hp <= 0) return;
     // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
     if (invulnTimer > 0) return;
-    // 金刚不坏（ward 维度）：最终减伤区，乘算在来源减伤之后
+    // 最终减伤区（乘算在护甲减伤之后）：金刚不坏（ward 维度）与坚韧光环
+    // （沙僧）加法合流后统一钳 ward_cap，避免两路独立乘算叠加破上限。
     final wardLv = game.slotLevel('ward');
-    if (wardLv > 0) {
-      final wardRed = (game.slotValue('ward', 0.04) * wardLv).clamp(
-        0.0,
-        game.battleNum('weapon', 'ward_cap', 0.5),
-      );
-      amount *= 1 - wardRed;
-    }
+    final wardRed =
+        wardLv > 0 ? game.slotValue('ward', 0.04) * wardLv : 0.0;
+    final auraReduce = game.character.code == 'shaseng'
+        ? game.character.auraNum('hurt_reduce', 0.1)
+        : 0.0;
+    final totalReduce = (wardRed + auraReduce).clamp(
+      0.0,
+      game.battleNum('weapon', 'ward_cap', 0.5),
+    );
+    if (totalReduce > 0) amount *= 1 - totalReduce;
     // 护体金光（shield 维度）：护盾先抵扣，余量再进扣血
     if (shield > 0) {
       final absorbed = math.min(shield, amount);

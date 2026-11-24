@@ -202,6 +202,34 @@ extension JourneyNewSlotTick on JourneyFlameGame {
       }
     }
 
+    // 坚韧光环（shaseng）：周期授予护盾，单次点数 = 每级点数 × 角色等级，
+    // 并钳点数上限；护盾池上限与通用护体槽一致为最大生命值。与通用护体槽
+    // 共用 player.shield 池但独立计时，避免互相重置。
+    // 满盾不空转、消耗后下一周期补，周期/每级点数/点数上限均走光环参数。
+    if (character.code == 'shaseng') {
+      final period = character.auraNum('shield_period', 10);
+      if (period > 0) {
+        if (_shasengShieldTick < period) {
+          _shasengShieldTick = math.min(period, _shasengShieldTick + dt);
+        }
+        final pointCap = character.auraNum('shield_max', 200);
+        if (_shasengShieldTick >= period && p.shield < p.maxHp) {
+          _shasengShieldTick = 0;
+          final add = math.min(
+            pointCap,
+            character.auraNum('shield_per_level', 5) * _charLv,
+          );
+          p.shield = math.min(p.maxHp, p.shield + add);
+          controller.hud.shield.value = p.shield;
+          spawnFloatText(
+            p.position + Vector2(0, -36),
+            '坚韧·护盾',
+            const Color(0xFFE8C470),
+          );
+        }
+      }
+    }
+
     // 缚灵（slow）：每帧对臂展圆内怪物刷新减速；离开范围由怪物侧计时自然到期
     final slowLv = slotLevel('slow');
     if (slowLv > 0) {

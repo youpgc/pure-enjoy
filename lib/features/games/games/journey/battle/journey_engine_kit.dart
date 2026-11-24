@@ -219,8 +219,8 @@ extension JourneyKit on JourneyFlameGame {
   /// 与天赋/光环/局内护甲槽累加），再叠加光环差异化效果。
   void _applyCharacterKit() {
     player.armor += character.armor;
-    // 数值取角色光环参数（journey_characters.aura_params jsonb，后台可配），
-    // 键缺失回落内置兜底；键语义见 journey_models.JourneyCharacterModel 注释。
+    // 数值取角色光环参数（journey_character_aura_params 一行一键，按角色
+    // 聚合注入，后台可配），键缺失回落内置兜底；键语义见角色模型注释。
     switch (character.code) {
       case 'tang': // 佛光：周期回血
         player.regen += character.auraNum('regen', 0.8);
@@ -244,7 +244,10 @@ extension JourneyKit on JourneyFlameGame {
       case 'tieshan': // 罡风偃月：移速加成（控场走位）
         moveSpeedAmp *= 1 + character.auraNum('move_amp', 0.08);
         break;
-      case 'laojun': // 兜率炉火：暴击伤害加成（炉火淬炼）
+      case 'laojun': // 兜率炉火：基础暴击率 + 暴击伤害加成（炉火淬炼）
+        // 基础暴击率为暴伤光环的收益前提，与天赋暴击率增量叠合后在
+        // _applyLoadout 统一钳 ≤0.60；暴击伤害钳 [1.0, 2.0]。
+        critRate += character.auraNum('crit_rate', 0.05);
         critDamage =
             (critDamage + character.auraNum('crit_damage', 0.2)).clamp(1.0, 2.0);
         break;
