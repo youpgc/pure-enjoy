@@ -1,8 +1,11 @@
 part of 'journey_flame_game.dart';
 
 /// 经验与升级（extension，同 library 访问宿主私有成员）：
-/// - 角色等级上限 = journey_globals.char_level_cap（后台可调，缺省 99；
-///   槽位等级与角色等级独立，不受此上限影响）；
+/// - 角色等级上限 = journey_globals.char_level_cap（后台可调，缺省值仅作
+///   兜底，不写死在逻辑里；槽位等级与角色等级独立，不受此上限影响）；
+///   升到上限这一级时经验归零、分母改显 max（如 0/max），此后额外经验
+///   继续入账并封顶数值上限（如 99999/max），经验条保持充满不显示进度；
+///   上限提高时可直接退出累计态恢复常规曲线（预留等级上限突破）；
 /// - 两段式经验条动画：升级瞬间先充满（旧值→expNeed 动画到满），
 ///   归零后（HUD 按 expReset 重建进度条，直接落位无反向 tween）再增长；
 /// - 连升时逐级排队「充满→归零」，全部播完一次同步真实等级/需求/经验；
@@ -48,7 +51,7 @@ extension JourneyExp on JourneyFlameGame {
     // （默认 12+28×lv^1.75）。产出侧普通/精英/妖王三类怪的经验共享
     // 波次成长乘区（exp_wave_gain）、妖王另走独立基准，整池随波扩张；
     // 需求取同阶幂次：波 17 约 17 级、第 81 波满级，末段波次预留纯挑战
-    // （满级后经验不再累计）。
+    // （满级后经验转为 0/max 累计展示，不再升级）。
     if (level.kind == 'endless') {
       return ((config?.endlessExpBase ?? kJourneyEndlessExpBase) +
               (config?.endlessExpPerLv ?? kJourneyEndlessExpPerLv) *
@@ -62,9 +65,33 @@ extension JourneyExp on JourneyFlameGame {
     return (config?.expBase ?? 12) + (config?.expPerLv ?? 7) * math.pow(lv, pow);
   }
 
+  /// 进入满级累计态：满级瞬间经验归零、分母切 max（如 0/max），
+  /// 此后经验从 0 起累计额外收益。_expNeed 保留为本级需求不覆写，
+  /// 便于上限突破时无损退出。
+  void _enterPostMaxAccumulation() {
+    if (_postMaxExpAccumulating) return;
+    _postMaxExpAccumulating = true;
+    _exp = 0;
+  }
+
+  /// 退出满级累计态（预留等级上限突破）：累计经验按当前等级需求折算为
+  /// 本级进度，避免下一笔经验因累计值远大于本级需求而一次性连升多级、
+  /// 属性与境界瞬间跳变；整级部分不计入，等级提升交由突破逻辑另行结算。
+  void _exitPostMaxAccumulation() {
+    _postMaxExpAccumulating = false;
+    controller.hud.expMaxed.value = false;
+    if (_expNeed > 0) _exp %= _expNeed;
+  }
+
   /// 经验入账与升级结算（loot part 拾取香火调用）。
+  /// 满级后不再升级，经验继续入账并封顶数值上限，HUD 分母显示 max，
+  /// 展示「当前经验/max」，经验条保持充满。
   void gainExp(double amount) {
-    if (_charLv >= _charLevelCap) return; // 满级：经验停止累计
+    // 上限提高时先退出累计态（预留突破逻辑）：必须在入账与升级循环之前，
+    // 否则累计大值会被 while 一次连升多级。折算为本级进度后再走常规结算。
+    if (_postMaxExpAccumulating && _charLv < _charLevelCap) {
+      _exitPostMaxAccumulation();
+    }
     _exp += amount * expAmp;
     while (_exp >= _expNeed && _charLv < _charLevelCap) {
       _exp -= _expNeed;
@@ -82,12 +109,19 @@ extension JourneyExp on JourneyFlameGame {
       _checkRealmBreakthrough(); // 境界突破：档位边界增伤/生命增幅
       _expNeed = _expNeedFor(_charLv);
       _pendingLevelUps++;
-      // 升到上限的一级不排「充满→归零」段：满级后经验条直接落满格恒满
-      if (_charLv < _charLevelCap) _expFillPending++;
+      // 满级那级也排「充满→归零」：先把本级经验充满（如 6907/6907），
+      // 再在归零步切到 0/max 累计展示，衔接满级瞬间的经验清零。
+      _expFillPending++;
       _refreshWeaponGrade(); // 法宝分级：品阶随角色等级提升
     }
+    // 刚满级：本级满格走完充满段后归零，再切 0/max 累计展示；
+    // 上限可后台调，逻辑只比对 _charLv 与 _charLevelCap，不写死具体等级。
     if (_charLv >= _charLevelCap) {
-      _exp = _expNeed; // 顶格封条：满级后经验条冲满恒满，不再升级
+      _enterPostMaxAccumulation();
+    }
+    if (_postMaxExpAccumulating) {
+      // 满级后经验继续入账并封顶数值上限（不再触发升级或选卡）。
+      _exp = math.min(_exp, kJourneyPostMaxLevelExpCap);
     }
     if (_expFillPending > 0) {
       // 两段式动画进行中：真实值只在引擎侧累积，HUD 由定时器驱动
@@ -101,6 +135,7 @@ extension JourneyExp on JourneyFlameGame {
       controller.hud.realmTitle.value = realmTitle;
       controller.hud.expNeed.value = _expNeed;
       controller.hud.exp.value = _exp;
+      controller.hud.expMaxed.value = _postMaxExpAccumulating;
     }
     if (_pendingLevelUps > 0 && !_pausedByLevelUp) {
       // 真暂停：选卡期间世界完全静止（怪物不逼近、节拍不走）
@@ -124,10 +159,12 @@ extension JourneyExp on JourneyFlameGame {
       });
       return;
     }
+    // 归零完成：此时才把分母切 max，开始「当前累计/max」展示。
     controller.hud.level.value = _charLv;
     controller.hud.realmTitle.value = realmTitle;
     controller.hud.expNeed.value = _expNeed;
     controller.hud.exp.value = _exp;
+    controller.hud.expMaxed.value = _postMaxExpAccumulating;
   }
 
   void _scheduleExpFillReset() {

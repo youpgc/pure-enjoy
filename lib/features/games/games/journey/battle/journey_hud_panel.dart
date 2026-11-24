@@ -150,11 +150,14 @@ class JourneyHudPanel extends StatelessWidget {
               valueListenable: hud.exp,
               builder: (context, exp, _) => ValueListenableBuilder<double>(
                 valueListenable: hud.expNeed,
-                builder: (context, need, _) => _bar(
-                  need > 0 ? exp / need : 0,
-                  const Color(0xFFA37FE0),
-                  '✨ ${exp.round()}/${need.round()}',
-                  animKey: ValueKey<int>(reset),
+                builder: (context, need, _) => ValueListenableBuilder<bool>(
+                  valueListenable: hud.expMaxed,
+                  builder: (context, maxed, _) => _bar(
+                    maxed ? 1.0 : (need > 0 ? exp / need : 0),
+                    const Color(0xFFA37FE0),
+                    '✨ ${exp.round()}/${maxed ? 'max' : need.round()}',
+                    animKey: ValueKey<int>(reset),
+                  ),
                 ),
               ),
             ),

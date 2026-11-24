@@ -136,6 +136,10 @@ class JourneyBattleHud {
   final ValueNotifier<double> healBlockRemain = ValueNotifier<double>(0);
   final ValueNotifier<double> exp = ValueNotifier<double>(0);
   final ValueNotifier<double> expNeed = ValueNotifier<double>(12);
+  /// 满级累计展示态：满级瞬间经验归零，此后经验继续入账并封顶数值上限，
+  /// HUD 分母改显文字 max、分子展示累计值，经验条保持充满；
+  /// expNeed 仍保留本级需求，供上限突破时退出累计态恢复常规曲线。
+  final ValueNotifier<bool> expMaxed = ValueNotifier<bool>(false);
   final ValueNotifier<int> level = ValueNotifier<int>(1);
 
   /// 当前境界名号（随境界突破切换，引擎同步；顶部状态面板首行展示）。

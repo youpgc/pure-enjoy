@@ -131,6 +131,11 @@ class JourneyFlameGame extends FlameGame
   // ---- 运行状态 ----
   double _elapsed = 0, _exp = 0, _expNeed = 12;
 
+  /// 满级经验累计标记：满级瞬间经验归零、分母改显 max，此后额外经验
+  /// 继续入账并封顶数值上限，不再升级。等级上限提高时该态可退出，
+  /// 经验回到常规需求曲线（预留给等级上限突破等扩展）。
+  bool _postMaxExpAccumulating = false;
+
   /// 妖王首次降临倒计时（秒）：0 = 本关无据点妖王或妖王已降临。
   double _bossSpawnCountdown = 0;
 

@@ -139,6 +139,10 @@ const double kJourneyExpWaveGain = 0.02;
 /// 「等级低→只能选低血妖王→经验低→升不动」的负反馈。
 const double kJourneyEndlessBossExpBase = 200;
 
+/// 满级后经验累计数值上限：达到角色等级上限后不再升级，经验继续入账，
+/// 封顶此值；HUD 分母固定显示文字 max，展示「当前经验/max」，条保持充满。
+const double kJourneyPostMaxLevelExpCap = 99999;
+
 /// 妖潮妖王血量每波额外增幅（journey_globals.endless_boss_hp_amp 可覆盖）：
 /// 妖潮妖王血量乘区与经验/速度/接触伤害共用乘区解耦，独立走
 /// hpBuffMult = 波次 buff ×(1+(波号−起点)×K)，且不吃玩家等级项——
