@@ -176,24 +176,25 @@ class JourneyPlayerComponent extends PositionComponent {
       healBlockTimer -= dt;
     }
 
-    // 金身佛光（tang 特殊能力）：按参数周期回复最大生命比例（禁疗期间失效）
+    // 金身佛光（tang 特殊能力）：周期回复最大生命比例（禁疗期间失效）。
+    // 计时到周期即停住，满血不空转；一旦缺血立即回血并重新计时。
     if (game.hasAbility('tang') && healBlockTimer <= 0) {
-      game._jinshenTimer += dt;
-      if (game._jinshenTimer >=
-          game.battleNum('ability', 'tang_heal_period_sec', 10)) {
+      final period = game.battleNum('ability', 'tang_heal_period_sec', 10);
+      if (game._jinshenTimer < period) {
+        game._jinshenTimer = math.min(period, game._jinshenTimer + dt);
+      }
+      if (game._jinshenTimer >= period && hp < maxHp) {
         game._jinshenTimer = 0;
-        if (hp < maxHp) {
-          final amount = maxHp *
-              game.battleNum('ability', 'tang_heal_ratio', 0.08);
-          hp = (hp + amount).clamp(0.0, maxHp);
-          game.onPlayerHpChanged();
-          game.spawnFloatText(
-            position + Vector2(0, -36),
-            '金身佛光 +${amount.round()}',
-            const Color(0xFFF6E3B4),
-          );
-          // GameAudio.instance.journeyAura();
-        }
+        final amount =
+            maxHp * game.battleNum('ability', 'tang_heal_ratio', 0.08);
+        hp = (hp + amount).clamp(0.0, maxHp);
+        game.onPlayerHpChanged();
+        game.spawnFloatText(
+          position + Vector2(0, -36),
+          '金身佛光 +${amount.round()}',
+          const Color(0xFFF6E3B4),
+        );
+        // GameAudio.instance.journeyAura();
       }
     }
 
@@ -202,23 +203,24 @@ class JourneyPlayerComponent extends PositionComponent {
       invulnTimer -= dt;
     }
 
-    // 玉净瓶甘露（扩展被动）：每 period 秒自动回复 heal 比例生命
-    // （params.period/params.heal；禁疗期间失效）
+    // 玉净瓶甘露（扩展被动）：周期回复 heal 比例生命（params.period/params.heal；
+    // 禁疗期间失效）。计时到周期即停住，满血不空转；一旦缺血立即回血并重新计时。
     if (game.passiveSlotCodes.contains('yujing_ping') &&
         healBlockTimer <= 0) {
-      _ganluTimer += dt;
-      if (_ganluTimer >= game.weaponParam('yujing_ping', 'period', 20)) {
+      final period = game.weaponParam('yujing_ping', 'period', 20);
+      if (_ganluTimer < period) {
+        _ganluTimer = math.min(period, _ganluTimer + dt);
+      }
+      if (_ganluTimer >= period && hp < maxHp) {
         _ganluTimer = 0;
-        if (hp < maxHp) {
-          final amount = maxHp * game.weaponParam('yujing_ping', 'heal', 0.20);
-          hp = (hp + amount).clamp(0.0, maxHp);
-          game.onPlayerHpChanged();
-          game.spawnFloatText(
-            position + Vector2(0, -36),
-            '甘露 +${amount.round()}',
-            const Color(0xFF9AD5C3),
-          );
-        }
+        final amount = maxHp * game.weaponParam('yujing_ping', 'heal', 0.20);
+        hp = (hp + amount).clamp(0.0, maxHp);
+        game.onPlayerHpChanged();
+        game.spawnFloatText(
+          position + Vector2(0, -36),
+          '甘露 +${amount.round()}',
+          const Color(0xFF9AD5C3),
+        );
       }
     }
 

@@ -52,30 +52,36 @@ extension JourneyAbilityTick on JourneyFlameGame {
       }
     }
 
-    // 芭蕉罡风（tieshan）：每周期扇出罡风，武器臂长内妖物按参数击退并定身
+    // 芭蕉罡风（tieshan）：周期扇出罡风，臂长内妖物按参数击退并定身。
+    // 计时到周期即停住，范围内无妖物不空转；有目标时立即触发并重新计时。
     if (hasAbility('tieshan')) {
-      _tieshanTimer += dt;
-      if (_tieshanTimer >= battleNum('ability', 'tieshan_period_sec', 30)) {
-        _tieshanTimer = 0;
+      final period = battleNum('ability', 'tieshan_period_sec', 30);
+      if (_tieshanTimer < period) {
+        _tieshanTimer = math.min(period, _tieshanTimer + dt);
+      }
+      if (_tieshanTimer >= period) {
         final arm = weaponArm;
         final reach = arm?.outerRadius ?? 0.0;
-        final push = battleNum('ability', 'tieshan_knockback', 240);
-        final root = battleNum('ability', 'tieshan_root_sec', 1);
-        for (final m in monsters) {
-          if (m.isDead) continue;
-          final away = m.position - player.position;
-          if (away.length > reach) continue;
-          if (away.length > 1) {
-            m.applyKnockback(away, push);
+        final inRange = monsters.where((m) => !m.isDead &&
+            (m.position - player.position).length <= reach).toList();
+        if (inRange.isNotEmpty) {
+          _tieshanTimer = 0;
+          final push = battleNum('ability', 'tieshan_knockback', 240);
+          final root = battleNum('ability', 'tieshan_root_sec', 1);
+          for (final m in inRange) {
+            final away = m.position - player.position;
+            if (away.length > 1) {
+              m.applyKnockback(away, push);
+            }
+            m.rootTimer = root;
           }
-          m.rootTimer = root;
+          fxLayer.spawnRing(player.position, reach);
+          spawnFloatText(
+            player.position + Vector2(0, -36),
+            '芭蕉罡风',
+            const Color(0xFF9AD5C3),
+          );
         }
-        fxLayer.spawnRing(player.position, reach);
-        spawnFloatText(
-          player.position + Vector2(0, -36),
-          '芭蕉罡风',
-          const Color(0xFF9AD5C3),
-        );
       }
     }
 
@@ -148,36 +154,42 @@ extension JourneyNewSlotTick on JourneyFlameGame {
   void tickNewSlots(double dt) {
     final p = player;
 
-    // 回元（recovery）：周期按已损失生命比例回血，走 heal（含禁疗拦截）
+    // 回元（recovery）：周期按已损失生命比例回血，走 heal（含禁疗拦截）。
+    // 计时到周期即停住，满血/禁疗不空转；一旦缺血立即回血并重新计时。
     final recLv = slotLevel('recovery');
     if (recLv > 0) {
-      p.recoveryTick += dt;
-      final period = slotPeriod('recovery', battleNum('weapon', 'recovery_period', 4));
-      if (p.recoveryTick >= period) {
+      final period =
+          slotPeriod('recovery', battleNum('weapon', 'recovery_period', 4));
+      if (p.recoveryTick < period) {
+        p.recoveryTick = math.min(period, p.recoveryTick + dt);
+      }
+      final missing = p.maxHp - p.hp;
+      if (p.recoveryTick >= period && missing > 0 && p.healBlockTimer <= 0) {
         p.recoveryTick = 0;
-        final missing = p.maxHp - p.hp;
-        if (missing > 0) {
-          final ratio = (slotValue('recovery', 0.05) * recLv).clamp(
-            0.0,
-            battleNum('weapon', 'recovery_cap', 0.5),
-          );
-          p.heal(missing * ratio);
-          spawnFloatText(
-            p.position + Vector2(0, -36),
-            '回元',
-            const Color(0xFF8FD98A),
-          );
-        }
+        final ratio = (slotValue('recovery', 0.05) * recLv).clamp(
+          0.0,
+          battleNum('weapon', 'recovery_cap', 0.5),
+        );
+        p.heal(missing * ratio);
+        spawnFloatText(
+          p.position + Vector2(0, -36),
+          '回元',
+          const Color(0xFF8FD98A),
+        );
       }
     }
 
     // 护体金光（shield）：周期按固定护盾点数授予（每级数值×等级），
-    // 与最大生命无关；护盾总量上限为最大生命值，达到上限不再增长。
+    // 与最大生命无关；护盾总量上限为最大生命值。计时到周期即停住，
+    // 满盾不空转；护盾被消耗后立即补盾并重新计时。
     final shieldLv = slotLevel('shield');
     if (shieldLv > 0) {
-      p.shieldTick += dt;
-      final period = slotPeriod('shield', battleNum('weapon', 'shield_period', 4));
-      if (p.shieldTick >= period) {
+      final period =
+          slotPeriod('shield', battleNum('weapon', 'shield_period', 4));
+      if (p.shieldTick < period) {
+        p.shieldTick = math.min(period, p.shieldTick + dt);
+      }
+      if (p.shieldTick >= period && p.shield < p.maxHp) {
         p.shieldTick = 0;
         final add = slotValue('shield', 20) * shieldLv;
         p.shield = math.min(p.maxHp, p.shield + add);
@@ -211,26 +223,29 @@ extension JourneyNewSlotTick on JourneyFlameGame {
     }
 
     // 聚妖幡（juyao_fan）：周期吸引范围内非妖王妖物主动接战；
-    // 周期/范围/锁定秒数走法宝参数（period/range/seconds）。
+    // 周期/范围/锁定秒数走法宝参数（period/range/seconds）。计时到周期
+    // 即停住，无可引目标不空转；有目标时立即触发并重新计时。
     if (effectWeapons.contains('juyao_fan')) {
-      p.huntTick += dt;
       final period = weaponParam('juyao_fan', 'period', 15.0);
+      if (p.huntTick < period) {
+        p.huntTick = math.min(period, p.huntTick + dt);
+      }
       if (p.huntTick >= period) {
-        p.huntTick = 0;
         final reach = weaponParam('juyao_fan', 'range', 900.0);
         final hold = weaponParam('juyao_fan', 'seconds', 12.0);
-        var lured = 0;
-        for (final m in monsters) {
-          if (m.isDead || m.model.isBoss) continue; // 妖王不受寻猎
-          if ((m.position - p.position).length > reach) continue;
-          m.lureTimer = hold;
-          lured++;
-        }
-        if (lured > 0) {
+        final candidates = monsters.where((m) =>
+            !m.isDead &&
+            !m.model.isBoss &&
+            (m.position - p.position).length <= reach).toList();
+        if (candidates.isNotEmpty) {
+          p.huntTick = 0;
+          for (final m in candidates) {
+            m.lureTimer = hold;
+          }
           fxLayer.spawnRing(p.position, reach);
           spawnFloatText(
             p.position + Vector2(0, -36),
-            '聚妖幡·$lured 妖',
+            '聚妖幡·${candidates.length} 妖',
             const Color(0xFFD98A8A),
           );
         }
@@ -240,10 +255,11 @@ extension JourneyNewSlotTick on JourneyFlameGame {
     // 风火轮（灼烧扩散）：周期点燃最近妖物作火种；火种按扩散周期把灼烧
     // 传给邻近未点燃妖物，逐代衰减、代际到上限后停止，灼烧到期归位可复燃。
     if (effectWeapons.contains('fenghuo_lun')) {
-      p.fenghuoTick += dt;
       final period = weaponParam('fenghuo_lun', 'period', 10.0);
+      if (p.fenghuoTick < period) {
+        p.fenghuoTick = math.min(period, p.fenghuoTick + dt);
+      }
       if (p.fenghuoTick >= period) {
-        p.fenghuoTick = 0;
         final reach = weaponArm?.outerRadius ?? 0.0;
         JourneyMonsterComponent? seed;
         var best = double.maxFinite;
@@ -255,6 +271,7 @@ extension JourneyNewSlotTick on JourneyFlameGame {
           seed = m;
         }
         if (seed != null) {
+          p.fenghuoTick = 0;
           final burn = weaponParam('fenghuo_lun', 'burn', 0.5) *
               (weaponArm?.damage ?? 10);
           seed.igniteFenghuo(

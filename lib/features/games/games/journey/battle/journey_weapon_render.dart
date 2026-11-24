@@ -160,44 +160,41 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
     }
 
     if (hasZhuo) {
-      _zhuoTimer += dt;
-      if (_zhuoTimer >= weaponParam('jinggang_zhuo', 'period', 12)) {
-        final target = nearest;
-        if (target != null && !target.isDead) {
-          _zhuoTimer = 0;
-          target.takeDamage(
-            hitDamageBase *
-                weaponParam('jinggang_zhuo', 'damage', 2.5),
-          );
-          target.weakenTimer = weaponParam('jinggang_zhuo', 'weak', 5);
-          fxLayer.spawnRing(target.position, 26);
-          spawnFloatText(
-            target.position + Vector2(0, -target.radius - 14),
-            '金刚琢！',
-            const Color(0xFFE8C470),
-          );
-        } else {
-          _zhuoTimer = weaponParam('jinggang_zhuo', 'period', 12) - 1;
-        }
+      final period = weaponParam('jinggang_zhuo', 'period', 12);
+      if (_zhuoTimer < period) {
+        _zhuoTimer = math.min(period, _zhuoTimer + dt);
+      }
+      final target = nearest;
+      if (_zhuoTimer >= period && target != null && !target.isDead) {
+        _zhuoTimer = 0;
+        target.takeDamage(
+          hitDamageBase * weaponParam('jinggang_zhuo', 'damage', 2.5),
+        );
+        target.weakenTimer = weaponParam('jinggang_zhuo', 'weak', 5);
+        fxLayer.spawnRing(target.position, 26);
+        spawnFloatText(
+          target.position + Vector2(0, -target.radius - 14),
+          '金刚琢！',
+          const Color(0xFFE8C470),
+        );
       }
     }
 
     if (hasPing) {
-      _pingTimer += dt;
-      if (_pingTimer >= weaponParam('yinyang_ping', 'period', 18)) {
-        final target = nearest;
-        if (target != null && !target.isDead) {
-          _pingTimer = 0;
-          target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
-          fxLayer.spawnRing(target.position, 30);
-          spawnFloatText(
-            target.position + Vector2(0, -target.radius - 14),
-            '入瓶！',
-            const Color(0xFF9AD5C3),
-          );
-        } else {
-          _pingTimer = weaponParam('yinyang_ping', 'period', 18) - 1;
-        }
+      final period = weaponParam('yinyang_ping', 'period', 18);
+      if (_pingTimer < period) {
+        _pingTimer = math.min(period, _pingTimer + dt);
+      }
+      final target = nearest;
+      if (_pingTimer >= period && target != null && !target.isDead) {
+        _pingTimer = 0;
+        target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
+        fxLayer.spawnRing(target.position, 30);
+        spawnFloatText(
+          target.position + Vector2(0, -target.radius - 14),
+          '入瓶！',
+          const Color(0xFF9AD5C3),
+        );
       }
     }
   }
