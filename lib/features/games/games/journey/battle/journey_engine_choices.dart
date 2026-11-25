@@ -164,18 +164,22 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
   // 被动加持卡：扩展批功德解锁的三件仅在图鉴解锁后入池（不免费掉落）
   if (game.passiveSlotCodes.length < 6) {
     final unlocked = JourneyProgressService.instance.state.unlockedWeapons;
-    for (final p in kJourneyPassiveEffects.entries) {
+    for (final p in kJourneyPassiveNames.entries) {
       if (game.passiveSlotCodes.contains(p.key)) continue;
       if (kJourneyMeritPassives.contains(p.key) &&
           !unlocked.contains(p.key)) {
         continue;
       }
-      pool.add(_passiveGrantChoice(p.key, p.value.$1, p.value.$2));
+      pool.add(_passiveGrantChoice(
+        p.key,
+        p.value,
+        journeyPassiveEffectDesc(p.key, game.weaponParam),
+      ));
     }
   }
 
   // 特效触发法宝卡（§6）：入池=已解锁且未持有（持有后不重复出现）
-  for (final e in kJourneyEffectWeapons.entries) {
+  for (final e in kJourneyEffectWeaponNames.entries) {
     final unlocked = JourneyProgressService.instance.state.unlockedWeapons;
     if (game.effectWeapons.contains(e.key) || !unlocked.contains(e.key)) {
       continue;
@@ -183,8 +187,8 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
     pool.add(JourneyUpgradeChoice(
       JourneyUpgradeKind.effectGrant,
       code: e.key,
-      title: '触发·${e.value.$1}',
-      desc: e.value.$2,
+      title: '触发·${e.value}',
+      desc: journeyEffectWeaponDesc(e.key, game.weaponParam),
       category: JourneyChoiceCategory.effect,
     ));
   }
@@ -368,25 +372,6 @@ Map<String, JourneySlotDefModel> _fallbackSlotDefs() {
   };
 }
 
-/// 被动加持效果文案（入槽即生效，效果实现见 _grantPassiveWeapon）；
-/// 描述一句话说清当前效果，不写括号补充/实现细节。
-const Map<String, (String, String)> kJourneyPassiveEffects =
-    <String, (String, String)>{
-  'jindou_cloud': ('筋斗云', '移速 +12%'),
-  'pantao': ('蟠桃', '生命上限 +20%，回复 +0.5/秒'),
-  'renshen_guo': ('人参果', '经验 +25%'),
-  'bishui_pearl': ('避水珠', '转速 +15%'),
-  'dingfeng_pearl': ('定风丹', '臂长 +18'),
-  'shelizi': ('舍利子', '伤害 +15%'),
-  // 西游扩展批（功德解锁，图鉴直购）
-  'sanheng_mao': ('三根毫毛', '免死一次，回 30% 生命'),
-  'yujing_ping': ('玉净瓶', '每 20 秒回 20% 生命'),
-  'huoyan_jingjing': ('火眼金睛', '精英/妖王受伤 +20%'),
-  'jinlan_kasha': ('锦襕袈裟', '护甲 +5'),
-  'feilong_staff': ('飞龙宝杖', '命中击退 +12'),
-  'bihuo_zhao': ('辟火罩', '火系伤害减免 15%'),
-};
-
 JourneyUpgradeChoice _passiveGrantChoice(
   String code,
   String name,
@@ -400,30 +385,3 @@ JourneyUpgradeChoice _passiveGrantChoice(
     category: JourneyChoiceCategory.passive,
   );
 }
-
-/// 特效触发法宝文案（§6）：入池=图鉴已解锁，触发结算见 _hitMonster /
-/// updateDamageTick；激活即入 game.effectWeapons。
-const Map<String, (String, String)> kJourneyEffectWeapons =
-    <String, (String, String)>{
-  'kunxian_rope': ('幌金绳', '12% 概率定身 1.5 秒'),
-  'fanshang_thorns': ('反伤荆棘', '受击反弹 30% 伤害'),
-  'baoji_thunder': ('暴击雷引', '暴击引闪电链，波及 2 妖'),
-  // 西游扩展批（功德解锁，图鉴直购）
-  'zijin_ling': ('紫金铃', '同目标命中 3 次引爆'),
-  'jinggang_zhuo': ('金刚琢', '每 12 秒套取并虚弱最近妖物'),
-  'yinyang_ping': ('阴阳二气瓶', '每 18 秒定身灼烧最近妖物'),
-  'huntian_ling': ('混天绫', '12% 概率把妖物拖拽近身'),
-  'fenghuo_lun': ('风火轮', '点燃妖物并向周围逐代扩散灼烧'),
-  'qixing_jian': ('七星剑', '暴击对精英妖王追加真伤'),
-  'juyao_fan': ('聚妖幡', '每 15 秒招引范围妖物主动来攻'),
-};
-
-/// 功德解锁的扩展被动（图鉴直购；未解锁不进三选一免费池）。
-const Set<String> kJourneyMeritPassives = <String>{
-  'sanheng_mao',
-  'yujing_ping',
-  'huoyan_jingjing',
-  'jinlan_kasha',
-  'feilong_staff',
-  'bihuo_zhao',
-};

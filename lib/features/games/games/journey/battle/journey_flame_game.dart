@@ -34,6 +34,7 @@ part 'journey_engine_attack_forms.dart';
 part 'journey_engine_attack_beam_fx.dart';
 part 'journey_weapon_render.dart';
 part 'journey_engine_choices.dart';
+part 'journey_weapon_effect_texts.dart';
 part 'journey_engine_kit.dart';
 part 'journey_engine_lifecycle.dart';
 part 'journey_engine_fx.dart';

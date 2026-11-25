@@ -159,8 +159,8 @@ abstract final class JourneyAttributesData {
         <(String, String)>[
           for (final code in game.passiveSlotCodes)
             (
-              kJourneyPassiveEffects[code]?.$1 ?? code,
-              kJourneyPassiveEffects[code]?.$2 ?? '',
+              kJourneyPassiveNames[code] ?? code,
+              journeyPassiveEffectDesc(code, game.weaponParam),
             ),
         ],
       ));
@@ -176,7 +176,7 @@ abstract final class JourneyAttributesData {
     final result = recipe?.resultName ?? '';
     if (game.evolved) return result.isNotEmpty ? result : '已炼化';
     final passiveCode = recipe?.requiredPassiveCode ?? '';
-    final passive = kJourneyPassiveEffects[passiveCode]?.$1 ?? passiveCode;
+    final passive = kJourneyPassiveNames[passiveCode] ?? passiveCode;
     if (passive.isEmpty) return '未炼化';
     return '未炼化（需被动「$passive」）';
   }

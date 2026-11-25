@@ -63,7 +63,7 @@ extension _JourneyBattlePrepare on _JourneyBattleScreenState {
       JourneySprites.character(character.code),
       // 初始武器 + 被动加持资源（武器 SVG=纯武器内容）
       JourneySprites.weapon(character.weaponCode),
-      for (final c in kJourneyPassiveEffects.keys) JourneySprites.weapon(c),
+      for (final c in kJourneyPassiveNames.keys) JourneySprites.weapon(c),
       // 场景道具（参照物供台/山石 + 路旁石碑/驿亭装饰）
       JourneySprites.prop('gongtai'),
       JourneySprites.prop('shikuai'),
