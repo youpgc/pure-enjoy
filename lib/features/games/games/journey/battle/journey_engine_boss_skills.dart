@@ -60,6 +60,7 @@ extension JourneyBossSkillCast on JourneyFlameGame {
         'black_wind' => 10.0,
         'deer_belly' => 9.0,
         'ram_oil' => 10.0,
+        'shield_break' => 9.0,
         _ => 0.0,
       };
 

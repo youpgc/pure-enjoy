@@ -64,6 +64,8 @@ class JourneyPlayerComponent extends PositionComponent {
   /// 单体持续伤害来源：妖王领域灼烧/毒雾按每次 tick 结算。
   double skillDotRemain = 0;
   double skillDotPerTick = 0;
+  /// DOT 施法者：盾抵 DOT 时照妖镜反震/破盾加成的来源，换源或到期即清空。
+  JourneyMonsterComponent? skillDotOwner;
   double _skillDotTimer = 0;
 
   /// 妖王技能负面态统一推进：计时到点归零并清理派生状态。
@@ -86,6 +88,7 @@ class JourneyPlayerComponent extends PositionComponent {
       skillDotRemain = math.max(0, skillDotRemain - dt);
       if (skillDotRemain <= 0) {
         skillDotPerTick = 0;
+        skillDotOwner = null;
         resetSkillDotTimer();
       }
     }
@@ -165,7 +168,8 @@ class JourneyPlayerComponent extends PositionComponent {
       _skillDotTimer += dt;
       if (_skillDotTimer >= dotTick) {
         _skillDotTimer -= dotTick;
-        takeDamage(skillDotPerTick);
+        takeDamage(skillDotPerTick,
+            rawAmount: skillDotPerTick, attacker: skillDotOwner);
       }
     }
 
@@ -515,10 +519,21 @@ class JourneyPlayerComponent extends PositionComponent {
     _skillShiftLeft = 0;
   }
 
-  void takeDamage(double amount, {bool trueDamage = false}) {
+  /// [rawAmount] 为护甲/最终减伤/护盾抵扣之前的原值，供盾反与盾破震荡取基准；
+  /// 未传时以进入本方法的伤害作为原值。[attacker] 决定破盾妖王的加成与反震衰减。
+  void takeDamage(
+    double amount, {
+    bool trueDamage = false,
+    JourneyMonsterComponent? attacker,
+    double? rawAmount,
+  }) {
     if (hp <= 0) return;
     // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
     if (invulnTimer > 0) return;
+    final raw = rawAmount ?? amount;
+    // 破盾妖王：角色带盾时伤害加成，在减伤与护盾抵扣之前生效
+    final shieldBonus = game.shieldBreakBonus(attacker);
+    if (shieldBonus > 0) amount *= 1 + shieldBonus;
     if (!trueDamage) {
       // 最终减伤区（乘算在护甲减伤之后）：金刚不坏（ward 维度）与坚韧光环
       // （沙僧）加法合流后统一钳 ward_cap，避免两路独立乘算叠加破上限。
@@ -535,11 +550,20 @@ class JourneyPlayerComponent extends PositionComponent {
       if (totalReduce > 0) amount *= 1 - totalReduce;
     }
     // 护体金光（shield 维度）：护盾先抵扣，余量再进扣血
+    final shieldBefore = shield;
+    var absorbed = 0.0;
     if (shield > 0) {
-      final absorbed = math.min(shield, amount);
+      absorbed = math.min(shield, amount);
       shield -= absorbed;
       amount -= absorbed;
       game.controller.hud.shield.value = shield;
+    }
+    // 盾抵伤害的反震与盾破震荡：均取减伤前原值，避免被护甲/减伤二次缩放
+    if (absorbed > 0 && attacker != null) {
+      game.resolveShieldReflect(attacker, raw);
+    }
+    if (shieldBefore > 0 && shield <= 0) {
+      game.resolveShieldBurst(raw);
     }
     hp = (hp - amount).clamp(0.0, maxHp);
     // 有效受击：屏幕边框呼吸灯按脉冲重启一次泛红提示
@@ -557,5 +581,12 @@ class JourneyPlayerComponent extends PositionComponent {
     if (healBlockTimer > 0) return;
     hp = (hp + amount).clamp(0.0, maxHp);
     game.onPlayerHpChanged();
+  }
+
+  /// 护盾入账统一入口：拾取物、周期护盾与角色光环共用，上限为最大生命。
+  void gainShield(double amount) {
+    if (amount <= 0) return;
+    shield = math.min(maxHp, shield + amount);
+    game.controller.hud.shield.value = shield;
   }
 }

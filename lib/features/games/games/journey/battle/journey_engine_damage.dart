@@ -60,7 +60,7 @@ mixin JourneyDamageTickMixin {
       if (game._bajieGuard > 0) {
         afterArmor *= game.battleNum('ability', 'bajie_guard_mult', 0.70);
       }
-      player.takeDamage(afterArmor);
+      player.takeDamage(afterArmor, attacker: strongestM, rawAmount: strongest);
       // 反伤荆棘（§6 特效法宝）：对造成伤害的怪反弹 thorns 比例护甲后
       // 伤害（params.thorns，直接 takeDamage，不计暴击）；荆棘绿环提示
       if (game.effectWeapons.contains('fanshang_thorns')) {
@@ -75,31 +75,34 @@ mixin JourneyDamageTickMixin {
         // GameAudio.instance.journeyTrigger();
       }
       // 妖王接触附带控制/毒（西游记扩展）：
-      // 金光缚身（百眼魔君）定身；倒马毒桩（蝎子精）禁疗（时长可配）
-      switch (strongestM.model.abilityKey) {
-        case 'spider_web':
-          player.rootTimer = game.monsterParam(
-              strongestM.model.code, 'web_root', 0.8);
-          break;
-        case 'poison_mist': // 倒马毒桩：禁疗 + 接触叠毒刺，满层真伤爆发
-          player.healBlockTimer = game.monsterParam(
-              strongestM.model.code, 'poison_block', 3.0);
-          game.applyBossSkillEffect('sting',
-              power: game.monsterParam(
-                  strongestM.model.code, 'sting_add', 1),
-              owner: strongestM);
-          game.spawnFloatText(
-            player.position + Vector2(0, -36),
-            '倒马毒桩·禁疗',
-            const Color(0xFF8E2F3C),
-          );
-          break;
-        case 'ice_seal': // 灵感大王：接触附带减速（冰封周期再补破甲）
-          game.applyBossSkillEffect('slow',
-              power: game.monsterParam(
-                  strongestM.model.code, 'seal_slow', 0.3),
-              owner: strongestM);
-          break;
+      // 金光缚身（百眼魔君）定身；倒马毒桩（蝎子精）禁疗（时长可配）。
+      // 反伤/反震先于此处结算，来源已被击杀时不再遗留控制效果。
+      if (!strongestM.isDead) {
+        switch (strongestM.model.abilityKey) {
+          case 'spider_web':
+            player.rootTimer = game.monsterParam(
+                strongestM.model.code, 'web_root', 0.8);
+            break;
+          case 'poison_mist': // 倒马毒桩：禁疗 + 接触叠毒刺，满层真伤爆发
+            player.healBlockTimer = game.monsterParam(
+                strongestM.model.code, 'poison_block', 3.0);
+            game.applyBossSkillEffect('sting',
+                power: game.monsterParam(
+                    strongestM.model.code, 'sting_add', 1),
+                owner: strongestM);
+            game.spawnFloatText(
+              player.position + Vector2(0, -36),
+              '倒马毒桩·禁疗',
+              const Color(0xFF8E2F3C),
+            );
+            break;
+          case 'ice_seal': // 灵感大王：接触附带减速（冰封周期再补破甲）
+            game.applyBossSkillEffect('slow',
+                power: game.monsterParam(
+                    strongestM.model.code, 'seal_slow', 0.3),
+                owner: strongestM);
+            break;
+        }
       }
     }
 
@@ -149,7 +152,7 @@ extension JourneyBossCharge on JourneyFlameGame {
     if (_bajieGuard > 0) {
       afterArmor *= battleNum('ability', 'bajie_guard_mult', 0.70);
     }
-    player.takeDamage(afterArmor);
+    player.takeDamage(afterArmor, attacker: boss, rawAmount: raw);
     // 反伤荆棘：冲撞同属接触伤害，照常对撞人妖王反弹
     if (effectWeapons.contains('fanshang_thorns')) {
       boss.takeDamage(

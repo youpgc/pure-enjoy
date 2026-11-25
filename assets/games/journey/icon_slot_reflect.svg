@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 金钟罩：反震成长，钟罩聚气回荡 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 4 V6"/>
+    <path d="M7 7 Q12 4 17 7 L18 15 Q12 19 6 15 Z"/>
+    <path d="M9 17 Q9 20 12 20 Q15 20 15 17"/>
+    <path d="M4 11 L2 9 M20 11 L22 9"/>
+  </g>
+  <circle cx="12" cy="11" r="1.6" fill="#F6E3B4"/>
+</svg>

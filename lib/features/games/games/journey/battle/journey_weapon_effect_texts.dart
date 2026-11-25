@@ -9,13 +9,16 @@ const Map<String, String> kJourneyPassiveNames = <String, String>{
   'bishui_pearl': '避水珠',
   'dingfeng_pearl': '定风丹',
   'shelizi': '舍利子',
-  // 西游扩展批（功德解锁，图鉴直购）
+  // 西游扩展批（以下 6 件功德解锁、图鉴直购，见 kJourneyMeritPassives）
   'sanheng_mao': '三根毫毛',
   'yujing_ping': '玉净瓶',
   'huoyan_jingjing': '火眼金睛',
   'jinlan_kasha': '锦襕袈裟',
   'feilong_staff': '飞龙宝杖',
   'bihuo_zhao': '辟火罩',
+  // 护盾攻防批：免费入池（不在 kJourneyMeritPassives），开局即可三选一
+  'zhaoyao_jing': '照妖镜',
+  'zhenyao_zhong': '震妖钟',
 };
 
 /// 特效触发法宝名称（§6）：入池=图鉴已解锁，触发结算见 _hitMonster /
@@ -121,6 +124,12 @@ String journeyPassiveEffectDesc(
       return '命中击退 +${amount('knockback', 12)}';
     case 'bihuo_zhao':
       return '火系伤害减免 ${pct('resist', 0.15)}';
+    case 'zhaoyao_jing':
+      return '盾抵伤时额外反震 ${pct('reflect_ratio', 1.0)} 减伤前伤害，与金钟罩维度叠加（不吃护甲，总上限 ${pct('reflect_cap', 3.0)}）';
+    case 'zhenyao_zhong':
+      final ignoreArmor =
+          param(code, 'burst_armor_ignore', 0) > 0 ? '（无视护甲）' : '';
+      return '盾破时以破盾那击减伤前伤害的 ${pct('burst_ratio', 0.6)} 向周围 ${amount('burst_radius', 140)} 范围震荡$ignoreArmor';
     default:
       return '';
   }

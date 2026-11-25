@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 震妖钟：钟体震荡，波纹扩散 -->
+  <path d="M16 12 Q24 8 32 12 L34 32 Q24 38 14 32 Z" fill="none" stroke="#E8C470" stroke-width="3" stroke-linejoin="round"/>
+  <path d="M20 34 Q24 40 28 34" fill="none" stroke="#B98F3E" stroke-width="2" stroke-linecap="round"/>
+  <circle cx="24" cy="11" r="2.4" fill="#F6E3B4"/>
+  <path d="M8 23 Q4 29 8 35 M40 23 Q44 29 40 35" fill="none" stroke="#F0D9A0" stroke-width="2.2" stroke-linecap="round"/>
+</svg>

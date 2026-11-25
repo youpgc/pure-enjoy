@@ -174,6 +174,8 @@ extension JourneyKit on JourneyFlameGame {
       case 'sanheng_mao': // 三根毫毛：免死标记在血量归零链路查表生效
       case 'yujing_ping': // 玉净瓶甘露：周期回血在玩家 update 查表生效
       case 'huoyan_jingjing': // 火眼金睛：命中结算查表对精英/妖王增伤
+      case 'zhaoyao_jing': // 照妖镜：护盾抵伤时反震（受击入口查表）
+      case 'zhenyao_zhong': // 震妖钟：护盾归零时范围震荡（受击入口查表）
         break;
     }
     passiveSlotCodes.add(code);

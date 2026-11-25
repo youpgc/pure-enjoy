@@ -209,8 +209,10 @@ class JourneyBossSkillLayer extends Component {
     final player = game.player;
     const pr = JourneyPlayerComponent._radius;
 
-    for (var i = _projectiles.length - 1; i >= 0; i--) {
-      final p = _projectiles[i];
+    // 快照遍历：结算可能触发护盾反震/震荡击杀施法者，进而由 clearByOwner
+    // 在遍历途中删改这三个列表。用快照迭代并按对象引用定位移除，避免索引错位。
+    for (final p in _projectiles.toList()) {
+      if (!_projectiles.any((e) => identical(e, p))) continue;
       if (p.homing) {
         final to = player.position - p.pos;
         if (to.length > 1) {
@@ -244,11 +246,14 @@ class JourneyBossSkillLayer extends Component {
           consumed = true;
         }
       }
-      if (consumed) _projectiles.removeAt(i);
+      if (consumed) {
+        final idx = _projectiles.indexWhere((e) => identical(e, p));
+        if (idx >= 0) _projectiles.removeAt(idx);
+      }
     }
 
-    for (var i = _telegraphs.length - 1; i >= 0; i--) {
-      final t = _telegraphs[i];
+    for (final t in _telegraphs.toList()) {
+      if (!_telegraphs.any((e) => identical(e, t))) continue;
       t.delay -= dt;
       if (t.delay > 0) continue;
       if ((t.pos - player.position).length <= t.radius + pr) {
@@ -260,11 +265,12 @@ class JourneyBossSkillLayer extends Component {
         );
       }
       game.fxLayer.spawnRing(t.pos, t.radius, color: t.color);
-      _telegraphs.removeAt(i);
+      final idx = _telegraphs.indexWhere((e) => identical(e, t));
+      if (idx >= 0) _telegraphs.removeAt(idx);
     }
 
-    for (var i = _fields.length - 1; i >= 0; i--) {
-      final f = _fields[i];
+    for (final f in _fields.toList()) {
+      if (!_fields.any((e) => identical(e, f))) continue;
       f.life -= dt;
       if (f.followOwner != null) {
         f.pos
@@ -283,7 +289,10 @@ class JourneyBossSkillLayer extends Component {
           );
         }
       }
-      if (f.life <= 0) _fields.removeAt(i);
+      if (f.life <= 0) {
+        final idx = _fields.indexWhere((e) => identical(e, f));
+        if (idx >= 0) _fields.removeAt(idx);
+      }
     }
   }
 

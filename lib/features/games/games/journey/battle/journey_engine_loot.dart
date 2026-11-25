@@ -2,7 +2,16 @@ part of 'journey_flame_game.dart';
 
 /// 掉落与拾取：击杀产出（香火=经验/功德铜钱/蟠桃/宝箱 + 后期分档
 /// 妖丹=大经验/灵珠=大治疗/功德金锭=大额功德），磁吸拾取。
-enum JourneyPickupKind { exp, meritCoin, peach, chest, yaodan, lingzhu, jinding }
+enum JourneyPickupKind {
+  exp,
+  meritCoin,
+  peach,
+  chest,
+  yaodan,
+  lingzhu,
+  jinding,
+  shield,
+}
 
 class JourneyPickupComponent extends PositionComponent {
   JourneyPickupComponent({
@@ -10,17 +19,25 @@ class JourneyPickupComponent extends PositionComponent {
     required this.kind,
     required super.position,
     required this.value,
-  }) : _radius = kind == JourneyPickupKind.chest || kind == JourneyPickupKind.jinding
-            ? 13
-            : 8;
+    String? spriteKey,
+  })  : spriteKey = spriteKey ?? _defaultSpriteKey(kind);
 
   final JourneyFlameGame game;
   final JourneyPickupKind kind;
 
+  /// 图标资源键：优先取后台拾取物 code 的专属资源，缺省按结算类别回落。
+  /// 对象池复用时同步重置（见 JourneyLootMixin._spawnPickup）。
+  String spriteKey;
+
   /// 拾取价值（可变：对象池复用时重置，见 JourneyLootMixin._spawnPickup）。
   int value;
 
-  final double _radius;
+  /// 渲染/碰撞半径：按当前 kind 与图标键动态计算，对象池复用时随 spriteKey 同步刷新。
+  double get _radius => kind == JourneyPickupKind.chest ||
+          kind == JourneyPickupKind.jinding ||
+          spriteKey == 'jinding'
+      ? 13
+      : 8;
 
   @override
   void update(double dt) {
@@ -67,22 +84,16 @@ class JourneyPickupComponent extends PositionComponent {
       case JourneyPickupKind.jinding:
         game.addMeritCoins(value);
         break;
+      case JourneyPickupKind.shield:
+        game.player.gainShield(value.toDouble());
+        break;
     }
     game._recyclePickup(this);
   }
 
   @override
   void render(Canvas canvas) {
-    // 精灵优先（pickup_<kind>.svg，48 视箱）；失败回落色块
-    final spriteKey = switch (kind) {
-      JourneyPickupKind.exp => 'xianghuo',
-      JourneyPickupKind.meritCoin => 'coin',
-      JourneyPickupKind.peach => 'peach',
-      JourneyPickupKind.chest => 'chest',
-      JourneyPickupKind.yaodan => 'yaodan',
-      JourneyPickupKind.lingzhu => 'lingzhu',
-      JourneyPickupKind.jinding => 'jinding',
-    };
+    // 精灵优先（pickup_<spriteKey>.svg，48 视箱）；失败回落色块
     final pic = JourneySprites.get(JourneySprites.pickup(spriteKey));
     if (pic != null) {
       final size = _radius * 2.4;
@@ -108,6 +119,7 @@ class JourneyPickupComponent extends PositionComponent {
         JourneyPickupKind.yaodan => const Color(0xFF6C4BD5),
         JourneyPickupKind.lingzhu => const Color(0xFF5BC4B0),
         JourneyPickupKind.jinding => const Color(0xFFE8A83E),
+        JourneyPickupKind.shield => const Color(0xFF6FA8DC),
       };
     canvas.drawCircle(Offset.zero, _radius, paint);
     if (kind == JourneyPickupKind.chest) {
@@ -134,22 +146,26 @@ mixin JourneyLootMixin {
     JourneyFlameGame game,
     JourneyPickupKind kind,
     Vector2 pos,
-    int value,
-  ) {
+    int value, {
+    String? spriteKey,
+  }) {
     final pool =
         (_pickupPool[kind] ??= <JourneyPickupComponent>[]);
     final reused = pool.isNotEmpty ? pool.removeLast() : null;
+    final resolvedSprite = spriteKey ?? _defaultSpriteKey(kind);
     final p = reused
       ?? JourneyPickupComponent(
           game: game,
           kind: kind,
           position: pos,
           value: value,
+          spriteKey: resolvedSprite,
         );
     if (reused != null) {
       p
         ..position = pos
-        ..value = value;
+        ..value = value
+        ..spriteKey = resolvedSprite;
     }
     game.pickups.add(p);
     game.world.add(p);
@@ -316,30 +332,70 @@ void _rollDropTable(
   _spawnPickupByCode(game, code, pos, qty);
 }
 
-/// pickup 编码映射（drops 的 pickup_code → 拾取物）：
-/// xianghuo=香火(经验) / gongde_tongqian=功德铜钱 / pantao_pickup=蟠桃 /
-/// baoxiang=宝箱 / yaodan=妖丹(大经验) / lingzhu=灵珠(大治疗) /
-/// jinding=功德金锭(大额功德)；未知编码不生成。
+/// 结算类别由后台拾取物 effect 驱动（exp/merit/heal/chest/shield），
+/// 后台未配置该行时才回落到内置 code 映射；新增任意 code 只要后台配了
+/// effect 即可生效，无需改引擎。图标优先取 code 专属资源，缺省按类别回落。
+JourneyPickupKind? _kindOfEffect(String effect) => switch (effect) {
+      'exp' => JourneyPickupKind.exp,
+      'merit' => JourneyPickupKind.meritCoin,
+      'heal' => JourneyPickupKind.peach,
+      'chest' => JourneyPickupKind.chest,
+      'shield' => JourneyPickupKind.shield,
+      _ => null,
+    };
+
+JourneyPickupKind? _kindOfCode(String code) => switch (code) {
+      'xianghuo' => JourneyPickupKind.exp,
+      'gongde_tongqian' => JourneyPickupKind.meritCoin,
+      'pantao_pickup' => JourneyPickupKind.peach,
+      'baoxiang' => JourneyPickupKind.chest,
+      'yaodan' => JourneyPickupKind.yaodan,
+      'lingzhu' => JourneyPickupKind.lingzhu,
+      'jinding' => JourneyPickupKind.jinding,
+      'huxin_dan' => JourneyPickupKind.shield,
+      _ => null,
+    };
+
+String _defaultSpriteKey(JourneyPickupKind kind) => switch (kind) {
+      JourneyPickupKind.exp => 'xianghuo',
+      JourneyPickupKind.meritCoin => 'coin',
+      JourneyPickupKind.peach => 'peach',
+      JourneyPickupKind.chest => 'chest',
+      JourneyPickupKind.yaodan => 'yaodan',
+      JourneyPickupKind.lingzhu => 'lingzhu',
+      JourneyPickupKind.jinding => 'jinding',
+      JourneyPickupKind.shield => 'huxin',
+    };
+
+/// code 专属图标键（保留妖丹/灵珠/金锭等大份拾取物的独立外观）。
+String? _spriteKeyOfCode(String code) => switch (code) {
+      'xianghuo' => 'xianghuo',
+      'gongde_tongqian' => 'coin',
+      'pantao_pickup' => 'peach',
+      'baoxiang' => 'chest',
+      'yaodan' => 'yaodan',
+      'lingzhu' => 'lingzhu',
+      'jinding' => 'jinding',
+      'huxin_dan' => 'huxin',
+      _ => null,
+    };
+
 void _spawnPickupByCode(
   JourneyFlameGame game,
   String code,
   Vector2 pos,
   int qty,
 ) {
-  final kind = switch (code) {
-    'xianghuo' => JourneyPickupKind.exp,
-    'gongde_tongqian' => JourneyPickupKind.meritCoin,
-    'pantao_pickup' => JourneyPickupKind.peach,
-    'baoxiang' => JourneyPickupKind.chest,
-    'yaodan' => JourneyPickupKind.yaodan,
-    'lingzhu' => JourneyPickupKind.lingzhu,
-    'jinding' => JourneyPickupKind.jinding,
-    _ => null,
-  };
+  final config = game.config?.pickupConfigOf(code);
+  // 结算类别：后台 effect 优先，未配置该行才回落内置 code 映射
+  final kind = (config != null ? _kindOfEffect(config.effect) : null) ??
+      _kindOfCode(code);
   if (kind == null) return;
-  // 值=单价×数量；单价优先 pickupConfigOf，缺省回落现有数值
-  final unit = game.config?.pickupConfigOf(code)?.value ??
-      switch (kind) {
+  // 值=单价×数量；单价优先 pickupConfigOf（>0 生效，0 视为漏配），否则回落内置值
+  final configured = config?.value ?? 0;
+  final unit = configured > 0
+      ? configured
+      : switch (kind) {
         JourneyPickupKind.exp => 1,
         JourneyPickupKind.meritCoin => 3,
         JourneyPickupKind.peach => 15,
@@ -347,6 +403,7 @@ void _spawnPickupByCode(
         JourneyPickupKind.yaodan => 30,
         JourneyPickupKind.lingzhu => 80,
         JourneyPickupKind.jinding => 30,
+        JourneyPickupKind.shield => 40,
       };
   game._spawnPickup(
     game,
@@ -357,5 +414,6 @@ void _spawnPickupByCode(
           (game.rng.nextDouble() - 0.5) * 24,
         ),
     unit * qty,
+    spriteKey: _spriteKeyOfCode(code),
   );
 }

@@ -231,6 +231,8 @@ const List<Map<String, dynamic>> kJourneyWeaponSeed = <Map<String, dynamic>>[
   {'code': 'fenghuo_lun', 'name': '风火轮', 'category': 'effect', 'attack_kind': '', 'description': '哪吒风火轮，点燃妖物并逐代扩散灼烧'},
   {'code': 'qixing_jian', 'name': '七星剑', 'category': 'effect', 'attack_kind': '', 'description': '金角七星剑，暴击对精英妖王追加真伤'},
   {'code': 'juyao_fan', 'name': '聚妖幡', 'category': 'effect', 'attack_kind': '', 'description': '招妖法幡，周期吸引范围妖物主动来攻'},
+  {'code': 'zhaoyao_jing', 'name': '照妖镜', 'category': 'passive', 'attack_kind': '', 'description': '护盾抵伤时按减伤前伤害反震来源妖物', 'attr_key': 'shield_reflect'},
+  {'code': 'zhenyao_zhong', 'name': '震妖钟', 'category': 'passive', 'attack_kind': '', 'description': '护盾破碎时向周围妖物造成范围震荡', 'attr_key': 'shield_burst'},
 ];
 
 const List<Map<String, dynamic>> kJourneyMonsterSeed = <Map<String, dynamic>>[
@@ -448,6 +450,8 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'recovery', 'name': '回元', 'kind': 'effect', 'effect_per_level': '每 4 秒按缺失生命 5% 回复', 'max_level': 9, 'value_per_level': 0.05, 'period_sec': 4},
   {'code': 'shield', 'name': '护体', 'kind': 'effect', 'effect_per_level': '每 4 秒获护盾 20 点', 'max_level': 9, 'value_per_level': 20, 'period_sec': 4},
   {'code': 'slow', 'name': '缚灵', 'kind': 'effect', 'effect_per_level': '臂展内妖物减速 6%', 'max_level': 9, 'value_per_level': 0.06},
+  // 金钟罩：盾抵反震的基础倍率，按等级×每级增量叠加照妖镜额外倍率
+  {'code': 'reflect', 'name': '金钟罩', 'kind': 'attribute', 'effect_per_level': '盾抵反震倍率 +15%', 'max_level': 9, 'value_per_level': 0.15},
 ];
 
 // ---- 局外玩法种子（M3；镜像 SQL 种子 feature_journey_m3_20261105）----
@@ -505,11 +509,14 @@ const List<Map<String, dynamic>> kJourneyDropSeed =
   {'table_code': 'monster_normal', 'source_kind': 'monster', 'pickup_code': 'xianghuo', 'weight': 100, 'qty_min': 1, 'qty_max': 2},
   {'table_code': 'monster_normal', 'source_kind': 'monster', 'pickup_code': 'gongde_tongqian', 'weight': 12, 'qty_min': 2, 'qty_max': 5},
   {'table_code': 'monster_normal', 'source_kind': 'monster', 'pickup_code': 'pantao_pickup', 'weight': 2, 'qty_min': 1, 'qty_max': 1},
+  {'table_code': 'monster_normal', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 8, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_elite', 'source_kind': 'monster', 'pickup_code': 'xianghuo', 'weight': 100, 'qty_min': 2, 'qty_max': 4},
   {'table_code': 'monster_elite', 'source_kind': 'monster', 'pickup_code': 'gongde_tongqian', 'weight': 30, 'qty_min': 4, 'qty_max': 8},
   {'table_code': 'monster_elite', 'source_kind': 'monster', 'pickup_code': 'baoxiang', 'weight': 100, 'qty_min': 1, 'qty_max': 1},
+  {'table_code': 'monster_elite', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 15, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_boss', 'source_kind': 'monster', 'pickup_code': 'baoxiang', 'weight': 100, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_boss', 'source_kind': 'monster', 'pickup_code': 'gongde_tongqian', 'weight': 100, 'qty_min': 10, 'qty_max': 20},
+  {'table_code': 'monster_boss', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 25, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'breakable_default', 'source_kind': 'breakable', 'pickup_code': null, 'weight': 40, 'qty_min': 0, 'qty_max': 0},
   {'table_code': 'breakable_default', 'source_kind': 'breakable', 'pickup_code': 'gongde_tongqian', 'weight': 45, 'qty_min': 1, 'qty_max': 3},
   {'table_code': 'breakable_default', 'source_kind': 'breakable', 'pickup_code': 'pantao_pickup', 'weight': 8, 'qty_min': 1, 'qty_max': 1},
@@ -519,17 +526,20 @@ const List<Map<String, dynamic>> kJourneyDropSeed =
   {'table_code': 'monster_normal_late', 'source_kind': 'monster', 'pickup_code': 'yaodan', 'weight': 6, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_normal_late', 'source_kind': 'monster', 'pickup_code': 'lingzhu', 'weight': 3, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_normal_late', 'source_kind': 'monster', 'pickup_code': 'jinding', 'weight': 2, 'qty_min': 1, 'qty_max': 1},
+  {'table_code': 'monster_normal_late', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 12, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'xianghuo', 'weight': 100, 'qty_min': 3, 'qty_max': 6},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'gongde_tongqian', 'weight': 35, 'qty_min': 8, 'qty_max': 16},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'baoxiang', 'weight': 100, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'yaodan', 'weight': 25, 'qty_min': 1, 'qty_max': 2},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'lingzhu', 'weight': 15, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'jinding', 'weight': 10, 'qty_min': 1, 'qty_max': 1},
+  {'table_code': 'monster_elite_late', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 20, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'baoxiang', 'weight': 100, 'qty_min': 1, 'qty_max': 1},
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'gongde_tongqian', 'weight': 100, 'qty_min': 20, 'qty_max': 40},
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'yaodan', 'weight': 60, 'qty_min': 2, 'qty_max': 4},
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'lingzhu', 'weight': 40, 'qty_min': 1, 'qty_max': 2},
   {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'jinding', 'weight': 30, 'qty_min': 1, 'qty_max': 2},
+  {'table_code': 'monster_boss_late', 'source_kind': 'monster', 'pickup_code': 'huxin_dan', 'weight': 30, 'qty_min': 1, 'qty_max': 1},
 ];
 
 /// 炼化配方种子（journey_evo_recipes；9 条镜像 SQL 种子，
@@ -567,6 +577,7 @@ const List<Map<String, dynamic>> kJourneyPickupConfigSeed =
   {'code': 'yaodan', 'name': '妖丹', 'effect': 'exp', 'value': 30, 'radius': 12, 'magnet_range': 40},
   {'code': 'lingzhu', 'name': '灵珠', 'effect': 'heal', 'value': 80, 'radius': 12, 'magnet_range': 40},
   {'code': 'jinding', 'name': '功德金锭', 'effect': 'merit', 'value': 30, 'radius': 13, 'magnet_range': 40},
+  {'code': 'huxin_dan', 'name': '护心丹', 'effect': 'shield', 'value': 40, 'radius': 12, 'magnet_range': 40},
 ];
 
 // ---- 每日游历·特色地图（journey_daily_maps 后台可配；此为离线兜底种子，

@@ -11,7 +11,8 @@ part of 'journey_flame_game.dart';
 /// - dot：持续伤害（领域灼烧/毒雾）；
 /// - sting：毒刺叠层，满层真伤爆发；
 /// - drain：套取增益（增伤削减）；
-/// - seal：封印一个已选槽。
+/// - seal：封印一个已选槽；
+/// - shield_break：按比例撕开玩家护盾，盾破时走范围震荡钩子。
 extension JourneyBossSkillEffects on JourneyFlameGame {
   void applyBossSkillEffect(
     String effect, {
@@ -41,11 +42,16 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
                     cap: battleNum('damage', 'player_armor_cap',
                         kJourneyPlayerArmorCap),
                   )),
+          attacker: owner,
+          rawAmount: dmg,
         );
         break;
       case 'true_hit':
         // 真伤爆发：绕甲、跳过最终减伤区，仅护盾在 takeDamage 内抵扣
-        if (rawDamage > 0) p.takeDamage(rawDamage, trueDamage: true);
+        if (rawDamage > 0) {
+          p.takeDamage(rawDamage,
+              trueDamage: true, attacker: owner, rawAmount: rawDamage);
+        }
         break;
       case 'root':
         p.rootTimer = math.max(p.rootTimer, power);
@@ -90,6 +96,8 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
             p.skillDotPerTick * p.skillDotRemain) {
           p.skillDotPerTick = rawDamage;
           p.skillDotRemain = power;
+          // 记录来源：盾抵 DOT 时照妖镜反震/破盾加成需命中该妖王
+          p.skillDotOwner = owner;
           p.resetSkillDotTimer();
         }
         break;
@@ -112,6 +120,13 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         // 妖王护罩：吸收量按接触伤害×层数，写回妖王实体
         if (owner != null) owner.grantWard(power);
         break;
+      case 'shield_break':
+        // 妖王破盾：撕开当前护盾的一部分；rawDamage 供盾破震荡取基准
+        reducePlayerShield(
+          p.shield * power.clamp(0.0, 1.0),
+          rawDamage: rawDamage,
+        );
+        break;
     }
   }
 
@@ -125,7 +140,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
     // 满层真伤：接触伤害×爆发倍率，绕甲结算
     final burst = (owner?.contactDamage ?? 0) *
         monsterParam(code, 'sting_burst_ratio', 1.2);
-    p.takeDamage(burst, trueDamage: true);
+    p.takeDamage(burst, trueDamage: true, attacker: owner, rawAmount: burst);
     spawnFloatText(p.position + Vector2(0, -36), '倒马毒桩·爆发',
         const Color(0xFFB07CD4));
   }

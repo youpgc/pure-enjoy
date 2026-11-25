@@ -192,8 +192,7 @@ extension JourneyNewSlotTick on JourneyFlameGame {
       if (p.shieldTick >= period && p.shield < p.maxHp) {
         p.shieldTick = 0;
         final add = slotValue('shield', 20) * shieldLv;
-        p.shield = math.min(p.maxHp, p.shield + add);
-        controller.hud.shield.value = p.shield;
+        p.gainShield(add);
         spawnFloatText(
           p.position + Vector2(0, -36),
           '护体金光',
@@ -219,8 +218,7 @@ extension JourneyNewSlotTick on JourneyFlameGame {
             pointCap,
             character.auraNum('shield_per_level', 5) * _charLv,
           );
-          p.shield = math.min(p.maxHp, p.shield + add);
-          controller.hud.shield.value = p.shield;
+          p.gainShield(add);
           spawnFloatText(
             p.position + Vector2(0, -36),
             '坚韧·护盾',

@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
+  <!-- 护心丹：金蓝护罩，加盾意象 -->
+  <ellipse cx="24" cy="43" rx="10" ry="2.5" fill="#1E3A52" opacity="0.35"/>
+  <path d="M24 7 L38 12 V25 C38 33 32 39 24 42 C16 39 10 33 10 25 V12 Z" fill="#6FA8DC"/>
+  <path d="M24 7 L38 12 V25 C38 33 32 39 24 42 C16 39 10 33 10 25 V12 Z" fill="none" stroke="#E8C470" stroke-width="2.5"/>
+  <path d="M24 15 L30 18 V25 C30 29 27 32 24 34 C21 32 18 29 18 25 V18 Z" fill="#DFF1FF" opacity="0.9"/>
+</svg>

@@ -81,6 +81,7 @@ extension JourneyInteract on JourneyFlameGame {
     player.stingStacks = 0;
     player.skillDotRemain = 0;
     player.skillDotPerTick = 0;
+    player.skillDotOwner = null;
     player.resetSkillDotTimer();
     player.hp = player.maxHp *
         battleNum('economy', 'revive_hp_ratio', 0.6);

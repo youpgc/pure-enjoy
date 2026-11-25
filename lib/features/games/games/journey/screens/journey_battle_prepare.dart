@@ -52,7 +52,7 @@ extension _JourneyBattlePrepare on _JourneyBattleScreenState {
     final monsterCodes = gamePoolCodes(snapshot);
     await JourneySprites.warmUp(context, <String>[
       for (final c in monsterCodes) JourneySprites.monster(c),
-      // 拾取物 7 种全覆盖（漏预热的 kind 会退化为色块圆点）
+      // 拾取物 8 种全覆盖（漏预热的 kind 会退化为色块圆点）
       JourneySprites.pickup('xianghuo'),
       JourneySprites.pickup('coin'),
       JourneySprites.pickup('peach'),
@@ -60,6 +60,7 @@ extension _JourneyBattlePrepare on _JourneyBattleScreenState {
       JourneySprites.pickup('yaodan'),
       JourneySprites.pickup('lingzhu'),
       JourneySprites.pickup('jinding'),
+      JourneySprites.pickup('huxin'),
       JourneySprites.character(character.code),
       // 初始武器 + 被动加持资源（武器 SVG=纯武器内容）
       JourneySprites.weapon(character.weaponCode),

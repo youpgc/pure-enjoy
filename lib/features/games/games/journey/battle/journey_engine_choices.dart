@@ -55,6 +55,8 @@ enum _SlotUnit { percent, intValue, perSecond, count }
       return (brief: '移动速度', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: double.infinity);
     case 'ward':
       return (brief: '受击减伤', unit: _SlotUnit.percent, base: 0, fallback: 0.04, cap: 0.50);
+    case 'reflect':
+      return (brief: '盾抵反震', unit: _SlotUnit.percent, base: 0, fallback: 0.15, cap: 3.0);
     case 'recovery':
       return (brief: '回元回血', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.50);
     case 'shield':
@@ -83,7 +85,16 @@ double _slotDisplayValue(
   final raw = (code == 'pierce' || code == 'lifesteal')
       ? rule.base + step * (level - 1)
       : rule.base + step * level;
-  return raw.clamp(0.0, rule.cap);
+  // 反震展示上限与结算共用 reflect_cap，避免后台调参后卡牌显示与实际不符
+  final cap = code == 'reflect'
+      ? math.max(
+          0.0,
+          JourneyConfigService.instance.cached
+                  ?.weaponParam('zhaoyao_jing', 'reflect_cap', 3.0) ??
+              3.0,
+        )
+      : rule.cap;
+  return raw.clamp(0.0, cap);
 }
 
 /// 数值转文案：倍率类乘 100 取整，整数/分身取整，每秒数值保留 1 位小数。

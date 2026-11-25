@@ -33,6 +33,8 @@ mixin JourneyResumeGateMixin on FlameGame {
 extension JourneyLifecycle on JourneyFlameGame {
   // ---- 伤害/击杀（damage part 调用）----
   void onMonsterKilled(JourneyMonsterComponent m) {
+    // 施法者死亡即断开持续伤害来源，避免死源残留期间反震/破盾加成指向空壳
+    if (identical(player.skillDotOwner, m)) player.skillDotOwner = null;
     // 结算快照取走后不再改写局内计数与掉落
     if (_ended) return;
     // 变化术/分瓣梅花的假身不计入击杀、功德、图鉴与掉落

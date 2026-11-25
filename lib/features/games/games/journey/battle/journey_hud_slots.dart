@@ -235,6 +235,7 @@ class JourneyHudSlotBar extends StatelessWidget {
       'vitality': '生机',
       'cloud': '腾云',
       'ward': '金刚',
+      'reflect': '金钟罩',
       'recovery': '回元',
       'shield': '护体',
       'slow': '缚灵',

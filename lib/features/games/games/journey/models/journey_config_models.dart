@@ -104,7 +104,7 @@ class JourneyRelicUnlockModel {
 }
 
 /// 拾取物配置（journey_pickups 行）：effect=效果类别
-/// （exp/merit/heal/chest），value=单次拾取效果数值。
+/// （exp/merit/heal/chest/shield），value=单次拾取效果数值。
 class JourneyPickupConfigModel {
   final String code;
   final String name;

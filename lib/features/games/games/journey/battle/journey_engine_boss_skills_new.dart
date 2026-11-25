@@ -248,6 +248,13 @@ extension JourneyBossSkillsNew on JourneyFlameGame {
         applyBossSkillEffect('blind',
             power: monsterParam(code, 'oil_blind', 2.0), owner: boss);
         break;
+      case 'shield_break': // 破盾能力：撕开护盾；带盾受伤加成与反震衰减在受击入口统一处理
+        applyBossSkillEffect('shield_break',
+            power: monsterParam(code, 'shield_break_ratio', 0.6),
+            rawDamage: boss.contactDamage *
+                monsterParam(code, 'shield_break_raw', 1.0),
+            owner: boss);
+        break;
     }
   }
 
