@@ -226,7 +226,9 @@ class _JourneyLevelSelectScreenState extends State<JourneyLevelSelectScreen> {
       'story' => '叙事',
       'boss' => '妖王${level.bossFights > 1 ? ' ×${level.bossFights}' : ''}',
       'trial' => '试炼',
+      'race' => '竞速',
       'node' => '节点',
+      'final' => '终章',
       _ => '战斗',
     };
     return Padding(

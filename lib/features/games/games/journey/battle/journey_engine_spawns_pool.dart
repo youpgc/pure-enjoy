@@ -36,7 +36,8 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
 String? resolveBossCode(JourneyFlameGame game) {
   if (_isEndless(game) || _isDaily(game)) return null;
   final levelBoss = game.level.bossCode;
-  if (levelBoss != null && levelBoss.isNotEmpty) return levelBoss;
+  // 关卡显式配置优先：空串=本关无妖王战（走西行里程），非空=覆盖本段妖王。
+  if (levelBoss != null) return levelBoss.isEmpty ? null : levelBoss;
   final region = game.config?.regionOf(game.level.regionCode);
   if (game.config?.fromSeed != true && region != null) {
     final configured = region.bossCode;
