@@ -125,6 +125,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         reducePlayerShield(
           p.shield * power.clamp(0.0, 1.0),
           rawDamage: rawDamage,
+          attacker: owner,
         );
         break;
     }

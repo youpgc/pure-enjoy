@@ -57,6 +57,15 @@ enum _SlotUnit { percent, intValue, perSecond, count }
       return (brief: '受击减伤', unit: _SlotUnit.percent, base: 0, fallback: 0.04, cap: 0.50);
     case 'reflect':
       return (brief: '盾抵反震', unit: _SlotUnit.percent, base: 0, fallback: 0.15, cap: 3.0);
+    case 'execute':
+      // 普通怪处决血线：下限 1% + 每级增量×等级，钳到上限；妖王血线按绝对值另算
+      return (
+        brief: '残血处决',
+        unit: _SlotUnit.percent,
+        base: kJourneyExecuteNormalFloorRatio,
+        fallback: 0.0175,
+        cap: kJourneyExecuteNormalCapRatio,
+      );
     case 'recovery':
       return (brief: '回元回血', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.50);
     case 'shield':
@@ -81,19 +90,33 @@ double _slotDisplayValue(
   double cap,
 }) rule,
 ) {
+  final cached = JourneyConfigService.instance.cached;
+  // 处决展示与结算同源：下限读 normal_floor、上限读 normal_cap，
+  // 反震展示上限共用 reflect_cap，避免后台调参后卡牌显示与实际不符
+  final base = code == 'execute'
+      ? (cached?.battleNum(
+                  'execute', 'normal_floor', kJourneyExecuteNormalFloorRatio) ??
+              kJourneyExecuteNormalFloorRatio)
+          .clamp(0.0, 1.0)
+      : rule.base;
   final step = perLevel > 0 ? perLevel : rule.fallback;
-  final raw = (code == 'pierce' || code == 'lifesteal')
-      ? rule.base + step * (level - 1)
-      : rule.base + step * level;
-  // 反震展示上限与结算共用 reflect_cap，避免后台调参后卡牌显示与实际不符
+  final raw = (code == 'pierce' || code == 'lifesteal' || code == 'execute')
+      ? base + step * (level - 1)
+      : base + step * level;
   final cap = code == 'reflect'
       ? math.max(
           0.0,
-          JourneyConfigService.instance.cached
-                  ?.weaponParam('zhaoyao_jing', 'reflect_cap', 3.0) ??
-              3.0,
+          cached?.weaponParam('zhaoyao_jing', 'reflect_cap', 3.0) ?? 3.0,
         )
-      : rule.cap;
+      : code == 'execute'
+          ? math.max(
+              base,
+              (cached?.battleNum(
+                      'execute', 'normal_cap', kJourneyExecuteNormalCapRatio) ??
+                  kJourneyExecuteNormalCapRatio)
+                  .clamp(0.0, 1.0),
+            )
+          : rule.cap;
   return raw.clamp(0.0, cap);
 }
 

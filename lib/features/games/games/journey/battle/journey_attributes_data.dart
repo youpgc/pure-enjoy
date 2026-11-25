@@ -56,6 +56,7 @@ abstract final class JourneyAttributesData {
     'cloud': '腾云',
     'ward': '金刚',
     'reflect': '金钟',
+    'execute': '处决',
     'recovery': '回元',
     'shield': '护体',
     'slow': '缚灵',

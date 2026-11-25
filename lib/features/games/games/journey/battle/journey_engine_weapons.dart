@@ -185,6 +185,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         break;
       case 'ward': // 金刚不坏：受击最终减伤，在 takeDamage 侧按等级读取
       case 'reflect': // 金钟罩：盾抵反震倍率，在受击反震结算侧按等级读取
+      case 'execute': // 处决：残血斩杀，在怪物/玩家受击结算侧按等级读取
       case 'recovery': // 回元：周期回血，在 tickNewSlots 侧按等级读取
       case 'shield': // 护体金光：周期护盾，在 tickNewSlots 侧按等级读取
       case 'slow': // 缚灵：范围减速，在 tickNewSlots 侧按等级读取

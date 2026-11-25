@@ -41,6 +41,7 @@ part 'journey_engine_fx.dart';
 part 'journey_engine_loot.dart';
 part 'journey_engine_damage.dart';
 part 'journey_engine_shield.dart';
+part 'journey_engine_execute.dart';
 part 'journey_engine_spawns.dart';
 part 'journey_engine_spawns_pool.dart';
 part 'journey_engine_endless.dart';

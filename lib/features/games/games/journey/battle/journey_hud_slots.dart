@@ -236,6 +236,7 @@ class JourneyHudSlotBar extends StatelessWidget {
       'cloud': '腾云',
       'ward': '金刚',
       'reflect': '金钟罩',
+      'execute': '处决',
       'recovery': '回元',
       'shield': '护体',
       'slow': '缚灵',

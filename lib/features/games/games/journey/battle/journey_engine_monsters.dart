@@ -518,6 +518,9 @@ class JourneyMonsterComponent extends PositionComponent
     }
     hp -= amount;
     _hpBarTimer = 2.5;
+    // 处决维度槽：任意伤害后血量落入阈值直接清血条，走既有击杀奖励链；
+    // 置于阶段能力判定之前，处决命中后不再触发低血分裂/狂暴等阶段技。
+    if (hp > 0) game.tryExecuteMonster(this);
     // 法天象地（牛魔王）：血量首次跌破阈值后接触伤害永久提升（每场一次）
     if (!isDecoy &&
         model.abilityKey == 'unmovable' &&

@@ -88,8 +88,11 @@ extension JourneyShieldCombat on JourneyFlameGame {
   }
 
   /// 妖王破盾效果：按当前护盾比例撕开护盾；盾破时走统一震荡钩子。
-  void reducePlayerShield(double points, {double rawDamage = 0}) {
+  /// 撕盾属于妖王伤害，携带处决能力且角色残血时先触发处决再结算护盾。
+  void reducePlayerShield(double points,
+      {double rawDamage = 0, JourneyMonsterComponent? attacker}) {
     if (points <= 0 || player.shield <= 0) return;
+    if (tryExecutePlayer(attacker: attacker)) return;
     player.shield = math.max(0.0, player.shield - points);
     controller.hud.shield.value = player.shield;
     if (player.shield <= 0) {

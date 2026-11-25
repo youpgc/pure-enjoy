@@ -528,8 +528,10 @@ class JourneyPlayerComponent extends PositionComponent {
     double? rawAmount,
   }) {
     if (hp <= 0) return;
-    // 无敌帧（三根毫毛免死窗口）：免疫接触伤害
+    // 无敌帧（三根毫毛免死窗口）：免疫接触伤害，也不触发妖王处决
     if (invulnTimer > 0) return;
+    // 妖王处决能力：判定在扣血与护盾抵扣之前，命中直接清血条（穿透护盾）
+    if (game.tryExecutePlayer(attacker: attacker)) return;
     final raw = rawAmount ?? amount;
     // 破盾妖王：角色带盾时伤害加成，在减伤与护盾抵扣之前生效
     final shieldBonus = game.shieldBreakBonus(attacker);

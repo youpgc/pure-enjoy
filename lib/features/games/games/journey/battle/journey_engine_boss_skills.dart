@@ -16,6 +16,8 @@ extension JourneyBossSkillCast on JourneyFlameGame {
     // 法天象地是血线被动（接触伤害提升挂在受击钩子），不进周期调度，
     // 否则每次空转都会写入 GCD，把妖王自身的冲撞机会挡掉。
     if (key == 'unmovable') return;
+    // 处决是受击侧被动（任意伤害达阈值即斩），不进周期调度。
+    if (key == 'execute') return;
     // 九头噬仅在狂暴期释放扇形弹道；非狂暴期停表等待，不空占 GCD。
     if (key == 'blood_frenzy' && !boss._bloodFrenzy) return;
     final period = monsterParam(code, '${key}_period', _periodFallback(key));

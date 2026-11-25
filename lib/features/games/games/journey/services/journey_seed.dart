@@ -452,6 +452,8 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'slow', 'name': '缚灵', 'kind': 'effect', 'effect_per_level': '臂展内妖物减速 6%', 'max_level': 9, 'value_per_level': 0.06},
   // 金钟罩：盾抵反震的基础倍率，按等级×每级增量叠加照妖镜额外倍率
   {'code': 'reflect', 'name': '金钟罩', 'kind': 'attribute', 'effect_per_level': '盾抵反震倍率 +15%', 'max_level': 9, 'value_per_level': 0.15},
+  // 处决：任意伤害后残血斩杀；普通怪血线 1%+每级增量，妖王按绝对血线双钳
+  {'code': 'execute', 'name': '处决', 'kind': 'attribute', 'effect_per_level': '血量低于斩杀线触发处决', 'max_level': 9, 'value_per_level': 0.0175},
 ];
 
 // ---- 局外玩法种子（M3；镜像 SQL 种子 feature_journey_m3_20261105）----
