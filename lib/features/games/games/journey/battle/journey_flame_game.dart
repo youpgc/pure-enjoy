@@ -29,6 +29,7 @@ part 'journey_engine_config_access.dart';
 part 'journey_engine_abilities.dart';
 part 'journey_engine_ability_state.dart';
 part 'journey_engine_weapons.dart';
+part 'journey_engine_blade_hits.dart';
 part 'journey_engine_attack_units.dart';
 part 'journey_engine_attack_forms.dart';
 part 'journey_engine_attack_beam_fx.dart';
@@ -296,9 +297,9 @@ class JourneyFlameGame extends FlameGame
   /// 已触发的里程碑参照物（同一参照物只报一次）。
   final Set<int> _milestoneHit = <int>{};
 
-  /// 参照物扇叶命中冷却（per-object 0.3s，对齐 orbHitCd 口径；
-  /// 无冷却时高伤一帧即破坏，hp 配置失去「累积破坏」意义）。
-  final Map<int, double> _mapObjHitCd = <int, double>{};
+  /// 参照物按扇叶独立命中豁免（时长取 weapon.hit_cd）：
+  /// 无豁免时高伤一帧即破坏，hp 配置失去「累积破坏」意义。
+  final Map<int, List<double>> _mapObjHitCd = <int, List<double>>{};
 
   // ---- 还魂复活（§3）/ 宝箱炼化（§6）----
   /// 本局剩余还魂次数（还魂丹口径：功德直接购买，单局 1 次）。
@@ -348,8 +349,10 @@ class JourneyFlameGame extends FlameGame
   /// 扇叶数：1 条本体扇叶 + 分身槽每级 1 条分身（等角间隔，命中同效；
   /// 兜底 seed 无 clone 行时=1）；身外身法增益期间临时 +1 分身扇叶。
   /// 单局上限：分身≤5，总扇叶（本体+分身）≤6（运营可配 clone 上限 5）。
-  int get bladeCount =>
-      math.min(1 + slotLevel('clone') + (_shenfenTimer > 0 ? 1 : 0), 6);
+  int get bladeCount => math.min(
+        1 + slotLevel('clone') + (_shenfenTimer > 0 ? 1 : 0),
+        kJourneyMaxBlades,
+      );
 
   // ---- 局内成长（三选一应用的加成）----
   @override

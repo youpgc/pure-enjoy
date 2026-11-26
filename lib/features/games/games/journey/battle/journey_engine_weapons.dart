@@ -58,7 +58,8 @@ abstract interface class JourneyWeaponHost {
 /// 武器系统：
 /// - 判定=扇形扫掠：怪与玩家连线角落在扇叶角 ± atan(半宽/距离) 内，
 ///   且怪距落在 [内环-怪半径, 外环+怪半径] → 扇叶扫到哪里哪里受击；
-/// - 单怪 0.3s 冷却防反复叠伤；环带内缘贴脸怪按 8 折兜底扫击；
+/// - 每个扇叶各自持有命中豁免（weapon.hit_cd，缺省 0.3 秒），
+///   扇叶之间互不共享，同一扇叶在豁免窗口内不再结算伤害与命中效果；
 /// - 命中结算维度特效：穿刺（破甲：按比例无视目标护甲）/击退（推开）/
 ///   吸血（回复）；
 /// - 灼烧不走命中：三路来源统一由臂展圆内驻留满阈值点燃（见 tickBurnAura）；
@@ -215,12 +216,13 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
 
     // 空间哈希（节点12）：先取玩家附近候选（外环 + 最大怪半径 + 余量）
     // 再扇形判定，避免 monsterCap 全量遍历
+    final hitCd = game.bladeHitCd;
     final candidates = game.spatialGrid.queryRange(
       center,
       arm.outerRadius + 120 + 40,
     );
     for (final m in candidates) {
-      if (m.isDead || m.orbHitCd > 0) continue;
+      if (m.isDead) continue;
       final toM = m.position - center;
       final dist = toM.length;
       if (dist < 1) continue;
@@ -229,30 +231,25 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       // 内圈贴身经过同样造成全额伤害
       if (dist - m.radius > arm.outerRadius) continue;
 
-      // 扇形判定
-      final monsterAngle = math.atan2(toM.y, toM.x);
-      final angularHalf = math.atan2(arm.halfWidth + m.radius, dist);
-      var hit = false;
-      for (var i = 0; i < game.bladeCount; i++) {
-        final a = arm.angle + i * math.pi * 2 / game.bladeCount;
-        var diff = (monsterAngle - a) % (math.pi * 2);
-        if (diff > math.pi) diff -= math.pi * 2;
-        if (diff.abs() <= angularHalf) {
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) continue;
+      // 扇形判定：逐扇叶检查各自豁免，命中后立即登记；扇叶之间互不共享
+      final hitBlade = bladeAngleHit(
+        game: game,
+        arm: arm,
+        targetAngle: math.atan2(toM.y, toM.x),
+        angularHalf: bladeAngularHalf(arm, m.radius, dist),
+        canHit: (i) => m.bladeHitCds.canBladeHit(i),
+      );
+      if (hitBlade == null) continue;
       _hitMonster(game, m, game.hitDamageBase,
           pierceIgnore: pierceIgnore,
           knockLv: knockLv,
           lifestealLv: lifestealLv,
           toM: toM);
-      m.orbHitCd = game.battleNum('weapon', 'hit_cd', 0.3);
+      m.bladeHitCds.markBladeHit(hitBlade, hitCd);
     }
 
-    // 参照物扫掠：可击破参照物被扇叶命中扣血（无暴击，0.3s/个冷却）
-    _sweepMapObjects(game, arm, dt);
+    // 参照物扫掠同样按扇叶独立豁免
+    game.sweepMapObjects(game, arm, dt);
   }
 
   /// 命中结算：暴击判定 → 穿刺破甲（按比例无视护甲，在 takeDamage 内
@@ -446,56 +443,4 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     );
   }
 
-  /// 参照物扫掠判定（§7/§2）：可击破参照物中心距玩家 ≤ 外环+radius
-  /// （无内圈豁免）且角度落在扇叶角 ± atan(半宽+radius, dist)
-  /// → 扣 hp（arm.damage×乘区，无暴击）；per-object 0.3s 冷却保证 hp
-  /// 「累积破坏」口径成立（无冷却时高伤一帧即碎）。
-  void _sweepMapObjects(
-    JourneyFlameGame game,
-    JourneyWeaponArm arm,
-    double dt,
-  ) {
-    final cd = game._mapObjHitCd;
-    if (cd.isNotEmpty) {
-      final expired = <int>[];
-      cd.forEach((k, v) {
-        if (v - dt <= 0) {
-          expired.add(k);
-        } else {
-          cd[k] = v - dt;
-        }
-      });
-      for (final k in expired) {
-        cd.remove(k);
-      }
-    }
-    final center = game.player.position;
-    final objs = game.runtime.mapObjects;
-    for (var i = 0; i < objs.length; i++) {
-      if (!game.isMapObjectBreakableAlive(i)) continue;
-      if (cd.containsKey(i)) continue;
-      final o = objs[i];
-      final toO = Vector2(o.x, o.y) - center;
-      final dist = toO.length;
-      // 无内圈豁免：外环可及即参与扇形判定
-      if (dist > arm.outerRadius + o.radius || dist < 1) {
-        continue;
-      }
-      final objAngle = math.atan2(toO.y, toO.x);
-      final angularHalf = math.atan2(arm.halfWidth + o.radius, dist);
-      var hit = false;
-      for (var b = 0; b < game.bladeCount; b++) {
-        final a = arm.angle + b * math.pi * 2 / game.bladeCount;
-        var diff = (objAngle - a) % (math.pi * 2);
-        if (diff > math.pi) diff -= math.pi * 2;
-        if (diff.abs() <= angularHalf) {
-          hit = true;
-          break;
-        }
-      }
-      if (!hit) continue;
-      game.damageMapObject(i, game.hitDamageBase);
-      game._mapObjHitCd[i] = game.battleNum('weapon', 'hit_cd', 0.3);
-    }
-  }
 }

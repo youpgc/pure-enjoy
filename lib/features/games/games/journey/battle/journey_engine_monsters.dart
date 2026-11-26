@@ -107,8 +107,10 @@ class JourneyMonsterComponent extends PositionComponent
   bool isDead = false;
   bool _aggro = false;
 
-  /// 环绕法宝命中冷却：防旋转扫过同一怪连击叠伤。
-  double orbHitCd = 0;
+  /// 环绕扇叶命中豁免：每个扇叶对同一怪独立计时，互不共享。
+  /// 扇叶命中后，其伤害与由命中触发的效果在同一窗口内不再结算。
+  final List<double> bladeHitCds =
+      List<double>.filled(kJourneyMaxBlades, 0);
 
   /// 并行攻击单位命中冷却：按形态分槽，避免不同形态互相吞命中。
   /// 槽位由 [_attackUnitSlot] 映射；同形态仍按 0.3s 去重。
@@ -260,9 +262,7 @@ class JourneyMonsterComponent extends PositionComponent
         }
       }
     }
-    if (orbHitCd > 0) {
-      orbHitCd -= dt;
-    }
+    bladeHitCds.tickBladeHits(dt);
     for (var i = 0; i < attackUnitCds.length; i++) {
       if (attackUnitCds[i] > 0) {
         attackUnitCds[i] -= dt;
