@@ -186,11 +186,10 @@ String journeySlotValueText(String code, int level, double perLevel) {
   )}';
 }
 
-/// 顿悟卡描述：后台每级效果文案优先，空时回落简介 + 当前值→下一级值；
-/// 无匹配规则时同样回落后台文案。后台可随时改写措辞，无需发版。
+/// 顿悟卡描述：简介 + 当前值→下一级值动态对比，让升级收益一目了然；
+/// 无匹配规则时回落后台每级效果文案。后台每级效果文案用于习得卡，
+/// 不覆盖升级卡的数值提升展示。
 String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
-  final remote = def.effectPerLevel.trim();
-  if (remote.isNotEmpty) return remote;
   final rule = _slotDisplayRule(def.code);
   if (rule.brief.isEmpty) return def.effectPerLevel;
   final before = _formatSlotValue(
