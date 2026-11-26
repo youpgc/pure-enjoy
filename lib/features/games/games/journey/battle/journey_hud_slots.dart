@@ -240,6 +240,10 @@ class JourneyHudSlotBar extends StatelessWidget {
       'recovery': '回元',
       'shield': '护体',
       'slow': '缚灵',
+      'bloodlust': '嗜血',
+      'desperation': '背水',
+      'qiankun': '乾坤',
+      'poison': '淬毒',
     };
     final name = names[code] ?? code;
     return name.length > 2 ? name.substring(0, 2) : name;

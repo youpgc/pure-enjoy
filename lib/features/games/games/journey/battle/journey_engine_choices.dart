@@ -72,6 +72,26 @@ enum _SlotUnit { percent, intValue, perSecond, count }
       return (brief: '护盾点数', unit: _SlotUnit.intValue, base: 0, fallback: 20, cap: double.infinity);
     case 'slow':
       return (brief: '范围减速', unit: _SlotUnit.percent, base: 0, fallback: 0.06, cap: 0.70);
+    case 'bloodlust':
+      return (brief: '满血攻速', unit: _SlotUnit.percent, base: 0, fallback: kJourneyBloodlustAmpPerLv, cap: double.infinity);
+    case 'desperation':
+      return (brief: '满血增伤', unit: _SlotUnit.percent, base: 0, fallback: kJourneyDesperationAmpPerLv, cap: double.infinity);
+    case 'qiankun':
+      return (
+        brief: '命中护盾',
+        unit: _SlotUnit.intValue,
+        base: kJourneyQiankunShieldBase,
+        fallback: kJourneyQiankunShieldPerLv,
+        cap: double.infinity,
+      );
+    case 'poison':
+      return (
+        brief: '中毒伤害',
+        unit: _SlotUnit.percent,
+        base: kJourneyPoisonRatioBase,
+        fallback: kJourneyPoisonRatioPerLv,
+        cap: double.infinity,
+      );
     default:
       return (brief: '', unit: _SlotUnit.intValue, base: 0, fallback: 0, cap: double.infinity);
   }
@@ -93,14 +113,36 @@ double _slotDisplayValue(
   final cached = JourneyConfigService.instance.cached;
   // 处决展示与结算同源：下限读 normal_floor、上限读 normal_cap，
   // 反震展示上限共用 reflect_cap，避免后台调参后卡牌显示与实际不符
-  final base = code == 'execute'
-      ? (cached?.battleNum(
-                  'execute', 'normal_floor', kJourneyExecuteNormalFloorRatio) ??
-              kJourneyExecuteNormalFloorRatio)
-          .clamp(0.0, 1.0)
-      : rule.base;
+  final base = switch (code) {
+    'execute' => (cached?.battleNum(
+              'execute',
+              'normal_floor',
+              kJourneyExecuteNormalFloorRatio,
+            ) ??
+            kJourneyExecuteNormalFloorRatio)
+        .clamp(0.0, 1.0),
+    'qiankun' =>
+      cached?.battleNum(
+            'weapon',
+            'qiankun_base',
+            kJourneyQiankunShieldBase,
+          ) ??
+          kJourneyQiankunShieldBase,
+    'poison' =>
+      cached?.battleNum(
+            'weapon',
+            'poison_base',
+            kJourneyPoisonRatioBase,
+          ) ??
+          kJourneyPoisonRatioBase,
+    _ => rule.base,
+  };
   final step = perLevel > 0 ? perLevel : rule.fallback;
-  final raw = (code == 'pierce' || code == 'lifesteal' || code == 'execute')
+  final raw = (code == 'pierce' ||
+          code == 'lifesteal' ||
+          code == 'execute' ||
+          code == 'qiankun' ||
+          code == 'poison')
       ? base + step * (level - 1)
       : base + step * level;
   final cap = code == 'reflect'

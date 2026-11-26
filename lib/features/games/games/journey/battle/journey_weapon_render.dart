@@ -20,6 +20,9 @@ class JourneyOrbitWeapons extends Component {
     final arm = game.weaponArm;
     if (arm == null) return;
     var speed = game.spinAmp; // 全局转速乘区（转速槽/天赋/避水珠）
+    // 嗜血：血量越低档位越高，逐帧并入转速乘区；满配低血时与此前
+    // 全部转速来源叠加后触达下方的 5 圈/秒硬上限。
+    speed += game.bloodlustAmp;
     // 悟空「大圣威压」增益期间转速额外提升（光环参数 aura_params.spin_amp，
     // 后台可配；身外身法/三头六臂为特殊能力窗口，增量固定）
     if (game._wukongBuffTimer > 0) {

@@ -239,3 +239,28 @@ const Map<String, double> kJourneyBossArmorDefaults = {
   'jiuling_yuansheng': 200,
   'yutu_jing': 76,
 };
+
+/// ---- 低血增益与命中新槽（journey_weapon_slots.value_per_level 可覆盖）----
+
+/// 低血增益的最低血量阈值：每缺失 10% 血量升 1 档，到该阈值封顶，
+/// 满血为第 0 档仍享有基础加成。对应 journey_battle_params.weapon
+/// 的 bloodlust_min_hp_ratio / desperation_min_hp_ratio。
+const double kJourneyLowHpThresholdRatio = 0.10;
+const int kJourneyLowHpTierCount = 10;
+
+/// 嗜血每级攻速乘区增量：9 级 × 10 档 = +540%，使满配低血时
+/// 叠加既有转速来源后触达 5 圈/秒上限。
+const double kJourneyBloodlustAmpPerLv = 0.06;
+
+/// 背水一战每级增伤增量：9 级 × 10 档 = +300%。
+const double kJourneyDesperationAmpPerLv = 1 / 30;
+
+/// 乾坤命中护盾：1 级基数，每级增量，9 级 = 100 点（上限=最大生命）。
+const double kJourneyQiankunShieldBase = 20;
+const double kJourneyQiankunShieldPerLv = 10;
+
+/// 淬毒：1 级基准比例、每级增量，9 级 = 30% 基础攻击力/秒；
+/// 持续秒数与基准比例均由 journey_battle_params.weapon 可配。
+const double kJourneyPoisonRatioBase = 0.05;
+const double kJourneyPoisonRatioPerLv = 0.03125;
+const double kJourneyPoisonSeconds = 5;

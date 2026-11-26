@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 淬毒：毒滴与弥散气泡，命中附着持续伤害 -->
+  <g fill="none" stroke="#E8C470" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 3 C12 3 6 11 6 15 A6 6 0 0 0 18 15 C18 11 12 3 12 3 Z"/>
+    <path d="M9.5 15 H10.5 M13.5 15 H14.5"/>
+    <path d="M10 18 Q12 20 14 18"/>
+  </g>
+</svg>

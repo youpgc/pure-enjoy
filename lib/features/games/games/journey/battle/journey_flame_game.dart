@@ -30,6 +30,7 @@ part 'journey_engine_abilities.dart';
 part 'journey_engine_ability_state.dart';
 part 'journey_engine_weapons.dart';
 part 'journey_engine_blade_hits.dart';
+part 'journey_engine_hp_scaling.dart';
 part 'journey_engine_attack_units.dart';
 part 'journey_engine_attack_forms.dart';
 part 'journey_engine_attack_beam_fx.dart';
@@ -238,7 +239,8 @@ class JourneyFlameGame extends FlameGame
   /// - damageAmp：武器增伤%（1.0 基准，舍利子 +15%/级、红孩儿光环 +8%，
   ///   钳 ≤+200%）；
   /// - 紫金宝葫叠层 3%/层（jinjiao 特殊能力，击杀精英/妖王 +1 层）；
-  /// - 三头六臂（nezha 特殊能力）增益窗口 +40%。
+  /// - 三头六臂（nezha 特殊能力）增益窗口 +40%；
+  /// - 背水一战维度槽：随缺失生命档位提升，满级低血 +300%。
   double get damageAmpTotal =>
       attackAmp +
       (damageAmp - 1.0)
@@ -246,7 +248,8 @@ class JourneyFlameGame extends FlameGame
       battleNum('ability', 'jinjiao_per_stack', 0.03) * _jinjiaoStacks +
       (_nezhaWindow > 0
           ? battleNum('ability', 'nezha_amp', 0.4)
-          : 0);
+          : 0) +
+      desperationAmp;
 
   /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 fallback）。
   /// [group] 为参数分组（damage/spawn/monster/boss/ability/economy/…），
@@ -265,9 +268,11 @@ class JourneyFlameGame extends FlameGame
     return v > 0 ? v : fallback;
   }
 
-  /// 属性面板展示口径：最终角速度（含 5 圈/秒=10π 钳制，与环绕推进同源）。
+  /// 属性面板展示口径：最终角速度（含嗜血低血加成与 5 圈/秒=10π 钳制，
+  /// 与环绕推进同源；不含限时增益窗口的临时转速）。
   double get displayAngularSpeed =>
-      ((weaponArm?.speedBase ?? 0) * spinAmp).clamp(0.0, 10 * math.pi);
+      ((weaponArm?.speedBase ?? 0) * (spinAmp + bloodlustAmp))
+          .clamp(0.0, 10 * math.pi);
 
   // ---- 特效触发法宝（§6）----
   /// 已激活的触发型法宝（kunxian_rope/fanshang_thorns/baoji_thunder）。

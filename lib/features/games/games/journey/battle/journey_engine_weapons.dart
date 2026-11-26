@@ -190,6 +190,10 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       case 'recovery': // 回元：周期回血，在 tickNewSlots 侧按等级读取
       case 'shield': // 护体金光：周期护盾，在 tickNewSlots 侧按等级读取
       case 'slow': // 缚灵：范围减速，在 tickNewSlots 侧按等级读取
+      case 'bloodlust': // 嗜血：攻速随缺失生命档位变化，逐帧并入环绕转速
+      case 'desperation': // 背水一战：增伤随档位变化，并入伤害公式合计
+      case 'qiankun': // 乾坤：命中获盾，在 _hitMonster 结算
+      case 'poison': // 淬毒：命中上毒，在 _hitMonster 结算
       case 'knockback':
       case 'lifesteal':
       case 'pierce':
@@ -367,6 +371,36 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       // 走共享口径（见 lifestealHealOf）；秒窗合计钳到最大生命一定比例
       // （防多目标高频命中叠乘；禁疗由 addLifestealHeal 拦截）。
       game.addLifestealHeal(game.lifestealHealOf(dmg, lifestealLv));
+    }
+    final qiankunLv = game.slotLevel('qiankun');
+    if (qiankunLv > 0) {
+      // 乾坤：命中获盾，基数与每级增量后台可配；gainShield 封顶最大生命，
+      // 盾满不再增长，与护体/拾取护盾共用同一盾池。
+      final add =
+          game.battleNum(
+            'weapon',
+            'qiankun_base',
+            kJourneyQiankunShieldBase,
+          ) +
+          game.slotValue('qiankun', kJourneyQiankunShieldPerLv) *
+              (qiankunLv - 1);
+      game.player.gainShield(add);
+    }
+    final poisonLv = game.slotLevel('poison');
+    if (poisonLv > 0 && !m.isDead) {
+      // 淬毒：命中点燃中毒，同一 source key 覆盖实现不可叠加、二次命中
+      // 重置时长；伤害按伤害基础值（武器伤害+等级攻击+角色基础攻击）比例
+      // 结算，走绕甲的真实伤害通道。
+      final base =
+          game.battleNum('weapon', 'poison_base', kJourneyPoisonRatioBase) +
+          game.slotValue('poison', kJourneyPoisonRatioPerLv) * (poisonLv - 1);
+      m.ignite(
+        source: 'weapon_poison',
+        burnDps: game.damageBaseValue * base,
+        seconds:
+            game.battleNum('weapon', 'poison_sec', kJourneyPoisonSeconds),
+        trueDamage: true,
+      );
     }
     if (knockLv > 0 || game.player.bonusKnockback > 0) {
       var kb = game.slotValue('knockback', 16) * knockLv +

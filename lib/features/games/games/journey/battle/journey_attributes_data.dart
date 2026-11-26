@@ -60,6 +60,10 @@ abstract final class JourneyAttributesData {
     'recovery': '回元',
     'shield': '护体',
     'slow': '缚灵',
+    'bloodlust': '嗜血',
+    'desperation': '背水',
+    'qiankun': '乾坤',
+    'poison': '淬毒',
   };
 
   static List<JourneyAttrGroup> collect(JourneyFlameGame game) {

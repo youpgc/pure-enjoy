@@ -454,6 +454,12 @@ const List<Map<String, dynamic>> kJourneySlotDefSeed =
   {'code': 'reflect', 'name': '金钟罩', 'kind': 'attribute', 'effect_per_level': '盾抵反震倍率 +15%', 'max_level': 9, 'value_per_level': 0.15},
   // 处决：任意伤害后残血斩杀；普通怪血线 1%+每级增量，妖王按绝对血线双钳
   {'code': 'execute', 'name': '处决', 'kind': 'attribute', 'effect_per_level': '血量低于斩杀线触发处决', 'max_level': 9, 'value_per_level': 0.0175},
+  // 低血增益：每缺失 10% 血量升 1 档，到 10% 血量阈值封顶
+  {'code': 'bloodlust', 'name': '嗜血', 'kind': 'attribute', 'effect_per_level': '低血攻速 +6%/档', 'max_level': 9, 'value_per_level': 0.06},
+  {'code': 'desperation', 'name': '背水一战', 'kind': 'attribute', 'effect_per_level': '低血增伤 +3.3%/档', 'max_level': 9, 'value_per_level': 0.0333333333},
+  // 命中特效：乾坤加盾（1~9 级 20~100 点）、淬毒（1~9 级 5%~30%/秒·5 秒）
+  {'code': 'qiankun', 'name': '乾坤', 'kind': 'effect', 'effect_per_level': '命中获护盾 20~100', 'max_level': 9, 'value_per_level': 10},
+  {'code': 'poison', 'name': '淬毒', 'kind': 'effect', 'effect_per_level': '命中中毒 5%~30%/秒·5秒', 'max_level': 9, 'value_per_level': 0.03125},
 ];
 
 // ---- 局外玩法种子（M3；镜像 SQL 种子 feature_journey_m3_20261105）----
