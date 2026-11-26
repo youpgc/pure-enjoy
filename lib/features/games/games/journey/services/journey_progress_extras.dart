@@ -38,24 +38,6 @@ extension JourneyProgressExtras on JourneyProgressService {
     return true;
   }
 
-  /// 图鉴解锁（功德定价）：按 journey_relic_unlocks 配置取 merit_cost；
-  /// 重复解锁/功德不足返回 false。图鉴解锁不产生功德流水
-  /// （source_type CHECK 无武器口径），仅扣功德 + 落解锁记录并双写。
-  Future<bool> unlockWeaponWithMerit(String weaponCode) async {
-    await ensureLoaded();
-    if (_state.unlockedWeapons.contains(weaponCode)) return false;
-    final relic = JourneyConfigService.instance.cached?.relicOf(weaponCode);
-    final cost = relic?.meritCost ?? 0;
-    if (_state.meritBalance < cost) return false;
-    // 扣费与解锁合并为一次状态变更+落盘，避免中途失败出现「已解锁未扣费」
-    _state = _copyState(
-      meritBalance: _state.meritBalance - cost,
-      unlockedWeapons: Set<String>.of(_state.unlockedWeapons)..add(weaponCode),
-    );
-    await _persist();
-    return true;
-  }
-
   /// 从远端回拉本游戏已解锁成就 code 并并入本地状态（清缓存后恢复点亮态）。
   /// 取并集：远端已解锁的补亮；本地已有但远端暂不可达的保留（离线兼容）。
   Future<void> syncUnlockedAchievements() async {

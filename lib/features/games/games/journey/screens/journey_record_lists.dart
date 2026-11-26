@@ -20,6 +20,7 @@ const Map<String, String> _kSourceLabels = <String, String>{
   'talent_spend': '天赋点亮',
   'character_unlock': '角色解锁',
   'revive_spend': '还魂复活',
+  'unlock_spend': '统一解锁',
 };
 
 /// 时间：yyyy-MM-dd HH:mm（北京墙钟口径，禁止设备时区）。

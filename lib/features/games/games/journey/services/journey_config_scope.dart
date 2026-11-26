@@ -22,6 +22,7 @@ enum JourneyConfigTable {
   drops('journey_drops', 'table_code.asc'),
   evoRecipes('journey_evo_recipes', 'seq.asc'),
   relicUnlocks('journey_relic_unlocks', 'seq.asc'),
+  unlockEntries('journey_unlock_entries', 'code.asc'),
   pickups('journey_pickups', 'code.asc'),
   dailyMaps('journey_daily_maps', 'sort.asc'),
   endlessWaves('journey_endless_waves', 'wave_no.asc'),
@@ -108,6 +109,7 @@ extension JourneyConfigScopeTables on JourneyConfigScope {
           JourneyConfigTable.weapons,
           JourneyConfigTable.monsters,
           JourneyConfigTable.relicUnlocks,
+          JourneyConfigTable.unlockEntries,
         },
       JourneyConfigScope.achievements => base,
       // 战斗引擎帧内会读强度曲线、维度槽、掉落、法宝/妖王参数等，

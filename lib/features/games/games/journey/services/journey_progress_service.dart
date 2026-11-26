@@ -5,12 +5,14 @@ import '../../../../../services/supabase_service.dart';
 import '../../../../../utils/cache_helper.dart';
 import '../models/journey_models.dart';
 import '../models/journey_talent_models.dart';
+import '../models/journey_unlock_models.dart';
 import 'journey_config_service.dart';
 import 'journey_progress_sync.dart';
 import 'journey_seed.dart';
 import 'journey_time.dart';
 
 part 'journey_progress_talent.dart';
+part 'journey_progress_unlock.dart';
 
 /// 西行·用户进度服务（本地持久化优先，登录态双写远端）。
 ///
@@ -28,24 +30,6 @@ class JourneyProgressService extends ChangeNotifier {
 
   /// 本地流水/西行记录保留条数（新的在前）。
   static const int _recordLimit = 50;
-
-  /// 相生链：生我者（下一组解锁需本系前一组与生我者系前一组均修满）。
-  static const Map<String, String> generatorOf = <String, String>{
-    'metal': 'earth', // 土生金
-    'water': 'metal', // 金生水
-    'wood': 'water', // 水生木
-    'fire': 'wood', // 木生火
-    'earth': 'fire', // 火生土
-  };
-
-  /// 相克链：克我者。当前天赋解锁已不设相克制衡，留存供展示/后续复用。
-  static const Map<String, String> restrainerOf = <String, String>{
-    'metal': 'fire', // 火克金
-    'wood': 'metal', // 金克木
-    'water': 'earth', // 土克水
-    'fire': 'water', // 水克火
-    'earth': 'wood', // 木克土
-  };
 
   JourneyProgressModel _state = const JourneyProgressModel();
   JourneyProgressModel get state => _state;
@@ -100,6 +84,10 @@ class JourneyProgressService extends ChangeNotifier {
             ((raw['unlocked_weapons'] as List<dynamic>?) ?? const <dynamic>[])
                 .cast<String>()
                 .toSet(),
+        unlockedEntries:
+            ((raw['unlocked_entries'] as List<dynamic>?) ?? const <dynamic>[])
+                .cast<String>()
+                .toSet(),
         unlockedAchievements:
             ((raw['unlocked_achievements'] as List<dynamic>?) ??
                     const <dynamic>[])
@@ -140,10 +128,18 @@ class JourneyProgressService extends ChangeNotifier {
           ((row['unlocked_characters'] as List<dynamic>?) ?? const <dynamic>[])
               .cast<String>()
               .toSet(),
-      unlockedWeapons:
-          ((row['unlocked_weapons'] as List<dynamic>?) ?? const <dynamic>[])
+      // 与新增列同口径：远端缺列时保留本地老档，避免已购法宝/被动被清空。
+      unlockedWeapons: row.containsKey('unlocked_weapons')
+          ? ((row['unlocked_weapons'] as List<dynamic>?) ?? const <dynamic>[])
               .cast<String>()
-              .toSet(),
+              .toSet()
+          : null,
+      // 列未随 DDL 落地时保留本地值，不覆盖老档。
+      unlockedEntries: row.containsKey('unlocked_entries')
+          ? ((row['unlocked_entries'] as List<dynamic>?) ?? const <dynamic>[])
+              .cast<String>()
+              .toSet()
+          : null,
       lastDailyDate: row['last_daily_date'] as String?,
       totalMeritEarned: (row['total_merit_earned'] as num?)?.toInt(),
     );
@@ -238,6 +234,7 @@ class JourneyProgressService extends ChangeNotifier {
     List<JourneyRunRecordModel>? runRecords,
     Set<String>? unlockedCharacters,
     Set<String>? unlockedWeapons,
+    Set<String>? unlockedEntries,
     Set<String>? unlockedAchievements,
     String? lastDailyDate,
     int? totalMeritEarned,
@@ -252,6 +249,7 @@ class JourneyProgressService extends ChangeNotifier {
         runRecords: runRecords ?? _state.runRecords,
         unlockedCharacters: unlockedCharacters ?? _state.unlockedCharacters,
         unlockedWeapons: unlockedWeapons ?? _state.unlockedWeapons,
+        unlockedEntries: unlockedEntries ?? _state.unlockedEntries,
         unlockedAchievements:
             unlockedAchievements ?? _state.unlockedAchievements,
         lastDailyDate: lastDailyDate ?? _state.lastDailyDate,
@@ -405,10 +403,13 @@ class JourneyProgressService extends ChangeNotifier {
     return <String>{..._state.unlockedWeapons, ...bound};
   }
 
-  Future<void> unlockWeapon(String code) => _addUnlock(
-        code: code,
-        isCharacter: false,
-      );
+  // 旧「直接置解锁位」入口已停用：法宝/被动统一走 JourneyProgressService
+  // 的 unlockWeaponWithMerit（校验条件 → 扣功德 → 写 unlock_spend 流水 → 落条目）。
+  // 保留源码便于恢复；启用前需确认不会绕过统一门控与功德账。
+  // Future<void> unlockWeapon(String code) => _addUnlock(
+  //       code: code,
+  //       isCharacter: false,
+  //     );
 
   /// 切换出战角色（仅已解锁角色；持久化供下次进页恢复）。
   Future<void> selectCharacter(String code) async {
@@ -418,21 +419,6 @@ class JourneyProgressService extends ChangeNotifier {
     await _persist();
   }
 
-  Future<void> _addUnlock({
-    required String code,
-    required bool isCharacter,
-  }) async {
-    await ensureLoaded();
-    final existing =
-        isCharacter ? _state.unlockedCharacters : _state.unlockedWeapons;
-    if (existing.contains(code)) return;
-    final next = Set<String>.of(existing)..add(code);
-    _state = _copyState(
-      unlockedCharacters: isCharacter ? next : null,
-      unlockedWeapons: isCharacter ? null : next,
-    );
-    await _persist();
-  }
 
   Future<void> _persist() async {
     // 北京墙钟 ISO（isUtc 标记，字段=BJ 墙钟；Z 后缀保证跨设备解析同口径，
@@ -448,6 +434,7 @@ class JourneyProgressService extends ChangeNotifier {
       'run_records': _state.runRecords.map((r) => r.toJson()).toList(),
       'unlocked_characters': _state.unlockedCharacters.toList(),
       'unlocked_weapons': _state.unlockedWeapons.toList(),
+      'unlocked_entries': _state.unlockedEntries.toList(),
       'unlocked_achievements': _state.unlockedAchievements.toList(),
       'last_daily_date': _state.lastDailyDate,
       'total_merit_earned': _state.totalMeritEarned,
@@ -469,6 +456,7 @@ class JourneyProgressService extends ChangeNotifier {
       'talent_levels': _state.talentLevels,
       'unlocked_characters': _state.unlockedCharacters.toList(),
       'unlocked_weapons': _state.unlockedWeapons.toList(),
+      'unlocked_entries': _state.unlockedEntries.toList(),
       'selected_character': selectedCharacterCode,
       'last_daily_date': _state.lastDailyDate,
       'total_merit_earned': _state.totalMeritEarned,

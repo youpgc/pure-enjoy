@@ -203,7 +203,8 @@ class JourneyMeritRecordModel {
 
   /// 入账后余额快照（append-only 口径）。
   final int balanceAfter;
-  final String sourceType; // run_settle / talent_spend / character_unlock
+  // 流水来源：对局结算 / 天赋点亮 / 角色解锁 / 还魂复活 / 统一解锁
+  final String sourceType;
   final String refType;
   final String refId;
   final String remark;

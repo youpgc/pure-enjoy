@@ -516,6 +516,9 @@ class JourneyProgressModel {
   final Set<String> unlockedCharacters;
   final Set<String> unlockedWeapons;
 
+  /// 统一解锁条目键（目标类型:目标编码）；旧图鉴解锁列保留兼容。
+  final Set<String> unlockedEntries;
+
   /// 已解锁成就 code（本地缓存；远端真源 = user_game_achievements）。
   final Set<String> unlockedAchievements;
 
@@ -538,6 +541,7 @@ class JourneyProgressModel {
     this.runRecords = const <JourneyRunRecordModel>[],
     this.unlockedCharacters = const <String>{},
     this.unlockedWeapons = const <String>{},
+    this.unlockedEntries = const <String>{},
     this.unlockedAchievements = const <String>{},
     this.lastDailyDate = '',
     this.totalMeritEarned = 0,
@@ -547,6 +551,10 @@ class JourneyProgressModel {
       code == 'tang' || unlockedCharacters.contains(code);
 
   bool weaponUnlocked(String code) => unlockedWeapons.contains(code);
+
+  /// 统一解锁条目是否已点亮（键=目标类型:目标编码）。
+  bool entryUnlocked(String targetKind, String targetCode) =>
+      unlockedEntries.contains('$targetKind:$targetCode');
 
   /// 五行轨迹已点亮层数（v4 分支树：key 即分支编码，未点亮 0）。
   int talentLevelOf(String char, String branchCode) =>

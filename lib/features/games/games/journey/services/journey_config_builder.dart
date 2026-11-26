@@ -1,5 +1,6 @@
 import '../models/journey_models.dart';
 import '../models/journey_talent_models.dart';
+import '../models/journey_unlock_models.dart';
 import 'journey_config_scope.dart';
 import 'journey_config_snapshot.dart';
 import 'journey_seed.dart';
@@ -409,6 +410,11 @@ Map<String, List<JourneyLevelBossFightModel>> _levelBossFights(_RowsView view) {
       ),
       evoRecipes: relations.evoRecipes,
       relicUnlocks: relations.relicUnlocks,
+      unlockEntries: view.models(
+        JourneyConfigTable.unlockEntries,
+        () => const <JourneyUnlockEntryModel>[],
+        JourneyUnlockEntryModel.fromJson,
+      ),
       pickupConfigs: view.models(
         JourneyConfigTable.pickups,
         () => kJourneyPickupConfigSeed

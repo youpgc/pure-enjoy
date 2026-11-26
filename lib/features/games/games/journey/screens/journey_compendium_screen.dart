@@ -3,6 +3,7 @@ import 'package:flutter_svg/flutter_svg.dart';
 
 import '../battle/journey_sprites.dart';
 import '../models/journey_models.dart';
+import '../models/journey_unlock_models.dart';
 import '../services/journey_config_service.dart';
 import '../services/journey_kill_stats_service.dart';
 import '../services/journey_progress_service.dart';
@@ -17,6 +18,7 @@ import '../widgets/journey_busy.dart';
 import 'journey_compendium_widgets.dart';
 
 part 'journey_compendium_weapons.dart';
+part 'journey_compendium_unlocks.dart';
 
 /// 图鉴页（节点9 解锁链路 + 妖怪击杀图鉴）：法宝=功德+达成条件混合解锁
 /// 口径的展示层；妖怪=分类型击杀累计（击杀≥1 解锁，展示累计击杀数）。
@@ -100,7 +102,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     _unlocking = true;
     try {
       // 二次确认：功德消耗解锁前核对价与余额，避免误触（与角色解锁口径一致）
-      final cost = _config?.relicOf(w.code)?.meritCost ?? 0;
+      final cost = _unlockCostOf(w.code);
       final balance = JourneyProgressService.instance.state.meritBalance;
       final confirmed = await showDialog<bool>(
         context: context,
@@ -143,18 +145,23 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
     final progress = JourneyProgressService.instance;
     await progress.evaluateAchievements();
     _refreshProgress();
-    final relic = _config?.relicOf(w.code);
-    // 无成就配置（achievement_code 空）= 纯功德直购，跳过成就判定
-    final achieved = relic == null ||
-        relic.achievementCode.isEmpty ||
-        _unlockedAchievements.contains(relic.achievementCode);
+    // 统一规则与扣费服务共用判定；仅无规则的旧图鉴配置做成就预检。
+    final entry = _unlockEntryOf(w.code);
+    final achieved = entry != null
+        ? _unlockConditionMet(entry)
+        : (() {
+            final relic = _config?.relicOf(w.code);
+            return relic == null ||
+                relic.achievementCode.isEmpty ||
+                _unlockedAchievements.contains(relic.achievementCode);
+          })();
     if (!achieved) {
-      _toast('成就未达成，暂无法解锁');
+      _toast('前置条件未达成，暂无法解锁');
       return;
     }
     final ok = await progress.unlockWeaponWithMerit(w.code);
     _refreshProgress();
-    _toast(ok ? '「${w.name}」已入池' : '功德不足，暂无法解锁');
+    _toast(ok ? '「${w.name}」已入池' : '条件未达成或功德不足，暂无法解锁');
     if (ok && mounted) setState(() {});
   }
 
@@ -188,6 +195,7 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
       'active': '主动法宝',
       'passive': '被动加持',
       'effect': '特效触发',
+      'slot': '维度解锁',
       'monster': '妖怪',
     };
     final list = config.weapons.where((w) => w.category == _tab).toList()
@@ -212,7 +220,9 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen> {
           Expanded(
             child: _tab == 'monster'
                 ? _buildMonsterList()
-                : ListView.separated(
+                : _tab == 'slot'
+                    ? _buildSlotUnlockList()
+                    : ListView.separated(
                     padding: const EdgeInsets.all(16),
                     itemCount: list.length,
                     separatorBuilder: (_, __) => const SizedBox(height: 8),

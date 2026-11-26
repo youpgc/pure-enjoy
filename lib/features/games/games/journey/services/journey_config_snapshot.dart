@@ -1,6 +1,9 @@
 import '../models/journey_models.dart';
 import '../models/journey_talent_models.dart';
+import '../models/journey_unlock_models.dart';
 import 'journey_seed.dart';
+
+part 'journey_config_unlock_access.dart';
 
 /// 西行·配置快照（一次聚合全部 journey_* 静态配置）。
 class JourneyConfigSnapshot {
@@ -34,6 +37,9 @@ class JourneyConfigSnapshot {
 
   /// 图鉴解锁（journey_relic_unlocks，seq 升序）；空=消费侧回落内置种子。
   final List<JourneyRelicUnlockModel> relicUnlocks;
+
+  /// 统一解锁规则（journey_unlock_entries）；空=三类目标均不设门控。
+  final List<JourneyUnlockEntryModel> unlockEntries;
 
   /// 拾取物配置（journey_pickups，code 升序）；空=消费侧回落内置种子。
   final List<JourneyPickupConfigModel> pickupConfigs;
@@ -314,6 +320,7 @@ class JourneyConfigSnapshot {
     this.drops = const <JourneyDropModel>[],
     this.evoRecipes = const <JourneyEvoRecipeModel>[],
     this.relicUnlocks = const <JourneyRelicUnlockModel>[],
+    this.unlockEntries = const <JourneyUnlockEntryModel>[],
     this.pickupConfigs = const <JourneyPickupConfigModel>[],
     this.dailyMaps = const <JourneyDailyMapModel>[],
     this.endlessWaves = const <JourneyEndlessWaveModel>[],
@@ -497,13 +504,6 @@ class JourneyConfigSnapshot {
     return null;
   }
 
-  /// 武器图鉴解锁定价（未配置返回 null）。
-  JourneyRelicUnlockModel? relicOf(String weaponCode) {
-    for (final r in relicUnlocks) {
-      if (r.weaponCode == weaponCode) return r;
-    }
-    return null;
-  }
 
   /// 拾取物配置（未配置返回 null）。
   JourneyPickupConfigModel? pickupConfigOf(String code) {

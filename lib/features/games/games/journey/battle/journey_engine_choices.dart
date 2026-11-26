@@ -189,7 +189,9 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
   for (final def in defs.values) {
     final held = game.weaponSlots.where((s) => s.code == def.code).toList();
     if (held.isEmpty) {
-      if (hasEmptySlot) {
+      // 统一解锁规则：有规则且未解锁的后期维度不进习得池；无规则不设门控。
+      if (hasEmptySlot &&
+          !JourneyProgressService.instance.needsUnlock('slot', def.code)) {
         pool.add(JourneyUpgradeChoice(
           JourneyUpgradeKind.slotLearn,
           code: def.code,
@@ -214,8 +216,10 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
     final unlocked = JourneyProgressService.instance.state.unlockedWeapons;
     for (final p in kJourneyPassiveNames.entries) {
       if (game.passiveSlotCodes.contains(p.key)) continue;
-      if (kJourneyMeritPassives.contains(p.key) &&
-          !unlocked.contains(p.key)) {
+      // 统一规则优先；规则未配置时保留原「功德被动」硬编码门控。
+      if (JourneyProgressService.instance.needsWeaponUnlock(p.key) ||
+          (kJourneyMeritPassives.contains(p.key) &&
+              !unlocked.contains(p.key))) {
         continue;
       }
       pool.add(_passiveGrantChoice(
@@ -233,7 +237,9 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
   // 特效触发法宝卡（§6）：入池=已解锁且未持有（持有后不重复出现）
   for (final e in kJourneyEffectWeaponNames.entries) {
     final unlocked = JourneyProgressService.instance.state.unlockedWeapons;
-    if (game.effectWeapons.contains(e.key) || !unlocked.contains(e.key)) {
+    if (game.effectWeapons.contains(e.key) ||
+        !unlocked.contains(e.key) ||
+        JourneyProgressService.instance.needsWeaponUnlock(e.key)) {
       continue;
     }
     pool.add(JourneyUpgradeChoice(

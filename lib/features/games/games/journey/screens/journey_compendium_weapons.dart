@@ -15,15 +15,19 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
     final charLocked = boundChar.isNotEmpty &&
         !JourneyProgressService.instance.state
             .characterUnlocked(boundChar);
-    final relic = _config?.relicOf(w.code);
+    final entry = _unlockEntryOf(w.code);
+    // 有统一规则时以规则为准展示条件与定价，无规则回落旧图鉴口径。
+    final relic = entry == null ? _config?.relicOf(w.code) : null;
     final noAchievement = relic != null && relic.achievementCode.isEmpty;
     final unlocked = _isWeaponUnlocked(w);
-    final done = relic == null ||
-        noAchievement ||
-        _achievementDone(relic.achievementCode);
-    // 被动加持/特效触发法宝：成就达成且功德足够时锁图标点金，未达条件默认灰锁
+    final done = entry != null
+        ? _unlockConditionMet(entry)
+        : relic == null ||
+            noAchievement ||
+            _achievementDone(relic.achievementCode);
+    // 被动加持/特效触发法宝：条件达成且功德足够时锁图标点金，未达条件默认灰锁
     final meritEnough = JourneyProgressService.instance.state.meritBalance >=
-        (relic?.meritCost ?? 0);
+        _unlockCostOf(w.code);
     final unlockable = done && meritEnough;
     final showStatusLock = !unlocked &&
         !charLocked &&
@@ -99,10 +103,12 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
                     // 无成就配置=纯功德直购，否则展示成就条件+功德价
                     charLocked
                         ? '先解锁角色「${_charName(boundChar)}」'
-                        : noAchievement
-                            ? '功德 ${relic.meritCost} 解锁'
-                            : '解锁条件：${_achievementName(relic!.achievementCode)}'
-                                ' · ${relic.meritCost} 功德',
+                        : entry != null
+                            ? '${_conditionLabel(entry)} · ${_unlockCostOf(w.code)} 功德'
+                            : noAchievement
+                                ? '功德 ${relic.meritCost} 解锁'
+                                : '解锁条件：${_achievementName(relic!.achievementCode)}'
+                                    ' · ${relic.meritCost} 功德',
                     style: JourneyTheme.faint,
                   ),
                 ],
@@ -126,14 +132,16 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
                     ),
                   ),
                 JourneyButton(
-                  text: noAchievement ? '功德解锁' : '解锁',
+                  text: noAchievement || entry?.conditionType == 'none'
+                      ? '功德解锁'
+                      : '解锁',
                   enabled: done && !_unlocking,
                   onTap: () => _unlock(w),
                 ),
                 if (!done)
                   const Padding(
                     padding: EdgeInsets.only(top: 4),
-                    child: Text('成就未达成', style: JourneyTheme.faint),
+                    child: Text('前置条件未达成', style: JourneyTheme.faint),
                   ),
               ],
             ),
@@ -144,14 +152,37 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
     );
   }
 
-  /// 法宝是否已入池（解锁口径同 _buildWeaponCard：角色绑定未解锁→锁定，
-  /// 有 relic 配置看进度，无配置默认已解锁）。用于列表"已解锁优先"排序。
+  /// 法宝是否已入池（角色绑定未解锁→锁定；有统一规则按规则判定，
+  /// 无规则回落旧图鉴口径）。用于列表"已解锁优先"排序与卡片展示。
   bool _isWeaponUnlocked(JourneyWeaponModel w) {
     final boundChar = w.characterCode;
     final charLocked = boundChar.isNotEmpty &&
         !JourneyProgressService.instance.state.characterUnlocked(boundChar);
+    if (charLocked) return false;
+    // 有规则无图鉴行时不能走 relic==null 的「默认已解锁」旧口径，
+    // 否则该法宝既不显示购买按钮又被战斗门控挡住，成为永久死项。
+    final entry = _unlockEntryOf(w.code);
+    if (entry != null) {
+      return JourneyProgressService.instance
+          .isUnlockGranted(entry.targetKind, w.code);
+    }
     final relic = _config?.relicOf(w.code);
-    return !charLocked && (relic == null || _unlockedWeapons.contains(w.code));
+    return relic == null || _unlockedWeapons.contains(w.code);
+  }
+
+  /// 图鉴展示用条件判定：与扣费服务共用模型层判定，妖王击杀读已加载统计。
+  bool _unlockConditionMet(JourneyUnlockEntryModel entry) {
+    final state = JourneyProgressService.instance.state;
+    return journeyUnlockConditionMet(
+      entry,
+      JourneyUnlockConditionContext(
+        farthestLevelNo: state.farthestLevelNo,
+        totalKills: state.totalKills,
+        totalMeritEarned: state.totalMeritEarned,
+        unlockedAchievements: state.unlockedAchievements,
+        bossKills: _killStats,
+      ),
+    );
   }
 
   /// 角色名（绑定归属展示用；未配置时回落编码）。

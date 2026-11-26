@@ -102,6 +102,31 @@ class JourneyProgressSync {
         offset: offset,
       );
 
+  /// 指定妖王击杀数（journey_kill_stats.kills）：boss_killed 解锁条件真源。
+  /// 失败/无行返回 0（条件不满足，不误发放解锁）。
+  static Future<int> fetchBossKills(String userId, String monsterCode) async {
+    if (userId.isEmpty || monsterCode.isEmpty) return 0;
+    try {
+      final result = await ApiClient.get(
+        'journey_kill_stats',
+        filters: <String, String>{
+          'user_id': 'eq.$userId',
+          'monster_code': 'eq.$monsterCode',
+        },
+        select: 'kills',
+        limit: 1,
+        note: 'journey:boss_kills',
+      );
+      if (!result.isSuccess) return 0;
+      final rows = result.data ?? const <Map<String, dynamic>>[];
+      if (rows.isEmpty) return 0;
+      return (rows.first['kills'] as num?)?.toInt() ?? 0;
+    } catch (e) {
+      if (kDebugMode) debugPrint('journey 妖王击杀数拉取异常: $e');
+      return 0;
+    }
+  }
+
   /// 分页拉取西行记录（journey_runs，按时间倒序）。
   static Future<List<JourneyRunRecordModel>?> fetchRunRecordsPage(
     String userId, {
@@ -140,6 +165,7 @@ class JourneyProgressSync {
   static const List<String> _optionalProgressColumns = <String>[
     'last_daily_date',
     'total_merit_earned',
+    'unlocked_entries',
   ];
 
   static Future<void> upsertProgressRow(

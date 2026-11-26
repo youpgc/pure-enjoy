@@ -1,5 +1,23 @@
 part of 'journey_progress_service.dart';
 
+/// 相生链：生我者（下一组解锁需本系前一组与生我者系前一组均修满）。
+const Map<String, String> generatorOf = <String, String>{
+  'metal': 'earth', // 土生金
+  'water': 'metal', // 金生水
+  'wood': 'water', // 水生木
+  'fire': 'wood', // 木生火
+  'earth': 'fire', // 火生土
+};
+
+/// 相克链：克我者。当前天赋解锁已不设相克制衡，留存供展示/后续复用。
+const Map<String, String> restrainerOf = <String, String>{
+  'metal': 'fire', // 火克金
+  'wood': 'metal', // 金克木
+  'water': 'earth', // 土克水
+  'fire': 'water', // 水克火
+  'earth': 'wood', // 木克土
+};
+
 /// 西行·角色专属天赋树逻辑拆分（part 同 library：访问宿主私有状态）。
 ///
 /// 分支树制：点亮的前置校验与双消耗扣费入账。每角色一棵五行树
@@ -77,7 +95,7 @@ extension JourneyProgressTalent on JourneyProgressService {
         return '需本系${prevBranch == 'core' ? '本源枝' : '生息枝'}修满';
       }
       // 生我者系同组也要修满，确保相生关系成立后才开放下一组。
-      final generator = JourneyProgressService.generatorOf[element]!;
+      final generator = generatorOf[element]!;
       final genPrevCode = journeyBranchCode(char, generator, prevBranch);
       if (_state.talentLevelOf(char, genPrevCode) <
           _branchOf(char, generator, prevBranch).maxLv) {
