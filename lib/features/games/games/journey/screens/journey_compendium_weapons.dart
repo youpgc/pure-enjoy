@@ -132,9 +132,7 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
                     ),
                   ),
                 JourneyButton(
-                  text: noAchievement || entry?.conditionType == 'none'
-                      ? '功德解锁'
-                      : '解锁',
+                  text: '解锁',
                   enabled: done && !_unlocking,
                   onTap: () => _unlock(w),
                 ),
