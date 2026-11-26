@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 金铙困形：双钹合拢收人 -->
+  <g fill="none" stroke="#B08A3C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 8 Q9 5 11 12 Q9 19 5 16 Z"/>
+    <path d="M19 8 Q15 5 13 12 Q15 19 19 16 Z"/>
+    <path d="M11 12 L13 12"/>
+    <path d="M12 3 L12 6 M12 18 L12 21"/>
+  </g>
+</svg>

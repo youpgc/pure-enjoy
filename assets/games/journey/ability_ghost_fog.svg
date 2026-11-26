@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 玄阴黑雾：三缕阴雾缠身 -->
+  <g fill="none" stroke="#6A4A8A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M4 8 Q8 5 12 8 Q16 5 20 8"/>
+    <path d="M3 12 Q8 9 13 12 Q17 9 21 12"/>
+    <path d="M5 16 Q9 13 13 16 Q17 13 19 16"/>
+    <path d="M12 4 L12 6"/>
+  </g>
+</svg>

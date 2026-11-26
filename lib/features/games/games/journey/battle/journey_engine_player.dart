@@ -61,6 +61,17 @@ class JourneyPlayerComponent extends PositionComponent {
   int stingStacks = 0;
   double stingTimer = 0;
 
+  /// 情丝层数与计时（盘丝大王）：满层触发定身，区别于毒刺的真伤爆发。
+  int silkStacks = 0;
+  double silkTimer = 0;
+
+  /// 金铙困形剩余时间（黄眉）：>0 时视野收窄、限移，由渲染/移动读取。
+  double imprisonedTimer = 0;
+
+  /// 本次困形的施加总时长（取自后台 cymbal_root）：暗角渐隐按此归一，
+  /// 后台改时长后视觉同步，不写死常量。
+  double imprisonedSpan = 0;
+
   /// 单体持续伤害来源：妖王领域灼烧/毒雾按每次 tick 结算。
   double skillDotRemain = 0;
   double skillDotPerTick = 0;
@@ -83,6 +94,15 @@ class JourneyPlayerComponent extends PositionComponent {
     if (stingTimer > 0) {
       stingTimer = math.max(0, stingTimer - dt);
       if (stingTimer <= 0) stingStacks = 0;
+    }
+    if (silkTimer > 0) {
+      silkTimer = math.max(0, silkTimer - dt);
+      if (silkTimer <= 0) silkStacks = 0;
+    }
+    if (imprisonedTimer > 0) {
+      imprisonedTimer = math.max(0, imprisonedTimer - dt);
+      // 困形结束即清总时长，避免下一次困形复用上次的分母导致暗角淡不入。
+      if (imprisonedTimer <= 0) imprisonedSpan = 0;
     }
     if (skillDotRemain > 0) {
       skillDotRemain = math.max(0, skillDotRemain - dt);

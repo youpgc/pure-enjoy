@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 情丝缚魂：层叠丝线缠绕 -->
+  <g fill="none" stroke="#B05A7A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M5 4 Q19 8 5 12 Q19 16 5 20"/>
+    <path d="M19 4 Q5 8 19 12 Q5 16 19 20"/>
+    <path d="M9 7 L15 17 M15 7 L9 17"/>
+  </g>
+</svg>

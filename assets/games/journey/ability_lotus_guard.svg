@@ -1,0 +1,9 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 金莲护体：莲台外环反震 -->
+  <g fill="none" stroke="#3C7A9A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 20 Q5 17 6 11 Q12 8 18 11 Q19 17 12 20 Z"/>
+    <path d="M12 20 L12 9"/>
+    <path d="M8 12 Q12 15 16 12"/>
+    <path d="M4 6 L6 8 M20 6 L18 8 M12 3 L12 6"/>
+  </g>
+</svg>

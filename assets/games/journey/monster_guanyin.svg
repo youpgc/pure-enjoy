@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 观音菩萨·观音：净瓶+柳枝+莲台 -->
+  <g fill="none" stroke="#4E9A7A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 6 Q12 3 15 6"/>
+    <path d="M7 10 Q12 7 17 10 L17 18 L7 18 Z"/>
+    <path d="M18 10 L21 10 L20 16 L19 16 Z"/>
+    <path d="M21 10 L21 7"/>
+    <path d="M6 21 Q12 17 18 21"/>
+  </g>
+  <circle cx="12" cy="13" r="1.2" fill="#F6E3B4"/>
+</svg>

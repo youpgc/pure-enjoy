@@ -221,7 +221,10 @@ class JourneyMonsterModel {
   /// 新增：inner_core/fake_body/water_prison/five_thunder/ice_seal/mirror/
   /// root_bind/golden_bag/devour/three_bells/spear_thrust/earth_trap/
   /// plum_flower/nine_seize/ice_charge/moon_guard/tiger_pounce/black_wind/
-  /// deer_belly/ram_oil
+  /// deer_belly/ram_oil；
+  /// 稀有扩展：sleeve_cosmos/heavenly_eye/banana_storm/five_mountain/
+  /// golden_bell/silk_fate/trunk_coil/swallow_sky/pure_dew/lotus_guard/
+  /// ghost_fog/divine_fire，另有 shield_break/execute。
   final String abilityKey;
 
   /// 能力键列表（journey_monster_abilities 承载；空=沿用单值 abilityKey）。
@@ -285,7 +288,8 @@ class JourneyMonsterModel {
         expDrop: expDrop,
         meritDrop: meritDrop,
         abilityKey: abilityKey,
-        abilityKeys: keys,
+        // 后台重复配置同一能力键时去重，避免同帧重复派发。
+        abilityKeys: keys.toSet().toList(),
         hasAbilityRows: true,
       );
 }

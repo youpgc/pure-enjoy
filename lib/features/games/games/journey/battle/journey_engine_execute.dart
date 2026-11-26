@@ -11,24 +11,43 @@ const double kJourneyExecuteNormalCapRatio = 0.15;
 /// 所有阈值经 battleNum / monsterParam / slotValue 读取，缺行回落内置兜底。
 /// 处决只把血条清零，后续保命（免死/无敌帧/还魂）与击杀奖励走各自既有链路。
 extension JourneyExecuteCombat on JourneyFlameGame {
-  /// 妖王是否携带处决能力（ability_key=execute）。
+  /// 妖王是否携带处决能力（execute）或吞天斩杀（swallow_sky）。
   bool _hasPlayerExecuteAbility(JourneyMonsterComponent? attacker) =>
-      attacker != null && !attacker.isDead && attacker.model.hasAbility('execute');
+      attacker != null &&
+      !attacker.isDead &&
+      (attacker.model.hasAbility('execute') ||
+          attacker.model.hasAbility('swallow_sky'));
 
   /// 妖王处决玩家：仅携带该能力的妖王之伤害触发，判定在扣血与护盾抵扣之前。
   /// 命中直接清血条（穿透护盾）；无敌帧期间不触发，免死/还魂由死亡链处理。
-  bool tryExecutePlayer({required JourneyMonsterComponent? attacker}) {
+  /// [swallowHit] 仅由吞天巨口的真伤技能命中传入：接触伤害/其他来源即使
+  /// 来自该妖王也不触发吞天斩杀，避免低血时被任意伤害瞬杀。
+  bool tryExecutePlayer({
+    required JourneyMonsterComponent? attacker,
+    bool swallowHit = false,
+  }) {
     if (!_hasPlayerExecuteAbility(attacker) || player.hp <= 0) return false;
     if (player.invulnTimer > 0) return false;
-    final ratio = monsterParam(attacker!.model.code, 'execute_hp_ratio', 0.10)
-        .clamp(0.0, 1.0);
+    final code = attacker!.model.code;
+    // 吞天巨口走独立阈值，与原处决互不覆盖；两能力并存时取更高的斩杀线。
+    // 吞天阈值只在技能命中窗口生效，execute 维持任意伤害触发的既有口径。
+    final executeRatio = attacker.model.hasAbility('execute')
+        ? abilityParam(code, 'execute', 'execute_hp_ratio', 0.10)
+        : 0.0;
+    final swallowRatio =
+        (swallowHit && attacker.model.hasAbility('swallow_sky'))
+            ? abilityParam(code, 'swallow_sky', 'sky_execute_ratio', 0.12)
+            : 0.0;
+    final ratio =
+        math.max(executeRatio, swallowRatio).clamp(0.0, 1.0);
     if (ratio <= 0 || player.hp >= player.maxHp * ratio) return false;
     player.hp = 0;
     controller.hud.hp.value = 0;
     controller.hud.hitPulse.value++;
+    // 飘字按本次真正触发的斩杀通道显示，双能力并存不误报吞天。
     spawnFloatText(
       player.position + Vector2(0, -36),
-      '摄魂·处决',
+      swallowRatio >= executeRatio ? '吞天·斩杀' : '摄魂·处决',
       const Color(0xFFC0392B),
     );
     onPlayerHpChanged();

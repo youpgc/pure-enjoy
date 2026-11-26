@@ -38,7 +38,9 @@ extension JourneyShieldCombat on JourneyFlameGame {
     final ratio = (base + extra).clamp(0.0, cap);
     final damage = raw * ratio * shieldReflectFactor(attacker);
     if (damage <= 0) return;
-    attacker.takeDamage(damage, armorIgnore: 1);
+    // reflect=false 标记这是护盾反震：不再触发金莲反伤回到玩家，
+    // 否则「玩家受击→盾反→妖王金莲反伤→玩家受击」会无限递归。
+    attacker.takeDamage(damage, armorIgnore: 1, reflect: false);
     fxLayer.spawnRing(
       attacker.position,
       attacker.radius + 8,
@@ -73,7 +75,8 @@ extension JourneyShieldCombat on JourneyFlameGame {
     for (final m in monsters.toList()) {
       if (m.isDead) continue;
       if ((m.position - player.position).length > radius + m.radius) continue;
-      m.takeDamage(damage, armorIgnore: armorIgnore);
+      // 震荡同为玩家侧反制伤害，不回传金莲反伤，避免盾破链递归。
+      m.takeDamage(damage, armorIgnore: armorIgnore, reflect: false);
     }
     fxLayer.spawnRing(
       player.position,

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 哪吒·哪吒：双髻+乾坤圈+混天绫 -->
+  <g fill="none" stroke="#3C7A9A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 5 Q8 2 11 4"/>
+    <path d="M16 5 Q16 2 13 4"/>
+    <path d="M8 8 Q12 6 16 8 L16 18 L8 18 Z"/>
+    <path d="M5 12 Q3 9 6 8 M19 12 Q21 9 18 8"/>
+    <path d="M4 20 Q12 16 20 20"/>
+  </g>
+  <circle cx="10" cy="13" r="1" fill="#F6E3B4"/>
+  <circle cx="14" cy="13" r="1" fill="#F6E3B4"/>
+</svg>

@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 吞天巨口：血盆大口獠牙 -->
+  <g fill="none" stroke="#8E3B2C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M3 9 Q12 4 21 9 Q18 20 12 20 Q6 20 3 9 Z"/>
+    <path d="M3 9 Q12 13 21 9"/>
+    <path d="M7 11 L8 15 M12 12 L12 16 M17 11 L16 15"/>
+  </g>
+</svg>

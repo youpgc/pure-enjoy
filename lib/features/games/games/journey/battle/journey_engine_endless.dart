@@ -13,6 +13,23 @@ part of 'journey_flame_game.dart';
 ///   boss_count 本波妖王配额（0=全局公式兜底）；未配置按经验池公式推演；
 /// - 除尽推进不变：本波怪全灭且妖王配额耗尽才进下一波；末波（99）
 ///   清空→「妖潮无尽·功成」可结算。
+
+/// 彩蛋妖王只用于关卡/图鉴编排，不进常规无尽妖潮随机池。
+/// 关卡或波次显式配置 boss_code 指定它们时仍按配置降临，不受此表限制。
+const Set<String> kJourneyEndlessEggBossCodes = <String>{
+  'zhenyuanzi',
+  'erlang_shen',
+  'tieshan_gongzhu',
+  'rulai',
+  'pansi_dawang',
+  'bai_xiang_jing',
+  'qing_shi_jing',
+  'guanyin',
+  'nezha',
+  'diyu_guwang',
+  'taishang_laojun',
+};
+
 void journeyEndlessTick(JourneyFlameGame game, double dt) {
   final hud = game.controller.hud;
   if (hud.endlessWave.value != game._endlessWave) {
@@ -264,7 +281,9 @@ JourneyMonsterModel? _bossModelOf(JourneyFlameGame game, String code) {
 /// 保证妖王波有怪可降。候选池为空（远端怪物表缺失且种子无妖王）时按
 /// 配置 code 回落兜底。
 JourneyMonsterModel? _randomTideBoss(JourneyFlameGame game, String code) {
-  final bosses = _monsterSource(game).where((m) => m.isBoss).toList();
+  final bosses = _monsterSource(game)
+      .where((m) => m.isBoss && !kJourneyEndlessEggBossCodes.contains(m.code))
+      .toList();
   if (bosses.isEmpty) return _bossModelOf(game, code);
   final hpBase = game.battleNum('endless', 'boss_pool_hp_base', 0);
   final hpPerLv = game.battleNum('endless', 'boss_pool_hp_per_lv', 3000);

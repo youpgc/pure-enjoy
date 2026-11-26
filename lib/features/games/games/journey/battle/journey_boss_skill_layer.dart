@@ -79,6 +79,7 @@ class JourneyBossField {
     this.owner,
     this.followOwner,
     this.abilityKey,
+    this.effectDuration,
   });
 
   final Vector2 pos;
@@ -94,6 +95,9 @@ class JourneyBossField {
   final JourneyMonsterComponent? followOwner;
   /// 施法时的能力键：领域按 tick 延迟结算时仍能读到该能力的专属参数。
   final String? abilityKey;
+  /// 领域存活时长：减速类效果按它设置玩家负面态时长，
+  /// 使 prison_sec / frost_sec / mountain_sec 等逐能力配置生效。
+  final double? effectDuration;
 
   double _tickLeft = 0;
 }
@@ -199,6 +203,7 @@ class JourneyBossSkillLayer extends Component {
       owner: owner,
       followOwner: followOwner ? owner : null,
       abilityKey: abilityKey ?? game._abilityParamContext?.abilityKey,
+      effectDuration: life,
     ));
   }
 
@@ -304,6 +309,7 @@ class JourneyBossSkillLayer extends Component {
             rawDamage: f.rawDamage,
             owner: f.owner,
             abilityKey: f.abilityKey,
+            effectDuration: f.effectDuration,
           );
         }
       }
@@ -358,6 +364,38 @@ class JourneyBossSkillLayer extends Component {
         Paint()..color = p.color.withValues(alpha: 0.22),
       );
       canvas.drawCircle(p.pos.toOffset(), p.radius, Paint()..color = p.color);
+    }
+    // 金铙困形：视野收窄以角色为中心的镂空圆 + 外围压暗表现，随剩余时间渐弱。
+    final imprisoned = game.player.imprisonedTimer;
+    if (imprisoned > 0) {
+      final center = game.player.position.toOffset();
+      final hole = math.min(game.size.x, game.size.y) * 0.22;
+      final fade = (imprisoned /
+              (game.player.imprisonedSpan > 0
+                  ? game.player.imprisonedSpan
+                  : 3.0))
+          .clamp(0.0, 1.0);
+      // 本层挂在 world：遮罩矩形必须用相机可见的世界矩形，不能用屏幕尺寸
+      // 从原点起算，否则大地图中角色不在遮罩内，暗角完全看不见。
+      final visible = game.camera.visibleWorldRect;
+      final viewport = visible.isEmpty
+          ? Rect.fromCircle(center: center, radius: hole * 2)
+          : visible;
+      canvas.drawPath(
+        Path()
+          ..addRect(viewport)
+          ..addOval(Rect.fromCircle(center: center, radius: hole))
+          ..fillType = PathFillType.evenOdd,
+        Paint()..color = const Color(0xAA241A10).withValues(alpha: 0.72 * fade),
+      );
+      canvas.drawCircle(
+        center,
+        hole,
+        Paint()
+          ..color = const Color(0xFFB08A3C).withValues(alpha: 0.5 * fade)
+          ..style = PaintingStyle.stroke
+          ..strokeWidth = 3,
+      );
     }
   }
 }

@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 白象精·白象：长鼻+象牙 -->
+  <g fill="none" stroke="#8A7A5A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 8 Q12 5 17 8 L17 13 L7 13 Z"/>
+    <path d="M9 13 L9 17 Q9 21 12 21 Q15 21 15 17 L15 13"/>
+    <path d="M10 13 L10 18 M14 13 L14 18"/>
+    <path d="M7 9 L4 6 M17 9 L20 6"/>
+  </g>
+  <circle cx="10" cy="11" r="1" fill="#F6E3B4"/>
+  <circle cx="14" cy="11" r="1" fill="#F6E3B4"/>
+</svg>

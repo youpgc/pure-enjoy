@@ -505,8 +505,9 @@ class JourneyMonsterComponent extends PositionComponent
             stage * game.battleNum('boss', 'stage_damage_gain', 0.25));
   }
 
-  void takeDamage(double amount, {double armorIgnore = 0}) {
+  void takeDamage(double amount, {double armorIgnore = 0, bool reflect = true}) {
     if (isDead) return;
+    final rawBefore = amount;
     // 护罩优先抵扣（金铙/月华护盾），破产部分再走护甲与扣血
     if (ward > 0) {
       final absorbed = math.min(ward, amount);
@@ -523,6 +524,20 @@ class JourneyMonsterComponent extends PositionComponent
     }
     hp -= amount;
     _hpBarTimer = 2.5;
+    // 金莲护体（哪吒）：近身反伤，反弹玩家本次伤害的一部分。
+    // reflect=false 表示这已经是反弹伤害，避免玩家受击再触发妖王反伤的死循环。
+    if (reflect &&
+        !isDecoy &&
+        model.hasAbility('lotus_guard') &&
+        rawBefore > 0 &&
+        hp > 0) {
+      game.player.takeDamage(
+        rawBefore *
+            game.abilityParam(
+                model.code, 'lotus_guard', 'lotus_thorns', 0.3),
+        attacker: this,
+      );
+    }
     // 处决维度槽：任意伤害后血量落入阈值直接清血条，走既有击杀奖励链；
     // 置于阶段能力判定之前，处决命中后不再触发低血分裂/狂暴等阶段技。
     if (hp > 0) game.tryExecuteMonster(this);

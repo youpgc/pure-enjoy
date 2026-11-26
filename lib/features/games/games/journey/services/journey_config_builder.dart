@@ -338,6 +338,7 @@ Map<String, List<JourneyLevelBossFightModel>> _levelBossFights(_RowsView view) {
     final keys = rows
         .where((a) => a.enabled)
         .map((a) => a.abilityKey)
+        .toSet()
         .toList();
     return m.withAbilityKeys(keys);
   }).toList();

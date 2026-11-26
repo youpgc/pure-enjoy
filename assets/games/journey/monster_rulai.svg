@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 如来佛祖·如来：肉髻+莲座+掌印 -->
+  <g fill="none" stroke="#B8933A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 4 Q12 2 15 4 L15 7 L9 7 Z"/>
+    <path d="M12 7 L12 12"/>
+    <path d="M6 12 Q12 9 18 12 Q12 18 6 12 Z"/>
+    <path d="M7 20 Q12 16 17 20"/>
+  </g>
+  <circle cx="12" cy="12" r="1.6" fill="#F6E3B4"/>
+</svg>

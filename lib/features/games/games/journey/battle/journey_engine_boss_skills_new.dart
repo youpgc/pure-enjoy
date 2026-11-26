@@ -255,6 +255,167 @@ extension JourneyBossSkillsNew on JourneyFlameGame {
                 monsterParam(code, 'shield_break_raw', 1.0),
             owner: boss);
         break;
+      case 'sleeve_cosmos': // 镇元子·袖里乾坤：超远吸拉 + 极长定身 + 自身护罩
+        final reach = monsterParam(code, 'cosmos_range', 520);
+        if (dist <= reach) {
+          applyBossSkillEffect('pull',
+              power: monsterParam(code, 'cosmos_pull', 380), owner: boss);
+        }
+        applyBossSkillEffect('root',
+            power: monsterParam(code, 'cosmos_root', 3.2), owner: boss);
+        boss.grantWard(monsterParam(code, 'cosmos_ward', 0.9));
+        break;
+      case 'heavenly_eye': // 二郎神·天眼识破：真伤预警 + 破甲 + 强致盲
+        bossSkillLayer.castTelegraph(p.position,
+            radius: monsterParam(code, 'eye_range', 110),
+            delay: monsterParam(code, 'eye_delay', 0.7),
+            damage: boss.contactDamage * monsterParam(code, 'eye_ratio', 1.4),
+            effect: 'true_hit',
+            power: 0,
+            color: const Color(0xFFD9C97A),
+            owner: boss);
+        applyBossSkillEffect('armor_break',
+            power: monsterParam(code, 'eye_armor_break', 0.5), owner: boss);
+        applyBossSkillEffect('blind',
+            power: monsterParam(code, 'eye_blind', 3.5), owner: boss);
+        break;
+      case 'banana_storm': // 铁扇公主·芭蕉神扇：超大范围吹飞 + 火系落点
+        if (dist <= monsterParam(code, 'storm_range', 420)) {
+          applyBossSkillEffect('push',
+              power: monsterParam(code, 'storm_push', 320), owner: boss);
+        }
+        bossSkillLayer.castTelegraph(p.position,
+            radius: monsterParam(code, 'storm_radius', 170),
+            delay: monsterParam(code, 'storm_delay', 0.9),
+            damage:
+                boss.contactDamage * monsterParam(code, 'storm_ratio', 1.2),
+            effect: 'fire_hit',
+            power: 0,
+            color: const Color(0xFF6FA86A),
+            owner: boss);
+        break;
+      case 'five_mountain': // 如来·五行山镇压：超大落点 + 长定身 + 压制领域
+        final pressAt = p.position.clone();
+        bossSkillLayer.castTelegraph(pressAt,
+            radius: monsterParam(code, 'mountain_range', 200),
+            delay: monsterParam(code, 'mountain_delay', 1.2),
+            damage:
+                boss.contactDamage * monsterParam(code, 'mountain_ratio', 1.6),
+            effect: 'hit',
+            power: 0,
+            color: const Color(0xFFC8A24A),
+            owner: boss);
+        applyBossSkillEffect('root',
+            power: monsterParam(code, 'mountain_root', 4.0), owner: boss);
+        bossSkillLayer.castField(pressAt,
+            radius: monsterParam(code, 'mountain_range', 200),
+            life: monsterParam(code, 'mountain_sec', 5),
+            tick: monsterParam(code, 'mountain_tick', 0.8),
+            effect: 'slow',
+            power: monsterParam(code, 'mountain_press', 0.5),
+            color: const Color(0xFFC8A24A),
+            owner: boss);
+        break;
+      case 'golden_bell': // 黄眉·金铙困形：限移 + 视野收窄 + 持续伤
+        applyBossSkillEffect('imprison',
+            power: monsterParam(code, 'cymbal_root', 3.0), owner: boss);
+        bossSkillLayer.castField(p.position,
+            radius: monsterParam(code, 'cymbal_range', 150),
+            life: monsterParam(code, 'cymbal_sec', 4),
+            tick: monsterParam(code, 'cymbal_tick', 0.8),
+            effect: 'dot',
+            power: monsterParam(code, 'cymbal_sec', 4),
+            rawDamage:
+                boss.contactDamage * monsterParam(code, 'cymbal_ratio', 0.14),
+            color: const Color(0xFFB08A3C),
+            owner: boss);
+        break;
+      case 'silk_fate': // 盘丝大王·情丝缚魂：弹道叠层，满层定身
+        final aim = (p.position - pos).normalized();
+        bossSkillLayer.castProjectile(pos, aim,
+            speed: monsterParam(code, 'silk_speed', 240),
+            radius: monsterParam(code, 'silk_radius', 12),
+            life: monsterParam(code, 'silk_life', 4),
+            damage: boss.contactDamage * monsterParam(code, 'silk_ratio', 0.3),
+            effect: 'silk_stack',
+            power: monsterParam(code, 'silk_add', 1),
+            color: const Color(0xFFD4709A),
+            owner: boss);
+        break;
+      case 'trunk_coil': // 白象精·象鼻绞杀：近身卷住 + 持续绞杀 + 抛飞
+        if (dist <= monsterParam(code, 'coil_range', 220)) {
+          applyBossSkillEffect('pull',
+              power: monsterParam(code, 'coil_pull', 160), owner: boss);
+          bossSkillLayer.castField(p.position,
+              radius: monsterParam(code, 'coil_radius', 120),
+              life: monsterParam(code, 'coil_sec', 3),
+              tick: monsterParam(code, 'coil_tick', 0.7),
+              effect: 'dot',
+              power: monsterParam(code, 'coil_sec', 3),
+              rawDamage:
+                  boss.contactDamage * monsterParam(code, 'coil_ratio', 0.18),
+              color: const Color(0xFF9A8A6A),
+              owner: boss);
+          // 抛飞：延迟预警，仅击退不造成额外伤害
+          bossSkillLayer.castTelegraph(p.position,
+              radius: monsterParam(code, 'coil_radius', 120),
+              delay: monsterParam(code, 'coil_throw_delay', 1.4),
+              damage: 0,
+              effect: 'push',
+              power: monsterParam(code, 'coil_throw', 260),
+              color: const Color(0xFF9A8A6A),
+              owner: boss);
+        }
+        break;
+      case 'swallow_sky': // 青狮精·吞天巨口：近身真伤 + 低血斩杀
+        if (dist <= monsterParam(code, 'sky_range', 200)) {
+          bossSkillLayer.castTelegraph(p.position,
+              radius: monsterParam(code, 'sky_width', 120),
+              delay: monsterParam(code, 'sky_delay', 0.6),
+              damage: boss.contactDamage * monsterParam(code, 'sky_ratio', 1.8),
+              effect: 'true_hit',
+              power: 0,
+              color: const Color(0xFF8E4A3C),
+              owner: boss);
+        }
+        break;
+      case 'pure_dew': // 观音·杨柳甘露：驱散负面 + 自身回血
+        applyBossSkillEffect('dispel',
+            power: monsterParam(code, 'dew_clean', 4),
+            abilityKey: key,
+            owner: boss);
+        spawnFloatText(pos + Vector2(0, -boss.radius - 14), '杨柳甘露',
+            const Color(0xFFA8D5C0));
+        break;
+      case 'lotus_guard': // 哪吒·金莲护体：自身护罩 + 近身反伤（反伤在受击钩子）
+        boss.grantWard(monsterParam(code, 'lotus_ward', 0.8));
+        break;
+      case 'ghost_fog': // 地府鬼王·玄阴黑雾：致盲 + 减速 + 毒伤三负面
+        if (dist <= monsterParam(code, 'fog_range', 260)) {
+          applyBossSkillEffect('ghost_fog',
+              power: monsterParam(code, 'fog_ratio', 1),
+              abilityKey: key,
+              owner: boss);
+        }
+        break;
+      case 'divine_fire': // 太上老君·六丁神火：灼烧领域 + 火焰色毒刺满层真伤
+        bossSkillLayer.castField(boss.position,
+            radius: monsterParam(code, 'divine_range', 190),
+            life: monsterParam(code, 'divine_sec', 5),
+            tick: monsterParam(code, 'divine_tick', 0.6),
+            effect: 'fire_hit',
+            power: 0,
+            rawDamage:
+                boss.contactDamage * monsterParam(code, 'divine_ratio', 0.16),
+            color: const Color(0xFFE05A3C),
+            owner: boss,
+            followOwner: true);
+        // 火焰灼烧叠层：复用 sting 满层真伤通道，能力键保证参数隔离
+        applyBossSkillEffect('sting',
+            power: monsterParam(code, 'sting_add', 1),
+            abilityKey: key,
+            owner: boss);
+        break;
     }
   }
 

@@ -1,0 +1,12 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 杨柳甘露：柳枝滴水净化 -->
+  <g fill="none" stroke="#4E9A7A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M20 3 Q13 6 8 13"/>
+    <path d="M8 13 Q5 9 4 5"/>
+    <path d="M11 9 L6 7 M14 6 L10 4"/>
+    <path d="M8 14 Q8 19 6 21"/>
+    <path d="M12 17 Q12 20 10 21"/>
+  </g>
+  <circle cx="6" cy="21" r="1.2" fill="#8FD8C0"/>
+  <circle cx="10" cy="21" r="1.0" fill="#8FD8C0"/>
+</svg>

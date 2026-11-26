@@ -1,0 +1,11 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 地府鬼王·幽冥鬼王：角冠+黑雾 -->
+  <g fill="none" stroke="#6A4A8A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M7 7 L5 3 L10 6"/>
+    <path d="M17 7 L19 3 L14 6"/>
+    <path d="M6 9 Q12 6 18 9 L18 18 L6 18 Z"/>
+    <path d="M4 21 Q8 18 12 21 Q16 18 20 21"/>
+  </g>
+  <circle cx="10" cy="13" r="1" fill="#9A7AC0"/>
+  <circle cx="14" cy="13" r="1" fill="#9A7AC0"/>
+</svg>

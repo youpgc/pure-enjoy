@@ -1,0 +1,8 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 六丁神火：炉火叠焰上冲 -->
+  <g fill="none" stroke="#D4502C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 21 Q6 17 8 11 Q10 14 11 9 Q13 13 14 7 Q18 13 16 21 Z"/>
+    <path d="M12 21 L12 12"/>
+    <path d="M6 5 L8 3 M18 5 L16 3 M12 2 L12 4"/>
+  </g>
+</svg>

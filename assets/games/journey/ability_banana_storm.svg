@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 芭蕉神扇：阔叶扇面卷风 -->
+  <g fill="none" stroke="#4E8A3C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 21 Q4 18 5 9 Q12 4 19 9 Q20 18 12 21 Z"/>
+    <path d="M12 21 L12 6"/>
+    <path d="M7 11 L12 13 L17 11"/>
+    <path d="M3 6 Q6 3 9 5"/>
+    <path d="M21 6 Q18 3 15 5"/>
+  </g>
+</svg>

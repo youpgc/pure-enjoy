@@ -41,6 +41,12 @@ extension JourneyBossSkillCast on JourneyFlameGame {
       _abilityParamContext = (monsterCode: code, abilityKey: key);
       try {
         _dispatchSkill(boss, key, dist);
+      } catch (err) {
+        // 单个能力派发失败不能吞掉同帧其余能力，也不能中断整帧更新。
+        ErrorReporter.reportMessage(
+          '妖王能力派发失败 code=$code ability=$key: $err',
+          module: 'journey',
+        );
       } finally {
         _abilityParamContext = null;
       }
@@ -55,7 +61,6 @@ extension JourneyBossSkillCast on JourneyFlameGame {
         'samadhi_fire' => 6.0,
         'iron_horn' => 12.0,
         'poison_mist' => 9.0,
-        'unmovable' => 14.0,
         'blood_frenzy' => 8.0,
         'spider_web' => 10.0,
         'roc_speed' => 12.0,
@@ -80,6 +85,18 @@ extension JourneyBossSkillCast on JourneyFlameGame {
         'deer_belly' => 9.0,
         'ram_oil' => 10.0,
         'shield_break' => 9.0,
+        'sleeve_cosmos' => 14.0,
+        'heavenly_eye' => 11.0,
+        'banana_storm' => 11.0,
+        'five_mountain' => 16.0,
+        'golden_bell' => 12.0,
+        'silk_fate' => 10.0,
+        'trunk_coil' => 11.0,
+        'swallow_sky' => 9.0,
+        'pure_dew' => 15.0,
+        'lotus_guard' => 12.0,
+        'ghost_fog' => 10.0,
+        'divine_fire' => 10.0,
         _ => 0.0,
       };
 

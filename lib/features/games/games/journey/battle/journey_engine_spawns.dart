@@ -289,6 +289,15 @@ mixin JourneySpawnMixin {
     game.boss = comp;
     game.monsters.add(comp);
     game.world.add(comp);
+    // 换场清空上一场遗留的叠层/困形：不同妖王的毒刺、情丝、金铙各算各的，
+    // 残留层数会让新妖王的满层判定提前触发（如蝎子精 2 层带入太上老君）。
+    final p = game.player;
+    p.stingStacks = 0;
+    p.stingTimer = 0;
+    p.silkStacks = 0;
+    p.silkTimer = 0;
+    p.imprisonedTimer = 0;
+    p.imprisonedSpan = 0;
     // 罗盘/小地图显隐复位；大血条由每帧 syncBossHud 按新体交战状态入列。
     game.controller.hud.bossPresent.value = true;
     final note = bossFightNote(game, fightNo);

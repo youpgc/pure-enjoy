@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 太上老君·道祖：八卦炉+拂尘 -->
+  <g fill="none" stroke="#D4502C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M8 4 L16 4 L15 8 L9 8 Z"/>
+    <path d="M7 10 Q12 7 17 10 L17 19 L7 19 Z"/>
+    <path d="M10 13 L14 13 M10 16 L14 16"/>
+    <path d="M20 6 L20 18 M18 6 L22 6"/>
+  </g>
+  <circle cx="12" cy="14" r="1.4" fill="#F6A84B"/>
+</svg>

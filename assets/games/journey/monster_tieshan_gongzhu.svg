@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 铁扇公主·铁扇公主：芭蕉扇+发髻 -->
+  <g fill="none" stroke="#4E8A3C" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M9 5 Q12 2 15 5"/>
+    <path d="M7 10 Q12 7 17 10 L17 20 L7 20 Z"/>
+    <path d="M17 12 Q21 8 20 4 Q18 10 17 12"/>
+  </g>
+  <circle cx="10" cy="14" r="1" fill="#F6E3B4"/>
+  <circle cx="14" cy="14" r="1" fill="#F6E3B4"/>
+</svg>

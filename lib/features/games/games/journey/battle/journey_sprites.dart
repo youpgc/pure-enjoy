@@ -19,6 +19,8 @@ class JourneySprites {
   static String slotIcon(String code) =>
       'assets/games/journey/icon_slot_$code.svg';
   static String character(String code) => 'assets/games/journey/char_$code.svg';
+  /// 妖王能力图标（能力图鉴/配置对照用；key 与 ability_key 同键空间）
+  static String ability(String key) => 'assets/games/journey/ability_$key.svg';
   /// 场景道具（参照物/里程碑装饰；name=gongtai/shikuai/shibei/yiting）
   static String prop(String name) => 'assets/games/journey/prop_$name.svg';
 
@@ -43,6 +45,13 @@ class JourneySprites {
       return null;
     }
   }
+
+  /// 预热一批妖王能力图标（能力图鉴接入时调用，尚未建图鉴页时不影响对局）。
+  static Future<void> warmUpAbilities(
+    BuildContext context,
+    Iterable<String> abilityKeys,
+  ) =>
+      warmUp(context, abilityKeys.map(ability));
 
   /// 取已预热的精灵（未预热/失败返回 null）。
   static ui.Picture? get(String key) => _cache[key];

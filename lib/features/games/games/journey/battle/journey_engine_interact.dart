@@ -79,6 +79,11 @@ extension JourneyInteract on JourneyFlameGame {
     player.sealTimer = 0;
     player.sealedSlotCode = '';
     player.stingStacks = 0;
+    player.stingTimer = 0;
+    player.silkStacks = 0;
+    player.silkTimer = 0;
+    player.imprisonedTimer = 0;
+    player.imprisonedSpan = 0;
     player.skillDotRemain = 0;
     player.skillDotPerTick = 0;
     player.skillDotOwner = null;

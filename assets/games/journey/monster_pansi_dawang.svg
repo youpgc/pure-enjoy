@@ -1,0 +1,10 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24">
+  <!-- 盘丝大王·盘丝洞主：蛛网+多足 -->
+  <g fill="none" stroke="#B05A7A" stroke-width="1.6" stroke-linecap="round" stroke-linejoin="round">
+    <path d="M12 8 L12 16"/>
+    <path d="M12 12 L6 6 M12 12 L18 6 M12 12 L5 14 M12 12 L19 14"/>
+    <path d="M12 12 L8 20 M12 12 L16 20"/>
+    <path d="M4 4 L20 20 M20 4 L4 20"/>
+  </g>
+  <circle cx="12" cy="12" r="1.6" fill="#F6E3B4"/>
+</svg>
