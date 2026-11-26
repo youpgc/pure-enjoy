@@ -267,9 +267,13 @@ mixin JourneySpawnMixin {
     }
   }
 
-  /// 下一场妖王：同体增强（血量/伤害按场递增），据点重生。
+  /// 下一场妖王：按逐战编排取本场妖王（无编排时沿用原同妖增强），
+  /// 血量/伤害按场递增，据点重生。
   void respawnBoss(JourneyFlameGame game) {
-    final model = game.bossModel;
+    final fightNo = game._bossStage + 1;
+    // 编排表无该场行时 bossModelForFight 回落 resolveBossCode，
+    // 取到与 game.bossModel 同一只怪，保持改造前行为不变。
+    final model = bossModelForFight(game, fightNo) ?? game.bossModel;
     if (model == null) return;
     final hpGain =
         game.battleNum('boss', 'stage_hp_gain', 0.55);
@@ -287,7 +291,10 @@ mixin JourneySpawnMixin {
     game.world.add(comp);
     // 罗盘/小地图显隐复位；大血条由每帧 syncBossHud 按新体交战状态入列。
     game.controller.hud.bossPresent.value = true;
-    game.controller.onBossSpawn('${game._bossStage + 1} 打 · ${model.name}');
+    final note = bossFightNote(game, fightNo);
+    final label = note.isEmpty ? '' : ' · $note';
+    game.controller
+        .onBossSpawn('$fightNo 打 · ${model.name}$label');
   }
 
   // ---- 无尽妖潮 / 每日游历（虚拟关 level_no=0，纯 App 端模式）----
@@ -381,7 +388,9 @@ void tickBossSpawnCountdown(JourneyFlameGame game, double dt) {
   if (game._bossSpawnCountdown <= 0) {
     game.controller.hud.bossSpawnIn.value = 0;
     game.spawnBossAtPost(game);
-    game.controller.onBossSpawn(game.bossModel?.name ?? '妖王');
+    final note = bossFightNote(game, 1);
+    final label = note.isEmpty ? '' : ' · $note';
+    game.controller.onBossSpawn('${game.bossModel?.name ?? '妖王'}$label');
     return;
   }
   final left = game._bossSpawnCountdown.ceil();

@@ -13,7 +13,7 @@ const double kJourneyExecuteNormalCapRatio = 0.15;
 extension JourneyExecuteCombat on JourneyFlameGame {
   /// 妖王是否携带处决能力（ability_key=execute）。
   bool _hasPlayerExecuteAbility(JourneyMonsterComponent? attacker) =>
-      attacker != null && !attacker.isDead && attacker.model.abilityKey == 'execute';
+      attacker != null && !attacker.isDead && attacker.model.hasAbility('execute');
 
   /// 妖王处决玩家：仅携带该能力的妖王之伤害触发，判定在扣血与护盾抵扣之前。
   /// 命中直接清血条（穿透护盾）；无敌帧期间不触发，免死/还魂由死亡链处理。

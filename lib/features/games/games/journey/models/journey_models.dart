@@ -224,6 +224,14 @@ class JourneyMonsterModel {
   /// deer_belly/ram_oil
   final String abilityKey;
 
+  /// 能力键列表（journey_monster_abilities 承载；空=沿用单值 abilityKey）。
+  /// 新表有行时按 slot 升序填入，构建时已过滤 enabled=false 的行。
+  final List<String> abilityKeys;
+
+  /// 新表是否有该妖王的能力行（即使全部关闭也为 true）。
+  /// 用于区分「未配置，回落主表单值」与「配置了但全部关闭，确实无能力」。
+  final bool hasAbilityRows;
+
   const JourneyMonsterModel({
     required this.code,
     required this.name,
@@ -235,6 +243,8 @@ class JourneyMonsterModel {
     this.expDrop = 5,
     this.meritDrop = 0,
     this.abilityKey = '',
+    this.abilityKeys = const <String>[],
+    this.hasAbilityRows = false,
   });
 
   factory JourneyMonsterModel.fromJson(Map<String, dynamic> json) {
@@ -254,6 +264,84 @@ class JourneyMonsterModel {
 
   bool get isBoss => aiTier == 'boss';
   bool get isElite => aiTier == 'elite';
+
+  /// 生效能力键集合：新表有行时以其为准（即使全部关闭也返回空，不回落
+  /// 主表单值，否则后台的关闭开关会失效）；无行才回落单值 abilityKey。
+  List<String> get effectiveAbilityKeys => hasAbilityRows
+      ? abilityKeys
+      : (abilityKey.isEmpty ? const <String>[] : <String>[abilityKey]);
+
+  /// 是否持有指定能力（覆盖所有按单值 abilityKey 判定的旧调用点）。
+  bool hasAbility(String key) => effectiveAbilityKeys.contains(key);
+
+  JourneyMonsterModel withAbilityKeys(List<String> keys) => JourneyMonsterModel(
+        code: code,
+        name: name,
+        aiTier: aiTier,
+        baseHp: baseHp,
+        baseSpeed: baseSpeed,
+        contactDamage: contactDamage,
+        sizeScale: sizeScale,
+        expDrop: expDrop,
+        meritDrop: meritDrop,
+        abilityKey: abilityKey,
+        abilityKeys: keys,
+        hasAbilityRows: true,
+      );
+}
+
+/// 妖王能力行（journey_monster_abilities）：一妖多能力的承载行。
+class JourneyMonsterAbilityModel {
+  final String id;
+  final String monsterId;
+  final int slot;
+  final String abilityKey;
+  final bool enabled;
+
+  const JourneyMonsterAbilityModel({
+    required this.id,
+    required this.monsterId,
+    required this.slot,
+    required this.abilityKey,
+    this.enabled = true,
+  });
+
+  factory JourneyMonsterAbilityModel.fromJson(Map<String, dynamic> json) {
+    return JourneyMonsterAbilityModel(
+      id: json['id'] as String? ?? '',
+      monsterId: json['monster_id'] as String? ?? '',
+      slot: (json['slot'] as num?)?.toInt() ?? 0,
+      abilityKey: json['ability_key'] as String? ?? '',
+      enabled: json['enabled'] as bool? ?? true,
+    );
+  }
+}
+
+/// 同关逐战妖王编排（journey_level_boss_fights）：一行一场。
+class JourneyLevelBossFightModel {
+  final String id;
+  final String levelId;
+  final int fightNo;
+  final String bossCode;
+  final String note;
+
+  const JourneyLevelBossFightModel({
+    required this.id,
+    required this.levelId,
+    required this.fightNo,
+    required this.bossCode,
+    this.note = '',
+  });
+
+  factory JourneyLevelBossFightModel.fromJson(Map<String, dynamic> json) {
+    return JourneyLevelBossFightModel(
+      id: json['id'] as String? ?? '',
+      levelId: json['level_id'] as String? ?? '',
+      fightNo: (json['fight_no'] as num?)?.toInt() ?? 1,
+      bossCode: json['boss_code'] as String? ?? '',
+      note: json['note'] as String? ?? '',
+    );
+  }
 }
 
 /// 每日游历地图（journey_daily_maps 行）：运营后台可配的地图列表，

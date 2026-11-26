@@ -13,8 +13,15 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
       ? List<JourneyMonsterModel>.of(remote)
       : kJourneyMonsterSeed.map(JourneyMonsterModel.fromJson).toList();
   final bossCode = resolveBossCode(game);
+  // 逐战编排时把所有场次妖王纳入池，避免后续场次换妖而池里没有该怪。
+  final levelId = game.level.id;
+  final fightCodes = levelId.isEmpty
+      ? const <String>{}
+      : game.config?.bossFightsOf(levelId).map((f) => f.bossCode).toSet() ??
+          const <String>{};
   final boss = source
-      .where((m) => m.isBoss && m.code == bossCode)
+      .where((m) =>
+          m.isBoss && (m.code == bossCode || fightCodes.contains(m.code)))
       .toList(growable: false);
   if (game.runtime.waves.isNotEmpty) {
     // 波次关：池=波次怪种（映射断裂的行已在 config service 过滤）∪ 妖王
@@ -24,7 +31,9 @@ List<JourneyMonsterModel> _buildPool(JourneyFlameGame game) {
         .toList();
     return <JourneyMonsterModel>[...mobs, ...boss];
   }
-  return source.where((m) => !m.isBoss || m.code == bossCode).toList();
+  return source
+      .where((m) => !m.isBoss || m.code == bossCode || fightCodes.contains(m.code))
+      .toList();
 }
 
 /// 本关妖王编码：
@@ -59,14 +68,33 @@ String? _fallbackBossCode(int levelNo) {
   return 'baigu_jing'; // 白虎岭起
 }
 
-JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) {
-  final code = resolveBossCode(game);
-  if (code == null) return null;
+JourneyMonsterModel? _bossOfRegion(JourneyFlameGame game) =>
+    bossModelForFight(game, 1);
+
+/// 按场次解析妖王模型：journey_level_boss_fights 有该场编排则按 boss_code
+/// 取（可同关逐场不同妖王）；无编排行时回落现有三级解析，行为与改造前一致。
+JourneyMonsterModel? bossModelForFight(
+  JourneyFlameGame game,
+  int fightNo,
+) {
   final source = _monsterSource(game);
+  final levelId = game.level.id;
+  final fight = levelId.isEmpty
+      ? null
+      : game.config?.bossFightAt(levelId, fightNo);
+  final code = fight?.bossCode ?? resolveBossCode(game);
+  if (code == null) return null;
   for (final m in source) {
     if (m.code == code && m.isBoss) return m;
   }
   return null;
+}
+
+/// 当前场次的彩蛋/剧情标签（编排表 note）；无编排返回空串。
+String bossFightNote(JourneyFlameGame game, int fightNo) {
+  final levelId = game.level.id;
+  if (levelId.isEmpty) return '';
+  return game.config?.bossFightAt(levelId, fightNo)?.note ?? '';
 }
 
 /// 怪物全源（远端优先，种子兜底）：主线按 code 取关卡妖王、妖潮期

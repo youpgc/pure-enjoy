@@ -15,6 +15,7 @@ class JourneyBossProjectile {
     this.homing = false,
     this.pierce = 0,
     this.owner,
+    this.abilityKey,
   });
 
   Vector2 pos;
@@ -28,6 +29,8 @@ class JourneyBossProjectile {
   final bool homing;
   int pierce;
   final JourneyMonsterComponent? owner;
+  /// 施法时的能力键：弹道延迟命中时仍能读到该能力的专属参数。
+  final String? abilityKey;
 
   /// 命中去重：穿透弹可穿多个目标，但同一目标只结算一次，
   /// 避免停留在玩家碰撞圈内逐帧重复扣血。
@@ -46,6 +49,7 @@ class JourneyBossTelegraph {
     required this.power,
     required this.color,
     this.owner,
+    this.abilityKey,
   });
 
   final Vector2 pos;
@@ -57,6 +61,8 @@ class JourneyBossTelegraph {
   final double power;
   final Color color;
   final JourneyMonsterComponent? owner;
+  /// 施法时的能力键：预警延迟落地时仍能读到该能力的专属参数。
+  final String? abilityKey;
 }
 
 /// 持续领域：跟随施法妖王或固定落点，按 [tick] 周期对圈内玩家施加效果。
@@ -72,6 +78,7 @@ class JourneyBossField {
     required this.color,
     this.owner,
     this.followOwner,
+    this.abilityKey,
   });
 
   final Vector2 pos;
@@ -85,6 +92,8 @@ class JourneyBossField {
   /// 施法者：用于死亡时清除在途技能；与位置跟随解耦。
   final JourneyMonsterComponent? owner;
   final JourneyMonsterComponent? followOwner;
+  /// 施法时的能力键：领域按 tick 延迟结算时仍能读到该能力的专属参数。
+  final String? abilityKey;
 
   double _tickLeft = 0;
 }
@@ -115,6 +124,7 @@ class JourneyBossSkillLayer extends Component {
     bool homing = false,
     int pierce = 0,
     JourneyMonsterComponent? owner,
+    String? abilityKey,
   }) {
     if (_projectiles.length >= 48) return;
     _projectiles.add(JourneyBossProjectile(
@@ -129,6 +139,7 @@ class JourneyBossSkillLayer extends Component {
       homing: homing,
       pierce: pierce,
       owner: owner,
+      abilityKey: abilityKey ?? game._abilityParamContext?.abilityKey,
     ));
   }
 
@@ -142,6 +153,7 @@ class JourneyBossSkillLayer extends Component {
     required double power,
     required Color color,
     JourneyMonsterComponent? owner,
+    String? abilityKey,
   }) {
     if (_telegraphs.length >= 24) return;
     _telegraphs.add(JourneyBossTelegraph(
@@ -154,6 +166,7 @@ class JourneyBossSkillLayer extends Component {
       power: power,
       color: color,
       owner: owner,
+      abilityKey: abilityKey ?? game._abilityParamContext?.abilityKey,
     ));
   }
 
@@ -169,6 +182,7 @@ class JourneyBossSkillLayer extends Component {
     required Color color,
     JourneyMonsterComponent? owner,
     bool followOwner = false,
+    String? abilityKey,
   }) {
     if (_fields.length >= 16) return;
     // tick 由后台逐怪配置，钳到下限避免 0/负值造成逐帧高频结算。
@@ -184,6 +198,7 @@ class JourneyBossSkillLayer extends Component {
       color: color,
       owner: owner,
       followOwner: followOwner ? owner : null,
+      abilityKey: abilityKey ?? game._abilityParamContext?.abilityKey,
     ));
   }
 
@@ -239,6 +254,7 @@ class JourneyBossSkillLayer extends Component {
           power: p.power,
           rawDamage: p.damage,
           owner: p.owner,
+          abilityKey: p.abilityKey,
         );
         if (p.pierce > 0) {
           p.pierce--;
@@ -262,6 +278,7 @@ class JourneyBossSkillLayer extends Component {
           power: t.power,
           rawDamage: t.damage,
           owner: t.owner,
+          abilityKey: t.abilityKey,
         );
       }
       game.fxLayer.spawnRing(t.pos, t.radius, color: t.color);
@@ -286,6 +303,7 @@ class JourneyBossSkillLayer extends Component {
             power: f.power,
             rawDamage: f.rawDamage,
             owner: f.owner,
+            abilityKey: f.abilityKey,
           );
         }
       }

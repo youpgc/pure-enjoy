@@ -78,30 +78,34 @@ mixin JourneyDamageTickMixin {
       // 金光缚身（百眼魔君）定身；倒马毒桩（蝎子精）禁疗（时长可配）。
       // 反伤/反震先于此处结算，来源已被击杀时不再遗留控制效果。
       if (!strongestM.isDead) {
-        switch (strongestM.model.abilityKey) {
-          case 'spider_web':
-            player.rootTimer = game.monsterParam(
-                strongestM.model.code, 'web_root', 0.8);
-            break;
-          case 'poison_mist': // 倒马毒桩：禁疗 + 接触叠毒刺，满层真伤爆发
-            player.healBlockTimer = game.monsterParam(
-                strongestM.model.code, 'poison_block', 3.0);
-            game.applyBossSkillEffect('sting',
-                power: game.monsterParam(
-                    strongestM.model.code, 'sting_add', 1),
-                owner: strongestM);
-            game.spawnFloatText(
-              player.position + Vector2(0, -36),
-              '倒马毒桩·禁疗',
-              const Color(0xFF8E2F3C),
-            );
-            break;
-          case 'ice_seal': // 灵感大王：接触附带减速（冰封周期再补破甲）
-            game.applyBossSkillEffect('slow',
-                power: game.monsterParam(
-                    strongestM.model.code, 'seal_slow', 0.3),
-                owner: strongestM);
-            break;
+        for (final ability in strongestM.model.effectiveAbilityKeys) {
+          switch (ability) {
+            case 'spider_web':
+              player.rootTimer = game.abilityParam(
+                  strongestM.model.code, ability, 'web_root', 0.8);
+              break;
+            case 'poison_mist': // 倒马毒桩：禁疗 + 接触叠毒刺，满层真伤爆发
+              player.healBlockTimer = game.abilityParam(
+                  strongestM.model.code, ability, 'poison_block', 3.0);
+              game.applyBossSkillEffect('sting',
+                  power: game.abilityParam(
+                      strongestM.model.code, ability, 'sting_add', 1),
+                  abilityKey: ability,
+                  owner: strongestM);
+              game.spawnFloatText(
+                player.position + Vector2(0, -36),
+                '倒马毒桩·禁疗',
+                const Color(0xFF8E2F3C),
+              );
+              break;
+            case 'ice_seal': // 灵感大王：接触附带减速（冰封周期再补破甲）
+              game.applyBossSkillEffect('slow',
+                  power: game.abilityParam(
+                      strongestM.model.code, ability, 'seal_slow', 0.3),
+                  abilityKey: ability,
+                  owner: strongestM);
+              break;
+          }
         }
       }
     }
@@ -170,7 +174,7 @@ extension JourneyBossCharge on JourneyFlameGame {
       monsterParam(boss.model.code, 'charge_knockback', 160),
     );
     // 金翅迅影·风刃轨迹：冲撞命中后在身后留一段减速领域
-    if (boss.model.abilityKey == 'roc_speed') {
+    if (boss.model.hasAbility('roc_speed')) {
       bossSkillLayer.castField(
         boss.position - boss._chargeDir * 60,
           radius: monsterParam(boss.model.code, 'blade_range', 120),

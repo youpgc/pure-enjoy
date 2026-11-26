@@ -19,17 +19,24 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
     required double power,
     double rawDamage = 0,
     JourneyMonsterComponent? owner,
+    String? abilityKey,
   }) {
     final p = player;
     if (p.invulnTimer > 0 && effect != 'root') return;
     final code = owner?.model.code ?? '';
+    // 效果常由弹道/预警/领域延迟命中，此时派发窗口已结束；能力键随技能实体
+    // 携带过来，使能力专属参数在延迟结算时同样生效，无能力键则回落逐怪参数。
+    double param(String key, double fallback) =>
+        (abilityKey?.isNotEmpty ?? false)
+            ? abilityParam(code, abilityKey!, key, fallback)
+            : monsterParam(code, key, fallback);
     switch (effect) {
       case 'hit':
       case 'fire_hit':
         final dmg = rawDamage > 0
             ? rawDamage
             : (owner?.contactDamage ?? 0) *
-                monsterParam(code, 'skill_hit_ratio', 0.6);
+                param('skill_hit_ratio', 0.6);
         if (dmg <= 0) return;
         // 火系技能先过辟火罩减免，再与常规技能共用护甲减伤与最终减伤区。
         final afterFire = effect == 'fire_hit' ? dmg * (1 - p.fireResist) : dmg;
@@ -61,7 +68,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         break;
       case 'slow':
         p.chillTimer = math.max(p.chillTimer,
-            monsterParam(code, 'slow_sec', 3.0));
+            param('slow_sec', 3.0));
         p.chillFactor = (1 - power.clamp(0.0, 0.9));
         break;
       case 'heal_block':
@@ -69,7 +76,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         break;
       case 'armor_break':
         p.armorBreakTimer = math.max(p.armorBreakTimer,
-            monsterParam(code, 'armor_break_sec', 4.0));
+            param('armor_break_sec', 4.0));
         p.armorBreakRatio = power.clamp(0.0, 0.9);
         break;
       case 'pull':
@@ -77,7 +84,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         final dir = owner.position - p.position;
         if (dir.length > 1) {
           p.applySkillShift(dir, power,
-              monsterParam(code, 'pull_shift_sec', 0.6));
+              param('pull_shift_sec', 0.6));
         }
         break;
       case 'push':
@@ -85,7 +92,7 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         final dir = p.position - owner.position;
         if (dir.length > 1) {
           p.applySkillShift(dir, power,
-              monsterParam(code, 'push_shift_sec', 0.6));
+              param('push_shift_sec', 0.6));
         }
         break;
       case 'dot':
@@ -102,18 +109,18 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
         }
         break;
       case 'sting':
-        _applySting(code, power, owner);
+        _applySting(code, power, owner, abilityKey);
         break;
       case 'drain':
         p.drainTimer = math.max(p.drainTimer,
-            monsterParam(code, 'drain_sec', 4.0));
+            param('drain_sec', 4.0));
         break;
       case 'seal':
         final slots = weaponSlots.where((s) => s.level > 0).toList();
         if (slots.isNotEmpty) {
           p.sealedSlotCode = slots[rng.nextInt(slots.length)].code;
           p.sealTimer = math.max(p.sealTimer,
-              monsterParam(code, 'seal_sec', 4.0));
+              param('seal_sec', 4.0));
         }
         break;
       case 'shield':
@@ -131,16 +138,25 @@ extension JourneyBossSkillEffects on JourneyFlameGame {
     }
   }
 
-  void _applySting(String code, double power, JourneyMonsterComponent? owner) {
+  void _applySting(
+    String code,
+    double power,
+    JourneyMonsterComponent? owner,
+    String? abilityKey,
+  ) {
     final p = player;
     p.stingStacks++;
-    p.stingTimer = monsterParam(code, 'sting_window', 6.0);
-    final need = monsterParam(code, 'sting_max', 3).round().clamp(1, 20);
+    double param(String key, double fallback) =>
+        (abilityKey?.isNotEmpty ?? false)
+            ? abilityParam(code, abilityKey!, key, fallback)
+            : monsterParam(code, key, fallback);
+    p.stingTimer = param('sting_window', 6.0);
+    final need = param('sting_max', 3).round().clamp(1, 20);
     if (p.stingStacks < need) return;
     p.stingStacks = 0;
     // 满层真伤：接触伤害×爆发倍率，绕甲结算
     final burst = (owner?.contactDamage ?? 0) *
-        monsterParam(code, 'sting_burst_ratio', 1.2);
+        param('sting_burst_ratio', 1.2);
     p.takeDamage(burst, trueDamage: true, attacker: owner, rawAmount: burst);
     spawnFloatText(p.position + Vector2(0, -36), '倒马毒桩·爆发',
         const Color(0xFFB07CD4));

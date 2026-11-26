@@ -222,7 +222,8 @@ mixin JourneyBossAbilityMixin on PositionComponent {
   double get contactDamage;
 
   /// 周期能力计时（到周期即停住，GCD/条件未满足不空转）。
-  double _abilityTimer = 0;
+  /// 按能力键分桶，一妖多能力时各能力独立计时、互不叠加。
+  final Map<String, double> _abilityTimers = <String, double>{};
 
   /// 白骨三变形态计数：交替授予护罩/致幻。
   int _boneForm = 0;
@@ -231,9 +232,10 @@ mixin JourneyBossAbilityMixin on PositionComponent {
   int _bellPhase = 0;
 
   /// 周期是否到点：计时钳在 period，就绪后由 [ackPeriodic] 清零。
-  bool periodicReady(double period) => _abilityTimer >= period;
+  bool periodicReady(String key, double period) =>
+      (_abilityTimers[key] ?? 0) >= period;
 
-  void ackPeriodic() => _abilityTimer = 0;
+  void ackPeriodic(String key) => _abilityTimers[key] = 0;
 
   /// 统一调度入口（由 monsters part 每帧在追击态调用）：
   /// 周期读取、计时推进、GCD 检查与派发全部收敛在调度 part，
@@ -243,9 +245,10 @@ mixin JourneyBossAbilityMixin on PositionComponent {
   }
 
   /// 计时钳在周期上限（到点停表，不空转）。
-  void advancePeriodic(double dt, double period) {
-    if (_abilityTimer < period) {
-      _abilityTimer = math.min(period, _abilityTimer + dt);
+  void advancePeriodic(String key, double dt, double period) {
+    final timer = _abilityTimers[key] ?? 0;
+    if (timer < period) {
+      _abilityTimers[key] = math.min(period, timer + dt);
     }
   }
 }

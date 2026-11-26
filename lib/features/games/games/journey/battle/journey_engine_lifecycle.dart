@@ -114,7 +114,13 @@ extension JourneyLifecycle on JourneyFlameGame {
       // 大血条由每帧 syncBossHud 按存活妖王收起；末场伏诛后罗盘与妖王点
       // 一并熄灭，多场战重生时再置回 true。
       controller.hud.bossPresent.value = false;
-      final totalFights = level.bossFights > 1 ? level.bossFights : 1;
+      // 逐战编排有行时以编排行数为准，避免漏配 boss_fights 导致后半段
+      // 编排场次不生效；无编排则沿用关卡原字段，行为与改造前一致。
+      final fightRows = level.id.isEmpty
+          ? const <JourneyLevelBossFightModel>[]
+          : config?.bossFightsOf(level.id) ?? const <JourneyLevelBossFightModel>[];
+      final totalFights =
+          fightRows.isNotEmpty ? fightRows.length : (level.bossFights > 1 ? level.bossFights : 1);
       if (_bossStage < totalFights - 1) {
         _bossStage++;
         // 妖王阵亡→复活/新妖王降临冷却：罗盘位展示倒计时常显，归零由

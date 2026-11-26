@@ -219,6 +219,73 @@ Map<String, Map<String, double>> _monsterParams(
   return result;
 }
 
+/// 单只妖王最多可挂的能力数（slot 0~15，与数据库 CHECK 约束一致）。
+const int _maxMonsterAbilities = 16;
+
+/// 妖王能力行：monster_id→code 由怪物行映射，按 slot 升序分组。
+/// 每妖最多保留前 _maxMonsterAbilities 行，避免异常数据越界。
+/// 返回能力行与 ability_id→(monsterCode|abilityKey) 的映射供专属参数表使用。
+({
+  Map<String, List<JourneyMonsterAbilityModel>> byMonster,
+  Map<String, String> idToScope,
+}) _monsterAbilities(
+  _RowsView view,
+  Map<String, String> monsterIdToCode,
+) {
+  final rows = view.of(JourneyConfigTable.monsterAbilities).toList()
+    ..sort((a, b) {
+      final slotA = (a['slot'] as num?)?.toInt() ?? 0;
+      final slotB = (b['slot'] as num?)?.toInt() ?? 0;
+      return slotA.compareTo(slotB);
+    });
+  final byMonster = <String, List<JourneyMonsterAbilityModel>>{};
+  final idToScope = <String, String>{};
+  for (final row in rows) {
+    final code = monsterIdToCode[row['monster_id'] as String?];
+    final model = JourneyMonsterAbilityModel.fromJson(row);
+    if (code == null || model.abilityKey.isEmpty || model.id.isEmpty) continue;
+    final list = byMonster[code] ??= <JourneyMonsterAbilityModel>[];
+    if (list.length >= _maxMonsterAbilities) continue;
+    list.add(model);
+    idToScope[model.id] =
+        JourneyConfigSnapshot.abilityParamKey(code, model.abilityKey);
+  }
+  return (byMonster: byMonster, idToScope: idToScope);
+}
+
+/// 能力专属参数：ability_id→scope 由能力行映射，断裂行丢弃。
+Map<String, Map<String, double>> _monsterAbilityParams(
+  _RowsView view,
+  Map<String, String> abilityIdToScope,
+) {
+  final result = <String, Map<String, double>>{};
+  for (final row in view.of(JourneyConfigTable.monsterAbilityParams)) {
+    final scope = abilityIdToScope[row['ability_id'] as String?];
+    final paramCode = row['code'] as String?;
+    final value = (row['value_num'] as num?)?.toDouble();
+    if (scope == null || paramCode == null || value == null) continue;
+    (result[scope] ??= <String, double>{})[paramCode] = value;
+  }
+  return result;
+}
+
+/// 同关逐战编排：level_id 直接按关卡主键分组，按 fight_no 升序。
+Map<String, List<JourneyLevelBossFightModel>> _levelBossFights(_RowsView view) {
+  final rows = view.of(JourneyConfigTable.levelBossFights).toList()
+    ..sort((a, b) {
+      final noA = (a['fight_no'] as num?)?.toInt() ?? 0;
+      final noB = (b['fight_no'] as num?)?.toInt() ?? 0;
+      return noA.compareTo(noB);
+    });
+  final result = <String, List<JourneyLevelBossFightModel>>{};
+  for (final row in rows) {
+    final model = JourneyLevelBossFightModel.fromJson(row);
+    if (model.levelId.isEmpty || model.bossCode.isEmpty) continue;
+    (result[model.levelId] ??= <JourneyLevelBossFightModel>[]).add(model);
+  }
+  return result;
+}
+
 /// 把已加载的配置行组装成快照：未加载的表按域回落内置种子，已加载的
 /// 表无论先后都参与外键映射，避免分组加载时「分级/配方/参数」被丢弃。
 ({JourneyConfigSnapshot snapshot, bool fromSeed}) buildJourneyConfigSnapshot(
@@ -259,6 +326,21 @@ Map<String, Map<String, double>> _monsterParams(
   final monsterRows = view.of(JourneyConfigTable.monsters);
   final monsterIdToCode = _idCodeMap(monsterRows);
   final relations = _weaponRelations(view, weaponIdToCode);
+
+  // 妖王能力承载：能力行按怪物 code 分组，映射其专属参数；再把能力键列表
+  // 注入怪物模型。新表无行时 abilityKeys 为空，模型判定回落单值 abilityKey。
+  final abilities = _monsterAbilities(view, monsterIdToCode);
+  final abilityParams = _monsterAbilityParams(view, abilities.idToScope);
+  final levelBossFights = _levelBossFights(view);
+  final monsterModels = monsterRows.map(JourneyMonsterModel.fromJson).map((m) {
+    final rows = abilities.byMonster[m.code];
+    if (rows == null) return m;
+    final keys = rows
+        .where((a) => a.enabled)
+        .map((a) => a.abilityKey)
+        .toList();
+    return m.withAbilityKeys(keys);
+  }).toList();
 
   final branchSeed = buildJourneyTalentBranchSeed()
       .map(JourneyTalentBranchModel.fromJson)
@@ -305,7 +387,7 @@ Map<String, Map<String, double>> _monsterParams(
       characters: _charactersOf(view),
       weapons: weaponRows.map(JourneyWeaponModel.fromJson).toList(),
       talentBranches: branches.isEmpty ? branchSeed : branches,
-      monsters: monsterRows.map(JourneyMonsterModel.fromJson).toList(),
+      monsters: monsterModels,
       slotDefs: view.models(
         JourneyConfigTable.weaponSlots,
         () => kJourneySlotDefSeed.map(JourneySlotDefModel.fromJson).toList(),
@@ -344,6 +426,9 @@ Map<String, Map<String, double>> _monsterParams(
           .toList(),
       weaponParams: relations.weaponParams,
       monsterParams: _monsterParams(view, monsterIdToCode),
+      monsterAbilities: abilities.byMonster,
+      monsterAbilityParams: abilityParams,
+      levelBossFights: levelBossFights,
       battleParamsNum: battleParamsNum,
       battleParamsText: battleParamsText,
       globalsRaw: globalsRaw,

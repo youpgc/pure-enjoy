@@ -31,7 +31,10 @@ enum JourneyConfigTable {
   upgradeCards('journey_upgrade_cards', 'sort_order.asc'),
   characterAuraParams('journey_character_aura_params', 'character_code.asc'),
   realmTitles('journey_realm_titles', 'character_code.asc,tier.asc'),
-  journeyLevels('journey_levels', 'level_id.asc');
+  journeyLevels('journey_levels', 'level_id.asc'),
+  monsterAbilities('journey_monster_abilities', 'monster_id.asc,slot.asc'),
+  monsterAbilityParams('journey_monster_ability_params', 'ability_id.asc'),
+  levelBossFights('journey_level_boss_fights', 'level_id.asc,fight_no.asc');
 
   const JourneyConfigTable(this.tableName, this.order, [this.select]);
 
@@ -128,8 +131,15 @@ Set<JourneyConfigTable> expandConfigDependencies(
   if (tables.any(needsWeapons.contains)) {
     result.add(JourneyConfigTable.weapons);
   }
-  if (tables.contains(JourneyConfigTable.monsterParams)) {
+  if (tables.contains(JourneyConfigTable.monsterParams) ||
+      tables.contains(JourneyConfigTable.monsterAbilities)) {
     result.add(JourneyConfigTable.monsters);
+  }
+  // 能力专属参数依赖能力行把 ability_id 映射为「怪物code|能力键」，缺源表时丢弃。
+  if (tables.contains(JourneyConfigTable.monsterAbilityParams)) {
+    result
+      ..add(JourneyConfigTable.monsterAbilities)
+      ..add(JourneyConfigTable.monsters);
   }
   // 角色附带数据：aura 参数与境界名号按 character_code 关联，缺源表时
   // 角色会退回内置兜底，故凡需角色的页面自动带上这两张表。
@@ -147,7 +157,8 @@ Set<JourneyConfigTable> expandConfigDependencies(
   // 关卡的西行专属属性已拆到 journey_levels（level_id=game_levels.id），
   // 选关页需同时拿到两者；缺任一表则该关退回内置兜底。
   if (tables.contains(JourneyConfigTable.levels) ||
-      tables.contains(JourneyConfigTable.journeyLevels)) {
+      tables.contains(JourneyConfigTable.journeyLevels) ||
+      tables.contains(JourneyConfigTable.levelBossFights)) {
     result
       ..add(JourneyConfigTable.levels)
       ..add(JourneyConfigTable.journeyLevels);

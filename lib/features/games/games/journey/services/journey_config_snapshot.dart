@@ -52,6 +52,18 @@ class JourneyConfigSnapshot {
   /// 空=引擎全部走内置兜底）。
   final Map<String, Map<String, double>> monsterParams;
 
+  /// 妖王能力行（journey_monster_abilities，monsterCode 分组，slot 升序）。
+  /// 空=沿用 journey_monsters.ability_key 单值，行为与改造前一致。
+  final Map<String, List<JourneyMonsterAbilityModel>> monsterAbilities;
+
+  /// 能力专属参数（journey_monster_ability_params，
+  /// key='monsterCode|abilityKey' → {参数code→值}）；优先级高于 monsterParams。
+  final Map<String, Map<String, double>> monsterAbilityParams;
+
+  /// 同关逐战妖王编排（journey_level_boss_fights，levelId 分组，fightNo 升序）。
+  /// 空=沿用关卡>区域>内置兜底的三级解析。
+  final Map<String, List<JourneyLevelBossFightModel>> levelBossFights;
+
   /// journey_globals 原始行（通用成长卡/经验曲线等扩展列直读；
   /// 列缺失/seed 快照为 null 时消费侧回落内置兜底）。
   final Map<String, dynamic>? globalsRaw;
@@ -307,6 +319,9 @@ class JourneyConfigSnapshot {
     this.endlessWaves = const <JourneyEndlessWaveModel>[],
     this.weaponParams = const <String, Map<String, double>>{},
     this.monsterParams = const <String, Map<String, double>>{},
+    this.monsterAbilities = const <String, List<JourneyMonsterAbilityModel>>{},
+    this.monsterAbilityParams = const <String, Map<String, double>>{},
+    this.levelBossFights = const <String, List<JourneyLevelBossFightModel>>{},
     this.battleParamsNum = const <String, double>{},
     this.battleParamsText = const <String, String>{},
     this.globalsRaw,
@@ -373,6 +388,41 @@ class JourneyConfigSnapshot {
   /// 妖王能力参数（monsterCode+参数 code 读取；行缺失回落 fallback）。
   double monsterParam(String monsterCode, String code, double fallback) {
     return monsterParams[monsterCode]?[code] ?? fallback;
+  }
+
+  /// 能力专属参数键：怪物编码与能力键拼接，避免共享参数键跨能力串值。
+  static String abilityParamKey(String monsterCode, String abilityKey) =>
+      '$monsterCode|$abilityKey';
+
+  /// 能力作用域参数：能力专属 > 怪物级 > fallback。
+  /// 多能力共存时同一参数键（如 blind_sec）按能力各取一套值。
+  double abilityParam(
+    String monsterCode,
+    String abilityKey,
+    String code,
+    double fallback,
+  ) {
+    return monsterAbilityParams[abilityParamKey(monsterCode, abilityKey)]?[code] ??
+        monsterParams[monsterCode]?[code] ??
+        fallback;
+  }
+
+  /// 妖王能力行（monsterCode；已按 slot 升序）；空列表=回落单值 abilityKey。
+  List<JourneyMonsterAbilityModel> abilitiesOf(String monsterCode) =>
+      monsterAbilities[monsterCode] ?? const <JourneyMonsterAbilityModel>[];
+
+  /// 同关逐战编排（levelId；已按 fightNo 升序）；空列表=走旧三级解析。
+  List<JourneyLevelBossFightModel> bossFightsOf(String levelId) =>
+      levelBossFights[levelId] ?? const <JourneyLevelBossFightModel>[];
+
+  /// 指定场次的妖王编码与彩蛋标签；无编排行时返回 null 走旧逻辑。
+  ({String bossCode, String note})? bossFightAt(String levelId, int fightNo) {
+    for (final f in bossFightsOf(levelId)) {
+      if (f.fightNo == fightNo) {
+        return (bossCode: f.bossCode, note: f.note);
+      }
+    }
+    return null;
   }
 
   // ---- 通用成长卡/经验曲线（journey_globals 列；缺省走内置兜底）----

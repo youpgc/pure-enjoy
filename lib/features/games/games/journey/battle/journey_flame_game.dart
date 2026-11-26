@@ -188,6 +188,10 @@ class JourneyFlameGame extends FlameGame
   /// 当前妖王战场次（0-based；bossFights>1 时打完一场增强再战）。
   int _bossStage = 0;
 
+  /// 能力派发上下文：派发某个能力期间，monsterParam 优先读该能力专属参数。
+  /// 仅在同步派发窗口内置位，派发结束即清除，避免跨能力串值。
+  ({String monsterCode, String abilityKey})? _abilityParamContext;
+
   /// 妖王伏诛（末场击杀后）：等待玩家抉择「结算离开/继续游玩」；
   /// 继续游玩后无妖王（罗盘距离导航已移除），循环刷怪照常成长。
   bool _bossDefeated = false;

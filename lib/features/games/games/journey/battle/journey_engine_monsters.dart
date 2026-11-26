@@ -79,7 +79,7 @@ class JourneyMonsterComponent extends PositionComponent
   /// 血怒狂暴（九头虫）：血量 <frenzy_hp 比例时移速/接触伤害 frenzy_mult
   /// （journey_monster_params.frenzy_hp/frenzy_mult）。
   bool get _bloodFrenzy =>
-      model.abilityKey == 'blood_frenzy' &&
+      model.hasAbility('blood_frenzy') &&
       hp < maxHp * game.monsterParam(model.code, 'frenzy_hp', 0.4);
 
   double get frenzyMult =>
@@ -88,12 +88,17 @@ class JourneyMonsterComponent extends PositionComponent
   /// 移速倍率（journey_monster_params.move_mult；缺省按能力兜底，
   /// 狂暴再乘 frenzy_mult）。
   double get _speedMult {
-    var mult = game.monsterParam(model.code, 'move_mult',
-        switch (model.abilityKey) {
-          'swift_wind' => 1.6,
-          'roc_speed' => 1.8,
-          _ => 1.0,
-        });
+    // 多个加速能力并存时按最高兜底倍率取，避免低倍率覆盖高倍率。
+    var fallback = 1.0;
+    for (final ability in model.effectiveAbilityKeys) {
+      final candidate = switch (ability) {
+        'swift_wind' => 1.6,
+        'roc_speed' => 1.8,
+        _ => 1.0,
+      };
+      if (candidate > fallback) fallback = candidate;
+    }
+    var mult = game.monsterParam(model.code, 'move_mult', fallback);
     if (_bloodFrenzy) mult *= frenzyMult;
     return mult;
   }
@@ -158,7 +163,7 @@ class JourneyMonsterComponent extends PositionComponent
   /// 妖王技能专属的战斗中回血（劲节十八公·根须汲取）：交战态按最大
   /// 生命比例持续回复，区别于通用脱战回血；数值走逐怪 combat_regen。
   void regenInCombat(double dt) {
-    if (!model.isBoss || model.abilityKey != 'root_bind' || hp >= maxHp) {
+    if (!model.isBoss || !model.hasAbility('root_bind') || hp >= maxHp) {
       return;
     }
     final rate = game.monsterParam(model.code, 'combat_regen', 0.03);
@@ -331,7 +336,7 @@ class JourneyMonsterComponent extends PositionComponent
     if (model.isBoss && !isDecoy) {
       _updateCharge(dt, dist, toPlayer, rooted: rooted);
       // 妖王周期能力（追击态才走，定身中不放）
-      if (_aggro && !rooted && model.abilityKey.isNotEmpty) {
+      if (_aggro && !rooted && model.effectiveAbilityKeys.isNotEmpty) {
         tickBossAbility(dt, dist);
       }
       // 交战态专属回血（根须汲取）：持续生效，定身中亦在战斗中
@@ -440,7 +445,7 @@ class JourneyMonsterComponent extends PositionComponent
           _chargePhase = 0;
           // 金翅迅影（大鹏）：冲撞冷却减半（params.charge_cd 可调）
           _chargeCd = game.monsterParam(model.code, 'charge_cd',
-              model.abilityKey == 'roc_speed' ? 2.0 : 4.0);
+              model.hasAbility('roc_speed') ? 2.0 : 4.0);
         }
         break;
     }
@@ -523,7 +528,7 @@ class JourneyMonsterComponent extends PositionComponent
     if (hp > 0) game.tryExecuteMonster(this);
     // 法天象地（牛魔王）：血量首次跌破阈值后接触伤害永久提升（每场一次）
     if (!isDecoy &&
-        model.abilityKey == 'unmovable' &&
+        model.hasAbility('unmovable') &&
         !_giantTriggered &&
         hp > 0 &&
         hp < maxHp * game.monsterParam(model.code, 'giant_hp', 0.5)) {
@@ -537,7 +542,7 @@ class JourneyMonsterComponent extends PositionComponent
     }
     // 分魂化形（白骨精）：血量首次跌破阈值分裂 2 只妖卫（每场一次）
     if (!isDecoy &&
-        model.abilityKey == 'bone_split' &&
+        model.hasAbility('bone_split') &&
         !_splitDone &&
         hp > 0 &&
         hp < maxHp * game.battleNum('monster', 'split_hp_ratio', 0.5)) {

@@ -9,8 +9,24 @@ extension JourneyConfigAccess on JourneyFlameGame {
       config?.weaponParam(code, key, fallback) ?? fallback;
 
   /// 妖王能力参数（journey_monster_params 后台配置；行缺失回落 fallback）。
-  double monsterParam(String monsterCode, String key, double fallback) =>
-      config?.monsterParam(monsterCode, key, fallback) ?? fallback;
+  /// 派发上下文命中时优先读能力专属参数，解决多能力共享键串值。
+  double monsterParam(String monsterCode, String key, double fallback) {
+    final ctx = _abilityParamContext;
+    if (ctx != null && ctx.monsterCode == monsterCode) {
+      return abilityParam(monsterCode, ctx.abilityKey, key, fallback);
+    }
+    return config?.monsterParam(monsterCode, key, fallback) ?? fallback;
+  }
+
+  /// 能力作用域参数（能力专属 > 怪物级 > 内置兜底）；
+  /// 一妖多能力时同名的共享参数键按能力各取一套值。
+  double abilityParam(
+    String monsterCode,
+    String abilityKey,
+    String key,
+    double fallback,
+  ) =>
+      config?.abilityParam(monsterCode, abilityKey, key, fallback) ?? fallback;
 
   /// 玩家基础移速（player.base_speed；缺省用内置值）。
   double get baseSpeed =>

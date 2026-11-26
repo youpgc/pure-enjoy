@@ -11,14 +11,14 @@ extension JourneyShieldCombat on JourneyFlameGame {
   /// 妖王破盾能力下，角色带盾时其伤害的额外加成。
   double shieldBreakBonus(JourneyMonsterComponent? attacker) {
     if (attacker == null || attacker.isDead || player.shield <= 0) return 0;
-    if (attacker.model.abilityKey != 'shield_break') return 0;
+    if (!attacker.model.hasAbility('shield_break')) return 0;
     return monsterParam(attacker.model.code, 'shield_damage_bonus', 0.25)
         .clamp(0.0, 1.0);
   }
 
   /// 妖王破盾能力下，玩家反震的衰减系数（缺省减半）。
   double shieldReflectFactor(JourneyMonsterComponent attacker) =>
-      attacker.model.abilityKey == 'shield_break'
+      attacker.model.hasAbility('shield_break')
           ? monsterParam(attacker.model.code, 'reflect_mult', 0.5)
               .clamp(0.0, 1.0)
           : 1.0;

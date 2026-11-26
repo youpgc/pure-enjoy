@@ -383,7 +383,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           game.monsterParam(
             m.model.code,
             'knock_resist',
-            m.model.abilityKey == 'unmovable' ? 0.8 : 0,
+            m.model.hasAbility('unmovable') ? 0.8 : 0,
           );
       m.applyKnockback(toM, kb);
     }

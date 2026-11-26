@@ -11,23 +11,40 @@ extension JourneyBossSkillCast on JourneyFlameGame {
   /// 避免计时上限与派发口径分离；计时到点且 GCD 就绪才起手。
   void tickBossSkill(JourneyMonsterComponent boss, double dt, double dist) {
     final code = boss.model.code;
-    final key = boss.model.abilityKey;
-    if (key.isEmpty) return;
-    // 法天象地是血线被动（接触伤害提升挂在受击钩子），不进周期调度，
-    // 否则每次空转都会写入 GCD，把妖王自身的冲撞机会挡掉。
-    if (key == 'unmovable') return;
-    // 处决是受击侧被动（任意伤害达阈值即斩），不进周期调度。
-    if (key == 'execute') return;
-    // 九头噬仅在狂暴期释放扇形弹道；非狂暴期停表等待，不空占 GCD。
-    if (key == 'blood_frenzy' && !boss._bloodFrenzy) return;
-    final period = monsterParam(code, '${key}_period', _periodFallback(key));
-    if (period <= 0) return;
-    boss.advancePeriodic(dt, period);
-    // 计时到点但 GCD 未就绪：停表等待，不空转、不写 GCD
-    if (!boss.periodicReady(period) || !boss.skillGcdReady) return;
-    boss.ackPeriodic();
+    final keys = boss.model.effectiveAbilityKeys;
+    if (keys.isEmpty) return;
+    // 到点的主动能力先收集再统一派发：多能力共用一把 GCD，
+    // 同一帧最多写一次冷却，避免逐个派发时把后续能力全挡在下一轮。
+    final ready = <String>[];
+    for (final key in keys) {
+      // 法天象地是血线被动（接触伤害提升挂在受击钩子），不进周期调度。
+      // 处决是受击侧被动（任意伤害达阈值即斩），不进周期调度。
+      if (key == 'unmovable' || key == 'execute') continue;
+      // 九头噬仅在狂暴期释放扇形弹道；非狂暴期停表等待，不空占 GCD。
+      if (key == 'blood_frenzy' && !boss._bloodFrenzy) continue;
+      final period = abilityParam(
+          code, key, '${key}_period', _periodFallback(key));
+      if (period <= 0) continue;
+      boss.advancePeriodic(key, dt, period);
+      // 计时未到点：继续攒。到点但 GCD 未就绪：停表等待，不清零、不写 GCD，
+      // 下一帧 GCD 一就绪即可释放，避免把到点的技能整轮吞掉。
+      if (!boss.periodicReady(key, period) || !boss.skillGcdReady) continue;
+      ready.add(key);
+    }
+    if (ready.isEmpty) return;
     boss.startSkillGcd();
-    _dispatchSkill(boss, key, dist);
+    for (final key in ready) {
+      // 真正派发才清零计时，保证「到点等待」期间停表不丢技能。
+      boss.ackPeriodic(key);
+      // 派发窗口内置位能力上下文，使派发分支内的 monsterParam 自动优先读
+      // 该能力专属参数；每个能力派发结束即清除，互不串值。
+      _abilityParamContext = (monsterCode: code, abilityKey: key);
+      try {
+        _dispatchSkill(boss, key, dist);
+      } finally {
+        _abilityParamContext = null;
+      }
+    }
   }
 
   /// 各能力缺省周期（秒）；后台 journey_monster_params.<key>_period 优先。
