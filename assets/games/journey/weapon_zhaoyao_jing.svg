@@ -1,8 +1,12 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- 照妖镜：镜面反照，金光回震 -->
-  <ellipse cx="24" cy="25" rx="14" ry="16" fill="none" stroke="#E8C470" stroke-width="3"/>
-  <ellipse cx="24" cy="25" rx="10" ry="12" fill="#F6E3B4" opacity="0.85"/>
-  <path d="M24 11 V39 M14 25 H34" stroke="#B98F3E" stroke-width="1.6" opacity="0.7"/>
-  <path d="M8 9 L13 14 M40 9 L35 14 M8 41 L13 36 M40 41 L35 36" stroke="#F0D9A0" stroke-width="2.4" stroke-linecap="round"/>
-  <path d="M24 7 L24 3" stroke="#F0D9A0" stroke-width="2.4" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 照妖镜：双圈古镜，星芒反照，金光四射 -->
+  <g fill="none" stroke="#E8C470" stroke-width="2.6" stroke-linecap="round" stroke-linejoin="round">
+    <circle cx="24" cy="21" r="12"/>
+    <circle cx="24" cy="21" r="8"/>
+    <path d="M24 33 L24 41 M20 41 L28 41"/>
+  </g>
+  <path d="M24 15 L26 19 L30 21 L26 23 L24 27 L22 23 L18 21 L22 19 Z" fill="#F6E3B4"/>
+  <g stroke="#F0D9A0" stroke-width="2" stroke-linecap="round" fill="none">
+    <path d="M24 3 L24 7 M5 21 L9 21 M39 21 L43 21 M9 6 L12 9 M39 6 L36 9"/>
+  </g>
 </svg>

@@ -1,7 +1,9 @@
-<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48" width="48" height="48">
-  <!-- 震妖钟：钟体震荡，波纹扩散 -->
-  <path d="M16 12 Q24 8 32 12 L34 32 Q24 38 14 32 Z" fill="none" stroke="#E8C470" stroke-width="3" stroke-linejoin="round"/>
-  <path d="M20 34 Q24 40 28 34" fill="none" stroke="#B98F3E" stroke-width="2" stroke-linecap="round"/>
-  <circle cx="24" cy="11" r="2.4" fill="#F6E3B4"/>
-  <path d="M8 23 Q4 29 8 35 M40 23 Q44 29 40 35" fill="none" stroke="#F0D9A0" stroke-width="2.2" stroke-linecap="round"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 48 48">
+  <!-- 震妖钟：古钟纹饰，钟口声波扩散 -->
+  <path d="M21 6 L27 6 L27 9 L21 9 Z" fill="#B98F3E"/>
+  <path d="M14 12 Q24 8 34 12 L36 31 Q24 36 12 31 Z" fill="none" stroke="#E8C470" stroke-width="2.6" stroke-linejoin="round"/>
+  <path d="M12 31 Q24 37 36 31" fill="none" stroke="#F6E3B4" stroke-width="2.4" stroke-linecap="round"/>
+  <path d="M17 17 L31 17 M18 23 L30 23" fill="none" stroke="#B98F3E" stroke-width="1.6" stroke-linecap="round"/>
+  <circle cx="24" cy="35" r="2" fill="#F6E3B4"/>
+  <path d="M7 19 Q3 24 7 29 M41 19 Q45 24 41 29" fill="none" stroke="#F0D9A0" stroke-width="2" stroke-linecap="round"/>
 </svg>
