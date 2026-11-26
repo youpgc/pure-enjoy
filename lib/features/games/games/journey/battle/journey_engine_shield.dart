@@ -36,7 +36,8 @@ extension JourneyShieldCombat on JourneyFlameGame {
     final extra =
         hasMirror ? weaponParam('zhaoyao_jing', 'reflect_ratio', 1.0) : 0.0;
     final ratio = (base + extra).clamp(0.0, cap);
-    final damage = raw * ratio * shieldReflectFactor(attacker);
+    final damage =
+        raw * ratio * shieldReflectFactor(attacker) * passiveAmpFactor;
     if (damage <= 0) return;
     // reflect=false 标记这是护盾反震：不再触发金莲反伤回到玩家，
     // 否则「玩家受击→盾反→妖王金莲反伤→玩家受击」会无限递归。
@@ -68,7 +69,8 @@ extension JourneyShieldCombat on JourneyFlameGame {
     if (radius <= 0) return;
     final damage = raw *
         weaponParam('zhenyao_zhong', 'burst_ratio', 0.6)
-            .clamp(0.0, kJourneyBurstRatioCap);
+            .clamp(0.0, kJourneyBurstRatioCap) *
+        passiveAmpFactor;
     if (damage <= 0) return;
     final armorIgnore =
         weaponParam('zhenyao_zhong', 'burst_armor_ignore', 0) > 0 ? 1.0 : 0.0;

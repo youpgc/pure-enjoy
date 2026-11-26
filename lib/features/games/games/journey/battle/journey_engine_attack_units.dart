@@ -8,6 +8,7 @@ part of 'journey_flame_game.dart';
 /// 共用同一伤害公式乘区；aura=领域 / magnet=磁吸走独立真实伤害乘区，范围取
 /// 武器臂展，驻留按秒与周期脉冲两条线各按 value_num（领域每秒伤害）结算，
 /// 不限目标数，不叠加角色攻击/增伤，不受护甲，不触发环绕专属暴击与特效。
+/// 数值快照与飞行弹体模型见 attack_models part。
 
 /// 并行单位命中冷却槽位总数：5 种已实现形态各占一槽，
 /// 末槽留给未实现形态（如 melee_arc），避免其默认落点与其他形态串扰。
@@ -30,73 +31,6 @@ int _attackUnitSlot(String kind) {
     default:
       return 5;
   }
-}
-
-/// 单个并行单位的当前分级数值快照（升级时由 _refreshAttackUnits 重建）。
-class JourneyAttackUnit {
-  JourneyAttackUnit({
-    required this.code,
-    required this.kind,
-    this.damage = 0,
-    this.intervalMs = 0,
-    this.projCount = 1,
-    this.valueNum = 0,
-    this.pierce = 0,
-    this.speed = 0,
-    this.aoeRadius = 0,
-    this.rangePx = 0,
-    this.starterEffect = '',
-  });
-
-  final String code;
-  final String kind;
-  final double damage;
-  final double intervalMs;
-  final int projCount;
-  final double valueNum;
-  final int pierce;
-  final double speed;
-  final double aoeRadius;
-  final double rangePx;
-
-  /// 法宝初始特效槽（knockback/burn/lifesteal/pierce）：并行命中沿用该
-  /// 特效，保证非出战法宝的初始特性不因脱离环绕维度槽而丢失。
-  final String starterEffect;
-
-  /// 发射/扫击计时器，归零触发并重置；无目标时回退到阈值前 1s 重试。
-  double timer = 0;
-}
-
-/// 飞行弹体：projectile 穿透 / boomerang 去回程；world 坐标驱动。
-class JourneyAttackShot {
-  JourneyAttackShot({
-    required this.unit,
-    required this.pos,
-    required this.dir,
-    required this.speed,
-    required this.range,
-    required this.pierce,
-    required this.boomerang,
-    required this.lifeSec,
-  });
-
-  /// 所属单位：升级刷新后按 code 重绑到新数值快照，保证飞行中弹体用新伤害。
-  JourneyAttackUnit unit;
-  Vector2 pos;
-  final Vector2 dir;
-  final double speed;
-  final double range;
-  final int pierce;
-  final bool boomerang;
-
-  /// 剩余存在时间（秒）：逐帧扣减，归零即销毁，防止异常射程/速度配置下
-  /// 弹体滞留。初值取后台 attack_shot_life_sec，缺省 8 秒。
-  double lifeSec;
-
-  double traveled = 0;
-  bool returning = false;
-  int hits = 0;
-  final Set<JourneyMonsterComponent> hitSet = <JourneyMonsterComponent>{};
 }
 
 /// 并行攻击单位调度组件：推进所有单位的攻击行为。
@@ -319,10 +253,11 @@ class JourneyAttackUnits extends Component {
     );
   }
 
-  /// 领域轨真实伤害：只按自身 value_num（领域每秒伤害）×驻留倍率结算，
-  /// 不叠加角色基础攻击/等级攻击/增伤百分比，不受护甲减免。
-  /// 不进入 _hitMonster，暴击/雷引/紫金铃/伏魔/火眼等环绕专属效果不触发，
-  /// 领域伤害不触发任何吸血或回血——吸血只发生在武器与弹道命中链。
+  /// 领域轨真实伤害：按自身 value_num（领域每秒伤害）×驻留倍率结算，
+  /// 不叠加角色基础攻击/等级攻击/增伤百分比，但乘被动法宝增伤（舍利子），
+  /// 不受护甲减免。不进入 _hitMonster，暴击/雷引/紫金铃/伏魔/火眼等
+  /// 环绕专属效果不触发，领域伤害不触发任何吸血或回血——吸血只发生在
+  /// 武器与弹道命中链。
   ///
   /// [mult] 为该怪当前驻留倍率（驻留越久越高）；[fromPulse] 标识这次结算
   /// 来自周期脉冲（true）还是驻留按秒（false），仅用于受击圈反馈。
@@ -333,7 +268,8 @@ class JourneyAttackUnits extends Component {
     bool fromPulse = false,
   }) {
     if (m.isDead) return;
-    final dmg = math.max(0.0, unit.valueNum) * mult;
+    final dmg =
+        math.max(0.0, unit.valueNum) * mult * game.passiveAmpFactor;
     if (dmg <= 0) return;
     m.takeDamage(dmg, armorIgnore: 1);
     // 领域灼烧：灼烧是固定伤害、只随升级提升，按领域自身每秒伤害基准
@@ -344,7 +280,8 @@ class JourneyAttackUnits extends Component {
       m.ignite(
         source: 'field_${unit.code}',
         burnDps: math.max(0.0, unit.valueNum) *
-            game.battleNum('weapon', 'attack_burn_ratio', 0.25),
+            game.battleNum('weapon', 'attack_burn_ratio', 0.25) *
+            game.passiveAmpFactor,
         seconds: game.battleNum('weapon', 'attack_burn_sec', 2.0),
         trueDamage: true,
       );

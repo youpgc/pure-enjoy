@@ -299,7 +299,8 @@ extension JourneyNewSlotTick on JourneyFlameGame {
         if (seed != null) {
           p.fenghuoTick = 0;
           final burn = weaponParam('fenghuo_lun', 'burn', 0.5) *
-              (weaponArm?.damage ?? 10);
+              (weaponArm?.damage ?? 10) *
+              passiveAmpFactor;
           seed.igniteFenghuo(
             burn,
             weaponParam('fenghuo_lun', 'seconds', 3.0),
@@ -317,7 +318,8 @@ extension JourneyNewSlotTick on JourneyFlameGame {
       final spreadRatio = weaponParam('fenghuo_lun', 'spread_ratio', 0.6);
       final maxGen = weaponParam('fenghuo_lun', 'spread_generations', 2).round();
       final baseBurn = weaponParam('fenghuo_lun', 'burn', 0.5) *
-          (weaponArm?.damage ?? 10);
+          (weaponArm?.damage ?? 10) *
+          passiveAmpFactor;
       final seconds = weaponParam('fenghuo_lun', 'seconds', 3.0);
       final sources =
           monsters.where((m) => !m.isDead && m.fenghuoGen >= 0).toList();

@@ -32,6 +32,7 @@ part 'journey_engine_weapons.dart';
 part 'journey_engine_blade_hits.dart';
 part 'journey_engine_hp_scaling.dart';
 part 'journey_engine_attack_units.dart';
+part 'journey_engine_attack_models.dart';
 part 'journey_engine_attack_forms.dart';
 part 'journey_engine_attack_beam_fx.dart';
 part 'journey_weapon_render.dart';
@@ -233,24 +234,6 @@ class JourneyFlameGame extends FlameGame
   @override
   double critDamage = 1.5;
 
-  /// 增伤百分比合计（伤害公式固定：基础值 →(1+Σ%) 单次乘算，各百分比
-  /// 来源加法合流，不做乘法叠乘）：
-  /// - attackAmp：攻击力%（天赋锐金/离火本源+化形，局外注入）；
-  /// - damageAmp：武器增伤%（1.0 基准，舍利子 +15%/级、红孩儿光环 +8%，
-  ///   钳 ≤+200%）；
-  /// - 紫金宝葫叠层 3%/层（jinjiao 特殊能力，击杀精英/妖王 +1 层）；
-  /// - 三头六臂（nezha 特殊能力）增益窗口 +40%；
-  /// - 背水一战维度槽：随缺失生命档位提升，满级低血 +300%。
-  double get damageAmpTotal =>
-      attackAmp +
-      (damageAmp - 1.0)
-          .clamp(0.0, battleNum('damage', 'amp_cap', 2.0)) +
-      battleNum('ability', 'jinjiao_per_stack', 0.03) * _jinjiaoStacks +
-      (_nezhaWindow > 0
-          ? battleNum('ability', 'nezha_amp', 0.4)
-          : 0) +
-      desperationAmp;
-
   /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 fallback）。
   /// [group] 为参数分组（damage/spawn/monster/boss/ability/economy/…），
   /// [key] 为组内语义键；原内置常量作为 [fallback] 保证未配置行为不变。
@@ -267,12 +250,6 @@ class JourneyFlameGame extends FlameGame
     final v = slotDefOf(code)?.valuePerLevel ?? 0;
     return v > 0 ? v : fallback;
   }
-
-  /// 属性面板展示口径：最终角速度（含嗜血低血加成与 5 圈/秒=10π 钳制，
-  /// 与环绕推进同源；不含限时增益窗口的临时转速）。
-  double get displayAngularSpeed =>
-      ((weaponArm?.speedBase ?? 0) * (spinAmp + bloodlustAmp))
-          .clamp(0.0, 10 * math.pi);
 
   // ---- 特效触发法宝（§6）----
   /// 已激活的触发型法宝（kunxian_rope/fanshang_thorns/baoji_thunder）。
@@ -365,6 +342,10 @@ class JourneyFlameGame extends FlameGame
 
   /// 攻击力%合计（伤害公式固定：与武器增伤%加法合流进 damageAmpTotal）。
   double attackAmp = 0;
+
+  /// 被动法宝伤害加成合计：只累加提供通用增伤的被动法宝（当前为舍利子），
+  /// 供绕开命中链的对怪伤害乘算，避免把天赋/能力/维度槽等来源扩张到这些轨。
+  double passiveDamageAmp = 0;
   @override
   double moveSpeedAmp = 1.0;
 

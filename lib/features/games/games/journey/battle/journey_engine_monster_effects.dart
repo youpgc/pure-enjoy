@@ -159,7 +159,8 @@ mixin JourneyBurnMixin on PositionComponent {
             lvGrowth *
             (honghaier
                 ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
-                : 1.0),
+                : 1.0) *
+            game.passiveAmpFactor,
         seconds: honghaier
             ? game.battleNum('ability', 'honghaier_burn_sec', 4)
             : 2,

@@ -65,7 +65,9 @@ mixin JourneyDamageTickMixin {
       // 伤害（params.thorns，直接 takeDamage，不计暴击）；荆棘绿环提示
       if (game.effectWeapons.contains('fanshang_thorns')) {
         strongestM.takeDamage(
-          afterArmor * game.weaponParam('fanshang_thorns', 'thorns', 0.30),
+          afterArmor *
+              game.weaponParam('fanshang_thorns', 'thorns', 0.30) *
+              game.passiveAmpFactor,
         );
         game.fxLayer.spawnRing(
           strongestM.position,
@@ -160,7 +162,9 @@ extension JourneyBossCharge on JourneyFlameGame {
     // 反伤荆棘：冲撞同属接触伤害，照常对撞人妖王反弹
     if (effectWeapons.contains('fanshang_thorns')) {
       boss.takeDamage(
-        afterArmor * weaponParam('fanshang_thorns', 'thorns', 0.30),
+        afterArmor *
+            weaponParam('fanshang_thorns', 'thorns', 0.30) *
+            passiveAmpFactor,
       );
       fxLayer.spawnRing(
         boss.position,

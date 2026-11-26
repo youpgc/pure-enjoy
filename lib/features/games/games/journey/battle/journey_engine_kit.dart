@@ -157,7 +157,11 @@ extension JourneyKit on JourneyFlameGame {
         break;
       }
       case 'shelizi': // 舍利子：伤害（params.damage）
-        damageAmp += weaponParam('shelizi', 'damage', 0.15);
+        // 命中轨经 damageAmpTotal 已含此增量；另记一份供绕开命中链的
+        // 对怪伤害乘算，使舍利子增伤对所有伤害通用且不重复计入。
+        final amp = weaponParam('shelizi', 'damage', 0.15);
+        damageAmp += amp;
+        passiveDamageAmp += amp;
         break;
       case 'jinlan_kasha': // 锦襕袈裟：护体护甲（params.armor）
         player.armor += weaponParam('jinlan_kasha', 'armor', 5);

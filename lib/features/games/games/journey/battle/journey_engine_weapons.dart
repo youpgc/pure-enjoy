@@ -396,7 +396,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
           game.slotValue('poison', kJourneyPoisonRatioPerLv) * (poisonLv - 1);
       m.ignite(
         source: 'weapon_poison',
-        burnDps: game.damageBaseValue * base,
+        burnDps: game.damageBaseValue * base * game.passiveAmpFactor,
         seconds:
             game.battleNum('weapon', 'poison_sec', kJourneyPoisonSeconds),
         trueDamage: true,
