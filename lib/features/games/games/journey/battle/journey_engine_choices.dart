@@ -144,8 +144,11 @@ String journeySlotValueText(String code, int level, double perLevel) {
   )}';
 }
 
-/// 顿悟卡描述：简介 + 当前值→下一级值；无匹配规则时回落原介绍文案。
+/// 顿悟卡描述：后台每级效果文案优先，空时回落简介 + 当前值→下一级值；
+/// 无匹配规则时同样回落后台文案。后台可随时改写措辞，无需发版。
 String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
+  final remote = def.effectPerLevel.trim();
+  if (remote.isNotEmpty) return remote;
   final rule = _slotDisplayRule(def.code);
   if (rule.brief.isEmpty) return def.effectPerLevel;
   final before = _formatSlotValue(
@@ -153,6 +156,17 @@ String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
   final after = _formatSlotValue(
       _slotDisplayValue(def.code, currentLevel + 1, def.valuePerLevel, rule), rule.unit);
   return '${rule.brief} $before → $after';
+}
+
+/// 三选一法宝卡描述：后台法宝描述优先，空时回落内置数值模板。
+/// 数值模板仍从法宝参数读取，保证后台未写描述时展示与结算同源。
+String _weaponChoiceDesc(
+  JourneyFlameGame game,
+  String code,
+  String fallback,
+) {
+  final remote = game.config?.weaponOf(code)?.desc.trim() ?? '';
+  return remote.isNotEmpty ? remote : fallback;
 }
 
 /// 三选一卡的唯一键（类别+编码）：基础属性卡 code 为空但同属 base 类，
@@ -207,7 +221,11 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
       pool.add(_passiveGrantChoice(
         p.key,
         p.value,
-        journeyPassiveEffectDesc(p.key, game.weaponParam),
+        _weaponChoiceDesc(
+          game,
+          p.key,
+          journeyPassiveEffectDesc(p.key, game.weaponParam),
+        ),
       ));
     }
   }
@@ -222,7 +240,11 @@ List<JourneyUpgradeChoice> drawChoices(JourneyFlameGame game) {
       JourneyUpgradeKind.effectGrant,
       code: e.key,
       title: '触发·${e.value}',
-      desc: journeyEffectWeaponDesc(e.key, game.weaponParam),
+      desc: _weaponChoiceDesc(
+        game,
+        e.key,
+        journeyEffectWeaponDesc(e.key, game.weaponParam),
+      ),
       category: JourneyChoiceCategory.effect,
     ));
   }
