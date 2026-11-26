@@ -12,10 +12,11 @@ import '../widgets/journey_theme.dart';
 import '../widgets/journey_widgets.dart';
 
 import 'journey_compendium_state.dart';
+import 'journey_compendium_widgets.dart';
 
-/// 维度槽图鉴独立页：展示全部武器维度槽（属性/效果两类）。
-/// 初始槽无解锁规则、直接可用；后期槽按后台解锁规则显示条件与功德定价，
-/// 解锁走统一服务（条件校验→扣功德→写流水→写进度）。
+/// 武装图鉴独立页：展示全部武装槽（属性/效果两类）。
+/// 无解锁规则或已解锁的武装归入「已解锁」，其余按后台规则显示条件与功德
+/// 归入「待解锁」；解锁走统一服务（条件校验→扣功德→写流水→写进度）。
 class JourneySlotCompendiumScreen extends StatefulWidget {
   const JourneySlotCompendiumScreen({super.key});
 
@@ -37,14 +38,14 @@ class _JourneySlotCompendiumScreenState
   Widget build(BuildContext context) {
     if (loadFailed) {
       return JourneyPageScaffold(
-        title: '维度图鉴',
+        title: '武装图鉴',
         body: JourneyLoadError(onRetry: retry),
       );
     }
     final snapshot = config;
     if (snapshot == null) {
       return const JourneyPageScaffold(
-        title: '维度图鉴',
+        title: '武装图鉴',
         body: Center(child: JourneyLoading(label: '西行中…')),
       );
     }
@@ -53,18 +54,22 @@ class _JourneySlotCompendiumScreenState
     final entries = <String, JourneyUnlockEntryModel?>{
       for (final def in defs) def.code: snapshot.unlockEntry('slot', def.code),
     };
-    final initial = defs.where((def) => entries[def.code] == null).toList();
-    final unlockable = defs.where((def) => entries[def.code] != null).toList();
+    // 已解锁 = 无规则（默认可用）或已购买；其余归入待解锁。
+    bool isUnlocked(JourneySlotDefModel def) =>
+        entries[def.code] == null ||
+        JourneyProgressService.instance.isUnlockGranted('slot', def.code);
+    final unlocked = defs.where(isUnlocked).toList();
+    final pending = defs.where((def) => !isUnlocked(def)).toList();
     return JourneyPageScaffold(
-      title: '维度图鉴',
+      title: '武装图鉴',
       body: ListView(
         padding: const EdgeInsets.all(16),
         children: <Widget>[
-          _sectionTitle('初始维度 · 直接可用', initial.length),
-          ...initial.map((def) => _buildSlotCard(def, entries[def.code])),
+          _sectionTitle('已解锁', unlocked.length),
+          ...unlocked.map((def) => _buildSlotCard(def, entries[def.code])),
           const SizedBox(height: 12),
-          _sectionTitle('进阶维度 · 功德解锁', unlockable.length),
-          ...unlockable.map((def) => _buildSlotCard(def, entries[def.code])),
+          _sectionTitle('待解锁', pending.length),
+          ...pending.map((def) => _buildSlotCard(def, entries[def.code])),
         ],
       ),
     );
@@ -133,11 +138,9 @@ class _JourneySlotCompendiumScreenState
                   Text(def.effectPerLevel, style: JourneyTheme.caption),
                   const SizedBox(height: 3),
                   Text(
-                    entry == null
-                        ? '初始可用 · 三选一可习得'
-                        : granted
-                            ? '已解锁 · 三选一可习得'
-                            : '${conditionLabel(entry)} · ${entry.meritCost} 功德',
+                    entry == null || granted
+                        ? '已解锁 · 三选一可习得'
+                        : '${conditionLabel(entry)} · ${entry.meritCost} 功德',
                     style: deficit
                         ? JourneyTheme.faint.copyWith(color: JourneyTheme.locked)
                         : JourneyTheme.faint.copyWith(color: JourneyTheme.gold),
@@ -145,20 +148,17 @@ class _JourneySlotCompendiumScreenState
                 ],
               ),
             ),
-            if (entry != null && !granted)
-              JourneyButton(
-                text: '解锁',
-                enabled: unlockConditionMet(entry) && !deficit && !unlocking,
-                onTap: () => requestUnlock(
-                  subject: '维度',
-                  name: def.name,
-                  cost: entry.meritCost,
-                  action: () => unlockSlot(def.code),
-                  successMessage: '「${def.name}」已解锁',
-                ),
-              )
-            else if (persistent)
-              const Icon(Icons.verified, color: JourneyTheme.gold, size: 18),
+            JourneyUnlockLock(
+              unlocked: persistent,
+              unlockable: entry != null && unlockConditionMet(entry) && !deficit,
+              onTap: () => requestUnlock(
+                subject: '武装',
+                name: def.name,
+                cost: entry?.meritCost ?? 0,
+                action: () => unlockSlot(def.code),
+                successMessage: '「${def.name}」已解锁',
+              ),
+            ),
           ],
         ),
       ),

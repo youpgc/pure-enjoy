@@ -50,6 +50,38 @@ class JourneyCompendiumTabChip extends StatelessWidget {
   }
 }
 
+/// 图鉴解锁图标：可解锁显示金色锁并可点触发解锁，条件未达成显示灰色锁，
+/// 已解锁不展示任何图标。两个图鉴共用同一交互口径。
+class JourneyUnlockLock extends StatelessWidget {
+  const JourneyUnlockLock({
+    super.key,
+    required this.unlocked,
+    required this.unlockable,
+    required this.onTap,
+  });
+
+  final bool unlocked;
+  final bool unlockable;
+  final VoidCallback onTap;
+
+  @override
+  Widget build(BuildContext context) {
+    if (unlocked) return const SizedBox.shrink();
+    return GestureDetector(
+      onTap: unlockable ? onTap : null,
+      behavior: HitTestBehavior.opaque,
+      child: Padding(
+        padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 6),
+        child: Icon(
+          Icons.lock,
+          size: 20,
+          color: unlockable ? JourneyTheme.gold : JourneyTheme.locked,
+        ),
+      ),
+    );
+  }
+}
+
 /// 已入池角标（已解锁或无 relic 配置的法宝）。
 class JourneyPoolBadge extends StatelessWidget {
   const JourneyPoolBadge({super.key});

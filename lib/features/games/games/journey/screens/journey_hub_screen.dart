@@ -220,16 +220,9 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
           onTap: () => _push(const JourneyCharacterScreen())),
       (icon: Icons.auto_fix_high, label: '五行天赋',
           onTap: () => _push(const JourneyTalentScreen())),
-      (icon: Icons.auto_stories, label: '主动法宝',
-          onTap: () => _push(const JourneyCompendiumScreen(
-              category: 'active', title: '主动法宝'))),
-      (icon: Icons.shield_outlined, label: '被动加持',
-          onTap: () => _push(const JourneyCompendiumScreen(
-              category: 'passive', title: '被动加持'))),
-      (icon: Icons.bolt, label: '特效触发',
-          onTap: () => _push(const JourneyCompendiumScreen(
-              category: 'effect', title: '特效触发'))),
-      (icon: Icons.category, label: '维度图鉴',
+      (icon: Icons.auto_stories, label: '法宝图鉴',
+          onTap: () => _push(const JourneyCompendiumScreen())),
+      (icon: Icons.category, label: '武装图鉴',
           onTap: () => _push(const JourneySlotCompendiumScreen())),
       (icon: Icons.pets, label: '妖怪图鉴',
           onTap: () => _push(const JourneyMonsterCompendiumScreen())),

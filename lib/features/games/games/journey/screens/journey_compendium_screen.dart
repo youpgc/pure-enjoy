@@ -15,17 +15,9 @@ import 'journey_compendium_widgets.dart';
 
 part 'journey_compendium_weapons.dart';
 
-/// 法宝图鉴独立页：category 决定展示主动/被动/特效其中一类。
-/// 三处入口各开一页，页面内不再设法宝类别页签。
+/// 法宝图鉴独立页：主动/被动/特效三类以页签切换，共用同一列表与解锁口径。
 class JourneyCompendiumScreen extends StatefulWidget {
-  final String category;
-  final String title;
-
-  const JourneyCompendiumScreen({
-    super.key,
-    this.category = 'active',
-    this.title = '主动法宝',
-  });
+  const JourneyCompendiumScreen({super.key});
 
   @override
   State<JourneyCompendiumScreen> createState() =>
@@ -34,6 +26,13 @@ class JourneyCompendiumScreen extends StatefulWidget {
 
 class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen>
     with JourneyCompendiumState<JourneyCompendiumScreen> {
+  static const _tabs = <(String, String)>[
+    ('active', '主动'),
+    ('passive', '被动'),
+    ('effect', '特效'),
+  ];
+  String _category = 'active';
+
   @override
   void initState() {
     super.initState();
@@ -44,27 +43,46 @@ class _JourneyCompendiumScreenState extends State<JourneyCompendiumScreen>
   Widget build(BuildContext context) {
     if (loadFailed) {
       return JourneyPageScaffold(
-        title: widget.title,
+        title: '法宝图鉴',
         body: JourneyLoadError(onRetry: retry),
       );
     }
     final snapshot = config;
     if (snapshot == null) {
-      return JourneyPageScaffold(
-        title: widget.title,
-        body: const Center(child: JourneyLoading(label: '西行中…')),
+      return const JourneyPageScaffold(
+        title: '法宝图鉴',
+        body: Center(child: JourneyLoading(label: '西行中…')),
       );
     }
-    final list = snapshot.weapons.where((w) => w.category == widget.category).toList()
+    final list = snapshot.weapons.where((w) => w.category == _category).toList()
       ..sort((a, b) =>
           (isWeaponUnlocked(b) ? 1 : 0) - (isWeaponUnlocked(a) ? 1 : 0));
     return JourneyPageScaffold(
-      title: widget.title,
-      body: ListView.separated(
-        padding: const EdgeInsets.all(16),
-        itemCount: list.length,
-        separatorBuilder: (_, __) => const SizedBox(height: 8),
-        itemBuilder: (ctx, i) => _buildWeaponCard(list[i]),
+      title: '法宝图鉴',
+      body: Column(
+        children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 8, 16, 0),
+            child: Row(
+              children: _tabs
+                  .map((tab) => JourneyCompendiumTabChip(
+                        label: tab.$2,
+                        selected: tab.$1 == _category,
+                        onTap: () => setState(() => _category = tab.$1),
+                      ))
+                  .toList(),
+            ),
+          ),
+          Expanded(
+            child: ListView.separated(
+              key: ValueKey(_category),
+              padding: const EdgeInsets.all(16),
+              itemCount: list.length,
+              separatorBuilder: (_, __) => const SizedBox(height: 8),
+              itemBuilder: (ctx, i) => _buildWeaponCard(list[i]),
+            ),
+          ),
+        ],
       ),
     );
   }

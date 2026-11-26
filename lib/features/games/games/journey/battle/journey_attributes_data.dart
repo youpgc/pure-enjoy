@@ -143,7 +143,7 @@ abstract final class JourneyAttributesData {
     ]));
 
     groups.add(JourneyAttrGroup(
-      '武器维度槽',
+      '武装',
       <(String, String)>[
         for (final slot in game.weaponSlots)
           (
@@ -154,7 +154,7 @@ abstract final class JourneyAttributesData {
         if (game.weaponSlots.length < 6)
           (
             '空槽',
-            '${6 - game.weaponSlots.length} 格 · 三选一可习得新维度',
+            '${6 - game.weaponSlots.length} 格 · 三选一可习得新武装',
           ),
       ],
     ));

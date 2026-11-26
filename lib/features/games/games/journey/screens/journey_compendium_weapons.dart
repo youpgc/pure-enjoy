@@ -101,39 +101,17 @@ extension _JourneyCompendiumWeapons on _JourneyCompendiumScreenState {
               ],
             ),
           ),
-          if (!unlocked && !charLocked)
-            Column(
-              mainAxisSize: MainAxisSize.min,
-              crossAxisAlignment: CrossAxisAlignment.end,
-              children: <Widget>[
-                Padding(
-                  padding: const EdgeInsets.only(bottom: 4),
-                  child: Icon(
-                    Icons.lock,
-                    color: unlockable ? JourneyTheme.gold : JourneyTheme.locked,
-                    size: 18,
-                  ),
-                ),
-                JourneyButton(
-                  text: '解锁',
-                  enabled: unlockable && !unlocking,
-                  onTap: () => requestUnlock(
-                    subject: '法宝',
-                    name: w.name,
-                    cost: unlockCostOf(w.code),
-                    action: () => unlockWeapon(w),
-                    successMessage: '「${w.name}」已入池',
-                  ),
-                ),
-                if (!done)
-                  const Padding(
-                    padding: EdgeInsets.only(top: 4),
-                    child: Text('前置条件未达成', style: JourneyTheme.faint),
-                  ),
-              ],
+          JourneyUnlockLock(
+            unlocked: unlocked,
+            unlockable: !charLocked && unlockable,
+            onTap: () => requestUnlock(
+              subject: '法宝',
+              name: w.name,
+              cost: unlockCostOf(w.code),
+              action: () => unlockWeapon(w),
+              successMessage: '「${w.name}」已入池',
             ),
-          if (charLocked)
-            const Icon(Icons.lock, color: JourneyTheme.locked, size: 18),
+          ),
         ],
       ),
     );
