@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 
 import '../widgets/journey_theme.dart';
 
-/// 图鉴页签：选中态高亮，点击交由页面切换当前页签。
+/// 图鉴分类页签：选中态高亮，点击交由页面切换当前分类，供多分类聚合布局复用。
 class JourneyCompendiumTabChip extends StatelessWidget {
   const JourneyCompendiumTabChip({
     super.key,

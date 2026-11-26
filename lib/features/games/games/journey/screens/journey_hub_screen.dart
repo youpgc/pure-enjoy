@@ -16,6 +16,8 @@ import 'journey_daily_screen.dart';
 import 'journey_character_screen.dart';
 import 'journey_talent_screen.dart';
 import 'journey_compendium_screen.dart';
+import 'journey_compendium_monsters.dart';
+import 'journey_compendium_slots.dart';
 import 'journey_records_screen.dart';
 import 'journey_record_lists.dart';
 import 'journey_hub_actions.dart';
@@ -26,7 +28,7 @@ import '../widgets/journey_entry_card.dart';
 /// 布局对齐宠物主页范式：角色是唯一主角（舞台居中），信息各归其位——
 /// - 全屏主题背景（bg_hub.svg 月夜山峦古道，独立画风）；
 /// - 顶栏：返回 / 标题与进度（同行）/ 功德胶囊；
-/// - 入口行（顶栏正下方）：取经队伍/五行天赋/法宝图鉴/西行记录/设置；
+/// - 入口行（顶栏正下方）：取经队伍/五行天赋/各图鉴独立入口/西行记录/设置；
 /// - 中央舞台：出战角色立绘（char_*.svg）+ 左右箭头切换已解锁角色；
 /// - 底部：出战角色名牌（光环/特性法宝/基础血量）+「开始西行」主按钮。
 class JourneyHubScreen extends StatefulWidget {
@@ -212,85 +214,57 @@ class _JourneyHubScreenState extends State<JourneyHubScreen> {
   // ---- 入口行：顶栏正下方（功德流水/西行记录/成就独立入口） ----
 
   Widget _entryRow() {
-    // Wrap 换行排布：窄机型自动折行，卡片定宽防文案换行/间距过窄
+    // 入口项统一数据驱动：图标/文案/行为，卡片定宽防窄机型文案换行。
+    final entries = <({IconData icon, String label, VoidCallback onTap})>[
+      (icon: Icons.groups, label: '取经队伍',
+          onTap: () => _push(const JourneyCharacterScreen())),
+      (icon: Icons.auto_fix_high, label: '五行天赋',
+          onTap: () => _push(const JourneyTalentScreen())),
+      (icon: Icons.auto_stories, label: '主动法宝',
+          onTap: () => _push(const JourneyCompendiumScreen(
+              category: 'active', title: '主动法宝'))),
+      (icon: Icons.shield_outlined, label: '被动加持',
+          onTap: () => _push(const JourneyCompendiumScreen(
+              category: 'passive', title: '被动加持'))),
+      (icon: Icons.bolt, label: '特效触发',
+          onTap: () => _push(const JourneyCompendiumScreen(
+              category: 'effect', title: '特效触发'))),
+      (icon: Icons.category, label: '维度图鉴',
+          onTap: () => _push(const JourneySlotCompendiumScreen())),
+      (icon: Icons.pets, label: '妖怪图鉴',
+          onTap: () => _push(const JourneyMonsterCompendiumScreen())),
+      (icon: Icons.receipt_long, label: '功德流水',
+          onTap: () => _push(const JourneyMeritRecordsScreen())),
+      (icon: Icons.sports_esports, label: '西行记录',
+          onTap: () => _push(const JourneyRunRecordsScreen())),
+      (icon: Icons.emoji_events, label: '成就',
+          onTap: () => _push(const JourneyAchievementsScreen())),
+      (icon: Icons.leaderboard, label: '西行排行',
+          onTap: () => _runLocked(() => openJourneyLeaderboard(
+                context,
+                snapshotGameId: _config?.gameId ?? '',
+                fallbackGameId: widget.game.id,
+                gameCode: widget.game.code,
+              ))),
+      (icon: Icons.settings, label: '设置',
+          onTap: () => _runLocked(() => openJourneySettings(context))),
+    ];
     return Padding(
       padding: const EdgeInsets.fromLTRB(16, 10, 16, 0),
       child: Wrap(
-        // 从左至右排列（不居中）：窄机型自动折行，卡片定宽防文案换行
         alignment: WrapAlignment.start,
         spacing: 8,
         runSpacing: 8,
-        children: <Widget>[
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.groups,
-              label: '取经队伍',
-              onTap: () => _push(const JourneyCharacterScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.auto_fix_high,
-              label: '五行天赋',
-              onTap: () => _push(const JourneyTalentScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.auto_stories,
-              label: '图鉴',
-              onTap: () => _push(const JourneyCompendiumScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.receipt_long,
-              label: '功德流水',
-              onTap: () => _push(const JourneyMeritRecordsScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.sports_esports,
-              label: '西行记录',
-              onTap: () => _push(const JourneyRunRecordsScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.emoji_events,
-              label: '成就',
-              onTap: () => _push(const JourneyAchievementsScreen()),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.leaderboard,
-              label: '西行排行',
-              onTap: () => _runLocked(() => openJourneyLeaderboard(
-                    context,
-                    snapshotGameId: _config?.gameId ?? '',
-                    fallbackGameId: widget.game.id,
-                    gameCode: widget.game.code,
-                  )),
-            ),
-          ),
-          SizedBox(
-            width: 68,
-            child: JourneyEntryCard(
-              icon: Icons.settings,
-              label: '设置',
-              onTap: () => _runLocked(() => openJourneySettings(context)),
-            ),
-          ),
-        ],
+        children: entries
+            .map((e) => SizedBox(
+                  width: 68,
+                  child: JourneyEntryCard(
+                    icon: e.icon,
+                    label: e.label,
+                    onTap: e.onTap,
+                  ),
+                ))
+            .toList(),
       ),
     );
   }

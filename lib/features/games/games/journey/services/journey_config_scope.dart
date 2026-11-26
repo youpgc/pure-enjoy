@@ -107,6 +107,7 @@ extension JourneyConfigScopeTables on JourneyConfigScope {
           ...base,
           JourneyConfigTable.characters,
           JourneyConfigTable.weapons,
+          JourneyConfigTable.weaponSlots,
           JourneyConfigTable.monsters,
           JourneyConfigTable.relicUnlocks,
           JourneyConfigTable.unlockEntries,
