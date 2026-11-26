@@ -17,7 +17,7 @@ import '../widgets/journey_busy.dart';
 /// 纯消耗 1 天赋点（全账号共享点池，关卡首通 +1 / 击败妖王概率
 /// 掉落），每层点亮即得该系属性加强；五系修满后点亮加强点，额外
 /// 解锁角色特殊能力（引擎侧永久生效）。两级切换：顶部角色 pill
-/// （未解锁置灰+「解锁后可修」角标，树可浏览不可点亮）→ 五行 Tab
+/// （未解锁置灰+锁图标，树可浏览不可点亮）→ 五行 Tab
 /// → 轨迹卡 + 加强点卡。
 class JourneyTalentScreen extends StatefulWidget {
   const JourneyTalentScreen({super.key});
@@ -189,16 +189,10 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
                           : JourneyTheme.textFaint),
                 ),
               ),
-              // 未解锁角色：置灰 + 「解锁后可修」角标（树可浏览不可升级）
+              // 未解锁角色：置灰 + 锁图标（树可浏览不可升级）
               if (!unlocked) ...<Widget>[
                 const SizedBox(width: 5),
-                const Icon(Icons.lock,
-                    size: 11, color: JourneyTheme.locked),
-                const SizedBox(width: 3),
-                const Text(
-                  '解锁后可修',
-                  style: TextStyle(fontSize: 9, color: JourneyTheme.locked),
-                ),
+                const Icon(Icons.lock, size: 11, color: JourneyTheme.locked),
               ],
             ],
           ),
@@ -324,9 +318,7 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
           Text(desc, style: JourneyTheme.faint),
           const SizedBox(height: 6),
           Text(
-            '●' * lv +
-                '○' *
-                    (b.maxLv - lv).clamp(0, b.maxLv).toInt(),
+            '●' * lv + '○' * (b.maxLv - lv).clamp(0, b.maxLv).toInt(),
             style: TextStyle(fontSize: 10, color: color),
           ),
           const SizedBox(height: 6),
@@ -376,8 +368,7 @@ class _JourneyTalentScreenState extends State<JourneyTalentScreen>
     return JourneyCard(
       onTap: (lit || !_charUnlocked || !ready)
           ? null
-          : () => _spend(
-              kJourneyTalentEnhanceKey, kJourneyTalentEnhanceKey),
+          : () => _spend(kJourneyTalentEnhanceKey, kJourneyTalentEnhanceKey),
       qualityColor: lit ? JourneyTheme.gold : null,
       locked: locked,
       child: Column(
