@@ -125,11 +125,9 @@ String journeyPassiveEffectDesc(
     case 'bihuo_zhao':
       return '火系伤害减免 ${pct('resist', 0.15)}';
     case 'zhaoyao_jing':
-      return '盾抵伤时额外反震 ${pct('reflect_ratio', 1.0)} 减伤前伤害，与金钟罩维度叠加（不吃护甲，总上限 ${pct('reflect_cap', 3.0)}）';
+      return '盾抵伤时反震 ${pct('reflect_ratio', 1.0)} 减伤前伤害';
     case 'zhenyao_zhong':
-      final ignoreArmor =
-          param(code, 'burst_armor_ignore', 0) > 0 ? '（无视护甲）' : '';
-      return '盾破时以破盾那击减伤前伤害的 ${pct('burst_ratio', 0.6)} 向周围 ${amount('burst_radius', 140)} 范围震荡$ignoreArmor';
+      return '盾破时对周围 ${amount('burst_radius', 140)} 范围造成 ${pct('burst_ratio', 0.6)} 震荡';
     default:
       return '';
   }
