@@ -208,8 +208,32 @@ mixin JourneyLootMixin {
     final waveGain = game.level.kind == 'endless' && m.endlessWave > 0
         ? game.battleNum('endless', 'exp_wave_gain', kJourneyExpWaveGain)
         : 0.0;
+    // 经验独立成长通道（仅主线/每日）：等级项随角色等级增长，时间项
+    // 放大等级增量而非整条乘区，使成长从 1 连续起步、每级击杀需求缓慢
+    // 上调；与强度乘区解耦，不改变怪物血量/速度/接触伤害。
+    // 无尽需求走 lv^1.75 专属曲线、产出靠 waveGain 与发育期倍率成长，
+    // 不叠加本通道，避免两套成长叠乘。
+    final lvPow = game.config?.expLvPow ?? kJourneyExpLvPow;
+    final baseLv = game.config?.expLvBaseLv ?? kJourneyExpLvBaseLv;
+    final timeGain = game.config?.expTimeGain ?? kJourneyExpTimeGain;
+    final gainCap = game.config?.expGainCap ?? kJourneyExpGainCap;
+    // 等级项下限钳 1：基准等级及以下整条通道恒 1，前期产出与旧口径一致。
+    final lvTerm = math.max(
+      1.0,
+      math.min(
+        math.pow(math.max(1, game._charLv) / baseLv, lvPow).toDouble(),
+        gainCap,
+      ),
+    );
+    final expGrowth = game.level.kind == 'endless'
+        ? 1.0
+        : math.min(
+            1 + (lvTerm - 1) * (1 + (game._elapsed / 60.0) * timeGain),
+            gainCap,
+          );
     final expValue = (expBasis *
             (1 + m.buffMult * expK) *
+            expGrowth *
             developExp *
             (1 + waveGain * (m.endlessWave - 1)))
         .round();

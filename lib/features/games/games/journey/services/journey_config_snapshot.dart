@@ -4,6 +4,7 @@ import '../models/journey_unlock_models.dart';
 import 'journey_seed.dart';
 
 part 'journey_config_unlock_access.dart';
+part 'journey_config_globals_access.dart';
 
 /// 西行·配置快照（一次聚合全部 journey_* 静态配置）。
 class JourneyConfigSnapshot {
@@ -80,47 +81,6 @@ class JourneyConfigSnapshot {
   final Map<String, double> battleParamsNum;
   final Map<String, String> battleParamsText;
 
-  /// 全局参数数值统一从原始行惰性读取：分组加载时 globals 表可能尚未
-  /// 到齐，构造期固化会把后台后到的配置永久锁在内置基线上。
-  /// 妖王天赋点掉率（journey_globals.talent_drop_rate，0~1；
-  /// 妖王伏诛判定命中后全账号共享天赋点池 +1）。
-  double get talentDropRate =>
-      _globalNum(globalsRaw, 'talent_drop_rate') ?? kJourneyTalentDropRate;
-
-  /// 还魂复活功德基准价（journey_globals.revive_merit_base）；
-  /// 实际消耗=基准 × 当前角色等级。
-  int get reviveMeritBase =>
-      _globalNum(globalsRaw, 'revive_merit_base')?.toInt() ??
-      kJourneyReviveMeritBase;
-
-  /// 还魂复活功德封顶（journey_globals.revive_merit_cap，后台可配）。
-  int get reviveMeritCap =>
-      _globalNum(globalsRaw, 'revive_merit_cap')?.toInt() ??
-      kJourneyReviveMeritCap;
-
-  /// 同屏怪物实体上限（journey_globals.monster_cap，运营可在后台调整）。
-  int get monsterCap => _globalNum(globalsRaw, 'monster_cap')?.toInt() ?? 120;
-
-  /// 开局铺场只数（journey_globals.initial_pack_size，0=关闭）；
-  /// 波次关恢复铺场（修「接配置后开局空场走远看不到怪」）。
-  int get initialPackSize =>
-      _globalNum(globalsRaw, 'initial_pack_size')?.toInt() ??
-      kJourneyInitialPackSize;
-
-  /// 妖穴集中概率（journey_globals.spawn_den_ratio，0~1；调低=沿途遭遇
-  /// 更均匀）。刷怪点落入 demon_den 热区的比例。
-  double get spawnDenRatio =>
-      _globalNum(globalsRaw, 'spawn_den_ratio') ?? kJourneySpawnDenRatio;
-
-  /// 角色等级上限（journey_globals.char_level_cap；满级经验条恒满）。
-  int get charLevelCap =>
-      _globalNum(globalsRaw, 'char_level_cap')?.toInt() ?? kJourneyCharLevelCap;
-
-  /// 每日游历局内功德增长上限（journey_globals.merit_cap，缺省 9999）；
-  /// 局内累计功德达上限后不再增长，仍可继续游玩；不限制结算余额，
-  /// 也不限制其他关卡模式。
-  int get meritCap => _globalNum(globalsRaw, 'merit_cap')?.toInt() ?? 9999;
-
   /// 西行游戏 id（games.code='journey'；成绩上报用，空=未就绪不上报）。
   final String gameId;
 
@@ -130,14 +90,6 @@ class JourneyConfigSnapshot {
 
   /// true = 全部来自内置兜底（journey_* 表未部署或拉取失败）。
   final bool fromSeed;
-
-  /// 全局参数数值读取：numeric 列经 PostgREST 可能返回数字或字符串。
-  static double? _globalNum(Map<String, dynamic>? row, String key) {
-    final v = row?[key];
-    if (v is num) return v.toDouble();
-    if (v is String) return double.tryParse(v);
-    return null;
-  }
 
   /// 通用战斗参数键：分组码与语义键拼成唯一键。
   static String battleKey(String group, String code) => '$group.$code';
@@ -150,162 +102,6 @@ class JourneyConfigSnapshot {
   /// 枚举/文本型战斗参数：未配置走 [fallback]。
   String battleText(String group, String code, String fallback) =>
       battleParamsText[battleKey(group, code)] ?? fallback;
-
-  /// 妖王首次降临延迟（秒）；列缺失或未配值时回落内置兜底。
-  int get bossSpawnDelaySec =>
-      _globalNum(globalsRaw, 'boss_spawn_delay_sec')?.toInt() ??
-      kJourneyBossSpawnDelaySec;
-
-  /// 妖王降临倒计时提醒窗口（秒）；剩余 ≤ 该值时罗盘位展示倒计时，
-  /// 0=关闭提醒。列缺失或未配值时回落内置兜底。
-  int get bossWarnSec =>
-      _globalNum(globalsRaw, 'boss_warn_sec')?.toInt() ?? kJourneyBossWarnSec;
-
-  /// 妖王阵亡到复活/新妖王降临的冷却（秒）；列缺失或未配值时回落内置兜底。
-  int get bossRespawnCdSec =>
-      _globalNum(globalsRaw, 'boss_respawn_cd_sec')?.toInt() ??
-      kJourneyBossRespawnCdSec;
-
-  /// 前期发育保护期（秒）；期间不产生精英怪。
-  int get earlyGameProtectSec =>
-      _globalNum(globalsRaw, 'early_game_protect_sec')?.toInt() ??
-      kJourneyEarlyGameProtectSec;
-
-  /// 保护期结束后精英率每分钟增量。
-  double get eliteRatePerMin =>
-      _globalNum(globalsRaw, 'elite_rate_per_min') ?? kJourneyEliteRatePerMin;
-
-  /// 精英率上限：后期仍保留普通怪比例（journey_globals.elite_rate_cap）。
-  double get eliteRateCap =>
-      _globalNum(globalsRaw, 'elite_rate_cap') ?? kJourneyEliteRateCap;
-
-  /// 局内强度每分钟增长斜率；列缺失或未配值回落内置兜底。
-  double get buffTimeSlope =>
-      _globalNum(globalsRaw, 'buff_time_slope') ?? kJourneyBuffTimeSlope;
-
-  /// 每点关卡难度的强度乘区增量。
-  double get buffLevelMult =>
-      _globalNum(globalsRaw, 'buff_level_mult') ?? kJourneyBuffLevelMult;
-
-  /// 生效强度乘区上限。
-  double get buffMultCap =>
-      _globalNum(globalsRaw, 'buff_mult_cap') ?? kJourneyBuffMultCap;
-
-  /// 怪物最终移速上限（px/s）。
-  double get monsterSpeedCap =>
-      _globalNum(globalsRaw, 'monster_speed_cap') ?? kJourneyMonsterSpeedCap;
-
-  /// 妖王接触伤害的玩家等级成长系数（journey_globals.boss_damage_lv_k）；
-  /// 列缺失或未配值回落内置兜底。
-  double get bossDamageLvK =>
-      _globalNum(globalsRaw, 'boss_damage_lv_k') ?? kJourneyBossDamageLvK;
-
-  // ---- 平衡曲线（经验幂次 / 怪物等级项 / 境界 / 品阶 / 精英宝箱）----
-
-  /// 经验曲线幂次（exp_curve_pow）：升级所需 = exp_base + exp_per_lv ×
-  /// lv^pow；1=旧线性曲线。
-  double get expCurvePow =>
-      _globalNum(globalsRaw, 'exp_curve_pow') ?? kJourneyExpCurvePow;
-
-  /// 怪物经验随强度乘区缩放系数（exp_mult_k）：经验 ×(1+乘区×K)；0=旧口径。
-  double get expMultK =>
-      _globalNum(globalsRaw, 'exp_mult_k') ?? kJourneyExpMultK;
-
-  /// 普通怪血量玩家等级成长系数（monster_lv_k）；精英不跟等级，0=旧口径。
-  double get monsterLvK =>
-      _globalNum(globalsRaw, 'monster_lv_k') ?? kJourneyMonsterLvK;
-
-  /// 妖王血量玩家等级成长系数（boss_hp_lv_k），与时间项叠乘；0=旧口径。
-  double get bossHpLvK =>
-      _globalNum(globalsRaw, 'boss_hp_lv_k') ?? kJourneyBossHpLvK;
-
-  /// 每次境界突破的增伤增量（realm_amp_per）：增伤Σ%加法合流。
-  double get realmAmpPer =>
-      _globalNum(globalsRaw, 'realm_amp_per') ?? kJourneyRealmAmpPer;
-
-  /// 每次境界突破的生命上限增幅（realm_hp_per）：maxHp 复利。
-  double get realmHpPer =>
-      _globalNum(globalsRaw, 'realm_hp_per') ?? kJourneyRealmHpPer;
-
-  /// 境界步长（realm_step）：每 N 级一档境界，99 级共 9 档。
-  int get realmStep =>
-      _globalNum(globalsRaw, 'realm_step')?.toInt() ?? kJourneyRealmStep;
-
-  /// 法宝品阶 L9+ 每级增幅（weapon_grade_per_lv）：L8 锚点复利延展。
-  double get weaponGradePerLv =>
-      _globalNum(globalsRaw, 'weapon_grade_per_lv') ??
-      kJourneyWeaponGradePerLv;
-
-  // ---- 无尽妖潮·妖王潮（起点/配额/降临/领地/护卫/限流/经验曲线）----
-
-  /// 妖潮起点波号兜底（endless_boss_tide_start_wave）：波次表首个
-  /// boss_count>0 的波优先于本值。
-  int get endlessBossTideStartWave =>
-      _globalNum(globalsRaw, 'endless_boss_tide_start_wave')?.toInt() ??
-      kJourneyEndlessBossTideStartWave;
-
-  /// 同波妖王配额上限（endless_boss_count_cap，默认 99=波次刷新总量，
-  /// 与同屏并发为两个独立维度）。
-  int get endlessBossCountCap =>
-      _globalNum(globalsRaw, 'endless_boss_count_cap')?.toInt() ??
-      kJourneyEndlessBossCountCap;
-
-  /// 无尽妖王宝箱波内首杀掉落概率（endless_boss_chest_rate）。
-  double get endlessBossChestRate =>
-      _globalNum(globalsRaw, 'endless_boss_chest_rate') ??
-      kJourneyEndlessBossChestRate;
-
-  /// 宝葫妖潮期每波炼化上限（endless_boss_refine_per_wave）。
-  int get endlessBossRefinePerWave =>
-      _globalNum(globalsRaw, 'endless_boss_refine_per_wave')?.toInt() ??
-      kJourneyEndlessBossRefinePerWave;
-
-  /// 无尽模式专属升级需求曲线：need(lv) = base + per_lv × lv^pow
-  /// （endless_exp_base / endless_exp_per_lv / endless_exp_pow）。
-  double get endlessExpBase =>
-      _globalNum(globalsRaw, 'endless_exp_base') ?? kJourneyEndlessExpBase;
-
-  double get endlessExpPerLv =>
-      _globalNum(globalsRaw, 'endless_exp_per_lv') ?? kJourneyEndlessExpPerLv;
-
-  double get endlessExpPow =>
-      _globalNum(globalsRaw, 'endless_exp_pow') ?? kJourneyEndlessExpPow;
-
-  /// 同场并发妖王数上限（endless_boss_concurrent）。
-  int get endlessBossConcurrent =>
-      _globalNum(globalsRaw, 'endless_boss_concurrent')?.toInt() ??
-      kJourneyEndlessBossConcurrent;
-
-  /// 妖王补位降临倒计时秒（endless_boss_arrive_cd）。
-  double get endlessBossArriveCd =>
-      _globalNum(globalsRaw, 'endless_boss_arrive_cd') ??
-      kJourneyEndlessBossArriveCd;
-
-  /// 妖王能力每波额外增幅（endless_boss_amp_per_wave）。
-  double get endlessBossAmpPerWave =>
-      _globalNum(globalsRaw, 'endless_boss_amp_per_wave') ??
-      kJourneyEndlessBossAmpPerWave;
-
-  /// 妖潮妖王血量每波额外增幅（endless_boss_hp_amp）：血量乘区独立于
-  /// 经验/速度/接触伤害共用乘区，不吃玩家等级项。
-  double get endlessBossHpAmp =>
-      _globalNum(globalsRaw, 'endless_boss_hp_amp') ??
-      kJourneyEndlessBossHpAmp;
-
-  /// 妖王领地半径 px（endless_boss_territory_radius）。
-  double get endlessBossTerritoryRadius =>
-      _globalNum(globalsRaw, 'endless_boss_territory_radius') ??
-      kJourneyEndlessBossTerritoryRadius;
-
-  /// 多妖王锚点最小间距 px（endless_boss_spread_min_dist）。
-  double get endlessBossSpreadMinDist =>
-      _globalNum(globalsRaw, 'endless_boss_spread_min_dist') ??
-      kJourneyEndlessBossSpreadMinDist;
-
-  /// 妖潮期护卫精英占比（endless_boss_guard_elite_ratio）。
-  double get endlessBossGuardEliteRatio =>
-      _globalNum(globalsRaw, 'endless_boss_guard_elite_ratio') ??
-      kJourneyEndlessBossGuardEliteRatio;
 
   const JourneyConfigSnapshot({
     required this.regions,
@@ -432,62 +228,6 @@ class JourneyConfigSnapshot {
     return null;
   }
 
-  // ---- 通用成长卡/经验曲线（journey_globals 列；缺省走内置兜底）----
-
-  /// 三选一通用成长卡·移动速度加成（upgrade_move）。
-  double get upgradeMove => _globalDouble('upgrade_move', 0.09);
-
-  /// 三选一通用成长卡·生命上限（upgrade_hp）。
-  double get upgradeHp => _globalDouble('upgrade_hp', 20);
-
-  /// 三选一通用成长卡·自动回复（upgrade_regen）。
-  double get upgradeRegen => _globalDouble('upgrade_regen', 1);
-
-  /// 三选一通用成长卡·拾取范围（upgrade_pickup）。
-  double get upgradePickup => _globalDouble('upgrade_pickup', 18);
-
-  /// 经验曲线基数（exp_base：升级所需 = base + 当前等级 × exp_per_lv）。
-  double get expBase => _globalDouble('exp_base', 12);
-
-  /// 经验曲线每级增量（exp_per_lv）。
-  double get expPerLv => _globalDouble('exp_per_lv', 7);
-
-  /// 每次升级提升的基础攻击力（level_attack_per_lv）。
-  double get levelAttackPerLv =>
-      _globalNum(globalsRaw, 'level_attack_per_lv') ?? kJourneyLevelAttackPerLv;
-
-  /// 每次升级提升的生命上限（level_hp_per_lv）。
-  double get levelHpPerLv =>
-      _globalNum(globalsRaw, 'level_hp_per_lv') ?? kJourneyLevelHpPerLv;
-
-  /// 攻击力成长卡单次提升量（upgrade_attack）。
-  double get upgradeAttack =>
-      _globalNum(globalsRaw, 'upgrade_attack') ?? kJourneyUpgradeAttack;
-
-  /// 攻击力成长卡累计提升上限（attack_upgrade_cap）。
-  double get attackUpgradeCap =>
-      _globalNum(globalsRaw, 'attack_upgrade_cap') ?? kJourneyAttackUpgradeCap;
-
-  /// 妖王血量时间项系数（boss_hp_time_k）。
-  double get bossHpTimeK =>
-      _globalNum(globalsRaw, 'boss_hp_time_k') ?? kJourneyBossHpTimeK;
-
-  /// 护甲减伤曲线分母 K（armor_curve_k）：armor/(armor+K)，K 越大
-  /// 同护甲减伤越低；列缺失/未配值回落内置兜底。
-  double get armorCurveK =>
-      _globalNum(globalsRaw, 'armor_curve_k') ?? kJourneyArmorCurveK;
-
-  /// 怪物侧护甲减伤上限（monster_armor_reduction_cap）：高于玩家侧 60%，
-  /// 使 150~200 甲档位仍可区分；列缺失/未配值回落内置兜底。
-  double get monsterArmorCap =>
-      _globalNum(globalsRaw, 'monster_armor_reduction_cap') ??
-      kJourneyMonsterArmorCap;
-
-  double _globalDouble(String key, double fallback) {
-    // globals 原始行直读（列缺失/seed 快照 null 时回落内置兜底）
-    return (globalsRaw?[key] as num?)?.toDouble() ?? fallback;
-  }
-
   List<JourneyLevelModel> levelsOfRegion(String regionCode) =>
       levels.where((l) => l.regionCode == regionCode).toList()
         ..sort((a, b) => a.levelNo.compareTo(b.levelNo));
@@ -503,7 +243,6 @@ class JourneyConfigSnapshot {
     }
     return null;
   }
-
 
   /// 拾取物配置（未配置返回 null）。
   JourneyPickupConfigModel? pickupConfigOf(String code) {
@@ -546,8 +285,4 @@ class JourneyConfigSnapshot {
         name: branchType,
         attrKey: branchType);
   }
-
-  /// 还魂复活功德价 = 基准价 × 当前角色等级，封顶 reviveMeritCap。
-  int reviveCostFor(int charLevel) =>
-      (reviveMeritBase * charLevel).clamp(0, reviveMeritCap);
 }

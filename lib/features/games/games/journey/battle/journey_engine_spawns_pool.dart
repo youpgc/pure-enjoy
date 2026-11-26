@@ -145,8 +145,9 @@ List<JourneyMonsterModel> endlessTierPool(
 }
 
 /// 兜底刷怪选怪（波次缺失时的遭遇战来源）：
-/// - 生态轮换（角色等级分带线 10/16/26，分档血量阈值 600/2800）——
-///   精英登场分阶：10 级前只小型精英、26 级前不见大型精英、之后全量，
+/// - 生态轮换（角色等级分带线 10/16/26，分档血量阈值 600/大型血线）——
+///   精英登场分阶：10 级前只小型精英、26 级前不见大型精英、之后全量；
+///   大型血线由后台配置（默认 1600），下调后 20 级窗口即可遭遇高经验精英，
 ///   低级不撞顶阶精英、高级不刷低阶小精英；
 /// - 普怪退场曲线：16 级起出现概率线性衰减、26 级绝迹（只刷精英）。
 ///   能力上升后小怪不再刷，遭遇战换成可秒杀的精英——爽感锚点迁移；
@@ -164,7 +165,9 @@ JourneyMonsterModel? _pickMonster(
           .toDouble();
   final elapsed = game._elapsed;
   final charLv = game._charLv;
-  final elites = _ecologyElitePool(pool, charLv);
+  final eliteLargeHp =
+      game.config?.ecoEliteLargeHp ?? kJourneyEcoEliteLargeHp;
+  final elites = _ecologyElitePool(pool, charLv, eliteLargeHp);
 
   final pCommon = (allowElite &&
           elapsed >= protectSec &&
@@ -201,17 +204,19 @@ JourneyMonsterModel? _pickMonster(
 }
 
 /// 生态轮换精英分阶池：按角色等级限定登场档位（小型 ≤600 / 中型
-/// ≤2800 / 大型 >2800 血量档）；分档后为空时回落全量精英池防死局。
+/// ≤大型血线 / 大型 >大型血线）；大型血线由后台配置，下调后让 20 级
+/// 窗口即可遭遇高经验精英；分档后为空时回落全量精英池防死局。
 List<JourneyMonsterModel> _ecologyElitePool(
   List<JourneyMonsterModel> pool,
-  int charLv,
-) {
+  int charLv, [
+  double largeHp = kJourneyEcoEliteLargeHp,
+]) {
   final elites = pool.where((m) => m.isElite).toList();
   if (elites.isEmpty) return elites;
   final band = charLv < kJourneyEcoEliteInLv
       ? elites.where((m) => m.baseHp <= kJourneyEcoEliteMidHp).toList()
       : charLv < kJourneyEcoCommonOutLv
-          ? elites.where((m) => m.baseHp <= kJourneyEcoEliteLargeHp).toList()
+          ? elites.where((m) => m.baseHp <= largeHp).toList()
           : elites;
   return band.isNotEmpty ? band : elites;
 }

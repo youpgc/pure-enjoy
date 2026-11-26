@@ -25,10 +25,12 @@ const int kJourneyEcoEliteInLv = 10;
 const int kJourneyEcoCommonFadeLv = 16;
 const int kJourneyEcoCommonOutLv = 26;
 
-/// 生态轮换精英分阶血量阈值：小型 ≤600 / 中型 ≤2800 / 大型 >2800。
-/// 按角色等级限定登场精英档位（低级不见顶阶精英，高级不刷低阶小精英）。
+/// 生态轮换精英分阶血量阈值：小型 ≤600 / 中型 ≤1600 / 大型 >1600。
+/// 按角色等级限定登场精英档位（低级不见顶阶精英，高级不刷低阶小精英）；
+/// 大型血线取 1600 使普通怪退场窗口即可遭遇高经验精英，补齐换挡真空。
+/// journey_globals.eco_elite_large_hp 可覆盖。
 const double kJourneyEcoEliteMidHp = 600;
-const double kJourneyEcoEliteLargeHp = 2800;
+const double kJourneyEcoEliteLargeHp = 1600;
 
 /// 怪物最终移速上限（journey_globals.monster_speed_cap 可覆盖，px/s）：
 /// 低于玩家基准移速，长时对局怪群不会反超玩家。
@@ -142,6 +144,18 @@ const double kJourneyEndlessBossExpBase = 200;
 /// 满级后经验累计数值上限：达到角色等级上限后不再升级，经验继续入账，
 /// 封顶此值；HUD 分母固定显示文字 max，展示「当前经验/max」，条保持充满。
 const double kJourneyPostMaxLevelExpCap = 99999;
+
+/// 经验产出独立成长通道：升级需求按 lv^exp_curve_pow 无上限增长，
+/// 产出侧强度乘区有硬上限，两者在高级段拉开剪刀差。本组参数让产出
+/// 随角色等级与局内时间同步成长，与强度乘区解耦（怪物血量/速度/
+/// 接触伤害不走本通道），基准等级之前保持原产出不变。
+/// 等级幂次低于需求幂次，使每级击杀需求随等级缓慢上调而非被完全对冲；
+/// 时间项只放大等级增量，成长从 1 连续起步，基准等级处不出现阶跃。
+/// 五项均可由 journey_globals 同名列覆盖，列缺失时回落本兜底。
+const double kJourneyExpLvPow = 1.0;
+const int kJourneyExpLvBaseLv = 20;
+const double kJourneyExpTimeGain = 0.03;
+const double kJourneyExpGainCap = 24;
 
 /// 妖潮妖王血量每波额外增幅（journey_globals.endless_boss_hp_amp 可覆盖）：
 /// 妖潮妖王血量乘区与经验/速度/接触伤害共用乘区解耦，独立走
