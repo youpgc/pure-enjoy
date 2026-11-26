@@ -107,7 +107,7 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
                 ),
                 SizedBox(height: 10),
                 Text(
-                  '沿途铜钱雨不断，按你节奏随时点「功成」结算入账。',
+                  '沿途铜钱雨不断，按你节奏随时「功成」结算入账。',
                   style: JourneyTheme.body,
                 ),
                 SizedBox(height: 8),
@@ -123,14 +123,14 @@ class _JourneyDailyScreenState extends State<JourneyDailyScreen> {
           if (_dailyPlayed)
             const JourneyPanel(
               child: Text(
-                '今日已游历 · 明日再来',
+                '今日已游历',
                 style: JourneyTheme.body,
               ),
             )
           else if (maps.isEmpty)
             const JourneyPanel(
               child: Text(
-                '今日暂无游历地图 · 明日再来',
+                '暂无游历地图',
                 style: JourneyTheme.body,
               ),
             )
