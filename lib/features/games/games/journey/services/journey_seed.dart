@@ -195,14 +195,14 @@ const List<Map<String, dynamic>> kJourneyWeaponSeed = <Map<String, dynamic>>[
   {'code': 'staff_buddha_light', 'name': '九环锡杖·佛光', 'category': 'active', 'attack_kind': 'orbit', 'description': '观音所赐九环锡杖：均衡环绕，佛光回血光环', 'character_code': 'tang',
    'orbit_speed': 3.3, 'inner_radius': 26, 'outer_radius': 104, 'blade_width': 24, 'base_damage': 14, 'starter_effect': 'lifesteal'},
   // 常规主动（5）：随角色解锁自动入池，按 attack_kind 常驻并行攻击（非环绕）。
-  {'code': 'qiankun_circle', 'name': '乾坤圈', 'category': 'active', 'attack_kind': 'boomerang', 'description': '乾坤圈掷出砸击：快转中距，命中击退', 'character_code': 'nezha',
-   'base_damage': 16, 'base_interval_ms': 900, 'projectile_speed': 360, 'range_px': 300, 'pierce': 99, 'starter_effect': 'knockback'},
+  {'code': 'qiankun_circle', 'name': '乾坤圈', 'category': 'active', 'attack_kind': 'boomerang', 'description': '乾坤圈掷出回旋：中距连续命中', 'character_code': 'nezha',
+   'base_damage': 16, 'base_interval_ms': 900, 'projectile_speed': 360, 'range_px': 300, 'pierce': 99, 'starter_effect': ''},
   {'code': 'sanmei_fire', 'name': '八卦炉真火', 'category': 'active', 'attack_kind': 'aura', 'description': '兜率宫八卦炉焰：少件重击带灼烧', 'character_code': 'laojun',
    'base_damage': 17, 'base_interval_ms': 1200, 'aoe_radius': 110, 'starter_effect': 'burn'},
   {'code': 'huojian_spear', 'name': '火尖枪', 'category': 'active', 'attack_kind': 'projectile', 'description': '火尖枪燎原：长杆点火，命中灼烧', 'character_code': 'honghaier',
    'base_damage': 18, 'base_interval_ms': 320, 'projectile_speed': 420, 'range_px': 480, 'pierce': 2, 'starter_effect': 'burn'},
   {'code': 'bajiao_fan', 'name': '芭蕉扇', 'category': 'active', 'attack_kind': 'beam', 'description': '芭蕉扇罡风：宽扇慢转，覆盖面最大', 'character_code': 'tieshan',
-   'base_damage': 12, 'base_interval_ms': 1200, 'range_px': 420, 'starter_effect': 'knockback'},
+   'base_damage': 12, 'base_interval_ms': 1200, 'range_px': 420, 'starter_effect': ''},
   {'code': 'zijin_gourd', 'name': '紫金葫芦', 'category': 'active', 'attack_kind': 'magnet', 'description': '紫金葫芦摄魂：领域真伤，扩大拾取', 'character_code': 'jinjiao',
    'base_damage': 14, 'base_interval_ms': 1500, 'aoe_radius': 120, 'starter_effect': 'lifesteal'},
   // 被动加持（6）
