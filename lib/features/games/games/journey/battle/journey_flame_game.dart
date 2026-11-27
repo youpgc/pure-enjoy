@@ -29,6 +29,7 @@ part 'journey_engine_config_access.dart';
 part 'journey_engine_abilities.dart';
 part 'journey_engine_ability_state.dart';
 part 'journey_engine_weapons.dart';
+part 'journey_engine_slot_attributes.dart';
 part 'journey_engine_blade_hits.dart';
 part 'journey_engine_hp_scaling.dart';
 part 'journey_engine_attack_units.dart';
@@ -36,6 +37,7 @@ part 'journey_engine_attack_models.dart';
 part 'journey_engine_attack_forms.dart';
 part 'journey_engine_attack_beam_fx.dart';
 part 'journey_weapon_render.dart';
+part 'journey_engine_slot_display.dart';
 part 'journey_engine_choices.dart';
 part 'journey_weapon_effect_texts.dart';
 part 'journey_engine_kit.dart';
@@ -234,9 +236,8 @@ class JourneyFlameGame extends FlameGame
   @override
   double critDamage = 1.5;
 
-  /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 fallback）。
-  /// [group] 为参数分组（damage/spawn/monster/boss/ability/economy/…），
-  /// [key] 为组内语义键；原内置常量作为 [fallback] 保证未配置行为不变。
+  /// 通用战斗参数·数值（journey_battle_params 后台配置；未配置回落 [fallback]）。
+  /// [group]/[key] 定位参数，内置常量兜底保证未配置行为不变。
   @override
   double battleNum(String group, String key, double fallback) =>
       config?.battleNum(group, key, fallback) ?? fallback;
@@ -244,11 +245,10 @@ class JourneyFlameGame extends FlameGame
   /// 维度槽定义缓存（slotDefMap 惰性构建一次；对局内配置不变）。
   Map<String, JourneySlotDefModel>? _slotDefCache;
 
-  /// 维度槽每级数值（value_per_level 后台配置；0/缺失回落内置兜底）。
   @override
-  double slotValue(String code, double fallback) {
-    final v = slotDefOf(code)?.valuePerLevel ?? 0;
-    return v > 0 ? v : fallback;
+  JourneySlotDefModel? slotDefOf(String code) {
+    final map = _slotDefCache ??= config?.slotDefMap() ?? const {};
+    return map[code];
   }
 
   // ---- 特效触发法宝（§6）----

@@ -561,7 +561,7 @@ class JourneyPlayerComponent extends PositionComponent {
       // （沙僧）加法合流后统一钳 ward_cap，避免两路独立乘算叠加破上限。
       final wardLv = game.slotLevel('ward');
       final wardRed =
-          wardLv > 0 ? game.slotValue('ward', 0.04) * wardLv : 0.0;
+          wardLv > 0 ? game.linearSlotValue('ward', wardLv, 0.04) : 0.0;
       final auraReduce = game.character.code == 'shaseng'
           ? game.character.auraNum('hurt_reduce', 0.1)
           : 0.0;

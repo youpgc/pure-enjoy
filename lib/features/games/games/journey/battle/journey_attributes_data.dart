@@ -72,13 +72,7 @@ abstract final class JourneyAttributesData {
     final hud = game.controller.hud;
 
     final pierceLv = game.slotLevel('pierce');
-    final piercePct = pierceLv > 0
-        ? (kJourneyPierceBaseRatio +
-                game.slotValue('pierce', kJourneyPierceIgnorePerLv) *
-                    (pierceLv - 1))
-            .clamp(0.0, kJourneyPierceRatioCap) *
-            100
-        : 0.0;
+    final piercePct = pierceLv > 0 ? game.armorIgnoreRatio * 100 : 0.0;
     final arm = game.weaponArm;
 
     groups.add(JourneyAttrGroup('基础属性', <(String, String)>[
@@ -193,7 +187,12 @@ abstract final class JourneyAttributesData {
     Map<String, JourneySlotDefModel> defs,
   ) {
     final def = defs[code];
-    final text = journeySlotValueText(code, level, def?.valuePerLevel ?? 0);
+    final text = journeySlotValueText(
+      code,
+      level,
+      def?.valuePerLevel ?? 0,
+      baseValue: def?.baseValue ?? 0,
+    );
     return text.isNotEmpty ? text : (def?.effectPerLevel ?? '');
   }
 

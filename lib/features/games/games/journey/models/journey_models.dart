@@ -436,6 +436,9 @@ class JourneySlotDefModel {
   /// 每级数值（value_per_level 列；0=未配置走引擎内置兜底）。
   final double valuePerLevel;
 
+  /// 1级初始值（base_value 列；0=回落原1级基准，与每级增量独立）。
+  final double baseValue;
+
   /// 周期触发秒数（period_sec 列；仅回元/护体等周期槽使用，0=回落引擎兜底）。
   final double periodSec;
 
@@ -446,6 +449,7 @@ class JourneySlotDefModel {
     required this.effectPerLevel,
     required this.maxLevel,
     this.valuePerLevel = 0,
+    this.baseValue = 0,
     this.periodSec = 0,
   });
 
@@ -457,6 +461,7 @@ class JourneySlotDefModel {
       effectPerLevel: json['effect_per_level'] as String? ?? '',
       maxLevel: (json['max_level'] as num?)?.toInt() ?? 3,
       valuePerLevel: (json['value_per_level'] as num?)?.toDouble() ?? 0,
+      baseValue: (json['base_value'] as num?)?.toDouble() ?? 0,
       periodSec: (json['period_sec'] as num?)?.toDouble() ?? 0,
     );
   }

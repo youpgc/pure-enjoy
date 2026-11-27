@@ -54,8 +54,8 @@ extension JourneyExecuteCombat on JourneyFlameGame {
     return true;
   }
 
-  /// 普通怪处决阈值：下限 + 每级增量×(等级−1)，钳在 [下限, 上限]。
-  /// 每级增量取维度槽 value_per_level，上限来自战斗参数，展示与结算同源。
+  /// 普通怪处决阈值：1 级初始值（未配回落下限）+ 每级增量×(等级−1)，
+  /// 钳在 [下限, 上限]。每级增量取维度槽 value_per_level，上限来自战斗参数。
   double executeNormalRatio(int level) {
     final floor = battleNum(
             'execute', 'normal_floor', kJourneyExecuteNormalFloorRatio)
@@ -63,8 +63,12 @@ extension JourneyExecuteCombat on JourneyFlameGame {
     final cap =
         battleNum('execute', 'normal_cap', kJourneyExecuteNormalCapRatio)
             .clamp(0.0, 1.0);
-    final step = slotValue('execute', 0.0175);
-    return (floor + step * (level - 1)).clamp(0.0, math.max(floor, cap));
+    return slotValueAtLevel(
+      'execute',
+      level,
+      0.0175,
+      levelOneFallback: floor,
+    ).clamp(0.0, math.max(floor, cap));
   }
 
   /// 妖王处决血线：绝对血线按等级成长，再钳在最大生命的 1%~3%。

@@ -32,7 +32,8 @@ extension JourneyShieldCombat on JourneyFlameGame {
     final reflectLv = slotLevel('reflect');
     if (!hasMirror && reflectLv <= 0) return;
     final cap = math.max(0.0, weaponParam('zhaoyao_jing', 'reflect_cap', 3.0));
-    final base = reflectLv > 0 ? slotValue('reflect', 0.15) * reflectLv : 0.0;
+    final base =
+        reflectLv > 0 ? linearSlotValue('reflect', reflectLv, 0.15) : 0.0;
     final extra =
         hasMirror ? weaponParam('zhaoyao_jing', 'reflect_ratio', 1.0) : 0.0;
     final ratio = (base + extra).clamp(0.0, cap);

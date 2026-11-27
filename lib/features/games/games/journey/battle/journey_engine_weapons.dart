@@ -50,7 +50,15 @@ abstract interface class JourneyWeaponHost {
   double get critDamage;
   set critDamage(double value);
   double get maxArmDiameter;
+  JourneySlotDefModel? slotDefOf(String code);
   double slotValue(String code, double fallback);
+  double slotBaseValue(String code, double levelOneFallback);
+  double slotValueAtLevel(
+    String code,
+    int level,
+    double perLevelFallback, {
+    required double levelOneFallback,
+  });
   double battleNum(String group, String key, double fallback);
   JourneyPlayerComponent get player;
 }
@@ -75,17 +83,49 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     return 0;
   }
 
-  /// 吸血比例（lv<=0 返回 0）：1 级取 lifesteal_base，每级增量取维度槽
-  /// value_per_level（远端可覆盖），钳 lifesteal_cap。环绕与并行单位共用，
-  /// 保证同名参数在两条命中链上口径一致。
+  /// 维度槽每级数值（value_per_level 后台配置；0/缺失回落内置兜底）。
+  @override
+  double slotValue(String code, double fallback) {
+    final v = slotDefOf(code)?.valuePerLevel ?? 0;
+    return v > 0 ? v : fallback;
+  }
+
+  /// 维度槽 1 级初始值（base_value 后台配置；0/缺失回落 [levelOneFallback]）。
+  /// 基准型槽的回退取战斗参数 base，线性型槽的回退取每级数值本身。
+  @override
+  double slotBaseValue(String code, double levelOneFallback) {
+    final v = slotDefOf(code)?.baseValue ?? 0;
+    return v > 0 ? v : levelOneFallback;
+  }
+
+  /// 维度槽在 [level] 级的数值：1 级初始值 + 每级增量×(等级−1)。
+  @override
+  double slotValueAtLevel(
+    String code,
+    int level,
+    double perLevelFallback, {
+    required double levelOneFallback,
+  }) {
+    if (level <= 0) return 0;
+    return slotBaseValue(code, levelOneFallback) +
+        slotValue(code, perLevelFallback) * (level - 1);
+  }
+
+  /// 吸血比例（lv<=0 返回 0）：1 级取 base_value（未配回落 lifesteal_base），
+  /// 每级增量取维度槽 value_per_level（远端可覆盖），钳 lifesteal_cap。
+  /// 环绕与并行单位共用，保证同名参数在两条命中链上口径一致。
   double lifestealRatioOf(int lv) {
     if (lv <= 0) return 0;
-    return (battleNum('weapon', 'lifesteal_base', kJourneyLifestealBaseRatio) +
-            slotValue('lifesteal', kJourneyLifestealRatioPerLv) * (lv - 1))
-        .clamp(
-          0.0,
-          battleNum('weapon', 'lifesteal_cap', kJourneyLifestealRatioCap),
-        );
+    return slotValueAtLevel(
+      'lifesteal',
+      lv,
+      kJourneyLifestealRatioPerLv,
+      levelOneFallback:
+          battleNum('weapon', 'lifesteal_base', kJourneyLifestealBaseRatio),
+    ).clamp(
+      0.0,
+      battleNum('weapon', 'lifesteal_cap', kJourneyLifestealRatioCap),
+    );
   }
 
   /// 单次吸血回血点：命中伤害×比例，低伤命中保底 lifesteal_floor。
@@ -131,75 +171,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         bumpSlotsRevision();
         return;
       }
-    }
-  }
-
-  /// 维度每级效果结算：属性维度即时应用到战斗字段；
-  /// 特效维度击退/吸血/穿刺破甲在命中时读 slotLevel 结算，灼烧由驻留判定读取。
-  void applySlotEffect(String code, int delta) {
-    switch (code) {
-      case 'radius': // 臂展：每级 +（value_per_level 后台可配）
-        final arm = weaponArm;
-        if (arm != null) {
-          arm.outerRadius = math.min(
-            arm.outerRadius + slotValue('radius', 14) * delta,
-            math.min(arm.outerRadiusBase * 2.2, maxArmDiameter / 2),
-          );
-        }
-        break;
-      case 'speed': // 转速：每级 +（value_per_level；最终角速度钳 5 圈/秒）
-        spinAmp += slotValue('speed', 0.10) * delta;
-        break;
-      case 'damage': // 伤害：每级 +（value_per_level）
-        damageAmp += slotValue('damage', 0.20) * delta;
-        break;
-      case 'magnet': // 磁吸：每级拾取范围 +（value_per_level）
-        player.pickupRange += slotValue('magnet', 40) * delta;
-        break;
-      case 'crit_rate': // 暴击率：每级 +（value_per_level；引擎钳上限可配）
-        critRate = (critRate + slotValue('crit_rate', 0.025) * delta)
-            .clamp(0.0, battleNum('damage', 'crit_rate_cap', 0.60));
-        break;
-      case 'crit_damage': // 暴击伤害：每级 +（value_per_level；上下限可配）
-        final cMin = battleNum('damage', 'crit_dmg_min', 1.0);
-        final cMax = battleNum('damage', 'crit_dmg_cap', 2.0);
-        critDamage = (critDamage + slotValue('crit_damage', 0.06) * delta)
-            .clamp(math.min(cMin, cMax), math.max(cMin, cMax));
-        break;
-      case 'armor': // 护甲：每级 +（value_per_level；减伤曲线钳制在伤害侧）
-        player.armor += slotValue('armor', 3.0) * delta;
-        break;
-      case 'vitality': // 生机：生命上限百分比，与蟠桃同构按当前上限放大并登记比例
-        final ratio = (slotValue('vitality', 0.05) * delta).clamp(
-          0.0,
-          battleNum('weapon', 'vitality_cap', 0.6),
-        );
-        player.hpBonusRatio += ratio;
-        final hpUp = player.maxHp * ratio;
-        player.maxHp += hpUp;
-        player.hp += hpUp;
-        controller.hud.maxHp.value = player.maxHp;
-        controller.hud.hp.value = player.hp;
-        break;
-      case 'cloud': // 腾云：移速百分比，加法区（与筋斗云/升级卡同级）
-        moveSpeedAmp += slotValue('cloud', 0.05) * delta;
-        break;
-      case 'ward': // 金刚不坏：受击最终减伤，在 takeDamage 侧按等级读取
-      case 'reflect': // 金钟罩：盾抵反震倍率，在受击反震结算侧按等级读取
-      case 'execute': // 处决：残血斩杀，在怪物/玩家受击结算侧按等级读取
-      case 'recovery': // 回元：周期回血，在 tickNewSlots 侧按等级读取
-      case 'shield': // 护体金光：周期护盾，在 tickNewSlots 侧按等级读取
-      case 'slow': // 缚灵：范围减速，在 tickNewSlots 侧按等级读取
-      case 'bloodlust': // 嗜血：攻速随缺失生命档位变化，逐帧并入环绕转速
-      case 'desperation': // 背水一战：增伤随档位变化，并入伤害公式合计
-      case 'qiankun': // 乾坤：命中获盾，在 _hitMonster 结算
-      case 'poison': // 淬毒：命中上毒，在 _hitMonster 结算
-      case 'knockback':
-      case 'lifesteal':
-      case 'pierce':
-        break; // 命中/周期结算特效（见 _hitMonster / tickNewSlots）
-      case 'burn':
-        break; // 灼烧驻留特效（见 JourneyBurnMixin.tickBurnAura）
     }
   }
 
@@ -378,16 +349,18 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     }
     final qiankunLv = game.slotLevel('qiankun');
     if (qiankunLv > 0) {
-      // 乾坤：命中获盾，基数与每级增量后台可配；gainShield 封顶最大生命，
-      // 盾满不再增长，与护体/拾取护盾共用同一盾池。
-      final add =
-          game.battleNum(
-            'weapon',
-            'qiankun_base',
-            kJourneyQiankunShieldBase,
-          ) +
-          game.slotValue('qiankun', kJourneyQiankunShieldPerLv) *
-              (qiankunLv - 1);
+      // 乾坤：命中获盾，1 级初始值（未配回落 qiankun_base）与每级增量
+      // 后台可配；gainShield 封顶最大生命，与护体/拾取护盾共用同一盾池。
+      final add = game.slotValueAtLevel(
+        'qiankun',
+        qiankunLv,
+        kJourneyQiankunShieldPerLv,
+        levelOneFallback: game.battleNum(
+          'weapon',
+          'qiankun_base',
+          kJourneyQiankunShieldBase,
+        ),
+      );
       game.player.gainShield(add);
     }
     final poisonLv = game.slotLevel('poison');
@@ -395,9 +368,13 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       // 淬毒：命中点燃中毒，同一 source key 覆盖实现不可叠加、二次命中
       // 重置时长；伤害按伤害基础值（武器伤害+等级攻击+角色基础攻击）比例
       // 结算，走绕甲的真实伤害通道。
-      final base =
-          game.battleNum('weapon', 'poison_base', kJourneyPoisonRatioBase) +
-          game.slotValue('poison', kJourneyPoisonRatioPerLv) * (poisonLv - 1);
+      final base = game.slotValueAtLevel(
+        'poison',
+        poisonLv,
+        kJourneyPoisonRatioPerLv,
+        levelOneFallback:
+            game.battleNum('weapon', 'poison_base', kJourneyPoisonRatioBase),
+      );
       m.ignite(
         source: 'weapon_poison',
         burnDps: game.damageBaseValue * base * game.passiveAmpFactor,
@@ -411,7 +388,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     if (allowKnockback &&
         (knockLv > 0 || game.player.bonusKnockback > 0) &&
         m.knockbackCd <= 0) {
-      var kb = game.slotValue('knockback', 16) * knockLv +
+      var kb = game.linearSlotValue('knockback', knockLv, 16) +
           game.player.bonusKnockback; // 击退槽 + 飞龙宝杖被动加成
       // 铜皮铁骨（bajie 特殊能力）：受击窗口内击退强度放大
       if (game._bajieGuard > 0) {

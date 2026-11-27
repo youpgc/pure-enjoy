@@ -166,10 +166,8 @@ extension JourneyNewSlotTick on JourneyFlameGame {
       final missing = p.maxHp - p.hp;
       if (p.recoveryTick >= period && missing > 0 && p.healBlockTimer <= 0) {
         p.recoveryTick = 0;
-        final ratio = (slotValue('recovery', 0.05) * recLv).clamp(
-          0.0,
-          battleNum('weapon', 'recovery_cap', 0.5),
-        );
+        final ratio = linearSlotValue('recovery', recLv, 0.05)
+            .clamp(0.0, battleNum('weapon', 'recovery_cap', 0.5));
         p.heal(missing * ratio);
         spawnFloatText(
           p.position + Vector2(0, -36),
@@ -191,7 +189,7 @@ extension JourneyNewSlotTick on JourneyFlameGame {
       }
       if (p.shieldTick >= period && p.shield < p.maxHp) {
         p.shieldTick = 0;
-        final add = slotValue('shield', 20) * shieldLv;
+        final add = linearSlotValue('shield', shieldLv, 20);
         p.gainShield(add);
         spawnFloatText(
           p.position + Vector2(0, -36),
@@ -233,10 +231,8 @@ extension JourneyNewSlotTick on JourneyFlameGame {
     if (slowLv > 0) {
       final reach = weaponArm?.outerRadius ?? 0.0;
       final factor = (1 -
-              (slotValue('slow', 0.06) * slowLv).clamp(
-                0.0,
-                battleNum('weapon', 'slow_cap', 0.7),
-              ))
+              linearSlotValue('slow', slowLv, 0.06)
+                  .clamp(0.0, battleNum('weapon', 'slow_cap', 0.7)))
           .clamp(0.0, 1.0);
       final hold = battleNum('weapon', 'slow_hold_sec', 0.6);
       for (final m in monsters) {

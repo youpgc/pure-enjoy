@@ -29,8 +29,7 @@ extension JourneyLowHpScaling on JourneyFlameGame {
   double get bloodlustAmp {
     final lv = slotLevel('bloodlust');
     if (lv <= 0) return 0;
-    return slotValue('bloodlust', kJourneyBloodlustAmpPerLv) *
-        lv *
+    return linearSlotValue('bloodlust', lv, kJourneyBloodlustAmpPerLv) *
         journeyLowHpTierFactor(this, 'bloodlust_min_hp_ratio');
   }
 
@@ -39,8 +38,7 @@ extension JourneyLowHpScaling on JourneyFlameGame {
   double get desperationAmp {
     final lv = slotLevel('desperation');
     if (lv <= 0) return 0;
-    return slotValue('desperation', kJourneyDesperationAmpPerLv) *
-        lv *
+    return linearSlotValue('desperation', lv, kJourneyDesperationAmpPerLv) *
         journeyLowHpTierFactor(this, 'desperation_min_hp_ratio');
   }
 }

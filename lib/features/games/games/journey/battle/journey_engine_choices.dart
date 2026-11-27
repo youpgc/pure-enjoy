@@ -1,104 +1,8 @@
 part of 'journey_flame_game.dart';
 
-/// 维度卡升级对比的数值口径：把「等级 → 展示数值」按引擎结算规则还原，
-/// 供顿悟卡展示「当前→下一级」。[brief] 为简介，[value] 取后台每级数值
-/// （缺失时回落引擎内置），[unit] 决定展示格式。
-///
-/// 倍率类（speed/damage）引擎以小数累加（+0.10=+10%），展示乘 100；
-/// 暴伤按槽位增量展示（玩家已有 150% 基础暴伤且受角色/法宝加成，槽位
-/// 不决定最终倍率）；穿刺/吸血有起始基准且从 2 级起按增量累加（见引擎
-/// updateWeapons / _hitMonster），其余为整数或每秒数值直接按等级线性。
-enum _SlotUnit { percent, intValue, perSecond, count }
-
-({String brief, _SlotUnit unit, double base, double fallback, double cap})
-    _slotDisplayRule(String code) {
-  switch (code) {
-    case 'radius':
-      return (brief: '武器臂长', unit: _SlotUnit.intValue, base: 0, fallback: 14, cap: double.infinity);
-    case 'speed':
-      return (brief: '环绕转速', unit: _SlotUnit.percent, base: 0, fallback: 0.10, cap: double.infinity);
-    case 'damage':
-      return (brief: '武器伤害', unit: _SlotUnit.percent, base: 0, fallback: 0.20, cap: double.infinity);
-    case 'knockback':
-      return (brief: '击退距离', unit: _SlotUnit.intValue, base: 0, fallback: 16, cap: double.infinity);
-    case 'magnet':
-      return (brief: '拾取范围', unit: _SlotUnit.intValue, base: 0, fallback: 40, cap: double.infinity);
-    case 'armor':
-      return (brief: '护甲', unit: _SlotUnit.intValue, base: 0, fallback: 3, cap: double.infinity);
-    case 'burn':
-      return (brief: '灼烧伤害', unit: _SlotUnit.perSecond, base: 0, fallback: 8, cap: double.infinity);
-    case 'clone':
-      return (brief: '武器分身', unit: _SlotUnit.count, base: 0, fallback: 1, cap: double.infinity);
-    case 'crit_rate':
-      return (brief: '暴击率', unit: _SlotUnit.percent, base: 0, fallback: 0.025, cap: 0.60);
-    case 'crit_damage':
-      return (brief: '暴击伤害', unit: _SlotUnit.percent, base: 0, fallback: 0.06, cap: double.infinity);
-    case 'pierce':
-      return (
-        brief: '无视护甲',
-        unit: _SlotUnit.percent,
-        base: kJourneyPierceBaseRatio,
-        fallback: kJourneyPierceIgnorePerLv,
-        cap: kJourneyPierceRatioCap,
-      );
-    case 'lifesteal':
-      return (
-        brief: '命中回血',
-        unit: _SlotUnit.percent,
-        base: kJourneyLifestealBaseRatio,
-        fallback: kJourneyLifestealRatioPerLv,
-        cap: kJourneyLifestealRatioCap,
-      );
-    case 'vitality':
-      return (brief: '生命上限', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.60);
-    case 'cloud':
-      return (brief: '移动速度', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: double.infinity);
-    case 'ward':
-      return (brief: '受击减伤', unit: _SlotUnit.percent, base: 0, fallback: 0.04, cap: 0.50);
-    case 'reflect':
-      return (brief: '盾抵反震', unit: _SlotUnit.percent, base: 0, fallback: 0.15, cap: 3.0);
-    case 'execute':
-      // 普通怪处决血线：下限 1% + 每级增量×等级，钳到上限；妖王血线按绝对值另算
-      return (
-        brief: '残血处决',
-        unit: _SlotUnit.percent,
-        base: kJourneyExecuteNormalFloorRatio,
-        fallback: 0.0175,
-        cap: kJourneyExecuteNormalCapRatio,
-      );
-    case 'recovery':
-      return (brief: '回元回血', unit: _SlotUnit.percent, base: 0, fallback: 0.05, cap: 0.50);
-    case 'shield':
-      return (brief: '护盾点数', unit: _SlotUnit.intValue, base: 0, fallback: 20, cap: double.infinity);
-    case 'slow':
-      return (brief: '范围减速', unit: _SlotUnit.percent, base: 0, fallback: 0.06, cap: 0.70);
-    case 'bloodlust':
-      return (brief: '满血攻速', unit: _SlotUnit.percent, base: 0, fallback: kJourneyBloodlustAmpPerLv, cap: double.infinity);
-    case 'desperation':
-      return (brief: '满血增伤', unit: _SlotUnit.percent, base: 0, fallback: kJourneyDesperationAmpPerLv, cap: double.infinity);
-    case 'qiankun':
-      return (
-        brief: '命中护盾',
-        unit: _SlotUnit.intValue,
-        base: kJourneyQiankunShieldBase,
-        fallback: kJourneyQiankunShieldPerLv,
-        cap: double.infinity,
-      );
-    case 'poison':
-      return (
-        brief: '中毒伤害',
-        unit: _SlotUnit.percent,
-        base: kJourneyPoisonRatioBase,
-        fallback: kJourneyPoisonRatioPerLv,
-        cap: double.infinity,
-      );
-    default:
-      return (brief: '', unit: _SlotUnit.intValue, base: 0, fallback: 0, cap: double.infinity);
-  }
-}
-
-/// 按引擎口径算某维度在 [level] 级的展示数值：基准类（穿刺/吸血）1 级
-/// 即基准值、此后每级加增量；其余按等级×每级值；暴伤仅展示槽位增量。
+/// 按引擎口径算某维度在 [level] 级的展示数值：配了 1 级初始值则按
+/// 初始值 + 每级增量×(等级−1)；未配时基准类（穿刺/吸血/处决/乾坤/淬毒）
+/// 1 级即基准值、其余按等级×每级值，保持原口径零回归。
 double _slotDisplayValue(
   String code,
   int level,
@@ -108,12 +12,27 @@ double _slotDisplayValue(
   double base,
   double fallback,
   double cap,
-}) rule,
-) {
+}) rule, {
+  double baseValue = 0,
+}) {
   final cached = JourneyConfigService.instance.cached;
-  // 处决展示与结算同源：下限读 normal_floor、上限读 normal_cap，
-  // 反震展示上限共用 reflect_cap，避免后台调参后卡牌显示与实际不符
+  // 基准与上限均与结算同源：基准读各槽基数，上限读后台可配的
+  // 对应 cap，避免调参后卡面数值与实际不符
   final base = switch (code) {
+    'pierce' =>
+      cached?.battleNum(
+            'weapon',
+            'pierce_base',
+            kJourneyPierceBaseRatio,
+          ) ??
+          kJourneyPierceBaseRatio,
+    'lifesteal' =>
+      cached?.battleNum(
+            'weapon',
+            'lifesteal_base',
+            kJourneyLifestealBaseRatio,
+          ) ??
+          kJourneyLifestealBaseRatio,
     'execute' => (cached?.battleNum(
               'execute',
               'normal_floor',
@@ -138,27 +57,46 @@ double _slotDisplayValue(
     _ => rule.base,
   };
   final step = perLevel > 0 ? perLevel : rule.fallback;
-  final raw = (code == 'pierce' ||
-          code == 'lifesteal' ||
-          code == 'execute' ||
-          code == 'qiankun' ||
-          code == 'poison')
-      ? base + step * (level - 1)
-      : base + step * level;
-  final cap = code == 'reflect'
-      ? math.max(
-          0.0,
-          cached?.weaponParam('zhaoyao_jing', 'reflect_cap', 3.0) ?? 3.0,
-        )
-      : code == 'execute'
-          ? math.max(
-              base,
-              (cached?.battleNum(
-                      'execute', 'normal_cap', kJourneyExecuteNormalCapRatio) ??
-                  kJourneyExecuteNormalCapRatio)
-                  .clamp(0.0, 1.0),
-            )
-          : rule.cap;
+  final isBaseType = code == 'pierce' ||
+      code == 'lifesteal' ||
+      code == 'execute' ||
+      code == 'qiankun' ||
+      code == 'poison';
+  final raw = baseValue > 0
+      ? baseValue + step * (level - 1)
+      : isBaseType
+          ? base + step * (level - 1)
+          : base + step * level;
+  final cap = switch (code) {
+    'pierce' =>
+      cached?.battleNum(
+            'weapon', 'pierce_cap', kJourneyPierceRatioCap) ??
+          kJourneyPierceRatioCap,
+    'lifesteal' =>
+      cached?.battleNum(
+            'weapon', 'lifesteal_cap', kJourneyLifestealRatioCap) ??
+          kJourneyLifestealRatioCap,
+    'crit_rate' =>
+      cached?.battleNum('damage', 'crit_rate_cap', 0.60) ?? 0.60,
+    'crit_damage' =>
+      cached?.battleNum('damage', 'crit_dmg_cap', 2.0) ?? 2.0,
+    'vitality' =>
+      cached?.battleNum('weapon', 'vitality_cap', 0.6) ?? 0.6,
+    'ward' => cached?.battleNum('weapon', 'ward_cap', 0.5) ?? 0.5,
+    'recovery' =>
+      cached?.battleNum('weapon', 'recovery_cap', 0.5) ?? 0.5,
+    'slow' => cached?.battleNum('weapon', 'slow_cap', 0.7) ?? 0.7,
+    'reflect' => math.max(
+        0.0,
+        cached?.weaponParam('zhaoyao_jing', 'reflect_cap', 3.0) ?? 3.0),
+    'execute' => math.max(
+        base,
+        (cached?.battleNum(
+                'execute', 'normal_cap', kJourneyExecuteNormalCapRatio) ??
+            kJourneyExecuteNormalCapRatio)
+            .clamp(0.0, 1.0)),
+    _ => rule.cap,
+  };
   return raw.clamp(0.0, cap);
 }
 
@@ -177,11 +115,16 @@ String _formatSlotValue(double value, _SlotUnit unit) {
 
 /// 维度槽当前等级的实际贡献值文案（属性详情面板与选卡对比共用同一口径）。
 /// 无匹配规则时返回空串，由调用方回落原介绍文案。
-String journeySlotValueText(String code, int level, double perLevel) {
+String journeySlotValueText(
+  String code,
+  int level,
+  double perLevel, {
+  double baseValue = 0,
+}) {
   final rule = _slotDisplayRule(code);
   if (rule.brief.isEmpty) return '';
   return '${rule.brief} ${_formatSlotValue(
-    _slotDisplayValue(code, level, perLevel, rule),
+    _slotDisplayValue(code, level, perLevel, rule, baseValue: baseValue),
     rule.unit,
   )}';
 }
@@ -193,9 +136,11 @@ String _upgradeDesc(JourneySlotDefModel def, int currentLevel) {
   final rule = _slotDisplayRule(def.code);
   if (rule.brief.isEmpty) return def.effectPerLevel;
   final before = _formatSlotValue(
-      _slotDisplayValue(def.code, currentLevel, def.valuePerLevel, rule), rule.unit);
+      _slotDisplayValue(def.code, currentLevel, def.valuePerLevel, rule,
+          baseValue: def.baseValue), rule.unit);
   final after = _formatSlotValue(
-      _slotDisplayValue(def.code, currentLevel + 1, def.valuePerLevel, rule), rule.unit);
+      _slotDisplayValue(def.code, currentLevel + 1, def.valuePerLevel, rule,
+          baseValue: def.baseValue), rule.unit);
   return '${rule.brief} $before → $after';
 }
 

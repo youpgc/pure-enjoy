@@ -54,15 +54,17 @@ extension JourneyGrowth on JourneyFlameGame {
       ((weaponArm?.speedBase ?? 0) * (spinAmp + bloodlustAmp))
           .clamp(0.0, 10 * math.pi);
 
-  /// 穿刺破甲比例：1 级基准 + 每级增量（value_per_level 后台可配），钳 ≤ 上限。
-  /// 环绕命中与并行单位命中共用此口径，避免穿透弹硬编码全额破甲。
+  /// 穿刺破甲比例：1 级初始值（未配回落 pierce_base）+ 每级增量
+  /// （value_per_level 后台可配），钳 ≤ 上限。环绕命中与并行单位命中共用此口径。
   double get armorIgnoreRatio {
     final lv = slotLevel('pierce');
     if (lv <= 0) return 0.0;
-    return (battleNum('weapon', 'pierce_base', kJourneyPierceBaseRatio) +
-            slotValue('pierce', kJourneyPierceIgnorePerLv) * (lv - 1))
-        .clamp(
-            0.0,
-            battleNum('weapon', 'pierce_cap', kJourneyPierceRatioCap));
+    return slotValueAtLevel(
+      'pierce',
+      lv,
+      kJourneyPierceIgnorePerLv,
+      levelOneFallback:
+          battleNum('weapon', 'pierce_base', kJourneyPierceBaseRatio),
+    ).clamp(0.0, battleNum('weapon', 'pierce_cap', kJourneyPierceRatioCap));
   }
 }

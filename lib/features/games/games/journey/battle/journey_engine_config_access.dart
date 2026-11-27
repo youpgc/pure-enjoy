@@ -45,12 +45,6 @@ extension JourneyConfigAccess on JourneyFlameGame {
   double get monsterArmorCap =>
       config?.monsterArmorCap ?? kJourneyMonsterArmorCap;
 
-  /// 维度槽定义（code 匹配；含远端空表回落内置种子）。
-  JourneySlotDefModel? slotDefOf(String code) {
-    final map = _slotDefCache ??= config?.slotDefMap() ?? const {};
-    return map[code];
-  }
-
   /// 维度槽周期秒数（period_sec 后台配置；0/缺失回落 [fallback]）。
   /// 回元/护体等周期槽的文案与真实触发周期同源，避免两处口径脱节。
   double slotPeriod(String code, double fallback) {

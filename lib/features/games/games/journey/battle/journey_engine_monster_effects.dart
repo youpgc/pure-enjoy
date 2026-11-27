@@ -154,8 +154,7 @@ mixin JourneyBurnMixin on PositionComponent {
               game.battleNum('weapon', 'burn_level_growth', 0.04);
       ignite(
         source: 'weapon_burn',
-        burnDps: game.slotValue('burn', 8.0) *
-            burnLv *
+        burnDps: game.linearSlotValue('burn', burnLv, 8.0) *
             lvGrowth *
             (honghaier
                 ? game.battleNum('ability', 'honghaier_burn_mult', 2.0)
