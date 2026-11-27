@@ -207,18 +207,15 @@ class JourneyAttackUnits extends Component {
   /// 返回是否真正命中（被冷却/死亡拦截时返回 false），供弹体决定是否消耗穿透。
   ///
   /// 弹道轨：与环绕武器同一伤害公式乘区（damageOf），走完整命中链——破甲、
-  /// 暴击、击退/吸血（初始特效与全局维度槽取较高等级）、雷引/幌金绳/紫金铃
-  /// 等特效；火眼金睛条件增伤并入增伤百分比合计后随命中生效。同怪命中受
+  /// 暴击、雷引/幌金绳/紫金铃等特效；击退仅环绕扇叶命中生效，
+  /// 弹道/回旋/光束命中不推开目标。吸血仍取初始特效与全局维度槽的较高等级。
+  /// 火眼金睛条件增伤并入增伤百分比合计后随命中生效。同怪命中受
   /// 形态冷却约束不会每帧叠加；角色专属伏魔重击不随并行命中消耗。
   bool _hit(JourneyAttackUnit unit, JourneyMonsterComponent m) {
     final cdSlot = _attackUnitSlot(unit.kind);
     if (m.isDead || m.attackUnitCds[cdSlot] > 0) return false;
     m.attackUnitCds[cdSlot] = game.battleNum('weapon', 'hit_cd', 0.3);
     // 初始特效只在该法宝确有此特效时给 1 级；全局槽升级可叠加其上。
-    final knockLv = math.max(
-      game.slotLevel('knockback'),
-      unit.starterEffect == 'knockback' ? 1 : 0,
-    );
     final lifestealLv = math.max(
       game.slotLevel('lifesteal'),
       unit.starterEffect == 'lifesteal' ? 1 : 0,
@@ -228,10 +225,10 @@ class JourneyAttackUnits extends Component {
       m,
       damageOf(unit),
       pierceIgnore: game.armorIgnoreRatio,
-      knockLv: knockLv,
       lifestealLv: lifestealLv,
       toM: m.position - game.player.position,
       allowSignature: false,
+      allowKnockback: false,
       // 火眼金睛按增伤Σ%的一项结算，基数取该弹道自身未增伤基础值。
       conditionBase: unit.damage + game.attackBonus + game.character.baseAttack,
     );

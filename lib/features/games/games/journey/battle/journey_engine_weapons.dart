@@ -265,11 +265,12 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     JourneyMonsterComponent m,
     double damage, {
     required double pierceIgnore,
-    required int knockLv,
+    int knockLv = 0,
     required int lifestealLv,
     required Vector2 toM,
     bool allowSignature = true,
     double? conditionBase,
+    bool allowKnockback = true,
   }) {
     var dmg = damage;
     // 伏魔重击（沙僧环绕专属爆发）：并行单位高频命中若也能消耗，
@@ -402,7 +403,10 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         trueDamage: true,
       );
     }
-    if ((knockLv > 0 || game.player.bonusKnockback > 0) &&
+    // 击退只对环绕扇叶命中生效：弹道/回旋/光束经同一命中链但不推开目标。
+    // 按目标节流与逐扇叶伤害豁免独立，同一目标在 knockback_cd 窗口内只结算一次位移。
+    if (allowKnockback &&
+        (knockLv > 0 || game.player.bonusKnockback > 0) &&
         m.knockbackCd <= 0) {
       var kb = game.slotValue('knockback', 16) * knockLv +
           game.player.bonusKnockback; // 击退槽 + 飞龙宝杖被动加成
