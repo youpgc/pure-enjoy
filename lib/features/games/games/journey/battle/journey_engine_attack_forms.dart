@@ -32,8 +32,8 @@ extension JourneyAttackForms on JourneyFlameGame {
   /// 复利延展（与环绕 _gradeDamage 同口径）；各列缺行/为 0 时按列回落
   /// journey_weapons base 列或语义兜底。
   JourneyAttackUnit _attackUnitOf(JourneyWeaponModel w) {
-    final levels = config?.weaponLevels[w.code] ??
-        const <JourneyWeaponLevelModel>[];
+    final levels =
+        config?.weaponLevels[w.code] ?? const <JourneyWeaponLevelModel>[];
     JourneyWeaponLevelModel? gradeAt(int lv) {
       for (final l in levels) {
         if (l.lv == lv) return l;
@@ -103,7 +103,7 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
     // 目标恰与玩家重叠时零向量没有方向，兜底朝右，避免扇形判定全落空。
     final delta = target.position - game.player.position;
     final dir = delta.length > 0.001 ? delta.normalized() : Vector2(1, 0);
-    beamFx.trigger(unit.code, dir, range);
+    game.fxLayer.particles.spawnBeam(game.player.position, dir, range);
 
     final beamSlot = _attackUnitSlot('beam');
     final candidates = game.spatialGrid.queryRange(game.player.position, range);
@@ -118,7 +118,8 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
       }
       targets.add(m);
     }
-    targets.sort((a, b) => (a.position - game.player.position).length2
+    targets.sort((a, b) => (a.position - game.player.position)
+        .length2
         .compareTo((b.position - game.player.position).length2));
     for (final m in targets.take(_attackTargetCap)) {
       _hit(unit, m);
@@ -179,7 +180,6 @@ extension JourneyAttackUnitTick on JourneyAttackUnits {
           unit,
           m,
           mult: _fieldDwellMult(dwell[m] ?? 0),
-          fromPulse: true,
         );
       }
     }
@@ -204,9 +204,8 @@ class JourneyAttackUnitRenderer extends Component {
         final radius = units._fieldRadius;
         final period = units._fieldPulsePeriod;
         // 伤害在 timer 归零时触发：越接近归零越亮，脉冲峰值与伤害同相。
-        final pulse = unit.timer > 0
-            ? (1 - unit.timer / period).clamp(0.0, 1.0)
-            : 1.0;
+        final pulse =
+            unit.timer > 0 ? (1 - unit.timer / period).clamp(0.0, 1.0) : 1.0;
         canvas.drawCircle(
           center,
           radius,
@@ -230,26 +229,20 @@ class JourneyAttackUnitRenderer extends Component {
       }
     }
 
-    units.beamFx.render(canvas, center);
-
     for (final s in units.shots) {
       final isBoom = s.boomerang;
       canvas.drawCircle(
         s.pos.toOffset(),
         isBoom ? 9 : 5,
         Paint()
-          ..color = (isBoom
-                  ? const Color(0xFF9AD5C8)
-                  : const Color(0xFFFFB27A))
+          ..color = (isBoom ? const Color(0xFF9AD5C8) : const Color(0xFFFFB27A))
               .withValues(alpha: 0.85),
       );
       canvas.drawCircle(
         s.pos.toOffset(),
         isBoom ? 13 : 8,
         Paint()
-          ..color = (isBoom
-                  ? const Color(0xFF9AD5C8)
-                  : const Color(0xFFFFB27A))
+          ..color = (isBoom ? const Color(0xFF9AD5C8) : const Color(0xFFFFB27A))
               .withValues(alpha: 0.25)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2,

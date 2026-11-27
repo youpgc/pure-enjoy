@@ -3,7 +3,11 @@ part of 'journey_flame_game.dart';
 /// 怪物实体：驻守→追击→归位三态；血量/速度/接触伤害走钳制后的生效乘区；
 /// 妖王血量可传入独立时间乘区，不随关卡难度放大，速度/接触伤害口径不变。
 class JourneyMonsterComponent extends PositionComponent
-    with JourneyKnockbackMixin, JourneyBurnMixin, JourneyBossAbilityMixin, JourneySlotStatusMixin {
+    with
+        JourneyKnockbackMixin,
+        JourneyBurnMixin,
+        JourneyBossAbilityMixin,
+        JourneySlotStatusMixin {
   JourneyMonsterComponent({
     required this.game,
     required this.model,
@@ -82,8 +86,7 @@ class JourneyMonsterComponent extends PositionComponent
       model.hasAbility('blood_frenzy') &&
       hp < maxHp * game.monsterParam(model.code, 'frenzy_hp', 0.4);
 
-  double get frenzyMult =>
-      game.monsterParam(model.code, 'frenzy_mult', 1.5);
+  double get frenzyMult => game.monsterParam(model.code, 'frenzy_mult', 1.5);
 
   /// 移速倍率（journey_monster_params.move_mult；缺省按能力兜底，
   /// 狂暴再乘 frenzy_mult）。
@@ -110,8 +113,7 @@ class JourneyMonsterComponent extends PositionComponent
   /// 环绕扇叶命中豁免：每个扇叶对同一怪独立计时，互不共享。
   /// 扇叶命中后，其伤害与命中附着的吸血/淬毒/乾坤等效果在同一窗口内不再结算；
   /// 击退物理位移由按目标的 [knockbackCd] 单独节流。
-  final List<double> bladeHitCds =
-      List<double>.filled(kJourneyMaxBlades, 0);
+  final List<double> bladeHitCds = List<double>.filled(kJourneyMaxBlades, 0);
 
   /// 并行攻击单位命中冷却：按形态分槽，避免不同形态互相吞命中。
   /// 槽位由 [_attackUnitSlot] 映射；同形态仍按 0.3s 去重。
@@ -222,7 +224,8 @@ class JourneyMonsterComponent extends PositionComponent
 
   /// 侦测半径：妖王潮领地半径优先；普通怪≈屏高 0.4 口径；妖王据点
   /// 用更大触发圈。
-  double get aggroRange => territoryRadius ??
+  double get aggroRange =>
+      territoryRadius ??
       (model.isBoss
           ? game.battleNum('monster', 'aggro_boss', 420)
           : game.battleNum('monster', 'aggro_normal', 260));
@@ -231,8 +234,8 @@ class JourneyMonsterComponent extends PositionComponent
   /// 默认口径=侦测 × 脱战倍率。
   double get leashRange => territoryRadius != null
       ? territoryRadius! *
-          game.battleNum('endless', 'boss_leash_gain',
-              kJourneyEndlessBossLeashGain)
+          game.battleNum(
+              'endless', 'boss_leash_gain', kJourneyEndlessBossLeashGain)
       : aggroRange * game.battleNum('monster', 'leash_mult', 1.5);
 
   /// 脱战快速回血速率：每秒恢复 maxHp 的比例（默认 40%，2.5 秒回满）。
@@ -308,6 +311,7 @@ class JourneyMonsterComponent extends PositionComponent
       takeDamage(tick.damage, armorIgnore: tick.trueDamage ? 1 : 0);
       if (isDead) return;
     }
+    game.fxLayer.particles.emitBurn(this);
     final player = game.player;
     final toPlayer = player.position - position;
     final dist = toPlayer.length;
@@ -362,10 +366,8 @@ class JourneyMonsterComponent extends PositionComponent
     if (_aggro) {
       if (_chargePhase == 0 && !rooted && dist > 1) {
         // 追击：直线朝玩家（分离力在 game 层统一做）
-        position += toPlayer.normalized() *
-            cappedMonsterSpeed(this) *
-            dt *
-            knockFactor;
+        position +=
+            toPlayer.normalized() * cappedMonsterSpeed(this) * dt * knockFactor;
       } else if (_chargePhase == 3 && !rooted && dist > 1) {
         // 收招：缓速归位追击
         position += toPlayer.normalized() *
@@ -433,8 +435,7 @@ class JourneyMonsterComponent extends PositionComponent
         //（幌金绳对妖王突进同样生效），突进时长照常消耗（root 中即原地停摆）
         _chargeTimer -= dt;
         if (!rooted) {
-          position +=
-              _chargeDir *
+          position += _chargeDir *
               cappedMonsterSpeed(this) *
               game.battleNum('boss', 'charge_speed_mult', 4.5) *
               dt;
@@ -459,6 +460,8 @@ class JourneyMonsterComponent extends PositionComponent
 
   @override
   void render(Canvas canvas) {
+    // 可见剔除：屏外怪不绘制本体/状态环/血条，留出体型边距避免边缘闪现。
+    if (!isVisibleToCamera(radius * 4)) return;
     // 局部坐标绘制（画布已平移到本组件位置），禁止叠加 position。
     final isBoss = model.isBoss;
     // 精灵优先（monster_<code>.svg，64 视箱）；失败回落几何占位；
@@ -507,11 +510,11 @@ class JourneyMonsterComponent extends PositionComponent
   void scaleStageDamage(int stage) {
     if (stage <= 0) return;
     _contactDamageVal = _contactDamageVal *
-        (1.0 +
-            stage * game.battleNum('boss', 'stage_damage_gain', 0.25));
+        (1.0 + stage * game.battleNum('boss', 'stage_damage_gain', 0.25));
   }
 
-  void takeDamage(double amount, {double armorIgnore = 0, bool reflect = true}) {
+  void takeDamage(double amount,
+      {double armorIgnore = 0, bool reflect = true}) {
     if (isDead) return;
     final rawBefore = amount;
     // 护罩优先抵扣（金铙/月华护盾），破产部分再走护甲与扣血
@@ -525,8 +528,9 @@ class JourneyMonsterComponent extends PositionComponent
     // 护甲（其余衍生伤害不受益）
     if (bonusArmor > 0) {
       final effArmor = bonusArmor * (1 - armorIgnore.clamp(0.0, 1.0));
-      amount *= 1 - JourneyDamageTickMixin.armorReductionRatio(
-          effArmor, curveK: game.armorCurveK, cap: game.monsterArmorCap);
+      amount *= 1 -
+          JourneyDamageTickMixin.armorReductionRatio(effArmor,
+              curveK: game.armorCurveK, cap: game.monsterArmorCap);
     }
     hp -= amount;
     _hpBarTimer = 2.5;
@@ -539,8 +543,7 @@ class JourneyMonsterComponent extends PositionComponent
         hp > 0) {
       game.player.takeDamage(
         rawBefore *
-            game.abilityParam(
-                model.code, 'lotus_guard', 'lotus_thorns', 0.3),
+            game.abilityParam(model.code, 'lotus_guard', 'lotus_thorns', 0.3),
         attacker: this,
       );
     }
@@ -582,19 +585,15 @@ class JourneyMonsterComponent extends PositionComponent
 
   /// 白骨妖卫 ×2：白骨精分魂（精英属性，血量 40% buff，落位本体两侧）。
   void _spawnBoneSplinters() {
-    final pool = game.pool
-        .where((m) => m.code == 'baigu_yaozu')
-        .toList();
+    final pool = game.pool.where((m) => m.code == 'baigu_yaozu').toList();
     if (pool.isEmpty) return;
     final model = pool.first;
     for (var i = 0; i < 2; i++) {
       final comp = JourneyMonsterComponent(
         game: game,
         model: model,
-        buffMult: buffMult *
-            game.battleNum('monster', 'split_hp_mult', 0.4),
-        position: position +
-            Vector2(i == 0 ? -46 : 46, 0),
+        buffMult: buffMult * game.battleNum('monster', 'split_hp_mult', 0.4),
+        position: position + Vector2(i == 0 ? -46 : 46, 0),
       );
       // 继承本体波次标记：无尽妖潮除尽推进不漏分裂怪
       comp.endlessWave = endlessWave;

@@ -48,14 +48,13 @@ mixin JourneyDamageTickMixin {
       if (strongestM.weakenTimer > 0) {
         strongest *= game.battleNum('damage', 'weaken_mult', 0.5);
       }
-      var afterArmor =
-          (strongest *
-                  (1 -
-                      armorReductionRatio(player.effectiveArmor,
-                          curveK: game.armorCurveK,
-                          cap: game.battleNum('damage', 'player_armor_cap',
-                              kJourneyPlayerArmorCap))))
-              .clamp(1.0, double.maxFinite);
+      var afterArmor = (strongest *
+              (1 -
+                  armorReductionRatio(player.effectiveArmor,
+                      curveK: game.armorCurveK,
+                      cap: game.battleNum('damage', 'player_armor_cap',
+                          kJourneyPlayerArmorCap))))
+          .clamp(1.0, double.maxFinite);
       // 铜皮铁骨（bajie 特殊能力）：受击后窗口内按系数减伤
       if (game._bajieGuard > 0) {
         afterArmor *= game.battleNum('ability', 'bajie_guard_mult', 0.70);
@@ -68,11 +67,6 @@ mixin JourneyDamageTickMixin {
           afterArmor *
               game.weaponParam('fanshang_thorns', 'thorns', 0.30) *
               game.passiveAmpFactor,
-        );
-        game.fxLayer.spawnRing(
-          strongestM.position,
-          strongestM.radius + 6,
-          color: const Color(0xFF9AD5C3),
         );
         // GameAudio.instance.journeyTrigger();
       }
@@ -149,11 +143,11 @@ extension JourneyBossCharge on JourneyFlameGame {
     }
     var afterArmor = (raw *
             (1 -
-                    JourneyDamageTickMixin.armorReductionRatio(
+                JourneyDamageTickMixin.armorReductionRatio(
                     player.effectiveArmor,
                     curveK: armorCurveK,
-                    cap: battleNum('damage', 'player_armor_cap',
-                        kJourneyPlayerArmorCap))))
+                    cap: battleNum(
+                        'damage', 'player_armor_cap', kJourneyPlayerArmorCap))))
         .clamp(1.0, double.maxFinite);
     if (_bajieGuard > 0) {
       afterArmor *= battleNum('ability', 'bajie_guard_mult', 0.70);
@@ -166,11 +160,6 @@ extension JourneyBossCharge on JourneyFlameGame {
             weaponParam('fanshang_thorns', 'thorns', 0.30) *
             passiveAmpFactor,
       );
-      fxLayer.spawnRing(
-        boss.position,
-        boss.radius + 6,
-        color: const Color(0xFF9AD5C3),
-      );
       // GameAudio.instance.journeyTrigger();
     }
     player.applyChargeKnock(
@@ -181,9 +170,9 @@ extension JourneyBossCharge on JourneyFlameGame {
     if (boss.model.hasAbility('roc_speed')) {
       bossSkillLayer.castField(
         boss.position - boss._chargeDir * 60,
-          radius: monsterParam(boss.model.code, 'blade_range', 120),
-          life: monsterParam(boss.model.code, 'blade_sec', 3),
-          tick: monsterParam(boss.model.code, 'blade_tick', 0.6),
+        radius: monsterParam(boss.model.code, 'blade_range', 120),
+        life: monsterParam(boss.model.code, 'blade_sec', 3),
+        tick: monsterParam(boss.model.code, 'blade_tick', 0.6),
         effect: 'slow',
         power: monsterParam(boss.model.code, 'blade_slow', 0.35),
         color: const Color(0xFFD4A73F),

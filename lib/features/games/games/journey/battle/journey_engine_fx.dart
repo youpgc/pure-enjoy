@@ -111,8 +111,7 @@ class JourneyAuraBlend {
 
 /// 特效层（世界坐标覆盖渲染，world 内最后加入=置顶）：
 /// - 浮动文字：世界坐标上飘 + 前 0.12s 淡入、0.8s 渐隐，对象池复用（上限 40）；
-/// - 闪电连线：暴击雷引链式命中视觉，0.15s 白色线段（池 8）；
-/// - 破坏残屑：参照物击碎迸散的褐色小圆 0.5s（池 48）。
+/// - 瞬时特效：火焰/雷电/冲击/残屑/光束/尾迹统一交给粒子层，池化发射。
 class JourneyFxLayer extends Component {
   JourneyFxLayer(this.game);
 
@@ -120,44 +119,33 @@ class JourneyFxLayer extends Component {
 
   static const int _maxTexts = 40;
   static const double _textLife = 0.8;
-  static const double _lineLife = 0.15;
-  static const double _dustLife = 0.5;
-  static const double _ringLife = 0.35;
+
+  /// 写实粒子特效发射池：与飘字共用本层更新节奏。
+  late final JourneyParticleFx particles = JourneyParticleFx(this);
 
   final List<_FxText> _texts = <_FxText>[
     for (var i = 0; i < _maxTexts; i++) _FxText(),
   ];
-  final List<_FxLine> _lines = <_FxLine>[
-    for (var i = 0; i < 8; i++) _FxLine(),
-  ];
-  final List<_FxDust> _dusts = <_FxDust>[
-    for (var i = 0; i < 48; i++) _FxDust(),
-  ];
-  final List<_FxRing> _rings = <_FxRing>[
-    for (var i = 0; i < 8; i++) _FxRing(),
-  ];
 
-  /// 扩散圆环（法宝触发/反伤/定身/增伤触发视觉）：0.35s 淡出。
+  /// 飘字贴图缓存与绘制画笔：文字在首次出现时栅格化为白色贴图，
+  /// 渲染帧只按颜色调制绘制，不再逐帧排版。
+  final JourneyFxGlyphCache _glyphs = JourneyFxGlyphCache();
+  final Paint _textPaint = Paint();
+
+  @override
+  void onRemove() {
+    _glyphs.clear();
+    super.onRemove();
+  }
+
+  /// 环形冲击（法宝触发/反伤/定身/增伤触发视觉）：火星外扩 + 烟尘。
   /// 颜色缺省为鎏金，可按反馈类型传入区分色。
   void spawnRing(
     Vector2 pos,
     double radius, {
     Color color = const Color(0xFFE8C470),
   }) {
-    _FxRing? pick;
-    for (final r in _rings) {
-      if (!r.alive) {
-        pick = r;
-        break;
-      }
-    }
-    pick ??= _rings.first;
-    pick
-      ..alive = true
-      ..life = _ringLife
-      ..pos = pos.clone()
-      ..radius = radius
-      ..color = color;
+    particles.spawnShockwave(pos, radius, color: color);
   }
 
   /// 浮动文字：池满时复用剩余寿命最短的一条（防刷屏口径只弹关键事件）。
@@ -176,41 +164,17 @@ class JourneyFxLayer extends Component {
       ..pos = pos.clone()
       ..text = text
       ..color = color;
+    _glyphs.cache(text);
   }
 
-  /// 闪电连线（暴击雷引）。
+  /// 暴击雷引：折线电弧 + 分叉火花。
   void spawnLightning(Vector2 from, Vector2 to) {
-    _FxLine? pick;
-    for (final l in _lines) {
-      if (!l.alive) {
-        pick = l;
-        break;
-      }
-    }
-    pick ??= _lines.first;
-    pick
-      ..alive = true
-      ..life = _lineLife
-      ..from = from.clone()
-      ..to = to.clone();
+    particles.spawnLightning(from, to);
   }
 
-  /// 破坏残屑：4~6 个褐色小圆从参照物中心迸散。
+  /// 参照物破坏：带重力翻滚的碎块与落地尘烟。
   void spawnDebris(Vector2 pos, double radius) {
-    final count = 4 + game.rng.nextInt(3);
-    var spawned = 0;
-    for (final d in _dusts) {
-      if (d.alive) continue;
-      final a = game.rng.nextDouble() * math.pi * 2;
-      final dir = Vector2(math.cos(a), math.sin(a));
-      d
-        ..alive = true
-        ..life = _dustLife
-        ..pos = pos + dir * radius * 0.5
-        ..vel = dir * (60 + game.rng.nextDouble() * 90);
-      spawned++;
-      if (spawned >= count) break;
-    }
+    particles.spawnDebris(pos, radius);
   }
 
   @override
@@ -223,82 +187,23 @@ class JourneyFxLayer extends Component {
       t.pos.y -= 34 * dt; // 上飘
       if (t.life <= 0) t.alive = false;
     }
-    for (final l in _lines) {
-      if (!l.alive) continue;
-      l.life -= dt;
-      if (l.life <= 0) l.alive = false;
-    }
-    for (final d in _dusts) {
-      if (!d.alive) continue;
-      d.life -= dt;
-      d.pos += d.vel * dt;
-      d.vel *= 0.92; // 迸散阻尼
-      if (d.life <= 0) d.alive = false;
-    }
-    for (final r in _rings) {
-      if (!r.alive) continue;
-      r.life -= dt;
-      if (r.life <= 0) r.alive = false;
-    }
+    particles.update(dt);
   }
 
   @override
   void render(Canvas canvas) {
+    particles.render(canvas);
     for (final t in _texts) {
       if (!t.alive) continue;
       final fadeOut = (t.life / _textLife).clamp(0.0, 1.0);
       final fadeIn = ((_textLife - t.life) / 0.12).clamp(0.0, 1.0);
-      final alpha = fadeOut * fadeIn;
-      final tp = TextPainter(
-        text: TextSpan(
-          text: t.text,
-          style: TextStyle(
-            color: t.color.withValues(alpha: alpha),
-            fontSize: 15,
-            fontWeight: FontWeight.w700,
-            shadows: const <Shadow>[
-              Shadow(color: Color(0x99000000), blurRadius: 3),
-            ],
-          ),
-        ),
-        textDirection: TextDirection.ltr,
-      )..layout();
-      tp.paint(
+      _glyphs.paint(
         canvas,
-        t.pos.toOffset() - Offset(tp.width / 2, tp.height),
-      );
-    }
-    for (final l in _lines) {
-      if (!l.alive) continue;
-      canvas.drawLine(
-        l.from.toOffset(),
-        l.to.toOffset(),
-        Paint()
-          ..color = const Color(0xFFF6F2E6)
-              .withValues(alpha: (l.life / _lineLife).clamp(0.0, 1.0))
-          ..strokeWidth = 2.6,
-      );
-    }
-    for (final d in _dusts) {
-      if (!d.alive) continue;
-      final k = d.life / _dustLife;
-      canvas.drawCircle(
-        d.pos.toOffset(),
-        3 + 2 * k,
-        Paint()..color = const Color(0xFF8A6A4A).withValues(alpha: k.clamp(0.0, 1.0)),
-      );
-    }
-    // 扩散圆环：半径随寿命收缩 + 淡出（鎏金勾线）
-    for (final r in _rings) {
-      if (!r.alive) continue;
-      final k = (r.life / _ringLife).clamp(0.0, 1.0);
-      canvas.drawCircle(
-        r.pos.toOffset(),
-        r.radius * (1.15 - 0.15 * k),
-        Paint()
-          ..color = r.color.withValues(alpha: k)
-          ..style = PaintingStyle.stroke
-          ..strokeWidth = 3,
+        t.text,
+        t.pos.toOffset(),
+        t.color,
+        fadeOut * fadeIn,
+        _textPaint,
       );
     }
   }
@@ -310,28 +215,6 @@ class _FxText {
   Vector2 pos = Vector2.zero();
   String text = '';
   Color color = const Color(0xFFFFFFFF);
-}
-
-class _FxLine {
-  bool alive = false;
-  double life = 0;
-  Vector2 from = Vector2.zero();
-  Vector2 to = Vector2.zero();
-}
-
-class _FxDust {
-  bool alive = false;
-  double life = 0;
-  Vector2 pos = Vector2.zero();
-  Vector2 vel = Vector2.zero();
-}
-
-class _FxRing {
-  bool alive = false;
-  double life = 0;
-  Vector2 pos = Vector2.zero();
-  double radius = 60;
-  Color color = const Color(0xFFE8C470);
 }
 
 /// 怪物身上的持续状态视觉：减益状态环、妖王冲撞预警/残影、受击血条。
@@ -370,7 +253,8 @@ extension JourneyMonsterVisual on JourneyMonsterComponent {
         arcSweep,
         false,
         Paint()
-          ..color = kJourneyMonsterStateSlots[i].$2
+          ..color = kJourneyMonsterStateSlots[i]
+              .$2
               .withValues(alpha: 0.55 + 0.3 * pulse)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 3
@@ -401,15 +285,15 @@ extension JourneyMonsterVisual on JourneyMonsterComponent {
         Offset.zero,
         radius + 18,
         Paint()
-            ..color = const Color(0xFFD4593F)
-                .withValues(alpha: blink * _warningFade),
+          ..color =
+              const Color(0xFFD4593F).withValues(alpha: blink * _warningFade),
       );
       canvas.drawCircle(
         Offset.zero,
         radius + 18,
         Paint()
-          ..color = const Color(0xFFD4593F).withValues(
-              alpha: (blink + 0.2).clamp(0.0, 1.0) * _warningFade)
+          ..color = const Color(0xFFD4593F)
+              .withValues(alpha: (blink + 0.2).clamp(0.0, 1.0) * _warningFade)
           ..style = PaintingStyle.stroke
           ..strokeWidth = 2.6,
       );
@@ -420,7 +304,8 @@ extension JourneyMonsterVisual on JourneyMonsterComponent {
           Offset(-_chargeDir.x * 14 * i, -_chargeDir.y * 14 * i),
           radius * (1 - 0.18 * i),
           Paint()
-            ..color = const Color(0xFF8E2F3C).withValues(alpha: 0.4 * _dashFade),
+            ..color =
+                const Color(0xFF8E2F3C).withValues(alpha: 0.4 * _dashFade),
         );
       }
     }
@@ -433,9 +318,8 @@ extension JourneyMonsterVisual on JourneyMonsterComponent {
     if (hp <= 0 || hp >= maxHp || (!model.isBoss && _hpBarTimer <= 0)) {
       return;
     }
-    final alpha = model.isBoss
-        ? 1.0
-        : _hpBarFade * (_hpBarTimer / 0.6).clamp(0.0, 1.0);
+    final alpha =
+        model.isBoss ? 1.0 : _hpBarFade * (_hpBarTimer / 0.6).clamp(0.0, 1.0);
     final w = radius * 2.2;
     // 血条置于状态环上方留出间隙（状态环半径 radius+8、描边外沿 radius+9.5），
     // 避免灼烧槽位的弧段与血条在怪物正上方叠色盖暗。
@@ -448,10 +332,9 @@ extension JourneyMonsterVisual on JourneyMonsterComponent {
     canvas.drawRect(
       Rect.fromLTWH(rect.left, rect.top, w * (hp / maxHp), 4),
       Paint()
-        ..color = (model.isBoss
-                ? const Color(0xFFE8C470)
-                : const Color(0xFFD4593F))
-            .withValues(alpha: alpha),
+        ..color =
+            (model.isBoss ? const Color(0xFFE8C470) : const Color(0xFFD4593F))
+                .withValues(alpha: alpha),
     );
   }
 }

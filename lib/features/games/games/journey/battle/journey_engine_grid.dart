@@ -11,8 +11,12 @@ class JourneySpatialGrid {
       <int, List<JourneyMonsterComponent>>{};
 
   /// 帧首重建：死亡怪不入格（消费方另有 isDead 过滤，双保险）。
+  /// 复用已有格桶列表，只清空不丢弃，避免每帧为每个桶新建列表；
+  /// 世界坐标有限，桶数量收敛后不再分配。
   void rebuild(List<JourneyMonsterComponent> monsters) {
-    _cells.clear();
+    for (final bucket in _cells.values) {
+      bucket.clear();
+    }
     for (final m in monsters) {
       if (m.isDead) continue;
       (_cells[_keyOf(m.position)] ??= <JourneyMonsterComponent>[]).add(m);

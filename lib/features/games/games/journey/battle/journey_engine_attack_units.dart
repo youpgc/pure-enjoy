@@ -44,9 +44,6 @@ class JourneyAttackUnits extends Component {
   final List<JourneyAttackUnit> units = <JourneyAttackUnit>[];
   final List<JourneyAttackShot> shots = <JourneyAttackShot>[];
 
-  /// 光束闪光视觉委托：分槽状态、逐帧衰减与扇形绘制由独立视觉组件承载。
-  final JourneyAttackBeamFx beamFx = JourneyAttackBeamFx();
-
   /// 领域驻留计时：每只怪在每个领域单位内的连续驻留秒数（离场清零），
   /// 用于计算驻留伤害倍率——驻留越久伤害越高。
   /// 按单位 code + 怪物实例双键，避免两件领域互相串。
@@ -80,7 +77,6 @@ class JourneyAttackUnits extends Component {
       ..clear()
       ..addAll(game._buildAttackUnits());
     shots.clear();
-    beamFx.clear();
     _fieldDwell.clear();
     _fieldTick.clear();
     _magnetApplied = 0;
@@ -116,7 +112,6 @@ class JourneyAttackUnits extends Component {
   /// 仍存活的怪，避免并行单位先手击杀导致环绕判定被旁路。
   void step(double dt) {
     if (dt <= 0 || game._ended || game._pendingLevelUps > 0) return;
-    beamFx.update(dt);
 
     for (final unit in units) {
       switch (unit.kind) {
@@ -162,8 +157,9 @@ class JourneyAttackUnits extends Component {
   }
 
   /// 脉冲扩散半径相对武器臂长的比例（默认 0.3），后台可配。
-  double get _fieldPulseRadiusRatio =>
-      game.battleNum('weapon', 'field_pulse_radius_ratio', 0.3).clamp(0.01, 5.0);
+  double get _fieldPulseRadiusRatio => game
+      .battleNum('weapon', 'field_pulse_radius_ratio', 0.3)
+      .clamp(0.01, 5.0);
 
   /// 领域范围 = 武器臂展长度；臂展缺失时用内置兜底。
   double get _fieldRadius => game.weaponArm?.outerRadius ?? 120.0;
@@ -235,7 +231,8 @@ class JourneyAttackUnits extends Component {
 
   /// 弹道轨初始特效灼烧：按该单位分级伤害的固定比例，经护甲结算。
   /// 独立 source key 不覆盖环绕驻留灼烧来源。
-  void _igniteProjectileBurn(JourneyAttackUnit unit, JourneyMonsterComponent m) {
+  void _igniteProjectileBurn(
+      JourneyAttackUnit unit, JourneyMonsterComponent m) {
     if (unit.starterEffect != 'burn' || m.isDead) return;
     m.ignite(
       source: 'attack_${unit.code}',
@@ -251,17 +248,14 @@ class JourneyAttackUnits extends Component {
   /// 环绕专属效果不触发，领域伤害不触发任何吸血或回血——吸血只发生在
   /// 武器与弹道命中链。
   ///
-  /// [mult] 为该怪当前驻留倍率（驻留越久越高）；[fromPulse] 标识这次结算
-  /// 来自周期脉冲（true）还是驻留按秒（false），仅用于受击圈反馈。
+  /// [mult] 为该怪当前驻留倍率（驻留越久越高）。
   void _hitField(
     JourneyAttackUnit unit,
     JourneyMonsterComponent m, {
     double mult = 1,
-    bool fromPulse = false,
   }) {
     if (m.isDead) return;
-    final dmg =
-        math.max(0.0, unit.valueNum) * mult * game.passiveAmpFactor;
+    final dmg = math.max(0.0, unit.valueNum) * mult * game.passiveAmpFactor;
     if (dmg <= 0) return;
     m.takeDamage(dmg, armorIgnore: 1);
     // 领域灼烧：灼烧是固定伤害、只随升级提升，按领域自身每秒伤害基准
@@ -276,16 +270,6 @@ class JourneyAttackUnits extends Component {
             game.passiveAmpFactor,
         seconds: game.battleNum('weapon', 'attack_burn_sec', 2.0),
         trueDamage: true,
-      );
-    }
-    // 受击圈提示伤害来源：按脉冲节拍出现，驻留结算不画避免刷屏。
-    if (fromPulse && !m.isDead) {
-      game.fxLayer.spawnRing(
-        m.position,
-        m.radius + 4,
-        color: unit.kind == 'magnet'
-            ? const Color(0xFF7FA8D8)
-            : const Color(0xFFE8703A),
       );
     }
   }
@@ -420,8 +404,13 @@ class JourneyAttackUnits extends Component {
           }
         }
       }
-      final candidates =
-          game.spatialGrid.queryRange(s.pos, 64);
+      game.fxLayer.particles.spawnTrail(
+        s,
+        s.pos,
+        s.boomerang ? const Color(0xFF9AD5C8) : const Color(0xFFFFB27A),
+        s.boomerang ? 9 : 5,
+      );
+      final candidates = game.spatialGrid.queryRange(s.pos, 64);
       for (final m in candidates) {
         if (m.isDead || s.hitSet.contains(m)) continue;
         if ((m.position - s.pos).length > m.radius + 12) continue;

@@ -29,6 +29,7 @@ class JourneyBossProjectile {
   final bool homing;
   int pierce;
   final JourneyMonsterComponent? owner;
+
   /// 施法时的能力键：弹道延迟命中时仍能读到该能力的专属参数。
   final String? abilityKey;
 
@@ -61,6 +62,7 @@ class JourneyBossTelegraph {
   final double power;
   final Color color;
   final JourneyMonsterComponent? owner;
+
   /// 施法时的能力键：预警延迟落地时仍能读到该能力的专属参数。
   final String? abilityKey;
 }
@@ -90,11 +92,14 @@ class JourneyBossField {
   final double power;
   final double rawDamage;
   final Color color;
+
   /// 施法者：用于死亡时清除在途技能；与位置跟随解耦。
   final JourneyMonsterComponent? owner;
   final JourneyMonsterComponent? followOwner;
+
   /// 施法时的能力键：领域按 tick 延迟结算时仍能读到该能力的专属参数。
   final String? abilityKey;
+
   /// 领域存活时长：减速类效果按它设置玩家负面态时长，
   /// 使 prison_sec / frost_sec / mountain_sec 等逐能力配置生效。
   final double? effectDuration;
@@ -207,20 +212,27 @@ class JourneyBossSkillLayer extends Component {
     ));
   }
 
+  /// 列表变更代次：结算触发清场时递增，遍历中的循环据此中止，
+  /// 避免倒序索引因中途删改而错位；替代原来的快照拷贝与全表重复查找。
+  int _mutation = 0;
+
   /// 清空全部在途技能实体（结算/还魂时避免残留特效继续判定）。
   void clearAll() {
+    _mutation++;
     _projectiles.clear();
     _telegraphs.clear();
     _fields.clear();
+    game.fxLayer.particles.clearEmitState();
   }
 
   /// 施法者死亡时清掉它在途的弹道/预警/领域：
   /// 否则妖王被击杀后，死亡前放出的落雷/毒雾仍会命中玩家。
   void clearByOwner(JourneyMonsterComponent owner) {
+    _mutation++;
     _projectiles.removeWhere((p) => identical(p.owner, owner));
     _telegraphs.removeWhere((t) => identical(t.owner, owner));
-    _fields.removeWhere((f) =>
-        identical(f.followOwner, owner) || identical(f.owner, owner));
+    _fields.removeWhere(
+        (f) => identical(f.followOwner, owner) || identical(f.owner, owner));
   }
 
   @override
@@ -229,10 +241,12 @@ class JourneyBossSkillLayer extends Component {
     final player = game.player;
     const pr = JourneyPlayerComponent._radius;
 
-    // 快照遍历：结算可能触发护盾反震/震荡击杀施法者，进而由 clearByOwner
-    // 在遍历途中删改这三个列表。用快照迭代并按对象引用定位移除，避免索引错位。
-    for (final p in _projectiles.toList()) {
-      if (!_projectiles.any((e) => identical(e, p))) continue;
+    // 倒序遍历 + 原地删除，替代快照拷贝与全表重复查找：
+    // 结算触发清场时列表被删改，代次递增，循环即刻中止，剩余项下一帧再处理。
+    var mutation = _mutation;
+    for (var i = _projectiles.length - 1; i >= 0; i--) {
+      if (_mutation != mutation) break;
+      final p = _projectiles[i];
       if (p.homing) {
         final to = player.position - p.pos;
         if (to.length > 1) {
@@ -244,6 +258,7 @@ class JourneyBossSkillLayer extends Component {
         }
       }
       p.pos += p.vel * dt;
+      game.fxLayer.particles.spawnTrail(p, p.pos, p.color, p.radius);
       p.life -= dt;
       var consumed = p.life <= 0 ||
           p.pos.x < 0 ||
@@ -267,15 +282,17 @@ class JourneyBossSkillLayer extends Component {
           consumed = true;
         }
       }
-      if (consumed) {
-        final idx = _projectiles.indexWhere((e) => identical(e, p));
-        if (idx >= 0) _projectiles.removeAt(idx);
+      if (consumed && _mutation == mutation) {
+        _projectiles.removeAt(i);
       }
     }
 
-    for (final t in _telegraphs.toList()) {
-      if (!_telegraphs.any((e) => identical(e, t))) continue;
+    mutation = _mutation;
+    for (var i = _telegraphs.length - 1; i >= 0; i--) {
+      if (_mutation != mutation) break;
+      final t = _telegraphs[i];
       t.delay -= dt;
+      game.fxLayer.particles.emitTelegraph(t);
       if (t.delay > 0) continue;
       if ((t.pos - player.position).length <= t.radius + pr) {
         game.applyBossSkillEffect(
@@ -287,13 +304,15 @@ class JourneyBossSkillLayer extends Component {
         );
       }
       game.fxLayer.spawnRing(t.pos, t.radius, color: t.color);
-      final idx = _telegraphs.indexWhere((e) => identical(e, t));
-      if (idx >= 0) _telegraphs.removeAt(idx);
+      if (_mutation == mutation) _telegraphs.removeAt(i);
     }
 
-    for (final f in _fields.toList()) {
-      if (!_fields.any((e) => identical(e, f))) continue;
+    mutation = _mutation;
+    for (var i = _fields.length - 1; i >= 0; i--) {
+      if (_mutation != mutation) break;
+      final f = _fields[i];
       f.life -= dt;
+      game.fxLayer.particles.emitField(f);
       if (f.followOwner != null) {
         f.pos
           ..x = f.followOwner!.position.x
@@ -313,9 +332,8 @@ class JourneyBossSkillLayer extends Component {
           );
         }
       }
-      if (f.life <= 0) {
-        final idx = _fields.indexWhere((e) => identical(e, f));
-        if (idx >= 0) _fields.removeAt(idx);
+      if (f.life <= 0 && _mutation == mutation) {
+        _fields.removeAt(i);
       }
     }
   }

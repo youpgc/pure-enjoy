@@ -73,6 +73,17 @@ abstract interface class JourneyWeaponHost {
 /// - 灼烧不走命中：三路来源统一由臂展圆内驻留满阈值点燃（见 tickBurnAura）；
 /// - 维度槽操作（习得/升级/每级效果结算）。
 mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
+  /// 屏幕逻辑宽度（宿主视图）：臂展钳制与百分比展示的基准。
+  double get screenLogicalWidth {
+    final view = ui.PlatformDispatcher.instance.implicitView;
+    if (view == null) return 400;
+    return view.physicalSize.width / view.devicePixelRatio;
+  }
+
+  /// 臂展直径上限 = 屏幕逻辑宽 - 40（左右各留 20px 空余）。
+  @override
+  double get maxArmDiameter => screenLogicalWidth - 40;
+
   /// 某维度槽当前等级（未习得=0）。
   int slotLevel(String code) {
     // 装天封印：被封槽在有效期内等级按 0 计，槽定义与 UI 均不改
@@ -258,8 +269,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         game.weaponArm?.outerRadius ?? double.maxFinite,
       );
       for (final other in game.monsters) {
-        if (!other.isDead &&
-            (other.position - m.position).length <= reach) {
+        if (!other.isDead && (other.position - m.position).length <= reach) {
           other.rootTimer = 1;
         }
       }
@@ -276,12 +286,6 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         game.passiveSlotCodes.contains('huoyan_jingjing')) {
       dmg += (conditionBase ?? game.damageBaseValue) *
           game.weaponParam('huoyan_jingjing', 'elite', 0.2);
-      game.fxLayer.spawnRing(
-        m.position,
-        m.radius + 6,
-        color: const Color(0xFFFFB27A),
-      );
-      // GameAudio.instance.journeyTrigger();
     }
     // 暴击判定（§8）：率与倍率见主类字段
     final isCrit = game.critRate > 0 && game.rng.nextDouble() < game.critRate;
@@ -317,20 +321,18 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     // 幌金绳：命中按概率定身；混天绫：命中按概率把妖物拖向玩家近身
     if (!m.isDead &&
         game.effectWeapons.contains('kunxian_rope') &&
-        game.rng.nextDouble() < game.weaponParam('kunxian_rope', 'chance', 0.12)) {
+        game.rng.nextDouble() <
+            game.weaponParam('kunxian_rope', 'chance', 0.12)) {
       m.rootTimer = game.weaponParam('kunxian_rope', 'root', 1.5);
-      game.fxLayer.spawnRing(m.position, m.radius + 8,
-          color: const Color(0xFFFFE9A8));
     }
     if (!m.isDead &&
         game.effectWeapons.contains('huntian_ling') &&
-        game.rng.nextDouble() < game.weaponParam('huntian_ling', 'chance', 0.12)) {
+        game.rng.nextDouble() <
+            game.weaponParam('huntian_ling', 'chance', 0.12)) {
       final toPlayer = game.player.position - m.position;
       final drag = math.min(game.weaponParam('huntian_ling', 'drag', 90),
           toPlayer.length - m.radius - 20);
       if (drag > 0) m.applyDrag(toPlayer, drag);
-      game.fxLayer.spawnRing(m.position, m.radius + 8,
-          color: const Color(0xFFD98AD9));
     }
     // 紫金铃（扩展特效）：同一目标累计命中 hits 次引发妖火爆炸
     if (!m.isDead && game.effectWeapons.contains('zijin_ling')) {
@@ -378,8 +380,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       m.ignite(
         source: 'weapon_poison',
         burnDps: game.damageBaseValue * base * game.passiveAmpFactor,
-        seconds:
-            game.battleNum('weapon', 'poison_sec', kJourneyPoisonSeconds),
+        seconds: game.battleNum('weapon', 'poison_sec', kJourneyPoisonSeconds),
         trueDamage: true,
       );
     }
@@ -409,7 +410,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
 
   /// 暴击雷引：从受击怪出发，range 内最近 ≤targets 只其他怪各受
   /// chain 比例本击伤害（params.range/params.targets/params.chain，
-  /// 直接结算，不计暴击），并画 0.15s 白色连线。
+  /// 直接结算，不计暴击）。电弧属低频大场面反馈：仅一次波及 3 只及以上
+  /// 目标时画，单体暴击不再每击连线。
   void _lightningChain(
     JourneyFlameGame game,
     JourneyMonsterComponent from,
@@ -430,11 +432,14 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       }
     }
     if (candidates.isEmpty) return;
-    double d2(JourneyMonsterComponent m) => (m.position - from.position).length2;
+    double d2(JourneyMonsterComponent m) =>
+        (m.position - from.position).length2;
     candidates.sort((a, b) => d2(a).compareTo(d2(b)));
-    for (final m in candidates.take(targets)) {
+    final hit = candidates.take(targets).toList();
+    final showArc = hit.length >= 3;
+    for (final m in hit) {
       m.takeDamage(damage);
-      game.fxLayer.spawnLightning(from.position, m.position);
+      if (showArc) game.fxLayer.spawnLightning(from.position, m.position);
     }
   }
 
@@ -443,8 +448,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
   void _lingBurst(JourneyFlameGame game, JourneyMonsterComponent m) {
     final arm = game.weaponArm;
     if (arm == null) return;
-    final damage = game.hitDamageBase *
-        game.weaponParam('zijin_ling', 'damage', 0.6);
+    final damage =
+        game.hitDamageBase * game.weaponParam('zijin_ling', 'damage', 0.6);
     // 爆炸半径钳制在武器臂长内（以目标怪为圆心，不波及屏外目标）。
     final range = math.min(
       game.weaponParam('zijin_ling', 'range', 120),
@@ -463,5 +468,4 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
       const Color(0xFFD4593F),
     );
   }
-
 }

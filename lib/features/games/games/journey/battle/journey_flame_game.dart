@@ -1,9 +1,11 @@
 import 'dart:async' as dart_async; // 别名避开 flame 同名 Timer，经验条动画用
 import 'dart:math' as math;
+import 'dart:typed_data';
 import 'dart:ui' as ui;
 import 'package:flame/components.dart';
 import 'package:flame/experimental.dart' show Rectangle;
 import 'package:flame/game.dart';
+import 'package:flame/particles.dart';
 import 'package:flutter/material.dart' hide Colors;
 import 'package:flutter/scheduler.dart' show SchedulerBinding, SchedulerPhase;
 
@@ -43,6 +45,13 @@ part 'journey_weapon_effect_texts.dart';
 part 'journey_engine_kit.dart';
 part 'journey_engine_lifecycle.dart';
 part 'journey_engine_fx.dart';
+part 'journey_engine_fx_glyphs.dart';
+part 'journey_engine_fx_presets.dart';
+part 'journey_engine_fx_textures.dart';
+part 'journey_engine_particle_fx.dart';
+part 'journey_engine_particle_kinds.dart';
+part 'journey_engine_particle_shapes.dart';
+part 'journey_engine_visibility.dart';
 part 'journey_engine_loot.dart';
 part 'journey_engine_damage.dart';
 part 'journey_engine_shield.dart';
@@ -59,10 +68,8 @@ part 'journey_engine_curve.dart';
 part 'journey_engine_growth.dart';
 part 'journey_engine_autohunt.dart';
 
-/// 西行·Flame 对局主类。
-///
-/// 平铺大地图全向自由探索；周身环绕法宝周期收割；妖王驻守地图据点，
-/// 循罗盘找到并击杀通关。接触伤害全局 0.5s 节拍。
+/// 西行·Flame 对局主类：平铺大地图全向自由探索，环绕法宝周期收割；
+/// 妖王驻守地图据点，循罗盘击杀通关，接触伤害全局 0.5s 节拍。
 class JourneyFlameGame extends FlameGame
     with
         JourneyWeaponMixin,
@@ -81,7 +88,6 @@ class JourneyFlameGame extends FlameGame
     this.config,
     this.runtime = const JourneyLevelRuntime(),
   });
-
   final JourneyLevelModel level;
   final JourneyCharacterModel character;
   @override
@@ -103,17 +109,6 @@ class JourneyFlameGame extends FlameGame
   /// 无尽妖潮用小地图（2000）保持遭遇密度。
   double get worldSize =>
       _isEndless(this) ? 2000 : 3200 + level.levelNo * 160.0;
-
-  /// 屏幕逻辑宽度（宿主视图）：臂展钳制与百分比展示的基准。
-  double get screenLogicalWidth {
-    final view = ui.PlatformDispatcher.instance.implicitView;
-    if (view == null) return 400;
-    return view.physicalSize.width / view.devicePixelRatio;
-  }
-
-  /// 臂展直径上限 = 屏幕逻辑宽 - 40（左右各留 20px 空余）。
-  @override
-  double get maxArmDiameter => screenLogicalWidth - 40;
 
   /// 妖王据点坐标（开局确定性生成，远离出生点）。
   late final Vector2 bossPos;
@@ -386,6 +381,7 @@ class JourneyFlameGame extends FlameGame
     bossModel = _bossOfRegion(this);
     initWaveProgress(this);
 
+    await JourneyFxTextures.ensureInitialized();
     setupWorld();
 
     // 妖王首次降临延迟：留出发育窗口；每日游历/无尽妖潮无据点妖王，

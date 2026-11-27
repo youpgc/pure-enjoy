@@ -174,7 +174,6 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
           hitDamageBase * weaponParam('jinggang_zhuo', 'damage', 2.5),
         );
         target.weakenTimer = weaponParam('jinggang_zhuo', 'weak', 5);
-        fxLayer.spawnRing(target.position, 26);
         spawnFloatText(
           target.position + Vector2(0, -target.radius - 14),
           '金刚琢！',
@@ -192,7 +191,6 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
       if (_pingTimer >= period && target != null && !target.isDead) {
         _pingTimer = 0;
         target.rootTimer = weaponParam('yinyang_ping', 'root', 2.5);
-        fxLayer.spawnRing(target.position, 30);
         spawnFloatText(
           target.position + Vector2(0, -target.radius - 14),
           '入瓶！',
@@ -202,4 +200,3 @@ extension JourneyTriggerWeapons on JourneyFlameGame {
     }
   }
 }
-
