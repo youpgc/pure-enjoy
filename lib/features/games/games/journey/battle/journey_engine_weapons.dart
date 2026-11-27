@@ -258,6 +258,7 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
 
   /// 命中结算：暴击判定 → 穿刺破甲（按比例无视护甲，在 takeDamage 内
   /// 生效）→ 触发型法宝（幌金绳定身/暴击雷引闪电链）→ 吸血回复 → 击退。
+  /// 吸血与击退都只由环绕扇叶命中触发，弹道/回旋/光束共用本链但关闭两者。
   /// 灼烧不随命中点燃，统一由臂展驻留判定驱动。
   /// 暴击/特效只弹关键浮动文字（普通命中不弹字，防刷屏）。
   void _hitMonster(
@@ -266,11 +267,12 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
     double damage, {
     required double pierceIgnore,
     int knockLv = 0,
-    required int lifestealLv,
+    int lifestealLv = 0,
     required Vector2 toM,
     bool allowSignature = true,
     double? conditionBase,
     bool allowKnockback = true,
+    bool allowLifesteal = true,
   }) {
     var dmg = damage;
     // 伏魔重击（沙僧环绕专属爆发）：并行单位高频命中若也能消耗，
@@ -367,8 +369,9 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         _lingBurst(game, m);
       }
     }
-    if (lifestealLv > 0) {
-      // 吸血：按最终命中伤害（含暴击/伏魔/火眼加伤）比例回复，比例与保底
+    if (allowLifesteal && lifestealLv > 0) {
+      // 吸血只对环绕扇叶命中生效，弹道/回旋/光束经同一命中链但不回血。
+      // 按最终命中伤害（含暴击/伏魔/火眼加伤）比例回复，比例与保底
       // 走共享口径（见 lifestealHealOf）；秒窗合计钳到最大生命一定比例
       // （防多目标高频命中叠乘；禁疗由 addLifestealHeal 拦截）。
       game.addLifestealHeal(game.lifestealHealOf(dmg, lifestealLv));
