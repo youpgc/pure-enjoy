@@ -57,6 +57,7 @@ part 'journey_engine_damage.dart';
 part 'journey_engine_shield.dart';
 part 'journey_engine_execute.dart';
 part 'journey_engine_spawns.dart';
+part 'journey_engine_spawns_elite.dart';
 part 'journey_engine_spawns_pool.dart';
 part 'journey_engine_endless.dart';
 part 'journey_engine_interact.dart';

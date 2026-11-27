@@ -203,6 +203,20 @@ JourneyMonsterModel? _pickMonster(
   return candidates[game.rng.nextInt(candidates.length)];
 }
 
+/// 波次关精英供给池：严格取本关配置精英（波次怪种 ∪ 本关妖王，排除妖王），
+/// 保持本关原著怪种口径，不跨章节回落全源。精英槽怪种由配置保证为精英，
+/// 循环层混入与精英波复刷均从本池取，供给完全由关卡配置驱动。
+/// 复用生态分阶，避免低等级撞上顶阶精英。
+JourneyMonsterModel? _pickWaveElite(JourneyFlameGame game) {
+  final largeHp = game.config?.ecoEliteLargeHp ?? kJourneyEcoEliteLargeHp;
+  final local = _ecologyElitePool(
+    game.pool.where((m) => !m.isBoss).toList(),
+    game._charLv,
+    largeHp,
+  );
+  return local.isEmpty ? null : local[game.rng.nextInt(local.length)];
+}
+
 /// 生态轮换精英分阶池：按角色等级限定登场档位（小型 ≤600 / 中型
 /// ≤大型血线 / 大型 >大型血线）；大型血线由后台配置，下调后让 20 级
 /// 窗口即可遭遇高经验精英；分档后为空时回落全量精英池防死局。

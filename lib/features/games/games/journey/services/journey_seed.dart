@@ -481,7 +481,15 @@ const int kJourneyInitialPackSize = 24;
 
 /// 妖穴集中概率（journey_globals.spawn_den_ratio 镜像，0~1；
 /// 刷怪点落入 demon_den 热区的比例）。
-const double kJourneySpawnDenRatio = 0.70;
+const double kJourneySpawnDenRatio = 0.35;
+
+/// 波次关循环层精英混入比例（journey_battle_params.spawn.loop_elite_ratio
+/// 镜像）：保护期后每次循环层刷怪抽精英的概率。
+const double kJourneySpawnLoopEliteRatio = 0.18;
+
+/// 主线精英波复刷周期（journey_battle_params.spawn.elite_wave_repeat_sec
+/// 镜像）：时间轴精英波刷完后按该周期复刷。
+const double kJourneyEliteWaveRepeatSec = 45;
 
 /// 妖王天赋点掉率（journey_globals.talent_drop_rate 镜像，0~1；
 /// 末场伏诛判定命中后全账号共享天赋点池 +1；点池不设上限）。

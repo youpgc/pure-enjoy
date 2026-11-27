@@ -3,8 +3,9 @@ part of 'journey_flame_game.dart';
 /// 怪物生成与妖王据点（平铺大地图口径）：
 /// - **波次优先**：关卡配置了 journey_waves 时按时间轴刷怪（start_sec 起
 ///   每 spawn_interval_ms 刷 count 只 monster_code，该波乘 buff_mult）；
+/// - 波次关精英供给：循环层按比例混入生态精英，时间轴精英波按周期复刷；
 /// - 无波次配置回落全向兜底刷怪（探索沿途持续遭遇）；
-/// - 生成点感知密度热区：妖穴（demon_den）内集中刷怪、安全谷排除；
+/// - 生成点感知密度热区：妖穴（demon_den）内按比例集中刷怪、安全谷排除；
 /// - 妖王据点延迟降临 + 周边守卫群，降临后罗盘指引玩家前往。
 mixin JourneySpawnMixin {
   double _spawnTimer = 0;
@@ -26,6 +27,9 @@ mixin JourneySpawnMixin {
   /// 波次刷怪进度（index 对齐 game.runtime.waves）。
   final List<List<double>> _waveProgress = <List<double>>[]; // [spawned, timer]
 
+  /// 精英波复刷计时（index 对齐 game.runtime.waves；非精英波恒 0）。
+  final List<double> _eliteWaveRepeatTimers = <double>[];
+
   /// 引擎接入关卡波次配置时初始化进度表（onLoad 调一次）。
   void initWaveProgress(JourneyFlameGame game) {
     _waveProgress
@@ -33,6 +37,9 @@ mixin JourneySpawnMixin {
       ..addAll(<List<double>>[
         for (final _ in game.runtime.waves) <double>[0, 0],
       ]);
+    _eliteWaveRepeatTimers
+      ..clear()
+      ..addAll(<double>[for (final _ in game.runtime.waves) 0]);
   }
 
   void updateSpawns(JourneyFlameGame game, double dt) {
@@ -85,9 +92,15 @@ mixin JourneySpawnMixin {
       final prog = _waveProgress.isEmpty ? null : _waveProgress[i];
       if (prog == null) return false;
       // 循环层不消费 count（种子置 1 占位），恒不判完成；
-      // 时间轴波计数达成后跳过
-      if (!wave.loop && prog[0] >= wave.count) continue;
-      allDone = false;
+      // 时间轴精英波刷完后按周期复刷，其余波计数达成后跳过
+      if (!wave.loop && prog[0] >= wave.count) {
+        final repeat = _eliteRepeatState(
+          game, wave, _eliteWaveRepeatTimers, i, prog, dt);
+        if (repeat != _EliteRepeat.replayed) continue;
+        allDone = false;
+      } else {
+        allDone = false;
+      }
 
       prog[1] += dt;
       final interval = (wave.spawnIntervalMs / 1000.0).clamp(0.05, 10.0);
@@ -102,17 +115,19 @@ mixin JourneySpawnMixin {
           prog[0] = wave.count.toDouble();
           break;
         }
-        // 保护期内波次指定的强怪回落普通怪，避免开局被打断发育
+        // 保护期内精英、妖王与高血「伪普通」怪回落低阶小妖，
+        // 波次指定的普通怪保留原怪种；保护期后循环层按比例混入生态精英。
         final protectSec =
             (game.config?.earlyGameProtectSec ?? kJourneyEarlyGameProtectSec)
                 .toDouble();
-        // 保护期内精英、妖王与高血「伪普通」怪都回落低阶小妖，
-        // 保证开局先拿到经验池再面对强度压力
         final early = game._elapsed < protectSec;
-        final spawnModel =
-            (early && (model.isElite || model.isBoss || model.baseHp > 200))
+        final spawnModel = early
+            ? ((model.isElite || model.isBoss || model.baseHp > 200)
                 ? (_pickMonster(game, allowElite: false) ?? model)
-                : model;
+                : model)
+            : (wave.loop && _rollLoopElite(game)
+                ? (_pickWaveElite(game) ?? model)
+                : model);
         spawnMonsterAt(
           game,
           spawnModel,
@@ -125,14 +140,7 @@ mixin JourneySpawnMixin {
     return allDone;
   }
 
-  JourneyMonsterModel? _modelOf(JourneyFlameGame game, String code) {
-    for (final m in game.pool) {
-      if (m.code == code) return m;
-    }
-    return null;
-  }
-
-  /// 生成点：感知密度热区——妖穴内集中（70% 概率），安全谷排除；
+  /// 生成点：感知密度热区——妖穴内按比例集中，安全谷排除；
   /// 无热区时回落玩家活动环带。
   Vector2 _spawnPosition(JourneyFlameGame game) {
     final size = game.worldSize;
@@ -146,7 +154,7 @@ mixin JourneySpawnMixin {
     Vector2 pick() {
       // 妖穴集中概率走 journey_globals.spawn_den_ratio（0~1，后台可调；
       // 调低=玩家沿途遭遇更均匀）
-      final denRatio = game.config?.spawnDenRatio ?? 0.70;
+      final denRatio = game.config?.spawnDenRatio ?? kJourneySpawnDenRatio;
       if (dens.isNotEmpty && game.rng.nextDouble() < denRatio) {
         final z = dens[game.rng.nextInt(dens.length)];
         final a = game.rng.nextDouble() * math.pi * 2;
