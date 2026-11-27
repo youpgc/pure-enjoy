@@ -108,7 +108,8 @@ class JourneyMonsterComponent extends PositionComponent
   bool _aggro = false;
 
   /// 环绕扇叶命中豁免：每个扇叶对同一怪独立计时，互不共享。
-  /// 扇叶命中后，其伤害与由命中触发的效果在同一窗口内不再结算。
+  /// 扇叶命中后，其伤害与命中附着的吸血/淬毒/乾坤等效果在同一窗口内不再结算；
+  /// 击退物理位移由按目标的 [knockbackCd] 单独节流。
   final List<double> bladeHitCds =
       List<double>.filled(kJourneyMaxBlades, 0);
 
@@ -116,6 +117,10 @@ class JourneyMonsterComponent extends PositionComponent
   /// 槽位由 [_attackUnitSlot] 映射；同形态仍按 0.3s 去重。
   final List<double> attackUnitCds =
       List<double>.filled(kAttackUnitSlotCount, 0);
+
+  /// 击退按目标冷却：环绕扇叶命中触发击退后，该怪在窗口内不再被击退。
+  /// 与逐扇叶伤害豁免独立，避免多扇叶各自触发击退把目标反复弹开。
+  double knockbackCd = 0;
 
   /// 血条显示剩余时间：受击刷新，超时渐隐（妖王血条常显不受此控）。
   double _hpBarTimer = 0;
@@ -263,6 +268,7 @@ class JourneyMonsterComponent extends PositionComponent
       }
     }
     bladeHitCds.tickBladeHits(dt);
+    if (knockbackCd > 0) knockbackCd = math.max(0.0, knockbackCd - dt);
     for (var i = 0; i < attackUnitCds.length; i++) {
       if (attackUnitCds[i] > 0) {
         attackUnitCds[i] -= dt;

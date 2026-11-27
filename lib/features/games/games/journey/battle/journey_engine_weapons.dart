@@ -402,7 +402,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
         trueDamage: true,
       );
     }
-    if (knockLv > 0 || game.player.bonusKnockback > 0) {
+    if ((knockLv > 0 || game.player.bonusKnockback > 0) &&
+        m.knockbackCd <= 0) {
       var kb = game.slotValue('knockback', 16) * knockLv +
           game.player.bonusKnockback; // 击退槽 + 飞龙宝杖被动加成
       // 铜皮铁骨（bajie 特殊能力）：受击窗口内击退强度放大
@@ -417,6 +418,8 @@ mixin JourneyWeaponMixin on FlameGame implements JourneyWeaponHost {
             m.model.hasAbility('unmovable') ? 0.8 : 0,
           );
       m.applyKnockback(toM, kb);
+      // 抗击退把距离抵消到 0 时不计入冷却，避免吞掉窗口内后续有效击退。
+      if (kb > 0) m.knockbackCd = game.knockbackHitCd;
     }
   }
 

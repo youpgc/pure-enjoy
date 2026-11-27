@@ -53,6 +53,12 @@ int? bladeAngleHit({
 extension JourneyBladeHitConfig on JourneyFlameGame {
   double get bladeHitCd =>
       battleNum('weapon', 'hit_cd', 0.3).clamp(0.0, kJourneyBladeHitCdMaxSec);
+
+  /// 击退按目标冷却：后台 weapon.knockback_cd 可配，缺省 0.3 秒。
+  /// 独立于逐扇叶命中豁免，保证同一目标在窗口内只被击退一次。
+  double get knockbackHitCd =>
+      battleNum('weapon', 'knockback_cd', 0.3)
+          .clamp(0.0, kJourneyBladeHitCdMaxSec);
 }
 
 /// 可击破参照物同样按扇叶持有独立豁免，避免同一扇叶在窗口内重复扣血。
